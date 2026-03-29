@@ -229,15 +229,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setIsAiLoading(true)
 
     try {
-      // TODO: 调用 opencode server API
-      // 这里模拟 AI 响应
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const messages = [
+        ...aiMessages,
+        { role: 'user' as const, content: userMessage },
+      ]
+
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, sessionId, demoId }),
+      })
+
+      if (!response.ok) {
+        throw new Error('AI 请求失败')
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error.message || 'AI 请求失败')
+      }
+
+      const assistantContent = data.choices?.[0]?.message?.content || '抱歉，我没有收到有效的回复。'
 
       setAiMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `收到指令: "${userMessage}"。\n\n（此处应调用 opencode server 处理）`,
+          content: assistantContent,
         },
       ])
     } catch (error) {
@@ -246,6 +265,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         description: error instanceof Error ? error.message : '未知错误',
         variant: 'destructive',
       })
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
+        },
+      ])
     } finally {
       setIsAiLoading(false)
     }
@@ -391,7 +417,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                     value={editorContent}
                     onChange={(e) => handleEditorChange(e.target.value)}
                     spellCheck={false}
-                    className="w-full h-full p-4 resize-none outline-none font-mono text-sm bg-background text-foreground"
+                    className="w-full h-full p-4 resize-none outline-none font-mono text-sm bg-zinc-900 text-zinc-100"
                     style={{ tabSize: 2 }}
                     placeholder={`${'=== DEMO CODE ==='}\n// 在此处粘贴 React 组件代码\n\n${'=== DEMO SCHEMA ==='}\n// 在此处粘贴 JSON Schema 配置\n\n${'=== END ==='}`}
                   />

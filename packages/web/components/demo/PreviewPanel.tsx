@@ -1,6 +1,6 @@
 'use client';
 
-import { Sandpack, SandpackPreview } from '@codesandbox/sandpack-react';
+import { SandpackProvider, SandpackLayout, SandpackPreview } from '@codesandbox/sandpack-react';
 import type { PreviewPanelProps } from './types';
 
 export function PreviewPanel({
@@ -25,23 +25,31 @@ export default function App() {
 
   return (
     <div className={className || 'h-full w-full'}>
-      <Sandpack
+      <SandpackProvider
         template="react-ts"
         files={files}
-        options={{
-          showNavigator: false,
-          showTabs: false,
-          showLineNumbers: true,
-          showInlineErrors: true,
-          wrapContent: true,
-          editorHeight: '100%',
-          classes: {
-            'sp-wrapper': 'h-full',
-            'sp-layout': 'h-full',
-            'sp-stack': 'h-full',
+        customSetup={{
+          dependencies: {
+            'react': '^18.0.0',
+            'react-dom': '^18.0.0',
           },
         }}
-      />
+        theme={{
+          colors: {
+            surface1: '#ffffff',
+            surface2: '#f7f7f7',
+            surface3: '#e8e8e8',
+          },
+        }}
+      >
+        <SandpackLayout>
+          <SandpackPreview
+            showNavigator={false}
+            showRefreshButton={true}
+            style={{ height: '100%', width: '100%' }}
+          />
+        </SandpackLayout>
+      </SandpackProvider>
     </div>
   );
 }
