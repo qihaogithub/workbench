@@ -43,6 +43,8 @@ export type ErrorCode =
   | 'SESSION_EXPIRED'
   | 'VALIDATION_ERROR';
 
+export type ErrorCodeType = ErrorCode;
+
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   DEMO_NOT_FOUND: 'Demo 不存在',
   SESSION_NOT_FOUND: 'Session 不存在',

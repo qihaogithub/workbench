@@ -1,15 +1,16 @@
 import useSWR, { mutate } from 'swr'
-import type { DemoMeta, ApiResponse } from '@opencode-workbench/shared'
-import { getMockDemos, createMockDemo, deleteMockDemo } from './mock-api'
+import type { DemoMeta, ApiResponse, DemoFiles, SessionMeta } from '@opencode-workbench/shared'
 
-type Fetcher<T> = () => Promise<ApiResponse<T>>
+// 真实 API 调用
+const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
+  const res = await fetch(url)
+  return res.json()
+}
 
-const defaultFetcher: Fetcher<DemoMeta[]> = getMockDemos
-
-export function useDemos(fetcher: Fetcher<DemoMeta[]> = defaultFetcher) {
+export function useDemos() {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     '/api/demos',
-    fetcher,
+    () => fetcher<DemoMeta[]>('/api/demos'),
     {
       revalidateOnFocus: false,
     }
@@ -26,17 +27,12 @@ export function useDemos(fetcher: Fetcher<DemoMeta[]> = defaultFetcher) {
   }
 }
 
-export async function createDemo(
-  name: string,
-  useMock: boolean = true
-): Promise<ApiResponse<DemoMeta>> {
-  const response = useMock
-    ? await createMockDemo(name)
-    : await fetch('/api/demos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      }).then((res) => res.json())
+export async function createDemo(name: string): Promise<ApiResponse<DemoMeta>> {
+  const response = await fetch('/api/demos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  }).then((res) => res.json())
 
   if (response.success) {
     mutate('/api/demos')
@@ -45,19 +41,50 @@ export async function createDemo(
   return response
 }
 
-export async function deleteDemo(
-  id: string,
-  useMock: boolean = true
-): Promise<ApiResponse<void>> {
-  const response = useMock
-    ? await deleteMockDemo(id)
-    : await fetch(`/api/demos/${id}`, {
-        method: 'DELETE',
-      }).then((res) => res.json())
+export async function deleteDemo(id: string): Promise<ApiResponse<void>> {
+  const response = await fetch(`/api/demos/${id}`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
 
   if (response.success) {
     mutate('/api/demos')
   }
 
   return response
+}
+
+// Session API
+export async function createSession(demoId: string): Promise<ApiResponse<SessionMeta>> {
+  return fetch('/api/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ demoId }),
+  }).then((res) => res.json())
+}
+
+export async function getSessionFiles(sessionId: string): Promise<ApiResponse<DemoFiles>> {
+  return fetch(`/api/sessions/${sessionId}/files`).then((res) => res.json())
+}
+
+export async function saveSessionFiles(
+  sessionId: string,
+  files: DemoFiles
+): Promise<ApiResponse<void>> {
+  return fetch(`/api/sessions/${sessionId}/files`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(files),
+  }).then((res) => res.json())
+}
+
+export async function mergeSession(sessionId: string): Promise<ApiResponse<void>> {
+  return fetch(`/api/sessions/${sessionId}/merge`, {
+    method: 'POST',
+  }).then((res) => res.json())
+}
+
+export async function deleteSession(sessionId: string): Promise<ApiResponse<void>> {
+  return fetch(`/api/sessions/${sessionId}`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
 }

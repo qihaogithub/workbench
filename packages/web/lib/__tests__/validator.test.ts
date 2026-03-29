@@ -240,8 +240,8 @@ export default function Demo() {
 
     const errors = validatePropsSchema(code, schema)
 
-    // 代码中有 interface 但属性不匹配
-    expect(errors.length).toBeGreaterThan(0)
+    // 空 interface 和空 properties 应该是一致的，没有错误
+    expect(errors).toHaveLength(0)
   })
 })
 

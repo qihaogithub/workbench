@@ -77,22 +77,27 @@ function extractPropsFromCode(code: string): string[] | null {
 function extractPropsFromDestructuring(code: string): string[] | null {
   // 匹配函数组件的解构赋值
   const patterns = [
-    /function\s+\w+\s*\(\s*\{\s*([^}]+)\s*\}/,
-    /const\s+\w+\s*=\s*\(\s*\{\s*([^}]+)\s*\}\s*\)/,
-    /export\s+default\s+function\s+\w+\s*\(\s*\{\s*([^}]+)\s*\}/,
+    /function\s+\w+\s*\(\s*\{([^}]*)\}/,
+    /const\s+\w+\s*=\s*\(\s*\{([^}]*)\}\s*\)/,
+    /export\s+default\s+function\s+\w+\s*\(\s*\{([^}]*)\}/,
   ];
 
   for (const pattern of patterns) {
     const match = code.match(pattern);
     if (match) {
       const destructured = match[1];
-      // 提取属性名，支持默认值（如：title = 'default'）
-      const propPattern = /(\w+)(?:\s*[=:]|\s*$)/g;
+      // 提取属性名，支持默认值（如：title = 'default'）和类型注解
+      // 匹配: propName, propName = default, propName?: type, propName: type
+      const propPattern = /(\w+)(?:\??:?[^,=]*)?(?:\s*=\s*[^,]+)?/g;
       const props: string[] = [];
       let propMatch;
 
       while ((propMatch = propPattern.exec(destructured)) !== null) {
-        props.push(propMatch[1]);
+        const propName = propMatch[1];
+        // 排除 TypeScript 关键字和空字符串
+        if (propName && !['type', 'interface', 'const', 'let', 'var'].includes(propName)) {
+          props.push(propName);
+        }
       }
 
       if (props.length > 0) {

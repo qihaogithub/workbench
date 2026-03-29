@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { PreviewPanel, ConfigForm } from '@/components/demo'
-import { parseFigmaText, buildFigmaText } from '@/lib/parser'
-import { validateAll, ValidationResult, getDefaultValues } from '@/lib/validator'
-import { Button } from '@/src/components/ui/button'
-import { useToast } from '@/src/components/ui/toast-provider'
+import { PreviewPanel, ConfigForm } from '../../../../../components/demo'
+import { parseFigmaText, buildFigmaText } from '../../../../../lib/parser'
+import { validateAll, ValidationResult, getDefaultValues } from '../../../../../lib/validator'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface DemoEditPageProps {
   params: {
@@ -327,7 +327,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       <div className="text-4xl mb-2">🤖</div>
                       <p className="text-sm">输入自然语言指令，AI 将帮您修改代码</p>
                       <p className="text-xs mt-2 text-muted-foreground">
-                        例如："把标题改成轮播图"、"添加一个按钮组件"
+                        例如：&quot;把标题改成轮播图&quot;、&quot;添加一个按钮组件&quot;
                       </p>
                     </div>
                   )}
@@ -400,7 +400,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                 {/* 错误提示区 */}
                 {validationResult.errors.length > 0 && (
                   <div className="max-h-32 overflow-y-auto border-t bg-destructive/10">
-                    {validationResult.errors.map((error: { type: string; message: string }, index: number) => (
+                    {validationResult.errors.map((error: { type: string; message: string; line?: number }, index: number) => (
                       <div
                         key={index}
                         className="px-4 py-2 text-xs border-b border-destructive/20 last:border-b-0"
