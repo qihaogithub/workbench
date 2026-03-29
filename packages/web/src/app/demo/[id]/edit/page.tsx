@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { PreviewPanel, ConfigForm } from '@/components/demo'
 import { parseFigmaText, buildFigmaText } from '@/lib/parser'
 import { validateAll, ValidationResult, getDefaultValues } from '@/lib/validator'
-import { Button } from '@/components/ui/button'
-import { toast } from '@/components/ui/toast'
+import { Button } from '@/src/components/ui/button'
+import { useToast } from '@/src/components/ui/toast-provider'
 
 interface DemoEditPageProps {
   params: {
@@ -19,6 +19,7 @@ type ActiveTab = 'ai' | 'code'
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter()
   const { id: demoId } = params
+  const { toast } = useToast()
 
   // 当前代码和 Schema
   const [code, setCode] = useState('')
@@ -399,7 +400,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                 {/* 错误提示区 */}
                 {validationResult.errors.length > 0 && (
                   <div className="max-h-32 overflow-y-auto border-t bg-destructive/10">
-                    {validationResult.errors.map((error, index) => (
+                    {validationResult.errors.map((error: { type: string; message: string }, index: number) => (
                       <div
                         key={index}
                         className="px-4 py-2 text-xs border-b border-destructive/20 last:border-b-0"
