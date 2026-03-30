@@ -61,11 +61,17 @@ async function readSSEStream(
     const response = await fetch(url, {
       method: 'GET',
       signal: controller.signal,
-      headers: { 'Accept': 'text/event-stream' },
+      headers: { 
+        'Accept': 'text/event-stream',
+        'x-session-id': sessionId
+      },
     });
 
+    console.log('[SSE] Response status:', response.status);
+    console.log('[SSE] Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`SSE stream error: ${response.status}`);
+      throw new Error(`SSE stream error: ${response.status} ${response.statusText}`);
     }
 
     const reader = response.body?.getReader();
@@ -78,9 +84,15 @@ async function readSSEStream(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      
+      if (done) {
+        console.log('[SSE] Stream completed');
+        break;
+      }
 
-      buffer += new TextDecoder().decode(value, { stream: true });
+      const decodedValue = new TextDecoder().decode(value, { stream: true });
+      console.log('[SSE] Raw chunk received:', JSON.stringify(decodedValue));
+      buffer += decodedValue;
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
@@ -93,13 +105,19 @@ async function readSSEStream(
 
         if (key === 'data') {
           if (val) {
+            console.log('[SSE] Raw data:', val); // 添加详细日志
             try {
               const data = JSON.parse(val);
+              console.log('[SSE] Parsed data:', JSON.stringify(data, null, 2)); // 解析后的日志
+              
+              // 处理不同类型的消息事件
               if (lastEventType === 'message' || lastEventType === 'text') {
                 if (data.type === 'text' && data.text) {
+                  console.log('[SSE] Extracting text from data.type:', data.text);
                   onMessage(data.text);
                 }
                 if (data.content || data.text) {
+                  console.log('[SSE] Extracting content/text:', data.content || data.text);
                   onMessage(data.content || data.text);
                 }
               }
@@ -107,15 +125,29 @@ async function readSSEStream(
                 if (data.parts) {
                   for (const part of data.parts) {
                     if (part.type === 'text' && part.text) {
+                      console.log('[SSE] Extracting from parts:', part.text);
                       onMessage(part.text);
                     }
                   }
                 }
               }
+              // 处理 assistant 直接返回的消息
+              if (data.choices && Array.isArray(data.choices)) {
+                const choice = data.choices[0];
+                if (choice?.message?.content) {
+                  console.log('[SSE] Extracting from choices:', choice.message.content);
+                  onMessage(choice.message.content);
+                }
+              }
+              if (data.delta !== undefined && typeof data.delta === 'string') {
+                console.log('[SSE] Extracting delta:', data.delta);
+                onMessage(data.delta);
+              }
               if (lastEventType === 'done') {
                 return;
               }
-            } catch {
+            } catch (e) {
+              console.error('[SSE] Failed to parse JSON:', e);
               onMessage(val);
             }
           }
@@ -131,6 +163,8 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   let isStreamClosed = false;
 
+  console.log('[AI Chat] Received request');
+
   const stream = new ReadableStream({
     async start(controller) {
       try {
@@ -141,14 +175,19 @@ export async function POST(request: NextRequest) {
           demoId: string;
         };
 
+        console.log('[AI Chat] Request body:', { messages: messages.length, sessionId: existingSessionId, demoId });
+
         if (!messages || !Array.isArray(messages)) {
+          console.error('[AI Chat] Missing messages');
           controller.enqueue(encoder.encode(JSON.stringify({ error: { message: 'messages is required' } }) + '\n'));
           controller.close();
           return;
         }
 
         const health = await checkOpenCodeServerHealth();
+        console.log('[AI Chat] OpenCode Server health:', health);
         if (!health.healthy) {
+          console.error('[AI Chat] OpenCode Server unavailable:', OPENCODE_SERVER_URL);
           controller.enqueue(encoder.encode(JSON.stringify({
             error: { message: `OpenCode Server 未运行 (${OPENCODE_SERVER_URL})` }
           }) + '\n'));
@@ -159,21 +198,24 @@ export async function POST(request: NextRequest) {
         let sessionId = existingSessionId;
 
         if (!sessionId) {
+          console.log('[AI Chat] Creating new session...');
           const sessionRes = await fetch(`${OPENCODE_SERVER_URL}/session`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: `Demo: ${demoId}` }),
           });
-
+        
           if (!sessionRes.ok) {
             const errorText = await sessionRes.text();
-            controller.enqueue(encoder.encode(JSON.stringify({ error: { message: `创建 Session 失败: ${errorText}` } }) + '\n'));
+            console.error('[AI Chat] Failed to create session:', errorText);
+            controller.enqueue(encoder.encode(JSON.stringify({ error: { message: `创建 Session 失败：${errorText}` } }) + '\n'));
             controller.close();
             return;
           }
 
           const sessionData = await sessionRes.json();
           sessionId = sessionData.id;
+          console.log('[AI Chat] Session created:', sessionId);
           controller.enqueue(encoder.encode(JSON.stringify({ sessionId }) + '\n'));
         }
 
@@ -195,8 +237,11 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify(messageBody),
         });
 
+        console.log('[AI Chat] Message sent, status:', response.status);
+
         if (!response.ok) {
           const errorText = await response.text();
+          console.error('[AI Chat] Message API error:', errorText);
           controller.enqueue(encoder.encode(JSON.stringify({ error: { message: `API error: ${errorText}` } }) + '\n'));
           controller.close();
           return;
@@ -205,18 +250,26 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(JSON.stringify({ status: 'waiting_for_response' }) + '\n'));
 
         let fullResponse = '';
+        
+        // 监听 session 的事件流
+        const eventUrl = `${OPENCODE_SERVER_URL}/session/${sessionId!}/event`;
+        console.log('[AI Chat] Listening to SSE stream:', eventUrl);
+        
         await readSSEStream(
-          `${OPENCODE_SERVER_URL}/global/event`,
+          eventUrl,
           sessionId!,
           (content) => {
+            console.log('[AI Chat] Received content:', content.substring(0, 50));
             if (!isStreamClosed) {
               try {
                 controller.enqueue(encoder.encode(JSON.stringify({ delta: content }) + '\n'));
                 fullResponse += content;
-              } catch {
+              } catch (error) {
+                console.error('[AI Chat] Error enqueueing content:', error);
               }
             }
-          }
+          },
+          120000 // 增加到 2 分钟超时
         );
 
         if (!isStreamClosed) {
@@ -229,6 +282,7 @@ export async function POST(request: NextRequest) {
           controller.close();
         }
       } catch (error) {
+        console.error('[AI Chat] Error:', error);
         if (!isStreamClosed) {
           controller.enqueue(encoder.encode(JSON.stringify({
             error: { message: error instanceof Error ? error.message : 'Unknown error' }

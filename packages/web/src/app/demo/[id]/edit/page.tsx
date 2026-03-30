@@ -228,18 +228,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setAiMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setIsAiLoading(true)
 
-    let currentSessionId = sessionId
-
     try {
       const messages = [
         ...aiMessages,
         { role: 'user' as const, content: userMessage },
       ]
 
+      // 不传 sessionId，让 AI API 自动创建新的 Opencode Server Session
+      // 这样可以避免本地 Session ID 和 Opencode Session ID 混淆
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, sessionId, demoId }),
+        body: JSON.stringify({ 
+          messages, 
+          sessionId: undefined, // 关键：不传本地 sessionId
+          demoId 
+        }),
       })
 
       if (!response.ok) {
@@ -279,12 +283,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           try {
             const data = JSON.parse(line)
 
-            if (data.sessionId && !currentSessionId) {
-              currentSessionId = data.sessionId
-              setSessionId(data.sessionId)
-            }
-
+            // 不再更新 sessionId，因为已经使用了页面加载时的 sessionId
             if (data.error) {
+              console.error('[AI Chat] Error from server:', data.error);
               throw new Error(data.error.message || 'AI 请求失败')
             }
 
@@ -299,9 +300,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               )
             }
 
-            if (data.done && data.sessionId) {
-              currentSessionId = data.sessionId
-              setSessionId(data.sessionId)
+            if (data.done) {
+              // 收到完成信号，不需要更新 sessionId
             }
           } catch (parseError) {
           }
