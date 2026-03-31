@@ -8,7 +8,7 @@ import { MainLayout } from '@/components/layout/main-layout'
 import { PreviewPanel, ConfigForm } from '../../../../components/demo'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
-import { getDefaultValues } from '../../../../lib/validator'
+import { getDefaultValues, getPreviewSize } from '../../../../lib/validator'
 
 interface DemoUsePageProps {
   params: {
@@ -24,6 +24,7 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
   const [code, setCode] = useState('')
   const [schema, setSchema] = useState('')
   const [configData, setConfigData] = useState<Record<string, unknown>>({})
+  const [previewSize, setPreviewSize] = useState<import('../../../../components/demo/types').PreviewSize>()
   const [isLoading, setIsLoading] = useState(true)
   const [demoName, setDemoName] = useState('')
 
@@ -79,6 +80,10 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
         // 初始化默认值
         const defaults = getDefaultValues(loadedSchema)
         setConfigData(defaults)
+
+        // 解析预览尺寸配置
+        const size = getPreviewSize(loadedSchema)
+        setPreviewSize(size)
 
         // 4. 清理临时 Session（使用页面不需要保持 Session）
         await fetch(`/api/sessions/${sessionData.data.sessionId}`, {
@@ -142,7 +147,7 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
         {/* 左侧：预览区 */}
         <div className="w-2/3 p-4 bg-muted/50">
           <div className="h-full border rounded-lg overflow-hidden bg-white">
-            <PreviewPanel code={code} configData={configData} />
+            <PreviewPanel code={code} configData={configData} previewSize={previewSize} />
           </div>
         </div>
 

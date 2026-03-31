@@ -1,7 +1,25 @@
 'use client';
 
 import { SandpackProvider, SandpackLayout, SandpackPreview } from '@codesandbox/sandpack-react';
-import type { PreviewPanelProps } from './types';
+import type { PreviewPanelProps, PreviewSize } from './types';
+
+function buildPreviewStyle(size?: PreviewSize): React.CSSProperties {
+  if (!size) {
+    return { height: '100%', minHeight: '400px', width: '100%' };
+  }
+
+  const style: React.CSSProperties = {
+    width: size.width ?? '100%',
+    height: size.height ?? '100%',
+    minHeight: size.minHeight ?? '400px',
+  };
+
+  if (size.maxHeight !== undefined) {
+    style.maxHeight = size.maxHeight;
+  }
+
+  return style;
+}
 
 export function PreviewPanel({
   code,
@@ -9,6 +27,7 @@ export function PreviewPanel({
   sdkFiles,
   onError,
   className,
+  previewSize,
 }: PreviewPanelProps) {
   const entryCode = `
 import Demo from './Demo';
@@ -22,6 +41,8 @@ export default function App() {
     '/App.tsx': entryCode,
     ...sdkFiles,
   };
+
+  const previewStyle = buildPreviewStyle(previewSize);
 
   return (
     <div className={className || 'h-full w-full'}>
@@ -46,7 +67,7 @@ export default function App() {
           <SandpackPreview
             showNavigator={false}
             showRefreshButton={true}
-            style={{ height: '100%', width: '100%' }}
+            style={previewStyle}
           />
         </SandpackLayout>
       </SandpackProvider>

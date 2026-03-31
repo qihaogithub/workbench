@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createEditSession } from '@/lib/session-manager';
-import { listDemos, createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { createEditSession, findActiveSession } from '@/lib/session-manager';
+import { listDemos, createApiSuccess, createApiError, getSessionFiles } from '@/lib/fs-utils';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { demoId } = body;
-    
+
     if (!demoId || typeof demoId !== 'string') {
       return NextResponse.json(
         createApiError('INVALID_REQUEST', 'demoId 参数必填'),
         { status: 400 }
       );
     }
-    
+
+    const activeSessionId = findActiveSession(demoId);
+    if (activeSessionId) {
+      const files = getSessionFiles(activeSessionId);
+      if (files) {
+        return NextResponse.json(createApiSuccess({
+          sessionId: activeSessionId,
+          code: files.code,
+          schema: files.schema,
+        }));
+      }
+    }
+
     const result = await createEditSession(demoId);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {

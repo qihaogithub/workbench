@@ -20,6 +20,36 @@ export interface CreateSessionResult {
   schema: string;
 }
 
+export function findActiveSession(demoId: string): string | null {
+  const sessionsDir = getSessionsDir();
+  if (!fs.existsSync(sessionsDir)) {
+    return null;
+  }
+
+  try {
+    const entries = fs.readdirSync(sessionsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const metaPath = path.join(sessionsDir, entry.name, '.session.json');
+      if (!fs.existsSync(metaPath)) continue;
+
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        if (meta.demoId === demoId && Date.now() <= meta.expiresAt) {
+          return meta.sessionId;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export async function createEditSession(demoId: string): Promise<CreateSessionResult> {
   if (!demoExists(demoId)) {
     throw new Error(`Demo "${demoId}" 不存在`);

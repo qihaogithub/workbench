@@ -3,6 +3,8 @@
  * 用于校验 JSON Schema 语法和 Props 与 Schema 的一致性
  */
 
+import type { PreviewSize } from '../components/demo/types';
+
 export interface ValidationError {
   type: 'json_syntax' | 'props_mismatch' | 'required_missing' | 'interface_not_found';
   message: string;
@@ -295,5 +297,44 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
     return defaults;
   } catch {
     return {};
+  }
+}
+
+/**
+ * 从 Schema 的 ui:options 中解析预览尺寸配置
+ * @param schema JSON Schema 字符串
+ * @returns 预览尺寸配置，如果未定义则返回 undefined
+ */
+export function getPreviewSize(schema: string): PreviewSize | undefined {
+  try {
+    const parsed = JSON.parse(schema);
+
+    if (parsed.ui?.options?.preview) {
+      const preview = parsed.ui.options.preview;
+
+      const size: PreviewSize = {};
+
+      if (preview.width !== undefined) {
+        size.width = preview.width;
+      }
+      if (preview.height !== undefined) {
+        size.height = preview.height;
+      }
+      if (preview.minHeight !== undefined) {
+        size.minHeight = preview.minHeight;
+      }
+      if (preview.maxHeight !== undefined) {
+        size.maxHeight = preview.maxHeight;
+      }
+      if (preview.scale !== undefined) {
+        size.scale = Number(preview.scale);
+      }
+
+      return Object.keys(size).length > 0 ? size : undefined;
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
   }
 }

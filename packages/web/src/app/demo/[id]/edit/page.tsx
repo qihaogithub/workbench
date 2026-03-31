@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PreviewPanel, ConfigForm } from '../../../../../components/demo'
 import { parseFigmaText, buildFigmaText } from '../../../../../lib/parser'
-import { validateAll, ValidationResult, getDefaultValues } from '../../../../../lib/validator'
+import { validateAll, ValidationResult, getDefaultValues, getPreviewSize } from '../../../../../lib/validator'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -47,6 +47,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [isSaving, setIsSaving] = useState(false)
 
   const [sessionId, setSessionId] = useState('')
+  const [previewSize, setPreviewSize] = useState<import('../../../../../components/demo/types').PreviewSize>()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -100,6 +101,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         const result = validateAll(loadedCode, loadedSchema)
         setValidationResult(result)
+
+        const size = getPreviewSize(loadedSchema)
+        setPreviewSize(size)
       } catch (error) {
         toast({
           title: '加载失败',
@@ -140,6 +144,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     const defaults = getDefaultValues(parsed.schema)
     setConfigData((prev) => ({ ...defaults, ...prev }))
+
+    const size = getPreviewSize(parsed.schema)
+    setPreviewSize(size)
   }, [])
 
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
@@ -245,6 +252,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (result.data.schema) {
         setSchema(result.data.schema)
         setEditorContent(buildFigmaText(result.data.code || code, result.data.schema))
+        const size = getPreviewSize(result.data.schema)
+        setPreviewSize(size)
       }
     } catch (error) {
       toast({
@@ -311,7 +320,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-[320px] flex flex-col border-r bg-card">
-          <Tabs defaultValue="ai" className="flex-1 flex flex-col">
+          <Tabs defaultValue="ai" className="flex-1 flex flex-col [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col">
             <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
               <TabsTrigger value="ai" className="gap-2">
                 <Bot className="h-4 w-4" />
@@ -323,7 +332,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ai" className="flex-1 flex flex-col m-0">
+            <TabsContent value="ai" className="flex-1 flex flex-col m-0 data-[state=inactive]:hidden">
               <ScrollArea className="flex-1 px-4">
                 <div className="space-y-4 py-4">
                   {aiMessages.length === 0 && (
@@ -405,8 +414,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </div>
             </TabsContent>
 
-            <TabsContent value="code" className="flex-1 flex flex-col m-0">
-              <div className="flex-1 relative">
+            <TabsContent value="code" className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden">
+              <div className="flex-1 relative w-full">
                 <Textarea
                   value={editorContent}
                   onChange={(e) => handleEditorChange(e.target.value)}
@@ -476,7 +485,7 @@ ${'=== END ==='}`}
 
         <div className="flex-1 p-4 bg-muted/30">
           <div className="h-full border rounded-lg overflow-hidden bg-background shadow-sm">
-            <PreviewPanel code={code} configData={configData} />
+            <PreviewPanel code={code} configData={configData} previewSize={previewSize} />
           </div>
         </div>
 
