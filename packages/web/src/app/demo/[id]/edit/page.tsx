@@ -229,93 +229,35 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setIsAiLoading(true)
 
     try {
-      const messages = [
-        ...aiMessages,
-        { role: 'user' as const, content: userMessage },
-      ]
-
-      // 不传 sessionId，让 AI API 自动创建新的 Opencode Server Session
-      // 这样可以避免本地 Session ID 和 Opencode Session ID 混淆
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          messages, 
-          sessionId: undefined, // 关键：不传本地 sessionId
-          demoId 
+          message: userMessage,
+          sessionId,
+          demoId,
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('AI 请求失败')
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error?.message || 'AI 请求失败')
       }
 
-      if (!response.body) {
-        throw new Error('No response body')
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let fullContent = ''
-      let assistantMessageId = `assistant-${Date.now()}`
+      const aiReply = result.data.aiReply || '抱歉，我没有收到有效的回复。'
 
       setAiMessages((prev) => [
         ...prev,
-        {
-          role: 'assistant' as const,
-          content: '',
-          id: assistantMessageId,
-        },
+        { role: 'assistant', content: aiReply },
       ])
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.trim()) continue
-
-          try {
-            const data = JSON.parse(line)
-
-            // 不再更新 sessionId，因为已经使用了页面加载时的 sessionId
-            if (data.error) {
-              console.error('[AI Chat] Error from server:', data.error);
-              throw new Error(data.error.message || 'AI 请求失败')
-            }
-
-            if (data.delta !== undefined) {
-              fullContent += data.delta
-              setAiMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: fullContent }
-                    : msg
-                )
-              )
-            }
-
-            if (data.done) {
-              // 收到完成信号，不需要更新 sessionId
-            }
-          } catch (parseError) {
-          }
-        }
+      if (result.data.code) {
+        setCode(result.data.code)
       }
-
-      if (!fullContent.trim()) {
-        setAiMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: '抱歉，我没有收到有效的回复。' }
-              : msg
-          )
-        )
+      if (result.data.schema) {
+        setSchema(result.data.schema)
+        setEditorContent(buildFigmaText(result.data.code || code, result.data.schema))
       }
     } catch (error) {
       toast({
@@ -326,7 +268,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       setAiMessages((prev) => [
         ...prev,
         {
-          role: 'assistant' as const,
+          role: 'assistant',
           content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
         },
       ])
