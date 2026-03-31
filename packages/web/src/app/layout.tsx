@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ToastProviderWrapper } from '@/components/ui/toast-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,7 +21,9 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-          <ToastProviderWrapper>{children}</ToastProviderWrapper>
+          <TooltipProvider delayDuration={0}>
+            <ToastProviderWrapper>{children}</ToastProviderWrapper>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>
