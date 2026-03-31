@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/providers/theme-toggle'
 
 interface BreadcrumbItem {
   label: string
@@ -65,6 +66,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
         </nav>
 
         <div className="ml-auto flex items-center space-x-4">
+          <ThemeToggle />
           <Link href="/">
             <Home className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
           </Link>

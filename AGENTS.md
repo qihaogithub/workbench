@@ -83,6 +83,17 @@ import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
 - 使用 `@opencode-workbench/shared` 中定义的 `ErrorCode` 常量
 - 客户端使用 SWR 处理数据获取和错误状态
 
+### 组件库
+- **基础组件库**：[shadcn/ui](https://ui.shadcn.com/)
+  - 组件位于 `src/components/ui/` 目录
+  - 使用 `npx shadcn@latest add <component>` 添加新组件
+  - 基于 Radix UI 原语 + `class-variance-authority` 变体系统
+- **AI 组件库**：[AI Elements](https://ai.sdk.dev/)
+  - 使用 `npx ai-elements@latest add <component>` 添加 AI 相关组件
+  - 依赖 shadcn/ui 基础架构，必须在 shadcn/ui 初始化后才能使用
+  - 用于流式响应、工具调用展示、推理面板、聊天容器等 AI 场景
+- **禁止引入其他 UI 组件库**（如 Ant Design、Material-UI、Chakra UI 等）
+
 ### 样式
 - **Tailwind CSS** 为主要样式方案
 - 使用 `cn()` 工具函数合并类名（`clsx` + `tailwind-merge`）

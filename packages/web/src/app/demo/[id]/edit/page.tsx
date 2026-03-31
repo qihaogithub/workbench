@@ -1,12 +1,20 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PreviewPanel, ConfigForm } from '../../../../../components/demo'
 import { parseFigmaText, buildFigmaText } from '../../../../../lib/parser'
 import { validateAll, ValidationResult, getDefaultValues } from '../../../../../lib/validator'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ChatBubble, type ChatMessage } from '@/components/ui/chat-bubble'
+import { Bot, Code2, Send, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface DemoEditPageProps {
   params: {
@@ -14,51 +22,45 @@ interface DemoEditPageProps {
   }
 }
 
-type ActiveTab = 'ai' | 'code'
-
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter()
   const { id: demoId } = params
   const { toast } = useToast()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // 当前代码和 Schema
   const [code, setCode] = useState('')
   const [schema, setSchema] = useState('')
   const [editorContent, setEditorContent] = useState('')
 
-  // 配置数据
   const [configData, setConfigData] = useState<Record<string, unknown>>({})
 
-  // 校验结果
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
     errors: [],
   })
 
-  // 当前激活的 Tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('code')
-
-  // AI 对话相关
-  const [aiMessages, setAiMessages] = useState<
-    { role: 'user' | 'assistant'; content: string; id?: string }[]
-  >([])
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([])
   const [aiInput, setAiInput] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
 
-  // 加载状态
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Session ID
   const [sessionId, setSessionId] = useState('')
 
-  // 加载 Demo 数据
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [aiMessages, isAiLoading])
+
   useEffect(() => {
     const loadDemo = async () => {
       try {
         setIsLoading(true)
 
-        // 1. 创建 Session
         const sessionRes = await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,7 +78,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         setSessionId(sessionData.data.sessionId)
 
-        // 2. 加载文件内容
         const filesRes = await fetch(`/api/sessions/${sessionData.data.sessionId}/files`)
         if (!filesRes.ok) {
           throw new Error('加载文件失败')
@@ -94,11 +95,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setSchema(loadedSchema)
         setEditorContent(buildFigmaText(loadedCode, loadedSchema))
 
-        // 初始化默认值
         const defaults = getDefaultValues(loadedSchema)
         setConfigData(defaults)
 
-        // 执行初始校验
         const result = validateAll(loadedCode, loadedSchema)
         setValidationResult(result)
       } catch (error) {
@@ -113,13 +112,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }
 
     loadDemo()
-  }, [demoId])
+  }, [demoId, toast])
 
-  // 处理编辑器内容变更
   const handleEditorChange = useCallback((value: string) => {
     setEditorContent(value)
 
-    // 解析分隔符格式
     const parsed = parseFigmaText(value)
 
     if (!parsed.success) {
@@ -135,25 +132,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return
     }
 
-    // 更新代码和 Schema
     setCode(parsed.code)
     setSchema(parsed.schema)
 
-    // 执行完整校验
     const result = validateAll(parsed.code, parsed.schema)
     setValidationResult(result)
 
-    // 更新配置数据的默认值
     const defaults = getDefaultValues(parsed.schema)
     setConfigData((prev) => ({ ...defaults, ...prev }))
   }, [])
 
-  // 处理配置表单变更
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
     setConfigData(data)
   }, [])
 
-  // 处理保存
   const handleSave = async () => {
     if (!validationResult.isValid) {
       toast({
@@ -167,7 +159,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     try {
       setIsSaving(true)
 
-      // 1. 保存文件到 Session
       const saveRes = await fetch(`/api/sessions/${sessionId}/files`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -178,7 +169,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         throw new Error('保存文件失败')
       }
 
-      // 2. 合并到 Demo
       const mergeRes = await fetch(`/api/sessions/${sessionId}/merge`, {
         method: 'POST',
       })
@@ -204,22 +194,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }
   }
 
-  // 处理取消
   const handleCancel = async () => {
     try {
-      // 删除 Session
       if (sessionId) {
         await fetch(`/api/sessions/${sessionId}`, {
           method: 'DELETE',
         })
       }
     } catch {
-      // 忽略删除错误
+      // ignore
     }
     router.push('/')
   }
 
-  // 处理 AI 发送消息
   const handleAiSend = async () => {
     if (!aiInput.trim() || isAiLoading) return
 
@@ -232,7 +219,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: userMessage,
           sessionId,
           demoId,
@@ -280,9 +267,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">加载中...</p>
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+          <p className="text-muted-foreground">加载中...</p>
         </div>
       </div>
     )
@@ -290,18 +279,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* 顶部工具栏 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-card border-b">
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold">编辑 Demo</h1>
-          <span className="text-sm text-muted-foreground">{demoId}</span>
+          <Badge variant="secondary">{demoId.slice(0, 8)}</Badge>
           {sessionId && (
-            <span className="text-xs px-2 py-1 bg-secondary text-secondary-foreground rounded">
+            <Badge variant="outline" className="font-mono text-xs">
               Session: {sessionId.slice(0, 8)}...
-            </span>
+            </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>
             取消
           </Button>
@@ -309,188 +297,205 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             onClick={handleSave}
             disabled={!validationResult.isValid || isSaving}
           >
-            {isSaving ? '保存中...' : '保存'}
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                保存中...
+              </>
+            ) : (
+              '保存'
+            )}
           </Button>
         </div>
       </div>
 
-      {/* 三栏布局 */}
       <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：AI 对话区 / 代码编辑区 Tab */}
-        <div className="w-1/4 flex flex-col border-r bg-card">
-          {/* Tab 切换 */}
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'ai'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              AI 对话
-            </button>
-            <button
-              onClick={() => setActiveTab('code')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'code'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              代码编辑
-            </button>
-          </div>
+        <div className="w-[320px] flex flex-col border-r bg-card">
+          <Tabs defaultValue="ai" className="flex-1 flex flex-col">
+            <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
+              <TabsTrigger value="ai" className="gap-2">
+                <Bot className="h-4 w-4" />
+                AI 对话
+              </TabsTrigger>
+              <TabsTrigger value="code" className="gap-2">
+                <Code2 className="h-4 w-4" />
+                代码编辑
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Tab 内容 */}
-          <div className="flex-1 overflow-hidden">
-            {activeTab === 'ai' ? (
-              <div className="h-full flex flex-col">
-                {/* AI 消息列表 */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <TabsContent value="ai" className="flex-1 flex flex-col m-0">
+              <ScrollArea className="flex-1 px-4">
+                <div className="space-y-4 py-4">
                   {aiMessages.length === 0 && (
-                    <div className="text-center text-muted-foreground py-8">
-                      <div className="text-4xl mb-2">🤖</div>
-                      <p className="text-sm">输入自然语言指令，AI 将帮您修改代码</p>
-                      <p className="text-xs mt-2 text-muted-foreground">
-                        例如：&quot;把标题改成轮播图&quot;、&quot;添加一个按钮组件&quot;
-                      </p>
+                    <div className="text-center py-8 space-y-3">
+                      <div className="flex justify-center">
+                        <div className="p-3 rounded-full bg-primary/10">
+                          <Bot className="h-8 w-8 text-primary" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">AI 助手</p>
+                        <p className="text-xs text-muted-foreground">
+                          输入自然语言指令，AI 将帮您修改代码
+                        </p>
+                      </div>
+                      <div className="pt-2 space-y-2 text-left">
+                        <p className="text-xs text-muted-foreground">示例指令：</p>
+                        <div className="space-y-1">
+                          <p className="text-xs bg-muted px-2 py-1 rounded">
+                            &quot;把标题改成轮播图&quot;
+                          </p>
+                          <p className="text-xs bg-muted px-2 py-1 rounded">
+                            &quot;添加一个按钮组件&quot;
+                          </p>
+                          <p className="text-xs bg-muted px-2 py-1 rounded">
+                            &quot;修改配色方案为蓝色&quot;
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {aiMessages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${
-                        msg.role === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] px-4 py-2 rounded-lg text-sm ${
-                          msg.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-secondary text-secondary-foreground'
-                        }`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
+                    <ChatBubble key={idx} message={msg} />
                   ))}
                   {isAiLoading && (
-                    <div className="flex justify-start">
-                      <div className="px-4 py-2 rounded-lg bg-secondary">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100"></div>
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200"></div>
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
+                        <div className="flex gap-1">
+                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" />
+                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce delay-100" />
+                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce delay-200" />
                         </div>
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
+              </ScrollArea>
 
-                {/* AI 输入框 */}
-                <div className="p-4 border-t">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAiSend()}
-                      placeholder="输入指令..."
-                      className="flex-1 px-3 py-2 border rounded-md text-sm bg-gray-900 text-white dark:bg-gray-800 dark:text-gray-100"
-                    />
-                    <Button
-                      onClick={handleAiSend}
-                      disabled={!aiInput.trim() || isAiLoading}
-                      size="sm"
-                    >
-                      发送
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                {/* 代码编辑器 */}
-                <div className="flex-1 relative">
-                  <textarea
-                    value={editorContent}
-                    onChange={(e) => handleEditorChange(e.target.value)}
-                    spellCheck={false}
-                    className="w-full h-full p-4 resize-none outline-none font-mono text-sm bg-zinc-900 text-zinc-100"
-                    style={{ tabSize: 2 }}
-                    placeholder={`${'=== DEMO CODE ==='}\n// 在此处粘贴 React 组件代码\n\n${'=== DEMO SCHEMA ==='}\n// 在此处粘贴 JSON Schema 配置\n\n${'=== END ==='}`}
+              <div className="p-4 border-t">
+                <div className="flex gap-2">
+                  <Textarea
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleAiSend()
+                      }
+                    }}
+                    placeholder="输入指令，按 Enter 发送..."
+                    className="min-h-[80px] resize-none"
+                    disabled={isAiLoading}
                   />
                 </div>
+                <div className="flex justify-end mt-2">
+                  <Button
+                    onClick={handleAiSend}
+                    disabled={!aiInput.trim() || isAiLoading}
+                    size="sm"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    发送
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
 
-                {/* 错误提示区 */}
-                {validationResult.errors.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto border-t bg-destructive/10">
-                    {validationResult.errors.map((error: { type: string; message: string; line?: number }, index: number) => (
+            <TabsContent value="code" className="flex-1 flex flex-col m-0">
+              <div className="flex-1 relative">
+                <Textarea
+                  value={editorContent}
+                  onChange={(e) => handleEditorChange(e.target.value)}
+                  spellCheck={false}
+                  className="w-full h-full resize-none outline-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-none"
+                  style={{ tabSize: 2 }}
+                  placeholder={`${'=== DEMO CODE ==='}
+// 在此处粘贴 React 组件代码
+
+${'=== DEMO SCHEMA ==='}
+// 在此处粘贴 JSON Schema 配置
+
+${'=== END ==='}`}
+                />
+              </div>
+
+              {validationResult.errors.length > 0 && (
+                <ScrollArea className="h-[120px] border-t bg-destructive/5">
+                  <div className="p-3 space-y-2">
+                    {validationResult.errors.map((error, index) => (
                       <div
                         key={index}
-                        className="px-4 py-2 text-xs border-b border-destructive/20 last:border-b-0"
+                        className="flex items-start gap-2 text-xs"
                       >
-                        <div className="flex items-start gap-2">
-                          <span className="text-destructive font-medium shrink-0">
-                            {error.type === 'json_syntax'
-                              ? '[语法]'
-                              : error.type === 'props_mismatch'
-                              ? '[不匹配]'
-                              : error.type === 'required_missing'
-                              ? '[必填]'
-                              : '[警告]'}
-                          </span>
-                          <span className="text-destructive/90">
-                            {error.message}
-                            {error.line && (
-                              <span className="text-destructive/70 ml-1">
-                                (第 {error.line} 行)
-                              </span>
-                            )}
-                          </span>
-                        </div>
+                        <AlertCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
+                        <span className="text-destructive">
+                          {error.type === 'json_syntax'
+                            ? '[语法]'
+                            : error.type === 'props_mismatch'
+                            ? '[不匹配]'
+                            : error.type === 'required_missing'
+                            ? '[必填]'
+                            : '[警告]'}
+                          {' '}{error.message}
+                          {error.line && ` (第 ${error.line} 行)`}
+                        </span>
                       </div>
                     ))}
                   </div>
-                )}
+                </ScrollArea>
+              )}
 
-                {/* 底部信息栏 */}
-                <div className="px-4 py-2 border-t text-xs text-muted-foreground flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span>{editorContent.length} 字符</span>
-                    <span>{editorContent.split('\n').length} 行</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {validationResult.isValid ? (
-                      <span className="text-green-600 dark:text-green-400">✓ 有效</span>
-                    ) : (
-                      <span className="text-destructive">✗ {validationResult.errors.length} 个错误</span>
-                    )}
-                  </div>
+              <div className="px-4 py-2 border-t bg-muted/50 flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-4">
+                  <span>{editorContent.length} 字符</span>
+                  <span>{editorContent.split('\n').length} 行</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {validationResult.isValid ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <span className="text-green-500">有效</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-3 w-3 text-destructive" />
+                      <span className="text-destructive">
+                        {validationResult.errors.length} 个错误
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
-            )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="flex-1 p-4 bg-muted/30">
+          <div className="h-full border rounded-lg overflow-hidden bg-background shadow-sm">
+            <PreviewPanel code={code} configData={configData} />
           </div>
         </div>
 
-        {/* 中间：预览区 */}
-        <div className="w-1/2 p-4 bg-muted/50">
-          <PreviewPanel code={code} configData={configData} />
-        </div>
-
-        {/* 右侧：配置面板 */}
-        <div className="w-1/4 border-l bg-card flex flex-col">
+        <div className="w-[300px] border-l bg-card flex flex-col">
           <div className="px-4 py-3 border-b">
             <h2 className="text-sm font-medium">配置面板</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              修改配置项，预览区将实时更新
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <ConfigForm
-              schema={schema}
-              onChange={handleConfigChange}
-              initialData={configData}
-            />
-          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4">
+              <ConfigForm
+                schema={schema}
+                onChange={handleConfigChange}
+                initialData={configData}
+              />
+            </div>
+          </ScrollArea>
         </div>
       </div>
     </div>
