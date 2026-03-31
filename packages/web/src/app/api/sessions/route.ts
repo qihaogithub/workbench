@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, demoExists, createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { createEditSession } from '@/lib/session-manager';
+import { listDemos, createApiSuccess, createApiError } from '@/lib/fs-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,15 +14,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!demoExists(demoId)) {
-      return NextResponse.json(
-        createApiError('DEMO_NOT_FOUND'),
-        { status: 404 }
-      );
-    }
-    
-    const session = createSession(demoId);
-    return NextResponse.json(createApiSuccess(session), { status: 201 });
+    const result = await createEditSession(demoId);
+    return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {
     console.error('Error creating session:', error);
     
@@ -34,6 +28,19 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       createApiError('FILE_WRITE_ERROR', '创建 Session 失败'),
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const demos = listDemos();
+    return NextResponse.json(createApiSuccess(demos));
+  } catch (error) {
+    console.error('Error listing demos:', error);
+    return NextResponse.json(
+      createApiError('FILE_READ_ERROR', '获取 Demo 列表失败'),
       { status: 500 }
     );
   }

@@ -397,7 +397,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       onChange={(e) => setAiInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAiSend()}
                       placeholder="输入指令..."
-                      className="flex-1 px-3 py-2 border rounded-md text-sm bg-background"
+                      className="flex-1 px-3 py-2 border rounded-md text-sm bg-gray-900 text-white dark:bg-gray-800 dark:text-gray-100"
                     />
                     <Button
                       onClick={handleAiSend}

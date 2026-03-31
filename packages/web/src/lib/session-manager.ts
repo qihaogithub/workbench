@@ -11,6 +11,7 @@ import {
   deleteSession,
 } from './fs-utils';
 
+const OPENCODE_SERVER_URL = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export interface CreateSessionResult {
@@ -19,7 +20,7 @@ export interface CreateSessionResult {
   schema: string;
 }
 
-export function createEditSession(demoId: string): CreateSessionResult {
+export async function createEditSession(demoId: string): Promise<CreateSessionResult> {
   if (!demoExists(demoId)) {
     throw new Error(`Demo "${demoId}" 不存在`);
   }
@@ -38,9 +39,12 @@ export function createEditSession(demoId: string): CreateSessionResult {
     fs.writeFileSync(agentsMdPath, AGENTS_MD_TEMPLATE, 'utf-8');
   }
 
+  const ocSessionId = await createOpenCodeSession(sessionId);
+
   const sessionMeta = {
     sessionId,
     demoId,
+    opencodeSessionId: ocSessionId,
     createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
   };
@@ -58,6 +62,33 @@ export function createEditSession(demoId: string): CreateSessionResult {
     code: fs.readFileSync(codePath, 'utf-8'),
     schema: fs.readFileSync(schemaPath, 'utf-8'),
   };
+}
+
+async function createOpenCodeSession(sessionId: string): Promise<string> {
+  const http = require('http');
+  return new Promise<string>((resolve, reject) => {
+    const req = http.request(`${OPENCODE_SERVER_URL}/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+    let raw = '';
+    req.on('data', (chunk: string) => raw += chunk);
+    req.on('response', (res: any) => {
+      res.on('data', (chunk: string) => raw += chunk);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw);
+          resolve(data.id);
+        } catch {
+          reject(new Error(`Failed to create opencode session: ${raw.substring(0, 200)}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(JSON.stringify({ title: `Edit: ${sessionId}` }));
+    req.end();
+  });
 }
 
 export function getEditSession(sessionId: string) {
