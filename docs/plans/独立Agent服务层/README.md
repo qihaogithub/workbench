@@ -106,8 +106,11 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 
 ### 参考文档
 
-- [AionUi-Agent 接入架构分析报告](../AionUi-Agent%20接入架构分析报告.md)
 - [需求文档](../../项目文档/需求文档.md)
+- AionUi 架构分析内容已整合到本文档系列中：
+  - [架构设计 - AionUi 参考](./01-架构设计.md#十三aionui-架构参考)
+  - [核心模块设计 - AionUi 代码参考](./03-核心模块设计.md#十aionui-代码参考指南)
+  - [核心模块设计 - 具体实施代码示例](./03-核心模块设计.md#十一具体实施代码示例)
 
 ### 现有代码
 
@@ -117,8 +120,57 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 
 ---
 
+---
+
+## AionUi 参考指南
+
+本项目大量参考了 [AionUi](../../AionUi) 的 Agent 架构设计。以下是具体的参考对照表。
+
+### 核心参考对照
+
+| 本项目模块 | AionUi 参考文件 | 参考程度 | 说明 |
+|:-----------|:----------------|:---------|:-----|
+| `AgentFactory` | `src/process/task/AgentFactory.ts` | **95%** | 工厂模式几乎完全一致 |
+| `IAgentManager` | `src/process/task/IAgentManager.ts` | **90%** | 接口定义参考 |
+| `BaseAgent` | `src/process/agent/acp/index.ts` | **70%** | 核心结构参考，通信层需重写 |
+| 事件回调机制 | `AcpAgent.onStreamEvent` | **85%** | 回调解耦模式 |
+| 会话恢复 | `createOrResumeSession()` | **80%** | 恢复策略参考 |
+| 权限缓存 | `ApprovalStore.ts` | **60%** | 可选功能，后期实现 |
+
+### 需要适配的关键差异
+
+```
+AionUi (Electron 应用)              本项目 (独立服务)
+─────────────────────────────────────────────────────────────
+IPC 通信                    →      HTTP REST / WebSocket
+spawn CLI 进程              →      undici 连接池调用 HTTP API
+AcpConnection (ACP 协议)    →      OpenCodeBackend (HTTP API)
+主进程内存存储              →      可选 Redis/数据库持久化
+Electron 生命周期           →      Fastify 生命周期
+```
+
+### 推荐抄作业顺序
+
+1. **直接抄**：`AgentFactory`、`IAgentManager` 接口定义
+2. **参考改**：`BaseAgent` 类结构、事件回调机制
+3. **理解后重写**：后端通信层（HTTP 替代 ACP 协议）
+4. **后期借鉴**：会话恢复、权限缓存、模型切换
+
+### AionUi 核心文件路径
+
+| 文件 | 路径 | 核心内容 |
+|:-----|:-----|:---------|
+| Agent 工厂 | `AionUi/src/process/task/AgentFactory.ts` | 极简工厂实现 |
+| Agent 接口 | `AionUi/src/process/task/IAgentManager.ts` | 生命周期接口 |
+| ACP Agent | `AionUi/src/process/agent/acp/index.ts` | 完整 Agent 实现 |
+| 连接管理 | `AionUi/src/process/agent/acp/AcpConnection.ts` | 连接生命周期 |
+| 权限缓存 | `AionUi/src/process/agent/acp/ApprovalStore.ts` | "always allow" 缓存 |
+
+---
+
 ## 更新日志
 
 | 日期 | 版本 | 更新内容 |
 |:-----|:-----|:---------|
 | 2026-04-05 | v1.0 | 初始版本，完成全部文档 |
+| 2026-04-05 | v1.1 | 添加 AionUi 参考指南 |

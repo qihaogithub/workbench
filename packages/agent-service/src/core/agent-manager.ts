@@ -1,6 +1,9 @@
 import { AgentConfig, AgentResult, SendMessageOptions } from './types';
 import { BaseAgent } from './agent';
+import { BackendAgent } from './backend-agent';
 import { AgentFactory, getAgentFactory } from './agent-factory';
+
+const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 export interface IAgentManager {
   getOrCreate(sessionId: string, config: AgentConfig): BaseAgent;
@@ -11,9 +14,10 @@ export interface IAgentManager {
   sendMessage(sessionId: string, content: string, options?: SendMessageOptions): Promise<AgentResult>;
   list(): AgentInfo[];
   count(): number;
+  cleanupIdleAgents(timeoutMs?: number): number;
 }
 
-interface AgentInfo {
+export interface AgentInfo {
   sessionId: string;
   status: string;
   backend: string;
@@ -21,14 +25,25 @@ interface AgentInfo {
   lastActivityAt: string;
   messageCount: number;
   workingDir?: string;
+  busy?: boolean;
 }
 
 export class AgentManager implements IAgentManager {
   private agents: Map<string, BaseAgent> = new Map();
   private factory: AgentFactory;
+  private idleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(factory?: AgentFactory) {
+  constructor(factory?: AgentFactory, private idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS) {
     this.factory = factory || getAgentFactory();
+    this.startIdleCheck();
+  }
+
+  private startIdleCheck(): void {
+    if (this.idleCheckTimer) clearInterval(this.idleCheckTimer);
+    this.idleCheckTimer = setInterval(() => {
+      this.cleanupIdleAgents(this.idleTimeoutMs);
+    }, 60 * 1000);
+    this.idleCheckTimer.unref();
   }
 
   getOrCreate(sessionId: string, config: AgentConfig): BaseAgent {
@@ -59,6 +74,10 @@ export class AgentManager implements IAgentManager {
   }
 
   async destroyAll(): Promise<void> {
+    if (this.idleCheckTimer) {
+      clearInterval(this.idleCheckTimer);
+      this.idleCheckTimer = null;
+    }
     const promises = Array.from(this.agents.values()).map((agent) => agent.kill());
     await Promise.all(promises);
     this.agents.clear();
@@ -69,9 +88,20 @@ export class AgentManager implements IAgentManager {
     content: string,
     options?: SendMessageOptions
   ): Promise<AgentResult> {
-    const agent = this.get(sessionId);
+    const agent = this.agents.get(sessionId);
     if (!agent) {
       throw new Error(`Agent not found: ${sessionId}`);
+    }
+
+    if (agent instanceof BackendAgent && agent.isBusy()) {
+      return {
+        success: false,
+        error: {
+          code: 'AGENT_NOT_INITIALIZED',
+          message: 'Agent is currently processing a previous message',
+          retryable: true,
+        },
+      };
     }
 
     if (agent.status === 'initializing') {
@@ -82,11 +112,37 @@ export class AgentManager implements IAgentManager {
   }
 
   list(): AgentInfo[] {
-    return Array.from(this.agents.values()).map((agent) => agent.getInfo());
+    return Array.from(this.agents.values()).map((agent) => {
+      const info = agent.getInfo();
+      return {
+        ...info,
+        busy: agent instanceof BackendAgent ? agent.isBusy() : false,
+      };
+    });
   }
 
   count(): number {
     return this.agents.size;
+  }
+
+  cleanupIdleAgents(timeoutMs?: number): number {
+    const timeout = timeoutMs ?? this.idleTimeoutMs;
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [sessionId, agent] of this.agents.entries()) {
+      const lastActivity = agent.lastActivityAtPub.getTime();
+      const isIdle = (now - lastActivity) > timeout;
+
+      if (isIdle && agent.status !== 'processing') {
+        void agent.kill().then(() => {
+          this.agents.delete(sessionId);
+        });
+        cleaned++;
+      }
+    }
+
+    return cleaned;
   }
 }
 

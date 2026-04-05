@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { AgentManager, getAgentManager } from '../core/agent-manager';
+import { getAgentManager } from '../core/agent-manager';
 import { AgentConfig } from '../core/types';
 
 interface StreamParams {

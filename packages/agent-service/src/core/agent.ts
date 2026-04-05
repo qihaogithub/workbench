@@ -34,6 +34,10 @@ export abstract class BaseAgent extends EventEmitter {
     return this._status;
   }
 
+  get lastActivityAtPub(): Date {
+    return this.lastActivityAt;
+  }
+
   protected setStatus(status: AgentStatus): void {
     this._status = status;
     this.lastActivityAt = new Date();

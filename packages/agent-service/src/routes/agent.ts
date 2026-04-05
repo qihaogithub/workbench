@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { AgentManager, getAgentManager } from '../core/agent-manager';
-import { AgentFactory, getAgentFactory } from '../core/agent-factory';
+import { getAgentManager } from '../core/agent-manager';
+import { BackendAgent } from '../core/backend-agent';
 import { MemorySessionStore } from '../session/session-store';
 import { getChangedFiles } from '../session/session-guard';
 import { AgentConfig, AgentType } from '../core/types';
@@ -32,7 +32,6 @@ interface RollbackBody {
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
   const manager = getAgentManager();
-  const factory = getAgentFactory();
 
   const sessionStore = new MemorySessionStore();
 
@@ -191,7 +190,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       const { status, limit, offset } = request.query;
 
       const sessions = manager.list();
-      const total = sessions.length;
       const limitNum = parseInt(limit || '50', 10);
       const offsetNum = parseInt(offset || '0', 10);
 
@@ -224,6 +222,80 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           rolledBack: files || [],
         },
       });
+    }
+  );
+
+  fastify.post<{ Params: SessionParams; Body: { modelId: string } }>(
+    '/api/agent/:sessionId/model',
+    async (request: FastifyRequest<{ Params: SessionParams; Body: { modelId: string } }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const { modelId } = request.body;
+      const agent = manager.get(sessionId);
+
+      if (!agent) {
+        return reply.code(404).send({
+          success: false,
+          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
+        });
+      }
+
+      if (agent instanceof BackendAgent) {
+        const result = await agent.setModel(modelId);
+        return reply.send({ success: true, data: result });
+      }
+
+      return reply.send({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Model switching not supported for this agent' },
+      });
+    }
+  );
+
+  fastify.post<{ Params: SessionParams; Body: { mode: string } }>(
+    '/api/agent/:sessionId/mode',
+    async (request: FastifyRequest<{ Params: SessionParams; Body: { mode: string } }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const { mode } = request.body;
+      const agent = manager.get(sessionId);
+
+      if (!agent) {
+        return reply.code(404).send({
+          success: false,
+          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
+        });
+      }
+
+      if (agent instanceof BackendAgent) {
+        const result = await agent.setMode(mode);
+        return reply.send({ success: true, data: result });
+      }
+
+      return reply.send({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Mode switching not supported for this agent' },
+      });
+    }
+  );
+
+  fastify.get<{ Params: SessionParams }>(
+    '/api/agent/:sessionId/models',
+    async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const agent = manager.get(sessionId);
+
+      if (!agent) {
+        return reply.code(404).send({
+          success: false,
+          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
+        });
+      }
+
+      if (agent instanceof BackendAgent) {
+        const models = await agent.getModels();
+        return reply.send({ success: true, data: { models } });
+      }
+
+      return reply.send({ success: true, data: { models: [] } });
     }
   );
 }

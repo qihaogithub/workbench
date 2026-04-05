@@ -179,10 +179,13 @@ export class ClaudeBackend extends BaseBackendAdapter {
         const streamReader = reader.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let done = false;
 
-        while (true) {
-          const { done, value } = await streamReader.read();
-          if (done) break;
+        while (!done) {
+          const readResult = await streamReader.read();
+          done = readResult.done;
+          const value = readResult.value;
+          if (!value) continue;
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -208,11 +211,13 @@ export class ClaudeBackend extends BaseBackendAdapter {
                 });
               }
             } catch {
+              // Ignore parse errors for individual chunks
             }
           }
         }
       }
     } catch {
+      // Ignore stream reading errors
     }
 
     return fullContent;

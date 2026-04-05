@@ -40,13 +40,31 @@ async function start() {
 
   await registerRoutes(fastify);
 
-  fastify.get('/health', async () => ({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    agents: getAgentManager().count(),
-    backends: factory.getRegisteredTypes(),
-  }));
+  fastify.get('/health', async () => {
+    const backends = factory.getRegisteredTypes();
+    const checks: Record<string, { status: string }> = {};
+
+    for (const type of backends) {
+      try {
+        const testBackend = factory.create({ sessionId: '_health', backend: type });
+        if (testBackend instanceof BackendAgent) {
+          const healthy = await testBackend.getModels().then(() => true).catch(() => false);
+          checks[type] = { status: healthy ? 'ok' : 'degraded' };
+        }
+      } catch {
+        checks[type] = { status: 'error' };
+      }
+    }
+
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      agents: getAgentManager().count(),
+      backends,
+      checks,
+    };
+  });
 
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
