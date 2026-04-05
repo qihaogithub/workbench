@@ -1,0 +1,16 @@
+{
+  "name": "@opencode-workbench/agent-client",
+  "version": "1.0.0",
+  "description": "Agent Service Client SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
