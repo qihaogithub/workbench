@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { AgentManager, getAgentManager } from '../core/agent-manager';
 import { AgentFactory, getAgentFactory } from '../core/agent-factory';
-import { OpenCodeBackend } from '../backends/opencode';
 import { MemorySessionStore } from '../session/session-store';
 import { getChangedFiles } from '../session/session-guard';
 import { AgentConfig, AgentType } from '../core/types';
@@ -34,10 +33,6 @@ interface RollbackBody {
 export async function registerAgentRoutes(fastify: FastifyInstance) {
   const manager = getAgentManager();
   const factory = getAgentFactory();
-
-  if (!factory.has('opencode')) {
-    factory.register('opencode', (config) => new OpenCodeBackend(config) as unknown as import('../core/agent').BaseAgent);
-  }
 
   const sessionStore = new MemorySessionStore();
 

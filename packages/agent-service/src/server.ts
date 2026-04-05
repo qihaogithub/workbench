@@ -7,7 +7,8 @@ import { loadConfig } from './utils/config';
 import { getLogger } from './utils/logger';
 import { getAgentManager } from './core/agent-manager';
 import { getAgentFactory } from './core/agent-factory';
-import { OpenCodeBackend } from './backends/opencode';
+import { OpenCodeBackend, ClaudeBackend, CodexBackend, GeminiBackend } from './backends';
+import { BackendAgent } from './core/backend-agent';
 import { registerRoutes } from './routes';
 
 const config = loadConfig();
@@ -32,7 +33,10 @@ async function start() {
   });
 
   const factory = getAgentFactory();
-  factory.register('opencode', (agentConfig) => new OpenCodeBackend(agentConfig) as unknown as import('./core/agent').BaseAgent);
+  factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeBackend(agentConfig)));
+  factory.register('claude', (agentConfig) => new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)));
+  factory.register('codex', (agentConfig) => new BackendAgent(agentConfig, new CodexBackend(agentConfig)));
+  factory.register('gemini', (agentConfig) => new BackendAgent(agentConfig, new GeminiBackend(agentConfig)));
 
   await registerRoutes(fastify);
 
@@ -41,6 +45,7 @@ async function start() {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     agents: getAgentManager().count(),
+    backends: factory.getRegisteredTypes(),
   }));
 
   process.on('SIGTERM', async () => {

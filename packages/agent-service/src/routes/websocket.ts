@@ -1,7 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { AgentManager, getAgentManager } from '../core/agent-manager';
-import { AgentFactory, getAgentFactory } from '../core/agent-factory';
-import { OpenCodeBackend } from '../backends/opencode';
 import { AgentConfig } from '../core/types';
 
 interface StreamParams {
@@ -21,11 +19,6 @@ interface ClientMessage {
 
 export async function registerWebSocketRoutes(fastify: FastifyInstance) {
   const manager = getAgentManager();
-  const factory = getAgentFactory();
-
-  if (!factory.has('opencode')) {
-    factory.register('opencode', (config) => new OpenCodeBackend(config) as unknown as import('../core/agent').BaseAgent);
-  }
 
   fastify.get<{ Params: StreamParams }>('/api/agent/:sessionId/stream', { websocket: true }, async (socket: import('ws'), request: FastifyRequest<{ Params: StreamParams }>) => {
     const { sessionId } = request.params;

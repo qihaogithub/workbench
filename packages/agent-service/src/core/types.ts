@@ -33,6 +33,8 @@ export interface AgentConfig {
 
   opencode?: OpenCodeConfig;
   claude?: ClaudeConfig;
+  codex?: CodexConfig;
+  gemini?: GeminiConfig;
 }
 
 export interface OpenCodeConfig {
@@ -43,6 +45,19 @@ export interface OpenCodeConfig {
 export interface ClaudeConfig {
   apiKey?: string;
   model?: string;
+  timeout?: number;
+}
+
+export interface CodexConfig {
+  apiKey?: string;
+  model?: string;
+  timeout?: number;
+}
+
+export interface GeminiConfig {
+  apiKey?: string;
+  model?: string;
+  timeout?: number;
 }
 
 // ============================================================
