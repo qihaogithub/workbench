@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listDemos, createDemo, createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { listProjects, createProject, createApiSuccess, createApiError } from '@/lib/fs-utils';
 
 export async function GET() {
   try {
-    const demos = listDemos();
-    return NextResponse.json(createApiSuccess(demos));
+    const projects = listProjects();
+    return NextResponse.json(createApiSuccess(projects));
   } catch (error) {
-    console.error('Error listing demos:', error);
+    console.error('Error listing projects:', error);
     return NextResponse.json(
-      createApiError('FILE_READ_ERROR', '读取 Demo 列表失败'),
+      createApiError('FILE_READ_ERROR', '读取项目列表失败'),
       { status: 500 }
     );
   }
@@ -26,12 +26,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const demo = createDemo(name);
-    return NextResponse.json(createApiSuccess(demo), { status: 201 });
+    const project = createProject(name);
+    return NextResponse.json(createApiSuccess(project), { status: 201 });
   } catch (error) {
-    console.error('Error creating demo:', error);
+    console.error('Error creating project:', error);
     return NextResponse.json(
-      createApiError('FILE_WRITE_ERROR', '创建 Demo 失败'),
+      createApiError('FILE_WRITE_ERROR', '创建项目失败'),
       { status: 500 }
     );
   }

@@ -8,12 +8,22 @@ import {
   ERROR_MESSAGES,
 } from '@opencode-workbench/shared';
 
-const DEMOS_DIR = process.env.DEMOS_DIR || path.join(process.cwd(), '../../demos');
-const SESSIONS_DIR = process.env.SESSIONS_DIR || path.join(process.cwd(), '../../sessions');
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const PROJECTS_DIR = process.env.PROJECTS_DIR || path.join(DATA_DIR, 'projects');
+const SESSIONS_DIR = process.env.SESSIONS_DIR || path.join(DATA_DIR, 'sessions');
+const SNAPSHOTS_DIR = process.env.SNAPSHOTS_DIR || path.join(DATA_DIR, 'snapshots');
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
-export function getDemosDir(): string {
-  return DEMOS_DIR;
+export function getDataDir(): string {
+  return DATA_DIR;
+}
+
+export function getProjectsDir(): string {
+  return PROJECTS_DIR;
+}
+
+export function getSnapshotsDir(): string {
+  return SNAPSHOTS_DIR;
 }
 
 export function getSessionsDir(): string {
@@ -21,45 +31,80 @@ export function getSessionsDir(): string {
 }
 
 export function ensureDirsExist(): void {
-  if (!fs.existsSync(DEMOS_DIR)) {
-    fs.mkdirSync(DEMOS_DIR, { recursive: true });
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(PROJECTS_DIR)) {
+    fs.mkdirSync(PROJECTS_DIR, { recursive: true });
   }
   if (!fs.existsSync(SESSIONS_DIR)) {
     fs.mkdirSync(SESSIONS_DIR, { recursive: true });
   }
+  if (!fs.existsSync(SNAPSHOTS_DIR)) {
+    fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+  }
 }
 
-export function getDemoPath(demoId: string): string {
-  return path.join(DEMOS_DIR, demoId);
+export function getProjectPath(projectId: string): string {
+  return path.join(PROJECTS_DIR, projectId);
 }
 
-export function getSessionPath(sessionId: string): string {
-  return path.join(SESSIONS_DIR, sessionId);
+export function getSnapshotPath(projectId: string, versionId: string): string {
+  return path.join(SNAPSHOTS_DIR, projectId, versionId);
 }
 
-export function demoExists(demoId: string): boolean {
-  const demoPath = getDemoPath(demoId);
-  return fs.existsSync(demoPath) && fs.statSync(demoPath).isDirectory();
+export function getSessionPath(sessionId: string, projectId?: string): string {
+  if (projectId) {
+    return path.join(SESSIONS_DIR, projectId, sessionId);
+  }
+  const foundPath = findSessionPath(sessionId);
+  return foundPath || path.join(SESSIONS_DIR, sessionId);
 }
 
-export function sessionExists(sessionId: string): boolean {
-  const sessionPath = getSessionPath(sessionId);
-  return fs.existsSync(sessionPath) && fs.statSync(sessionPath).isDirectory();
+export function findSessionPath(sessionId: string): string | null {
+  if (!fs.existsSync(SESSIONS_DIR)) {
+    return null;
+  }
+  
+  const projectDirs = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
+  for (const projectDir of projectDirs) {
+    if (!projectDir.isDirectory()) continue;
+    
+    const sessionPath = path.join(SESSIONS_DIR, projectDir.name, sessionId);
+    if (fs.existsSync(sessionPath) && fs.statSync(sessionPath).isDirectory()) {
+      return sessionPath;
+    }
+  }
+  
+  return null;
 }
 
-export function listDemos(): DemoMeta[] {
+export function projectExists(projectId: string): boolean {
+  const projectPath = getProjectPath(projectId);
+  return fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory();
+}
+
+export function sessionExists(sessionId: string, projectId?: string): boolean {
+  if (projectId) {
+    const sessionPath = getSessionPath(sessionId, projectId);
+    return fs.existsSync(sessionPath) && fs.statSync(sessionPath).isDirectory();
+  }
+  return findSessionPath(sessionId) !== null;
+}
+
+export function listProjects(): DemoMeta[] {
   ensureDirsExist();
   
-  const demos: DemoMeta[] = [];
-  const entries = fs.readdirSync(DEMOS_DIR, { withFileTypes: true });
+  const projects: DemoMeta[] = [];
+  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
   
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     
-    const demoPath = path.join(DEMOS_DIR, entry.name);
-    const stats = fs.statSync(demoPath);
+    const projectPath = path.join(PROJECTS_DIR, entry.name);
+    const stats = fs.statSync(projectPath);
     
-    demos.push({
+    projects.push({
       id: entry.name,
       name: entry.name,
       createdAt: stats.birthtimeMs,
@@ -67,16 +112,17 @@ export function listDemos(): DemoMeta[] {
     });
   }
   
-  return demos.sort((a, b) => b.updatedAt - a.updatedAt);
+  return projects.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function createDemo(name: string): DemoMeta {
+export function createProject(name: string): DemoMeta {
   ensureDirsExist();
   
-  const demoId = `demo-${Date.now()}`;
-  const demoPath = getDemoPath(demoId);
+  const projectId = `proj_${Date.now()}`;
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, 'workspace');
   
-  fs.mkdirSync(demoPath, { recursive: true });
+  fs.mkdirSync(workspacePath, { recursive: true });
   
   const defaultCode = `import React from 'react';
 
@@ -114,47 +160,60 @@ export default function Demo({ title, description }: DemoProps) {
     "required": ["title"]
   }, null, 2);
   
-  fs.writeFileSync(path.join(demoPath, 'index.tsx'), defaultCode, 'utf-8');
-  fs.writeFileSync(path.join(demoPath, 'config.schema.json'), defaultSchema, 'utf-8');
+  const projectJson = JSON.stringify({
+    id: projectId,
+    name: name || projectId,
+    workspacePath: workspacePath,
+    versions: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }, null, 2);
   
-  const stats = fs.statSync(demoPath);
+  fs.writeFileSync(path.join(workspacePath, 'index.tsx'), defaultCode, 'utf-8');
+  fs.writeFileSync(path.join(workspacePath, 'config.schema.json'), defaultSchema, 'utf-8');
+  fs.writeFileSync(path.join(projectPath, 'project.json'), projectJson, 'utf-8');
+  
+  const stats = fs.statSync(projectPath);
   
   return {
-    id: demoId,
-    name: name || demoId,
+    id: projectId,
+    name: name || projectId,
     createdAt: stats.birthtimeMs,
     updatedAt: stats.mtimeMs,
   };
 }
 
-export function deleteDemo(demoId: string): boolean {
-  if (!demoExists(demoId)) {
+export function deleteProject(projectId: string): boolean {
+  if (!projectExists(projectId)) {
     return false;
   }
   
-  const demoPath = getDemoPath(demoId);
-  fs.rmSync(demoPath, { recursive: true, force: true });
+  const projectPath = getProjectPath(projectId);
+  fs.rmSync(projectPath, { recursive: true, force: true });
   
   return true;
 }
 
-export function createSession(demoId: string): SessionMeta {
+export function createSession(projectId: string): SessionMeta {
   ensureDirsExist();
   
-  if (!demoExists(demoId)) {
+  if (!projectExists(projectId)) {
     throw new Error(ERROR_MESSAGES.DEMO_NOT_FOUND);
   }
   
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  const sessionPath = getSessionPath(sessionId);
-  const demoPath = getDemoPath(demoId);
+  const sessionDir = path.join(SESSIONS_DIR, projectId);
+  const sessionPath = path.join(sessionDir, sessionId);
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, 'workspace');
   
-  fs.cpSync(demoPath, sessionPath, { recursive: true });
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.cpSync(workspacePath, sessionPath, { recursive: true });
   
   const now = Date.now();
   const sessionMeta: SessionMeta = {
     sessionId,
-    demoId,
+    demoId: projectId,
     createdAt: now,
     expiresAt: now + SESSION_EXPIRY_MS,
   };
@@ -222,18 +281,19 @@ export function mergeSession(sessionId: string): boolean {
     return false;
   }
   
-  const { demoId } = sessionMeta;
+  const { demoId: projectId } = sessionMeta;
   
-  if (!demoExists(demoId)) {
+  if (!projectExists(projectId)) {
     return false;
   }
   
   const sessionPath = getSessionPath(sessionId);
-  const demoPath = getDemoPath(demoId);
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, 'workspace');
   
-  fs.rmSync(demoPath, { recursive: true, force: true });
-  fs.cpSync(sessionPath, demoPath, { recursive: true });
-  fs.rmSync(path.join(demoPath, '.session.json'), { force: true });
+  fs.rmSync(workspacePath, { recursive: true, force: true });
+  fs.cpSync(sessionPath, workspacePath, { recursive: true });
+  fs.rmSync(path.join(workspacePath, '.session.json'), { force: true });
   fs.rmSync(sessionPath, { recursive: true, force: true });
   
   return true;
@@ -270,4 +330,32 @@ export function createApiSuccess<T>(data: T) {
     success: true as const,
     data,
   };
+}
+
+// ========================================
+// Demo 相关函数（兼容性别名）
+// ========================================
+
+export function getDemosDir(): string {
+  return PROJECTS_DIR;
+}
+
+export function getDemoPath(demoId: string): string {
+  return getProjectPath(demoId);
+}
+
+export function demoExists(demoId: string): boolean {
+  return projectExists(demoId);
+}
+
+export function listDemos(): DemoMeta[] {
+  return listProjects();
+}
+
+export function createDemo(name: string): DemoMeta {
+  return createProject(name);
+}
+
+export function deleteDemo(demoId: string): boolean {
+  return deleteProject(demoId);
 }

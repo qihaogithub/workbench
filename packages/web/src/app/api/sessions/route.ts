@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentClient } from '@/lib/agent-client';
-import { listDemos, createApiSuccess, createApiError, getSessionFiles } from '@/lib/fs-utils';
+import { listProjects, createApiSuccess, createApiError, getSessionFiles } from '@/lib/fs-utils';
 import { findActiveSession, createEditSession } from '@/lib/session-manager';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { demoId } = body;
+    const { demoId: projectId } = body;
 
-    if (!demoId || typeof demoId !== 'string') {
+    if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json(
-        createApiError('INVALID_REQUEST', 'demoId 参数必填'),
+        createApiError('INVALID_REQUEST', 'projectId 参数必填'),
         { status: 400 }
       );
     }
 
-    const activeSessionId = findActiveSession(demoId);
+    const activeSessionId = findActiveSession(projectId);
     if (activeSessionId) {
       const files = getSessionFiles(activeSessionId);
       if (files) {
@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = await createEditSession(demoId);
+    const result = await createEditSession(projectId);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {
     console.error('Error creating session:', error);
 
     if (error instanceof Error && error.message.includes('不存在')) {
       return NextResponse.json(
-        createApiError('DEMO_NOT_FOUND'),
+        createApiError('PROJECT_NOT_FOUND'),
         { status: 404 }
       );
     }
