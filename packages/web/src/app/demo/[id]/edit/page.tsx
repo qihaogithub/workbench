@@ -44,6 +44,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [isSaving, setIsSaving] = useState(false)
 
   const [sessionId, setSessionId] = useState('')
+  const [tempWorkspace, setTempWorkspace] = useState('')
   const [previewSize, setPreviewSize] = useState<import('../../../../../components/demo/types').PreviewSize>()
 
   const scrollToBottom = () => {
@@ -71,6 +72,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
 
         setSessionId(sessionData.data.sessionId)
+        setTempWorkspace(sessionData.data.tempWorkspace || '')
 
         const filesRes = await fetch(`/api/sessions/${sessionData.data.sessionId}/files`)
         if (!filesRes.ok) {
@@ -290,7 +292,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               <AIChat
                 sessionId={sessionId}
                 agentSessionId={agentSessionId}
-                workingDir={undefined}
+                workingDir={tempWorkspace || undefined}
                 onCodeUpdate={handleCodeUpdate}
                 onSchemaUpdate={handleSchemaUpdate}
               />

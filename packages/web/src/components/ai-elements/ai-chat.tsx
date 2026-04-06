@@ -193,6 +193,7 @@ export function AIChat({
       stream.send(userMessage, `msg-${Date.now()}`, {
         timeout: 120000,
         stream: true,
+        workingDir,
       })
     } catch (error) {
       // WebSocket 失败，降级到非流式 HTTP
@@ -203,6 +204,7 @@ export function AIChat({
         const agentClient = getAgentClient()
         
         const result = await agentClient.sendMessage(agentSessionId, userMessage, {
+          workingDir,
           options: {
             timeout: 120000,
             stream: false,

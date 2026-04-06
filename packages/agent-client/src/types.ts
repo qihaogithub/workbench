@@ -78,6 +78,7 @@ export interface AgentResult {
 export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
+  workingDir?: string;
   context?: {
     files?: string[];
     presetRules?: string;

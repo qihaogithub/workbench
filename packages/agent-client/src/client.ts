@@ -243,6 +243,7 @@ export class AgentStream {
       type: 'message',
       id: id || `msg-${Date.now()}`,
       content,
+      workingDir: options?.workingDir,
       options,
     }));
   }

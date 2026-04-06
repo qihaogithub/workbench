@@ -15,6 +15,7 @@ interface ClientMessage {
   content?: string;
   sessionId?: string;
   modelId?: string;
+  workingDir?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -271,7 +272,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
               const config: AgentConfig = {
                 sessionId,
                 backend: 'opencode',
-                workingDir: process.cwd(),
+                workingDir: message.workingDir,
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -430,7 +431,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 backend: 'opencode',
-                workingDir: process.cwd(),
+                workingDir: message.workingDir,
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);

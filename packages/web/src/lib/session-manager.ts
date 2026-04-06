@@ -113,6 +113,7 @@ export interface CreateSessionResult {
   sessionId: string;
   code: string;
   schema: string;
+  tempWorkspace: string;
 }
 
 export function findActiveSession(projectId: string): string | null {
@@ -181,6 +182,7 @@ export async function createEditSession(projectId: string): Promise<CreateSessio
     sessionId,
     code: fs.readFileSync(codePath, 'utf-8'),
     schema: fs.readFileSync(schemaPath, 'utf-8'),
+    tempWorkspace: sessionPath,
   };
 }
 
