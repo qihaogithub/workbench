@@ -22,6 +22,29 @@ import { AcpApprovalStore, createAcpApprovalKey } from './approval-store';
 import { buildAcpModelInfo, AcpModelInfo } from './model-info';
 import { logger } from '../utils/logger';
 
+/**
+ * 清理环境变量（参考 AionUi 做法）
+ * 防止父进程环境变量干扰子进程
+ */
+function prepareCleanEnv(): Record<string, string> {
+  const env = { ...process.env } as Record<string, string>;
+
+  // 删除可能干扰子进程的 Node.js 相关变量
+  delete env.NODE_OPTIONS;
+  delete env.NODE_INSPECT;
+  delete env.NODE_DEBUG;
+  delete env.NODE_ENV;
+
+  // 删除 npm 生命周期变量
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('npm_')) {
+      delete env[key];
+    }
+  }
+
+  return env;
+}
+
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -94,13 +117,20 @@ export class AcpConnection extends EventEmitter {
     const args = [...(this.config?.acpArgs || [])];
     logger.info({ backend: this.backend, command, args }, 'Starting ACP process');
 
-    const useShell = command.startsWith('npx ') || command.includes(' ');
+    const isWindows = process.platform === 'win32';
+    const useShell = isWindows || command.startsWith('npx ') || command.includes(' ');
     const actualCommand = useShell ? command.split(' ')[0] : command;
     const actualArgs = useShell ? [...command.split(' ').slice(1), ...args] : args;
 
+    // 清理环境变量（参考 AionUi 做法）
+    const cleanEnv = prepareCleanEnv();
+    if (customEnv) {
+      Object.assign(cleanEnv, customEnv);
+    }
+
     this.child = spawn(actualCommand, actualArgs, {
       cwd: this.workingDir,
-      env: { ...process.env, ...customEnv, ...this.config?.env },
+      env: { ...cleanEnv, ...this.config?.env },
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: useShell,
     });
@@ -316,7 +346,7 @@ export class AcpConnection extends EventEmitter {
         ...(params && { params }),
       };
 
-      const timeoutDuration = method === ACP_METHODS.SESSION_PROMPT ? this.promptTimeoutMs : 60000;
+      const timeoutDuration = method === ACP_METHODS.SESSION_PROMPT ? this.promptTimeoutMs : 120000;
       const startTime = Date.now();
 
       const timeoutId = setTimeout(() => {
@@ -438,7 +468,8 @@ export class AcpConnection extends EventEmitter {
     if (!this.child?.stdin) {
       throw new Error('ACP process not running');
     }
-    const json = JSON.stringify(message) + '\n';
+    const lineEnding = process.platform === 'win32' ? '\r\n' : '\n';
+    const json = JSON.stringify(message) + lineEnding;
     this.child.stdin.write(json);
     logger.debug({ method: message.method, id: message.id }, 'Sent ACP request');
   }
@@ -470,6 +501,7 @@ export class AcpConnection extends EventEmitter {
 
     const params: Record<string, unknown> = {
       cwd: normalizedCwd,
+      mcpServers: [],
     };
 
     if (options?.model) {
