@@ -30,6 +30,7 @@ export interface AgentConfig {
   backend?: AgentType;
   workingDir?: string;
   demoId?: string;
+  model?: string;
 
   opencode?: OpenCodeConfig;
   claude?: ClaudeConfig;
@@ -109,13 +110,36 @@ export interface ResultMetadata {
 // 事件类型
 // ============================================================
 
-export type EventType = 'stream' | 'error' | 'finish' | 'status';
+export type EventType = 'stream' | 'thought' | 'tool_call' | 'tool_call_update' | 'error' | 'finish' | 'status';
 
 export interface StreamEvent {
   type: 'stream';
   sessionId: string;
   content: string;
   done: boolean;
+}
+
+export interface ThoughtEvent {
+  type: 'thought';
+  sessionId: string;
+  content: string;
+  done: boolean;
+}
+
+export interface ToolCallEvent {
+  type: 'tool_call';
+  sessionId: string;
+  toolCallId: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  title: string;
+  kind: 'read' | 'edit' | 'execute';
+}
+
+export interface ToolCallUpdateEvent {
+  type: 'tool_call_update';
+  sessionId: string;
+  toolCallId: string;
+  status: 'completed' | 'failed';
 }
 
 export interface ErrorEvent {
@@ -136,6 +160,6 @@ export interface StatusEvent {
   status: AgentStatus;
 }
 
-export type AgentEvent = StreamEvent | ErrorEvent | FinishEvent | StatusEvent;
+export type AgentEvent = StreamEvent | ThoughtEvent | ToolCallEvent | ToolCallUpdateEvent | ErrorEvent | FinishEvent | StatusEvent;
 
 export type EventHandler<T extends AgentEvent = AgentEvent> = (event: T) => void;

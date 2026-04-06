@@ -125,6 +125,10 @@ export class AgentManager implements IAgentManager {
     return this.agents.size;
   }
 
+  getRegisteredTypes(): string[] {
+    return Array.from(this.agents.keys());
+  }
+
   cleanupIdleAgents(timeoutMs?: number): number {
     const timeout = timeoutMs ?? this.idleTimeoutMs;
     const now = Date.now();

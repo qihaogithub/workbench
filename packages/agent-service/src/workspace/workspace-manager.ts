@@ -1,0 +1,139 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import type { WorkspaceInfo, CreateWorkspaceOptions } from '@opencode-workbench/shared';
+import {
+  getSystemTempDir,
+  generateTempWorkspaceName,
+  normalizeWorkspacePath,
+  isTemporaryWorkspace,
+  getWorkspaceDisplayName,
+} from './utils';
+import { logger } from '../utils/logger';
+
+export class WorkspaceManager {
+  private static instance: WorkspaceManager;
+  private tempBaseDir: string;
+
+  private constructor() {
+    this.tempBaseDir = getSystemTempDir();
+  }
+
+  static getInstance(): WorkspaceManager {
+    if (!WorkspaceManager.instance) {
+      WorkspaceManager.instance = new WorkspaceManager();
+    }
+    return WorkspaceManager.instance;
+  }
+
+  async create(options: CreateWorkspaceOptions): Promise<WorkspaceInfo> {
+    const { backend, workspace, customWorkspace: providedCustomWorkspace } = options;
+
+    const customWorkspace = providedCustomWorkspace !== undefined
+      ? providedCustomWorkspace
+      : !!workspace;
+
+    let workspacePath: string;
+
+    if (!workspace) {
+      workspacePath = await this.createTempWorkspace(backend);
+    } else {
+      workspacePath = await this.createOrValidateUserWorkspace(workspace);
+    }
+
+    const info: WorkspaceInfo = {
+      path: workspacePath,
+      customWorkspace,
+      type: customWorkspace ? 'user' : 'temp',
+      createdAt: Date.now(),
+    };
+
+    logger.info({ workspacePath, customWorkspace, backend }, 'Workspace created');
+    return info;
+  }
+
+  private async createTempWorkspace(backend: string): Promise<string> {
+    const tempDir = this.tempBaseDir;
+    
+    if (!fs.existsSync(tempDir)) {
+      await fs.promises.mkdir(tempDir, { recursive: true });
+    }
+
+    const workspaceName = generateTempWorkspaceName(backend);
+    const workspacePath = path.join(tempDir, workspaceName);
+
+    await fs.promises.mkdir(workspacePath, { recursive: true });
+    
+    logger.debug({ workspacePath, backend }, 'Temporary workspace created');
+    return workspacePath;
+  }
+
+  private async createOrValidateUserWorkspace(workspace: string): Promise<string> {
+    const normalizedPath = normalizeWorkspacePath(workspace);
+
+    if (!fs.existsSync(normalizedPath)) {
+      await fs.promises.mkdir(normalizedPath, { recursive: true });
+      logger.debug({ workspacePath: normalizedPath }, 'User workspace created');
+    } else {
+      logger.debug({ workspacePath: normalizedPath }, 'Using existing user workspace');
+    }
+
+    return normalizedPath;
+  }
+
+  async cleanup(workspacePath: string): Promise<void> {
+    if (!isTemporaryWorkspace(workspacePath, this.tempBaseDir)) {
+      logger.debug({ workspacePath }, 'Skipping cleanup of user workspace');
+      return;
+    }
+
+    try {
+      if (fs.existsSync(workspacePath)) {
+        await fs.promises.rm(workspacePath, { recursive: true, force: true });
+        logger.info({ workspacePath }, 'Temporary workspace cleaned up');
+      }
+    } catch (error) {
+      logger.error({ error, workspacePath }, 'Failed to cleanup temporary workspace');
+    }
+  }
+
+  getTempDir(): string {
+    return this.tempBaseDir;
+  }
+
+  isTemporary(workspacePath: string): boolean {
+    return isTemporaryWorkspace(workspacePath, this.tempBaseDir);
+  }
+
+  getDisplayName(workspacePath: string): string {
+    return getWorkspaceDisplayName(workspacePath);
+  }
+
+  normalize(workspacePath: string): string {
+    return normalizeWorkspacePath(workspacePath);
+  }
+
+  async cleanupAllTempWorkspaces(): Promise<void> {
+    const tempDir = this.tempBaseDir;
+
+    if (!fs.existsSync(tempDir)) {
+      return;
+    }
+
+    try {
+      const entries = await fs.promises.readdir(tempDir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const dirPath = path.join(tempDir, entry.name);
+          await fs.promises.rm(dirPath, { recursive: true, force: true });
+        }
+      }
+
+      logger.info({ tempDir }, 'All temporary workspaces cleaned up');
+    } catch (error) {
+      logger.error({ error, tempDir }, 'Failed to cleanup all temporary workspaces');
+    }
+  }
+}
+
+export const workspaceManager = WorkspaceManager.getInstance();

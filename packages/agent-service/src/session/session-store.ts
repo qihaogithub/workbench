@@ -1,10 +1,15 @@
 import { AgentConfig, AgentStatus } from '../core/types';
+import type { WorkspaceMeta } from '@opencode-workbench/shared';
 
 export interface SessionMeta {
   sessionId: string;
   demoId?: string;
   backend: string;
-  workingDir?: string;
+  workingDir: string;
+  customWorkspace: boolean;
+  workspaceType: 'user' | 'temp';
+  snapshotMode: 'git-repo' | 'snapshot' | null;
+  snapshotBranch: string | null;
   status: AgentStatus;
   createdAt: number;
   updatedAt: number;
@@ -12,8 +17,12 @@ export interface SessionMeta {
   opencodeSessionId?: string;
 }
 
+export interface CreateSessionOptions extends AgentConfig {
+  workspaceMeta?: WorkspaceMeta;
+}
+
 export interface ISessionStore {
-  create(sessionId: string, config: AgentConfig): SessionMeta;
+  create(sessionId: string, config: CreateSessionOptions): SessionMeta;
   get(sessionId: string): SessionMeta | undefined;
   update(sessionId: string, updates: Partial<SessionMeta>): void;
   delete(sessionId: string): void;
@@ -29,12 +38,18 @@ export interface SessionFilter {
 export class MemorySessionStore implements ISessionStore {
   private sessions: Map<string, SessionMeta> = new Map();
 
-  create(sessionId: string, config: AgentConfig): SessionMeta {
+  create(sessionId: string, config: CreateSessionOptions): SessionMeta {
+    const workspaceMeta = config.workspaceMeta;
+    
     const meta: SessionMeta = {
       sessionId,
       demoId: config.demoId,
       backend: config.backend || 'opencode',
-      workingDir: config.workingDir,
+      workingDir: workspaceMeta?.workingDir || config.workingDir || '',
+      customWorkspace: workspaceMeta?.customWorkspace ?? false,
+      workspaceType: workspaceMeta?.workspaceType || 'temp',
+      snapshotMode: workspaceMeta?.snapshotMode ?? null,
+      snapshotBranch: workspaceMeta?.snapshotBranch ?? null,
       status: 'initializing',
       createdAt: Date.now(),
       updatedAt: Date.now(),

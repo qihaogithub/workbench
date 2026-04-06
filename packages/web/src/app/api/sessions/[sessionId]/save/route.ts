@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveEditSession } from '@/lib/session-manager';
+import { getAgentClient } from '@/lib/agent-client';
 import { createApiSuccess, createApiError } from '@/lib/fs-utils';
 
 export async function POST(
@@ -8,17 +8,18 @@ export async function POST(
 ) {
   try {
     const { sessionId } = params;
-    
-    const success = saveEditSession(sessionId);
-    
-    if (!success) {
+
+    const agentClient = getAgentClient();
+    const result = await agentClient.destroySession(sessionId);
+
+    if (!result.success) {
       return NextResponse.json(
-        createApiError('SESSION_NOT_FOUND'),
-        { status: 404 }
+        createApiError('AGENT_SERVICE_ERROR', result.error.message),
+        { status: 500 }
       );
     }
-    
-    return NextResponse.json(createApiSuccess(null));
+
+    return NextResponse.json(createApiSuccess({ sessionId }));
   } catch (error) {
     console.error('Error saving session:', error);
     return NextResponse.json(

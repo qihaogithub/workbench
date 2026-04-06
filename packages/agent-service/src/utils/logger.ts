@@ -1,9 +1,13 @@
 import pino from 'pino';
 
 export interface Logger {
+  info(obj: Record<string, unknown>, message?: string): void;
   info(message: string, ...args: unknown[]): void;
+  warn(obj: Record<string, unknown>, message?: string): void;
   warn(message: string, ...args: unknown[]): void;
+  error(obj: Record<string, unknown>, message?: string): void;
   error(message: string, ...args: unknown[]): void;
+  debug(obj: Record<string, unknown>, message?: string): void;
   debug(message: string, ...args: unknown[]): void;
 }
 
@@ -29,3 +33,5 @@ export function getLogger(): Logger {
   }
   return globalLogger;
 }
+
+export const logger = getLogger();

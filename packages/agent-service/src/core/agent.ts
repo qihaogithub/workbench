@@ -6,6 +6,9 @@ import {
   EventHandler,
   AgentEvent,
   StreamEvent,
+  ThoughtEvent,
+  ToolCallEvent,
+  ToolCallUpdateEvent,
   ErrorEvent,
   FinishEvent,
   StatusEvent,
@@ -48,7 +51,7 @@ export abstract class BaseAgent extends EventEmitter {
     });
   }
 
-  abstract start(): Promise<void>;
+  abstract start(options?: { resumeSessionId?: string }): Promise<void>;
   abstract sendMessage(content: string, options?: SendMessageOptions): Promise<AgentResult>;
   abstract cancel(): void;
   abstract kill(): Promise<void>;
@@ -76,10 +79,17 @@ export abstract class BaseAgent extends EventEmitter {
       workingDir: this.config.workingDir,
     };
   }
+
+  abstract setModel?(modelId: string): Promise<void>;
+  abstract getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  abstract getCurrentSessionId?(): string | null;
 }
 
 interface EventMap {
   stream: StreamEvent;
+  thought: ThoughtEvent;
+  tool_call: ToolCallEvent;
+  tool_call_update: ToolCallUpdateEvent;
   error: ErrorEvent;
   finish: FinishEvent;
   status: StatusEvent;

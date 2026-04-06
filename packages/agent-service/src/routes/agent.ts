@@ -2,8 +2,12 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
 import { MemorySessionStore } from '../session/session-store';
-import { getChangedFiles } from '../session/session-guard';
+import { getChangedFiles, validatePath } from '../session/session-guard';
+import { snapshotService } from '../session/snapshot-service';
+import { workspaceManager } from '../workspace/workspace-manager';
+import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig, AgentType } from '../core/types';
+import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
   sessionId: string;
@@ -14,6 +18,7 @@ interface SendMessageBody {
   demoId?: string;
   backend?: AgentType;
   workingDir?: string;
+  customWorkspace?: boolean;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -30,6 +35,22 @@ interface RollbackBody {
   files?: string[];
 }
 
+interface UpdateWorkspaceBody {
+  workingDir: string;
+  customWorkspace?: boolean;
+}
+
+interface StageFilesBody {
+  files: string[];
+}
+
+interface DiscardFilesBody {
+  files: Array<{
+    path: string;
+    operation: 'create' | 'modify' | 'delete';
+  }>;
+}
+
 export async function registerAgentRoutes(fastify: FastifyInstance) {
   const manager = getAgentManager();
 
@@ -39,7 +60,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, demoId, backend, workingDir, options } = request.body;
+      const { content, demoId, backend, workingDir, customWorkspace, options } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -52,17 +73,48 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       }
 
       try {
+        let workspaceInfo: WorkspaceInfo | undefined;
+        
+        if (workingDir) {
+          workspaceInfo = await workspaceManager.create({
+            backend: backend || 'opencode',
+            workspace: workingDir,
+            customWorkspace,
+          });
+        } else {
+          const existingSession = sessionStore.get(sessionId);
+          if (!existingSession) {
+            workspaceInfo = await workspaceManager.create({
+              backend: backend || 'opencode',
+            });
+          }
+        }
+
         const config: AgentConfig = {
           sessionId,
           backend: backend || 'opencode',
           demoId,
-          workingDir,
+          workingDir: workspaceInfo?.path || workingDir,
         };
 
         const agent = manager.getOrCreate(sessionId, config);
 
         if (agent.status === 'initializing') {
           await agent.start();
+          
+          if (workspaceInfo) {
+            const snapshotInfo = await snapshotService.init(workspaceInfo.path);
+            sessionStore.create(sessionId, {
+              ...config,
+              workspaceMeta: {
+                workingDir: workspaceInfo.path,
+                customWorkspace: workspaceInfo.customWorkspace,
+                workspaceType: workspaceInfo.type,
+                snapshotMode: snapshotInfo.mode,
+                snapshotBranch: snapshotInfo.branch,
+              },
+            });
+          }
         }
 
         sessionStore.update(sessionId, {
@@ -126,6 +178,12 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId',
     async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
+      const session = sessionStore.get(sessionId);
+
+      if (session?.workingDir && session.workspaceType === 'temp') {
+        await workspaceManager.cleanup(session.workingDir);
+        snapshotService.clearSnapshot(session.workingDir);
+      }
 
       await manager.destroy(sessionId);
       sessionStore.delete(sessionId);
@@ -144,9 +202,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/files',
     async (request: FastifyRequest<{ Params: SessionParams; Querystring: { includeContent?: string } }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const agent = manager.get(sessionId);
+      const session = sessionStore.get(sessionId);
 
-      if (!agent) {
+      if (!session) {
         return reply.code(404).send({
           success: false,
           error: {
@@ -156,8 +214,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const info = agent.getInfo();
-      const workingDir = info.workingDir;
+      const workingDir = session.workingDir;
 
       if (!workingDir) {
         return reply.send({
@@ -165,20 +222,21 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           data: {
             sessionId,
             files: [],
+            staged: [],
+            unstaged: [],
           },
         });
       }
 
-      const files = getChangedFiles(workingDir);
+      const compareResult = await snapshotService.compare(workingDir);
 
       return reply.send({
         success: true,
         data: {
           sessionId,
-          files: files.map((file) => ({
-            path: file,
-            action: 'modified' as const,
-          })),
+          files: [...compareResult.staged, ...compareResult.unstaged],
+          staged: compareResult.staged,
+          unstaged: compareResult.unstaged,
         },
       });
     }
@@ -225,77 +283,185 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post<{ Params: SessionParams; Body: { modelId: string } }>(
-    '/api/agent/:sessionId/model',
-    async (request: FastifyRequest<{ Params: SessionParams; Body: { modelId: string } }>, reply: FastifyReply) => {
-      const { sessionId } = request.params;
-      const { modelId } = request.body;
-      const agent = manager.get(sessionId);
-
-      if (!agent) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
-        });
-      }
-
-      if (agent instanceof BackendAgent) {
-        const result = await agent.setModel(modelId);
-        return reply.send({ success: true, data: result });
-      }
-
-      return reply.send({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Model switching not supported for this agent' },
-      });
-    }
-  );
-
-  fastify.post<{ Params: SessionParams; Body: { mode: string } }>(
-    '/api/agent/:sessionId/mode',
-    async (request: FastifyRequest<{ Params: SessionParams; Body: { mode: string } }>, reply: FastifyReply) => {
-      const { sessionId } = request.params;
-      const { mode } = request.body;
-      const agent = manager.get(sessionId);
-
-      if (!agent) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
-        });
-      }
-
-      if (agent instanceof BackendAgent) {
-        const result = await agent.setMode(mode);
-        return reply.send({ success: true, data: result });
-      }
-
-      return reply.send({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Mode switching not supported for this agent' },
-      });
-    }
-  );
-
   fastify.get<{ Params: SessionParams }>(
-    '/api/agent/:sessionId/models',
+    '/api/agent/:sessionId/workspace',
     async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const agent = manager.get(sessionId);
+      const session = sessionStore.get(sessionId);
 
-      if (!agent) {
+      if (!session) {
         return reply.code(404).send({
           success: false,
-          error: { code: 'SESSION_NOT_FOUND', message: `Session ${sessionId} 不存在` },
+          error: {
+            code: 'SESSION_NOT_FOUND',
+            message: `Session ${sessionId} 不存在`,
+          },
         });
       }
 
-      if (agent instanceof BackendAgent) {
-        const models = await agent.getModels();
-        return reply.send({ success: true, data: { models } });
+      return reply.send({
+        success: true,
+        data: {
+          sessionId,
+          workingDir: session.workingDir,
+          displayName: getWorkspaceDisplayName(session.workingDir),
+          customWorkspace: session.customWorkspace,
+          workspaceType: session.workspaceType,
+          snapshotMode: session.snapshotMode,
+          snapshotBranch: session.snapshotBranch,
+        },
+      });
+    }
+  );
+
+  fastify.put<{ Params: SessionParams; Body: UpdateWorkspaceBody }>(
+    '/api/agent/:sessionId/workspace',
+    async (request: FastifyRequest<{ Params: SessionParams; Body: UpdateWorkspaceBody }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const { workingDir, customWorkspace } = request.body;
+
+      const session = sessionStore.get(sessionId);
+      if (!session) {
+        return reply.code(404).send({
+          success: false,
+          error: {
+            code: 'SESSION_NOT_FOUND',
+            message: `Session ${sessionId} 不存在`,
+          },
+        });
       }
 
-      return reply.send({ success: true, data: { models: [] } });
+      const pathValidation = validatePath(session.workingDir, workingDir);
+      if (!pathValidation.valid) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: 'FILE_ACCESS_DENIED',
+            message: pathValidation.violations.join('; '),
+          },
+        });
+      }
+
+      const workspaceInfo = await workspaceManager.create({
+        backend: session.backend,
+        workspace: workingDir,
+        customWorkspace,
+      });
+
+      const snapshotInfo = await snapshotService.init(workspaceInfo.path);
+
+      sessionStore.update(sessionId, {
+        workingDir: workspaceInfo.path,
+        customWorkspace: workspaceInfo.customWorkspace,
+        workspaceType: workspaceInfo.type,
+        snapshotMode: snapshotInfo.mode,
+        snapshotBranch: snapshotInfo.branch,
+      });
+
+      return reply.send({
+        success: true,
+        data: {
+          sessionId,
+          workingDir: workspaceInfo.path,
+          displayName: getWorkspaceDisplayName(workspaceInfo.path),
+          customWorkspace: workspaceInfo.customWorkspace,
+          workspaceType: workspaceInfo.type,
+          snapshotMode: snapshotInfo.mode,
+          snapshotBranch: snapshotInfo.branch,
+        },
+      });
+    }
+  );
+
+  fastify.post<{ Params: SessionParams; Body: StageFilesBody }>(
+    '/api/agent/:sessionId/files/stage',
+    async (request: FastifyRequest<{ Params: SessionParams; Body: StageFilesBody }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const { files } = request.body;
+
+      const session = sessionStore.get(sessionId);
+      if (!session) {
+        return reply.code(404).send({
+          success: false,
+          error: {
+            code: 'SESSION_NOT_FOUND',
+            message: `Session ${sessionId} 不存在`,
+          },
+        });
+      }
+
+      if (!session.workingDir) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_PARAMS',
+            message: 'Session 没有绑定工作空间',
+          },
+        });
+      }
+
+      const stagedFiles: string[] = [];
+      for (const file of files) {
+        const validation = validatePath(session.workingDir, file);
+        if (validation.valid) {
+          await snapshotService.stageFile(session.workingDir, file);
+          stagedFiles.push(file);
+        }
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          sessionId,
+          staged: stagedFiles,
+        },
+      });
+    }
+  );
+
+  fastify.post<{ Params: SessionParams; Body: DiscardFilesBody }>(
+    '/api/agent/:sessionId/files/discard',
+    async (request: FastifyRequest<{ Params: SessionParams; Body: DiscardFilesBody }>, reply: FastifyReply) => {
+      const { sessionId } = request.params;
+      const { files } = request.body;
+
+      const session = sessionStore.get(sessionId);
+      if (!session) {
+        return reply.code(404).send({
+          success: false,
+          error: {
+            code: 'SESSION_NOT_FOUND',
+            message: `Session ${sessionId} 不存在`,
+          },
+        });
+      }
+
+      if (!session.workingDir) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_PARAMS',
+            message: 'Session 没有绑定工作空间',
+          },
+        });
+      }
+
+      const discardedFiles: string[] = [];
+      for (const file of files) {
+        const validation = validatePath(session.workingDir, file.path);
+        if (validation.valid) {
+          await snapshotService.discardFile(session.workingDir, file.path, file.operation);
+          discardedFiles.push(file.path);
+        }
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          sessionId,
+          discarded: discardedFiles,
+        },
+      });
     }
   );
 }

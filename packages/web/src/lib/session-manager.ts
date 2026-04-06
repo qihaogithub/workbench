@@ -1,6 +1,5 @@
 import path from 'path';
 import fs from 'fs';
-import { OPENCODE_CONFIG_TEMPLATE, AGENTS_MD_TEMPLATE } from './templates/permission-config';
 import {
   getDemosDir,
   getSessionsDir,
@@ -11,7 +10,6 @@ import {
   deleteSession,
 } from './fs-utils';
 
-const OPENCODE_SERVER_URL = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export interface CreateSessionResult {
@@ -61,20 +59,10 @@ export async function createEditSession(demoId: string): Promise<CreateSessionRe
 
   fs.cpSync(demoPath, sessionPath, { recursive: true });
 
-  const opencodeConfigPath = path.join(sessionPath, 'opencode.json');
-  fs.writeFileSync(opencodeConfigPath, JSON.stringify(OPENCODE_CONFIG_TEMPLATE, null, 2), 'utf-8');
-
-  const agentsMdPath = path.join(sessionPath, 'AGENTS.md');
-  if (!fs.existsSync(agentsMdPath)) {
-    fs.writeFileSync(agentsMdPath, AGENTS_MD_TEMPLATE, 'utf-8');
-  }
-
-  const ocSessionId = await createOpenCodeSession(sessionId);
-
   const sessionMeta = {
     sessionId,
     demoId,
-    opencodeSessionId: ocSessionId,
+    opencodeSessionId: null,
     createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
   };
@@ -92,33 +80,6 @@ export async function createEditSession(demoId: string): Promise<CreateSessionRe
     code: fs.readFileSync(codePath, 'utf-8'),
     schema: fs.readFileSync(schemaPath, 'utf-8'),
   };
-}
-
-async function createOpenCodeSession(sessionId: string): Promise<string> {
-  const http = require('http');
-  return new Promise<string>((resolve, reject) => {
-    const req = http.request(`${OPENCODE_SERVER_URL}/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
-    let raw = '';
-    req.on('data', (chunk: string) => raw += chunk);
-    req.on('response', (res: any) => {
-      res.on('data', (chunk: string) => raw += chunk);
-      res.on('end', () => {
-        try {
-          const data = JSON.parse(raw);
-          resolve(data.id);
-        } catch {
-          reject(new Error(`Failed to create opencode session: ${raw.substring(0, 200)}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(JSON.stringify({ title: `Edit: ${sessionId}` }));
-    req.end();
-  });
 }
 
 export function getEditSession(sessionId: string) {
@@ -161,11 +122,6 @@ export function saveEditSession(sessionId: string): boolean {
   const metaInDemo = path.join(demoPath, '.session.json');
   if (fs.existsSync(metaInDemo)) {
     fs.rmSync(metaInDemo, { force: true });
-  }
-
-  const opencodeConfig = path.join(demoPath, 'opencode.json');
-  if (fs.existsSync(opencodeConfig)) {
-    fs.rmSync(opencodeConfig, { force: true });
   }
 
   deleteSession(sessionId);

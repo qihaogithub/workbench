@@ -23,6 +23,34 @@ export interface FileChange {
   content?: string;
 }
 
+export interface FileChangeInfo {
+  path: string;
+  operation: 'create' | 'modify' | 'delete';
+  status: 'staged' | 'unstaged';
+}
+
+export interface FilesResponse {
+  sessionId: string;
+  files: FileChangeInfo[];
+  staged: FileChangeInfo[];
+  unstaged: FileChangeInfo[];
+}
+
+export interface WorkspaceInfo {
+  sessionId: string;
+  workingDir: string;
+  displayName: string;
+  customWorkspace: boolean;
+  workspaceType: 'user' | 'temp';
+  snapshotMode: 'git-repo' | 'snapshot' | null;
+  snapshotBranch: string | null;
+}
+
+export interface UpdateWorkspaceOptions {
+  workingDir: string;
+  customWorkspace?: boolean;
+}
+
 export interface AgentError {
   code: ErrorCode;
   message: string;

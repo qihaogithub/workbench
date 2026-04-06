@@ -1,117 +1,68 @@
-import { BaseAgent } from '../core/agent';
-import { AgentConfig, AgentResult, SendMessageOptions, StreamEvent } from '../core/types';
+import { BaseAgent } from './agent';
+import { AgentConfig, AgentResult, SendMessageOptions, AgentEvent } from './types';
 import { IBackendAdapter } from '../backends/base';
 
+interface BackendWithModelSupport extends IBackendAdapter {
+  setModel?: (modelId: string) => Promise<void>;
+  getModelInfo?: () => { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  getCurrentSessionId?: () => string | null;
+  start?: (options?: { resumeSessionId?: string }) => Promise<void>;
+  getFiles?: () => Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+}
+
 export class BackendAgent extends BaseAgent {
-  private backend: IBackendAdapter;
-  private bootstrap: Promise<void> | undefined;
-  private bootstrapping = false;
-  private isFirstMessage = true;
+  private backend: BackendWithModelSupport;
   private busy = false;
-  private streamBuffer: Map<string, { content: string; timer: ReturnType<typeof setTimeout> }> = new Map();
-  private readonly STREAM_FLUSH_MS = 120;
+  private initialized = false;
 
   constructor(config: AgentConfig, backend: IBackendAdapter) {
     super(config);
-    this.backend = backend;
+    this.backend = backend as BackendWithModelSupport;
 
-    this.backend.onStream?.((event) => {
-      this.bufferStreamEvent(event);
-    });
-
-    this.backend.onError?.((event) => {
-      this.flushStreamBuffer();
-      this.emit('error', event);
-    });
-
-    this.backend.onFinish?.((event) => {
-      this.flushStreamBuffer();
-      this.emit('finish', event);
+    this.backend.onStream((event) => {
+      this.emit(event.type, event);
     });
   }
 
-  private bufferStreamEvent(event: StreamEvent): void {
-    const key = this.config.sessionId;
-    const existing = this.streamBuffer.get(key);
-
-    if (existing) {
-      existing.content += event.content;
-      clearTimeout(existing.timer);
-      existing.timer = setTimeout(() => this.flushStreamEvent(key), this.STREAM_FLUSH_MS);
-      return;
-    }
-
-    const timer = setTimeout(() => this.flushStreamEvent(key), this.STREAM_FLUSH_MS);
-    this.streamBuffer.set(key, { content: event.content, timer });
-  }
-
-  private flushStreamEvent(key: string): void {
-    const buffered = this.streamBuffer.get(key);
-    if (!buffered) return;
-
-    this.streamBuffer.delete(key);
-    this.emit('stream', {
-      type: 'stream',
-      sessionId: this.config.sessionId,
-      content: buffered.content,
-      done: false,
-    });
-  }
-
-  private flushStreamBuffer(): void {
-    for (const key of this.streamBuffer.keys()) {
-      const buffered = this.streamBuffer.get(key);
-      if (buffered) {
-        clearTimeout(buffered.timer);
-        this.emit('stream', {
-          type: 'stream',
-          sessionId: this.config.sessionId,
-          content: buffered.content,
-          done: false,
-        });
+  async start(options?: { resumeSessionId?: string }): Promise<void> {
+    if (!this.initialized) {
+      if (this.backend.start) {
+        await this.backend.start(options);
+      } else {
+        await this.backend.initialize();
       }
+      this.initialized = true;
     }
-    this.streamBuffer.clear();
-  }
-
-  private initBackend(): Promise<void> {
-    if (this.bootstrap) return this.bootstrap;
-    this.bootstrapping = true;
-    this.bootstrap = (async () => {
-      await this.backend.connect();
-      this.bootstrapping = false;
-    })();
-    return this.bootstrap;
-  }
-
-  async start(): Promise<void> {
-    await this.initBackend();
     this.setStatus('ready');
   }
 
   async sendMessage(content: string, options?: SendMessageOptions): Promise<AgentResult> {
-    this.bootstrapping = false;
     this.busy = true;
     this.messageCount++;
-
-    if (this.isFirstMessage) {
-      this.isFirstMessage = false;
-    }
-
     this.setStatus('processing');
 
     try {
-      await this.initBackend();
-      const result = await this.backend.sendMessage(content, options);
-
-      if (!result.success) {
-        this.busy = false;
+      if (!this.initialized) {
+        if (this.backend.start) {
+          await this.backend.start();
+        } else {
+          await this.backend.initialize();
+        }
+        this.initialized = true;
       }
 
-      this.setStatus(result.success ? 'ready' : 'error');
-      return result;
+      const resultContent = await this.backend.sendMessage(content, { stream: options?.stream });
+      this.busy = false;
+      this.setStatus('ready');
+
+      const files = this.backend.getFiles?.() || [];
+
+      return {
+        success: true,
+        content: resultContent,
+        files: files.length > 0 ? files : undefined,
+      };
     } catch (error) {
-      this.flushStreamBuffer();
       this.busy = false;
       this.setStatus('error');
       return {
@@ -126,14 +77,13 @@ export class BackendAgent extends BaseAgent {
   }
 
   cancel(): void {
-    this.backend.cancel();
     this.busy = false;
   }
 
   async kill(): Promise<void> {
-    this.flushStreamBuffer();
-    await this.backend.disconnect();
+    await this.backend.destroy();
     this.busy = false;
+    this.initialized = false;
     this.setStatus('destroyed');
   }
 
@@ -141,24 +91,25 @@ export class BackendAgent extends BaseAgent {
     return this.busy;
   }
 
-  async setModel(modelId: string): Promise<{ success: boolean; error?: string }> {
+  async setModel(modelId: string): Promise<void> {
     if (this.backend.setModel) {
-      return this.backend.setModel(modelId);
+      await this.backend.setModel(modelId);
+    } else {
+      throw new Error('Model switching not supported by this backend');
     }
-    return { success: false, error: 'Model switching not supported' };
   }
 
-  async setMode(mode: string): Promise<{ success: boolean; error?: string }> {
-    if (this.backend.setMode) {
-      return this.backend.setMode(mode);
+  getModelInfo(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null {
+    if (this.backend.getModelInfo) {
+      return this.backend.getModelInfo();
     }
-    return { success: false, error: 'Mode switching not supported' };
+    return null;
   }
 
-  async getModels(): Promise<string[]> {
-    if (this.backend.getModels) {
-      return this.backend.getModels();
+  getCurrentSessionId(): string | null {
+    if (this.backend.getCurrentSessionId) {
+      return this.backend.getCurrentSessionId();
     }
-    return [];
+    return null;
   }
 }

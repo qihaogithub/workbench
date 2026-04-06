@@ -1,148 +1,78 @@
-import { AgentConfig, AgentResult, SendMessageOptions, AgentError } from '../core/types';
-import { BaseBackendAdapter } from './base';
+import { IBackendAdapter, BackendStatus } from './base';
+import { AgentConfig, AgentEvent } from '../core/types';
 import { request } from 'undici';
+import { logger } from '../utils/logger';
 
-const DEFAULT_MODEL = 'gemini-2.5-pro';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 const DEFAULT_TIMEOUT = 120000;
 
-export class GeminiBackend extends BaseBackendAdapter {
-  readonly type = 'gemini';
+export class GeminiBackend implements IBackendAdapter {
+  readonly name = 'gemini';
+  private config: AgentConfig;
   private apiKey: string;
   private model: string;
   private timeout: number;
+  private status: BackendStatus = 'idle';
+  private eventCallback?: (event: AgentEvent) => void;
   private conversationHistory: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
   constructor(config: AgentConfig) {
-    super(config);
+    this.config = config;
     this.apiKey = config.gemini?.apiKey || process.env.GEMINI_API_KEY || '';
     this.model = config.gemini?.model || DEFAULT_MODEL;
     this.timeout = config.gemini?.timeout || DEFAULT_TIMEOUT;
   }
 
-  async connect(): Promise<void> {
+  async initialize(): Promise<void> {
     if (!this.apiKey) {
-      throw new Error('Google API key is required. Set GEMINI_API_KEY environment variable.');
+      throw new Error('Gemini API key is required. Set GEMINI_API_KEY environment variable.');
     }
-    const healthy = await this.isHealthy();
-    if (!healthy) {
-      throw new Error('Gemini API is not available');
-    }
-    this.connected = true;
+    this.status = 'ready';
+    logger.info({ sessionId: this.config.sessionId }, 'Gemini backend initialized');
   }
 
-  async sendMessage(content: string, options?: SendMessageOptions): Promise<AgentResult> {
-    this.ensureConnected();
-
-    const timeout = options?.timeout || this.timeout;
-    this.createAbortController();
-    const startTime = Date.now();
-
+  async sendMessage(content: string, options?: { stream?: boolean }): Promise<string> {
+    this.status = 'busy';
     this.conversationHistory.push({ role: 'user', parts: [{ text: content }] });
 
-    this.emitStream({
-      type: 'stream',
-      sessionId: this.config.sessionId,
-      content: '',
-      done: false,
-    });
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?key=${this.apiKey}`;
 
     try {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.currentModel || this.model}:streamGenerateContent?key=${this.apiKey}`;
-
       const response = await request(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           contents: this.conversationHistory,
           systemInstruction: {
-            parts: [{ text: this.buildSystemInstruction() }],
+            parts: [{ text: this.buildSystemPrompt() }],
           },
         }),
-        signal: AbortSignal.timeout(timeout),
+        signal: AbortSignal.timeout(this.timeout),
       });
 
       const resultContent = await this.parseStreamResponse(response);
-
       this.conversationHistory.push({ role: 'model', parts: [{ text: resultContent }] });
-
-      const result: AgentResult = {
-        success: true,
-        content: resultContent,
-        metadata: {
-          model: this.currentModel || this.model,
-          duration: Date.now() - startTime,
-        },
-      };
-
-      this.emitFinish({
-        type: 'finish',
-        sessionId: this.config.sessionId,
-        result,
-      });
-
-      return result;
+      this.status = 'ready';
+      return resultContent;
     } catch (error) {
-      const agentError = this.handleError(error);
-
-      this.emitError({
-        type: 'error',
-        sessionId: this.config.sessionId,
-        error: agentError,
-      });
-
-      return {
-        success: false,
-        error: agentError,
-        metadata: { duration: Date.now() - startTime },
-      };
+      this.status = 'error';
+      throw error;
     }
   }
 
-  cancel(): void {
-    this.abortController?.abort();
-  }
-
-  async disconnect(): Promise<void> {
-    this.connected = false;
-    this.conversationHistory = [];
-  }
-
-  async isHealthy(): Promise<boolean> {
-    if (!this.apiKey) return false;
-    try {
-      const response = await request(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-      return response.statusCode === 200;
-    } catch {
-      return false;
-    }
-  }
-
-  async setModel(modelId: string): Promise<{ success: boolean; error?: string }> {
-    const validModels = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
-    if (!validModels.includes(modelId)) {
-      return { success: false, error: `Invalid model: ${modelId}` };
-    }
-    this.currentModel = modelId;
-    return { success: true };
-  }
-
-  async getModels(): Promise<string[]> {
-    return ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
-  }
-
-  private buildSystemInstruction(): string {
-    const base = 'You are a helpful coding assistant.';
+  private buildSystemPrompt(): string {
+    const basePrompt = 'You are a helpful coding assistant. You can read, write, and modify files.';
     if (this.config.workingDir) {
-      return `${base} Working directory: ${this.config.workingDir}`;
+      return `${basePrompt}\n\nWorking directory: ${this.config.workingDir}`;
     }
-    return base;
+    return basePrompt;
   }
 
   private async parseStreamResponse(response: { body: unknown }): Promise<string> {
     let fullContent = '';
+
     try {
       const reader = response.body as unknown as { getReader: () => ReadableStreamDefaultReader<Uint8Array> };
       if (reader.getReader) {
@@ -172,12 +102,14 @@ export class GeminiBackend extends BaseBackendAdapter {
                 for (const part of parts) {
                   if (part.text) {
                     fullContent += part.text;
-                    this.emitStream({
-                      type: 'stream',
-                      sessionId: this.config.sessionId,
-                      content: part.text,
-                      done: false,
-                    });
+                    if (this.eventCallback) {
+                      this.eventCallback({
+                        type: 'stream',
+                        sessionId: this.config.sessionId,
+                        content: part.text,
+                        done: false,
+                      });
+                    }
                   }
                 }
               }
@@ -194,21 +126,30 @@ export class GeminiBackend extends BaseBackendAdapter {
     return fullContent;
   }
 
-  private handleError(error: unknown): AgentError {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+  onStream(callback: (event: AgentEvent) => void): void {
+    this.eventCallback = callback;
+  }
 
-    if (message.includes('timeout') || message.includes('aborted')) {
-      return { code: 'MESSAGE_SEND_ERROR', message: '请求超时', retryable: true };
+  async getStatus(): Promise<BackendStatus> {
+    return this.status;
+  }
+
+  async destroy(): Promise<void> {
+    this.conversationHistory = [];
+    this.status = 'idle';
+    logger.info({ sessionId: this.config.sessionId }, 'Gemini backend destroyed');
+  }
+
+  async checkHealth(): Promise<boolean> {
+    if (!this.apiKey) return false;
+    try {
+      const response = await request(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+      return response.statusCode === 200;
+    } catch {
+      return false;
     }
-
-    if (message.includes('401') || message.includes('403')) {
-      return { code: 'BACKEND_UNAVAILABLE', message: 'API Key 无效或权限不足', retryable: false };
-    }
-
-    if (message.includes('429')) {
-      return { code: 'RATE_LIMIT_EXCEEDED', message: '请求频率过高，请稍后重试', retryable: true };
-    }
-
-    return { code: 'MESSAGE_SEND_ERROR', message, retryable: true };
   }
 }

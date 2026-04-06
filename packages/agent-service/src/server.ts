@@ -7,7 +7,20 @@ import { loadConfig } from './utils/config';
 import { getLogger } from './utils/logger';
 import { getAgentManager } from './core/agent-manager';
 import { getAgentFactory } from './core/agent-factory';
-import { OpenCodeBackend, ClaudeBackend, CodexBackend, GeminiBackend } from './backends';
+import {
+  ClaudeBackend,
+  CodexBackend,
+  GeminiBackend,
+  QwenBackend,
+  GooseBackend,
+  AuggieBackend,
+  KimiBackend,
+  CopilotBackend,
+  QoderBackend,
+  VibeBackend,
+  CustomBackend,
+} from './backends';
+import { OpenCodeAcpBackend } from './backends/opencode-acp';
 import { BackendAgent } from './core/backend-agent';
 import { registerRoutes } from './routes';
 
@@ -33,37 +46,37 @@ async function start() {
   });
 
   const factory = getAgentFactory();
-  factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeBackend(agentConfig)));
+
+  factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeAcpBackend(agentConfig)));
   factory.register('claude', (agentConfig) => new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)));
   factory.register('codex', (agentConfig) => new BackendAgent(agentConfig, new CodexBackend(agentConfig)));
   factory.register('gemini', (agentConfig) => new BackendAgent(agentConfig, new GeminiBackend(agentConfig)));
+  factory.register('qwen', (agentConfig) => new BackendAgent(agentConfig, new QwenBackend(agentConfig)));
+  factory.register('goose', (agentConfig) => new BackendAgent(agentConfig, new GooseBackend(agentConfig)));
+  factory.register('auggie', (agentConfig) => new BackendAgent(agentConfig, new AuggieBackend(agentConfig)));
+  factory.register('kimi', (agentConfig) => new BackendAgent(agentConfig, new KimiBackend(agentConfig)));
+  factory.register('copilot', (agentConfig) => new BackendAgent(agentConfig, new CopilotBackend(agentConfig)));
+  factory.register('qoder', (agentConfig) => new BackendAgent(agentConfig, new QoderBackend(agentConfig)));
+  factory.register('vibe', (agentConfig) => new BackendAgent(agentConfig, new VibeBackend(agentConfig)));
+  factory.register('custom', (agentConfig) => new BackendAgent(agentConfig, new CustomBackend(agentConfig)));
 
   await registerRoutes(fastify);
 
   fastify.get('/health', async () => {
     const backends = factory.getRegisteredTypes();
-    const checks: Record<string, { status: string }> = {};
-
-    for (const type of backends) {
-      try {
-        const testBackend = factory.create({ sessionId: '_health', backend: type });
-        if (testBackend instanceof BackendAgent) {
-          const healthy = await testBackend.getModels().then(() => true).catch(() => false);
-          checks[type] = { status: healthy ? 'ok' : 'degraded' };
-        }
-      } catch {
-        checks[type] = { status: 'error' };
-      }
-    }
+    const manager = getAgentManager();
 
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      agents: getAgentManager().count(),
+      agents: manager.count(),
       backends,
-      checks,
     };
+  });
+
+  fastify.get('/backends', async () => {
+    return factory.getRegisteredTypes();
   });
 
   process.on('SIGTERM', async () => {

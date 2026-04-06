@@ -3,6 +3,10 @@ import type {
   AgentInfo,
   SessionListResponse,
   FileChange,
+  FileChangeInfo,
+  FilesResponse,
+  WorkspaceInfo,
+  UpdateWorkspaceOptions,
   SendMessageOptions,
   ApiResponse,
   AgentType,
@@ -51,6 +55,7 @@ export class AgentClient {
       demoId?: string;
       backend?: AgentType;
       workingDir?: string;
+      customWorkspace?: boolean;
       options?: SendMessageOptions;
     }
   ): Promise<ApiResponse<AgentResult>> {
@@ -61,6 +66,7 @@ export class AgentClient {
         demoId: options?.demoId,
         backend: options?.backend,
         workingDir: options?.workingDir,
+        customWorkspace: options?.customWorkspace,
         options: options?.options,
       }),
     });
@@ -79,9 +85,9 @@ export class AgentClient {
   async getFiles(
     sessionId: string,
     includeContent = false
-  ): Promise<ApiResponse<{ sessionId: string; files: FileChange[] }>> {
+  ): Promise<ApiResponse<FilesResponse>> {
     const query = includeContent ? '?includeContent=true' : '';
-    return this.request<{ sessionId: string; files: FileChange[] }>(`/api/agent/${sessionId}/files${query}`);
+    return this.request<FilesResponse>(`/api/agent/${sessionId}/files${query}`);
   }
 
   async listSessions(params?: {
@@ -104,6 +110,46 @@ export class AgentClient {
   ): Promise<ApiResponse<{ sessionId: string; rolledBack: string[]; failed?: string[] }>> {
     return this.request<{ sessionId: string; rolledBack: string[]; failed?: string[] }>(
       `/api/agent/${sessionId}/rollback`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ files }),
+      }
+    );
+  }
+
+  async getWorkspace(sessionId: string): Promise<ApiResponse<WorkspaceInfo>> {
+    return this.request<WorkspaceInfo>(`/api/agent/${sessionId}/workspace`);
+  }
+
+  async updateWorkspace(
+    sessionId: string,
+    options: UpdateWorkspaceOptions
+  ): Promise<ApiResponse<WorkspaceInfo>> {
+    return this.request<WorkspaceInfo>(`/api/agent/${sessionId}/workspace`, {
+      method: 'PUT',
+      body: JSON.stringify(options),
+    });
+  }
+
+  async stageFiles(
+    sessionId: string,
+    files: string[]
+  ): Promise<ApiResponse<{ sessionId: string; staged: string[] }>> {
+    return this.request<{ sessionId: string; staged: string[] }>(
+      `/api/agent/${sessionId}/files/stage`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ files }),
+      }
+    );
+  }
+
+  async discardFiles(
+    sessionId: string,
+    files: Array<{ path: string; operation: 'create' | 'modify' | 'delete' }>
+  ): Promise<ApiResponse<{ sessionId: string; discarded: string[] }>> {
+    return this.request<{ sessionId: string; discarded: string[] }>(
+      `/api/agent/${sessionId}/files/discard`,
       {
         method: 'POST',
         body: JSON.stringify({ files }),
