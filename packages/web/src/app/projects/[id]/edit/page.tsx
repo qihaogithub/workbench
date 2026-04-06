@@ -4,8 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { projectApiClient } from '@/lib/project-api';
 import { getAgentClient } from '@/lib/agent-client';
-import type { ChatMessage } from '@/components/ui/chat-bubble';
-import { ChatBubble } from '@/components/ui/chat-bubble';
+import { AIChat } from '@/components/ai-elements/ai-chat';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,10 +41,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
   const basedOn = searchParams.get('basedOn');
 
   const [sessionInfo, setSessionInfo] = useState<EditSessionInfo | null>(null);
-  const [message, setMessage] = useState('');
   const [note, setNote] = useState('');
-  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [agentSessionId, setAgentSessionId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,77 +76,10 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
       const agentClient = getAgentClient();
       const newAgentSessionId = `project-${params.id}-${Date.now()}`;
       setAgentSessionId(newAgentSessionId);
-
-      // 添加欢迎消息
-      setAiMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: `欢迎！您正在编辑项目（基于 ${basedOn}）。请告诉我您需要做什么？`,
-        },
-      ]);
     } catch (err) {
       setError('初始化 Agent 会话失败');
     }
   }, [sessionId, basedOn, params.id, searchParams]);
-
-  // 自动滚动到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiMessages]);
-
-  // 发送消息到 Agent
-  const handleAiSend = async () => {
-    if (!message.trim() || isAiLoading || !agentSessionId) return;
-
-    const userMessage = message.trim();
-    setMessage('');
-    setAiMessages((prev) => [
-      ...prev,
-      { id: `user-${Date.now()}`, role: 'user', content: userMessage },
-    ]);
-    setIsAiLoading(true);
-    setError(null);
-
-    try {
-      const agentClient = getAgentClient();
-      
-      const result = await agentClient.sendMessage(agentSessionId, userMessage, {
-        workingDir: sessionInfo?.tempWorkspace,
-        options: {
-          timeout: 120000,
-          stream: false,
-        },
-      });
-
-      if (!result.success) {
-        throw new Error(result.error?.message || 'Agent 请求失败');
-      }
-
-      const aiReply = result.data?.content || '抱歉，我没有收到有效的回复。';
-
-      setAiMessages((prev) => [
-        ...prev,
-        { id: `assistant-${Date.now()}`, role: 'assistant', content: aiReply },
-      ]);
-
-      // 获取文件变更
-      if (result.data?.files) {
-        setFileChanges(result.data.files.length);
-      }
-    } catch (error) {
-      setAiMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
-        },
-      ]);
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
 
   // 保存变更
   const handleSave = async () => {
@@ -197,13 +126,6 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
       router.push('/projects');
     } catch (err) {
       setError(err instanceof Error ? err.message : '放弃编辑失败');
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAiSend();
     }
   };
 
@@ -259,72 +181,12 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col p-0">
-            {/* 消息列表 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {aiMessages.map((msg) => (
-                <ChatBubble key={msg.id} message={msg} />
-              ))}
-              
-              {/* 加载状态 */}
-              {isAiLoading && (
-                <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
-                    <Bot className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-                    <div className="flex gap-1">
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* 输入区域 */}
-            <div className="border-t p-4 space-y-3">
-              {/* 错误/成功提示 */}
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              {success && (
-                <Alert className="bg-green-50 border-green-200">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    {success}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="输入您的请求..."
-                disabled={loading}
-                rows={3}
-              />
-              <Button
-                onClick={handleAiSend}
-                disabled={!message.trim() || isAiLoading}
-                className="w-full"
-              >
-                {isAiLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    处理中...
-                  </>
-                ) : (
-                  '发送'
-                )}
-              </Button>
-            </div>
+            <AIChat
+              sessionId={sessionInfo.sessionId}
+              agentSessionId={agentSessionId}
+              workingDir={sessionInfo.tempWorkspace}
+              onFilesChange={(files) => setFileChanges(files.length)}
+            />
           </CardContent>
         </Card>
 

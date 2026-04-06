@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChatBubble, type ChatMessage } from '@/components/ui/chat-bubble'
+import { AIChat } from '@/components/ai-elements/ai-chat'
 import { Bot, Code2, Send, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface DemoEditPageProps {
@@ -39,10 +39,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     errors: [],
   })
 
-  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([])
-  const [aiInput, setAiInput] = useState('')
-  const [isAiLoading, setIsAiLoading] = useState(false)
-
+  const [agentSessionId, setAgentSessionId] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -52,10 +49,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [aiMessages, isAiLoading])
 
   useEffect(() => {
     const loadDemo = async () => {
@@ -104,6 +97,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         const size = getPreviewSize(loadedSchema)
         setPreviewSize(size)
+
+        // 初始化 Agent 会话
+        const { getAgentClient } = await import('@/lib/agent-client')
+        const agentClient = getAgentClient()
+        const newAgentSessionId = `demo-${demoId}-${Date.now()}`
+        setAgentSessionId(newAgentSessionId)
       } catch (error) {
         toast({
           title: '加载失败',
@@ -214,63 +213,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     router.push('/')
   }
 
-  const handleAiSend = async () => {
-    if (!aiInput.trim() || isAiLoading) return
+  // 处理 AI 代码更新
+  const handleCodeUpdate = (newCode: string) => {
+    setCode(newCode)
+    setEditorContent(buildFigmaText(newCode, schema))
+  }
 
-    const userMessage = aiInput.trim()
-    setAiInput('')
-    setAiMessages((prev) => [...prev, { role: 'user', content: userMessage }])
-    setIsAiLoading(true)
-
-    try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          sessionId,
-          demoId,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!result.success) {
-        throw new Error(result.error?.message || 'AI 请求失败')
-      }
-
-      const aiReply = result.data.aiReply || '抱歉，我没有收到有效的回复。'
-
-      setAiMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: aiReply },
-      ])
-
-      if (result.data.code) {
-        setCode(result.data.code)
-      }
-      if (result.data.schema) {
-        setSchema(result.data.schema)
-        setEditorContent(buildFigmaText(result.data.code || code, result.data.schema))
-        const size = getPreviewSize(result.data.schema)
-        setPreviewSize(size)
-      }
-    } catch (error) {
-      toast({
-        title: 'AI 请求失败',
-        description: error instanceof Error ? error.message : '未知错误',
-        variant: 'destructive',
-      })
-      setAiMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
-        },
-      ])
-    } finally {
-      setIsAiLoading(false)
-    }
+  // 处理 AI Schema 更新
+  const handleSchemaUpdate = (newSchema: string) => {
+    setSchema(newSchema)
+    setEditorContent(buildFigmaText(code, newSchema))
+    const size = getPreviewSize(newSchema)
+    setPreviewSize(size)
   }
 
   if (isLoading) {
@@ -332,86 +286,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ai" className="flex-1 flex flex-col m-0 data-[state=inactive]:hidden">
-              <ScrollArea className="flex-1 px-4">
-                <div className="space-y-4 py-4">
-                  {aiMessages.length === 0 && (
-                    <div className="text-center py-8 space-y-3">
-                      <div className="flex justify-center">
-                        <div className="p-3 rounded-full bg-primary/10">
-                          <Bot className="h-8 w-8 text-primary" />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">AI 助手</p>
-                        <p className="text-xs text-muted-foreground">
-                          输入自然语言指令，AI 将帮您修改代码
-                        </p>
-                      </div>
-                      <div className="pt-2 space-y-2 text-left">
-                        <p className="text-xs text-muted-foreground">示例指令：</p>
-                        <div className="space-y-1">
-                          <p className="text-xs bg-muted px-2 py-1 rounded">
-                            &quot;把标题改成轮播图&quot;
-                          </p>
-                          <p className="text-xs bg-muted px-2 py-1 rounded">
-                            &quot;添加一个按钮组件&quot;
-                          </p>
-                          <p className="text-xs bg-muted px-2 py-1 rounded">
-                            &quot;修改配色方案为蓝色&quot;
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {aiMessages.map((msg, idx) => (
-                    <ChatBubble key={idx} message={msg} />
-                  ))}
-                  {isAiLoading && (
-                    <div className="flex gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
-                        <Bot className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-                        <div className="flex gap-1">
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" />
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce delay-100" />
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce delay-200" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-
-              <div className="p-4 border-t">
-                <div className="flex gap-2">
-                  <Textarea
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleAiSend()
-                      }
-                    }}
-                    placeholder="输入指令，按 Enter 发送..."
-                    className="min-h-[80px] resize-none"
-                    disabled={isAiLoading}
-                  />
-                </div>
-                <div className="flex justify-end mt-2">
-                  <Button
-                    onClick={handleAiSend}
-                    disabled={!aiInput.trim() || isAiLoading}
-                    size="sm"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    发送
-                  </Button>
-                </div>
-              </div>
+            <TabsContent value="ai" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden">
+              <AIChat
+                sessionId={sessionId}
+                agentSessionId={agentSessionId}
+                workingDir={undefined}
+                onCodeUpdate={handleCodeUpdate}
+                onSchemaUpdate={handleSchemaUpdate}
+              />
             </TabsContent>
 
             <TabsContent value="code" className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden">
