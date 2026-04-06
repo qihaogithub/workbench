@@ -4,9 +4,11 @@
 
 ## 项目概览
 
-Monorepo 架构，使用 pnpm workspaces 管理两个包：
+Monorepo 架构，使用 pnpm workspaces 管理四个包：
 - `@opencode-workbench/web` — Next.js 14 前端应用（App Router）
 - `@opencode-workbench/shared` — 共享类型定义
+- `@opencode-workbench/agent-service` — 独立 Agent 服务，实现 ACP 协议
+- `@opencode-workbench/agent-client` — Agent Service Client SDK
 
 ## 构建 / 测试 / 开发命令
 
@@ -20,7 +22,7 @@ pnpm typecheck    # TypeScript 类型检查
 
 ### 运行测试
 ```bash
-# 运行所有测试
+# 运行 web 包测试
 pnpm --filter @opencode-workbench/web test
 
 # 运行单个测试文件
@@ -31,6 +33,18 @@ pnpm --filter @opencode-workbench/web test -- -t "应验证有效的 JSON"
 
 # 监听模式
 pnpm --filter @opencode-workbench/web test:watch
+
+# 运行 agent-service 包测试（使用 fake-acp-cli）
+pnpm --filter @opencode-workbench/agent-service test
+
+# agent-service 测试监听模式
+pnpm --filter @opencode-workbench/agent-service test:watch
+
+# agent-service 测试覆盖率报告
+pnpm --filter @opencode-workbench/agent-service test:coverage
+
+# agent-service 真实后端冒烟测试（需要安装对应 CLI）
+pnpm --filter @opencode-workbench/agent-service test:smoke
 ```
 
 ### 包管理
@@ -116,6 +130,48 @@ import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
 - 模块映射：`@/*` → `<rootDir>/src/*`
 - 测试描述使用中文（`describe('应验证有效的 JSON', ...)`）
 
+### agent-service 特定约定
+
+#### ACP 协议
+- **协议说明**：ACP (Agent Client Protocol) 是由 Zed Industries 主导的行业开放标准
+- **通信方式**：通过 stdio 进行 JSON-RPC 通信（子进程标准输入/输出）
+- **消息格式**：每行一个 JSON 消息，以换行符分隔
+
+#### 支持的 Agent 后端
+| Backend | CLI 命令 | ACP 参数 |
+|---------|----------|----------|
+| `opencode` | `opencode` | `['acp']` |
+| `claude` | `claude` | `['--experimental-acp']` |
+| `codex` | `codex` | `[]` |
+| `gemini` | `gemini` | `['--experimental-acp']` |
+| `qwen` | `qwen` | `['--acp']` |
+| `goose` | `goose` | `['acp']` |
+
+#### 日志规范
+- 使用 **pino** 日志库
+- 通过 `src/utils/logger.ts` 统一导出
+- 日志级别：`debug`, `info`, `warn`, `error`
+
+#### 测试策略
+- **单元测试**：纯逻辑测试，位于 `tests/unit/`
+- **集成测试**：使用 `fake-acp-cli` 模拟真实 CLI，位于 `tests/integration/`
+- **真实后端测试**：可选，通过 `ACP_SMOKE_REAL=1` 环境变量启用
+
+### agent-client 使用示例
+```typescript
+import { AgentClient } from '@opencode-workbench/agent-client';
+
+const client = new AgentClient({ baseUrl: 'http://localhost:3001' });
+
+// 发送消息
+const result = await client.sendMessage('session-id', '你好');
+
+// 获取 WebSocket 流
+const stream = client.stream('session-id');
+stream.on('stream', (event) => console.log(event.content));
+stream.send('继续');
+```
+
 ## 目录结构
 ```
 packages/
@@ -127,8 +183,23 @@ packages/
 │   ├── lib/              # 校验器和解析器
 │   │   └── __tests__/    # 单元测试
 │   └── components/       # 演示组件
-└── shared/
-    └── src/              # 共享类型和常量
+├── shared/
+│   └── src/              # 共享类型和常量
+├── agent-service/
+│   ├── src/
+│   │   ├── acp/          # ACP 协议实现
+│   │   ├── backends/     # Agent 后端适配器
+│   │   ├── core/         # 核心逻辑（Agent、工厂、管理器）
+│   │   ├── events/       # 事件系统
+│   │   ├── routes/       # HTTP/WebSocket 路由
+│   │   ├── session/      # 会话管理
+│   │   ├── utils/        # 工具函数
+│   │   └── server.ts     # Fastify 服务器入口
+│   └── tests/            # 单元测试和集成测试
+└── agent-client/
+    └── src/
+        ├── client.ts     # AgentClient 类实现
+        └── types.ts      # 类型定义
 ```
 
 ## 注意事项
@@ -136,3 +207,12 @@ packages/
 - ESLint 配置：继承 `next/core-web-vitals`
 - 使用 Turbo 进行任务编排（缓存和依赖管理）
 - Node.js 版本要求：>= 18.0.0
+
+### agent-service 注意事项
+- **进程隔离**：每个 Agent 运行在独立子进程中
+- **超时处理**：`session/prompt` 默认超时 5 分钟，其他方法 1 分钟
+- **权限控制**：敏感操作需要通过 `onPermissionRequest` 回调确认
+- **流式响应**：通过 `session/update` 通知实现实时更新
+- **会话恢复**：支持通过 `loadSession` 恢复已有会话
+- **模型切换**：支持运行时切换模型（`setModel`）
+- **详细文档**：参见 `packages/agent-service/AGENTS.md`

@@ -48,8 +48,27 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error('[AI Chat] Agent 服务请求失败:', error);
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : '未知错误';
+    
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNREFUSED')) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { 
+            code: 'AGENT_SERVICE_UNAVAILABLE', 
+            message: 'Agent 服务不可用，请确保服务已启动 (http://localhost:3001)' 
+          } 
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: { code: 'FILE_WRITE_ERROR', message: error instanceof Error ? error.message : '未知错误' } },
+      { success: false, error: { code: 'AGENT_ERROR', message: errorMessage } },
       { status: 500 }
     );
   }

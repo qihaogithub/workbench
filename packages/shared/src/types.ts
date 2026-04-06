@@ -41,7 +41,8 @@ export type ErrorCode =
   | 'FILE_READ_ERROR'
   | 'FILE_WRITE_ERROR'
   | 'SESSION_EXPIRED'
-  | 'VALIDATION_ERROR';
+  | 'VALIDATION_ERROR'
+  | 'AGENT_SERVICE_ERROR';
 
 export type ErrorCodeType = ErrorCode;
 
@@ -53,4 +54,5 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   FILE_WRITE_ERROR: '文件写入失败',
   SESSION_EXPIRED: 'Session 已过期',
   VALIDATION_ERROR: '数据校验失败',
+  AGENT_SERVICE_ERROR: 'Agent 服务请求失败',
 };

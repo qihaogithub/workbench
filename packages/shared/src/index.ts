@@ -42,6 +42,7 @@ export const ErrorCode = {
   FILE_WRITE_ERROR: 'FILE_WRITE_ERROR',
   SESSION_EXPIRED: 'SESSION_EXPIRED',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AGENT_SERVICE_ERROR: 'AGENT_SERVICE_ERROR',
 } as const
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode]
@@ -54,6 +55,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   FILE_WRITE_ERROR: '文件写入失败',
   SESSION_EXPIRED: 'Session 已过期',
   VALIDATION_ERROR: '数据校验失败',
+  AGENT_SERVICE_ERROR: 'Agent 服务请求失败',
 }
 
 export * from './workspace'
