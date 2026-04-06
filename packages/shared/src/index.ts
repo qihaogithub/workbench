@@ -43,6 +43,11 @@ export const ErrorCode = {
   SESSION_EXPIRED: 'SESSION_EXPIRED',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   AGENT_SERVICE_ERROR: 'AGENT_SERVICE_ERROR',
+  PROJECT_NOT_FOUND: 'PROJECT_NOT_FOUND',
+  VERSION_NOT_FOUND: 'VERSION_NOT_FOUND',
+  SESSION_NOT_EDITING: 'SESSION_NOT_EDITING',
+  WORKSPACE_CREATE_ERROR: 'WORKSPACE_CREATE_ERROR',
+  SNAPSHOT_CREATE_ERROR: 'SNAPSHOT_CREATE_ERROR',
 } as const
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode]
@@ -56,6 +61,11 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   SESSION_EXPIRED: 'Session 已过期',
   VALIDATION_ERROR: '数据校验失败',
   AGENT_SERVICE_ERROR: 'Agent 服务请求失败',
+  PROJECT_NOT_FOUND: '项目不存在',
+  VERSION_NOT_FOUND: '版本不存在',
+  SESSION_NOT_EDITING: '会话不在编辑状态',
+  WORKSPACE_CREATE_ERROR: '工作空间创建失败',
+  SNAPSHOT_CREATE_ERROR: '快照创建失败',
 }
 
 export * from './workspace'

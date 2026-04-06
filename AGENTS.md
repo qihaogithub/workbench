@@ -14,7 +14,9 @@ Monorepo 架构，使用 pnpm workspaces 管理四个包：
 
 ### 根目录命令
 ```bash
-pnpm dev          # 启动开发服务器
+pnpm dev          # 同时启动 web 和 agent-service 开发服务器
+pnpm dev:web      # 仅启动 web 开发服务器
+pnpm dev:agent    # 仅启动 agent-service 开发服务器
 pnpm build        # 生产构建
 pnpm lint         # ESLint 检查
 pnpm typecheck    # TypeScript 类型检查
