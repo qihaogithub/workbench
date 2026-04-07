@@ -278,7 +278,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-[320px] flex flex-col border-r bg-card">
-          <Tabs defaultValue="ai" className="flex-1 flex flex-col [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col">
+          <Tabs defaultValue="ai" className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0">
             <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
               <TabsTrigger value="ai" className="gap-2">
                 <Bot className="h-4 w-4" />
@@ -290,7 +290,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ai" className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden overflow-hidden">
+            <TabsContent value="ai" className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden">
               <AIChat
                 sessionId={sessionId}
                 agentSessionId={agentSessionId}
