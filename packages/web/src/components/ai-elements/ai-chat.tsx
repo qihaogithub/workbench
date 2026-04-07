@@ -6,10 +6,12 @@ import {
   ConversationContent,
   Message,
   PromptInput,
+  ReasoningDisplay,
+  ToolCall,
   type ChatMessage,
 } from '@/components/ai-elements'
 import { AgentStream, type StreamEvent } from '@opencode-workbench/agent-client'
-import { Bot, Loader2 } from 'lucide-react'
+import { Bot, Sparkles } from 'lucide-react'
 
 interface AIChatProps {
   sessionId: string
@@ -33,6 +35,8 @@ export function AIChat({
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamContent, setStreamContent] = useState('')
   const streamRef = useRef<AgentStream | null>(null)
+
+  console.log('[AIChat] Props received - workingDir:', workingDir, 'agentSessionId:', agentSessionId)
 
   // 自动滚动到底部
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -73,14 +77,16 @@ export function AIChat({
 
       const { getAgentClient } = await import('@/lib/agent-client')
       const agentClient = getAgentClient()
-      
+
+      console.log('[AIChat] Creating WebSocket stream for session:', agentSessionId)
+
       // 每次发送消息时创建新的流连接
       const stream = agentClient.stream(agentSessionId)
       streamRef.current = stream
 
+      console.log('[AIChat] WebSocket URL:', (stream as any).url)
+
       let accumulatedContent = ''
-      let reasoningContent = ''
-      const tools: ChatMessage['tools'] = []
       let connectionEstablished = false
 
       // 监听流事件
@@ -98,13 +104,6 @@ export function AIChat({
           id: `assistant-${Date.now()}`,
           role: 'assistant',
           content: accumulatedContent || event.content || '抱歉，我没有收到有效的回复。',
-        }
-
-        if (reasoningContent) {
-          assistantMessage.reasoning = { content: reasoningContent }
-        }
-        if (tools.length > 0) {
-          assistantMessage.tools = tools
         }
 
         setMessages((prev) => [...prev, assistantMessage])
@@ -154,42 +153,37 @@ export function AIChat({
       })
 
       // 等待 WebSocket 连接建立（最多等待 3 秒）
-      await new Promise<void>((resolve, reject) => {
+      const connectionTimeout = new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('WebSocket 连接超时'))
         }, 3000)
 
-        stream.on('status', (event: StreamEvent) => {
-          if (event.status === 'connected') {
-            clearTimeout(timeout)
-            connectionEstablished = true
-            resolve()
-          }
-        })
-
-        // 检查是否已经连接
         const checkConnection = () => {
           const ws = (stream as any).ws
           if (ws?.readyState === WebSocket.OPEN) {
             clearTimeout(timeout)
+            stream.off('status', onStatus)
             connectionEstablished = true
             resolve()
           }
         }
-        
-        // 立即检查一次
-        checkConnection()
-        // 如果还没连接，设置一个短暂的检查间隔
-        if (!connectionEstablished) {
-          const interval = setInterval(() => {
+
+        const onStatus = (event: StreamEvent) => {
+          if (event.status === 'connected') {
             checkConnection()
-          }, 100)
-          // 清理函数会在 resolve/reject 时清除
-          setTimeout(() => clearInterval(interval), 2900)
+          }
         }
+
+        stream.on('status', onStatus)
+        
+        // 立即检查
+        setTimeout(checkConnection, 50)
       })
 
+      await connectionTimeout
+
       // 发送消息
+      console.log('[AIChat] Sending message with workingDir:', workingDir)
       stream.send(userMessage, `msg-${Date.now()}`, {
         timeout: 120000,
         stream: true,
@@ -326,16 +320,11 @@ export function AIChat({
 
           {/* 加载指示器 */}
           {isStreaming && !streamContent && (
-            <div className="flex gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
-                <Bot className="h-4 w-4 text-white" />
-              </div>
-              <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 w-fit">
+              <div className="flex gap-1">
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
@@ -344,28 +333,36 @@ export function AIChat({
         </ConversationContent>
       </Conversation>
 
+      {/* AI 正在生成状态提示 */}
+      {isStreaming && (
+        <div className="px-4 py-2 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-t border-primary/20">
+          <div className="flex items-center justify-center gap-3">
+            <div className="relative">
+              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+              <div className="absolute inset-0 blur-sm">
+                <Sparkles className="h-4 w-4 text-primary/50" />
+              </div>
+            </div>
+            <span className="text-sm font-medium text-primary">AI 正在思考中</span>
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 输入区域 */}
       <PromptInput
         value={input}
         onChange={setInput}
         onSubmit={handleSend}
+        onCancel={handleCancel}
         placeholder="输入指令，按 Enter 发送..."
         loading={isStreaming}
         className="flex-shrink-0"
       />
-
-      {/* 取消按钮（流式响应时显示） */}
-      {isStreaming && (
-        <div className="px-4 py-2 border-t bg-card">
-          <button
-            onClick={handleCancel}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            停止生成
-          </button>
-        </div>
-      )}
     </div>
   )
 }

@@ -71,8 +71,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           throw new Error(sessionData.error?.message || '创建 Session 失败')
         }
 
+        console.log('[DemoEdit] Session API response:', sessionData.data)
         setSessionId(sessionData.data.sessionId)
         setTempWorkspace(sessionData.data.tempWorkspace || '')
+        console.log('[DemoEdit] tempWorkspace set to:', sessionData.data.tempWorkspace)
 
         const filesRes = await fetch(`/api/sessions/${sessionData.data.sessionId}/files`)
         if (!filesRes.ok) {
@@ -288,7 +290,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ai" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden">
+            <TabsContent value="ai" className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden overflow-hidden">
               <AIChat
                 sessionId={sessionId}
                 agentSessionId={agentSessionId}

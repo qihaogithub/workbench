@@ -499,6 +499,8 @@ export class AcpConnection extends EventEmitter {
 
     const normalizedCwd = this.normalizeCwdForAgent(this.workingDir);
 
+    logger.info({ cwd: this.workingDir, normalizedCwd }, 'Creating ACP session')
+
     const params: Record<string, unknown> = {
       cwd: normalizedCwd,
       mcpServers: [],

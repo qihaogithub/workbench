@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentClient } from '@/lib/agent-client';
-import { listProjects, createApiSuccess, createApiError, getSessionFiles } from '@/lib/fs-utils';
+import { listProjects, createApiSuccess, createApiError, getSessionFiles, getSessionPath } from '@/lib/fs-utils';
 import { findActiveSession, createEditSession } from '@/lib/session-manager';
 
 export async function POST(request: NextRequest) {
@@ -19,10 +19,13 @@ export async function POST(request: NextRequest) {
     if (activeSessionId) {
       const files = getSessionFiles(activeSessionId);
       if (files) {
+        // 获取 session 的工作空间路径
+        const sessionPath = getSessionPath(activeSessionId);
         return NextResponse.json(createApiSuccess({
           sessionId: activeSessionId,
           code: files.code,
           schema: files.schema,
+          tempWorkspace: sessionPath,
         }));
       }
     }

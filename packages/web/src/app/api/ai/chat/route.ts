@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
     
     if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNREFUSED')) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: { 
-            code: 'AGENT_SERVICE_UNAVAILABLE', 
-            message: 'Agent 服务不可用，请确保服务已启动 (http://localhost:3001)' 
-          } 
+        {
+          success: false,
+          error: {
+            code: 'AGENT_SERVICE_UNAVAILABLE',
+            message: 'Agent 服务不可用，请确保服务已启动 (http://localhost:3101)'
+          }
         },
         { status: 503 }
       );

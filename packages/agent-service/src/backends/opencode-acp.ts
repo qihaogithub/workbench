@@ -46,7 +46,9 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
     }
 
     this.status = 'initializing';
-    this.connection = new AcpConnection('opencode', this.config.workingDir || process.cwd());
+    const workingDir = this.config.workingDir || process.cwd();
+    logger.info({ workingDir: this.config.workingDir, finalWorkingDir: workingDir }, 'OpenCode ACP backend starting')
+    this.connection = new AcpConnection('opencode', workingDir);
 
     this.connection.on('disconnect', () => {
       this.status = 'error';

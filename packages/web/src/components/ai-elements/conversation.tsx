@@ -20,9 +20,15 @@ const ConversationContent = React.forwardRef<
   React.ComponentRef<typeof ScrollAreaPrimitive>,
   React.ComponentProps<typeof ScrollAreaPrimitive>
 >(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive ref={ref} className={cn('flex-1', className)} {...props}>
-    <div className="flex flex-col gap-4 p-4">{children}</div>
-  </ScrollAreaPrimitive>
+  <div className="flex-1 min-h-0 overflow-hidden">
+    <ScrollAreaPrimitive
+      ref={ref}
+      className={cn('h-full', className)}
+      {...props}
+    >
+      <div className="flex flex-col gap-4 p-4 max-w-full">{children}</div>
+    </ScrollAreaPrimitive>
+  </div>
 ))
 ConversationContent.displayName = 'ConversationContent'
 

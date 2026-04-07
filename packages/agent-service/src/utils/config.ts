@@ -14,7 +14,7 @@ export interface ServiceConfig {
 
 export function loadConfig(): ServiceConfig {
   return {
-    port: parseInt(process.env.PORT || '3001', 10),
+    port: parseInt(process.env.PORT || '3101', 10),
     host: process.env.HOST || '0.0.0.0',
     logLevel: process.env.LOG_LEVEL || 'info',
     opencode: {

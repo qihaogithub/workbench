@@ -111,8 +111,8 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">加载中...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
         </div>
       </div>
     )
@@ -146,7 +146,7 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧：预览区 */}
         <div className="w-2/3 p-4 bg-muted/50">
-          <div className="h-full border rounded-lg overflow-hidden bg-white">
+          <div className="h-full border rounded-lg overflow-hidden bg-background">
             <PreviewPanel code={code} configData={configData} previewSize={previewSize} />
           </div>
         </div>

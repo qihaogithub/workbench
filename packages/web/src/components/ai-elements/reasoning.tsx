@@ -98,3 +98,6 @@ export function ReasoningContent({
     </div>
   )
 }
+
+// 别名导出，方便在 ai-chat 中使用
+export const ReasoningDisplay = Reasoning

@@ -163,7 +163,7 @@ import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
 ```typescript
 import { AgentClient } from '@opencode-workbench/agent-client';
 
-const client = new AgentClient({ baseUrl: 'http://localhost:3001' });
+const client = new AgentClient({ baseUrl: 'http://localhost:3101' });
 
 // 发送消息
 const result = await client.sendMessage('session-id', '你好');

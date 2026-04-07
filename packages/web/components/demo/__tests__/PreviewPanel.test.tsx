@@ -2,10 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { PreviewPanel } from '../PreviewPanel';
 
 jest.mock('@codesandbox/sandpack-react', () => ({
-  Sandpack: ({ files }: { files: Record<string, string> }) => (
-    <div data-testid="sandpack-mock">
-      <pre>{JSON.stringify(Object.keys(files), null, 2)}</pre>
+  SandpackProvider: ({ children, files }: { children: React.ReactNode; files?: Record<string, string> }) => (
+    <div data-testid="sandpack-provider">
+      {files && <pre data-testid="files">{JSON.stringify(Object.keys(files), null, 2)}</pre>}
+      {children}
     </div>
+  ),
+  SandpackLayout: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="sandpack-layout">{children}</div>
+  ),
+  SandpackPreview: () => (
+    <div data-testid="sandpack-preview">Preview</div>
   ),
 }));
 
@@ -18,17 +25,18 @@ describe('PreviewPanel', () => {
     render(
       <PreviewPanel code={mockCode} configData={{ title: 'Test' }} />
     );
-    
-    expect(screen.getByTestId('sandpack-mock')).toBeInTheDocument();
+
+    expect(screen.getByTestId('sandpack-provider')).toBeInTheDocument();
   });
 
   it('应正确注入文件', () => {
     render(
       <PreviewPanel code={mockCode} configData={{ title: 'Test' }} />
     );
-    
-    const pre = screen.getByText(/Demo\.tsx/);
+
+    const pre = screen.getByTestId('files');
     expect(pre).toBeInTheDocument();
+    expect(pre.textContent).toContain('Demo.tsx');
   });
 
   it('应支持自定义 className', () => {
@@ -50,14 +58,26 @@ describe('PreviewPanel', () => {
     };
     
     render(
-      <PreviewPanel 
-        code={mockCode} 
-        configData={{ title: 'Test' }} 
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: 'Test' }}
         sdkFiles={sdkFiles}
       />
     );
+
+    const pre = screen.getByTestId('files');
+    expect(pre.textContent).toContain('sdk/utils.ts');
+  });
+
+  it('应处理无效的代码路径（非代码内容）', () => {
+    const invalidCode = 'E:\\重要文件\\Programming\\file.tsx';
     
-    const pre = screen.getByText(/sdk\/utils\.ts/);
-    expect(pre).toBeInTheDocument();
+    render(
+      <PreviewPanel code={invalidCode} configData={{ title: 'Test' }} />
+    );
+
+    // 应显示错误提示
+    expect(screen.getByText('⚠️ 代码加载失败')).toBeInTheDocument();
+    expect(screen.getByText(/检测到无效的代码文件/)).toBeInTheDocument();
   });
 });

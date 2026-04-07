@@ -500,7 +500,7 @@ export class AgentClient {
 // packages/web/src/app/api/ai/chat/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const AGENT_SERVICE_URL = process.env.AGENT_SERVICE_URL || 'http://localhost:3001';
+const AGENT_SERVICE_URL = process.env.AGENT_SERVICE_URL || 'http://localhost:3101';
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -520,11 +520,11 @@ export async function POST(request: NextRequest) {
 
 ```env
 # packages/web/.env.local
-AGENT_SERVICE_URL=http://localhost:3001
-NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3001
+AGENT_SERVICE_URL=http://localhost:3101
+NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3101
 
 # packages/agent-service/.env
-PORT=3001
+PORT=3101
 OPENCODE_SERVER_URL=http://localhost:4096
 LOG_LEVEL=info
 ```
@@ -607,7 +607,7 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-EXPOSE 3001
+EXPOSE 3101
 
 CMD ["node", "dist/server.js"]
 ```
@@ -623,9 +623,9 @@ services:
       context: ./packages/agent-service
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "3101:3101"
     environment:
-      - PORT=3001
+      - PORT=3101
       - OPENCODE_SERVER_URL=http://opencode:4096
       - LOG_LEVEL=info
     depends_on:

@@ -20,12 +20,14 @@ export {
 
 export {
   Reasoning,
+  ReasoningDisplay,
   ReasoningTrigger,
   ReasoningContent,
 } from './reasoning'
 
 export {
   Tool,
+  ToolCall,
   ToolHeader,
   ToolContent,
   ToolInput,

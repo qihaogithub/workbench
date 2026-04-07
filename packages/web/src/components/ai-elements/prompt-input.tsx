@@ -3,13 +3,14 @@
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Send, Paperclip, Loader2 } from 'lucide-react'
+import { Send, Paperclip, Square } from 'lucide-react'
 import * as React from 'react'
 
 interface PromptInputProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
   value: string
   onChange: (value: string) => void
   onSubmit: () => void
+  onCancel?: () => void
   placeholder?: string
   disabled?: boolean
   loading?: boolean
@@ -20,6 +21,7 @@ export function PromptInput({
   value,
   onChange,
   onSubmit,
+  onCancel,
   placeholder = '输入消息...',
   disabled = false,
   loading = false,
@@ -76,11 +78,11 @@ export function PromptInput({
             <Button
               size="icon"
               className="h-8 w-8 rounded-lg"
-              disabled={!value.trim() || disabled || loading}
-              onClick={onSubmit}
+              disabled={!loading && !value.trim()}
+              onClick={loading ? onCancel : onSubmit}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Square className="h-3 w-3 fill-current" />
               ) : (
                 <Send className="h-4 w-4" />
               )}

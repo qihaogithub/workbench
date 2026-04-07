@@ -38,7 +38,17 @@ async function start() {
     },
   });
 
-  await fastify.register(cors, { origin: true });
+  // 配置 CORS 允许的来源
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+    : ['http://localhost:3100', 'http://127.0.0.1:3100'];
+
+  await fastify.register(cors, {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Upgrade', 'Connection'],
+    credentials: true,
+  });
   await fastify.register(websocket);
   await fastify.register(rateLimit, {
     max: config.rateLimit.max,

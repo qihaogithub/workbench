@@ -173,14 +173,14 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
       {/* 主内容区域 */}
       <div className="flex-1 flex gap-4 p-4 overflow-hidden">
         {/* 左侧：AI 对话区域 */}
-        <Card className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
               AI 助手
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col p-0">
+          <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
             <AIChat
               sessionId={sessionInfo.sessionId}
               agentSessionId={agentSessionId}

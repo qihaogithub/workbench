@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+        <ThemeProvider>
           <TooltipProvider delayDuration={0}>
             <ToastProviderWrapper>{children}</ToastProviderWrapper>
           </TooltipProvider>

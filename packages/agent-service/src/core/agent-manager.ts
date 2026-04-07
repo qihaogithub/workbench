@@ -2,6 +2,7 @@ import { AgentConfig, AgentResult, SendMessageOptions } from './types';
 import { BaseAgent } from './agent';
 import { BackendAgent } from './backend-agent';
 import { AgentFactory, getAgentFactory } from './agent-factory';
+import { logger } from '../utils/logger';
 
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -50,6 +51,8 @@ export class AgentManager implements IAgentManager {
     if (this.agents.has(sessionId)) {
       return this.agents.get(sessionId)!;
     }
+
+    logger.info({ workingDir: config.workingDir }, 'Agent getOrCreate')
 
     const agent = this.factory.create({ ...config, sessionId });
     this.agents.set(sessionId, agent);

@@ -168,7 +168,7 @@ export class AgentClient {
 }
 
 export interface StreamEvent {
-  type: 'stream' | 'error' | 'finish' | 'pong' | 'status';
+  type: 'stream' | 'thought' | 'tool_call' | 'tool_call_update' | 'error' | 'finish' | 'pong' | 'status';
   id?: string;
   content?: string;
   done?: boolean;
@@ -177,6 +177,10 @@ export interface StreamEvent {
   metadata?: Record<string, unknown>;
   timestamp?: number;
   status?: string;
+  toolCallId?: string;
+  title?: string;
+  kind?: 'read' | 'edit' | 'execute';
+  toolCallStatus?: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
 export class AgentStream {

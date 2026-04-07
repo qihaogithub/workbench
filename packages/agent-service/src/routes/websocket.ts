@@ -268,12 +268,16 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
               return;
             }
 
+            logger.info({ workingDir: message.workingDir }, 'WebSocket message received')
+
             try {
               const config: AgentConfig = {
                 sessionId,
                 backend: 'opencode',
                 workingDir: message.workingDir,
               };
+
+              logger.info({ workingDir: config.workingDir }, 'Agent config created')
 
               const agent = manager.getOrCreate(sessionId, config);
 
