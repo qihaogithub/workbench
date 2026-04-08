@@ -5,14 +5,21 @@
 ### 1.1 背景
 当前预览区（PreviewPanel）的尺寸是自适应容器宽高的，缺乏对特定设备尺寸的模拟能力。需要支持：
 - **默认尺寸**：375×667（iPhone 8/SE 等常见手机尺寸）
-- **可配置**：允许在 `index.tsx` 调用时或 `config.schema.json` 中自定义尺寸
+- **可配置**：允许在 `config.schema.json` 中自定义预览尺寸
 
 ### 1.2 目标
 - 预览区默认显示为 375×667 的设备尺寸
-- 支持两种配置方式：
-  1. 组件调用时在 `index.tsx` 中传入 `previewSize` 属性
-  2. 在 `config.schema.json` 中通过元数据声明预览尺寸
+- **唯一配置方式**：在 `config.schema.json` 中通过 `$demo.previewSize` 声明
 - 保持向后兼容，不破坏现有功能
+
+### 1.3 设计原则
+**单一来源（Single Source of Truth）**：预览尺寸属于 demo 的元数据，应由 `config.schema.json` 统一管理，不在组件调用处重复配置。
+
+**优势**：
+- 配置与代码分离，职责清晰
+- 同一个 demo 在不同页面使用时不需重复配置
+- 产品/设计人员可直接修改 JSON 调整预览效果
+- 避免多处配置导致的的不一致和调试困难
 
 ---
 
@@ -36,11 +43,21 @@ export interface DemoMeta {
   previewSize?: PreviewSize;
   [key: string]: unknown;
 }
+
+// 新增：JSON Schema 根级别扩展
+export interface DemoSchema extends Record<string, unknown> {
+  $demo?: DemoMeta;
+  $schema?: string;
+  title?: string;
+  type?: string;
+  properties?: Record<string, unknown>;
+  required?: string[];
+}
 ```
 
 **说明**：
 - 保持现有 `PreviewSize` 类型不变
-- 新增 `DemoMeta` 类型用于描述 demo 元数据（包含 `previewSize`）
+- 新增 `DemoMeta` 和 `DemoSchema` 类型用于类型安全地访问 `$demo` 字段
 
 ---
 
@@ -105,7 +122,7 @@ export function PreviewPanel({
   sdkFiles,
   onError,
   className,
-  previewSize, // ← 此属性已存在，无需修改接口
+  previewSize, // ← 此属性已存在，由调用方从 schema 提取后传入
 }: PreviewPanelProps)
 ```
 
@@ -167,48 +184,42 @@ export function PreviewPanel({
 
 ---
 
-### 2.5 配置优先级
+### 2.5 配置来源与优先级
 
-当多种方式同时指定预览尺寸时，优先级如下：
+**唯一配置来源**：`config.schema.json` 中的 `$demo.previewSize`
 
 ```
-index.tsx 显式传入 > config.schema.json 中的 $demo > 默认值 (375×667)
+config.schema.json 中声明 > 默认值 (375×667)
 ```
 
-**实现逻辑**（在使用 PreviewPanel 的页面中）：
+**实现逻辑**（在调用方页面统一处理）：
 
 ```typescript
-// 伪代码示例
-const previewSize = 
-  explicitPreviewSize ||           // 1. 页面显式传入
-  schema?.$demo?.previewSize ||    // 2. schema 中声明
-  DEFAULT_PREVIEW_SIZE;            // 3. 默认值
+// 从 schema 中提取预览尺寸
+const previewSize = (schema as DemoSchema)?.$demo?.previewSize;
+
+<PreviewPanel
+  code={demoCode}
+  configData={configData}
+  previewSize={previewSize}  // 可能为 undefined，组件内部会使用默认值
+/>
+```
+
+**辅助函数**（可选，位于 `@/lib/schema-utils`）：
+
+```typescript
+import type { DemoSchema, PreviewSize } from '@/components/demo/types';
+
+export function extractPreviewSize(schema: unknown): PreviewSize | undefined {
+  return (schema as DemoSchema)?.$demo?.previewSize;
+}
 ```
 
 ---
 
 ## 三、使用示例
 
-### 3.1 在 index.tsx 中指定尺寸
-
-```typescript
-import { PreviewPanel } from '@/components/demo';
-
-export default function DemoPage() {
-  return (
-    <PreviewPanel
-      code={demoCode}
-      configData={configData}
-      previewSize={{
-        width: 414,
-        height: 896, // iPhone 11 Pro Max
-      }}
-    />
-  );
-}
-```
-
-### 3.2 在 config.schema.json 中指定尺寸
+### 3.1 在 config.schema.json 中指定尺寸
 
 ```json
 {
@@ -227,13 +238,41 @@ export default function DemoPage() {
 }
 ```
 
-### 3.3 使用默认尺寸
+调用方自动从 schema 提取：
 
 ```typescript
-// 不传入 previewSize，自动使用 375×667
+import type { DemoSchema } from '@/components/demo/types';
+
+// 加载 schema 后自动提取预览尺寸
+const schema = await loadSchema();
+const previewSize = (schema as DemoSchema)?.$demo?.previewSize;
+
 <PreviewPanel
   code={demoCode}
   configData={configData}
+  previewSize={previewSize}
+/>
+```
+
+### 3.2 使用默认尺寸
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "简单组件演示",
+  "type": "object",
+  "properties": {
+    // 不声明 $demo，自动使用 375×667
+  }
+}
+```
+
+```typescript
+// 调用方无需特殊处理，直接传入 undefined 或不传
+<PreviewPanel
+  code={demoCode}
+  configData={configData}
+  previewSize={undefined}  // 或不传此属性
 />
 ```
 
@@ -282,38 +321,43 @@ export default function DemoPage() {
 ## 六、影响范围
 
 ### 6.1 需要修改的文件
-1. `packages/web/components/demo/types.ts` — 可选：新增 `DemoMeta` 类型
+1. `packages/web/components/demo/types.ts` — 新增 `DemoMeta` 和 `DemoSchema` 类型
 2. `packages/web/components/demo/PreviewPanel.tsx` — 修改默认尺寸逻辑
+3. 调用 PreviewPanel 的页面组件 — 从 schema 提取 `$demo.previewSize` 并传入
 
 ### 6.2 不需要修改的文件
 - `packages/web/components/demo/index.ts` — 导出接口不变
 - `packages/web/components/demo/ConfigForm.tsx` — 与预览尺寸无关
-- 现有 `config.schema.json` 文件 — 向后兼容，不传则使用默认值
 
 ### 6.3 向后兼容性
-✅ **完全兼容**：不传入 `previewSize` 时使用新的默认值 375×667，不会破坏现有功能
+✅ **完全兼容**：
+- 现有 `config.schema.json` 不声明 `$demo` 时，自动使用默认值 375×667
+- 不影响已有 demo 的显示效果
+- `PreviewPanel` 的 `previewSize` 属性为可选，不传即可
 
 ---
 
 ## 七、实施步骤
 
-1. **修改 PreviewPanel.tsx**
+1. **更新 types.ts**
+   - 新增 `DemoMeta` 和 `DemoSchema` 类型定义
+
+2. **修改 PreviewPanel.tsx**
    - 添加 `DEFAULT_PREVIEW_SIZE` 常量
-   - 修改 `buildPreviewStyle` 函数逻辑
+   - 修改 `buildPreviewStyle` 函数逻辑，使用 375×667 作为默认值
    - 添加居中样式和视觉装饰
 
-2. **（可选）更新 types.ts**
-   - 新增 `DemoMeta` 类型定义
-
-3. **（可选）更新调用方**
-   - 在现有使用 PreviewPanel 的页面中，从 schema 提取 `$demo.previewSize`
-   - 传入 PreviewPanel 组件
+3. **更新调用方页面组件**
+   - 在加载 schema 后，提取 `$demo.previewSize`
+   - 将提取的值传入 `PreviewPanel` 组件
+   - （可选）创建 `extractPreviewSize` 辅助函数
 
 4. **测试验证**
-   - 验证默认尺寸显示
-   - 验证自定义尺寸
-   - 验证 schema 配置
-   - 验证响应式布局
+   - 验证默认尺寸 375×667 显示正常
+   - 验证 config.schema.json 中声明 `$demo.previewSize` 后生效
+   - 验证不声明 `$demo` 的现有 demo 不受影响
+   - 验证不同尺寸（手机、平板、桌面）的显示效果
+   - 验证 `scale` 属性的缩放效果
 
 ---
 
