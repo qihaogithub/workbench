@@ -273,7 +273,7 @@ export function AIChat({
   return (
     <div className="flex flex-col h-full">
       {/* 消息列表 */}
-      <Conversation className="flex-1">
+      <Conversation className="flex-1 min-h-0">
         <ConversationContent>
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
