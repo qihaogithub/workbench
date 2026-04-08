@@ -425,7 +425,26 @@ useEffect(() => {
 
 ---
 
-## 六、总结
+## 六、修复实施记录
+
+### 6.1 已完成的修复
+
+| 修复项 | 状态 | 修改文件 | 说明 |
+|-------|------|---------|------|
+| P1: 实现 `onSchemaUpdate` 调用 | ✅ 已完成 | `ai-chat.tsx` | 从 `event.files` 中提取代码和 schema，并调用对应回调 |
+| P2: 同步 `initialData` | ✅ 已完成 | `ConfigFormNew.tsx` | 添加两个 `useEffect` 监听 `initialData` 和 `schema` 变化 |
+| P3: 更新 `configData` 逻辑 | ✅ 已完成 | `edit/page.tsx` | `handleSchemaUpdate` 中调用 `getDefaultValues` 更新配置 |
+| P4: 修复闭包陷阱 | ✅ 已完成 | `edit/page.tsx`, `parser.ts` | 使用 `useCallback` 和函数式更新，添加 `extractCodeFromFigma` 辅助函数 |
+
+### 6.2 验证结果
+
+- ✅ TypeScript 类型检查通过
+- ✅ 所有 57 个测试用例通过
+- ✅ 无编译错误或警告
+
+---
+
+## 七、总结
 
 ### 6.1 根本原因总结
 

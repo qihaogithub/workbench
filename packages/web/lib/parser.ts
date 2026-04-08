@@ -11,9 +11,9 @@ export interface ParsedContent {
 }
 
 // 分隔符常量
-const CODE_START_MARKER = '=== DEMO CODE ===';
-const SCHEMA_START_MARKER = '=== DEMO SCHEMA ===';
-const END_MARKER = '=== END ===';
+const CODE_START_MARKER = "=== DEMO CODE ===";
+const SCHEMA_START_MARKER = "=== DEMO SCHEMA ===";
+const END_MARKER = "=== END ===";
 
 /**
  * 解析 Figma 导出的分隔符格式文本
@@ -32,8 +32,8 @@ export function parseFigmaText(text: string): ParsedContent {
   // 验证分隔符存在性
   if (codeStartIndex === -1) {
     return {
-      code: '',
-      schema: '',
+      code: "",
+      schema: "",
       success: false,
       error: `缺少 ${CODE_START_MARKER} 分隔符`,
     };
@@ -41,8 +41,8 @@ export function parseFigmaText(text: string): ParsedContent {
 
   if (schemaStartIndex === -1) {
     return {
-      code: '',
-      schema: '',
+      code: "",
+      schema: "",
       success: false,
       error: `缺少 ${SCHEMA_START_MARKER} 分隔符`,
     };
@@ -51,10 +51,10 @@ export function parseFigmaText(text: string): ParsedContent {
   // 验证分隔符顺序
   if (codeStartIndex >= schemaStartIndex) {
     return {
-      code: '',
-      schema: '',
+      code: "",
+      schema: "",
       success: false,
-      error: '分隔符顺序错误：CODE 分隔符必须在 SCHEMA 分隔符之前',
+      error: "分隔符顺序错误：CODE 分隔符必须在 SCHEMA 分隔符之前",
     };
   }
 
@@ -71,19 +71,19 @@ export function parseFigmaText(text: string): ParsedContent {
   // 验证内容非空
   if (!code) {
     return {
-      code: '',
-      schema: '',
+      code: "",
+      schema: "",
       success: false,
-      error: 'CODE 部分不能为空',
+      error: "CODE 部分不能为空",
     };
   }
 
   if (!schema) {
     return {
-      code: '',
-      schema: '',
+      code: "",
+      schema: "",
       success: false,
-      error: 'SCHEMA 部分不能为空',
+      error: "SCHEMA 部分不能为空",
     };
   }
 
@@ -141,29 +141,57 @@ export function fixFigmaTextFormat(text: string): string {
   let fixed = text.trim();
 
   // 统一换行符
-  fixed = fixed.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  fixed = fixed.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
   // 如果缺少 CODE 标记但内容看起来像代码，添加标记
   if (!fixed.includes(CODE_START_MARKER)) {
     // 尝试检测是否是合并的格式
-    const lines = fixed.split('\n');
+    const lines = fixed.split("\n");
     let codeEndLine = -1;
 
     // 查找 JSON 开始的位置（通常是 schema 的开始）
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (line === '{' || line.startsWith('{')) {
+      if (line === "{" || line.startsWith("{")) {
         codeEndLine = i;
         break;
       }
     }
 
     if (codeEndLine > 0) {
-      const codePart = lines.slice(0, codeEndLine).join('\n').trim();
-      const schemaPart = lines.slice(codeEndLine).join('\n').trim();
+      const codePart = lines.slice(0, codeEndLine).join("\n").trim();
+      const schemaPart = lines.slice(codeEndLine).join("\n").trim();
       return buildFigmaText(codePart, schemaPart);
     }
   }
 
   return fixed;
+}
+
+/**
+ * 从 Figma 格式文本中提取 code 部分
+ * @param text Figma 格式文本
+ * @returns 提取的代码内容，如果解析失败返回 undefined
+ */
+export function extractCodeFromFigma(text: string): string | undefined {
+  try {
+    const result = parseFigmaText(text);
+    return result.success ? result.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 从 Figma 格式文本中提取 schema 部分
+ * @param text Figma 格式文本
+ * @returns 提取的 schema 内容，如果解析失败返回 undefined
+ */
+export function extractSchemaFromFigma(text: string): string | undefined {
+  try {
+    const result = parseFigmaText(text);
+    return result.success ? result.schema : undefined;
+  } catch {
+    return undefined;
+  }
 }

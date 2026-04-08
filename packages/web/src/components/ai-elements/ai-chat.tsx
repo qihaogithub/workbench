@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -9,17 +9,22 @@ import {
   ReasoningDisplay,
   ToolCall,
   type ChatMessage,
-} from '@/components/ai-elements'
-import { AgentStream, type StreamEvent } from '@opencode-workbench/agent-client'
-import { Bot, Sparkles } from 'lucide-react'
+} from "@/components/ai-elements";
+import {
+  AgentStream,
+  type StreamEvent,
+} from "@opencode-workbench/agent-client";
+import { Bot, Sparkles } from "lucide-react";
 
 interface AIChatProps {
-  sessionId: string
-  agentSessionId: string
-  workingDir?: string
-  onCodeUpdate?: (code: string) => void
-  onSchemaUpdate?: (schema: string) => void
-  onFilesChange?: (files: Array<{ path: string; action: 'created' | 'modified' | 'deleted' }>) => void
+  sessionId: string;
+  agentSessionId: string;
+  workingDir?: string;
+  onCodeUpdate?: (code: string) => void;
+  onSchemaUpdate?: (schema: string) => void;
+  onFilesChange?: (
+    files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
+  ) => void;
 }
 
 export function AIChat({
@@ -30,205 +35,294 @@ export function AIChat({
   onSchemaUpdate,
   onFilesChange,
 }: AIChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [streamContent, setStreamContent] = useState('')
-  const streamRef = useRef<AgentStream | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamContent, setStreamContent] = useState("");
+  const streamRef = useRef<AgentStream | null>(null);
 
-  console.log('[AIChat] Props received - workingDir:', workingDir, 'agentSessionId:', agentSessionId)
+  console.log(
+    "[AIChat] Props received - workingDir:",
+    workingDir,
+    "agentSessionId:",
+    agentSessionId,
+  );
 
   // 自动滚动到底部
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamContent])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamContent]);
 
   // 清理流
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current.close()
+        streamRef.current.close();
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // 处理发送消息
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isStreaming || !agentSessionId) return
+    if (!input.trim() || isStreaming || !agentSessionId) return;
 
-    const userMessage = input.trim()
-    setInput('')
+    const userMessage = input.trim();
+    setInput("");
 
     // 添加用户消息
     setMessages((prev) => [
       ...prev,
       {
         id: `user-${Date.now()}`,
-        role: 'user',
+        role: "user",
         content: userMessage,
       },
-    ])
+    ]);
 
     // 创建流式连接
     try {
-      setIsStreaming(true)
-      setStreamContent('')
+      setIsStreaming(true);
+      setStreamContent("");
 
-      const { getAgentClient } = await import('@/lib/agent-client')
-      const agentClient = getAgentClient()
+      const { getAgentClient } = await import("@/lib/agent-client");
+      const agentClient = getAgentClient();
 
-      console.log('[AIChat] Creating WebSocket stream for session:', agentSessionId)
+      console.log(
+        "[AIChat] Creating WebSocket stream for session:",
+        agentSessionId,
+      );
 
       // 每次发送消息时创建新的流连接
-      const stream = agentClient.stream(agentSessionId)
-      streamRef.current = stream
+      const stream = agentClient.stream(agentSessionId);
+      streamRef.current = stream;
 
-      console.log('[AIChat] WebSocket URL:', (stream as any).url)
+      console.log("[AIChat] WebSocket URL:", (stream as any).url);
 
-      let accumulatedContent = ''
-      let connectionEstablished = false
+      let accumulatedContent = "";
+      let connectionEstablished = false;
 
       // 监听流事件
-      stream.on('stream', (event: StreamEvent) => {
-        connectionEstablished = true
+      stream.on("stream", (event: StreamEvent) => {
+        connectionEstablished = true;
         if (event.content) {
-          accumulatedContent += event.content
-          setStreamContent(accumulatedContent)
+          accumulatedContent += event.content;
+          setStreamContent(accumulatedContent);
         }
-      })
+      });
 
-      stream.on('finish', async (event: StreamEvent) => {
+      stream.on("finish", async (event: StreamEvent) => {
         // 完成流式响应
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: accumulatedContent || event.content || '抱歉，我没有收到有效的回复。',
-        }
+          role: "assistant",
+          content:
+            accumulatedContent ||
+            event.content ||
+            "抱歉，我没有收到有效的回复。",
+        };
 
-        setMessages((prev) => [...prev, assistantMessage])
-        setStreamContent('')
-        setIsStreaming(false)
-        stream.close()
-        streamRef.current = null
+        setMessages((prev) => [...prev, assistantMessage]);
+        setStreamContent("");
+        setIsStreaming(false);
+        stream.close();
+        streamRef.current = null;
 
         // 处理文件变更
         if (event.files && event.files.length > 0) {
-          onFilesChange?.(event.files)
+          onFilesChange?.(event.files);
+
+          // 从文件变更中提取代码和 schema
+          for (const file of event.files) {
+            if (
+              file.path.includes("index.tsx") ||
+              file.path.includes("index.ts")
+            ) {
+              // 文件对象包含 content 属性，可以直接读取
+              if ("content" in file && typeof file.content === "string") {
+                onCodeUpdate?.(file.content);
+              }
+            } else if (file.path.includes("config.schema.json")) {
+              if ("content" in file && typeof file.content === "string") {
+                onSchemaUpdate?.(file.content);
+              }
+            }
+          }
         }
 
-        // 尝试从内容中提取代码和 schema 更新
+        // 尝试从内容中提取代码和 schema 更新（作为备选方案）
         try {
-          const codeMatch = accumulatedContent.match(/```(?:tsx?|typescript|javascript)?\n([\s\S]*?)```/)
+          // 提取 index.tsx 代码块
+          const codeMatch = accumulatedContent.match(
+            /```(?:tsx|tsx?|typescript|javascript)\n([\s\S]*?)```/,
+          );
           if (codeMatch && onCodeUpdate) {
-            onCodeUpdate(codeMatch[1].trim())
+            onCodeUpdate(codeMatch[1].trim());
+          }
+
+          // 提取 config.schema.json 代码块
+          const schemaMatch = accumulatedContent.match(
+            /```(?:json:schema|json)\n([\s\S]*?)```/,
+          );
+          if (schemaMatch && onSchemaUpdate) {
+            try {
+              const schemaContent = schemaMatch[1].trim();
+              // 验证是否为有效的 JSON
+              JSON.parse(schemaContent);
+              onSchemaUpdate(schemaContent);
+            } catch (parseError) {
+              console.warn(
+                "Failed to parse schema from AI response:",
+                parseError,
+              );
+            }
           }
         } catch {
           // 忽略解析错误
         }
-      })
+      });
 
-      stream.on('error', (event: StreamEvent) => {
+      stream.on("error", (event: StreamEvent) => {
         // 如果连接未建立且发生错误，降级到非流式模式
         if (!connectionEstablished) {
-          console.warn('WebSocket 连接失败，降级到非流式模式')
-          stream.close()
-          streamRef.current = null
+          console.warn("WebSocket 连接失败，降级到非流式模式");
+          stream.close();
+          streamRef.current = null;
           // 这里不显示错误消息，因为会在 catch 中处理
-          return
+          return;
         }
 
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `错误: ${event.error?.message || 'WebSocket 连接失败，请检查 Agent Service 是否运行'}`,
-        }
-        setMessages((prev) => [...prev, errorMessage])
-        setStreamContent('')
-        setIsStreaming(false)
+          role: "assistant",
+          content: `错误: ${event.error?.message || "WebSocket 连接失败，请检查 Agent Service 是否运行"}`,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setStreamContent("");
+        setIsStreaming(false);
         if (streamRef.current) {
-          streamRef.current.close()
-          streamRef.current = null
+          streamRef.current.close();
+          streamRef.current = null;
         }
-      })
+      });
 
       // 等待 WebSocket 连接建立（最多等待 3 秒）
       const connectionTimeout = new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('WebSocket 连接超时'))
-        }, 3000)
+          reject(new Error("WebSocket 连接超时"));
+        }, 3000);
 
         const checkConnection = () => {
-          const ws = (stream as any).ws
+          const ws = (stream as any).ws;
           if (ws?.readyState === WebSocket.OPEN) {
-            clearTimeout(timeout)
-            stream.off('status', onStatus)
-            connectionEstablished = true
-            resolve()
+            clearTimeout(timeout);
+            stream.off("status", onStatus);
+            connectionEstablished = true;
+            resolve();
           }
-        }
+        };
 
         const onStatus = (event: StreamEvent) => {
-          if (event.status === 'connected') {
-            checkConnection()
+          if (event.status === "connected") {
+            checkConnection();
           }
-        }
+        };
 
-        stream.on('status', onStatus)
-        
+        stream.on("status", onStatus);
+
         // 立即检查
-        setTimeout(checkConnection, 50)
-      })
+        setTimeout(checkConnection, 50);
+      });
 
-      await connectionTimeout
+      await connectionTimeout;
 
       // 发送消息
-      console.log('[AIChat] Sending message with workingDir:', workingDir)
+      console.log("[AIChat] Sending message with workingDir:", workingDir);
       stream.send(userMessage, `msg-${Date.now()}`, {
         timeout: 120000,
         stream: true,
         workingDir,
-      })
+      });
     } catch (error) {
       // WebSocket 失败，降级到非流式 HTTP
-      console.warn('WebSocket 失败，使用非流式模式:', error)
-      
+      console.warn("WebSocket 失败，使用非流式模式:", error);
+
       try {
-        const { getAgentClient } = await import('@/lib/agent-client')
-        const agentClient = getAgentClient()
-        
-        const result = await agentClient.sendMessage(agentSessionId, userMessage, {
-          workingDir,
-          options: {
-            timeout: 120000,
-            stream: false,
+        const { getAgentClient } = await import("@/lib/agent-client");
+        const agentClient = getAgentClient();
+
+        const result = await agentClient.sendMessage(
+          agentSessionId,
+          userMessage,
+          {
+            workingDir,
+            options: {
+              timeout: 120000,
+              stream: false,
+            },
           },
-        })
+        );
 
         if (!result.success) {
-          throw new Error(result.error?.message || 'Agent 请求失败')
+          throw new Error(result.error?.message || "Agent 请求失败");
         }
 
-        const aiReply = result.data?.content || '抱歉，我没有收到有效的回复。'
-        
+        const aiReply = result.data?.content || "抱歉，我没有收到有效的回复。";
+
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
-          role: 'assistant',
+          role: "assistant",
           content: aiReply,
-        }
+        };
 
-        setMessages((prev) => [...prev, assistantMessage])
-        
+        setMessages((prev) => [...prev, assistantMessage]);
+
         // 处理文件变更
         if (result.data?.files && result.data.files.length > 0) {
-          onFilesChange?.(result.data.files)
+          onFilesChange?.(result.data.files);
+
+          // 从文件变更中提取代码和 schema
+          for (const file of result.data.files) {
+            if (
+              file.path.includes("index.tsx") ||
+              file.path.includes("index.ts")
+            ) {
+              if ("content" in file && typeof file.content === "string") {
+                onCodeUpdate?.(file.content);
+              }
+            } else if (file.path.includes("config.schema.json")) {
+              if ("content" in file && typeof file.content === "string") {
+                onSchemaUpdate?.(file.content);
+              }
+            }
+          }
         }
 
-        // 尝试从内容中提取代码和 schema 更新
+        // 尝试从内容中提取代码和 schema 更新（作为备选方案）
         try {
-          const codeMatch = aiReply.match(/```(?:tsx?|typescript|javascript)?\n([\s\S]*?)```/)
+          // 提取 index.tsx 代码块
+          const codeMatch = aiReply.match(
+            /```(?:tsx|tsx?|typescript|javascript)\n([\s\S]*?)```/,
+          );
           if (codeMatch && onCodeUpdate) {
-            onCodeUpdate(codeMatch[1].trim())
+            onCodeUpdate(codeMatch[1].trim());
+          }
+
+          // 提取 config.schema.json 代码块
+          const schemaMatch = aiReply.match(
+            /```(?:json:schema|json)\n([\s\S]*?)```/,
+          );
+          if (schemaMatch && onSchemaUpdate) {
+            try {
+              const schemaContent = schemaMatch[1].trim();
+              JSON.parse(schemaContent);
+              onSchemaUpdate(schemaContent);
+            } catch (parseError) {
+              console.warn(
+                "Failed to parse schema from AI response:",
+                parseError,
+              );
+            }
           }
         } catch {
           // 忽略解析错误
@@ -236,39 +330,46 @@ export function AIChat({
       } catch (httpError) {
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `错误: ${httpError instanceof Error ? httpError.message : '未知错误'}。请确保 Agent Service 已启动（http://localhost:3001）`,
-        }
-        setMessages((prev) => [...prev, errorMessage])
+          role: "assistant",
+          content: `错误: ${httpError instanceof Error ? httpError.message : "未知错误"}。请确保 Agent Service 已启动（http://localhost:3001）`,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
       } finally {
-        setIsStreaming(false)
+        setIsStreaming(false);
         if (streamRef.current) {
-          streamRef.current.close()
-          streamRef.current = null
+          streamRef.current.close();
+          streamRef.current = null;
         }
       }
     }
-  }, [input, isStreaming, agentSessionId, onCodeUpdate, onSchemaUpdate, onFilesChange])
+  }, [
+    input,
+    isStreaming,
+    agentSessionId,
+    onCodeUpdate,
+    onSchemaUpdate,
+    onFilesChange,
+  ]);
 
   // 取消流式响应
   const handleCancel = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.close()
-      streamRef.current = null
+      streamRef.current.close();
+      streamRef.current = null;
     }
-    setIsStreaming(false)
+    setIsStreaming(false);
     if (streamContent) {
       setMessages((prev) => [
         ...prev,
         {
           id: `assistant-${Date.now()}`,
-          role: 'assistant',
+          role: "assistant",
           content: streamContent,
         },
-      ])
-      setStreamContent('')
+      ]);
+      setStreamContent("");
     }
-  }, [streamContent])
+  }, [streamContent]);
 
   return (
     <div className="flex flex-col h-full">
@@ -311,8 +412,8 @@ export function AIChat({
           {isStreaming && streamContent && (
             <Message
               message={{
-                id: 'streaming',
-                role: 'assistant',
+                id: "streaming",
+                role: "assistant",
                 content: streamContent,
               }}
             />
@@ -322,9 +423,18 @@ export function AIChat({
           {isStreaming && !streamContent && (
             <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 w-fit">
               <div className="flex gap-1">
-                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div
+                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <div
+                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <div
+                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
               </div>
             </div>
           )}
@@ -343,11 +453,22 @@ export function AIChat({
                 <Sparkles className="h-4 w-4 text-primary/50" />
               </div>
             </div>
-            <span className="text-sm font-medium text-primary">AI 正在思考中</span>
+            <span className="text-sm font-medium text-primary">
+              AI 正在思考中
+            </span>
             <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
             </div>
           </div>
         </div>
@@ -364,5 +485,5 @@ export function AIChat({
         className="flex-shrink-0"
       />
     </div>
-  )
+  );
 }
