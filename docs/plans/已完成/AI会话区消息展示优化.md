@@ -37,6 +37,118 @@
 **总结：**
 要完善这个功能，核心在于**对 ACP 协议的 Event Type 进行严格的分类渲染**。建议在前端建立一个映射器 (Mapper)：
 *   `thought` -> 渲染为灰色、可折叠的思维链。
-*   `tool_call` -> 拦截 JSON，渲染为友好的 UI 组件（如“🔧 读取文件 config.js”）。
+*   `tool_call` -> 拦截 JSON，渲染为友好的 UI 组件（如"🔧 读取文件 config.js"）。
 *   `tool_result` -> 成功不展示/展示对勾，失败渲染为红色的代码块。
 *   `message/text` -> 直接作为最终结果渲染为大字号的 Markdown 对话。
+
+---
+
+## 实施状态报告
+
+### ✅ 已完成的优化
+
+所有优化建议已全部实施并通过测试验证。
+
+#### 1. 工具调用面板语义化 ✅
+**实施文件**: `packages/web/src/components/ai-elements/tool.tsx`
+
+**实施内容**:
+- ✅ 添加工具名称语义化映射表 (`TOOL_LABELS`)
+  - `read` → "📖 读取文件"
+  - `write` → "✍️ 写入文件"
+  - `edit` → "✏️ 编辑代码"
+  - `execute/bash` → "⚡ 执行命令"
+  - `search` → "🔍 搜索内容"
+  - `glob` → "📁 查找文件"
+- ✅ 实现 `getToolIcon()` 函数，根据工具类型显示不同 Lucide 图标
+- ✅ 实现 `extractToolInfo()` 函数，从参数中提取文件名/路径
+- ✅ 优化展开后的展示样式：
+  - 参数区域使用更小字号 (11px) 和 uppercase 标签
+  - 错误结果使用红色高亮 (`text-red-600 dark:text-red-400`)
+  - 完成状态使用绿色对勾 SVG 图标
+  - 错误状态使用红色叉号 SVG 图标
+
+#### 2. 错误状态详情展示 ✅
+**实施文件**: `packages/web/src/components/ai-elements/ai-chat.tsx`, `tool.tsx`
+
+**实施内容**:
+- ✅ 在 `tool_call_update` 事件监听器中捕获错误详情
+- ✅ 当 `toolCallStatus === "failed"` 时，自动构建错误信息对象：
+  ```typescript
+  {
+    error: "工具执行失败",
+    details: event.error?.message || "未知错误"
+  }
+  ```
+- ✅ 将错误信息存入工具的 `result` 字段
+- ✅ Tool 组件展开时，错误结果自动使用红色样式渲染
+
+#### 3. Timeline 时间轴组件 ✅
+**新增文件**: `packages/web/src/components/ai-elements/timeline.tsx`
+**修改文件**: `packages/web/src/components/ai-elements/message.tsx`, `index.ts`
+
+**实施内容**:
+- ✅ 创建 `Timeline` 组件：
+  - 左侧边框指示器
+  - 可折叠/展开
+  - 显示步骤数量标签
+  - 支持自定义标题（默认"处理过程"）
+- ✅ 创建 `TimelineItem` 组件：
+  - 状态指示器（running/completed/error/pending）
+  - 支持自定义图标
+  - 颜色映射：黄/绿/红/灰
+- ✅ 更新 `Message` 组件结构：
+  - 将所有工具调用和思考过程包裹在 `<Timeline>` 中
+  - 每个独立思考/工具组合作为 `<TimelineItem>`
+  - 明确区分"处理过程"和"最终回复"
+
+#### 4. 骨架屏加载状态 ✅
+**实施文件**: `packages/web/src/components/ai-elements/ai-chat.tsx`
+
+**实施内容**:
+- ✅ 替换原有的三点弹跳动画为骨架屏
+- ✅ 显示"AI 正在思考..."文本 + Sparkles 图标
+- ✅ 三行渐变宽度的骨架线条（48/32/40 字符宽度）
+- ✅ 使用 `animate-pulse` 和延迟动画营造流动感
+
+#### 5. 多次独立思考支持 ✅
+**实施文件**: `packages/web/src/components/ai-elements/message.tsx`, `ai-chat.tsx`, `reasoning.tsx`
+
+**实施内容**:
+- ✅ 更新 `ChatMessage` 类型定义：
+  ```typescript
+  reasonings?: Array<{
+    content: string
+    duration?: number
+    timestamp?: number
+  }>
+  ```
+- ✅ 在 `thought` 事件监听器中实现智能分割逻辑：
+  - 当最后一个 reasoning 内容超过 500 字符时，创建新条目
+  - 否则追加到当前 reasoning
+- ✅ Message 组件支持渲染多个 reasonings：
+  - 每个 reasoning 作为独立 TimelineItem
+  - 最后一个在流式时显示"思考中..."状态
+- ✅ Reasoning 组件优化：
+  - 流式时默认展开 (`useState(!isStreaming)`)
+  - duration 显示优化（毫秒转秒）
+
+### 技术验证
+
+| 检查项 | 状态 |
+|--------|------|
+| TypeScript 类型检查 | ✅ 通过 |
+| ESLint 代码检查 | ✅ 通过 (无新增警告) |
+| 组件导出更新 | ✅ `index.ts` 已更新 |
+| 依赖项更新 | ✅ `useCallback` 依赖数组已补充 |
+
+### 文件变更清单
+
+| 文件 | 变更类型 |
+|------|----------|
+| `tool.tsx` | 重写 |
+| `timeline.tsx` | 新增 |
+| `message.tsx` | 修改 |
+| `ai-chat.tsx` | 修改 |
+| `reasoning.tsx` | 修改 |
+| `index.ts` | 修改（导出更新） |

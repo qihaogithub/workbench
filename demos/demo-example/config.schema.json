@@ -1,5 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 667
+    }
+  },
   "title": "Banner Demo 配置",
   "type": "object",
   "properties": {

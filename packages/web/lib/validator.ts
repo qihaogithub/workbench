@@ -3,10 +3,14 @@
  * 用于校验 JSON Schema 语法和 Props 与 Schema 的一致性
  */
 
-import type { PreviewSize } from '../components/demo/types';
+import type { PreviewSize } from "../components/demo/types";
 
 export interface ValidationError {
-  type: 'json_syntax' | 'props_mismatch' | 'required_missing' | 'interface_not_found';
+  type:
+    | "json_syntax"
+    | "props_mismatch"
+    | "required_missing"
+    | "interface_not_found";
   message: string;
   line?: number;
 }
@@ -33,7 +37,7 @@ export function validateJsonSyntax(schema: string): ValidationError | null {
     const line = lineMatch ? parseInt(lineMatch[1], 10) : undefined;
 
     return {
-      type: 'json_syntax',
+      type: "json_syntax",
       message: `JSON 语法错误: ${errorMessage}`,
       line,
     };
@@ -97,7 +101,10 @@ function extractPropsFromDestructuring(code: string): string[] | null {
       while ((propMatch = propPattern.exec(destructured)) !== null) {
         const propName = propMatch[1];
         // 排除 TypeScript 关键字和空字符串
-        if (propName && !['type', 'interface', 'const', 'let', 'var'].includes(propName)) {
+        if (
+          propName &&
+          !["type", "interface", "const", "let", "var"].includes(propName)
+        ) {
           props.push(propName);
         }
       }
@@ -120,7 +127,7 @@ function extractPropertiesFromSchema(schema: string): string[] | null {
   try {
     const parsed = JSON.parse(schema);
 
-    if (!parsed.properties || typeof parsed.properties !== 'object') {
+    if (!parsed.properties || typeof parsed.properties !== "object") {
       return [];
     }
 
@@ -150,7 +157,10 @@ function extractRequiredFromSchema(schema: string): string[] {
  * @param schema JSON Schema 字符串
  * @returns 校验错误列表
  */
-export function validatePropsSchema(code: string, schema: string): ValidationError[] {
+export function validatePropsSchema(
+  code: string,
+  schema: string,
+): ValidationError[] {
   const errors: ValidationError[] = [];
 
   // 1. 提取代码中的 props
@@ -166,8 +176,8 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
 
   if (schemaProps === null) {
     errors.push({
-      type: 'json_syntax',
-      message: '无法解析 Schema 中的 properties',
+      type: "json_syntax",
+      message: "无法解析 Schema 中的 properties",
     });
     return errors;
   }
@@ -179,8 +189,8 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
 
     if (hasPropsUsage) {
       errors.push({
-        type: 'interface_not_found',
-        message: '未找到 DemoProps 接口定义，无法校验 props 一致性',
+        type: "interface_not_found",
+        message: "未找到 DemoProps 接口定义，无法校验 props 一致性",
       });
     }
 
@@ -189,7 +199,7 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
     for (const field of requiredFields) {
       if (!schemaProps.includes(field)) {
         errors.push({
-          type: 'required_missing',
+          type: "required_missing",
           message: `required 字段 "${field}" 未在 properties 中定义`,
         });
       }
@@ -206,7 +216,7 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
   for (const prop of codeProps) {
     if (!schemaPropsSet.has(prop)) {
       errors.push({
-        type: 'props_mismatch',
+        type: "props_mismatch",
         message: `代码中的 props "${prop}" 未在 Schema 的 properties 中定义`,
       });
     }
@@ -216,7 +226,7 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
   for (const prop of schemaProps) {
     if (!codePropsSet.has(prop)) {
       errors.push({
-        type: 'props_mismatch',
+        type: "props_mismatch",
         message: `Schema 中的 property "${prop}" 未在代码的 DemoProps 中定义`,
       });
     }
@@ -227,7 +237,7 @@ export function validatePropsSchema(code: string, schema: string): ValidationErr
   for (const field of requiredFields) {
     if (!schemaPropsSet.has(field)) {
       errors.push({
-        type: 'required_missing',
+        type: "required_missing",
         message: `required 字段 "${field}" 未在 properties 中定义`,
       });
     }
@@ -285,7 +295,7 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
     const parsed = JSON.parse(schema);
     const defaults: Record<string, unknown> = {};
 
-    if (parsed.properties && typeof parsed.properties === 'object') {
+    if (parsed.properties && typeof parsed.properties === "object") {
       for (const [key, value] of Object.entries(parsed.properties)) {
         const prop = value as { default?: unknown };
         if (prop.default !== undefined) {
@@ -301,7 +311,11 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
 }
 
 /**
- * 从 Schema 的 ui:options 中解析预览尺寸配置
+ * 从 Schema 中提取预览尺寸配置
+ * 支持两种格式：
+ * 1. $demo.previewSize（新标准）
+ * 2. ui.options.preview（旧格式，向后兼容）
+ *
  * @param schema JSON Schema 字符串
  * @returns 预览尺寸配置，如果未定义则返回 undefined
  */
@@ -309,9 +323,9 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
   try {
     const parsed = JSON.parse(schema);
 
-    if (parsed.ui?.options?.preview) {
-      const preview = parsed.ui.options.preview;
-
+    // 优先读取 $demo.previewSize（新标准）
+    if (parsed.$demo?.previewSize) {
+      const preview = parsed.$demo.previewSize;
       const size: PreviewSize = {};
 
       if (preview.width !== undefined) {
@@ -330,7 +344,35 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
         size.scale = Number(preview.scale);
       }
 
-      return Object.keys(size).length > 0 ? size : undefined;
+      if (Object.keys(size).length > 0) {
+        return size;
+      }
+    }
+
+    // 向后兼容：读取 ui.options.preview（旧格式）
+    if (parsed.ui?.options?.preview) {
+      const preview = parsed.ui.options.preview;
+      const size: PreviewSize = {};
+
+      if (preview.width !== undefined) {
+        size.width = preview.width;
+      }
+      if (preview.height !== undefined) {
+        size.height = preview.height;
+      }
+      if (preview.minHeight !== undefined) {
+        size.minHeight = preview.minHeight;
+      }
+      if (preview.maxHeight !== undefined) {
+        size.maxHeight = preview.maxHeight;
+      }
+      if (preview.scale !== undefined) {
+        size.scale = Number(preview.scale);
+      }
+
+      if (Object.keys(size).length > 0) {
+        return size;
+      }
     }
 
     return undefined;
