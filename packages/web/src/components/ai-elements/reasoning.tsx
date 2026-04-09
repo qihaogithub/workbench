@@ -17,7 +17,7 @@ export function Reasoning({
   isStreaming = false,
   className,
 }: ReasoningProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(!isStreaming) // 流式时默认展开
 
   if (!content) return null
 
@@ -36,7 +36,7 @@ export function Reasoning({
             {isStreaming
               ? '思考中...'
               : duration
-              ? `思考过程 (${duration}s)`
+              ? `思考过程 (${(duration / 1000).toFixed(1)}s)`
               : '思考过程'}
           </span>
         </div>

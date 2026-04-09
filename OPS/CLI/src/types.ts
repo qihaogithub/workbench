@@ -22,7 +22,7 @@ export interface AgentResult {
 
 export interface FileChange {
   path: string;
-  action: 'created' | 'modified' | 'deleted';
+  action: "created" | "modified" | "deleted";
   content?: string;
 }
 
@@ -82,4 +82,54 @@ export interface InteractiveModeOptions {
 export interface DiagnoseOptions {
   sessionId?: string;
   testMessage?: string;
+}
+
+export interface StreamEvent {
+  type:
+    | "stream"
+    | "thought"
+    | "tool_call"
+    | "tool_call_update"
+    | "error"
+    | "finish"
+    | "pong"
+    | "status"
+    | "permission_request"
+    | "file_operation"
+    | "models";
+  id?: string;
+  content?: string;
+  done?: boolean;
+  error?: { code: string; message: string };
+  files?: FileChange[];
+  metadata?: Record<string, unknown>;
+  timestamp?: number;
+  status?: string;
+  toolCallId?: string;
+  title?: string;
+  kind?: "read" | "edit" | "execute";
+  toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
+  permissionRequest?: {
+    sessionId: string;
+    options: Array<{
+      optionId: string;
+      name: string;
+    }>;
+    toolCall: {
+      toolCallId: string;
+      title?: string;
+      kind?: string;
+    };
+  };
+  fileOperation?: {
+    method: string;
+    path: string;
+    content?: string;
+  };
+  models?: Array<{
+    id: string;
+    label: string;
+  }>;
+  currentModelId?: string;
+  canSwitch?: boolean;
 }

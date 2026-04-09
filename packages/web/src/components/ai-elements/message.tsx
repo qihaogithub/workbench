@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Streamdown } from 'streamdown'
 import { Tool } from './tool'
 import { Reasoning } from './reasoning'
+import { Timeline, TimelineItem } from './timeline'
 
 export interface MessagePart {
   type: 'text' | 'reasoning' | 'tool' | 'image' | 'file'
@@ -28,6 +29,12 @@ export interface ChatMessage {
     content: string
     duration?: number
   }
+  // 支持多个独立思考过程
+  reasonings?: Array<{
+    content: string
+    duration?: number
+    timestamp?: number
+  }>
   tools?: Array<{
     name: string
     status: 'running' | 'completed' | 'error'
@@ -63,51 +70,74 @@ export function Message({ message, className, isStreaming = false }: MessageProp
     }
   }
 
-  return (
-    <div className={cn('flex flex-col gap-2 group', isUser && 'items-end', className)}>
-      {/* 工具调用展示 */}
-      {message.tools && message.tools.length > 0 && (
-        <div className="space-y-2">
-          {message.tools.map((tool, index) => (
-            <Tool
-              key={index}
-              name={tool.name}
-              status={tool.status}
-              parameters={tool.parameters}
-              result={tool.result}
-            />
-          ))}
-        </div>
-      )}
+  const hasProcessContent = (message.tools && message.tools.length > 0) || message.reasoning || (message.reasonings && message.reasonings.length > 0)
 
-      {/* 思考过程展示 */}
-      {message.reasoning && message.reasoning.content && (
-        <Reasoning
-          content={message.reasoning.content}
-          duration={message.reasoning.duration}
-          isStreaming={isStreaming}
-        />
+  return (
+    <div className={cn('flex flex-col gap-3 group', isUser && 'items-end', className)}>
+      {/* 内部处理过程（工具调用 + 思考） */}
+      {hasProcessContent && (
+        <Timeline title="AI 处理过程" defaultExpanded={isStreaming}>
+          {/* 多个独立思考过程展示 */}
+          {message.reasonings && message.reasonings.length > 0 ? (
+            message.reasonings.map((r, index) => (
+              <TimelineItem key={index} status={index === message.reasonings!.length - 1 && isStreaming ? 'running' : 'completed'}>
+                <Reasoning
+                  content={r.content}
+                  duration={r.duration}
+                  isStreaming={isStreaming && index === message.reasonings!.length - 1}
+                />
+              </TimelineItem>
+            ))
+          ) : message.reasoning && message.reasoning.content ? (
+            <TimelineItem status={isStreaming ? 'running' : 'completed'}>
+              <Reasoning
+                content={message.reasoning.content}
+                duration={message.reasoning.duration}
+                isStreaming={isStreaming}
+              />
+            </TimelineItem>
+          ) : null}
+
+          {/* 工具调用展示 */}
+          {message.tools && message.tools.length > 0 && (
+            <TimelineItem status="completed">
+              <div className="space-y-2">
+                {message.tools.map((tool, index) => (
+                  <Tool
+                    key={index}
+                    name={tool.name}
+                    status={tool.status}
+                    parameters={tool.parameters}
+                    result={tool.result}
+                  />
+                ))}
+              </div>
+            </TimelineItem>
+          )}
+        </Timeline>
       )}
 
       {/* 消息内容 */}
-      <div
-        className={cn(
-          'rounded-2xl px-4 py-3 text-sm max-w-full overflow-hidden',
-          isUser
-            ? 'bg-primary text-primary-foreground rounded-tr-sm'
-            : 'bg-muted text-muted-foreground rounded-tl-sm'
-        )}
-      >
-        {isUser ? (
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
-        ) : (
-          <div className="overflow-x-auto max-w-full">
-            <Streamdown className="prose prose-sm dark:prose-invert max-w-full [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
-              {message.content}
-            </Streamdown>
-          </div>
-        )}
-      </div>
+      {message.content && (
+        <div
+          className={cn(
+            'rounded-2xl px-4 py-3 text-sm max-w-full overflow-hidden',
+            isUser
+              ? 'bg-primary text-primary-foreground rounded-tr-sm'
+              : 'bg-muted text-muted-foreground rounded-tl-sm'
+          )}
+        >
+          {isUser ? (
+            <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          ) : (
+            <div className="overflow-x-auto max-w-full">
+              <Streamdown className="prose prose-sm dark:prose-invert max-w-full [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+                {message.content}
+              </Streamdown>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 图片展示 */}
       {message.images && message.images.length > 0 && (
@@ -133,7 +163,7 @@ export function Message({ message, className, isStreaming = false }: MessageProp
       )}
 
       {/* 消息操作按钮（仅 AI 消息） */}
-      {!isUser && (
+      {!isUser && message.content && (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
@@ -202,3 +232,4 @@ function FileAttachment({ file }: { file: NonNullable<ChatMessage['files']>[numb
     </a>
   )
 }
+

@@ -9,12 +9,26 @@ import {
   ReasoningDisplay,
   ToolCall,
   type ChatMessage,
+  PermissionDialog,
 } from "@/components/ai-elements";
 import {
   AgentStream,
   type StreamEvent,
 } from "@opencode-workbench/agent-client";
 import { Bot, Sparkles } from "lucide-react";
+
+interface PermissionRequest {
+  sessionId: string;
+  options: Array<{
+    optionId: string;
+    name: string;
+  }>;
+  toolCall: {
+    toolCallId: string;
+    title?: string;
+    kind?: string;
+  };
+}
 
 interface AIChatProps {
   sessionId: string;
@@ -40,6 +54,19 @@ export function AIChat({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
   const streamRef = useRef<AgentStream | null>(null);
+
+  // 当前正在构建的 Assistant 消息
+  const [currentMessage, setCurrentMessage] = useState<ChatMessage>({
+    role: "assistant",
+    content: "",
+    reasoning: undefined,
+    reasonings: [],
+    tools: [],
+  });
+
+  // 待处理的权限请求
+  const [pendingPermissionRequest, setPendingPermissionRequest] =
+    useState<PermissionRequest | null>(null);
 
   console.log(
     "[AIChat] Props received - workingDir:",
@@ -100,19 +127,224 @@ export function AIChat({
       console.log("[AIChat] WebSocket URL:", (stream as any).url);
 
       let accumulatedContent = "";
+      let reasoningContent = "";
       let connectionEstablished = false;
 
-      // 监听流事件
+      // 重置当前消息状态
+      setCurrentMessage({
+        role: "assistant",
+        content: "",
+        reasoning: undefined,
+        reasonings: [],
+        tools: [],
+      });
+
+      // 监听流式文本
       stream.on("stream", (event: StreamEvent) => {
         connectionEstablished = true;
         if (event.content) {
           accumulatedContent += event.content;
           setStreamContent(accumulatedContent);
+          setCurrentMessage((prev) => ({
+            ...prev,
+            content: accumulatedContent,
+          }));
+        }
+      });
+
+      // 监听思考过程 - 支持多次独立思考
+      stream.on("thought", (event: StreamEvent) => {
+        if (event.content) {
+          // 检查是否有新的思考开始（通过事件ID或内容重置）
+          setCurrentMessage((prev) => {
+            const currentReasonings = prev.reasonings || [];
+
+            // 如果是新的思考片段（通过检查最后一个reasoning是否已经有内容）
+            const lastReasoning =
+              currentReasonings[currentReasonings.length - 1];
+
+            if (!lastReasoning || lastReasoning.content.length > 500) {
+              // 创建新的reasoning条目
+              return {
+                ...prev,
+                reasonings: [
+                  ...currentReasonings,
+                  {
+                    content: event.content!,
+                    timestamp: Date.now(),
+                  },
+                ],
+              };
+            } else {
+              // 追加到最后一个reasoning
+              const updatedReasonings = [...currentReasonings];
+              updatedReasonings[updatedReasonings.length - 1] = {
+                ...lastReasoning,
+                content: lastReasoning.content + event.content,
+              };
+              return {
+                ...prev,
+                reasonings: updatedReasonings,
+              };
+            }
+          });
+        }
+      });
+
+      // 监听工具调用开始
+      stream.on("tool_call", (event: StreamEvent) => {
+        setCurrentMessage((prev) => ({
+          ...prev,
+          tools: [
+            ...(prev.tools || []),
+            {
+              name: event.title || event.kind || "未知工具",
+              status: "running",
+              parameters: {
+                toolCallId: event.toolCallId,
+                kind: event.kind,
+                ...(event.title && { title: event.title }),
+              },
+            },
+          ],
+        }));
+      });
+
+      // 监听工具调用状态更新
+      stream.on("tool_call_update", (event: StreamEvent) => {
+        setCurrentMessage((prev) => {
+          const updatedTools = (prev.tools || []).map((tool, index) => {
+            // 通过 toolCallId 匹配
+            if (
+              event.toolCallId &&
+              tool.parameters?.toolCallId === event.toolCallId
+            ) {
+              const newStatus =
+                event.toolCallStatus === "completed"
+                  ? "completed"
+                  : event.toolCallStatus === "failed"
+                    ? "error"
+                    : tool.status;
+
+              // 如果失败，尝试从事件中提取错误信息
+              let errorResult = event.content || tool.result;
+              if (event.toolCallStatus === "failed" && !errorResult) {
+                errorResult = {
+                  error: "工具执行失败",
+                  details: event.error?.message || "未知错误",
+                };
+              }
+
+              return {
+                ...tool,
+                status: newStatus,
+                result: errorResult,
+              };
+            }
+            // 兜底:匹配最后一个工具
+            if (index === prev.tools!.length - 1) {
+              const newStatus =
+                event.toolCallStatus === "completed"
+                  ? "completed"
+                  : event.toolCallStatus === "failed"
+                    ? "error"
+                    : tool.status;
+
+              let errorResult = event.content || tool.result;
+              if (event.toolCallStatus === "failed" && !errorResult) {
+                errorResult = {
+                  error: "工具执行失败",
+                  details: event.error?.message || "未知错误",
+                };
+              }
+
+              return {
+                ...tool,
+                status: newStatus,
+                result: errorResult,
+              };
+            }
+            return tool;
+          });
+          return { ...prev, tools: updatedTools };
+        });
+      });
+
+      // 监听权限请求
+      stream.on("permission_request", (event: StreamEvent) => {
+        if (event.permissionRequest) {
+          setPendingPermissionRequest(
+            event.permissionRequest as PermissionRequest,
+          );
+        }
+      });
+
+      // 监听文件操作（实时文件变更追踪）
+      const realtimeFilesRef = new Map<
+        string,
+        { action: string; content?: string }
+      >();
+      let fileUpdateTimer: NodeJS.Timeout | null = null;
+
+      // 处理实时文件变更的辅助函数
+      const processRealtimeFiles = () => {
+        const files = Array.from(realtimeFilesRef.entries()).map(
+          ([path, info]) => ({
+            path,
+            action: info.action as "created" | "modified" | "deleted",
+            content: info.content,
+          }),
+        );
+
+        // 通知父组件
+        if (files.length > 0) {
+          onFilesChange?.(files);
+
+          // 实时提取代码和 schema 更新
+          for (const file of files) {
+            if (
+              (file.path.includes("index.tsx") ||
+                file.path.includes("index.ts")) &&
+              file.content
+            ) {
+              onCodeUpdate?.(file.content);
+            } else if (
+              file.path.includes("config.schema.json") &&
+              file.content
+            ) {
+              onSchemaUpdate?.(file.content);
+            }
+          }
+        }
+      };
+
+      stream.on("file_operation", (event: StreamEvent) => {
+        if (event.fileOperation) {
+          const { method, path, content } = event.fileOperation;
+
+          // 仅处理文件写入操作
+          if (method === "fs/write_text_file" && path) {
+            // 更新累计文件变更（去重）
+            realtimeFilesRef.set(path, {
+              action: "modified",
+              content,
+            });
+
+            // 防抖：100ms 后批量通知
+            if (fileUpdateTimer) {
+              clearTimeout(fileUpdateTimer);
+            }
+
+            fileUpdateTimer = setTimeout(() => {
+              processRealtimeFiles();
+              fileUpdateTimer = null;
+            }, 100);
+          }
         }
       });
 
       stream.on("finish", async (event: StreamEvent) => {
-        // 完成流式响应
+        // 完成流式响应,将当前消息添加到消息列表
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -120,20 +352,44 @@ export function AIChat({
             accumulatedContent ||
             event.content ||
             "抱歉，我没有收到有效的回复。",
+          reasoning: currentMessage.reasoning,
+          reasonings: currentMessage.reasonings,
+          tools: currentMessage.tools,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+        setCurrentMessage({
+          role: "assistant",
+          content: "",
+          reasoning: undefined,
+          tools: [],
+        });
         setStreamContent("");
         setIsStreaming(false);
         stream.close();
         streamRef.current = null;
 
-        // 处理文件变更
-        if (event.files && event.files.length > 0) {
-          onFilesChange?.(event.files);
+        // 清理文件更新定时器
+        if (fileUpdateTimer) {
+          clearTimeout(fileUpdateTimer);
+          fileUpdateTimer = null;
+        }
+
+        // 处理文件变更（优先使用 event.files，兜底使用 realtimeFiles）
+        const finalFiles =
+          event.files && event.files.length > 0
+            ? event.files
+            : Array.from(realtimeFilesRef.entries()).map(([path, info]) => ({
+                path,
+                action: info.action as "created" | "modified" | "deleted",
+                content: info.content,
+              }));
+
+        if (finalFiles.length > 0) {
+          onFilesChange?.(finalFiles);
 
           // 从文件变更中提取代码和 schema
-          for (const file of event.files) {
+          for (const file of finalFiles) {
             if (
               file.path.includes("index.tsx") ||
               file.path.includes("index.ts")
@@ -149,6 +405,9 @@ export function AIChat({
             }
           }
         }
+
+        // 清空实时文件缓存
+        realtimeFilesRef.clear();
 
         // 尝试从内容中提取代码和 schema 更新（作为备选方案）
         try {
@@ -346,10 +605,39 @@ export function AIChat({
     input,
     isStreaming,
     agentSessionId,
+    workingDir,
+    currentMessage.reasoning,
+    currentMessage.reasonings,
+    currentMessage.tools,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
   ]);
+
+  // 处理权限响应
+  const handlePermissionResponse = useCallback(
+    (optionId: string) => {
+      // 通过 WebSocket 发送权限响应
+      const ws = (streamRef.current as any)?.ws;
+      if (ws && ws.readyState === WebSocket.OPEN && pendingPermissionRequest) {
+        ws.send(
+          JSON.stringify({
+            type: "permission_response",
+            permissionId: pendingPermissionRequest.toolCall.toolCallId,
+            optionId,
+          }),
+        );
+      }
+      setPendingPermissionRequest(null);
+    },
+    [pendingPermissionRequest],
+  );
+
+  // 取消权限请求
+  const handlePermissionCancel = useCallback(() => {
+    // 发送拒绝响应
+    handlePermissionResponse("reject_once");
+  }, [handlePermissionResponse]);
 
   // 取消流式响应
   const handleCancel = useCallback(() => {
@@ -409,32 +697,43 @@ export function AIChat({
           ))}
 
           {/* 流式响应展示 */}
-          {isStreaming && streamContent && (
+          {isStreaming && currentMessage.content && (
             <Message
               message={{
                 id: "streaming",
                 role: "assistant",
-                content: streamContent,
+                content: currentMessage.content,
+                reasoning: currentMessage.reasoning,
+                tools: currentMessage.tools,
               }}
+              isStreaming={true}
             />
           )}
 
-          {/* 加载指示器 */}
-          {isStreaming && !streamContent && (
-            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 w-fit">
-              <div className="flex gap-1">
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
+          {/* 加载指示器 - 骨架屏 */}
+          {isStreaming && !currentMessage.content && (
+            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 w-fit max-w-[80%]">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    AI 正在思考...
+                  </span>
+                </div>
+                {/* 骨架屏动画 */}
+                <div className="space-y-1.5 pt-2">
+                  <div className="h-2 w-48 bg-muted-foreground/20 rounded animate-pulse" />
+                  <div
+                    className="h-2 w-32 bg-muted-foreground/20 rounded animate-pulse"
+                    style={{ animationDelay: "100ms" }}
+                  />
+                  <div
+                    className="h-2 w-40 bg-muted-foreground/20 rounded animate-pulse"
+                    style={{ animationDelay: "200ms" }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -484,6 +783,15 @@ export function AIChat({
         loading={isStreaming}
         className="flex-shrink-0"
       />
+
+      {/* 权限请求对话框 */}
+      {pendingPermissionRequest && (
+        <PermissionDialog
+          request={pendingPermissionRequest}
+          onRespond={handlePermissionResponse}
+          onCancel={handlePermissionCancel}
+        />
+      )}
     </div>
   );
 }
