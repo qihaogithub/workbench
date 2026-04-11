@@ -1,85 +1,104 @@
-'use client'
+"use client";
 
-import { cn } from '@/lib/utils'
-import { useState } from 'react'
-import React from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import type { ReactNode } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface TimelineProps {
-  children: React.ReactNode
-  className?: string
-  title?: string
-  defaultExpanded?: boolean
+  children: ReactNode;
+  className?: string;
+  title?: string;
+  defaultExpanded?: boolean;
 }
 
 export function Timeline({
   children,
   className,
-  title = '处理过程',
+  title = "处理过程",
   defaultExpanded = false,
 }: TimelineProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className={cn('border-l-2 border-muted pl-4 space-y-2', className)}>
+    <div className={cn("space-y-1", className)}>
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
+        <span className="font-medium">{title}</span>
         {isExpanded ? (
           <ChevronDown className="h-3 w-3" />
         ) : (
           <ChevronRight className="h-3 w-3" />
         )}
-        <span className="font-medium">{title}</span>
-        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-          {React.Children.count(children)} 个步骤
-        </span>
       </button>
       {isExpanded && (
-        <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+        <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
           {children}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 interface TimelineItemProps {
-  children: React.ReactNode
-  className?: string
-  indicator?: React.ReactNode
-  status?: 'running' | 'completed' | 'error' | 'pending'
+  children: ReactNode;
+  className?: string;
+  indicator?: ReactNode;
+  status?: "running" | "completed" | "error" | "pending";
 }
 
 export function TimelineItem({
   children,
   className,
-  indicator,
-  status = 'pending',
+  status = "pending",
 }: TimelineItemProps) {
-  const statusColors = {
-    running: 'bg-yellow-500',
-    completed: 'bg-green-500',
-    error: 'bg-red-500',
-    pending: 'bg-muted-foreground/30',
-  }
+  const statusIcons = {
+    running: (
+      <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+    ),
+    completed: (
+      <svg
+        className="h-3 w-3 text-muted-foreground/50"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 13l4 4L19 7"
+        />
+      </svg>
+    ),
+    error: (
+      <svg
+        className="h-3 w-3 text-muted-foreground/50"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M6 18L18 6M6 6l12 12"
+        />
+      </svg>
+    ),
+    pending: <div className="h-3 w-3 rounded-full bg-muted-foreground/20" />,
+  };
+
+  const Icon = statusIcons[status];
 
   return (
-    <div className={cn('relative flex gap-3', className)}>
-      {/* 时间轴指示器 */}
-      <div className="flex flex-col items-center">
-        {indicator || (
-          <div
-            className={cn(
-              'h-2 w-2 rounded-full flex-shrink-0',
-              statusColors[status]
-            )}
-          />
-        )}
-      </div>
+    <div className={cn("flex gap-2 items-start", className)}>
+      {/* 图标 */}
+      <div className="flex-shrink-0 mt-0.5">{Icon}</div>
       {/* 内容 */}
       <div className="flex-1 min-w-0">{children}</div>
     </div>
-  )
+  );
 }

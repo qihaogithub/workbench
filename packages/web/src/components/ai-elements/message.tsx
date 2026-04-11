@@ -1,141 +1,173 @@
-'use client'
+"use client";
 
-import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Bot, User, Copy, Check, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Streamdown } from 'streamdown'
-import { Tool } from './tool'
-import { Reasoning } from './reasoning'
-import { Timeline, TimelineItem } from './timeline'
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Bot,
+  User,
+  Copy,
+  Check,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Streamdown } from "streamdown";
+import { Tool } from "./tool";
+import { Reasoning } from "./reasoning";
+import { Timeline, TimelineItem } from "./timeline";
 
 export interface MessagePart {
-  type: 'text' | 'reasoning' | 'tool' | 'image' | 'file'
-  content?: string
-  name?: string
-  status?: 'running' | 'completed' | 'error' | 'awaiting-approval'
-  parameters?: Record<string, unknown>
-  result?: unknown
-  duration?: number
+  type: "text" | "reasoning" | "tool" | "image" | "file";
+  content?: string;
+  name?: string;
+  status?: "running" | "completed" | "error" | "awaiting-approval";
+  parameters?: Record<string, unknown>;
+  result?: unknown;
+  duration?: number;
 }
 
 export interface ChatMessage {
-  id?: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  parts?: MessagePart[]
+  id?: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  parts?: MessagePart[];
   reasoning?: {
-    content: string
-    duration?: number
-  }
+    content: string;
+    duration?: number;
+  };
   // 支持多个独立思考过程
   reasonings?: Array<{
-    content: string
-    duration?: number
-    timestamp?: number
-  }>
+    content: string;
+    duration?: number;
+    timestamp?: number;
+  }>;
   tools?: Array<{
-    name: string
-    status: 'running' | 'completed' | 'error'
-    parameters?: Record<string, unknown>
-    result?: unknown
-  }>
+    name: string;
+    kind?: "read" | "edit" | "execute";
+    path?: string;
+    status: "running" | "completed" | "error";
+    parameters?: Record<string, unknown>;
+    result?: unknown;
+  }>;
   images?: Array<{
-    url: string
-    alt?: string
-  }>
+    url: string;
+    alt?: string;
+  }>;
   files?: Array<{
-    name: string
-    url: string
-    size?: number
-  }>
+    name: string;
+    url: string;
+    size?: number;
+  }>;
 }
 
 interface MessageProps {
-  message: ChatMessage
-  className?: string
-  isStreaming?: boolean
+  message: ChatMessage;
+  className?: string;
+  isStreaming?: boolean;
 }
 
-export function Message({ message, className, isStreaming = false }: MessageProps) {
-  const isUser = message.role === 'user'
-  const [copied, setCopied] = useState(false)
+export function Message({
+  message,
+  className,
+  isStreaming = false,
+}: MessageProps) {
+  const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     if (message.content) {
-      await navigator.clipboard.writeText(message.content)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  }
+  };
 
-  const hasProcessContent = (message.tools && message.tools.length > 0) || message.reasoning || (message.reasonings && message.reasonings.length > 0)
+  const hasProcessContent = message.tools && message.tools.length > 0;
+
+  // 按文件路径合并工具调用
+  const groupedTools = (() => {
+    if (!message.tools) return [];
+    const groups = new Map<string, { path?: string; entries: any[] }>();
+    for (const tool of message.tools) {
+      const path = (tool.path ||
+        tool.parameters?.path ||
+        tool.parameters?.file_path) as string | undefined;
+      const key = path || tool.name;
+      if (!groups.has(key)) {
+        groups.set(key, { path, entries: [] });
+      }
+      groups.get(key)!.entries.push(tool);
+    }
+    return Array.from(groups.values());
+  })();
 
   return (
-    <div className={cn('flex flex-col gap-3 group', isUser && 'items-end', className)}>
-      {/* 内部处理过程（工具调用 + 思考） */}
-      {hasProcessContent && (
-        <Timeline title="AI 处理过程" defaultExpanded={isStreaming}>
-          {/* 多个独立思考过程展示 */}
-          {message.reasonings && message.reasonings.length > 0 ? (
-            message.reasonings.map((r, index) => (
-              <TimelineItem key={index} status={index === message.reasonings!.length - 1 && isStreaming ? 'running' : 'completed'}>
+    <div
+      className={cn(
+        "flex flex-col gap-3 group",
+        isUser && "items-end",
+        className,
+      )}
+    >
+      {/* 消息内容优先显示（AI 回复文字先于处理过程） */}
+      {!isUser && message.content && (
+        <div className="text-sm max-w-full overflow-hidden text-muted-foreground">
+          <div className="overflow-x-auto max-w-full">
+            <Streamdown className="prose prose-sm dark:prose-invert max-w-full [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+              {message.content}
+            </Streamdown>
+          </div>
+        </div>
+      )}
+
+      {/* 思考过程（完成后折叠） */}
+      {!isUser && message.reasonings && message.reasonings.length > 0 && (
+        <div className="w-fit max-w-[80%]">
+          <Timeline title="Thought" defaultExpanded={false}>
+            {message.reasonings.map((r, index) => (
+              <TimelineItem key={index} status="completed">
                 <Reasoning
                   content={r.content}
                   duration={r.duration}
-                  isStreaming={isStreaming && index === message.reasonings!.length - 1}
+                  isStreaming={false}
                 />
               </TimelineItem>
-            ))
-          ) : message.reasoning && message.reasoning.content ? (
-            <TimelineItem status={isStreaming ? 'running' : 'completed'}>
-              <Reasoning
-                content={message.reasoning.content}
-                duration={message.reasoning.duration}
-                isStreaming={isStreaming}
-              />
-            </TimelineItem>
-          ) : null}
+            ))}
+          </Timeline>
+        </div>
+      )}
 
-          {/* 工具调用展示 */}
-          {message.tools && message.tools.length > 0 && (
-            <TimelineItem status="completed">
-              <div className="space-y-2">
-                {message.tools.map((tool, index) => (
-                  <Tool
-                    key={index}
-                    name={tool.name}
-                    status={tool.status}
-                    parameters={tool.parameters}
-                    result={tool.result}
-                  />
-                ))}
-              </div>
-            </TimelineItem>
-          )}
+      {/* 工具调用展示 */}
+      {hasProcessContent && (
+        <Timeline title="AI 处理过程" defaultExpanded={false}>
+          <TimelineItem status="completed">
+            <div className="space-y-0">
+              {groupedTools.map((group, index) => (
+                <Tool
+                  key={index}
+                  path={group.path}
+                  entries={group.entries.map((e: any) => ({
+                    name: e.name,
+                    kind: e.kind,
+                    status: e.status,
+                    parameters: e.parameters,
+                    result: e.result,
+                  }))}
+                />
+              ))}
+            </div>
+          </TimelineItem>
         </Timeline>
       )}
 
-      {/* 消息内容 */}
-      {message.content && (
-        <div
-          className={cn(
-            'rounded-2xl px-4 py-3 text-sm max-w-full overflow-hidden',
-            isUser
-              ? 'bg-primary text-primary-foreground rounded-tr-sm'
-              : 'bg-muted text-muted-foreground rounded-tl-sm'
-          )}
-        >
-          {isUser ? (
-            <div className="whitespace-pre-wrap break-words">{message.content}</div>
-          ) : (
-            <div className="overflow-x-auto max-w-full">
-              <Streamdown className="prose prose-sm dark:prose-invert max-w-full [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
-                {message.content}
-              </Streamdown>
-            </div>
-          )}
+      {/* 用户消息内容 */}
+      {isUser && message.content && (
+        <div className="text-sm max-w-full overflow-hidden text-right">
+          <div className="whitespace-pre-wrap break-words text-foreground inline-block">
+            {message.content}
+          </div>
         </div>
       )}
 
@@ -146,7 +178,7 @@ export function Message({ message, className, isStreaming = false }: MessageProp
             <img
               key={index}
               src={img.url}
-              alt={img.alt || ''}
+              alt={img.alt || ""}
               className="rounded-lg max-w-full h-auto object-contain"
             />
           ))}
@@ -189,34 +221,38 @@ export function Message({ message, className, isStreaming = false }: MessageProp
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // 文件附件组件
-function FileAttachment({ file }: { file: NonNullable<ChatMessage['files']>[number] }) {
+function FileAttachment({
+  file,
+}: {
+  file: NonNullable<ChatMessage["files"]>[number];
+}) {
   const formatFileSize = (bytes?: number) => {
-    if (!bytes) return ''
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const getFileIcon = (name: string) => {
-    const ext = name.split('.').pop()?.toLowerCase()
+    const ext = name.split(".").pop()?.toLowerCase();
     const iconMap: Record<string, string> = {
-      pdf: '📄',
-      doc: '📝',
-      docx: '📝',
-      txt: '📃',
-      zip: '📦',
-      rar: '📦',
-      jpg: '🖼️',
-      jpeg: '🖼️',
-      png: '🖼️',
-      gif: '🖼️',
-    }
-    return iconMap[ext || ''] || '📎'
-  }
+      pdf: "📄",
+      doc: "📝",
+      docx: "📝",
+      txt: "📃",
+      zip: "📦",
+      rar: "📦",
+      jpg: "🖼️",
+      jpeg: "🖼️",
+      png: "🖼️",
+      gif: "🖼️",
+    };
+    return iconMap[ext || ""] || "📎";
+  };
 
   return (
     <a
@@ -227,9 +263,12 @@ function FileAttachment({ file }: { file: NonNullable<ChatMessage['files']>[numb
       <span className="text-lg">{getFileIcon(file.name)}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate">{file.name}</p>
-        {file.size && <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>}
+        {file.size && (
+          <p className="text-xs text-muted-foreground">
+            {formatFileSize(file.size)}
+          </p>
+        )}
       </div>
     </a>
-  )
+  );
 }
-

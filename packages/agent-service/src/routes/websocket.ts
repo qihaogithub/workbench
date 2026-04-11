@@ -1,16 +1,21 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
-import WebSocket, { WebSocketServer } from 'ws';
-import { getAgentManager } from '../core/agent-manager';
-import { AgentConfig, AgentEvent, AgentResult, AgentStatus } from '../core/types';
-import { AcpSessionUpdate, AcpPermissionRequest } from '../acp/types';
-import { logger } from '../utils/logger';
+import { FastifyInstance, FastifyRequest } from "fastify";
+import WebSocket, { WebSocketServer } from "ws";
+import { getAgentManager } from "../core/agent-manager";
+import {
+  AgentConfig,
+  AgentEvent,
+  AgentResult,
+  AgentStatus,
+} from "../core/types";
+import { AcpSessionUpdate, AcpPermissionRequest } from "../acp/types";
+import { logger } from "../utils/logger";
 
 interface StreamParams {
   sessionId: string;
 }
 
 interface ClientMessage {
-  type: 'message' | 'cancel' | 'ping' | 'resume' | 'set_model' | 'get_models';
+  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -25,7 +30,18 @@ interface ClientMessage {
 }
 
 interface ServerMessage {
-  type: 'stream' | 'thought' | 'tool_call' | 'tool_call_update' | 'error' | 'finish' | 'status' | 'pong' | 'permission_request' | 'models' | 'file_operation';
+  type:
+    | "stream"
+    | "thought"
+    | "tool_call"
+    | "tool_call_update"
+    | "error"
+    | "finish"
+    | "status"
+    | "pong"
+    | "permission_request"
+    | "models"
+    | "file_operation";
   id?: string;
   sessionId?: string;
   content?: string;
@@ -38,7 +54,7 @@ interface ServerMessage {
   };
   files?: Array<{
     path: string;
-    action: 'created' | 'modified' | 'deleted';
+    action: "created" | "modified" | "deleted";
     content?: string;
   }>;
   metadata?: {
@@ -51,8 +67,8 @@ interface ServerMessage {
   };
   toolCallId?: string;
   title?: string;
-  kind?: 'read' | 'edit' | 'execute';
-  toolCallStatus?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  kind?: "read" | "edit" | "execute";
+  toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
   timestamp?: number;
   permissionRequest?: {
     sessionId: string;
@@ -95,14 +111,16 @@ function heartbeat(): void {
   const now = Date.now();
   for (const [sessionId, conn] of connections) {
     if (now - conn.lastPing > HEARTBEAT_TIMEOUT) {
-      logger.info({ sessionId }, 'WebSocket connection timed out, closing');
+      logger.info({ sessionId }, "WebSocket connection timed out, closing");
       conn.socket.terminate();
       connections.delete(sessionId);
     }
   }
 }
 
-export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise<void> {
+export async function registerWebSocketRoutes(
+  fastify: FastifyInstance,
+): Promise<void> {
   const manager = getAgentManager();
 
   wss = new WebSocketServer({ noServer: true });
@@ -110,13 +128,19 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
   setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
   fastify.get<{ Params: StreamParams }>(
-    '/api/agent/:sessionId/stream',
+    "/api/agent/:sessionId/stream",
     { websocket: true },
-    async (socket: WebSocket, request: FastifyRequest<{ Params: StreamParams }>) => {
+    async (
+      socket: WebSocket,
+      request: FastifyRequest<{ Params: StreamParams }>,
+    ) => {
       const { sessionId } = request.params;
       const connectionId = `${sessionId}-${Date.now()}`;
 
-      logger.info({ sessionId, connectionId }, 'WebSocket connection established');
+      logger.info(
+        { sessionId, connectionId },
+        "WebSocket connection established",
+      );
 
       const connection: ActiveConnection = {
         socket,
@@ -135,62 +159,73 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         const sessionUpdate = update.update;
 
         switch (sessionUpdate.sessionUpdate) {
-          case 'agent_message_chunk':
+          case "agent_message_chunk":
             sendMessage({
-              type: 'stream',
+              type: "stream",
               sessionId,
-              content: sessionUpdate.content?.text || '',
+              content: sessionUpdate.content?.text || "",
               done: false,
             });
             break;
 
-          case 'agent_thought_chunk':
+          case "agent_thought_chunk":
             sendMessage({
-              type: 'thought',
+              type: "thought",
               sessionId,
-              content: sessionUpdate.content?.text || '',
+              content: sessionUpdate.content?.text || "",
               done: false,
             });
             break;
 
-          case 'tool_call':
+          case "tool_call":
             sendMessage({
-              type: 'tool_call',
+              type: "tool_call",
               sessionId,
-              toolCallId: sessionUpdate.toolCallId || '',
-              title: sessionUpdate.title || '',
-              kind: (sessionUpdate.kind as 'read' | 'edit' | 'execute') || 'execute',
-              toolCallStatus: 'pending',
+              toolCallId: sessionUpdate.toolCallId || "",
+              title: sessionUpdate.title || "",
+              kind:
+                (sessionUpdate.kind as "read" | "edit" | "execute") ||
+                "execute",
+              toolCallStatus: "pending",
             });
             break;
 
-          case 'tool_call_update':
+          case "tool_call_update":
             sendMessage({
-              type: 'tool_call_update',
+              type: "tool_call_update",
               sessionId,
-              toolCallId: sessionUpdate.toolCallId || '',
-              toolCallStatus: sessionUpdate.status === 'completed' ? 'completed' : 'failed',
+              toolCallId: sessionUpdate.toolCallId || "",
+              toolCallStatus:
+                sessionUpdate.status === "completed" ? "completed" : "failed",
             });
             break;
 
-          case 'config_option_update':
+          case "config_option_update":
             break;
 
-          case 'usage_update':
+          case "usage_update":
             break;
 
           default:
-            logger.debug({ sessionUpdate: sessionUpdate.sessionUpdate }, 'Unhandled session update type');
+            logger.debug(
+              { sessionUpdate: sessionUpdate.sessionUpdate },
+              "Unhandled session update type",
+            );
         }
       };
 
-      const handlePermissionRequest = async (request: AcpPermissionRequest): Promise<{ optionId: string }> => {
+      const handlePermissionRequest = async (
+        request: AcpPermissionRequest,
+      ): Promise<{ optionId: string }> => {
         return new Promise((resolve) => {
           const handlePermissionResponse = (data: Buffer): void => {
             try {
               const message = JSON.parse(data.toString());
-              if (message.type === 'permission_response' && message.permissionId) {
-                socket.off('message', handlePermissionResponse);
+              if (
+                message.type === "permission_response" &&
+                message.permissionId
+              ) {
+                socket.off("message", handlePermissionResponse);
                 resolve({ optionId: message.optionId });
               }
             } catch {
@@ -198,10 +233,10 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
             }
           };
 
-          socket.on('message', handlePermissionResponse);
+          socket.on("message", handlePermissionResponse);
 
           sendMessage({
-            type: 'permission_request',
+            type: "permission_request",
             sessionId,
             permissionRequest: {
               sessionId: request.sessionId,
@@ -218,15 +253,20 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
           });
 
           setTimeout(() => {
-            socket.off('message', handlePermissionResponse);
-            resolve({ optionId: 'reject_once' });
+            socket.off("message", handlePermissionResponse);
+            resolve({ optionId: "reject_once" });
           }, 60000);
         });
       };
 
-      const handleFileOperation = (operation: { method: string; path: string; content?: string; sessionId: string }): void => {
+      const handleFileOperation = (operation: {
+        method: string;
+        path: string;
+        content?: string;
+        sessionId: string;
+      }): void => {
         sendMessage({
-          type: 'file_operation',
+          type: "file_operation",
           sessionId,
           fileOperation: {
             method: operation.method,
@@ -236,7 +276,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         });
       };
 
-      socket.on('message', async (data: Buffer) => {
+      socket.on("message", async (data: Buffer) => {
         connection.lastPing = Date.now();
 
         let message: ClientMessage;
@@ -244,65 +284,71 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
           message = JSON.parse(data.toString());
         } catch {
           sendMessage({
-            type: 'error',
-            id: 'unknown',
+            type: "error",
+            id: "unknown",
             error: {
-              code: 'INVALID_PARAMS',
-              message: '消息格式无效，必须为 JSON',
+              code: "INVALID_PARAMS",
+              message: "消息格式无效，必须为 JSON",
             },
           });
           return;
         }
 
         switch (message.type) {
-          case 'message': {
+          case "message": {
             if (!message.content) {
               sendMessage({
-                type: 'error',
-                id: message.id || 'unknown',
+                type: "error",
+                id: message.id || "unknown",
                 error: {
-                  code: 'INVALID_PARAMS',
-                  message: '消息内容不能为空',
+                  code: "INVALID_PARAMS",
+                  message: "消息内容不能为空",
                 },
               });
               return;
             }
 
-            logger.info({ workingDir: message.workingDir }, 'WebSocket message received')
+            logger.info(
+              { workingDir: message.workingDir },
+              "WebSocket message received",
+            );
 
             try {
               const config: AgentConfig = {
                 sessionId,
-                backend: 'opencode',
+                backend: "opencode",
                 workingDir: message.workingDir,
               };
 
-              logger.info({ workingDir: config.workingDir }, 'Agent config created')
+              logger.info(
+                { workingDir: config.workingDir },
+                "Agent config created",
+              );
 
               const agent = manager.getOrCreate(sessionId, config);
 
-              if (agent.status === 'initializing') {
+              if (agent.status === "initializing") {
                 sendMessage({
-                  type: 'status',
+                  type: "status",
                   sessionId,
-                  status: 'initializing',
+                  status: "initializing",
                 });
                 await agent.start();
               }
 
               sendMessage({
-                type: 'status',
+                type: "status",
                 sessionId,
-                status: 'processing',
+                status: "processing",
               });
 
               const eventHandler = (event: AgentEvent): void => {
                 if (event.sessionId !== sessionId) return;
 
                 switch (event.type) {
-                  case 'stream':
+                  case "stream":
                     sendMessage({
-                      type: 'stream',
+                      type: "stream",
                       id: message.id,
                       sessionId,
                       content: event.content,
@@ -310,9 +356,9 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                     });
                     break;
 
-                  case 'thought':
+                  case "thought":
                     sendMessage({
-                      type: 'thought',
+                      type: "thought",
                       id: message.id,
                       sessionId,
                       content: event.content,
@@ -320,9 +366,9 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                     });
                     break;
 
-                  case 'tool_call':
+                  case "tool_call":
                     sendMessage({
-                      type: 'tool_call',
+                      type: "tool_call",
                       id: message.id,
                       sessionId,
                       toolCallId: event.toolCallId,
@@ -332,9 +378,9 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                     });
                     break;
 
-                  case 'tool_call_update':
+                  case "tool_call_update":
                     sendMessage({
-                      type: 'tool_call_update',
+                      type: "tool_call_update",
                       id: message.id,
                       sessionId,
                       toolCallId: event.toolCallId,
@@ -342,18 +388,27 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                     });
                     break;
 
-                  case 'error':
+                  case "plan":
                     sendMessage({
-                      type: 'error',
+                      type: "plan",
+                      id: message.id,
+                      sessionId,
+                      content: event.content,
+                    });
+                    break;
+
+                  case "error":
+                    sendMessage({
+                      type: "error",
                       id: message.id,
                       sessionId,
                       error: event.error,
                     });
                     break;
 
-                  case 'status':
+                  case "status":
                     sendMessage({
-                      type: 'status',
+                      type: "status",
                       id: message.id,
                       sessionId,
                       status: event.status,
@@ -362,25 +417,30 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                 }
               };
 
-              agent.on('stream', eventHandler);
-              agent.on('thought', eventHandler);
-              agent.on('tool_call', eventHandler);
-              agent.on('tool_call_update', eventHandler);
-              agent.on('error', eventHandler);
-              agent.on('status', eventHandler);
+              agent.on("stream", eventHandler);
+              agent.on("thought", eventHandler);
+              agent.on("tool_call", eventHandler);
+              agent.on("tool_call_update", eventHandler);
+              agent.on("plan", eventHandler);
+              agent.on("error", eventHandler);
+              agent.on("status", eventHandler);
 
-              const result: AgentResult = await agent.sendMessage(message.content, message.options);
+              const result: AgentResult = await agent.sendMessage(
+                message.content,
+                message.options,
+              );
 
-              agent.off('stream', eventHandler);
-              agent.off('thought', eventHandler);
-              agent.off('tool_call', eventHandler);
-              agent.off('tool_call_update', eventHandler);
-              agent.off('error', eventHandler);
-              agent.off('status', eventHandler);
+              agent.off("stream", eventHandler);
+              agent.off("thought", eventHandler);
+              agent.off("tool_call", eventHandler);
+              agent.off("tool_call_update", eventHandler);
+              agent.off("plan", eventHandler);
+              agent.off("error", eventHandler);
+              agent.off("status", eventHandler);
 
               if (result.success) {
                 sendMessage({
-                  type: 'finish',
+                  type: "finish",
                   id: message.id,
                   sessionId,
                   files: result.files,
@@ -388,44 +448,46 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                 });
               } else {
                 sendMessage({
-                  type: 'error',
+                  type: "error",
                   id: message.id,
                   sessionId,
                   error: result.error || {
-                    code: 'INTERNAL_ERROR',
-                    message: 'Unknown error',
+                    code: "INTERNAL_ERROR",
+                    message: "Unknown error",
                   },
                 });
               }
 
               sendMessage({
-                type: 'status',
+                type: "status",
                 sessionId,
-                status: 'ready',
+                status: "ready",
               });
             } catch (error) {
               sendMessage({
-                type: 'error',
-                id: message.id || 'unknown',
+                type: "error",
+                id: message.id || "unknown",
                 sessionId,
                 error: {
-                  code: 'MESSAGE_SEND_ERROR',
-                  message: error instanceof Error ? error.message : 'Unknown error',
+                  code: "MESSAGE_SEND_ERROR",
+                  message:
+                    error instanceof Error ? error.message : "Unknown error",
                 },
               });
             }
             break;
           }
 
-          case 'resume': {
-            const resumeSessionId = message.options?.resumeSessionId || message.sessionId;
+          case "resume": {
+            const resumeSessionId =
+              message.options?.resumeSessionId || message.sessionId;
             if (!resumeSessionId) {
               sendMessage({
-                type: 'error',
+                type: "error",
                 id: message.id,
                 error: {
-                  code: 'INVALID_PARAMS',
-                  message: 'resumeSessionId is required',
+                  code: "INVALID_PARAMS",
+                  message: "resumeSessionId is required",
                 },
               });
               return;
@@ -434,61 +496,64 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
             try {
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
-                backend: 'opencode',
+                backend: "opencode",
                 workingDir: message.workingDir,
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
 
-              if (agent.status === 'initializing') {
+              if (agent.status === "initializing") {
                 sendMessage({
-                  type: 'status',
+                  type: "status",
                   sessionId: resumeSessionId,
-                  status: 'initializing',
+                  status: "initializing",
                 });
                 await agent.start({ resumeSessionId });
               }
 
               sendMessage({
-                type: 'status',
+                type: "status",
                 sessionId: resumeSessionId,
                 status: agent.status,
               });
             } catch (error) {
               sendMessage({
-                type: 'error',
+                type: "error",
                 id: message.id,
                 error: {
-                  code: 'SESSION_RESUME_ERROR',
-                  message: error instanceof Error ? error.message : 'Failed to resume session',
+                  code: "SESSION_RESUME_ERROR",
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to resume session",
                 },
               });
             }
             break;
           }
 
-          case 'cancel': {
+          case "cancel": {
             const targetSessionId = message.sessionId || sessionId;
             const agent = manager.get(targetSessionId);
             if (agent) {
               agent.cancel();
               sendMessage({
-                type: 'status',
+                type: "status",
                 sessionId: targetSessionId,
-                status: 'ready',
+                status: "ready",
               });
             }
             break;
           }
 
-          case 'set_model': {
+          case "set_model": {
             if (!message.modelId) {
               sendMessage({
-                type: 'error',
+                type: "error",
                 id: message.id,
                 error: {
-                  code: 'INVALID_PARAMS',
-                  message: 'modelId is required',
+                  code: "INVALID_PARAMS",
+                  message: "modelId is required",
                 },
               });
               return;
@@ -496,44 +561,58 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
 
             try {
               const agent = manager.get(sessionId);
-              if (agent && 'setModel' in agent) {
-                await (agent as { setModel: (modelId: string) => Promise<void> }).setModel(message.modelId);
+              if (agent && "setModel" in agent) {
+                await (
+                  agent as { setModel: (modelId: string) => Promise<void> }
+                ).setModel(message.modelId);
                 sendMessage({
-                  type: 'models',
+                  type: "models",
                   sessionId,
                   currentModelId: message.modelId,
                 });
               } else {
                 sendMessage({
-                  type: 'error',
+                  type: "error",
                   id: message.id,
                   error: {
-                    code: 'SESSION_NOT_FOUND',
-                    message: 'Session not found or does not support model switching',
+                    code: "SESSION_NOT_FOUND",
+                    message:
+                      "Session not found or does not support model switching",
                   },
                 });
               }
             } catch (error) {
               sendMessage({
-                type: 'error',
+                type: "error",
                 id: message.id,
                 error: {
-                  code: 'SET_MODEL_ERROR',
-                  message: error instanceof Error ? error.message : 'Failed to set model',
+                  code: "SET_MODEL_ERROR",
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to set model",
                 },
               });
             }
             break;
           }
 
-          case 'get_models': {
+          case "get_models": {
             try {
               const agent = manager.get(sessionId);
-              if (agent && 'getModelInfo' in agent) {
-                const modelInfo = await (agent as { getModelInfo: () => { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null }).getModelInfo();
+              if (agent && "getModelInfo" in agent) {
+                const modelInfo = await (
+                  agent as {
+                    getModelInfo: () => {
+                      currentModelId: string | null;
+                      availableModels: Array<{ id: string; label: string }>;
+                      canSwitch: boolean;
+                    } | null;
+                  }
+                ).getModelInfo();
                 if (modelInfo) {
                   sendMessage({
-                    type: 'models',
+                    type: "models",
                     sessionId,
                     models: modelInfo.availableModels,
                     currentModelId: modelInfo.currentModelId || undefined,
@@ -541,7 +620,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                   });
                 } else {
                   sendMessage({
-                    type: 'models',
+                    type: "models",
                     sessionId,
                     models: [],
                     canSwitch: false,
@@ -549,30 +628,33 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
                 }
               } else {
                 sendMessage({
-                  type: 'error',
+                  type: "error",
                   id: message.id,
                   error: {
-                    code: 'SESSION_NOT_FOUND',
-                    message: 'Session not found',
+                    code: "SESSION_NOT_FOUND",
+                    message: "Session not found",
                   },
                 });
               }
             } catch (error) {
               sendMessage({
-                type: 'error',
+                type: "error",
                 id: message.id,
                 error: {
-                  code: 'GET_MODELS_ERROR',
-                  message: error instanceof Error ? error.message : 'Failed to get models',
+                  code: "GET_MODELS_ERROR",
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to get models",
                 },
               });
             }
             break;
           }
 
-          case 'ping': {
+          case "ping": {
             sendMessage({
-              type: 'pong',
+              type: "pong",
               timestamp: Date.now(),
             });
             break;
@@ -580,10 +662,10 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
 
           default: {
             sendMessage({
-              type: 'error',
-              id: message.id || 'unknown',
+              type: "error",
+              id: message.id || "unknown",
               error: {
-                code: 'INVALID_PARAMS',
+                code: "INVALID_PARAMS",
                 message: `未知的消息类型: ${(message as { type: string }).type}`,
               },
             });
@@ -591,28 +673,37 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         }
       });
 
-      socket.on('close', (code, reason) => {
-        logger.info({ sessionId, connectionId, code, reason: reason.toString() }, 'WebSocket connection closed');
+      socket.on("close", (code, reason) => {
+        logger.info(
+          { sessionId, connectionId, code, reason: reason.toString() },
+          "WebSocket connection closed",
+        );
         connections.delete(connectionId);
       });
 
-      socket.on('error', (error) => {
-        logger.error({ sessionId, connectionId, error }, 'WebSocket error');
+      socket.on("error", (error) => {
+        logger.error({ sessionId, connectionId, error }, "WebSocket error");
         connections.delete(connectionId);
       });
 
       sendMessage({
-        type: 'status',
+        type: "status",
         sessionId,
-        status: 'ready',
+        status: "ready",
       });
-    }
+    },
   );
 }
 
-export function broadcastToSession(sessionId: string, message: ServerMessage): void {
+export function broadcastToSession(
+  sessionId: string,
+  message: ServerMessage,
+): void {
   for (const [connectionId, conn] of connections) {
-    if (conn.sessionId === sessionId && conn.socket.readyState === WebSocket.OPEN) {
+    if (
+      conn.sessionId === sessionId &&
+      conn.socket.readyState === WebSocket.OPEN
+    ) {
       conn.socket.send(JSON.stringify(message));
     }
   }
@@ -620,7 +711,7 @@ export function broadcastToSession(sessionId: string, message: ServerMessage): v
 
 export function closeAllConnections(): void {
   for (const [connectionId, conn] of connections) {
-    conn.socket.close(1000, 'Server shutting down');
+    conn.socket.close(1000, "Server shutting down");
   }
   connections.clear();
 }

@@ -11,6 +11,7 @@ import {
   type ChatMessage,
   PermissionDialog,
 } from "@/components/ai-elements";
+import { Timeline, TimelineItem } from "@/components/ai-elements/timeline";
 import {
   AgentStream,
   type StreamEvent,
@@ -67,6 +68,9 @@ export function AIChat({
   // 待处理的权限请求
   const [pendingPermissionRequest, setPendingPermissionRequest] =
     useState<PermissionRequest | null>(null);
+
+  // Plan 状态
+  const [plan, setPlan] = useState<string>("");
 
   console.log(
     "[AIChat] Props received - workingDir:",
@@ -130,6 +134,9 @@ export function AIChat({
       let reasoningContent = "";
       let connectionEstablished = false;
 
+      // 重置 Plan
+      setPlan("");
+
       // 重置当前消息状态
       setCurrentMessage({
         role: "assistant",
@@ -191,14 +198,33 @@ export function AIChat({
         }
       });
 
+      // 监听 Plan 更新
+      stream.on("plan", (event: StreamEvent) => {
+        if (event.content) {
+          setPlan((prev) => prev + event.content);
+        }
+      });
+
       // 监听工具调用开始
       stream.on("tool_call", (event: StreamEvent) => {
+        // 从 title 中提取路径（格式: "fs/read_text_file › path/to/file"）
+        let extractedPath: string | undefined;
+        if (event.title && event.title.includes("›")) {
+          extractedPath = event.title.split("›").pop()?.trim();
+        }
+
         setCurrentMessage((prev) => ({
           ...prev,
           tools: [
             ...(prev.tools || []),
             {
               name: event.title || event.kind || "未知工具",
+              kind: event.kind as "read" | "edit" | "execute",
+              path:
+                extractedPath ||
+                event.path ||
+                (event.parameters as any)?.path ||
+                (event.parameters as any)?.file_path,
               status: "running",
               parameters: {
                 toolCallId: event.toolCallId,
@@ -358,12 +384,14 @@ export function AIChat({
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
-        setCurrentMessage({
+        setCurrentMessage((prev) => ({
           role: "assistant",
           content: "",
           reasoning: undefined,
+          // 保留 reasonings 用于显示折叠后的思考过程
+          reasonings: prev.reasonings,
           tools: [],
-        });
+        }));
         setStreamContent("");
         setIsStreaming(false);
         stream.close();
@@ -696,80 +724,146 @@ export function AIChat({
             <Message key={msg.id} message={msg} />
           ))}
 
-          {/* 流式响应展示 */}
+          {/* 思考过程（流式时展开，完成后折叠） */}
+          {currentMessage.reasonings &&
+            currentMessage.reasonings.length > 0 && (
+              <div className="w-fit max-w-[80%]">
+                <Timeline
+                  key={isStreaming ? "streaming" : "completed"}
+                  title="Thought"
+                  defaultExpanded={isStreaming}
+                >
+                  {currentMessage.reasonings.map((r, index) => (
+                    <TimelineItem
+                      key={index}
+                      status={
+                        index === currentMessage.reasonings!.length - 1 &&
+                        isStreaming
+                          ? "running"
+                          : "completed"
+                      }
+                    >
+                      <ReasoningDisplay
+                        content={r.content}
+                        duration={r.duration}
+                        isStreaming={
+                          isStreaming &&
+                          index === currentMessage.reasonings!.length - 1
+                        }
+                      />
+                    </TimelineItem>
+                  ))}
+                </Timeline>
+              </div>
+            )}
+
+          {/* 流式响应 - 文字内容 */}
           {isStreaming && currentMessage.content && (
             <Message
               message={{
-                id: "streaming",
+                id: "streaming-content",
                 role: "assistant",
                 content: currentMessage.content,
-                reasoning: currentMessage.reasoning,
-                tools: currentMessage.tools,
               }}
               isStreaming={true}
             />
           )}
 
-          {/* 加载指示器 - 骨架屏 */}
-          {isStreaming && !currentMessage.content && (
-            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 w-fit max-w-[80%]">
-              <div className="space-y-2">
+          {/* 流式响应 - 工具调用 */}
+          {isStreaming &&
+            currentMessage.tools &&
+            currentMessage.tools.length > 0 &&
+            (() => {
+              // 按文件路径合并工具调用
+              const groups = new Map<
+                string,
+                { path?: string; entries: any[] }
+              >();
+              for (const tool of currentMessage.tools) {
+                const path = (tool.path ||
+                  tool.parameters?.path ||
+                  tool.parameters?.file_path) as string | undefined;
+                const key = path || tool.name;
+                if (!groups.has(key)) {
+                  groups.set(key, { path, entries: [] });
+                }
+                groups.get(key)!.entries.push(tool);
+              }
+              const groupedTools = Array.from(groups.values());
+
+              return (
+                <div className="w-fit max-w-[80%]">
+                  <Timeline title="AI 处理过程" defaultExpanded={true}>
+                    <TimelineItem status="completed">
+                      <div className="space-y-0">
+                        {groupedTools.map((group, index) => (
+                          <ToolCall
+                            key={index}
+                            path={group.path}
+                            entries={group.entries.map((e: any) => ({
+                              name: e.name,
+                              kind: e.kind,
+                              status: e.status,
+                              parameters: e.parameters,
+                              result: e.result,
+                            }))}
+                          />
+                        ))}
+                      </div>
+                    </TimelineItem>
+                  </Timeline>
+                </div>
+              );
+            })()}
+
+          {/* 加载指示器 - 简洁样式（仅在没有 reasoning 时显示） */}
+          {isStreaming &&
+            !currentMessage.content &&
+            (!currentMessage.reasonings ||
+              currentMessage.reasonings.length === 0) && (
+              <div className="flex flex-col gap-1 w-fit max-w-[80%]">
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+                    <Sparkles className="h-3 w-3 text-muted-foreground/60" />
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    AI 正在思考...
-                  </span>
-                </div>
-                {/* 骨架屏动画 */}
-                <div className="space-y-1.5 pt-2">
-                  <div className="h-2 w-48 bg-muted-foreground/20 rounded animate-pulse" />
-                  <div
-                    className="h-2 w-32 bg-muted-foreground/20 rounded animate-pulse"
-                    style={{ animationDelay: "100ms" }}
-                  />
-                  <div
-                    className="h-2 w-40 bg-muted-foreground/20 rounded animate-pulse"
-                    style={{ animationDelay: "200ms" }}
-                  />
+                  <span className="text-xs text-muted-foreground">思考中</span>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div ref={messagesEndRef} />
         </ConversationContent>
       </Conversation>
 
-      {/* AI 正在生成状态提示 */}
-      {isStreaming && (
-        <div className="px-4 py-2 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-t border-primary/20">
-          <div className="flex items-center justify-center gap-3">
-            <div className="relative">
-              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-              <div className="absolute inset-0 blur-sm">
-                <Sparkles className="h-4 w-4 text-primary/50" />
+      {/* Plan 展示 - 输入框顶部 */}
+      {plan && (
+        <div className="flex-shrink-0 border-t border-muted">
+          <details className="group">
+            <summary className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors list-none">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-3 w-3 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+                <span className="font-medium">Plan</span>
               </div>
+              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                {isStreaming ? "生成中..." : "已完成"}
+              </span>
+            </summary>
+            <div className="px-4 py-2 border-t border-muted text-xs text-muted-foreground">
+              <div className="whitespace-pre-wrap break-words">{plan}</div>
             </div>
-            <span className="text-sm font-medium text-primary">
-              AI 正在思考中
-            </span>
-            <div className="flex gap-1">
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              />
-            </div>
-          </div>
+          </details>
         </div>
       )}
 
