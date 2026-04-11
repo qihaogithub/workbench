@@ -230,14 +230,31 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const handleCancel = async () => {
     try {
       if (sessionId) {
-        await fetch(`/api/sessions/${sessionId}`, {
+        const res = await fetch(`/api/sessions/${sessionId}`, {
           method: "DELETE",
         });
+
+        if (!res.ok) {
+          const data = await res.json();
+          console.error("[Cancel] Failed to delete session:", sessionId, data);
+          toast({
+            title: "清理失败",
+            description:
+              data.error?.message || "Session 清理失败，可能需要手动清理",
+            variant: "destructive",
+          });
+        }
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error("[Cancel] Error deleting session:", error);
+      toast({
+        title: "清理失败",
+        description: error instanceof Error ? error.message : "未知错误",
+        variant: "destructive",
+      });
+    } finally {
+      router.push("/");
     }
-    router.push("/");
   };
 
   // 处理 AI 代码更新

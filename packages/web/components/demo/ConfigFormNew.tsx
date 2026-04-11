@@ -182,26 +182,22 @@ function FieldRenderer({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
-  const [isFocused, setIsFocused] = useState(false);
-
   const renderInput = () => {
     // 颜色选择器
     if (field.format === "color" || field.type === "color") {
       return (
         <div className="flex gap-2 items-center">
-          <div className="relative">
-            <input
-              type="color"
-              value={(value as string) || "#000000"}
-              onChange={(e) => onChange(e.target.value)}
-              className="w-10 h-10 rounded-lg cursor-pointer border-2 border-border hover:border-primary transition-colors"
-            />
-          </div>
+          <input
+            type="color"
+            value={(value as string) || "#000000"}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-8 h-8 rounded cursor-pointer border-0"
+          />
           <Input
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
-            className="flex-1 font-mono"
+            className="flex-1 font-mono h-8"
           />
         </div>
       );
@@ -210,12 +206,12 @@ function FieldRenderer({
     // 布尔值 - 开关
     if (field.type === "boolean") {
       return (
-        <div className="flex items-center justify-between py-2">
+        <div className="flex items-center justify-between">
           <Switch
             checked={(value as boolean) || false}
             onCheckedChange={(checked: boolean) => onChange(checked)}
           />
-          <Badge variant={(value as boolean) ? "default" : "secondary"}>
+          <Badge variant={(value as boolean) ? "default" : "secondary"} className="text-xs">
             {(value as boolean) ? "开启" : "关闭"}
           </Badge>
         </div>
@@ -226,14 +222,13 @@ function FieldRenderer({
     if (field.type === "number" || field.type === "integer") {
       if (field.minimum !== undefined && field.maximum !== undefined) {
         return (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Slider
               value={[(value as number) || field.minimum || 0]}
               min={field.minimum}
               max={field.maximum}
               step={field.type === "integer" ? 1 : 0.1}
               onValueChange={(vals: number[]) => onChange(vals[0])}
-              className="py-2"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{field.minimum}</span>
@@ -259,7 +254,7 @@ function FieldRenderer({
           }
           min={field.minimum}
           max={field.maximum}
-          className="font-mono"
+          className="font-mono h-8"
         />
       );
     }
@@ -279,7 +274,7 @@ function FieldRenderer({
             onChange(index >= 0 ? field.enum![index] : val);
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-8">
             <SelectValue placeholder="请选择">{displayValue}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -304,7 +299,7 @@ function FieldRenderer({
           onChange={(e) => onChange(e.target.value)}
           placeholder={`请输入${field.title}`}
           maxLength={field.maxLength}
-          rows={4}
+          rows={3}
           className="resize-none"
         />
       );
@@ -318,25 +313,20 @@ function FieldRenderer({
         onChange={(e) => onChange(e.target.value)}
         placeholder={`请输入${field.title}`}
         maxLength={field.maxLength}
+        className="h-8"
       />
     );
   };
 
   return (
-    <div
-      className={cn(
-        "group space-y-2 p-4 rounded-xl border bg-card transition-all duration-200",
-        isFocused && "border-primary shadow-md shadow-primary/10",
-        !isFocused && "hover:border-primary/50 hover:shadow-sm",
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium text-foreground">
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <Label className="text-xs font-medium text-foreground truncate">
             {field.title}
           </Label>
           {field.required && (
-            <Badge variant="destructive" className="text-xs px-1.5 py-0">
+            <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">
               必填
             </Badge>
           )}
@@ -345,7 +335,7 @@ function FieldRenderer({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs max-w-[200px]">{field.description}</p>
@@ -354,12 +344,7 @@ function FieldRenderer({
           </TooltipProvider>
         )}
       </div>
-      <div
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-      >
-        {renderInput()}
-      </div>
+      <div>{renderInput()}</div>
     </div>
   );
 }
@@ -373,42 +358,30 @@ function FieldGroupSection({
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
   return (
-    <div className="space-y-3">
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-card to-card/50 border hover:shadow-md transition-all duration-200"
-      >
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 px-1">
         <div
-          className={cn("w-1 h-8 rounded-full bg-gradient-to-b", group.color)}
+          className={cn("w-1 h-4 rounded-full bg-gradient-to-b", group.color)}
         />
-        <h3 className="flex-1 text-left text-sm font-semibold">
+        <h3 className="text-sm font-semibold text-foreground">
           {group.title}
         </h3>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs h-5">
           {group.fields.length}
         </Badge>
-        {isCollapsed ? (
-          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-        )}
-      </button>
+      </div>
 
-      {!isCollapsed && (
-        <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
-          {group.fields.map((field) => (
-            <FieldRenderer
-              key={field.key}
-              field={field}
-              value={formData[field.key]}
-              onChange={(value) => onChange(field.key, value)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="space-y-3">
+        {group.fields.map((field) => (
+          <FieldRenderer
+            key={field.key}
+            field={field}
+            value={formData[field.key]}
+            onChange={(value) => onChange(field.key, value)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -493,16 +466,20 @@ export function ConfigForm({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
-      <ScrollArea className="h-[calc(100vh-280px)] pr-2">
-        <div className="space-y-6 pb-4">
+    <div className={cn("h-full", className)}>
+      <ScrollArea className="h-full">
+        <div className="space-y-6 px-1 pb-4">
           {fieldGroups.map((group, index) => (
-            <FieldGroupSection
-              key={index}
-              group={group}
-              formData={formData}
-              onChange={handleFieldChange}
-            />
+            <div key={index}>
+              <FieldGroupSection
+                group={group}
+                formData={formData}
+                onChange={handleFieldChange}
+              />
+              {index < fieldGroups.length - 1 && (
+                <Separator className="my-6" />
+              )}
+            </div>
           ))}
         </div>
       </ScrollArea>

@@ -1,11 +1,13 @@
-# 用户数据目录
-# 可选择是否纳入版本控制
+# Database
+data/*.db
+data/*.db-wal
+data/*.db-shm
 
-# 临时会话（建议忽略）
-data/sessions/
+# Environment
+.env.local
+.env.*.local
 
-# 版本快照（建议忽略，或只保留部分）
-data/snapshots/
-
-# 项目数据（可选择是否纳入版本控制）
-# data/projects/
+# Build
+.next
+.turbo
+dist

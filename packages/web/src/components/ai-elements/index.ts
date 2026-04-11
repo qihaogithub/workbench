@@ -7,6 +7,8 @@ export {
 
 export { Message, type ChatMessage, type MessagePart } from "./message";
 
+export { AssistantMessage } from "./assistant-message";
+
 export {
   PromptInput,
   PromptInputFooter,
@@ -22,12 +24,21 @@ export {
 } from "./reasoning";
 
 export {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+  ChainOfThoughtSearchResults,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtImage,
+  type StepStatus,
+  type SearchResult,
+} from "./chain-of-thought";
+
+export {
   Tool,
   ToolCall,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
+  type ToolEntry,
 } from "./tool";
 
 export { Timeline, TimelineItem } from "./timeline";

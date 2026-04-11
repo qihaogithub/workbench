@@ -1,5 +1,5 @@
-import path from 'path';
-import fs from 'fs';
+import path from "path";
+import fs from "fs";
 import {
   getProjectsDir,
   getSessionsDir,
@@ -8,7 +8,7 @@ import {
   projectExists,
   sessionExists,
   deleteSession,
-} from './fs-utils';
+} from "./fs-utils";
 
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
@@ -16,8 +16,8 @@ const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
  * 在 Session 中注入 .opencode 代理配置
  */
 function injectOpencodeAgentConfig(sessionPath: string): void {
-  const opencodeDir = path.join(sessionPath, '.opencode');
-  const agentsDir = path.join(opencodeDir, 'agents');
+  const opencodeDir = path.join(sessionPath, ".opencode");
+  const agentsDir = path.join(opencodeDir, "agents");
 
   // 创建目录结构
   if (!fs.existsSync(agentsDir)) {
@@ -26,11 +26,11 @@ function injectOpencodeAgentConfig(sessionPath: string): void {
 
   // 创建 opencode.json
   const opencodeJson = {
-    $schema: 'https://opencode.ai/config.json',
+    $schema: "https://opencode.ai/config.json",
     agent: {
-      'demo-generator': {
-        file: '.opencode/agents/demo-generator.md',
-        description: '专门用于生成 OpenCode Demo 文件的 AI 代理',
+      "demo-generator": {
+        file: ".opencode/agents/demo-generator.md",
+        description: "专门用于生成 OpenCode Demo 文件的 AI 代理",
         tools: {
           write: true,
           edit: true,
@@ -39,14 +39,14 @@ function injectOpencodeAgentConfig(sessionPath: string): void {
         },
       },
     },
-    default_agent: 'demo-generator',
-    instructions: ['.opencode/agents/demo-generator.md'],
+    default_agent: "demo-generator",
+    instructions: [".opencode/agents/demo-generator.md"],
   };
 
   fs.writeFileSync(
-    path.join(opencodeDir, 'opencode.json'),
+    path.join(opencodeDir, "opencode.json"),
     JSON.stringify(opencodeJson, null, 2),
-    'utf-8'
+    "utf-8",
   );
 
   // 创建 demo-generator.md
@@ -102,11 +102,7 @@ function injectOpencodeAgentConfig(sessionPath: string): void {
 - [ ] 代码完整可运行
 `;
 
-  fs.writeFileSync(
-    path.join(agentsDir, 'demo-generator.md'),
-    agentMd,
-    'utf-8'
-  );
+  fs.writeFileSync(path.join(agentsDir, "demo-generator.md"), agentMd, "utf-8");
 }
 
 export interface CreateSessionResult {
@@ -116,8 +112,19 @@ export interface CreateSessionResult {
   tempWorkspace: string;
 }
 
-export function findActiveSession(projectId: string): string | null {
-  const projectSessionDir = path.join(getSessionsDir(), projectId);
+/**
+ * 获取项目 Session 目录路径
+ * 新结构: sessions/{userId}/{projectId}/
+ */
+function getProjectSessionDir(userId: string, projectId: string): string {
+  return path.join(getSessionsDir(), userId, projectId);
+}
+
+export function findActiveSession(
+  userId: string,
+  projectId: string,
+): string | null {
+  const projectSessionDir = getProjectSessionDir(userId, projectId);
   if (!fs.existsSync(projectSessionDir)) {
     return null;
   }
@@ -127,12 +134,36 @@ export function findActiveSession(projectId: string): string | null {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
-      const metaPath = path.join(projectSessionDir, entry.name, '.session.json');
+      const metaPath = path.join(
+        projectSessionDir,
+        entry.name,
+        ".session.json",
+      );
       if (!fs.existsSync(metaPath)) continue;
 
       try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        if (meta.demoId === projectId && Date.now() <= meta.expiresAt) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+
+        // 防御性检查：如果 session 元数据中的 userId 与路径不匹配，记录警告
+        if (meta.userId && meta.userId !== userId) {
+          console.warn(
+            `[Session] Session ${entry.name} metadata userId (${meta.userId}) ` +
+              `doesn't match path userId (${userId}). Possible data corruption.`,
+          );
+          continue;
+        }
+
+        // 发现过期 session，主动删除
+        if (Date.now() > meta.expiresAt) {
+          fs.rmSync(path.join(projectSessionDir, entry.name), {
+            recursive: true,
+            force: true,
+          });
+          console.log(`[Session] Cleaned up expired session: ${entry.name}`);
+          continue;
+        }
+
+        if (meta.demoId === projectId) {
           return meta.sessionId;
         }
       } catch {
@@ -146,15 +177,18 @@ export function findActiveSession(projectId: string): string | null {
   return null;
 }
 
-export async function createEditSession(projectId: string): Promise<CreateSessionResult> {
+export async function createEditSession(
+  userId: string,
+  projectId: string,
+): Promise<CreateSessionResult> {
   if (!projectExists(projectId)) {
     throw new Error(`Project "${projectId}" 不存在`);
   }
 
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const projectPath = getProjectPath(projectId);
-  const workspacePath = path.join(projectPath, 'workspace');
-  const sessionDir = path.join(getSessionsDir(), projectId);
+  const workspacePath = path.join(projectPath, "workspace");
+  const sessionDir = getProjectSessionDir(userId, projectId);
   const sessionPath = path.join(sessionDir, sessionId);
 
   fs.mkdirSync(sessionDir, { recursive: true });
@@ -162,26 +196,27 @@ export async function createEditSession(projectId: string): Promise<CreateSessio
 
   const sessionMeta = {
     sessionId,
+    userId,
     demoId: projectId,
     opencodeSessionId: null,
     createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
   };
   fs.writeFileSync(
-    path.join(sessionPath, '.session.json'),
+    path.join(sessionPath, ".session.json"),
     JSON.stringify(sessionMeta, null, 2),
-    'utf-8'
+    "utf-8",
   );
 
   injectOpencodeAgentConfig(sessionPath);
 
-  const codePath = path.join(sessionPath, 'index.tsx');
-  const schemaPath = path.join(sessionPath, 'config.schema.json');
+  const codePath = path.join(sessionPath, "index.tsx");
+  const schemaPath = path.join(sessionPath, "config.schema.json");
 
   return {
     sessionId,
-    code: fs.readFileSync(codePath, 'utf-8'),
-    schema: fs.readFileSync(schemaPath, 'utf-8'),
+    code: fs.readFileSync(codePath, "utf-8"),
+    schema: fs.readFileSync(schemaPath, "utf-8"),
     tempWorkspace: sessionPath,
   };
 }
@@ -192,22 +227,24 @@ export function getEditSession(sessionId: string) {
     return null;
   }
 
-  const metaPath = path.join(sessionPath, '.session.json');
+  const metaPath = path.join(sessionPath, ".session.json");
   if (!fs.existsSync(metaPath)) {
     return null;
   }
 
-  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-  const codePath = path.join(sessionPath, 'index.tsx');
-  const schemaPath = path.join(sessionPath, 'config.schema.json');
+  const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+  const codePath = path.join(sessionPath, "index.tsx");
+  const schemaPath = path.join(sessionPath, "config.schema.json");
 
   return {
     sessionId: meta.sessionId,
     demoId: meta.demoId,
     createdAt: meta.createdAt,
     expiresAt: meta.expiresAt,
-    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, 'utf-8') : '',
-    schema: fs.existsSync(schemaPath) ? fs.readFileSync(schemaPath, 'utf-8') : '',
+    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
+    schema: fs.existsSync(schemaPath)
+      ? fs.readFileSync(schemaPath, "utf-8")
+      : "",
   };
 }
 
@@ -220,12 +257,12 @@ export function saveEditSession(sessionId: string): boolean {
   const { demoId: projectId } = sessionMeta;
   const sessionPath = getSessionPath(sessionId);
   const projectPath = getProjectPath(projectId);
-  const workspacePath = path.join(projectPath, 'workspace');
+  const workspacePath = path.join(projectPath, "workspace");
 
   fs.rmSync(workspacePath, { recursive: true, force: true });
   fs.cpSync(sessionPath, workspacePath, { recursive: true });
 
-  const metaInWorkspace = path.join(workspacePath, '.session.json');
+  const metaInWorkspace = path.join(workspacePath, ".session.json");
   if (fs.existsSync(metaInWorkspace)) {
     fs.rmSync(metaInWorkspace, { force: true });
   }
@@ -238,35 +275,105 @@ export function dropEditSession(sessionId: string): boolean {
   return deleteSession(sessionId);
 }
 
-export function cleanupExpiredSessions(): string[] {
+/**
+ * 清理指定用户的过期 Session
+ */
+export function cleanupExpiredSessions(userId: string): string[] {
+  const userSessionsDir = path.join(getSessionsDir(), userId);
+  if (!fs.existsSync(userSessionsDir)) {
+    return [];
+  }
+
+  const cleaned: string[] = [];
+  const projectDirs = fs.readdirSync(userSessionsDir, { withFileTypes: true });
+
+  for (const projectDir of projectDirs) {
+    if (!projectDir.isDirectory()) continue;
+
+    const projectSessionDir = path.join(userSessionsDir, projectDir.name);
+    const sessionDirs = fs.readdirSync(projectSessionDir, {
+      withFileTypes: true,
+    });
+
+    for (const sessionDir of sessionDirs) {
+      if (!sessionDir.isDirectory()) continue;
+
+      const metaPath = path.join(
+        projectSessionDir,
+        sessionDir.name,
+        ".session.json",
+      );
+      if (!fs.existsSync(metaPath)) continue;
+
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        if (Date.now() > meta.expiresAt) {
+          fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
+            recursive: true,
+            force: true,
+          });
+          cleaned.push(sessionDir.name);
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
+/**
+ * 全局清理：遍历所有用户的过期 Session（用于后台定时任务）
+ */
+export function cleanupAllExpiredSessions(): string[] {
   const sessionsDir = getSessionsDir();
   if (!fs.existsSync(sessionsDir)) {
     return [];
   }
 
   const cleaned: string[] = [];
-  const projectDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
+  const userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
 
-  for (const projectDir of projectDirs) {
-    if (!projectDir.isDirectory()) continue;
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
 
-    const projectSessionDir = path.join(sessionsDir, projectDir.name);
-    const sessionDirs = fs.readdirSync(projectSessionDir, { withFileTypes: true });
+    const userId = userDir.name;
+    const userSessionsDir = path.join(sessionsDir, userId);
+    const projectDirs = fs.readdirSync(userSessionsDir, {
+      withFileTypes: true,
+    });
 
-    for (const sessionDir of sessionDirs) {
-      if (!sessionDir.isDirectory()) continue;
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue;
 
-      const metaPath = path.join(projectSessionDir, sessionDir.name, '.session.json');
-      if (!fs.existsSync(metaPath)) continue;
+      const projectSessionDir = path.join(userSessionsDir, projectDir.name);
+      const sessionDirs = fs.readdirSync(projectSessionDir, {
+        withFileTypes: true,
+      });
 
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        if (Date.now() > meta.expiresAt) {
-          fs.rmSync(path.join(projectSessionDir, sessionDir.name), { recursive: true, force: true });
-          cleaned.push(sessionDir.name);
+      for (const sessionDir of sessionDirs) {
+        if (!sessionDir.isDirectory()) continue;
+
+        const metaPath = path.join(
+          projectSessionDir,
+          sessionDir.name,
+          ".session.json",
+        );
+        if (!fs.existsSync(metaPath)) continue;
+
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+          if (Date.now() > meta.expiresAt) {
+            fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
+              recursive: true,
+              force: true,
+            });
+            cleaned.push(sessionDir.name);
+          }
+        } catch {
+          continue;
         }
-      } catch {
-        continue;
       }
     }
   }

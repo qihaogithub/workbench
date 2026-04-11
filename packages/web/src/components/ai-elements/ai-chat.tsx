@@ -6,12 +6,10 @@ import {
   ConversationContent,
   Message,
   PromptInput,
-  ReasoningDisplay,
-  ToolCall,
+  AssistantMessage,
   type ChatMessage,
   PermissionDialog,
 } from "@/components/ai-elements";
-import { Timeline, TimelineItem } from "@/components/ai-elements/timeline";
 import {
   AgentStream,
   type StreamEvent,
@@ -64,6 +62,11 @@ export function AIChat({
     reasonings: [],
     tools: [],
   });
+  // 用 ref 追踪最新值，避免闭包问题
+  const currentMessageRef = useRef(currentMessage);
+  useEffect(() => {
+    currentMessageRef.current = currentMessage;
+  }, [currentMessage]);
 
   // 待处理的权限请求
   const [pendingPermissionRequest, setPendingPermissionRequest] =
@@ -213,6 +216,7 @@ export function AIChat({
           extractedPath = event.title.split("›").pop()?.trim();
         }
 
+        const eventAny = event as any;
         setCurrentMessage((prev) => ({
           ...prev,
           tools: [
@@ -222,9 +226,9 @@ export function AIChat({
               kind: event.kind as "read" | "edit" | "execute",
               path:
                 extractedPath ||
-                event.path ||
-                (event.parameters as any)?.path ||
-                (event.parameters as any)?.file_path,
+                eventAny.path ||
+                eventAny?.parameters?.path ||
+                eventAny?.parameters?.file_path,
               status: "running",
               parameters: {
                 toolCallId: event.toolCallId,
@@ -371,6 +375,7 @@ export function AIChat({
 
       stream.on("finish", async (event: StreamEvent) => {
         // 完成流式响应,将当前消息添加到消息列表
+        const currentMsg = currentMessageRef.current;
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -378,20 +383,20 @@ export function AIChat({
             accumulatedContent ||
             event.content ||
             "抱歉，我没有收到有效的回复。",
-          reasoning: currentMessage.reasoning,
-          reasonings: currentMessage.reasonings,
-          tools: currentMessage.tools,
+          reasoning: currentMsg.reasoning,
+          reasonings: currentMsg.reasonings,
+          tools: currentMsg.tools,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
-        setCurrentMessage((prev) => ({
+        // 重置 currentMessage，避免思维链重复显示
+        setCurrentMessage({
           role: "assistant",
           content: "",
           reasoning: undefined,
-          // 保留 reasonings 用于显示折叠后的思考过程
-          reasonings: prev.reasonings,
+          reasonings: [],
           tools: [],
-        }));
+        });
         setStreamContent("");
         setIsStreaming(false);
         stream.close();
@@ -634,12 +639,10 @@ export function AIChat({
     isStreaming,
     agentSessionId,
     workingDir,
-    currentMessage.reasoning,
-    currentMessage.reasonings,
-    currentMessage.tools,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
 
   // 处理权限响应
@@ -674,18 +677,28 @@ export function AIChat({
       streamRef.current = null;
     }
     setIsStreaming(false);
-    if (streamContent) {
+    if (streamContent || currentMessage.reasonings?.length || currentMessage.tools?.length) {
       setMessages((prev) => [
         ...prev,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          content: streamContent,
+          content: streamContent || "已取消",
+          reasonings: currentMessage.reasonings,
+          tools: currentMessage.tools,
         },
       ]);
       setStreamContent("");
     }
-  }, [streamContent]);
+    // 重置 currentMessage，避免思维链重复显示
+    setCurrentMessage({
+      role: "assistant",
+      content: "",
+      reasoning: undefined,
+      reasonings: [],
+      tools: [],
+    });
+  }, [streamContent, currentMessage.reasonings, currentMessage.tools]);
 
   return (
     <div className="flex flex-col h-full">
@@ -720,116 +733,31 @@ export function AIChat({
             </div>
           )}
 
-          {messages.map((msg) => (
-            <Message key={msg.id} message={msg} />
-          ))}
+          {messages.map((msg) => {
+            // 用户消息使用原有样式
+            if (msg.role === "user") {
+              return <Message key={msg.id} message={msg} />;
+            }
+            // Assistant 消息使用统一卡片
+            return (
+              <AssistantMessage
+                key={msg.id}
+                content={msg.content}
+                reasonings={msg.reasonings}
+                tools={msg.tools}
+              />
+            );
+          })}
 
-          {/* 思考过程（流式时展开，完成后折叠） */}
-          {currentMessage.reasonings &&
-            currentMessage.reasonings.length > 0 && (
-              <div className="w-fit max-w-[80%]">
-                <Timeline
-                  key={isStreaming ? "streaming" : "completed"}
-                  title="Thought"
-                  defaultExpanded={isStreaming}
-                >
-                  {currentMessage.reasonings.map((r, index) => (
-                    <TimelineItem
-                      key={index}
-                      status={
-                        index === currentMessage.reasonings!.length - 1 &&
-                        isStreaming
-                          ? "running"
-                          : "completed"
-                      }
-                    >
-                      <ReasoningDisplay
-                        content={r.content}
-                        duration={r.duration}
-                        isStreaming={
-                          isStreaming &&
-                          index === currentMessage.reasonings!.length - 1
-                        }
-                      />
-                    </TimelineItem>
-                  ))}
-                </Timeline>
-              </div>
-            )}
-
-          {/* 流式响应 - 文字内容 */}
-          {isStreaming && currentMessage.content && (
-            <Message
-              message={{
-                id: "streaming-content",
-                role: "assistant",
-                content: currentMessage.content,
-              }}
+          {/* 当前 AI 响应消息（流式/加载/完成中） */}
+          {isStreaming && (
+            <AssistantMessage
+              content={currentMessage.content || undefined}
+              reasonings={currentMessage.reasonings}
+              tools={currentMessage.tools}
               isStreaming={true}
             />
           )}
-
-          {/* 流式响应 - 工具调用 */}
-          {isStreaming &&
-            currentMessage.tools &&
-            currentMessage.tools.length > 0 &&
-            (() => {
-              // 按文件路径合并工具调用
-              const groups = new Map<
-                string,
-                { path?: string; entries: any[] }
-              >();
-              for (const tool of currentMessage.tools) {
-                const path = (tool.path ||
-                  tool.parameters?.path ||
-                  tool.parameters?.file_path) as string | undefined;
-                const key = path || tool.name;
-                if (!groups.has(key)) {
-                  groups.set(key, { path, entries: [] });
-                }
-                groups.get(key)!.entries.push(tool);
-              }
-              const groupedTools = Array.from(groups.values());
-
-              return (
-                <div className="w-fit max-w-[80%]">
-                  <Timeline title="AI 处理过程" defaultExpanded={true}>
-                    <TimelineItem status="completed">
-                      <div className="space-y-0">
-                        {groupedTools.map((group, index) => (
-                          <ToolCall
-                            key={index}
-                            path={group.path}
-                            entries={group.entries.map((e: any) => ({
-                              name: e.name,
-                              kind: e.kind,
-                              status: e.status,
-                              parameters: e.parameters,
-                              result: e.result,
-                            }))}
-                          />
-                        ))}
-                      </div>
-                    </TimelineItem>
-                  </Timeline>
-                </div>
-              );
-            })()}
-
-          {/* 加载指示器 - 简洁样式（仅在没有 reasoning 时显示） */}
-          {isStreaming &&
-            !currentMessage.content &&
-            (!currentMessage.reasonings ||
-              currentMessage.reasonings.length === 0) && (
-              <div className="flex flex-col gap-1 w-fit max-w-[80%]">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Sparkles className="h-3 w-3 text-muted-foreground/60" />
-                  </div>
-                  <span className="text-xs text-muted-foreground">思考中</span>
-                </div>
-              </div>
-            )}
 
           <div ref={messagesEndRef} />
         </ConversationContent>

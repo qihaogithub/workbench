@@ -1,29 +1,37 @@
-import { NextResponse } from 'next/server';
-import { getAgentClient } from '@/lib/agent-client';
-import { createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { NextResponse } from "next/server";
+import { createApiSuccess, createApiError } from "@/lib/fs-utils";
+import { cleanupExpiredSessions } from "@/lib/session-manager";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function POST() {
   try {
-    const agentClient = getAgentClient();
-    const health = await agentClient.health();
-
-    if (!health.success) {
-      return NextResponse.json(
-        createApiError('AGENT_SERVICE_ERROR', health.error.message),
-        { status: 500 }
-      );
+    // 从 Cookie 读取 userId
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
     }
 
-    return NextResponse.json(createApiSuccess({ 
-      cleaned: [], 
-      count: 0,
-      serviceStatus: health.data.status 
-    }));
-  } catch (error) {
-    console.error('Error cleaning up sessions:', error);
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
+    // 仅清理当前用户的过期 session
+    const cleaned = cleanupExpiredSessions(payload.userId);
     return NextResponse.json(
-      createApiError('FILE_WRITE_ERROR', '清理 Session 失败'),
-      { status: 500 }
+      createApiSuccess({
+        cleaned,
+        count: cleaned.length,
+      }),
     );
+  } catch (error) {
+    console.error("[Session Cleanup] Error:", error);
+    return NextResponse.json(createApiError("INTERNAL_ERROR", "清理失败"), {
+      status: 500,
+    });
   }
 }

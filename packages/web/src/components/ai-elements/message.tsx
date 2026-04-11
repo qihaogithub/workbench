@@ -16,7 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Streamdown } from "streamdown";
 import { Tool } from "./tool";
 import { Reasoning } from "./reasoning";
-import { Timeline, TimelineItem } from "./timeline";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+} from "./chain-of-thought";
 
 export interface MessagePart {
   type: "text" | "reasoning" | "tool" | "image" | "file";
@@ -124,42 +129,62 @@ export function Message({
 
       {/* 思考过程（完成后折叠） */}
       {!isUser && message.reasonings && message.reasonings.length > 0 && (
-        <div className="w-fit max-w-[80%]">
-          <Timeline title="Thought" defaultExpanded={false}>
-            {message.reasonings.map((r, index) => (
-              <TimelineItem key={index} status="completed">
-                <Reasoning
-                  content={r.content}
-                  duration={r.duration}
-                  isStreaming={false}
+        <div className="w-full">
+          <ChainOfThought defaultOpen={false}>
+            <ChainOfThoughtHeader
+              stepCount={message.reasonings.length}
+              completedCount={message.reasonings.length}
+            >
+              思考过程
+            </ChainOfThoughtHeader>
+            <ChainOfThoughtContent>
+              {message.reasonings.map((r, index) => (
+                <ChainOfThoughtStep
+                  key={index}
+                  status="complete"
+                  title={
+                    r.content.length > 50
+                      ? r.content.slice(0, 50) + "..."
+                      : r.content
+                  }
+                  description={
+                    r.duration
+                      ? `耗时 ${(r.duration / 1000).toFixed(1)}s`
+                      : undefined
+                  }
                 />
-              </TimelineItem>
-            ))}
-          </Timeline>
+              ))}
+            </ChainOfThoughtContent>
+          </ChainOfThought>
         </div>
       )}
 
       {/* 工具调用展示 */}
       {hasProcessContent && (
-        <Timeline title="AI 处理过程" defaultExpanded={false}>
-          <TimelineItem status="completed">
-            <div className="space-y-0">
-              {groupedTools.map((group, index) => (
-                <Tool
-                  key={index}
-                  path={group.path}
-                  entries={group.entries.map((e: any) => ({
-                    name: e.name,
-                    kind: e.kind,
-                    status: e.status,
-                    parameters: e.parameters,
-                    result: e.result,
-                  }))}
-                />
-              ))}
-            </div>
-          </TimelineItem>
-        </Timeline>
+        <div className="w-full">
+          <ChainOfThought defaultOpen={false}>
+            <ChainOfThoughtHeader>AI 处理过程</ChainOfThoughtHeader>
+            <ChainOfThoughtContent>
+              <ChainOfThoughtStep status="complete" title="执行工具调用">
+                <div className="space-y-0">
+                  {groupedTools.map((group, index) => (
+                    <Tool
+                      key={index}
+                      path={group.path}
+                      entries={group.entries.map((e: any) => ({
+                        name: e.name,
+                        kind: e.kind,
+                        status: e.status,
+                        parameters: e.parameters,
+                        result: e.result,
+                      }))}
+                    />
+                  ))}
+                </div>
+              </ChainOfThoughtStep>
+            </ChainOfThoughtContent>
+          </ChainOfThought>
+        </div>
       )}
 
       {/* 用户消息内容 */}

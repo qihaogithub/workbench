@@ -148,10 +148,12 @@ export function AgentProcessGroup({
                   {/* 工具组件 */}
                   <div className="flex-1 min-w-0">
                     <Tool
-                      name={tool.name}
-                      status={tool.status}
-                      parameters={tool.parameters}
-                      result={tool.result}
+                      entries={[{
+                        name: tool.name,
+                        status: tool.status,
+                        parameters: tool.parameters,
+                        result: tool.result,
+                      }]}
                       className="text-[11px]"
                     />
                   </div>
