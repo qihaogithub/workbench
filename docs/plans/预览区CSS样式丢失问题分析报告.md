@@ -509,7 +509,41 @@ export const sharedOptions: SandpackProviderProps['options'] = {
 2. **TypeScript 类型警告**：类型定义中 `SandpackProviderProps` 不包含 `externalResources` 顶层属性
 3. **CDN URL 格式**：建议使用带版本号的 URL（如 `3.4.17`）并添加 `#tailwind.js` fragment hint
 
-### 9.5 修复方案
+### 9.5 日志分析证据
+
+通过控制台日志收集，确认了 Tailwind CSS 未加载的事实：
+
+#### 代码完整性检查（通过）
+```
+[PreviewPanel] code length: 318
+[PreviewPanel] hasCompleteReturn: true
+[PreviewPanel] hasClosingBrace: true
+[PreviewPanel] hasExportDefault: true
+[PreviewPanel] braces balance: 1 / 1 (balanced)
+```
+
+#### Tailwind 加载检查（失败）
+```
+[Sandpack] ============= TAILWIND CHECK =============
+[Sandpack] Style tags count: 1
+[Sandpack] Style[0] length: 323
+[Sandpack] Style[0] preview: body {
+  font-family: sans-serif;
+  -webkit-font-smoothing: auto;
+  ...
+}
+[Sandpack] Script tags count: 6
+```
+
+**关键证据**：
+- **Style tags count: 1** - 只有 1 个 style 标签
+- **Style[0] length: 323** - 仅 323 字节，这是 Sandpack 默认样式
+- **Style 内容**：只有 `body { font-family: sans-serif; }` 等基础样式，**没有 Tailwind CSS**
+- **没有 Tailwind 相关的 script 标签**
+
+这完全证实了 `externalResources` 配置被忽略，Tailwind CSS CDN 没有被加载到沙箱中。
+
+### 9.6 修复方案
 
 修改 `PreviewPanel.tsx`：
 

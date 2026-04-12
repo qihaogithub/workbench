@@ -7,6 +7,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { useEffect } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
+import { extractDependenciesFromComments } from "@/lib/sandpack-deps";
 
 // 默认预览尺寸（iPhone 8/SE 标准）
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
@@ -55,8 +56,14 @@ export function PreviewPanel({
     console.log("[PreviewPanel] ========== CODE PROP DEBUG ==========");
     console.log("[PreviewPanel] code length:", code?.length);
     console.log("[PreviewPanel] code type:", typeof code);
-    console.log("[PreviewPanel] code preview (first 300 chars):\n", code?.slice(0, 300));
-    console.log("[PreviewPanel] code preview (last 300 chars):\n", code?.slice(-300));
+    console.log(
+      "[PreviewPanel] code preview (first 300 chars):\n",
+      code?.slice(0, 300),
+    );
+    console.log(
+      "[PreviewPanel] code preview (last 300 chars):\n",
+      code?.slice(-300),
+    );
     console.log("[PreviewPanel] ======================================");
   }, [code]);
 
@@ -75,7 +82,13 @@ export function PreviewPanel({
       console.log("[PreviewPanel] hasClosingBrace:", hasClosingBrace);
       console.log("[PreviewPanel] hasExportDefault:", hasExportDefault);
       console.log("[PreviewPanel] totalLines:", totalLines);
-      console.log("[PreviewPanel] braces balance:", openBraces, "/", closeBraces, openBraces === closeBraces ? "(balanced)" : "(UNBALANCED!)");
+      console.log(
+        "[PreviewPanel] braces balance:",
+        openBraces,
+        "/",
+        closeBraces,
+        openBraces === closeBraces ? "(balanced)" : "(UNBALANCED!)",
+      );
       console.log("[PreviewPanel] ======================================");
     }
   }, [code]);
@@ -83,17 +96,26 @@ export function PreviewPanel({
   // 调试日志：监听 configData
   useEffect(() => {
     console.log("[PreviewPanel] ========== CONFIG DATA ==========");
-    console.log("[PreviewPanel] configData:", JSON.stringify(configData, null, 2));
+    console.log(
+      "[PreviewPanel] configData:",
+      JSON.stringify(configData, null, 2),
+    );
     console.log("[PreviewPanel] ======================================");
   }, [configData]);
 
   // 调试日志：监听 sdkFiles
   useEffect(() => {
     console.log("[PreviewPanel] ========== SDK FILES ==========");
-    console.log("[PreviewPanel] sdkFiles keys:", sdkFiles ? Object.keys(sdkFiles) : "undefined");
+    console.log(
+      "[PreviewPanel] sdkFiles keys:",
+      sdkFiles ? Object.keys(sdkFiles) : "undefined",
+    );
     if (sdkFiles) {
       Object.entries(sdkFiles).forEach(([key, content]) => {
-        console.log(`[PreviewPanel] ${key} length:`, (content as string)?.length);
+        console.log(
+          `[PreviewPanel] ${key} length:`,
+          (content as string)?.length,
+        );
       });
     }
     console.log("[PreviewPanel] ======================================");
@@ -102,7 +124,10 @@ export function PreviewPanel({
   // 调试日志：外部资源配置
   useEffect(() => {
     console.log("[PreviewPanel] ========== EXTERNAL RESOURCES ==========");
-    console.log("[PreviewPanel] CDN URL:", "https://cdn.tailwindcss.com#tailwind.js");
+    console.log(
+      "[PreviewPanel] CDN URL:",
+      "https://cdn.tailwindcss.com#tailwind.js",
+    );
     console.log("[PreviewPanel] Dependencies:", {
       react: "^18.0.0",
       "react-dom": "^18.0.0",
@@ -135,7 +160,7 @@ console.log('[Sandpack] Entry code loaded, configData:', ${JSON.stringify(config
 // 检测 Tailwind CSS 是否加载
 function checkTailwind() {
   console.log('[Sandpack] ============= TAILWIND CHECK =============');
-  
+
   // 检查 style 标签
   const styles = document.querySelectorAll('style');
   console.log('[Sandpack] Style tags count:', styles.length);
@@ -148,15 +173,15 @@ function checkTailwind() {
       console.log('[Sandpack] Style[' + i + '] contains Tailwind!');
     }
   });
-  
+
   // 检查 head 标签内容
   const head = document.head;
   console.log('[Sandpack] Head children count:', head.children.length);
-  
+
   // 检查 body 标签
   const body = document.body;
   console.log('[Sandpack] Body className:', body.className);
-  
+
   // 检查是否有 Tailwind 相关的 script 标签
   const scripts = document.querySelectorAll('script');
   console.log('[Sandpack] Script tags count:', scripts.length);
@@ -167,7 +192,7 @@ function checkTailwind() {
       console.log('[Sandpack] Script[' + i + '] contains Tailwind, src:', src.slice(0, 100));
     }
   });
-  
+
   console.log('[Sandpack] =========================================');
 }
 
@@ -179,7 +204,7 @@ setTimeout(checkTailwind, 5000);
 export default function App() {
   console.log('[Sandpack] App component rendering...');
   console.log('[Sandpack] Props received:', ${JSON.stringify(configData)});
-  
+
   try {
     const result = <Demo {...${JSON.stringify(configData)}} />;
     console.log('[Sandpack] Demo component created successfully');
@@ -205,6 +230,32 @@ export default function App() {
 
   const previewStyle = buildPreviewStyle(previewSize);
 
+  // 从代码注释中提取依赖声明
+  const declaredDependencies = isValidCode
+    ? extractDependenciesFromComments(code)
+    : {};
+
+  // 合并依赖
+  const mergedDependencies = {
+    // 核心依赖
+    react: "^18.0.0",
+    "react-dom": "^18.0.0",
+
+    // shadcn/ui 工具库
+    clsx: "^2.1.0",
+    "tailwind-merge": "^2.2.0",
+    "class-variance-authority": "^0.7.0",
+
+    // UI 库
+    "lucide-react": "^0.323.0",
+
+    // 动画库
+    "framer-motion": "^10.0.0",
+
+    // AI 声明的额外依赖
+    ...declaredDependencies,
+  };
+
   return (
     <div className={className || "h-full w-full"}>
       {!isValidCode && (
@@ -220,14 +271,11 @@ export default function App() {
         template="react-ts"
         files={files}
         customSetup={{
-          dependencies: {
-            react: "^18.0.0",
-            "react-dom": "^18.0.0",
-            clsx: "^2.1.0",
-            "tailwind-merge": "^2.2.0",
-          },
+          dependencies: mergedDependencies,
         }}
-        externalResources={["https://cdn.tailwindcss.com#tailwind.js"]}
+        options={{
+          externalResources: ['https://cdn.tailwindcss.com/3.4.17#tailwind.js'],
+        }}
         theme={{
           colors: {
             surface1: "#ffffff",
