@@ -83,57 +83,53 @@ export function PreviewPanel({
 
   const entryCode = `
 import React from 'react';
-import './globals.css';
+import ReactDOM from 'react-dom/client';
 import Demo from './Demo';
 
-export default function App() {
+function App() {
   return <Demo {...${JSON.stringify(configData)}} />;
 }
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+root.render(<App />);
 `;
 
-  const tailwindConfig = `
-module.exports = {
-  content: ['./src/**/*.{js,jsx,ts,tsx}', './Demo.tsx', './App.tsx'],
-  theme: { extend: {} },
-  plugins: [],
-  corePlugins: { preflight: false },
-};
-`;
-
-  const postcssConfig = `
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-`;
-
-  const globalsCss = `
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-* {
-  box-sizing: border-box;
-}
+  const indexHtml = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
 `;
 
   const files: Record<string, string> = isValidCode
     ? {
         "/Demo.tsx": code,
-        "/App.tsx": entryCode,
-        "/tailwind.config.js": tailwindConfig,
-        "/postcss.config.js": postcssConfig,
-        "/src/globals.css": globalsCss,
+        "/index.tsx": entryCode,
+        "/index.html": indexHtml,
         ...sdkFiles,
       }
     : {
         "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
-        "/App.tsx": entryCode,
-        "/tailwind.config.js": tailwindConfig,
-        "/postcss.config.js": postcssConfig,
-        "/src/globals.css": globalsCss,
+        "/index.tsx": entryCode,
+        "/index.html": indexHtml,
         ...sdkFiles,
       };
 
@@ -151,15 +147,12 @@ module.exports = {
       )}
       <SandpackProvider
         key={code}
-        template="react-ts"
+        template="static"
         files={files}
         customSetup={{
           dependencies: {
             react: "^18.0.0",
             "react-dom": "^18.0.0",
-            tailwindcss: "^3.4.1",
-            autoprefixer: "^10.4.17",
-            postcss: "^8.4.33",
           },
         }}
         theme={{
