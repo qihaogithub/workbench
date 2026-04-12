@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const WORKSPACE_ROOT = path.resolve(__dirname, '..');
+const WORKSPACE_ROOT = process.cwd();
 
 function extractCodePaths(content) {
   const paths = new Set();
@@ -70,8 +70,8 @@ function main() {
   const args = process.argv.slice(2);
   
   if (args.length === 0) {
-    console.log('用法: node scripts/embed-code-to-doc.js <文档相对路径>');
-    console.log('示例: node scripts/embed-code-to-doc.js docs/plans/Web端预览区CSS样式缺失问题.md');
+    console.log('用法: node embed-code-to-doc.js <文档相对路径>');
+    console.log('示例: node embed-code-to-doc.js docs/plans/Web端预览区CSS样式缺失问题.md');
     process.exit(1);
   }
   
@@ -85,9 +85,9 @@ function main() {
   
   console.log(`正在处理文档: ${docRelativePath}`);
   
-  let content = fs.readFileSync(docAbsolutePath, 'utf-8');
+  const originalContent = fs.readFileSync(docAbsolutePath, 'utf-8');
   
-  content = removeExistingAppendix(content);
+  let content = removeExistingAppendix(originalContent);
   
   const codePaths = extractCodePaths(content);
   
@@ -134,9 +134,17 @@ function main() {
   
   const newContent = content.trimEnd() + appendix.join('\n');
   
-  fs.writeFileSync(docAbsolutePath, newContent, 'utf-8');
+  const ext = path.extname(docAbsolutePath);
+  const baseName = path.basename(docAbsolutePath, ext);
+  const dir = path.dirname(docAbsolutePath);
+  const outputFileName = `${baseName}-with-code${ext}`;
+  const outputPath = path.join(dir, outputFileName);
   
-  console.log(`\n完成! 已嵌入 ${codeContents.length} 个代码文件到文档底部`);
+  fs.writeFileSync(outputPath, newContent, 'utf-8');
+  
+  const outputRelativePath = path.join(path.dirname(docRelativePath), outputFileName);
+  console.log(`\n完成! 已生成副本: ${outputRelativePath}`);
+  console.log(`已嵌入 ${codeContents.length} 个代码文件到文档底部`);
   
   if (notFound.length > 0) {
     console.log(`\n警告: ${notFound.length} 个文件未找到:`);

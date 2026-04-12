@@ -83,7 +83,7 @@ export function PreviewPanel({
 
   const entryCode = `
 import React from 'react';
-import './globals.css';
+import './src/globals.css';
 import Demo from './Demo';
 
 export default function App() {

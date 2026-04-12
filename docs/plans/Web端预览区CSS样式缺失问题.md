@@ -5,11 +5,12 @@
 **问题描述**：Web端预览区（Sandpack Preview）展示的React组件没有CSS样式效果，尽管代码中正确使用了Tailwind CSS类名（如 `min-h-screen`、`bg-white`、`text-3xl` 等），但预览结果显示为无样式的原始HTML。
 
 **影响范围**：
+
 - `packages/web/src/app/demo/[id]/edit/page.tsx` - Demo编辑页面
 - `packages/web/src/app/demo-test/page.tsx` - 演示测试页面
 - 所有使用 `PreviewPanel` 组件的页面
 
----
+***
 
 ### 二、根本原因
 
@@ -44,7 +45,7 @@
 
 但Sandpack沙箱环境中没有Tailwind CSS运行时，无法解析这些类名。
 
----
+***
 
 ### 三、修复方案
 
@@ -57,6 +58,7 @@
 修改文件：[packages/web/components/demo/PreviewPanel.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/components/demo/PreviewPanel.tsx#L115-L132)
 
 **当前代码（第119-124行）：**
+
 ```tsx
 customSetup={{
   dependencies: {
@@ -67,6 +69,7 @@ customSetup={{
 ```
 
 **修改为：**
+
 ```tsx
 customSetup={{
   dependencies: {
@@ -100,6 +103,7 @@ customSetup={{
 **同时需要修改入口文件注入样式（第84-89行）：**
 
 **当前代码：**
+
 ```tsx
 const entryCode = `
 import Demo from './Demo';
@@ -110,6 +114,7 @@ export default function App() {
 ```
 
 **修改为：**
+
 ```tsx
 const entryCode = `
 import React from 'react';
@@ -122,18 +127,18 @@ export default function App() {
 `;
 ```
 
----
+***
 
 ### 四、相关代码路径汇总
 
-| 文件路径 | 说明 |
-|---------|------|
-| [packages/web/components/demo/PreviewPanel.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/components/demo/PreviewPanel.tsx) | 预览面板组件，需添加Tailwind配置 |
-| [packages/web/src/app/demo/[id]/edit/page.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/src/app/demo/[id]/edit/page.tsx) | Demo编辑页面，使用PreviewPanel |
-| [packages/web/src/app/demo-test/page.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/src/app/demo-test/page.tsx) | 演示测试页面，使用PreviewPanel |
-| [packages/web/components/demo/types.ts](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/components/demo/types.ts) | PreviewPanelProps类型定义 |
+| 文件路径                                                                                                                                           | 说明                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| [packages/web/components/demo/PreviewPanel.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/components/demo/PreviewPanel.tsx)  | 预览面板组件，需添加Tailwind配置    |
+| [packages/web/src/app/demo/\[id\]/edit/page.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/src/app/demo/\[id]/edit/page.tsx) | Demo编辑页面，使用PreviewPanel |
+| [packages/web/src/app/demo-test/page.tsx](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/src/app/demo-test/page.tsx)              | 演示测试页面，使用PreviewPanel   |
+| [packages/web/components/demo/types.ts](file:///e:/重要文件/Programming/1_Work/opencode工作台/packages/web/components/demo/types.ts)                  | PreviewPanelProps类型定义   |
 
----
+***
 
 ### 五、验证方法
 
@@ -143,4 +148,3 @@ export default function App() {
    - **修复前**：标题显示为普通文字，无背景色、无间距
    - **修复后**：标题有3xl大小、粗体、底部间距，背景根据theme变化
 
----
