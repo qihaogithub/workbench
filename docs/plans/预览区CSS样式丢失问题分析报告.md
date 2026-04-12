@@ -610,6 +610,49 @@ export const sharedOptions: SandpackProviderProps['options'] = {
 
 ### 后续行动
 
-1. 修复 `PreviewPanel.tsx` 中的属性位置
-2. 验证修复后 Tailwind CSS 是否正常加载
+1. ~~修复 `PreviewPanel.tsx` 中的属性位置~~ ✅ 已完成
+2. ~~验证修复后 Tailwind CSS 是否正常加载~~ ✅ 已完成
 3. 移除调试日志（可选）
+
+---
+
+## 十一、修复验证（2026-04-12）
+
+### 11.1 修复内容
+
+修改 `packages/web/components/demo/PreviewPanel.tsx`，将 `externalResources` 从顶层属性移到 `options` 属性中：
+
+```typescript
+<SandpackProvider
+  key={code}
+  template="react-ts"
+  files={files}
+  customSetup={{
+    dependencies: mergedDependencies,
+  }}
+  options={{
+    externalResources: ['https://cdn.tailwindcss.com/3.4.17#tailwind.js'],
+  }}
+  theme={{
+    colors: {
+      surface1: "#ffffff",
+      surface2: "#f7f7f7",
+      surface3: "#e8e8e8",
+    },
+  }}
+>
+```
+
+### 11.2 验证结果
+
+| 验证项 | 结果 |
+|:-------|:-----|
+| TypeScript 类型检查 | ✅ 通过 |
+| Tailwind CSS 加载 | ✅ 正常 |
+| 预览区样式显示 | ✅ 正常 |
+
+### 11.3 问题状态
+
+**已解决** ✅
+
+根因已确认并修复，预览区 Tailwind CSS 样式现已正常显示。
