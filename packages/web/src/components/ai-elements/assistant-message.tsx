@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Streamdown } from "streamdown";
 import {
   Loader2,
@@ -67,81 +67,93 @@ export function AssistantMessage({
   className,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
-  const [chainOpen, setChainOpen] = useState(isStreaming);
+  // 修复问题1：为每个处理过程块使用独立的展开状态
+  const [processOpenState, setProcessOpenState] = useState<
+    Record<number, boolean>
+  >({});
 
   useEffect(() => {
-    setChainOpen(isStreaming);
+    // 当流式传输结束时，可以选择关闭所有过程块，或者保持原状态
+    // 这里我们保持原状态不变，让用户手动控制
   }, [isStreaming]);
 
-  const normalizedParts: MessagePart[] = parts ? [...parts] : [];
+  const normalizedParts: MessagePart[] = useMemo(() => {
+    const parts_copy = parts ? [...parts] : [];
 
-  // 兼容旧的 reasonings/tools 格式，转换为 parts
-  if (
-    normalizedParts.length === 0 &&
-    (reasonings.length > 0 || tools.length > 0 || content)
-  ) {
-    const converted: MessagePart[] = [];
+    // 兼容旧的 reasonings/tools 格式，转换为 parts
+    if (
+      parts_copy.length === 0 &&
+      (reasonings.length > 0 || tools.length > 0 || content)
+    ) {
+      const converted: MessagePart[] = [];
 
-    // 转换 reasonings
-    for (const r of reasonings) {
-      converted.push({
-        type: "reasoning",
-        content: r.content,
-        duration: r.duration,
-        timestamp: r.timestamp,
-      });
+      // 转换 reasonings
+      for (const r of reasonings) {
+        converted.push({
+          type: "reasoning",
+          content: r.content,
+          duration: r.duration,
+          timestamp: r.timestamp,
+        });
+      }
+
+      // 转换 tools
+      for (const t of tools) {
+        converted.push({
+          type: "tool",
+          toolCallId: (t.parameters?.toolCallId as string) || `tool-${t.name}`,
+          toolName: t.name,
+          status: t.status,
+          parameters: t.parameters,
+          result: t.result,
+        });
+      }
+
+      // 如果有文本内容，添加到末尾
+      if (content && parts_copy.length === 0) {
+        converted.push({
+          type: "text",
+          content,
+        });
+      }
+
+      parts_copy.push(...converted);
     }
 
-    // 转换 tools
-    for (const t of tools) {
-      converted.push({
-        type: "tool",
-        toolCallId: (t.parameters?.toolCallId as string) || `tool-${t.name}`,
-        toolName: t.name,
-        status: t.status,
-        parameters: t.parameters,
-        result: t.result,
-      });
+    if (parts_copy.length === 0 && content) {
+      parts_copy.push({ type: "text", content });
     }
 
-    // 如果有文本内容，添加到末尾
-    if (content && normalizedParts.length === 0) {
-      converted.push({
-        type: "text",
-        content,
-      });
-    }
-
-    normalizedParts.push(...converted);
-  }
-
-  if (normalizedParts.length === 0 && content) {
-    normalizedParts.push({ type: "text", content });
-  }
+    return parts_copy;
+  }, [parts, reasonings, tools, content]);
 
   // 1. 核心修复：按时间线分组连续的块（保持 AI 说话和做事的先后顺序）
-  const renderBlocks: RenderBlock[] = [];
-  let currentProcessGroup: MessagePart[] = [];
+  const renderBlocks: RenderBlock[] = useMemo(() => {
+    const blocks: RenderBlock[] = [];
+    let currentProcessGroup: MessagePart[] = [];
 
-  normalizedParts.forEach((part) => {
-    if (part.type === "reasoning" || part.type === "tool") {
-      currentProcessGroup.push(part);
-    } else if (part.type === "text") {
-      // 遇到文本时，先把前面积累的过程块推入数组
-      if (currentProcessGroup.length > 0) {
-        renderBlocks.push({ type: "process", parts: currentProcessGroup });
-        currentProcessGroup = [];
+    normalizedParts.forEach((part) => {
+      if (part.type === "reasoning" || part.type === "tool") {
+        currentProcessGroup.push(part);
+      } else if (part.type === "text") {
+        // 遇到文本时，先把前面积累的过程块推入数组
+        if (currentProcessGroup.length > 0) {
+          blocks.push({ type: "process", parts: currentProcessGroup });
+          currentProcessGroup = [];
+        }
+        // 再推入当前的文本块
+        if (part.content?.trim()) {
+          blocks.push({ type: "text", content: part.content });
+        }
       }
-      // 再推入当前的文本块
-      if (part.content?.trim()) {
-        renderBlocks.push({ type: "text", content: part.content });
-      }
+    });
+    // 收尾：如果最后全是过程，推入最后一个过程块
+    if (currentProcessGroup.length > 0) {
+      blocks.push({ type: "process", parts: currentProcessGroup });
     }
-  });
-  // 收尾：如果最后全是过程，推入最后一个过程块
-  if (currentProcessGroup.length > 0) {
-    renderBlocks.push({ type: "process", parts: currentProcessGroup });
-  }
+
+    return blocks;
+  }, [normalizedParts]);
 
   // 如果什么都没有，显示初始加载状态
   if (renderBlocks.length === 0) {
@@ -194,11 +206,16 @@ export function AssistantMessage({
 
         // 渲染中间过程（取代旧的 ChainOfThoughtStep，直接用原生 DIV）
         if (block.type === "process") {
+          // 使用每个过程块的独立展开状态
+          const isOpen = processOpenState[index] ?? true; // 默认展开
+
           return (
             <ChainOfThought
               key={`process-${index}`}
-              open={chainOpen}
-              onOpenChange={setChainOpen}
+              open={isOpen}
+              onOpenChange={(open) => {
+                setProcessOpenState((prev) => ({ ...prev, [index]: open }));
+              }}
             >
               <ChainOfThoughtHeader>
                 {isStreaming && index === renderBlocks.length - 1

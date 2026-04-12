@@ -16,6 +16,31 @@
       "enum": ["light", "dark", "colorful"],
       "enumNames": ["浅色模式", "深色模式", "多彩渐变"],
       "default": "light"
+    },
+    "buttonText": {
+      "type": "string",
+      "title": "按钮文字",
+      "description": "按钮上显示的文字内容",
+      "default": "了解更多"
+    },
+    "buttonVariant": {
+      "type": "string",
+      "title": "按钮样式",
+      "enum": ["primary", "secondary", "outline", "ghost"],
+      "enumNames": ["主要按钮", "次要按钮", "描边按钮", "幽灵按钮"],
+      "default": "primary"
+    },
+    "carouselOrder": {
+      "type": "number",
+      "title": "轮播图顺序",
+      "description": "轮播图在布局中的位置（数字越小越靠前）",
+      "default": 1
+    },
+    "buttonOrder": {
+      "type": "number",
+      "title": "按钮顺序",
+      "description": "按钮在布局中的位置（数字越小越靠前）",
+      "default": 2
     }
   },
   "required": ["banner"]
