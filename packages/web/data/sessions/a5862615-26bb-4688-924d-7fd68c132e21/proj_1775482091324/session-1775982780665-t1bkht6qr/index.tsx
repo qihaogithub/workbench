@@ -32,10 +32,18 @@ export default function BannerDemo({
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
+  // 安全获取 banners 数组，确保是数组类型
+  const safeBanners = useMemo(() => {
+    if (!Array.isArray(banners)) {
+      return [];
+    }
+    return banners;
+  }, [banners]);
+
   // 根据 order 排序轮播图
   const sortedBanners = useMemo(() => {
-    return [...banners].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }, [banners]);
+    return [...safeBanners].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [safeBanners]);
 
   // 自动轮播
   useEffect(() => {
@@ -225,6 +233,17 @@ export default function BannerDemo({
       </div>
     );
   };
+
+  // 空状态处理
+  if (sortedBanners.length === 0) {
+    return (
+      <div className={`min-h-screen ${themeClasses[theme]} flex items-center justify-center`}>
+        <div className="text-center">
+          <p className="text-lg">请配置轮播图片</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${themeClasses[theme]}`}>

@@ -13,6 +13,7 @@ import {
   Wrench,
   Search,
 } from "lucide-react";
+import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
 import {
   ChainOfThought,
   ChainOfThoughtHeader,
@@ -53,9 +54,10 @@ interface AssistantMessageProps {
   className?: string;
 }
 
-// 渲染块定义：文本块 或 过程块(包含多个连续的思考和工具)
+// 渲染块定义：文本块、推理块、过程块（仅包含工具）
 type RenderBlock =
   | { type: "text"; content: string }
+  | { type: "reasoning"; content: string; duration?: number }
   | { type: "process"; parts: MessagePart[] };
 
 export function AssistantMessage({
@@ -127,30 +129,58 @@ export function AssistantMessage({
     return parts_copy;
   }, [parts, reasonings, tools, content]);
 
-  // 1. 核心修复：按时间线分组连续的块（保持 AI 说话和做事的先后顺序）
+  // 按类型分组：reasoning 独立出来，tool 和连续的 tool 组合成 process 块
   const renderBlocks: RenderBlock[] = useMemo(() => {
     const blocks: RenderBlock[] = [];
-    let currentProcessGroup: MessagePart[] = [];
+    let currentToolGroup: MessagePart[] = [];
+    let reasoningContent = "";
+    let reasoningDuration: number | undefined;
+
+    const flushReasoning = () => {
+      if (reasoningContent.trim()) {
+        blocks.push({
+          type: "reasoning",
+          content: reasoningContent.trim(),
+          duration: reasoningDuration,
+        });
+        reasoningContent = "";
+        reasoningDuration = undefined;
+      }
+    };
+
+    const flushTools = () => {
+      if (currentToolGroup.length > 0) {
+        blocks.push({ type: "process", parts: currentToolGroup });
+        currentToolGroup = [];
+      }
+    };
 
     normalizedParts.forEach((part) => {
-      if (part.type === "reasoning" || part.type === "tool") {
-        currentProcessGroup.push(part);
-      } else if (part.type === "text") {
-        // 遇到文本时，先把前面积累的过程块推入数组
-        if (currentProcessGroup.length > 0) {
-          blocks.push({ type: "process", parts: currentProcessGroup });
-          currentProcessGroup = [];
+      if (part.type === "reasoning") {
+        // 遇到 reasoning 时，先刷新前面的工具块
+        flushTools();
+        reasoningContent +=
+          (reasoningContent ? "\n\n" : "") + (part.content || "");
+        if (part.duration) {
+          reasoningDuration = part.duration;
         }
-        // 再推入当前的文本块
+      } else if (part.type === "tool") {
+        // 遇到 tool 时，先刷新前面的 reasoning
+        flushReasoning();
+        currentToolGroup.push(part);
+      } else if (part.type === "text") {
+        // 遇到文本时，刷新前面的 reasoning 和 tools
+        flushReasoning();
+        flushTools();
         if (part.content?.trim()) {
           blocks.push({ type: "text", content: part.content });
         }
       }
     });
-    // 收尾：如果最后全是过程，推入最后一个过程块
-    if (currentProcessGroup.length > 0) {
-      blocks.push({ type: "process", parts: currentProcessGroup });
-    }
+
+    // 收尾
+    flushReasoning();
+    flushTools();
 
     return blocks;
   }, [normalizedParts]);
@@ -190,7 +220,21 @@ export function AssistantMessage({
       )}
     >
       {renderBlocks.map((block, index) => {
-        // 渲染纯文本内容（现在它会老老实实呆在正确的时间线位置了）
+        // 渲染推理内容（使用官方的 Reasoning 组件）
+        if (block.type === "reasoning") {
+          return (
+            <Reasoning
+              key={`reasoning-${index}`}
+              isStreaming={isStreaming && index === renderBlocks.length - 1}
+              duration={block.duration}
+            >
+              <ReasoningTrigger />
+              <ReasoningContent>{block.content}</ReasoningContent>
+            </Reasoning>
+          );
+        }
+
+        // 渲染纯文本内容
         if (block.type === "text") {
           return (
             <div
@@ -204,7 +248,7 @@ export function AssistantMessage({
           );
         }
 
-        // 渲染中间过程（取代旧的 ChainOfThoughtStep，直接用原生 DIV）
+        // 渲染工具过程（仅包含 tool，不再包含 reasoning）
         if (block.type === "process") {
           // 使用每个过程块的独立展开状态
           const isOpen = processOpenState[index] ?? true; // 默认展开
@@ -226,19 +270,7 @@ export function AssistantMessage({
               <ChainOfThoughtContent>
                 <div className="flex flex-col gap-3 py-1">
                   {block.parts.map((part, pIndex) => {
-                    // 2. 官方风格的思考呈现：直接是普通的灰色小字，没有前面的绿勾和圆圈
-                    if (part.type === "reasoning") {
-                      return (
-                        <div
-                          key={pIndex}
-                          className="text-[13px] text-muted-foreground leading-relaxed"
-                        >
-                          <Streamdown>{part.content || ""}</Streamdown>
-                        </div>
-                      );
-                    }
-
-                    // 3. 官方风格的工具呈现：一个图标 + 简短的动作描述，没有乱七八糟的 JSON
+                    // 工具呈现：一个图标 + 简短的动作描述
                     if (part.type === "tool") {
                       const name = (part.toolName || "").toLowerCase();
                       const path = (part.parameters?.path ||

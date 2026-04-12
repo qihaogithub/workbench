@@ -1,137 +1,174 @@
 "use client";
 
+import * as React from "react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Loader2, ChevronDown, Sparkles } from "lucide-react";
 import { Streamdown } from "streamdown";
 
-interface ReasoningProps {
-  content: string;
-  duration?: number;
+interface ReasoningContextValue {
   isStreaming?: boolean;
-  className?: string;
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
+  duration?: number;
 }
 
-export function Reasoning({
-  content,
-  duration,
+const ReasoningContext = React.createContext<ReasoningContextValue | undefined>(
+  undefined,
+);
+
+function useReasoning() {
+  const context = React.useContext(ReasoningContext);
+  if (!context) {
+    throw new Error("useReasoning must be used within a Reasoning component");
+  }
+  return context;
+}
+
+interface ReasoningProps extends Omit<
+  React.ComponentProps<typeof Collapsible>,
+  "duration"
+> {
+  isStreaming?: boolean;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  duration?: number;
+}
+
+function Reasoning({
+  children,
   isStreaming = false,
+  open: controlledOpen,
+  defaultOpen = false,
+  onOpenChange,
+  duration,
   className,
+  ...props
 }: ReasoningProps) {
-  // 流式时默认展开，非流式时默认折叠
-  const [isExpanded, setIsExpanded] = useState(isStreaming);
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
 
-  // 当 isStreaming 状态变化时，自动更新展开状态
-  useEffect(() => {
-    setIsExpanded(isStreaming);
-  }, [isStreaming]);
+  const isOpen = controlledOpen ?? uncontrolledOpen;
 
-  if (!content) return null;
+  const setIsOpen = React.useCallback(
+    (value: boolean) => {
+      setUncontrolledOpen(value);
+      onOpenChange?.(value);
+    },
+    [onOpenChange],
+  );
+
+  // 当 isStreaming 变化时，自动展开
+  React.useEffect(() => {
+    if (isStreaming) {
+      setIsOpen(true);
+    }
+  }, [isStreaming, setIsOpen]);
 
   return (
-    <div
-      className={cn(
-        "bg-muted/30 border border-muted rounded-lg overflow-hidden",
-        className,
-      )}
+    <ReasoningContext.Provider
+      value={{ isStreaming, isOpen, setIsOpen, duration }}
     >
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-muted/50 transition-colors"
+      <Collapsible
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        className={cn("w-full", className)}
+        {...props}
       >
-        <div className="flex items-center gap-2">
-          {isStreaming ? (
-            <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-          ) : (
-            <svg
-              className="h-3 w-3 text-muted-foreground/50"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          )}
-          <span className="font-medium">
-            {isStreaming
-              ? "思考中..."
-              : duration
-                ? `思考过程 (${(duration / 1000).toFixed(1)}s)`
-                : "思考过程"}
-          </span>
-        </div>
-        <svg
-          className={cn(
-            "h-4 w-4 transition-transform",
-            isExpanded && "rotate-180",
-          )}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
-      {isExpanded && (
-        <div className="px-3 py-2 border-t border-muted">
-          <Streamdown className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground">
-            {content}
-          </Streamdown>
-        </div>
-      )}
-    </div>
+        {children}
+      </Collapsible>
+    </ReasoningContext.Provider>
   );
 }
 
-export function ReasoningTrigger({
-  onClick,
-  duration,
-  isStreaming,
-}: {
-  onClick: () => void;
-  duration?: number;
-  isStreaming?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-    >
-      <div
+interface ReasoningTriggerProps extends React.ComponentProps<
+  typeof CollapsibleTrigger
+> {
+  getThinkingMessage?: (
+    isStreaming: boolean,
+    duration?: number,
+  ) => React.ReactNode;
+}
+
+function ReasoningTrigger({
+  getThinkingMessage,
+  className,
+  children,
+  ...props
+}: ReasoningTriggerProps) {
+  const { isStreaming, isOpen, duration } = useReasoning();
+
+  const defaultThinkingMessage = (
+    <div className="flex items-center gap-2">
+      {isStreaming ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+      ) : (
+        <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+      )}
+      <span className="text-sm text-muted-foreground">
+        {isStreaming
+          ? "思考中..."
+          : duration
+            ? `思考过程 (${(duration / 1000).toFixed(1)}s)`
+            : "思考过程"}
+      </span>
+      <ChevronDown
         className={cn(
-          "h-2 w-2 rounded-full",
-          isStreaming ? "bg-violet-500 animate-pulse" : "bg-violet-500",
+          "h-4 w-4 text-muted-foreground/50 transition-transform duration-200",
+          isOpen && "rotate-180",
         )}
       />
-      <span>
-        {isStreaming ? "思考中..." : duration ? `思考 (${duration}s)` : "思考"}
-      </span>
-    </button>
+    </div>
+  );
+
+  return (
+    <CollapsibleTrigger
+      className={cn(
+        "flex w-full items-center justify-between px-3 py-2 text-sm transition-colors rounded-lg hover:bg-muted/50",
+        className,
+      )}
+      {...props}
+    >
+      {getThinkingMessage
+        ? getThinkingMessage(isStreaming ?? false, duration)
+        : defaultThinkingMessage}
+    </CollapsibleTrigger>
   );
 }
 
-export function ReasoningContent({
+interface ReasoningContentProps extends React.ComponentProps<
+  typeof CollapsibleContent
+> {
+  children: string;
+}
+
+function ReasoningContent({
   children,
   className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+  ...props
+}: ReasoningContentProps) {
   return (
-    <div className={cn("px-3 py-2 border-t border-muted", className)}>
-      {children}
-    </div>
+    <CollapsibleContent
+      className={cn(
+        "overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down",
+        className,
+      )}
+      {...props}
+    >
+      <div className="px-3 pb-3">
+        <div className="text-[13px] text-muted-foreground leading-relaxed">
+          <Streamdown>{children}</Streamdown>
+        </div>
+      </div>
+    </CollapsibleContent>
   );
 }
+
+export { Reasoning, ReasoningTrigger, ReasoningContent, useReasoning };
 
 // 别名导出，方便在 ai-chat 中使用
 export const ReasoningDisplay = Reasoning;
