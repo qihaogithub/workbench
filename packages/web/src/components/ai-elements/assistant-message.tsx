@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Streamdown } from "streamdown";
 import { Loader2, Check, Copy } from "lucide-react";
-import { Tool, type ToolEntry } from "./tool";
+import type { ToolEntry } from "./tool";
 import {
   ChainOfThought,
   ChainOfThoughtHeader,
@@ -135,7 +135,7 @@ export function AssistantMessage({
     if (!isStreaming) return null;
 
     return (
-      <div className={cn("w-full rounded-lg border bg-card", className)}>
+      <div className={cn("flex flex-col gap-4 w-full", className)}>
         <div className="flex items-center gap-3 px-3 py-3">
           <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
           <span className="text-sm text-muted-foreground">思考中...</span>
@@ -181,7 +181,7 @@ export function AssistantMessage({
   };
 
   return (
-    <div className={cn("w-full rounded-lg border bg-card", className)}>
+    <div className={cn("flex flex-col gap-4 w-full", className)}>
       {/* ChainOfThought - 渲染中间过程 */}
       {hasProcessContent && (
         <ChainOfThought open={chainOpen} onOpenChange={setChainOpen}>
@@ -230,19 +230,36 @@ export function AssistantMessage({
                   <ChainOfThoughtStep
                     key={`tool-${part.toolCallId || index}`}
                     status={status}
-                    title={part.toolName || "工具调用"}
+                    title={`调用工具: ${part.toolName || "未知"}`}
                   >
-                    <div className="mt-1">
-                      <Tool
-                        entries={[
-                          {
-                            name: part.toolName || "未知工具",
-                            status: part.status || "completed",
-                            parameters: part.parameters,
-                            result: part.result,
-                          },
-                        ]}
-                      />
+                    <div className="mt-2 flex flex-col gap-2">
+                      {/* 展示入参 */}
+                      {part.parameters &&
+                        typeof part.parameters === "object" &&
+                        Object.keys(part.parameters).length > 0 && (
+                          <div className="bg-muted/50 rounded-md p-3">
+                            <div className="text-xs text-muted-foreground mb-1 select-none font-medium">
+                              输入
+                            </div>
+                            <pre className="text-xs overflow-x-auto text-foreground font-mono">
+                              {JSON.stringify(part.parameters, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+
+                      {/* 展示结果（如果有） */}
+                      {part.result != null && (
+                        <div className="bg-muted/50 rounded-md p-3">
+                          <div className="text-xs text-muted-foreground mb-1 select-none font-medium">
+                            结果
+                          </div>
+                          <pre className="text-xs overflow-x-auto text-foreground font-mono">
+                            {typeof part.result === "object"
+                              ? JSON.stringify(part.result, null, 2)
+                              : String(part.result)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   </ChainOfThoughtStep>
                 );
@@ -256,13 +273,8 @@ export function AssistantMessage({
 
       {/* 正文内容 */}
       {finalContent && (
-        <div
-          className={cn(
-            "group relative",
-            hasProcessContent && "border-t border-border/40",
-          )}
-        >
-          <div className="px-3 py-3">
+        <div className="group relative w-full">
+          <div className="py-2">
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none overflow-hidden">
               <div className="overflow-x-auto">
                 <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">

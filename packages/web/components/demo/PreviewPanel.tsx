@@ -82,54 +82,21 @@ export function PreviewPanel({
     !code.includes("\\重要文件\\");
 
   const entryCode = `
-import React from 'react';
-import ReactDOM from 'react-dom/client';
 import Demo from './Demo';
-
-function App() {
+export default function App() {
   return <Demo {...${JSON.stringify(configData)}} />;
 }
-
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-root.render(<App />);
-`;
-
-  const indexHtml = `
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demo Preview</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      corePlugins: { preflight: false }
-    }
-  </script>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-</html>
 `;
 
   const files: Record<string, string> = isValidCode
     ? {
         "/Demo.tsx": code,
-        "/index.tsx": entryCode,
-        "/index.html": indexHtml,
+        "/App.tsx": entryCode,
         ...sdkFiles,
       }
     : {
         "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
-        "/index.tsx": entryCode,
-        "/index.html": indexHtml,
+        "/App.tsx": entryCode,
         ...sdkFiles,
       };
 
@@ -147,7 +114,7 @@ root.render(<App />);
       )}
       <SandpackProvider
         key={code}
-        template="static"
+        template="react-ts"
         files={files}
         customSetup={{
           dependencies: {

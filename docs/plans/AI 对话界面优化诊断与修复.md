@@ -1,99 +1,231 @@
-整个消息被一个框包裹，我觉得冗余，我希望思维链效果如图2官方演示的效果一样简洁（https://elements.ai-sdk.dev/components/chain-of-thought），完整消息使用官方效果https://elements.ai-sdk.dev/components/message
 
-### 🎨 现象与根因分析
+那些对勾状态感觉还是冗余，没有官方演示的图标简洁，调用工具也没有官方演示那样一个图标加文字好，比如读文件，既可以是一个眼镜图标加文件名，不需要“调用工具：read”这几个字，也不需要输入{}。
+信息顺序还是有点问题，“我将去除banner图相关的代码。”这句话似乎是AI最开始说的，放到底部感觉不对。
 
-#### 1. 整个消息被一个巨大的外框包裹
-*   **根因**：在 `assistant-message.txt` 中，最外层的包裹节点使用了带有卡片样式的类名：
-    ```tsx
-    // assistant-message.txt 约 108 行
-    <div className={cn("w-full rounded-lg border bg-card", className)}>
-    ```
-    这导致思维链（CoT）和最终的文本正文被强行塞进了一个大卡片里。而官方的 `<Message>` 组件通常是没有外边框的，内容是自然流式排布的。
+### 🔍 问题诊断
 
-#### 2. 思维链内部存在“双重折叠”和“嵌套边框”（导致冗余）
-*   **根因**：在 `assistant-message.txt` 渲染 `part.type === "tool"` 时，您在 `<ChainOfThoughtStep>` 内部又渲染了一个 `<Tool>` 组件。
-    *   `<ChainOfThoughtStep>` 本身就是一个带有状态的步骤节点。
-    *   而您引入的 `<Tool>` 组件（`tool.txt`）自带了 `border`、折叠箭头（`ChevronDown`）、工具图标和点击展开逻辑。
-    *   这导致了**“双重 Header”**和**“双重外框”**的视觉冗余（图 1 中的绿色勾勾下面，又套了一个黑色背景的 `> < > read` 框）。在官方演示中，工具调用的入参和结果是**直接作为 Step 的子元素（children）**展示的，不需要再套一层带有标题的卡片。
-
-#### 3. 正文内容区存在割裂感
-*   **根因**：正文部分的渲染代码带有 `border-t border-border/40` 和各种内边距（`px-3 py-3`），这进一步强化了“在卡片中切分区块”的感觉，缺乏呼吸感。
+1. **信息顺序错乱（先说的字跑到了最后面）**
+   * **原因**：在之前的代码中，我们把所有 `type === "text"` 的节点强行 `filter` 出来，并在最底部通过 `.join("\n\n")` 统一渲染。这就导致了如果 AI 是先说“我将去除 banner图…”，再去调用工具，这句话也会被强行拽到所有消息的最底部。
+   * **解法**：废弃 `filter` 的做法，改为**按时间线分组（Chronological Grouping）**。遇到纯文本就直接渲染，遇到“思考/工具”就把它们打包放进 `<ChainOfThought>` 块里。这样自然会形成 `文本 -> 过程折叠面板 -> 文本` 的正确流。
+2. **对勾状态冗余，不够官方**
+   * **原因**：您使用的 `<ChainOfThoughtStep>` 默认带有时间线竖线和绿色的对勾图标。而官方 Vercel AI SDK 的思维链设计中，**思考过程就是一段普通的灰色段落字，工具调用就是一个普通的小图标**，根本没有复杂的步骤连线和绿勾。
+   * **解法**：抛弃 `<ChainOfThoughtStep>` 组件，直接用原生的 `div` 和 `Lucide Icons` 排版。
+3. **“调用工具：read”太生硬，不需要输入 `{}`**
+   * **原因**：之前是暴力显示工具名和序列化后的 JSON。
+   * **解法**：加入一段小逻辑，把 `read` 映射为“读取文件”、把 `edit` 映射为“修改文件”，并配上对应的 `Eye` (眼镜) 或 `Edit3` 图标；直接删除展示 JSON 的 DOM 结构。
 
 ---
 
-### 🛠️ 优化步骤指南
+### 🛠️ 终极修复方案
 
-为了达到官方 https://elements.ai-sdk.dev/components/chain-of-thought 和 `message` 的极简效果，请按照以下步骤调整您的代码：
-
-#### 第一步：拆掉全局大边框，让消息自然流露
-打开 **`assistant-message.txt`**，修改最外层的 `div` 以及加载状态的 `div`：
-
-1. **移除卡片样式**：把 `border bg-card rounded-lg` 删掉，改为简单的 Flex 垂直布局。
-2. **移除正文的顶部分割线**：去掉 `border-t border-border/40` 和多余的 `px-3` padding。
+请将您的 **`assistant-message.txt`** 整个替换为以下代码。这份代码实现了**时间线分组流式渲染**，并且采用了极致干净的官方视觉风格：
 
 ```tsx
-// 修改前
-<div className={cn("w-full rounded-lg border bg-card", className)}>
-// 修改后 
-<div className={cn("flex flex-col gap-4 w-full", className)}>
+"use client";
 
-// ... 中间的 ChainOfThought 保持不动 ...
+import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { Streamdown } from "streamdown";
+// 引入更多贴合语义的极简图标
+import { Loader2, Check, Copy, Eye, Terminal, Edit3, Wrench, Search } from "lucide-react";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+} from "./chain-of-thought";
 
-// 正文部分修改前
-<div className={cn("group relative", hasProcessContent && "border-t border-border/40")}>
-  <div className="px-3 py-3">
-// 正文部分修改后
-<div className="group relative w-full">
-  <div className="py-2"> {/* 去掉左右 padding 和顶部 border */}
-```
+interface MessagePart {
+  type: "text" | "reasoning" | "tool" | "image" | "file";
+  content?: string;
+  toolCallId?: string;
+  toolName?: string;
+  status?: "running" | "completed" | "error" | "awaiting-approval";
+  parameters?: Record<string, unknown>;
+  result?: unknown;
+  duration?: number;
+  timestamp?: number;
+}
 
-#### 第二步：去除思维链内部的 `<Tool>` 嵌套，直接渲染数据
-既然 `<ChainOfThoughtStep>` 已经负责了标题和状态展示（带了绿色的勾或 Loading 转圈），我们就不需要在里面再放一个 `<Tool>` 卡片了。直接把参数和结果渲染成官方那种带有灰色背景的代码块即可。
+interface AssistantMessageProps {
+  content?: string;
+  parts?: MessagePart[];
+  isStreaming?: boolean;
+  className?: string;
+}
 
-在 **`assistant-message.txt`** 中，修改 `part.type === "tool"` 的渲染逻辑：
+// 渲染块定义：文本块 或 过程块(包含多个连续的思考和工具)
+type RenderBlock = 
+  | { type: "text"; content: string }
+  | { type: "process"; parts: MessagePart[] };
 
-```tsx
-// 替换 assistant-message.txt 中渲染 part.type === "tool" 的部分
-if (part.type === "tool") {
-  const status = ... // 保持原有的 status 逻辑
+export function AssistantMessage({
+  content,
+  parts,
+  isStreaming = false,
+  className,
+}: AssistantMessageProps) {
+  const [copied, setCopied] = useState(false);
+  const[chainOpen, setChainOpen] = useState(isStreaming);
+
+  useEffect(() => {
+    setChainOpen(isStreaming);
+  },[isStreaming]);
+
+  const normalizedParts: MessagePart[] = parts ? [...parts] :[];
+
+  if (normalizedParts.length === 0 && content) {
+    normalizedParts.push({ type: "text", content });
+  }
+
+  // 1. 核心修复：按时间线分组连续的块（保持 AI 说话和做事的先后顺序）
+  const renderBlocks: RenderBlock[] = [];
+  let currentProcessGroup: MessagePart[] =[];
+
+  normalizedParts.forEach((part) => {
+    if (part.type === "reasoning" || part.type === "tool") {
+      currentProcessGroup.push(part);
+    } else if (part.type === "text") {
+      // 遇到文本时，先把前面积累的过程块推入数组
+      if (currentProcessGroup.length > 0) {
+        renderBlocks.push({ type: "process", parts: currentProcessGroup });
+        currentProcessGroup =[];
+      }
+      // 再推入当前的文本块
+      if (part.content?.trim()) {
+        renderBlocks.push({ type: "text", content: part.content });
+      }
+    }
+  });
+  // 收尾：如果最后全是过程，推入最后一个过程块
+  if (currentProcessGroup.length > 0) {
+    renderBlocks.push({ type: "process", parts: currentProcessGroup });
+  }
+
+  // 如果什么都没有，显示初始加载状态
+  if (renderBlocks.length === 0) {
+    if (!isStreaming) return null;
+    return (
+      <div className={cn("flex flex-col gap-4 w-full py-2", className)}>
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
+          <span className="text-sm text-muted-foreground">思考中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 获取所有纯文本用于一键复制
+  const allTextContent = renderBlocks
+    .filter((b) => b.type === "text")
+    .map((b) => b.content)
+    .join("\n\n");
+
+  const handleCopy = async () => {
+    if (allTextContent) {
+      await navigator.clipboard.writeText(allTextContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
-    <ChainOfThoughtStep
-      key={`tool-${part.toolCallId || index}`}
-      status={status}
-      title={`调用工具: ${part.toolName || "未知"}`} // 直接在这里写清楚标题
-    >
-      {/* 抛弃 <Tool />，直接渲染极简的入参和结果 */}
-      <div className="mt-2 flex flex-col gap-2">
-        {/* 展示入参 */}
-        {part.parameters && Object.keys(part.parameters).length > 0 && (
-          <div className="bg-muted/50 rounded-md p-3">
-            <div className="text-xs text-muted-foreground mb-1 select-none font-medium">输入</div>
-            <pre className="text-xs overflow-x-auto text-foreground font-mono">
-              {JSON.stringify(part.parameters, null, 2)}
-            </pre>
-          </div>
-        )}
+    <div className={cn("flex flex-col gap-3 w-full group relative py-1", className)}>
+      {renderBlocks.map((block, index) => {
         
-        {/* 展示结果（如果有） */}
-        {part.result && (
-          <div className="bg-muted/50 rounded-md p-3">
-            <div className="text-xs text-muted-foreground mb-1 select-none font-medium">结果</div>
-            <pre className="text-xs overflow-x-auto text-foreground font-mono">
-              {typeof part.result === 'object' ? JSON.stringify(part.result, null, 2) : String(part.result)}
-            </pre>
-          </div>
-        )}
-      </div>
-    </ChainOfThoughtStep>
+        // 渲染纯文本内容（现在它会老老实实呆在正确的时间线位置了）
+        if (block.type === "text") {
+          return (
+            <div key={`text-${index}`} className="prose prose-sm dark:prose-invert max-w-none">
+              <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap[&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+                {block.content}
+              </Streamdown>
+            </div>
+          );
+        }
+
+        // 渲染中间过程（取代旧的 ChainOfThoughtStep，直接用原生 DIV）
+        if (block.type === "process") {
+          return (
+            <ChainOfThought key={`process-${index}`} open={chainOpen} onOpenChange={setChainOpen}>
+              <ChainOfThoughtHeader>
+                {isStreaming && index === renderBlocks.length - 1 ? "处理中..." : "处理过程"}
+              </ChainOfThoughtHeader>
+              
+              <ChainOfThoughtContent>
+                <div className="flex flex-col gap-3 py-1">
+                  {block.parts.map((part, pIndex) => {
+                    
+                    // 2. 官方风格的思考呈现：直接是普通的灰色小字，没有前面的绿勾和圆圈
+                    if (part.type === "reasoning") {
+                      return (
+                        <div key={pIndex} className="text-[13px] text-muted-foreground leading-relaxed">
+                          <Streamdown>{part.content || ""}</Streamdown>
+                        </div>
+                      );
+                    }
+
+                    // 3. 官方风格的工具呈现：一个图标 + 简短的动作描述，没有乱七八糟的 JSON
+                    if (part.type === "tool") {
+                      const name = (part.toolName || "").toLowerCase();
+                      const path = (part.parameters?.path || part.parameters?.file_path) as string;
+                      
+                      // 智能映射图标与文案
+                      let ToolIcon = Wrench;
+                      let actionText = part.toolName || "未知操作";
+
+                      if (name.includes("read")) {
+                        ToolIcon = Eye; // 读文件用眼镜图标
+                        actionText = path ? `读取 ${path}` : "读取文件";
+                      } else if (name.includes("edit") || name.includes("write")) {
+                        ToolIcon = Edit3; // 写文件用编辑图标
+                        actionText = path ? `修改 ${path}` : "修改文件";
+                      } else if (name.includes("execute") || name.includes("cmd") || name.includes("terminal")) {
+                        ToolIcon = Terminal; // 命令用终端图标
+                        actionText = "执行命令";
+                      } else if (name.includes("search")) {
+                        ToolIcon = Search; // 搜索用放大镜
+                        actionText = "搜索资料";
+                      }
+
+                      return (
+                        <div key={pIndex} className="flex items-center gap-2.5 text-[13px] font-medium text-foreground/90 my-0.5">
+                          <ToolIcon className="h-4 w-4 text-muted-foreground/80" />
+                          <span>{actionText}</span>
+                          {/* 如果正在运行，跟一个加载圈 */}
+                          {part.status === "running" && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </ChainOfThoughtContent>
+            </ChainOfThought>
+          );
+        }
+        return null;
+      })}
+
+      {/* 消息的整体操作按钮 (只在鼠标 Hover 时显示) */}
+      {allTextContent && (
+        <div className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-10 bg-background/80 backdrop-blur rounded p-1 shadow-sm">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded transition-colors"
+          >
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            {copied ? "已复制" : "复制"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 ```
-*💡 这样修改后，工具展开后就是干净清爽的代码块，不会再有那层黑乎乎的带有“read”标题的卡片了。*
 
-
-### 💡 总结验证
-按照以上三步修改后，您可以重新刷新页面发起对话，您会看到：
-1. **外框消失了**，AI 的思考和回复会像用户消息一样自然地融入聊天列表的背景中。
-2. **思维链清爽了**，点开 `<ChainOfThought>` 面板，只有带图标的步骤列表（`<ChainOfThoughtStep>`）。如果是工具调用，点开后是一块干净的灰色圆角框显示 JSON 参数，不会有重复的 Header 和边框。
-3. **排版对齐了**，文本、图片（若有）、思维链都会沿着统一的左对齐轴线排列，完美契合 Vercel AI SDK 的设计规范。
+### ✨ 修改后的视觉体验升级点：
+1. **彻底解决了倒装句问题**：您的提示“我将去除 banner...”现在会正常出现在卡片**顶部**，然后中间穿插着可以折叠的 `<ChainOfThought>`，最后如果 AI 还有结束语（比如“已完成...”）则会出现在折叠面板的**底部**。
+2. **抛弃了累赘的 Steps 组件**：没有绿勾、没有竖线，思考过程看起来就像一段自然的文字自言自语。
+3. **引入了语义化的工具呈现**：自动通过 `includes('read')` 拦截原始事件名，将冷冰冰的 `read` 替换成了一对可爱的**眼镜图标** (Lucide `Eye`) 加上实际的文件名；同时**彻底删除了渲染参数的块**，实现了极致干净！

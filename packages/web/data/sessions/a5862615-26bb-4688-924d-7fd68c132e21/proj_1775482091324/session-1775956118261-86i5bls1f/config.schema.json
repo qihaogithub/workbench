@@ -1,6 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "空组件",
+  "title": "Banner Demo 配置",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "活动标题",
+      "default": "精彩活动来袭",
+      "maxLength": 20
+    },
+    "description": {
+      "type": "string",
+      "title": "活动描述",
+      "default": "限时优惠，不容错过"
+    },
+    "theme": {
+      "type": "string",
+      "title": "主题颜色",
+      "enum": ["light", "dark", "colorful"],
+      "enumNames": ["浅色模式", "深色模式", "多彩渐变"],
+      "default": "light"
+    },
+    "showBadge": {
+      "type": "boolean",
+      "title": "显示活动标签",
+      "default": true
+    }
+  },
+  "required": ["title"]
 }
