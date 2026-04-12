@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Streamdown } from "streamdown";
 import {
   Loader2,
@@ -14,11 +14,6 @@ import {
   Search,
 } from "lucide-react";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
-import {
-  ChainOfThought,
-  ChainOfThoughtHeader,
-  ChainOfThoughtContent,
-} from "./chain-of-thought";
 
 interface MessagePart {
   type: "text" | "reasoning" | "tool" | "image" | "file";
@@ -54,11 +49,11 @@ interface AssistantMessageProps {
   className?: string;
 }
 
-// 渲染块定义：文本块、推理块、过程块（仅包含工具）
+// 渲染块定义：文本块、推理块、工具块
 type RenderBlock =
   | { type: "text"; content: string }
   | { type: "reasoning"; content: string; duration?: number }
-  | { type: "process"; parts: MessagePart[] };
+  | { type: "tool"; part: MessagePart };
 
 export function AssistantMessage({
   content,
@@ -69,15 +64,6 @@ export function AssistantMessage({
   className,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
-  // 修复问题1：为每个处理过程块使用独立的展开状态
-  const [processOpenState, setProcessOpenState] = useState<
-    Record<number, boolean>
-  >({});
-
-  useEffect(() => {
-    // 当流式传输结束时，可以选择关闭所有过程块，或者保持原状态
-    // 这里我们保持原状态不变，让用户手动控制
-  }, [isStreaming]);
 
   const normalizedParts: MessagePart[] = useMemo(() => {
     const parts_copy = parts ? [...parts] : [];
@@ -129,10 +115,9 @@ export function AssistantMessage({
     return parts_copy;
   }, [parts, reasonings, tools, content]);
 
-  // 按类型分组：reasoning 独立出来，tool 和连续的 tool 组合成 process 块
+  // 按类型分组：每个类型都独立成块
   const renderBlocks: RenderBlock[] = useMemo(() => {
     const blocks: RenderBlock[] = [];
-    let currentToolGroup: MessagePart[] = [];
     let reasoningContent = "";
     let reasoningDuration: number | undefined;
 
@@ -148,30 +133,22 @@ export function AssistantMessage({
       }
     };
 
-    const flushTools = () => {
-      if (currentToolGroup.length > 0) {
-        blocks.push({ type: "process", parts: currentToolGroup });
-        currentToolGroup = [];
-      }
-    };
-
     normalizedParts.forEach((part) => {
       if (part.type === "reasoning") {
-        // 遇到 reasoning 时，先刷新前面的工具块
-        flushTools();
+        // 遇到 reasoning 时，先刷新前面的 reasoning 块
+        flushReasoning();
         reasoningContent +=
           (reasoningContent ? "\n\n" : "") + (part.content || "");
         if (part.duration) {
           reasoningDuration = part.duration;
         }
       } else if (part.type === "tool") {
-        // 遇到 tool 时，先刷新前面的 reasoning
+        // 每个 tool 独立为一个块
         flushReasoning();
-        currentToolGroup.push(part);
+        blocks.push({ type: "tool", part });
       } else if (part.type === "text") {
-        // 遇到文本时，刷新前面的 reasoning 和 tools
+        // 遇到文本时，刷新前面的 reasoning
         flushReasoning();
-        flushTools();
         if (part.content?.trim()) {
           blocks.push({ type: "text", content: part.content });
         }
@@ -180,7 +157,6 @@ export function AssistantMessage({
 
     // 收尾
     flushReasoning();
-    flushTools();
 
     return blocks;
   }, [normalizedParts]);
@@ -248,78 +224,47 @@ export function AssistantMessage({
           );
         }
 
-        // 渲染工具过程（仅包含 tool，不再包含 reasoning）
-        if (block.type === "process") {
-          // 使用每个过程块的独立展开状态
-          const isOpen = processOpenState[index] ?? true; // 默认展开
+        // 渲染工具调用（直接展示，不折叠）
+        if (block.type === "tool") {
+          const part = block.part;
+          const name = (part.toolName || "").toLowerCase();
+          const path = (part.parameters?.path ||
+            part.parameters?.file_path) as string;
+
+          // 智能映射图标与文案
+          let ToolIcon = Wrench;
+          let actionText = part.toolName || "未知操作";
+
+          if (name.includes("read")) {
+            ToolIcon = Eye;
+            actionText = path ? `读取 ${path}` : "读取文件";
+          } else if (name.includes("edit") || name.includes("write")) {
+            ToolIcon = Edit3;
+            actionText = path ? `修改 ${path}` : "修改文件";
+          } else if (
+            name.includes("execute") ||
+            name.includes("cmd") ||
+            name.includes("terminal")
+          ) {
+            ToolIcon = Terminal;
+            actionText = "执行命令";
+          } else if (name.includes("search")) {
+            ToolIcon = Search;
+            actionText = "搜索资料";
+          }
 
           return (
-            <ChainOfThought
-              key={`process-${index}`}
-              open={isOpen}
-              onOpenChange={(open) => {
-                setProcessOpenState((prev) => ({ ...prev, [index]: open }));
-              }}
+            <div
+              key={`tool-${index}`}
+              className="flex items-center gap-2.5 text-[13px] font-medium text-foreground/90 py-0.5"
             >
-              <ChainOfThoughtHeader>
-                {isStreaming && index === renderBlocks.length - 1
-                  ? "处理中..."
-                  : "处理过程"}
-              </ChainOfThoughtHeader>
-
-              <ChainOfThoughtContent>
-                <div className="flex flex-col gap-3 py-1">
-                  {block.parts.map((part, pIndex) => {
-                    // 工具呈现：一个图标 + 简短的动作描述
-                    if (part.type === "tool") {
-                      const name = (part.toolName || "").toLowerCase();
-                      const path = (part.parameters?.path ||
-                        part.parameters?.file_path) as string;
-
-                      // 智能映射图标与文案
-                      let ToolIcon = Wrench;
-                      let actionText = part.toolName || "未知操作";
-
-                      if (name.includes("read")) {
-                        ToolIcon = Eye;
-                        actionText = path ? `读取 ${path}` : "读取文件";
-                      } else if (
-                        name.includes("edit") ||
-                        name.includes("write")
-                      ) {
-                        ToolIcon = Edit3;
-                        actionText = path ? `修改 ${path}` : "修改文件";
-                      } else if (
-                        name.includes("execute") ||
-                        name.includes("cmd") ||
-                        name.includes("terminal")
-                      ) {
-                        ToolIcon = Terminal;
-                        actionText = "执行命令";
-                      } else if (name.includes("search")) {
-                        ToolIcon = Search;
-                        actionText = "搜索资料";
-                      }
-
-                      return (
-                        <div
-                          key={pIndex}
-                          className="flex items-center gap-2.5 text-[13px] font-medium text-foreground/90 my-0.5"
-                        >
-                          <ToolIcon className="h-4 w-4 text-muted-foreground/80" />
-                          <span>{actionText}</span>
-                          {/* 如果正在运行，跟一个加载圈 */}
-                          {part.status === "running" && (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-              </ChainOfThoughtContent>
-            </ChainOfThought>
+              <ToolIcon className="h-4 w-4 text-muted-foreground/80" />
+              <span>{actionText}</span>
+              {/* 如果正在运行，跟一个加载圈 */}
+              {part.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              )}
+            </div>
           );
         }
         return null;

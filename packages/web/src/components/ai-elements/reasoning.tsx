@@ -7,7 +7,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Loader2, ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Streamdown } from "streamdown";
 
 interface ReasoningContextValue {
@@ -76,7 +76,10 @@ function Reasoning({
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
-        className={cn("w-full", className)}
+        className={cn(
+          "w-full rounded-lg border border-border/50 bg-muted/30",
+          className,
+        )}
         {...props}
       >
         {children}
@@ -105,15 +108,39 @@ function ReasoningTrigger({
   const defaultThinkingMessage = (
     <div className="flex items-center gap-2">
       {isStreaming ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        <svg
+          className="h-3.5 w-3.5 animate-spin text-muted-foreground"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
+            fill="currentColor"
+            opacity="0.3"
+          />
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
       ) : (
-        <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+        <svg
+          className="h-3.5 w-3.5 text-muted-foreground"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+        </svg>
       )}
       <span className="text-sm text-muted-foreground">
         {isStreaming
           ? "思考中..."
           : duration
-            ? `思考过程 (${(duration / 1000).toFixed(1)}s)`
+            ? `思考了${(duration / 1000).toFixed(0)}秒钟`
             : "思考过程"}
       </span>
       <ChevronDown
@@ -128,7 +155,7 @@ function ReasoningTrigger({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between px-3 py-2 text-sm transition-colors rounded-lg hover:bg-muted/50",
+        "flex w-full items-center justify-between px-3 py-2.5 text-sm transition-colors rounded-lg hover:bg-muted/50",
         className,
       )}
       {...props}
@@ -160,7 +187,7 @@ function ReasoningContent({
       {...props}
     >
       <div className="px-3 pb-3">
-        <div className="text-[13px] text-muted-foreground leading-relaxed">
+        <div className="text-[13px] text-muted-foreground/90 leading-relaxed">
           <Streamdown>{children}</Streamdown>
         </div>
       </div>
