@@ -151,6 +151,8 @@ export default function App() {
             tailwindcss: "^3.4.1",
             autoprefixer: "^10.4.17",
             postcss: "^8.4.33",
+            clsx: "^2.1.0",
+            "tailwind-merge": "^2.2.0",
           },
         }}
         theme={{

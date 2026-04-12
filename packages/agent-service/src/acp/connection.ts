@@ -575,6 +575,7 @@ export class AcpConnection extends EventEmitter {
     handlers?: {
       onSessionUpdate?: SessionUpdateHandler;
       onPermissionRequest?: PermissionHandler;
+      onFileOperation?: FileOperationHandler;
     }
   ): Promise<AcpPromptResult> {
     if (!this.sessionId) {
@@ -583,6 +584,7 @@ export class AcpConnection extends EventEmitter {
 
     this.onSessionUpdate = handlers?.onSessionUpdate;
     this.onPermissionRequest = handlers?.onPermissionRequest;
+    this.onFileOperation = handlers?.onFileOperation;
 
     const promptArray = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt;
 

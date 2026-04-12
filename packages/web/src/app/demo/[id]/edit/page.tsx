@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/components/ai-elements/ai-chat";
+import { type ChatMessage } from "@/components/ai-elements";
 import {
   Bot,
   Code2,
@@ -64,6 +65,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [tempWorkspace, setTempWorkspace] = useState("");
   const [previewSize, setPreviewSize] =
     useState<import("../../../../../components/demo/types").PreviewSize>();
+
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
+  const [aiIsStreaming, setAiIsStreaming] = useState(false);
+  const [aiStreamContent, setAiStreamContent] = useState("");
+  const [aiCurrentMessage, setAiCurrentMessage] = useState<ChatMessage>({
+    role: "assistant",
+    content: "",
+    parts: [],
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -371,6 +381,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                 workingDir={tempWorkspace || undefined}
                 onCodeUpdate={handleCodeUpdate}
                 onSchemaUpdate={handleSchemaUpdate}
+                externalMessages={aiMessages}
+                externalIsStreaming={aiIsStreaming}
+                externalStreamContent={aiStreamContent}
+                externalCurrentMessage={aiCurrentMessage}
+                onMessagesChange={setAiMessages}
+                onIsStreamingChange={setAiIsStreaming}
+                onStreamContentChange={setAiStreamContent}
+                onCurrentMessageChange={setAiCurrentMessage}
               />
             </TabsContent>
 

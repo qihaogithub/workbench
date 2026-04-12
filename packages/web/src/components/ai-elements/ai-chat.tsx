@@ -7,8 +7,8 @@ import {
   Message,
   PromptInput,
   AssistantMessage,
-  type ChatMessage,
   PermissionDialog,
+  type ChatMessage,
 } from "@/components/ai-elements";
 import {
   AgentStream,
@@ -39,7 +39,21 @@ interface AIChatProps {
   onFilesChange?: (
     files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
   ) => void;
+  externalMessages?: ChatMessage[];
+  externalIsStreaming?: boolean;
+  externalStreamContent?: string;
+  externalCurrentMessage?: ChatMessage;
+  onMessagesChange?: (messages: ChatMessage[]) => void;
+  onIsStreamingChange?: (isStreaming: boolean) => void;
+  onStreamContentChange?: (content: string) => void;
+  onCurrentMessageChange?: (message: ChatMessage) => void;
 }
+
+const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
+  role: "assistant",
+  content: "",
+  parts: [],
+};
 
 export function AIChat({
   sessionId,
@@ -48,24 +62,104 @@ export function AIChat({
   onCodeUpdate,
   onSchemaUpdate,
   onFilesChange,
+  externalMessages,
+  externalIsStreaming,
+  externalStreamContent,
+  externalCurrentMessage,
+  onMessagesChange,
+  onIsStreamingChange,
+  onStreamContentChange,
+  onCurrentMessageChange,
 }: AIChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamContent, setStreamContent] = useState("");
-  const streamRef = useRef<AgentStream | null>(null);
+  // 1. Messages 状态处理
+  const isControlled = externalMessages !== undefined;
+  const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
+  const messages = isControlled ? externalMessages : internalMessages;
 
-  // 当前正在构建的 Assistant 消息
-  const [currentMessage, setCurrentMessage] = useState<ChatMessage>({
-    role: "assistant",
-    content: "",
-    parts: [],
-  });
-  // 用 ref 追踪最新值，避免闭包问题
+  // 使用 ref 同步追踪最新 messages，防止并发覆盖
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const setMessages = useCallback(
+    (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+      if (isControlled) {
+        const prev = messagesRef.current || [];
+        const newMessages =
+          typeof updater === "function" ? updater(prev) : updater;
+        messagesRef.current = newMessages; // 关键：立刻同步更新 ref
+        onMessagesChange?.(newMessages);
+      } else {
+        setInternalMessages((prev) => {
+          const newMessages =
+            typeof updater === "function" ? updater(prev) : updater;
+          messagesRef.current = newMessages;
+          return newMessages;
+        });
+      }
+    },
+    [isControlled, onMessagesChange],
+  );
+
+  // 2. isStreaming 状态处理
+  const isStreamingControlled = externalIsStreaming !== undefined;
+  const [internalIsStreaming, setInternalIsStreaming] = useState(false);
+  const isStreaming = isStreamingControlled
+    ? externalIsStreaming
+    : internalIsStreaming;
+  const setIsStreaming = isStreamingControlled
+    ? onIsStreamingChange!
+    : setInternalIsStreaming;
+
+  // 3. streamContent 状态处理
+  const streamContentControlled = externalStreamContent !== undefined;
+  const [internalStreamContent, setInternalStreamContent] = useState("");
+  const streamContent = streamContentControlled
+    ? externalStreamContent
+    : internalStreamContent;
+  const setStreamContent = streamContentControlled
+    ? onStreamContentChange!
+    : setInternalStreamContent;
+
+  // 4. currentMessage 状态处理 (修复核心)
+  const currentMessageControlled = externalCurrentMessage !== undefined;
+  const [internalCurrentMessage, setInternalCurrentMessage] =
+    useState<ChatMessage>(DEFAULT_CURRENT_MESSAGE);
+  const currentMessage = currentMessageControlled
+    ? externalCurrentMessage
+    : internalCurrentMessage;
+
+  // 使用 ref 追踪绝对最新值，解决 WebSocket 密集事件下的状态跳闪问题
   const currentMessageRef = useRef(currentMessage);
   useEffect(() => {
     currentMessageRef.current = currentMessage;
   }, [currentMessage]);
+
+  const setCurrentMessage = useCallback(
+    (updater: ChatMessage | ((prev: ChatMessage) => ChatMessage)) => {
+      if (currentMessageControlled) {
+        // 永远从 ref 拿最底层的新数据，而不是从可能会滞后的 prop 拿
+        const prev = currentMessageRef.current || DEFAULT_CURRENT_MESSAGE;
+        const newMessage =
+          typeof updater === "function" ? updater(prev) : updater;
+
+        currentMessageRef.current = newMessage; // 关键：立刻同步更新 ref，供下一次毫秒级调用读取
+        onCurrentMessageChange?.(newMessage);
+      } else {
+        setInternalCurrentMessage((prev) => {
+          const newMessage =
+            typeof updater === "function" ? updater(prev) : updater;
+          currentMessageRef.current = newMessage;
+          return newMessage;
+        });
+      }
+    },
+    [currentMessageControlled, onCurrentMessageChange],
+  );
+
+  const [input, setInput] = useState("");
+  const streamRef = useRef<AgentStream | null>(null);
 
   // 待处理的权限请求
   const [pendingPermissionRequest, setPendingPermissionRequest] =

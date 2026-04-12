@@ -414,6 +414,14 @@ export async function registerWebSocketRoutes(
                       status: event.status,
                     });
                     break;
+
+                  case "file_operation":
+                    sendMessage({
+                      type: "file_operation",
+                      sessionId,
+                      fileOperation: event.fileOperation,
+                    });
+                    break;
                 }
               };
 
@@ -424,6 +432,7 @@ export async function registerWebSocketRoutes(
               agent.on("plan", eventHandler);
               agent.on("error", eventHandler);
               agent.on("status", eventHandler);
+              agent.on("file_operation", eventHandler);
 
               const result: AgentResult = await agent.sendMessage(
                 message.content,
@@ -437,6 +446,7 @@ export async function registerWebSocketRoutes(
               agent.off("plan", eventHandler);
               agent.off("error", eventHandler);
               agent.off("status", eventHandler);
+              agent.off("file_operation", eventHandler);
 
               if (result.success) {
                 sendMessage({

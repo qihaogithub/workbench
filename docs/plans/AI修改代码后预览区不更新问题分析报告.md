@@ -4,7 +4,7 @@
 
 **现象**：在编辑页的 AI 会话区，让 AI 修改代码后，预览区（PreviewPanel）不会自动更新显示最新的代码效果。
 
-**具体案例**：AI 声称删除了 banner，但预览区依然显示 banner
+**具体案例**：AI 声称修改了按钮颜色，但预览区依然显示原来的颜色
 
 **影响范围**：所有通过 AI 对话修改代码的场景
 
@@ -12,295 +12,256 @@
 
 ## 二、问题根因分析
 
-### 核心结论：代码更新流程正常，但需要验证代码是否真正被修改
+### 2.1 历史问题（已修复）
 
-经过深入分析，发现以下关键事实：
+#### 核心问题：`file_operation` 事件从未被推送到前端
 
-1. ✅ **`SandpackProvider` 的 `key={code}` 已实施**（PreviewPanel.tsx 第 137 行）
-2. ✅ **代码更新监听逻辑已优化**（ai-chat.tsx 使用精确路径匹配）
-3. ✅ **防抖时间已优化为 300ms**（ai-chat.tsx 第 413 行）
-4. ⚠️ **文件系统代码可能未真正被 AI 修改**（根本原因）
+**问题状态**：✅ **已修复**
 
-### 2.1 已实施的修复
+经过深入分析代码，发现 **数据流在 WebSocket 路由层断裂**，导致前端永远收不到文件变更通知。该问题已在代码中修复。
 
-#### 修复 1：`key={code}` 属性强制重新渲染
+#### 修复内容验证
 
-**位置**：`packages/web/components/demo/PreviewPanel.tsx` 第 137 行
+**1. OpenCodeAcpBackend 正确发出 file_operation 事件**
 
-```tsx
-<SandpackProvider
-  key={code}  // ✅ 已添加
-  template="react-ts"
-  files={files}
-  // ...
->
-```
+文件：`packages/agent-service/src/backends/opencode-acp.ts` 第 109-135 行
 
-**效果**：当 `code` 状态变化时，React 会销毁旧组件并创建新组件，确保 Sandpack 重新初始化。
+```typescript
+private handleFileOperation(operation: {
+  method: string;
+  path: string;
+  content?: string;
+  sessionId: string;
+}): void {
+  if (operation.method === "fs/write_text_file") {
+    this.files.push({
+      path: operation.path,
+      action: "modified",
+      content: operation.content,
+    });
 
-#### 修复 2：精确路径匹配
-
-**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 368-382 行
-
-```tsx
-const normalizedPath = file.path.replace(/\\/g, "/");
-const isCodeFile =
-  normalizedPath.endsWith("index.tsx") ||
-  normalizedPath.endsWith("index.ts") ||
-  normalizedPath.endsWith("Demo.tsx") ||
-  normalizedPath.endsWith("Demo.ts");
-
-if (isCodeFile && file.content) {
-  console.log("[AIChat] Code update detected:", file.path);
-  onCodeUpdate?.(file.content);
+    // ✅ 发出正确的 file_operation 事件
+    if (this.eventCallback) {
+      this.eventCallback({
+        type: "file_operation",
+        sessionId: this.config.sessionId,
+        fileOperation: {
+          method: operation.method,
+          path: operation.path,
+          content: operation.content,
+        },
+      });
+    }
+  }
 }
 ```
 
-**效果**：避免误匹配（如 `index.tsx.bak`），提高检测准确性。
+**2. WebSocket 路由监听 file_operation 事件**
 
-#### 修复 3：优化防抖时间
+文件：`packages/agent-service/src/routes/websocket.ts`
 
-**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 413 行
+- 第 418-424 行：正确处理 `file_operation` 事件类型
+- 第 435 行：`agent.on("file_operation", eventHandler)` 已添加
 
-```tsx
-fileUpdateTimer = setTimeout(() => {
-  processRealtimeFiles();
-  fileUpdateTimer = null;
-}, 300);  // ✅ 从 100ms 增加到 300ms
+**3. 类型定义已更新**
+
+文件：`packages/agent-service/src/core/types.ts`
+
+- 第 170-178 行：`FileOperationEvent` 接口已定义
+- 第 188 行：`AgentEvent` 联合类型已包含 `FileOperationEvent`
+
+**4. 前端正确处理 file_operation 事件**
+
+文件：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 456-480 行
+
+```typescript
+stream.on("file_operation", (event: StreamEvent) => {
+  if (event.fileOperation) {
+    const { method, path, content } = event.fileOperation;
+
+    // 仅处理文件写入操作
+    if (method === "fs/write_text_file" && path) {
+      // 更新累计文件变更（去重）
+      realtimeFilesRef.set(path, {
+        action: "modified",
+        content,
+      });
+
+      // 防抖：300ms 后批量通知
+      if (fileUpdateTimer) {
+        clearTimeout(fileUpdateTimer);
+      }
+
+      fileUpdateTimer = setTimeout(() => {
+        processRealtimeFiles();
+        fileUpdateTimer = null;
+      }, 300);
+    }
+  }
+});
 ```
-
-**效果**：避免批量更新被拆分，确保多个文件变更一起处理。
-
-### 2.2 当前问题分析
-
-#### 数据流完整路径
-
-```
-用户输入 AI 对话
-      │
-      ▼
-Agent Service (WebSocket)
-      │
-      ▼
-AI 修改文件 (index.tsx / config.schema.json)
-      │
-      ▼
-file_operation 事件回传前端（包含 content 字段）
-      │
-      ▼
-ai-chat.tsx 监听 file_operation 事件
-      │
-      ├─ 写入 realtimeFilesRef
-      └─ 防抖 300ms
-            │
-            ▼
-      processRealtimeFiles()
-            │
-            ├─ onFilesChange?.(files)
-            └─ onCodeUpdate?.(file.content)  ← 关键调用点
-                  │
-                  ▼
-edit/page.tsx handleCodeUpdate
-      │
-      ├─ setCode(newCode)
-      ├─ setEditorContent(...)
-      └─ validateAll(...)
-            │
-            ▼
-PreviewPanel 接收到新的 code prop
-      │
-      ▼
-key={code} 触发 Sandpack 重新渲染 ✅
-      │
-      ▼
-预览区应该更新 ✅
-```
-
-#### 为什么 banner 依然存在？
-
-**可能原因**：
-
-1. **AI 没有真正修改文件**
-   - AI 声称删除了 banner，但实际上没有调用文件写入操作
-   - 或者 AI 修改了其他文件，但没有修改 `index.tsx`
-
-2. **`file_operation` 事件未正确触发**
-   - Agent Service 可能没有推送文件变更事件
-   - 或者 `content` 字段为空
-
-3. **代码更新路径不匹配**
-   - AI 可能修改了其他路径的文件（如 `main.tsx` 而非 `index.tsx`）
-   - 导致 `isCodeFile` 检测失败
-
-4. **浏览器缓存**
-   - Sandpack 可能缓存了旧的编译结果
-
-### 2.3 证据分析
-
-**文件系统证据**：
-
-检查 `packages/web/data/projects/proj_1775482091324/workspace/index.tsx`，发现：
-
-```tsx
-export default function BannerDemo({
-  banner,  // ← banner prop 依然存在
-  title,
-  description,
-  theme,
-  showBadge
-}: BannerDemoProps) {
-  // ...
-  <img
-    src={banner}  // ← banner 渲染代码依然存在
-    alt="banner"
-    className="w-full h-64 object-cover rounded-lg mb-6"
-  />
-}
-```
-
-**结论**：文件系统中的代码**依然包含 banner**，说明 AI 并没有成功修改文件。
 
 ---
 
-## 三、排查步骤
+## 三、当前问题分析（2025-04-12）
 
-### 3.1 检查浏览器控制台日志
+### 3.1 问题现状
 
-打开开发者工具（F12），搜索以下日志：
+用户反馈：AI 声称修改了按钮颜色，但预览区未生效。
+
+**浏览器控制台日志**：
+```
+[AIChat] Tool Call Event: {type: tool_call, title: read}
+[AIChat] Tool Call Event: {type: tool_call, title: read}
+[AIChat] Tool Call Event: {type: tool_call, title: edit}
+```
+
+**关键发现**：没有看到 `[AIChat] Code update detected: ...` 日志，也没有 `[PreviewPanel] code prop changed, length: ...` 日志。
+
+### 3.2 🔴 新发现的问题根因
+
+经过深入代码分析，发现 **问题的根本原因**：
+
+**`AcpConnection.sendPrompt()` 方法没有使用 `this.onFileOperation`**
+
+文件：`packages/agent-service/src/acp/connection.ts` 第 573-599 行
+
+```typescript
+async sendPrompt(
+  prompt: string | Array<{ type: 'text' | 'image'; text?: string; data?: string; mimeType?: string }>,
+  handlers?: {
+    onSessionUpdate?: SessionUpdateHandler;
+    onPermissionRequest?: PermissionHandler;
+  },
+): Promise<AcpPromptResult> {
+  if (!this.sessionId) {
+    throw new Error('No active session');
+  }
+
+  this.onSessionUpdate = handlers?.onSessionUpdate;
+  this.onPermissionRequest = handlers?.onPermissionRequest;
+  // ❌ 缺少：this.onFileOperation = handlers?.onFileOperation;
+
+  const promptArray = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt;
+
+  this.startPromptKeepalive();
+  try {
+    const result = await this.sendRequest<AcpPromptResult>(ACP_METHODS.SESSION_PROMPT, {
+      sessionId: this.sessionId,
+      prompt: promptArray,
+    });
+    return result;
+  } finally {
+    this.stopPromptKeepalive();
+  }
+}
+```
+
+**问题分析**：
+
+1. `AcpConnection` 类定义了 `public onFileOperation?: FileOperationHandler`（第 89 行）
+2. `handleWriteOperation()` 方法正确调用了 `this.onFileOperation?.()`（第 321-329 行）
+3. 但是 `sendPrompt()` 方法**没有接收 `onFileOperation` 参数**，也**没有设置 `this.onFileOperation`**
+4. 这导致当 AI 执行文件写入操作时，`handleWriteOperation` 被调用，但 `this.onFileOperation` 是 `undefined`，事件无法传递出去
+
+**完整数据流断裂点**：
 
 ```
-[AIChat] Code update detected: <file_path>
-[AIChat] Calling onCodeUpdate with content length: <length>
-[DemoEdit] handleCodeUpdate called, code length: <length>
-[PreviewPanel] code prop changed, length: <length>
+[Agent CLI 子进程写文件]
+    │
+    ▼
+[AcpConnection.handleNotification()]
+    │
+    ▼
+[AcpConnection.handleWriteOperation()]
+    │
+    ├─ 调用 this.onFileOperation?.() 
+    │
+    └─ ❌ this.onFileOperation 是 undefined！
+         因为 sendPrompt() 没有设置它
 ```
 
-**如果看不到这些日志**，说明代码更新流程未触发。
+### 3.3 为什么之前的问题分析有误
 
-### 3.2 检查 Agent Service 日志
+之前的分析认为 `OpenCodeAcpBackend` 已经修复了 `file_operation` 事件推送，但实际上：
 
-确认：
-- AI 是否真正执行了文件写入操作
-- `file_operation` 事件是否包含 `content` 字段
-- 文件路径是否为 `index.tsx` 或 `Demo.tsx`
-
-### 3.3 手动测试预览区
-
-1. 在代码编辑区（Code 标签）手动删除 banner 相关代码
-2. 观察预览区是否更新
-
-**如果手动编辑也不更新**，说明问题在 PreviewPanel 本身（但 `key={code}` 已修复此问题）。
-
-### 3.4 检查 AI 的实际文件修改
-
-检查以下路径的文件内容：
-- `packages/web/data/sessions/<session_id>/index.tsx`
-- `packages/web/data/projects/<project_id>/workspace/index.tsx`
-
-**如果这些文件依然包含 banner**，说明 AI 没有真正修改文件。
+1. `OpenCodeAcpBackend.start()` 设置了 `this.connection.onFileOperation = ...` ✅
+2. 但 `OpenCodeAcpBackend.sendMessage()` 调用的是 `this.connection.sendPrompt()` 
+3. `sendPrompt()` 内部**重置了** `this.onSessionUpdate` 和 `this.onPermissionRequest`，但**没有处理 `onFileOperation`**
+4. 更糟糕的是，`sendPrompt` 的 `handlers` 参数类型定义中根本没有 `onFileOperation`！
 
 ---
 
 ## 四、解决方案
 
-### 方案 0：添加调试日志（最高优先级）⭐⭐⭐
+### 方案 1：修复 `AcpConnection.sendPrompt()` 方法
 
-**目的**：确认代码更新流程是否正常工作
+**文件**：`packages/agent-service/src/acp/connection.ts`
 
-**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx`
+#### 步骤 1：修改 `sendPrompt` 方法的参数类型
 
-```tsx
-// 在 processRealtimeFiles 函数中添加
-const processRealtimeFiles = () => {
-  const files = Array.from(realtimeFilesRef.entries()).map(
-    ([path, info]) => ({
-      path,
-      action: info.action as "created" | "modified" | "deleted",
-      content: info.content,
-    }),
-  );
-
-  console.log('[AIChat] processRealtimeFiles called with:', files);
-
-  if (files.length > 0) {
-    onFilesChange?.(files);
-
-    for (const file of files) {
-      const normalizedPath = file.path.replace(/\\/g, "/");
-      const isCodeFile =
-        normalizedPath.endsWith("index.tsx") ||
-        normalizedPath.endsWith("index.ts") ||
-        normalizedPath.endsWith("Demo.tsx") ||
-        normalizedPath.endsWith("Demo.ts");
-
-      if (isCodeFile && file.content) {
-        console.log('[AIChat] Code update detected:', file.path);
-        console.log('[AIChat] Content preview:', file.content.substring(0, 100));
-        onCodeUpdate?.(file.content);
-      } else if (
-        normalizedPath.endsWith("config.schema.json") &&
-        file.content
-      ) {
-        console.log('[AIChat] Schema update detected:', file.path);
-        onSchemaUpdate?.(file.content);
-      }
-    }
-  }
-};
-```
-
-**位置**：`packages/web/src/app/demo/[id]/edit/page.tsx`
-
-```tsx
-const handleCodeUpdate = useCallback(
-  (newCode: string) => {
-    console.log('[DemoEdit] handleCodeUpdate called, code length:', newCode.length);
-    console.log('[DemoEdit] Code preview (first 200 chars):', newCode.substring(0, 200));
-    setCode(newCode);
-    setEditorContent((prev) =>
-      buildFigmaText(newCode, extractSchemaFromFigma(prev) || schema),
-    );
-    if (schema) {
-      const result = validateAll(newCode, schema);
-      setValidationResult(result);
-    }
+```typescript
+// 修改前（第 573-577 行）
+async sendPrompt(
+  prompt: string | Array<{ type: 'text' | 'image'; text?: string; data?: string; mimeType?: string }>,
+  handlers?: {
+    onSessionUpdate?: SessionUpdateHandler;
+    onPermissionRequest?: PermissionHandler;
   },
-  [schema],
-);
+): Promise<AcpPromptResult> {
+
+// 修改后
+async sendPrompt(
+  prompt: string | Array<{ type: 'text' | 'image'; text?: string; data?: string; mimeType?: string }>,
+  handlers?: {
+    onSessionUpdate?: SessionUpdateHandler;
+    onPermissionRequest?: PermissionHandler;
+    onFileOperation?: FileOperationHandler;  // ← 添加此行
+  },
+): Promise<AcpPromptResult> {
 ```
 
-### 方案 1：验证 AI 是否真正修改了文件
+#### 步骤 2：在方法内部设置 `this.onFileOperation`
 
-**步骤**：
+```typescript
+// 修改前（第 583-584 行）
+this.onSessionUpdate = handlers?.onSessionUpdate;
+this.onPermissionRequest = handlers?.onPermissionRequest;
 
-1. 在 AI 对话中明确要求 AI 显示它修改的文件路径和内容
-2. 检查浏览器控制台的 `[AIChat]` 日志
-3. 检查文件系统中的实际文件内容
-
-**如果 AI 没有真正修改文件**：
-- 可能是 AI 的提示词问题，需要更明确地要求 AI 修改文件
-- 可能是 Agent Service 的文件写入逻辑有问题
-
-### 方案 2：增加文件变更通知的可靠性
-
-**问题**：如果 `file_operation` 事件未正确推送，前端无法感知文件变更。
-
-**解决方案**：
-1. 在 AI 对话完成后，主动拉取最新文件
-2. 或者增强 Agent Service 的文件变更通知机制
-
-### 方案 3：添加手动刷新按钮
-
-**临时方案**：在预览区添加刷新按钮，用户可以手动触发重新渲染。
-
-```tsx
-<Button onClick={() => setCode((prev) => prev + '')}>
-  <RefreshCw className="h-4 w-4" />
-  刷新预览
-</Button>
+// 修改后
+this.onSessionUpdate = handlers?.onSessionUpdate;
+this.onPermissionRequest = handlers?.onPermissionRequest;
+this.onFileOperation = handlers?.onFileOperation;  // ← 添加此行
 ```
 
-**原理**：通过修改 `code` 状态触发 `key={code}` 重新渲染。
+### 方案 2：修改 `OpenCodeAcpBackend.sendMessage()` 传递 `onFileOperation`
+
+**文件**：`packages/agent-service/src/backends/opencode-acp.ts`
+
+```typescript
+// 修改前（第 153-161 行）
+await this.connection.sendPrompt(content, {
+  onSessionUpdate: (update: AcpSessionUpdate) => {
+    this.handleSessionUpdate(update);
+  },
+  onPermissionRequest: async (request: AcpPermissionRequest) => {
+    return this.handlePermissionRequest(request);
+  },
+});
+
+// 修改后
+await this.connection.sendPrompt(content, {
+  onSessionUpdate: (update: AcpSessionUpdate) => {
+    this.handleSessionUpdate(update);
+  },
+  onPermissionRequest: async (request: AcpPermissionRequest) => {
+    return this.handlePermissionRequest(request);
+  },
+  onFileOperation: (operation) => {  // ← 添加此回调
+    this.handleFileOperation(operation);
+  },
+});
+```
 
 ---
 
@@ -308,18 +269,22 @@ const handleCodeUpdate = useCallback(
 
 | 问题 | 状态 | 严重程度 | 备注 |
 |------|------|---------|------|
-| **SandpackProvider 缺少 key 属性** | ✅ 已修复 | 极高 | PreviewPanel.tsx 第 137 行 |
-| **文件路径匹配不精确** | ✅ 已修复 | 中 | ai-chat.tsx 使用 endsWith |
-| **防抖时间过短** | ✅ 已修复 | 低 | 从 100ms 增加到 300ms |
-| **AI 未真正修改文件** | ⚠️ 待验证 | 极高 | 需要检查日志和文件系统 |
-| **file_operation 事件未推送** | ⚠️ 待验证 | 高 | 需要检查 Agent Service |
+| **file_operation 事件未推送** | ✅ 已修复 | 极高 | WebSocket 路由层已修复 |
+| SandpackProvider 缺少 key 属性 | ✅ 已修复 | 极高 | PreviewPanel.tsx 第 144 行 |
+| 文件路径匹配不精确 | ✅ 已修复 | 中 | ai-chat.tsx 使用 endsWith |
+| 防抖时间过短 | ✅ 已修复 | 低 | 从 100ms 增加到 300ms |
+| **🔴 AcpConnection.sendPrompt 未设置 onFileOperation** | ❌ **待修复** | **极高** | **根本原因** |
+| OpenCodeAcpBackend.sendMessage 未传递 onFileOperation | ❌ **待修复** | 高 | 需同步修改 |
+
+**根本原因**：
+
+`AcpConnection.sendPrompt()` 方法没有设置 `this.onFileOperation`，导致 `handleWriteOperation()` 被调用时，`this.onFileOperation` 是 `undefined`，文件操作事件无法传递到 `OpenCodeAcpBackend`。
 
 **下一步行动**：
 
-1. ✅ **立即实施方案 0**（增加调试日志）- 确认代码更新流程是否正常工作
-2. ⚠️ **验证 AI 是否真正修改了文件** - 检查浏览器控制台和 Agent Service 日志
-3. ⚠️ **如果 AI 没有修改文件** - 检查 Agent 的提示词和文件写入逻辑
-4. ⚠️ **如果 file_operation 事件未推送** - 检查 Agent Service 的 WebSocket 通知机制
+1. 🔴 **立即实施方案 1**（修复 `AcpConnection.sendPrompt()` 方法）
+2. 🔴 **立即实施方案 2**（修改 `OpenCodeAcpBackend.sendMessage()` 传递 `onFileOperation`）
+3. 验证修复后 `file_operation` 事件能正常触发
 
 ---
 
@@ -327,15 +292,17 @@ const handleCodeUpdate = useCallback(
 
 | 文件 | 路径 | 作用 |
 |------|------|------|
-| 编辑页面 | `packages/web/src/app/demo/[id]/edit/page.tsx` | 父组件，管理状态和回调 |
-| AI 聊天组件 | `packages/web/src/components/ai-elements/ai-chat.tsx` | 监听文件变更事件 |
-| 预览面板 | `packages/web/components/demo/PreviewPanel.tsx` | Sandpack 预览渲染（已修复） |
-| 类型定义 | `packages/web/components/demo/types.ts` | Props 类型定义 |
-| 工作区文件 | `packages/web/data/projects/proj_*/workspace/index.tsx` | 实际代码文件 |
-| WebSocket 路由 | `packages/agent-service/src/routes/websocket.ts` | 后端文件事件推送 |
+| ACP 连接 | `packages/agent-service/src/acp/connection.ts` | **需要修改：sendPrompt 方法** |
+| OpenCode ACP 后端 | `packages/agent-service/src/backends/opencode-acp.ts` | **需要修改：sendMessage 方法** |
+| WebSocket 路由 | `packages/agent-service/src/routes/websocket.ts` | 监听 file_operation 事件 ✅ |
+| 核心类型 | `packages/agent-service/src/core/types.ts` | FileOperationEvent 类型 ✅ |
+| AI 聊天组件 | `packages/web/src/components/ai-elements/ai-chat.tsx` | 监听文件变更事件 ✅ |
+| 预览面板 | `packages/web/components/demo/PreviewPanel.tsx` | Sandpack 预览渲染 ✅ |
 
 ---
 
-**报告更新时间**：2026-04-12
-**更新人**：Qwen Code AI Agent
-**更新内容**：补充了 banner 未删除的具体案例分析，确认 key={code} 已修复，新增排查步骤和验证方案
+**报告更新时间**：2025-04-12
+**更新人**：AI Assistant
+**更新内容**：
+1. 确认真正的根本原因：`AcpConnection.sendPrompt()` 没有设置 `onFileOperation`
+2. 提供详细的修复方案

@@ -25,6 +25,11 @@
       "type": "boolean",
       "title": "显示活动标签",
       "default": true
+    },
+    "showDeleteButton": {
+      "type": "boolean",
+      "title": "显示删除按钮",
+      "default": false
     }
   },
   "required": ["title"]

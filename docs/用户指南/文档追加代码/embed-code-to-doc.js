@@ -11,7 +11,8 @@ function extractCodePaths(content) {
   const patterns = [
     /`([^`]+\.(?:tsx?|jsx?|css|json|md))`/g,
     /\[([^\]]+)\]\(file:\/\/\/[^)]+\)/g,
-    /(?:^|\s|[\|])(packages\/[^\s\|\`\]\)]+\.(?:tsx?|jsx?|css|json))/gm,
+    /(?:^|\s|[\|])(packages[\/\\][^\s\|\`\]\)]+\.(?:tsx?|jsx?|css|json))/gm,
+    /^(packages[\/\\][^\s]+\.(?:tsx?|jsx?|css|json|md))$/gm,
   ];
   
   for (const pattern of patterns) {
@@ -27,9 +28,11 @@ function extractCodePaths(content) {
         continue;
       }
       
-      if (!filePath.includes('/')) {
+      if (!filePath.includes('/') && !filePath.includes('\\')) {
         continue;
       }
+      
+      filePath = filePath.replace(/\\/g, '/');
       
       if (filePath.startsWith('packages/')) {
         paths.add(filePath);
@@ -61,6 +64,10 @@ function formatCodeBlock(filePath, content) {
   return `### ${filePath}\n\n\`\`\`${lang}\n${content}\n\`\`\`\n`;
 }
 
+function hasExistingAppendix(content) {
+  return /## 附录：相关代码原文/.test(content);
+}
+
 function removeExistingAppendix(content) {
   const appendixPattern = /\n---\n\n## 附录：相关代码原文[\s\S]*$/;
   return content.replace(appendixPattern, '');
@@ -83,11 +90,31 @@ function main() {
     process.exit(1);
   }
   
-  console.log(`正在处理文档: ${docRelativePath}`);
+  const ext = path.extname(docAbsolutePath);
+  const baseName = path.basename(docAbsolutePath, ext);
+  const dir = path.dirname(docAbsolutePath);
+  const outputFileName = `${baseName}-with-code${ext}`;
+  const outputPath = path.join(dir, outputFileName);
   
-  const originalContent = fs.readFileSync(docAbsolutePath, 'utf-8');
+  let sourceContent;
+  let isUpdate = false;
   
-  let content = removeExistingAppendix(originalContent);
+  if (fs.existsSync(outputPath)) {
+    const existingOutput = fs.readFileSync(outputPath, 'utf-8');
+    if (hasExistingAppendix(existingOutput)) {
+      sourceContent = existingOutput;
+      isUpdate = true;
+      console.log(`正在更新文档: ${docRelativePath}`);
+    } else {
+      sourceContent = fs.readFileSync(docAbsolutePath, 'utf-8');
+      console.log(`正在处理文档: ${docRelativePath}`);
+    }
+  } else {
+    sourceContent = fs.readFileSync(docAbsolutePath, 'utf-8');
+    console.log(`正在处理文档: ${docRelativePath}`);
+  }
+  
+  let content = removeExistingAppendix(sourceContent);
   
   const codePaths = extractCodePaths(content);
   
@@ -134,16 +161,15 @@ function main() {
   
   const newContent = content.trimEnd() + appendix.join('\n');
   
-  const ext = path.extname(docAbsolutePath);
-  const baseName = path.basename(docAbsolutePath, ext);
-  const dir = path.dirname(docAbsolutePath);
-  const outputFileName = `${baseName}-with-code${ext}`;
-  const outputPath = path.join(dir, outputFileName);
-  
   fs.writeFileSync(outputPath, newContent, 'utf-8');
   
   const outputRelativePath = path.join(path.dirname(docRelativePath), outputFileName);
-  console.log(`\n完成! 已生成副本: ${outputRelativePath}`);
+  
+  if (isUpdate) {
+    console.log(`\n完成! 已更新副本: ${outputRelativePath}`);
+  } else {
+    console.log(`\n完成! 已生成副本: ${outputRelativePath}`);
+  }
   console.log(`已嵌入 ${codeContents.length} 个代码文件到文档底部`);
   
   if (notFound.length > 0) {

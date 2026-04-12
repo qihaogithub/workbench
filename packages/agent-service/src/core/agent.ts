@@ -12,12 +12,13 @@ import {
   ErrorEvent,
   FinishEvent,
   StatusEvent,
-} from './types';
-import { EventEmitter } from 'events';
+  FileOperationEvent,
+} from "./types";
+import { EventEmitter } from "events";
 
 export abstract class BaseAgent extends EventEmitter {
   protected config: AgentConfig;
-  protected _status: AgentStatus = 'initializing';
+  protected _status: AgentStatus = "initializing";
   protected messageCount: number = 0;
   protected createdAt: Date;
   protected lastActivityAt: Date;
@@ -44,23 +45,32 @@ export abstract class BaseAgent extends EventEmitter {
   protected setStatus(status: AgentStatus): void {
     this._status = status;
     this.lastActivityAt = new Date();
-    this.emit('status', {
-      type: 'status',
+    this.emit("status", {
+      type: "status",
       sessionId: this.sessionId,
       status,
     });
   }
 
   abstract start(options?: { resumeSessionId?: string }): Promise<void>;
-  abstract sendMessage(content: string, options?: SendMessageOptions): Promise<AgentResult>;
+  abstract sendMessage(
+    content: string,
+    options?: SendMessageOptions,
+  ): Promise<AgentResult>;
   abstract cancel(): void;
   abstract kill(): Promise<void>;
 
-  on<K extends keyof EventMap>(event: K, handler: EventHandler<EventMap[K]>): this {
+  on<K extends keyof EventMap>(
+    event: K,
+    handler: EventHandler<EventMap[K]>,
+  ): this {
     return super.on(event, handler as (...args: unknown[]) => void);
   }
 
-  off<K extends keyof EventMap>(event: K, handler: EventHandler<EventMap[K]>): this {
+  off<K extends keyof EventMap>(
+    event: K,
+    handler: EventHandler<EventMap[K]>,
+  ): this {
     return super.off(event, handler as (...args: unknown[]) => void);
   }
 
@@ -72,7 +82,7 @@ export abstract class BaseAgent extends EventEmitter {
     return {
       sessionId: this.sessionId,
       status: this._status,
-      backend: this.config.backend || 'opencode',
+      backend: this.config.backend || "opencode",
       createdAt: this.createdAt.toISOString(),
       lastActivityAt: this.lastActivityAt.toISOString(),
       messageCount: this.messageCount,
@@ -81,7 +91,11 @@ export abstract class BaseAgent extends EventEmitter {
   }
 
   abstract setModel?(modelId: string): Promise<void>;
-  abstract getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  abstract getModelInfo?(): {
+    currentModelId: string | null;
+    availableModels: Array<{ id: string; label: string }>;
+    canSwitch: boolean;
+  } | null;
   abstract getCurrentSessionId?(): string | null;
 }
 
@@ -93,6 +107,7 @@ interface EventMap {
   error: ErrorEvent;
   finish: FinishEvent;
   status: StatusEvent;
+  file_operation: FileOperationEvent;
 }
 
 interface AgentInfo {

@@ -2,24 +2,24 @@
 // 基础类型
 // ============================================================
 
-export type AgentType = 'opencode' | 'claude' | 'codex' | 'gemini' | string;
+export type AgentType = "opencode" | "claude" | "codex" | "gemini" | string;
 
 export type AgentStatus =
-  | 'initializing'
-  | 'ready'
-  | 'processing'
-  | 'error'
-  | 'destroyed';
+  | "initializing"
+  | "ready"
+  | "processing"
+  | "error"
+  | "destroyed";
 
 export type ErrorCode =
-  | 'INVALID_PARAMS'
-  | 'SESSION_NOT_FOUND'
-  | 'AGENT_NOT_INITIALIZED'
-  | 'BACKEND_UNAVAILABLE'
-  | 'MESSAGE_SEND_ERROR'
-  | 'FILE_ACCESS_DENIED'
-  | 'RATE_LIMIT_EXCEEDED'
-  | 'INTERNAL_ERROR';
+  | "INVALID_PARAMS"
+  | "SESSION_NOT_FOUND"
+  | "AGENT_NOT_INITIALIZED"
+  | "BACKEND_UNAVAILABLE"
+  | "MESSAGE_SEND_ERROR"
+  | "FILE_ACCESS_DENIED"
+  | "RATE_LIMIT_EXCEEDED"
+  | "INTERNAL_ERROR";
 
 // ============================================================
 // 配置类型
@@ -86,7 +86,7 @@ export interface AgentResult {
 
 export interface FileChange {
   path: string;
-  action: 'created' | 'modified' | 'deleted';
+  action: "created" | "modified" | "deleted";
   content?: string;
 }
 
@@ -110,56 +110,83 @@ export interface ResultMetadata {
 // 事件类型
 // ============================================================
 
-export type EventType = 'stream' | 'thought' | 'tool_call' | 'tool_call_update' | 'error' | 'finish' | 'status';
+export type EventType =
+  | "stream"
+  | "thought"
+  | "tool_call"
+  | "tool_call_update"
+  | "error"
+  | "finish"
+  | "status";
 
 export interface StreamEvent {
-  type: 'stream';
+  type: "stream";
   sessionId: string;
   content: string;
   done: boolean;
 }
 
 export interface ThoughtEvent {
-  type: 'thought';
+  type: "thought";
   sessionId: string;
   content: string;
   done: boolean;
 }
 
 export interface ToolCallEvent {
-  type: 'tool_call';
+  type: "tool_call";
   sessionId: string;
   toolCallId: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: "pending" | "in_progress" | "completed" | "failed";
   title: string;
-  kind: 'read' | 'edit' | 'execute';
+  kind: "read" | "edit" | "execute";
 }
 
 export interface ToolCallUpdateEvent {
-  type: 'tool_call_update';
+  type: "tool_call_update";
   sessionId: string;
   toolCallId: string;
-  status: 'completed' | 'failed';
+  status: "completed" | "failed";
 }
 
 export interface ErrorEvent {
-  type: 'error';
+  type: "error";
   sessionId: string;
   error: AgentError;
 }
 
 export interface FinishEvent {
-  type: 'finish';
+  type: "finish";
   sessionId: string;
   result: AgentResult;
 }
 
 export interface StatusEvent {
-  type: 'status';
+  type: "status";
   sessionId: string;
   status: AgentStatus;
 }
 
-export type AgentEvent = StreamEvent | ThoughtEvent | ToolCallEvent | ToolCallUpdateEvent | ErrorEvent | FinishEvent | StatusEvent;
+export interface FileOperationEvent {
+  type: "file_operation";
+  sessionId: string;
+  fileOperation: {
+    method: string;
+    path: string;
+    content?: string;
+  };
+}
 
-export type EventHandler<T extends AgentEvent = AgentEvent> = (event: T) => void;
+export type AgentEvent =
+  | StreamEvent
+  | ThoughtEvent
+  | ToolCallEvent
+  | ToolCallUpdateEvent
+  | ErrorEvent
+  | FinishEvent
+  | StatusEvent
+  | FileOperationEvent;
+
+export type EventHandler<T extends AgentEvent = AgentEvent> = (
+  event: T,
+) => void;
