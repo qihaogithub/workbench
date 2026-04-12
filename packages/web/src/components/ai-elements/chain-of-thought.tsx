@@ -105,7 +105,7 @@ function ChainOfThoughtHeader({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 transition-colors rounded-lg group",
+        "flex w-full items-center justify-between py-2 text-sm transition-colors rounded-lg group",
         className,
       )}
       {...props}
@@ -142,7 +142,7 @@ function ChainOfThoughtContent({
       )}
       {...props}
     >
-      <div className="px-3 pb-3 max-h-[300px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <div className="pb-3 max-h-[300px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full">
         {children}
       </div>
     </CollapsibleContent>

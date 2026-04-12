@@ -4,205 +4,76 @@
 
 **现象**：在编辑页的 AI 会话区，让 AI 修改代码后，预览区（PreviewPanel）不会自动更新显示最新的代码效果。
 
+**具体案例**：AI 声称删除了 banner，但预览区依然显示 banner
+
 **影响范围**：所有通过 AI 对话修改代码的场景
 
 ---
 
 ## 二、问题根因分析
 
-### 核心问题：`sdkFiles` prop 缺失 + SandpackProvider 未触发重新渲染
+### 核心结论：代码更新流程正常，但需要验证代码是否真正被修改
 
-经过详细分析代码，发现 **预览区不更新的核心原因有两个**：
+经过深入分析，发现以下关键事实：
 
-1. **`PreviewPanel` 组件缺少必要的 `sdkFiles` prop**（次要问题）
-2. **`SandpackProvider` 没有使用 `key` 属性，导致代码更新时不触发重新渲染**（主要问题）⭐
+1. ✅ **`SandpackProvider` 的 `key={code}` 已实施**（PreviewPanel.tsx 第 137 行）
+2. ✅ **代码更新监听逻辑已优化**（ai-chat.tsx 使用精确路径匹配）
+3. ✅ **防抖时间已优化为 300ms**（ai-chat.tsx 第 413 行）
+4. ⚠️ **文件系统代码可能未真正被 AI 修改**（根本原因）
 
-#### 2.1 代码证据
+### 2.1 已实施的修复
 
-**调用方**（`packages/web/src/app/demo/[id]/edit/page.tsx` 第 331-336 行）：
+#### 修复 1：`key={code}` 属性强制重新渲染
 
-```tsx
-<PreviewPanel
-  code={code}
-  configData={configData}
-  previewSize={previewSize}
-/>
-```
-
-**接收方**（`packages/web/components/demo/PreviewPanel.tsx` 第 44-50 行）：
-
-```tsx
-export function PreviewPanel({
-  code,
-  configData,
-  sdkFiles,  // ← 声明了此 prop
-  onError,
-  className,
-  previewSize,
-}: PreviewPanelProps) {
-```
-
-**使用处**（`PreviewPanel.tsx` 第 74-82 行）：
-
-```tsx
-const files: Record<string, string> = isValidCode
-  ? {
-      "/Demo.tsx": code,
-      "/App.tsx": entryCode,
-      ...sdkFiles,  // ← 展开 sdkFiles
-    }
-  : {
-      "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
-      "/App.tsx": entryCode,
-      ...sdkFiles,  // ← 展开 sdkFiles
-    };
-```
-
-#### 2.2 问题分析
-
-1. **`sdkFiles` 未传递**：父组件在调用 `PreviewPanel` 时没有传递 `sdkFiles` prop
-2. **`sdkFiles` 为 `undefined`**：当 prop 未传递时，`sdkFiles` 值为 `undefined`
-3. **展开运算符失效**：`{ ...undefined }` 会得到空对象 `{}`，不会报错但也不会添加任何文件
-4. **Sandpack 依赖缺失**：SDK 文件（如 React 组件依赖的基础设施文件）未被加载到 Sandpack 沙箱中
-
-#### 2.3 为什么代码更新后预览不刷新？（关键缺陷）
-
-**SandpackProvider 不会在 files prop 变化时自动重新渲染**：
-
-当 AI 修改代码并通过 `onCodeUpdate` 回调触发 `setCode(newCode)` 时：
-
-1. ✅ `code` 状态正确更新
-2. ✅ `PreviewPanel` 接收到新的 `code` prop
-3. ✅ `files` 对象重新构建（包含新的 `/Demo.tsx` 内容）
-4. ❌ **但 `SandpackProvider` 没有使用 `key` 属性**，React 认为这是同一个组件，不会重新初始化沙箱
-5. ❌ Sandpack 内部的文件系统不会更新，导致预览仍然显示旧代码
-
-**代码证据**（`PreviewPanel.tsx` 第 96-120 行）：
+**位置**：`packages/web/components/demo/PreviewPanel.tsx` 第 137 行
 
 ```tsx
 <SandpackProvider
-  template="react-ts"
-  files={files}  // ← 虽然 files 是响应式对象，但 Sandpack 不会自动检测深层变化
-  customSetup={{
-    dependencies: {
-      react: "^18.0.0",
-      "react-dom": "^18.0.0",
-    },
-  }}
-  // ← 缺少 key 属性！
->
-  <SandpackLayout>
-    <SandpackPreview
-      showNavigator={false}
-      showRefreshButton={true}
-      style={previewStyle}
-    />
-  </SandpackLayout>
-</SandpackProvider>
-```
-
-**Sandpack 的工作原理**：
-- `SandpackProvider` 在首次渲染时会创建内部文件系统和编译环境
-- 当 `files` prop 变化时，Sandpack 会尝试更新文件内容，但这依赖于文件引用的一致性
-- 如果 `files` 对象每次都是新创建的（在 `PreviewPanel` 中确实如此），Sandpack 可能无法正确检测到变化
-- **添加 `key` 属性可以强制 React 销毁旧组件并创建新组件，确保 Sandpack 重新初始化**
-
-**解决方案**：
-```tsx
-<SandpackProvider
-  key={code}  // ← 添加此行，当 code 变化时强制重新渲染
+  key={code}  // ✅ 已添加
   template="react-ts"
   files={files}
   // ...
 >
 ```
 
-#### 2.4 `sdkFiles` 问题分析
+**效果**：当 `code` 状态变化时，React 会销毁旧组件并创建新组件，确保 Sandpack 重新初始化。
 
-1. **`sdkFiles` 未传递**：父组件在调用 `PreviewPanel` 时没有传递 `sdkFiles` prop
-2. **`sdkFiles` 为 `undefined`**：当 prop 未传递时，`sdkFiles` 值为 `undefined`
-3. **展开运算符失效**：`{ ...undefined }` 会得到空对象 `{}`，不会报错但也不会添加任何文件
-4. **Sandpack 依赖缺失**：SDK 文件（如 React 组件依赖的基础设施文件）未被加载到 Sandpack 沙箱中
+#### 修复 2：精确路径匹配
 
-**注意**：根据代码审查，项目中并没有定义或加载任何 SDK 文件，因此 `sdkFiles` 缺失可能不是导致预览不更新的直接原因。但如果未来需要添加 SDK 文件，也需要修复此问题。
-
----
-
-## 三、其他潜在问题
-
-### 3.1 文件路径匹配不精确
-
-**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 327-343 行
+**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 368-382 行
 
 ```tsx
-if (
-  (file.path.includes("index.tsx") || file.path.includes("index.ts")) &&
-  file.content
-) {
+const normalizedPath = file.path.replace(/\\/g, "/");
+const isCodeFile =
+  normalizedPath.endsWith("index.tsx") ||
+  normalizedPath.endsWith("index.ts") ||
+  normalizedPath.endsWith("Demo.tsx") ||
+  normalizedPath.endsWith("Demo.ts");
+
+if (isCodeFile && file.content) {
+  console.log("[AIChat] Code update detected:", file.path);
   onCodeUpdate?.(file.content);
 }
 ```
 
-**问题**：
-- 使用 `includes()` 匹配可能导致误匹配（如 `some/path/index.tsx.bak`）
-- 如果 Agent 写入的是相对路径（如 `./index.tsx`），可能与预期路径格式不匹配
+**效果**：避免误匹配（如 `index.tsx.bak`），提高检测准确性。
 
-**建议**：改用精确匹配，如 `file.path.endsWith("index.tsx")` 或正则表达式
+#### 修复 3：优化防抖时间
 
-### 3.2 `content` 字段可能缺失
-
-**位置**：`ai-chat.tsx` 第 330-343 行
-
-```tsx
-if (
-  (file.path.includes("index.tsx") || file.path.includes("index.ts")) &&
-  file.content  // ← 如果 content 为 undefined，不会调用 onCodeUpdate
-) {
-  onCodeUpdate?.(file.content);
-}
-```
-
-**问题**：如果 `file_operation` 事件中 `content` 字段为空或缺失，`onCodeUpdate` 不会被调用。
-
-**排查建议**：
-- 检查 Agent Service 是否在 `file_operation` 事件中正确传递了 `content`
-- 查看 `packages/agent-service/src/backends/base-acp.ts` 的 `handleFileOperation` 方法
-
-### 3.3 防抖时间过短可能导致批量更新被拆分
-
-**位置**：`ai-chat.tsx` 第 360-367 行
+**位置**：`packages/web/src/components/ai-elements/ai-chat.tsx` 第 413 行
 
 ```tsx
 fileUpdateTimer = setTimeout(() => {
   processRealtimeFiles();
   fileUpdateTimer = null;
-}, 100);  // ← 100ms 防抖
+}, 300);  // ✅ 从 100ms 增加到 300ms
 ```
 
-**问题**：100ms 的防抖时间非常短，如果 Agent 在短时间内连续写入多个文件，可能导致部分更新被覆盖。
+**效果**：避免批量更新被拆分，确保多个文件变更一起处理。
 
-**建议**：考虑增加到 300-500ms，或使用更智能的批量策略
+### 2.2 当前问题分析
 
-### 3.4 `finish` 事件中的代码提取可能失败
-
-**位置**：`ai-chat.tsx` 第 440-463 行
-
-```tsx
-const codeMatch = accumulatedContent.match(
-  /```(?:tsx|tsx?|typescript|javascript)\n([\s\S]*?)```/,
-);
-if (codeMatch && onCodeUpdate) {
-  onCodeUpdate(codeMatch[1].trim());
-}
-```
-
-**问题**：如果 AI 没有以标准代码块格式回复（例如直接修改文件但回复中没有包含代码块），备选方案会失败。
-
-**影响**：较小，因为主要依赖 `file_operation` 事件，而非从文本中提取
-
----
-
-## 四、数据流完整路径
+#### 数据流完整路径
 
 ```
 用户输入 AI 对话
@@ -219,220 +90,127 @@ file_operation 事件回传前端（包含 content 字段）
       ▼
 ai-chat.tsx 监听 file_operation 事件
       │
-      ├─ 如果 file.path 包含 "index.tsx" 且 file.content 存在
-      │     → 调用 onCodeUpdate?.(file.content)
+      ├─ 写入 realtimeFilesRef
+      └─ 防抖 300ms
+            │
+            ▼
+      processRealtimeFiles()
+            │
+            ├─ onFilesChange?.(files)
+            └─ onCodeUpdate?.(file.content)  ← 关键调用点
+                  │
+                  ▼
+edit/page.tsx handleCodeUpdate
       │
-      └─ 如果 file.path 包含 "config.schema.json" 且 file.content 存在
-            → 调用 onSchemaUpdate?.(file.content)
-      │
-      ▼
-edit/page.tsx 的 handleCodeUpdate 回调
-      │
-      ├─ setCode(newCode) → 更新 code 状态
-      ├─ setEditorContent(...) → 更新编辑器内容
-      └─ validateAll(...) → 触发验证
-      │
-      ▼
+      ├─ setCode(newCode)
+      ├─ setEditorContent(...)
+      └─ validateAll(...)
+            │
+            ▼
 PreviewPanel 接收到新的 code prop
       │
       ▼
-构建 files 对象：
-  {
-    "/Demo.tsx": code,        // ← 新代码
-    "/App.tsx": entryCode,    // ← 入口代码
-    ...sdkFiles               // ← 问题点：sdkFiles 为 undefined
-  }
+key={code} 触发 Sandpack 重新渲染 ✅
       │
       ▼
-SandpackProvider 接收 files
-      │
-      ▼
-SandpackPreview 渲染预览
-      │
-      ❌ 如果 sdkFiles 缺失，可能导致编译失败或渲染异常
+预览区应该更新 ✅
 ```
+
+#### 为什么 banner 依然存在？
+
+**可能原因**：
+
+1. **AI 没有真正修改文件**
+   - AI 声称删除了 banner，但实际上没有调用文件写入操作
+   - 或者 AI 修改了其他文件，但没有修改 `index.tsx`
+
+2. **`file_operation` 事件未正确触发**
+   - Agent Service 可能没有推送文件变更事件
+   - 或者 `content` 字段为空
+
+3. **代码更新路径不匹配**
+   - AI 可能修改了其他路径的文件（如 `main.tsx` 而非 `index.tsx`）
+   - 导致 `isCodeFile` 检测失败
+
+4. **浏览器缓存**
+   - Sandpack 可能缓存了旧的编译结果
+
+### 2.3 证据分析
+
+**文件系统证据**：
+
+检查 `packages/web/data/projects/proj_1775482091324/workspace/index.tsx`，发现：
+
+```tsx
+export default function BannerDemo({
+  banner,  // ← banner prop 依然存在
+  title,
+  description,
+  theme,
+  showBadge
+}: BannerDemoProps) {
+  // ...
+  <img
+    src={banner}  // ← banner 渲染代码依然存在
+    alt="banner"
+    className="w-full h-64 object-cover rounded-lg mb-6"
+  />
+}
+```
+
+**结论**：文件系统中的代码**依然包含 banner**，说明 AI 并没有成功修改文件。
 
 ---
 
-## 五、解决方案
+## 三、排查步骤
 
-### 方案 0：添加 `key` 属性强制 Sandpack 重新渲染（最高优先级）⭐⭐⭐
+### 3.1 检查浏览器控制台日志
 
-**问题**：`SandpackProvider` 在 `files` 变化时不会自动重新渲染
+打开开发者工具（F12），搜索以下日志：
 
-**位置**：`packages/web/components/demo/PreviewPanel.tsx` 第 96 行
-
-**修复**：
-
-```tsx
-// 修复前
-<SandpackProvider
-  template="react-ts"
-  files={files}
-  customSetup={{
-    dependencies: {
-      react: "^18.0.0",
-      "react-dom": "^18.0.0",
-    },
-  }}
-  // ...
->
-
-// 修复后
-<SandpackProvider
-  key={code}  // ← 添加此行，当 code 变化时强制重新渲染
-  template="react-ts"
-  files={files}
-  customSetup={{
-    dependencies: {
-      react: "^18.0.0",
-      "react-dom": "^18.0.0",
-    },
-  }}
-  // ...
->
+```
+[AIChat] Code update detected: <file_path>
+[AIChat] Calling onCodeUpdate with content length: <length>
+[DemoEdit] handleCodeUpdate called, code length: <length>
+[PreviewPanel] code prop changed, length: <length>
 ```
 
-**原理**：
-- React 的 `key` 属性用于标识组件实例
-- 当 `key` 变化时，React 会销毁旧组件实例并创建新实例
-- 这会触发 `SandpackProvider` 重新初始化内部文件系统和编译环境
-- 从而确保新的代码能够正确编译和渲染
+**如果看不到这些日志**，说明代码更新流程未触发。
 
-**影响**：
-- ✅ 修复 AI 修改代码后预览区不更新的问题
-- ✅ 修复手动编辑代码后预览区可能不更新的问题
-- ⚠️ 每次代码变化都会重新初始化 Sandpack，可能有短暂的性能开销（通常 < 1 秒）
+### 3.2 检查 Agent Service 日志
+
+确认：
+- AI 是否真正执行了文件写入操作
+- `file_operation` 事件是否包含 `content` 字段
+- 文件路径是否为 `index.tsx` 或 `Demo.tsx`
+
+### 3.3 手动测试预览区
+
+1. 在代码编辑区（Code 标签）手动删除 banner 相关代码
+2. 观察预览区是否更新
+
+**如果手动编辑也不更新**，说明问题在 PreviewPanel 本身（但 `key={code}` 已修复此问题）。
+
+### 3.4 检查 AI 的实际文件修改
+
+检查以下路径的文件内容：
+- `packages/web/data/sessions/<session_id>/index.tsx`
+- `packages/web/data/projects/<project_id>/workspace/index.tsx`
+
+**如果这些文件依然包含 banner**，说明 AI 没有真正修改文件。
 
 ---
 
-### 方案 1：修复 `sdkFiles` 传递（中等优先级）⭐
+## 四、解决方案
 
-**步骤**：
+### 方案 0：添加调试日志（最高优先级）⭐⭐⭐
 
-1. **在编辑页面中获取 `sdkFiles`**：
-
-```tsx
-// packages/web/src/app/demo/[id]/edit/page.tsx
-
-// 添加状态
-const [sdkFiles, setSdkFiles] = useState<Record<string, string>>({});
-
-// 在 loadDemo 函数中加载 SDK 文件
-const loadDemo = async () => {
-  try {
-    // ... 现有代码 ...
-
-    // 从 API 加载 SDK 文件
-    const sdkRes = await fetch(`/api/sessions/${sessionData.data.sessionId}/sdk-files`);
-    if (sdkRes.ok) {
-      const sdkData = await sdkRes.json();
-      if (sdkData.success) {
-        setSdkFiles(sdkData.data.files);
-      }
-    }
-  } catch (error) {
-    // ... 错误处理 ...
-  }
-};
-```
-
-2. **传递给 PreviewPanel**：
-
-```tsx
-<PreviewPanel
-  code={code}
-  configData={configData}
-  sdkFiles={sdkFiles}  // ← 添加此行
-  previewSize={previewSize}
-/>
-```
-
-3. **如果 SDK 文件是静态资源，可以直接导入**：
-
-```tsx
-// 如果 SDK 文件是固定的，可以从静态资源加载
-import sdkFiles from '@/config/sdk-files.json';
-
-// 或在组件中定义
-const sdkFiles = {
-  '/sdk/SomeComponent.tsx': `// SDK 组件代码`,
-  // ...
-};
-```
-
-**注意**：根据代码审查，当前项目中并没有定义或加载任何 SDK 文件。此方案的优先级较低，可以暂缓实施。
-
----
-
-### 方案 1.5：优化 SandpackProvider 的文件更新机制（可选优化）⭐
-
-**问题**：使用 `key={code}` 会导致整个 Sandpack 重新初始化，可能有性能开销
-
-**更优方案**：使用 Sandpack 的 `useSandpack` hook 和 `dispatch` API 来更新文件
-
-```tsx
-import { useSandpack } from "@codesandbox/sandpack-react";
-import { useEffect } from "react";
-
-// 在 PreviewPanel 组件内部添加
-const { sandpack } = useSandpack();
-
-useEffect(() => {
-  // 当 code 变化时，更新 Sandpack 文件系统
-  if (sandpack.status === "running") {
-    sandpack.updateFile("/Demo.tsx", code);
-  }
-}, [code, sandpack]);
-```
-
-**优点**：
-- ✅ 不会重新初始化整个 Sandpack 环境
-- ✅ 性能更好，更新是增量的
-- ✅ 预览更新更流畅
-
-**缺点**：
-- ⚠️ 需要重构组件结构（将 `files` 构建逻辑移到 `SandpackProvider` 内部）
-- ⚠️ 实现复杂度较高
-
-**建议**：先实施方案 0，如果性能有问题再考虑此方案。
-
-### 方案 2：优化文件路径匹配逻辑
+**目的**：确认代码更新流程是否正常工作
 
 **位置**：`packages/web/src/components/ai-elements/ai-chat.tsx`
 
 ```tsx
-// 改进前
-if (
-  (file.path.includes("index.tsx") || file.path.includes("index.ts")) &&
-  file.content
-) {
-  onCodeUpdate?.(file.content);
-}
-
-// 改进后
-const isCodeFile = (path: string) => {
-  const normalizedPath = path.replace(/\\/g, '/');
-  return (
-    normalizedPath.endsWith('index.tsx') ||
-    normalizedPath.endsWith('index.ts') ||
-    normalizedPath.endsWith('Demo.tsx') ||
-    normalizedPath.endsWith('Demo.ts')
-  );
-};
-
-if (isCodeFile(file.path) && file.content) {
-  console.log('[AIChat] Code update detected:', file.path);
-  onCodeUpdate?.(file.content);
-}
-```
-
-### 方案 3：增加调试日志
-
-在关键位置添加日志，方便排查问题：
-
-```tsx
-// ai-chat.tsx - processRealtimeFiles 函数
+// 在 processRealtimeFiles 函数中添加
 const processRealtimeFiles = () => {
   const files = Array.from(realtimeFilesRef.entries()).map(
     ([path, info]) => ({
@@ -448,17 +226,22 @@ const processRealtimeFiles = () => {
     onFilesChange?.(files);
 
     for (const file of files) {
-      if (
-        (file.path.includes("index.tsx") || file.path.includes("index.ts")) &&
-        file.content
-      ) {
-        console.log('[AIChat] Calling onCodeUpdate with content length:', file.content.length);
+      const normalizedPath = file.path.replace(/\\/g, "/");
+      const isCodeFile =
+        normalizedPath.endsWith("index.tsx") ||
+        normalizedPath.endsWith("index.ts") ||
+        normalizedPath.endsWith("Demo.tsx") ||
+        normalizedPath.endsWith("Demo.ts");
+
+      if (isCodeFile && file.content) {
+        console.log('[AIChat] Code update detected:', file.path);
+        console.log('[AIChat] Content preview:', file.content.substring(0, 100));
         onCodeUpdate?.(file.content);
       } else if (
-        file.path.includes("config.schema.json") &&
+        normalizedPath.endsWith("config.schema.json") &&
         file.content
       ) {
-        console.log('[AIChat] Calling onSchemaUpdate with content length:', file.content.length);
+        console.log('[AIChat] Schema update detected:', file.path);
         onSchemaUpdate?.(file.content);
       }
     }
@@ -466,11 +249,13 @@ const processRealtimeFiles = () => {
 };
 ```
 
+**位置**：`packages/web/src/app/demo/[id]/edit/page.tsx`
+
 ```tsx
-// edit/page.tsx - handleCodeUpdate 函数
 const handleCodeUpdate = useCallback(
   (newCode: string) => {
     console.log('[DemoEdit] handleCodeUpdate called, code length:', newCode.length);
+    console.log('[DemoEdit] Code preview (first 200 chars):', newCode.substring(0, 200));
     setCode(newCode);
     setEditorContent((prev) =>
       buildFigmaText(newCode, extractSchemaFromFigma(prev) || schema),
@@ -484,77 +269,73 @@ const handleCodeUpdate = useCallback(
 );
 ```
 
+### 方案 1：验证 AI 是否真正修改了文件
+
+**步骤**：
+
+1. 在 AI 对话中明确要求 AI 显示它修改的文件路径和内容
+2. 检查浏览器控制台的 `[AIChat]` 日志
+3. 检查文件系统中的实际文件内容
+
+**如果 AI 没有真正修改文件**：
+- 可能是 AI 的提示词问题，需要更明确地要求 AI 修改文件
+- 可能是 Agent Service 的文件写入逻辑有问题
+
+### 方案 2：增加文件变更通知的可靠性
+
+**问题**：如果 `file_operation` 事件未正确推送，前端无法感知文件变更。
+
+**解决方案**：
+1. 在 AI 对话完成后，主动拉取最新文件
+2. 或者增强 Agent Service 的文件变更通知机制
+
+### 方案 3：添加手动刷新按钮
+
+**临时方案**：在预览区添加刷新按钮，用户可以手动触发重新渲染。
+
 ```tsx
-// PreviewPanel.tsx
-useEffect(() => {
-  console.log('[PreviewPanel] code prop changed:', code?.substring(0, 100));
-}, [code]);
+<Button onClick={() => setCode((prev) => prev + '')}>
+  <RefreshCw className="h-4 w-4" />
+  刷新预览
+</Button>
 ```
 
----
-
-## 六、排查步骤建议
-
-1. **检查浏览器控制台**：
-   - 打开开发者工具（F12）
-   - 搜索 `[AIChat]`、`[DemoEdit]`、`[PreviewPanel]` 日志
-   - 查看 `file_operation` 事件是否被触发
-   - 确认 `onCodeUpdate` 是否被调用
-
-2. **检查 Agent Service 日志**：
-   - 确认 Agent 是否成功写入了 `index.tsx`
-   - 确认 `file_operation` 事件是否包含 `content` 字段
-
-3. **验证 workingDir**：
-   ```tsx
-   console.log('[DemoEdit] tempWorkspace:', tempWorkspace);
-   ```
-
-4. **检查 Sandpack 编译错误**：
-   - 打开浏览器控制台
-   - 查看是否有 Sandpack 相关的编译错误
-   - 检查 Network 标签，查看 Sandpack 加载的资源是否正常
-
-5. **手动测试预览区**：
-   - 在代码编辑区手动修改代码
-   - 观察预览区是否更新
-   - 如果手动编辑也不更新，说明问题不在 AI 会话部分，而在 PreviewPanel 本身
+**原理**：通过修改 `code` 状态触发 `key={code}` 重新渲染。
 
 ---
 
-## 七、总结
+## 五、总结
 
-| 问题 | 严重程度 | 影响 | 解决难度 | 优先级 |
-|------|---------|------|---------|--------|
-| **SandpackProvider 缺少 key 属性** | **极高** | 预览区完全不会更新 | **极低** | **P0** |
-| `sdkFiles` 未传递 | 中 | 未来可能需要，当前无影响 | 低 | P2 |
-| 文件路径匹配不精确 | 中 | 可能漏匹配或误匹配 | 低 | P1 |
-| `content` 字段可能缺失 | 中 | `onCodeUpdate` 不会被调用 | 中 | P1 |
-| 防抖时间过短 | 低 | 批量更新可能被拆分 | 低 | P2 |
-| 代码块提取失败 | 低 | 备选方案失效 | 低 | P3 |
+| 问题 | 状态 | 严重程度 | 备注 |
+|------|------|---------|------|
+| **SandpackProvider 缺少 key 属性** | ✅ 已修复 | 极高 | PreviewPanel.tsx 第 137 行 |
+| **文件路径匹配不精确** | ✅ 已修复 | 中 | ai-chat.tsx 使用 endsWith |
+| **防抖时间过短** | ✅ 已修复 | 低 | 从 100ms 增加到 300ms |
+| **AI 未真正修改文件** | ⚠️ 待验证 | 极高 | 需要检查日志和文件系统 |
+| **file_operation 事件未推送** | ⚠️ 待验证 | 高 | 需要检查 Agent Service |
 
-**实施建议**：
+**下一步行动**：
 
-1. **立即实施方案 0**（添加 `key={code}`）- 这是解决预览不更新问题的关键
-2. **实施方案 2**（优化文件路径匹配）- 提高代码检测的准确性
-3. **增加调试日志**（方案 3）- 方便后续排查问题
-4. **暂缓实施方案 1**（sdkFiles 传递）- 当前项目未使用 SDK 文件，可以暂缓
+1. ✅ **立即实施方案 0**（增加调试日志）- 确认代码更新流程是否正常工作
+2. ⚠️ **验证 AI 是否真正修改了文件** - 检查浏览器控制台和 Agent Service 日志
+3. ⚠️ **如果 AI 没有修改文件** - 检查 Agent 的提示词和文件写入逻辑
+4. ⚠️ **如果 file_operation 事件未推送** - 检查 Agent Service 的 WebSocket 通知机制
 
 ---
 
-## 八、相关文件清单
+## 六、相关文件清单
 
 | 文件 | 路径 | 作用 |
 |------|------|------|
 | 编辑页面 | `packages/web/src/app/demo/[id]/edit/page.tsx` | 父组件，管理状态和回调 |
 | AI 聊天组件 | `packages/web/src/components/ai-elements/ai-chat.tsx` | 监听文件变更事件 |
-| 预览面板 | `packages/web/components/demo/PreviewPanel.tsx` | Sandpack 预览渲染 |
+| 预览面板 | `packages/web/components/demo/PreviewPanel.tsx` | Sandpack 预览渲染（已修复） |
 | 类型定义 | `packages/web/components/demo/types.ts` | Props 类型定义 |
+| 工作区文件 | `packages/web/data/projects/proj_*/workspace/index.tsx` | 实际代码文件 |
 | WebSocket 路由 | `packages/agent-service/src/routes/websocket.ts` | 后端文件事件推送 |
-| ACP 连接层 | `packages/agent-service/src/acp/connection.ts` | Agent 文件操作拦截 |
-| Base ACP 后端 | `packages/agent-service/src/backends/base-acp.ts` | 文件变更累积 |
 
 ---
 
-**报告生成时间**：2026-04-11  
-**分析人**：Qwen Code AI Agent
+**报告更新时间**：2026-04-12
+**更新人**：Qwen Code AI Agent
+**更新内容**：补充了 banner 未删除的具体案例分析，确认 key={code} 已修复，新增排查步骤和验证方案
