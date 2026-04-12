@@ -357,6 +357,10 @@ export function AIChat({
           path: extractedPath || parameters.path || parameters.file_path,
         };
 
+        // 使用后端发送的状态，如果没有则默认为 running
+        const toolStatus = event.toolCallStatus || "running";
+        console.log("[AIChat] Tool status from backend:", event.toolCallStatus, "-> using:", toolStatus);
+
         setCurrentMessage((prev) => {
           const parts = prev.parts || [];
           const toolCallId = event.toolCallId || `tool-${Date.now()}`;
@@ -369,7 +373,7 @@ export function AIChat({
                 type: "tool",
                 toolCallId,
                 toolName,
-                status: "running" as const,
+                status: toolStatus as "running" | "completed" | "error",
                 parameters: finalParameters,
               },
             ],
@@ -379,6 +383,8 @@ export function AIChat({
 
       // 监听工具调用状态更新 - 根据 toolCallId 更新对应的 ToolCallPart
       stream.on("tool_call_update", (event: StreamEvent) => {
+        console.log("[AIChat] Tool Call Update Event:", event);
+
         setCurrentMessage((prev) => {
           const parts = prev.parts || [];
           const toolCallId = event.toolCallId;
@@ -391,12 +397,16 @@ export function AIChat({
           // 查找并更新对应的工具 part
           const updatedParts = parts.map((part) => {
             if (part.type === "tool" && part.toolCallId === toolCallId) {
+              console.log("[AIChat] Found matching tool part:", toolCallId, "current status:", part.status, "-> new status:", event.toolCallStatus);
+
               const newStatus =
                 event.toolCallStatus === "completed"
                   ? "completed"
                   : event.toolCallStatus === "failed"
                     ? "error"
-                    : part.status;
+                    : event.toolCallStatus === "in_progress"
+                      ? "running"
+                      : part.status;
 
               // 提取结果
               let result = part.result;
@@ -416,6 +426,8 @@ export function AIChat({
                   details: event.error?.message || "未知错误",
                 };
               }
+
+              console.log("[AIChat] Updated tool part status to:", newStatus);
 
               return {
                 ...part,
