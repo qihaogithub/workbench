@@ -359,7 +359,12 @@ export function AIChat({
 
         // 使用后端发送的状态，如果没有则默认为 running
         const toolStatus = event.toolCallStatus || "running";
-        console.log("[AIChat] Tool status from backend:", event.toolCallStatus, "-> using:", toolStatus);
+        console.log(
+          "[AIChat] Tool status from backend:",
+          event.toolCallStatus,
+          "-> using:",
+          toolStatus,
+        );
 
         setCurrentMessage((prev) => {
           const parts = prev.parts || [];
@@ -397,7 +402,14 @@ export function AIChat({
           // 查找并更新对应的工具 part
           const updatedParts = parts.map((part) => {
             if (part.type === "tool" && part.toolCallId === toolCallId) {
-              console.log("[AIChat] Found matching tool part:", toolCallId, "current status:", part.status, "-> new status:", event.toolCallStatus);
+              console.log(
+                "[AIChat] Found matching tool part:",
+                toolCallId,
+                "current status:",
+                part.status,
+                "-> new status:",
+                event.toolCallStatus,
+              );
 
               const newStatus =
                 event.toolCallStatus === "completed"
@@ -468,9 +480,15 @@ export function AIChat({
           }),
         );
 
+        console.log(
+          "[AIChat] processRealtimeFiles called with:",
+          files.map((f) => ({ path: f.path, hasContent: !!f.content })),
+        );
+
         // 通知父组件
         if (files.length > 0) {
           onFilesChange?.(files);
+          console.log("[AIChat] onFilesChange callback invoked");
 
           // 实时提取代码和 schema 更新
           for (const file of files) {
@@ -483,13 +501,23 @@ export function AIChat({
               normalizedPath.endsWith("Demo.ts");
 
             if (isCodeFile && file.content) {
-              console.log("[AIChat] Code update detected:", file.path);
+              console.log(
+                "[AIChat] Code update detected:",
+                file.path,
+                "content length:",
+                file.content.length,
+              );
               onCodeUpdate?.(file.content);
             } else if (
               normalizedPath.endsWith("config.schema.json") &&
               file.content
             ) {
-              console.log("[AIChat] Schema update detected:", file.path);
+              console.log(
+                "[AIChat] Schema update detected:",
+                file.path,
+                "content length:",
+                file.content.length,
+              );
               onSchemaUpdate?.(file.content);
             }
           }
@@ -497,8 +525,14 @@ export function AIChat({
       };
 
       stream.on("file_operation", (event: StreamEvent) => {
+        console.log("[AIChat] file_operation event received:", event);
         if (event.fileOperation) {
           const { method, path, content } = event.fileOperation;
+          console.log("[AIChat] file_operation details:", {
+            method,
+            path,
+            contentLength: content?.length,
+          });
 
           // 仅处理文件写入操作
           if (method === "fs/write_text_file" && path) {
@@ -515,6 +549,10 @@ export function AIChat({
 
             // 优化：防抖时间从 100ms 增加到 300ms，避免批量更新被拆分
             fileUpdateTimer = setTimeout(() => {
+              console.log(
+                "[AIChat] Debounce timer triggered, processing files:",
+                Array.from(realtimeFilesRef.keys()),
+              );
               processRealtimeFiles();
               fileUpdateTimer = null;
             }, 300);
@@ -563,6 +601,11 @@ export function AIChat({
                 content: info.content,
               }));
 
+        console.log(
+          "[AIChat] finish event - finalFiles:",
+          finalFiles.map((f) => ({ path: f.path, hasContent: !!f.content })),
+        );
+
         if (finalFiles.length > 0) {
           onFilesChange?.(finalFiles);
 
@@ -588,6 +631,64 @@ export function AIChat({
                 onSchemaUpdate?.(file.content);
               }
             }
+          }
+        }
+
+        // ✅ 兜底：如果 realtimeFilesRef 为空（说明 edit 工具绕过 ACP 通知），通过 HTTP API 读取文件
+        if (
+          realtimeFilesRef.size === 0 &&
+          (!event.files || event.files.length === 0)
+        ) {
+          console.log(
+            "[AIChat] No file changes detected via ACP, fetching files via HTTP API as fallback...",
+          );
+          try {
+            const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+            if (filesRes.ok) {
+              const filesData = await filesRes.json();
+              console.log("[AIChat] Fetched files from API:", filesData);
+
+              if (filesData.success && filesData.data) {
+                const { code, schema } = filesData.data;
+                console.log(
+                  "[AIChat] Fetched code length:",
+                  code?.length,
+                  "schema length:",
+                  schema?.length,
+                );
+
+                if (code) {
+                  console.log("[AIChat] Applying code update from HTTP API");
+                  onCodeUpdate?.(code);
+                }
+                if (schema) {
+                  console.log("[AIChat] Applying schema update from HTTP API");
+                  onSchemaUpdate?.(schema);
+                }
+
+                // 通知父组件文件变更
+                const fetchedFiles = [
+                  {
+                    path: "index.tsx",
+                    action: "modified" as const,
+                    content: code,
+                  },
+                  {
+                    path: "config.schema.json",
+                    action: "modified" as const,
+                    content: schema,
+                  },
+                ];
+                onFilesChange?.(fetchedFiles);
+              }
+            } else {
+              console.warn(
+                "[AIChat] Failed to fetch files from API, status:",
+                filesRes.status,
+              );
+            }
+          } catch (error) {
+            console.error("[AIChat] Error fetching files via HTTP:", error);
           }
         }
 

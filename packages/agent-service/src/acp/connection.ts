@@ -1,6 +1,6 @@
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
-import path from 'path';
+import { spawn, ChildProcess } from "child_process";
+import { EventEmitter } from "events";
+import path from "path";
 import {
   AcpRequest,
   AcpResponse,
@@ -17,10 +17,10 @@ import {
   ACP_BACKENDS,
   ACP_METHODS,
   JSONRPC_VERSION,
-} from './types';
-import { AcpApprovalStore, createAcpApprovalKey } from './approval-store';
-import { buildAcpModelInfo, AcpModelInfo } from './model-info';
-import { logger } from '../utils/logger';
+} from "./types";
+import { AcpApprovalStore, createAcpApprovalKey } from "./approval-store";
+import { buildAcpModelInfo, AcpModelInfo } from "./model-info";
+import { logger } from "../utils/logger";
 
 /**
  * 清理环境变量（参考 AionUi 做法）
@@ -37,7 +37,7 @@ function prepareCleanEnv(): Record<string, string> {
 
   // 删除 npm 生命周期变量
   for (const key of Object.keys(env)) {
-    if (key.startsWith('npm_')) {
+    if (key.startsWith("npm_")) {
       delete env[key];
     }
   }
@@ -57,9 +57,19 @@ interface PendingRequest {
 }
 
 type SessionUpdateHandler = (update: AcpSessionUpdate) => void;
-type PermissionHandler = (request: AcpPermissionRequest) => Promise<{ optionId: string }>;
-type DisconnectHandler = (error: { code: number | null; signal: NodeJS.Signals | null }) => void;
-type FileOperationHandler = (operation: { method: string; path: string; content?: string; sessionId: string }) => void;
+type PermissionHandler = (
+  request: AcpPermissionRequest,
+) => Promise<{ optionId: string }>;
+type DisconnectHandler = (error: {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}) => void;
+type FileOperationHandler = (operation: {
+  method: string;
+  path: string;
+  content?: string;
+  sessionId: string;
+}) => void;
 
 export class AcpConnection extends EventEmitter {
   private child: ChildProcess | null = null;
@@ -67,7 +77,7 @@ export class AcpConnection extends EventEmitter {
   private config: AcpBackendConfig | null = null;
   private nextRequestId = 1;
   private pendingRequests = new Map<number, PendingRequest>();
-  private buffer = '';
+  private buffer = "";
   private isInitialized = false;
   private sessionId: string | null = null;
   private workingDir: string;
@@ -104,23 +114,33 @@ export class AcpConnection extends EventEmitter {
     this.promptTimeoutMs = Math.max(30, seconds) * 1000;
   }
 
-  async connect(cliPath?: string, customEnv?: Record<string, string>): Promise<void> {
+  async connect(
+    cliPath?: string,
+    customEnv?: Record<string, string>,
+  ): Promise<void> {
     if (this.child) {
       await this.disconnect();
     }
 
-    const command = cliPath || this.config?.cliCommand || this.config?.defaultCliPath;
+    const command =
+      cliPath || this.config?.cliCommand || this.config?.defaultCliPath;
     if (!command) {
       throw new Error(`CLI path is required for ${this.backend} backend`);
     }
 
     const args = [...(this.config?.acpArgs || [])];
-    logger.info({ backend: this.backend, command, args }, 'Starting ACP process');
+    logger.info(
+      { backend: this.backend, command, args },
+      "Starting ACP process",
+    );
 
-    const isWindows = process.platform === 'win32';
-    const useShell = isWindows || command.startsWith('npx ') || command.includes(' ');
-    const actualCommand = useShell ? command.split(' ')[0] : command;
-    const actualArgs = useShell ? [...command.split(' ').slice(1), ...args] : args;
+    const isWindows = process.platform === "win32";
+    const useShell =
+      isWindows || command.startsWith("npx ") || command.includes(" ");
+    const actualCommand = useShell ? command.split(" ")[0] : command;
+    const actualArgs = useShell
+      ? [...command.split(" ").slice(1), ...args]
+      : args;
 
     // 清理环境变量（参考 AionUi 做法）
     const cleanEnv = prepareCleanEnv();
@@ -131,25 +151,25 @@ export class AcpConnection extends EventEmitter {
     this.child = spawn(actualCommand, actualArgs, {
       cwd: this.workingDir,
       env: { ...cleanEnv, ...this.config?.env },
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
       shell: useShell,
     });
 
     await this.setupChildProcessHandlers();
     await this.initialize();
     this.isSetupComplete = true;
-    logger.info({ backend: this.backend }, 'ACP connection established');
+    logger.info({ backend: this.backend }, "ACP connection established");
   }
 
   private async setupChildProcessHandlers(): Promise<void> {
     if (!this.child) return;
 
-    let stderrBuffer = '';
+    let stderrBuffer = "";
 
-    this.child.stdout?.on('data', (data: Buffer) => {
+    this.child.stdout?.on("data", (data: Buffer) => {
       this.buffer += data.toString();
-      const lines = this.buffer.split('\n');
-      this.buffer = lines.pop() || '';
+      const lines = this.buffer.split("\n");
+      this.buffer = lines.pop() || "";
 
       for (const line of lines) {
         if (line.trim()) {
@@ -157,40 +177,50 @@ export class AcpConnection extends EventEmitter {
             const message = JSON.parse(line);
             this.handleMessage(message);
           } catch (error) {
-            logger.debug({ line, error }, 'Failed to parse ACP message');
+            logger.debug({ line, error }, "Failed to parse ACP message");
           }
         }
       }
     });
 
-    this.child.stderr?.on('data', (data: Buffer) => {
+    this.child.stderr?.on("data", (data: Buffer) => {
       stderrBuffer += data.toString();
-      logger.debug({ stderr: data.toString() }, 'ACP stderr');
+      logger.debug({ stderr: data.toString() }, "ACP stderr");
     });
 
-    this.child.on('exit', (code, signal) => {
-      logger.info({ backend: this.backend, code, signal }, 'ACP process exited');
+    this.child.on("exit", (code, signal) => {
+      logger.info(
+        { backend: this.backend, code, signal },
+        "ACP process exited",
+      );
       if (this.isSetupComplete) {
         this.handleProcessExit(code, signal);
       }
     });
 
-    this.child.on('error', (error) => {
-      logger.error({ backend: this.backend, error }, 'ACP process error');
-      this.emit('error', error);
+    this.child.on("error", (error) => {
+      logger.error({ backend: this.backend, error }, "ACP process error");
+      this.emit("error", error);
     });
 
     await new Promise((resolve) => setImmediate(resolve));
   }
 
-  private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
+  private handleProcessExit(
+    code: number | null,
+    signal: NodeJS.Signals | null,
+  ): void {
     this.stopPromptKeepalive();
 
     for (const [_id, request] of this.pendingRequests) {
       if (request.timeoutId) {
         clearTimeout(request.timeoutId);
       }
-      request.reject(new Error(`ACP process exited unexpectedly (code: ${code}, signal: ${signal})`));
+      request.reject(
+        new Error(
+          `ACP process exited unexpectedly (code: ${code}, signal: ${signal})`,
+        ),
+      );
     }
     this.pendingRequests.clear();
 
@@ -201,25 +231,25 @@ export class AcpConnection extends EventEmitter {
     this.child = null;
 
     this.onDisconnect?.({ code, signal });
-    this.emit('disconnect', { code, signal });
+    this.emit("disconnect", { code, signal });
   }
 
   private handleMessage(message: AcpResponse | AcpNotification): void {
-    if ('method' in message) {
+    if ("method" in message) {
       this.handleNotification(message);
-    } else if ('id' in message && message.id !== undefined) {
+    } else if ("id" in message && message.id !== undefined) {
       const pending = this.pendingRequests.get(message.id);
       if (pending) {
         this.pendingRequests.delete(message.id);
         if (pending.timeoutId) {
           clearTimeout(pending.timeoutId);
         }
-        if ('error' in message && message.error) {
+        if ("error" in message && message.error) {
           pending.reject(new Error(message.error.message));
         } else {
-          if (message.result && typeof message.result === 'object') {
+          if (message.result && typeof message.result === "object") {
             const result = message.result as Record<string, unknown>;
-            if (result.stopReason === 'end_turn') {
+            if (result.stopReason === "end_turn") {
               this.onEndTurn?.();
             }
           }
@@ -235,72 +265,98 @@ export class AcpConnection extends EventEmitter {
         this.resetSessionPromptTimeouts();
         if (notification.params) {
           const params = notification.params as Record<string, unknown>;
-          if (params.update && (params.update as Record<string, unknown>).sessionUpdate === 'config_option_update') {
-            const updatePayload = params.update as { configOptions?: AcpSessionConfigOption[] };
+          if (
+            params.update &&
+            (params.update as Record<string, unknown>).sessionUpdate ===
+              "config_option_update"
+          ) {
+            const updatePayload = params.update as {
+              configOptions?: AcpSessionConfigOption[];
+            };
             if (Array.isArray(updatePayload.configOptions)) {
               this.configOptions = updatePayload.configOptions;
             }
           }
-          this.onSessionUpdate?.(notification.params as unknown as AcpSessionUpdate);
+          this.onSessionUpdate?.(
+            notification.params as unknown as AcpSessionUpdate,
+          );
         }
-        this.emit('sessionUpdate', notification.params);
+        this.emit("sessionUpdate", notification.params);
         break;
 
       case ACP_METHODS.REQUEST_PERMISSION:
         if (notification.params) {
-          this.handlePermissionRequest(notification.params as unknown as AcpPermissionRequest);
+          this.handlePermissionRequest(
+            notification.params as unknown as AcpPermissionRequest,
+          );
         }
         break;
 
       case ACP_METHODS.READ_TEXT_FILE:
         if (notification.params) {
-          this.handleReadOperation(notification.params as { path: string; sessionId?: string });
+          this.handleReadOperation(
+            notification.params as { path: string; sessionId?: string },
+          );
         }
         break;
 
       case ACP_METHODS.WRITE_TEXT_FILE:
         if (notification.params) {
-          this.handleWriteOperation(notification.params as { path: string; content: string; sessionId?: string });
+          this.handleWriteOperation(
+            notification.params as {
+              path: string;
+              content: string;
+              sessionId?: string;
+            },
+          );
         }
         break;
 
       default:
-        logger.debug({ method: notification.method }, 'Unhandled ACP notification');
+        logger.debug(
+          { method: notification.method },
+          "Unhandled ACP notification",
+        );
     }
   }
 
-  private async handlePermissionRequest(request: AcpPermissionRequest): Promise<void> {
+  private async handlePermissionRequest(
+    request: AcpPermissionRequest,
+  ): Promise<void> {
     this.pauseSessionPromptTimeouts();
 
     try {
       const toolCallKey = createAcpApprovalKey(request.toolCall);
 
       if (this.approvalStore.isApprovedForSession(toolCallKey)) {
-        await this.sendPermissionResponse(request.sessionId, 'allow_always');
+        await this.sendPermissionResponse(request.sessionId, "allow_always");
         return;
       }
 
       if (this.onPermissionRequest) {
         const response = await this.onPermissionRequest(request);
 
-        if (response.optionId === 'allow_always') {
-          this.approvalStore.put(toolCallKey, 'allow_always');
+        if (response.optionId === "allow_always") {
+          this.approvalStore.put(toolCallKey, "allow_always");
         }
 
         await this.sendPermissionResponse(request.sessionId, response.optionId);
       } else {
-        await this.sendPermissionResponse(request.sessionId, 'reject_once');
+        await this.sendPermissionResponse(request.sessionId, "reject_once");
       }
     } catch (error) {
-      logger.error({ error }, 'Permission request failed');
-      await this.sendPermissionResponse(request.sessionId, 'reject_once');
+      logger.error({ error }, "Permission request failed");
+      await this.sendPermissionResponse(request.sessionId, "reject_once");
     } finally {
       this.resumeSessionPromptTimeouts();
     }
   }
 
-  private async sendPermissionResponse(sessionId: string, optionId: string): Promise<void> {
-    const outcome = optionId.includes('reject') ? 'rejected' : 'selected';
+  private async sendPermissionResponse(
+    sessionId: string,
+    optionId: string,
+  ): Promise<void> {
+    const outcome = optionId.includes("reject") ? "rejected" : "selected";
     const message: AcpNotification = {
       jsonrpc: JSONRPC_VERSION,
       method: ACP_METHODS.REQUEST_PERMISSION,
@@ -309,22 +365,39 @@ export class AcpConnection extends EventEmitter {
     this.sendMessage(message as unknown as AcpRequest);
   }
 
-  private async handleReadOperation(params: { path: string; sessionId?: string }): Promise<void> {
+  private async handleReadOperation(params: {
+    path: string;
+    sessionId?: string;
+  }): Promise<void> {
     const resolvedPath = this.resolveWorkspacePath(params.path);
     this.onFileOperation?.({
-      method: 'fs/read_text_file',
+      method: "fs/read_text_file",
       path: resolvedPath,
-      sessionId: params.sessionId || '',
+      sessionId: params.sessionId || "",
     });
   }
 
-  private async handleWriteOperation(params: { path: string; content: string; sessionId?: string }): Promise<void> {
+  private async handleWriteOperation(params: {
+    path: string;
+    content: string;
+    sessionId?: string;
+  }): Promise<void> {
     const resolvedPath = this.resolveWorkspacePath(params.path);
+    logger.info(
+      {
+        method: "fs/write_text_file",
+        originalPath: params.path,
+        resolvedPath,
+        contentLength: params.content?.length,
+        sessionId: params.sessionId,
+      },
+      "[ACP Connection] Handling write operation",
+    );
     this.onFileOperation?.({
-      method: 'fs/write_text_file',
+      method: "fs/write_text_file",
       path: resolvedPath,
       content: params.content,
-      sessionId: params.sessionId || '',
+      sessionId: params.sessionId || "",
     });
   }
 
@@ -336,7 +409,10 @@ export class AcpConnection extends EventEmitter {
     return path.join(this.workingDir, targetPath);
   }
 
-  private sendRequest<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
+  private sendRequest<T = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
       const id = this.nextRequestId++;
       const message: AcpRequest = {
@@ -346,7 +422,8 @@ export class AcpConnection extends EventEmitter {
         ...(params && { params }),
       };
 
-      const timeoutDuration = method === ACP_METHODS.SESSION_PROMPT ? this.promptTimeoutMs : 120000;
+      const timeoutDuration =
+        method === ACP_METHODS.SESSION_PROMPT ? this.promptTimeoutMs : 120000;
       const startTime = Date.now();
 
       const timeoutId = setTimeout(() => {
@@ -372,7 +449,10 @@ export class AcpConnection extends EventEmitter {
     });
   }
 
-  private handlePromptTimeout(requestId: number, request: PendingRequest): void {
+  private handlePromptTimeout(
+    requestId: number,
+    request: PendingRequest,
+  ): void {
     this.pendingRequests.delete(requestId);
     if (request.method === ACP_METHODS.SESSION_PROMPT) {
       this.cancelPrompt();
@@ -381,8 +461,8 @@ export class AcpConnection extends EventEmitter {
       new Error(
         request.method === ACP_METHODS.SESSION_PROMPT
           ? `LLM request timed out after ${request.timeoutDuration / 1000} seconds`
-          : `Request ${request.method} timed out after ${request.timeoutDuration / 1000} seconds`
-      )
+          : `Request ${request.method} timed out after ${request.timeoutDuration / 1000} seconds`,
+      ),
     );
   }
 
@@ -427,7 +507,11 @@ export class AcpConnection extends EventEmitter {
 
   private resetSessionPromptTimeouts(): void {
     for (const [id, request] of this.pendingRequests) {
-      if (request.method === ACP_METHODS.SESSION_PROMPT && !request.isPaused && request.timeoutId) {
+      if (
+        request.method === ACP_METHODS.SESSION_PROMPT &&
+        !request.isPaused &&
+        request.timeoutId
+      ) {
         clearTimeout(request.timeoutId);
         request.startTime = Date.now();
         request.timeoutId = setTimeout(() => {
@@ -440,7 +524,12 @@ export class AcpConnection extends EventEmitter {
   }
 
   private isChildAlive(): boolean {
-    return this.child !== null && !this.child.killed && this.child.exitCode === null && this.child.signalCode === null;
+    return (
+      this.child !== null &&
+      !this.child.killed &&
+      this.child.exitCode === null &&
+      this.child.signalCode === null
+    );
   }
 
   private startPromptKeepalive(): void {
@@ -449,7 +538,9 @@ export class AcpConnection extends EventEmitter {
       if (!this.isChildAlive()) return;
       const now = Date.now();
       const hasEligibleRequest = [...this.pendingRequests.values()].some(
-        (r) => r.method === ACP_METHODS.SESSION_PROMPT && now - r.promptOriginTime < r.timeoutDuration
+        (r) =>
+          r.method === ACP_METHODS.SESSION_PROMPT &&
+          now - r.promptOriginTime < r.timeoutDuration,
       );
       if (hasEligibleRequest) {
         this.resetSessionPromptTimeouts();
@@ -466,24 +557,30 @@ export class AcpConnection extends EventEmitter {
 
   private sendMessage(message: AcpRequest): void {
     if (!this.child?.stdin) {
-      throw new Error('ACP process not running');
+      throw new Error("ACP process not running");
     }
-    const lineEnding = process.platform === 'win32' ? '\r\n' : '\n';
+    const lineEnding = process.platform === "win32" ? "\r\n" : "\n";
     const json = JSON.stringify(message) + lineEnding;
     this.child.stdin.write(json);
-    logger.debug({ method: message.method, id: message.id }, 'Sent ACP request');
+    logger.debug(
+      { method: message.method, id: message.id },
+      "Sent ACP request",
+    );
   }
 
   private async initialize(): Promise<AcpInitializeResult> {
-    const result = await this.sendRequest<AcpInitializeResult>(ACP_METHODS.INITIALIZE, {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: {
-          readTextFile: true,
-          writeTextFile: true,
+    const result = await this.sendRequest<AcpInitializeResult>(
+      ACP_METHODS.INITIALIZE,
+      {
+        protocolVersion: 1,
+        clientCapabilities: {
+          fs: {
+            readTextFile: true,
+            writeTextFile: true,
+          },
         },
       },
-    });
+    );
     this.isInitialized = true;
     return result;
   }
@@ -494,12 +591,15 @@ export class AcpConnection extends EventEmitter {
     forkSession?: boolean;
   }): Promise<AcpSessionNewResult> {
     if (!this.isInitialized) {
-      throw new Error('ACP connection not initialized');
+      throw new Error("ACP connection not initialized");
     }
 
     const normalizedCwd = this.normalizeCwdForAgent(this.workingDir);
 
-    logger.info({ cwd: this.workingDir, normalizedCwd }, 'Creating ACP session')
+    logger.info(
+      { cwd: this.workingDir, normalizedCwd },
+      "Creating ACP session",
+    );
 
     const params: Record<string, unknown> = {
       cwd: normalizedCwd,
@@ -518,7 +618,10 @@ export class AcpConnection extends EventEmitter {
       params.forkSession = options.forkSession;
     }
 
-    const result = await this.sendRequest<AcpSessionNewResult>(ACP_METHODS.SESSION_NEW, params);
+    const result = await this.sendRequest<AcpSessionNewResult>(
+      ACP_METHODS.SESSION_NEW,
+      params,
+    );
     this.sessionId = result.sessionId;
 
     if (result.configOptions) {
@@ -528,18 +631,20 @@ export class AcpConnection extends EventEmitter {
       this.models = result.models;
     }
 
-    logger.info({ sessionId: this.sessionId }, 'ACP session created');
+    logger.info({ sessionId: this.sessionId }, "ACP session created");
     return result;
   }
 
   async loadSession(sessionId: string): Promise<AcpSessionNewResult> {
     if (!this.isInitialized) {
-      throw new Error('ACP connection not initialized');
+      throw new Error("ACP connection not initialized");
     }
 
     const normalizedCwd = this.normalizeCwdForAgent(this.workingDir);
 
-    const result = await this.sendRequest<AcpSessionNewResult & { sessionId?: string }>(ACP_METHODS.SESSION_LOAD, {
+    const result = await this.sendRequest<
+      AcpSessionNewResult & { sessionId?: string }
+    >(ACP_METHODS.SESSION_LOAD, {
       sessionId,
       cwd: normalizedCwd,
     });
@@ -553,17 +658,23 @@ export class AcpConnection extends EventEmitter {
       this.models = result.models;
     }
 
-    logger.info({ sessionId: this.sessionId }, 'ACP session loaded');
+    logger.info({ sessionId: this.sessionId }, "ACP session loaded");
     return result;
   }
 
-  async createOrResumeSession(resumeSessionId?: string, options?: { model?: string }): Promise<string> {
+  async createOrResumeSession(
+    resumeSessionId?: string,
+    options?: { model?: string },
+  ): Promise<string> {
     if (resumeSessionId) {
       try {
         const result = await this.loadSession(resumeSessionId);
         return result.sessionId;
       } catch (error) {
-        logger.warn({ error, resumeSessionId }, 'Failed to resume session, creating new one');
+        logger.warn(
+          { error, resumeSessionId },
+          "Failed to resume session, creating new one",
+        );
       }
     }
     const result = await this.createSession(options);
@@ -571,29 +682,42 @@ export class AcpConnection extends EventEmitter {
   }
 
   async sendPrompt(
-    prompt: string | Array<{ type: 'text' | 'image'; text?: string; data?: string; mimeType?: string }>,
+    prompt:
+      | string
+      | Array<{
+          type: "text" | "image";
+          text?: string;
+          data?: string;
+          mimeType?: string;
+        }>,
     handlers?: {
       onSessionUpdate?: SessionUpdateHandler;
       onPermissionRequest?: PermissionHandler;
       onFileOperation?: FileOperationHandler;
-    }
+    },
   ): Promise<AcpPromptResult> {
     if (!this.sessionId) {
-      throw new Error('No active session');
+      throw new Error("No active session");
     }
 
     this.onSessionUpdate = handlers?.onSessionUpdate;
     this.onPermissionRequest = handlers?.onPermissionRequest;
     this.onFileOperation = handlers?.onFileOperation;
 
-    const promptArray = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt;
+    const promptArray =
+      typeof prompt === "string"
+        ? [{ type: "text" as const, text: prompt }]
+        : prompt;
 
     this.startPromptKeepalive();
     try {
-      const result = await this.sendRequest<AcpPromptResult>(ACP_METHODS.SESSION_PROMPT, {
-        sessionId: this.sessionId,
-        prompt: promptArray,
-      });
+      const result = await this.sendRequest<AcpPromptResult>(
+        ACP_METHODS.SESSION_PROMPT,
+        {
+          sessionId: this.sessionId,
+          prompt: promptArray,
+        },
+      );
       return result;
     } finally {
       this.stopPromptKeepalive();
@@ -623,7 +747,7 @@ export class AcpConnection extends EventEmitter {
 
   async setModel(modelId: string): Promise<void> {
     if (!this.sessionId) {
-      throw new Error('No active session');
+      throw new Error("No active session");
     }
 
     await this.sendRequest(ACP_METHODS.SET_MODEL, {
@@ -637,14 +761,16 @@ export class AcpConnection extends EventEmitter {
 
     if (this.configOptions) {
       this.configOptions = this.configOptions.map((opt) =>
-        opt.category === 'model' ? { ...opt, currentValue: modelId, selectedValue: modelId } : opt
+        opt.category === "model"
+          ? { ...opt, currentValue: modelId, selectedValue: modelId }
+          : opt,
       );
     }
   }
 
   async setConfigOption(optionId: string, value: string): Promise<void> {
     if (!this.sessionId) {
-      throw new Error('No active session');
+      throw new Error("No active session");
     }
     await this.sendRequest(ACP_METHODS.SET_CONFIG_OPTION, {
       sessionId: this.sessionId,
@@ -655,7 +781,7 @@ export class AcpConnection extends EventEmitter {
 
   async setSessionMode(modeId: string): Promise<void> {
     if (!this.sessionId) {
-      throw new Error('No active session');
+      throw new Error("No active session");
     }
     await this.sendRequest(ACP_METHODS.SET_MODE, {
       sessionId: this.sessionId,
@@ -676,10 +802,10 @@ export class AcpConnection extends EventEmitter {
   }
 
   private normalizeCwdForAgent(cwd?: string): string {
-    const defaultPath = '.';
+    const defaultPath = ".";
     if (!cwd) return defaultPath;
 
-    if (this.backend === 'copilot' || this.backend === 'codex') {
+    if (this.backend === "copilot" || this.backend === "codex") {
       return path.resolve(cwd);
     }
 
@@ -688,13 +814,14 @@ export class AcpConnection extends EventEmitter {
       const requested = path.resolve(cwd);
 
       const relative = path.relative(workspaceRoot, requested);
-      const isInsideWorkspace = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+      const isInsideWorkspace =
+        relative && !relative.startsWith("..") && !path.isAbsolute(relative);
 
       if (isInsideWorkspace) {
         return relative.length === 0 ? defaultPath : relative;
       }
     } catch (error) {
-      logger.warn({ error }, 'Failed to normalize cwd for agent');
+      logger.warn({ error }, "Failed to normalize cwd for agent");
     }
 
     return defaultPath;
@@ -717,7 +844,7 @@ export class AcpConnection extends EventEmitter {
       if (request.timeoutId) {
         clearTimeout(request.timeoutId);
       }
-      request.reject(new Error('Connection closed'));
+      request.reject(new Error("Connection closed"));
     }
     this.pendingRequests.clear();
 
@@ -725,7 +852,7 @@ export class AcpConnection extends EventEmitter {
     this.configOptions = null;
     this.models = null;
 
-    logger.info({ backend: this.backend }, 'ACP connection closed');
+    logger.info({ backend: this.backend }, "ACP connection closed");
   }
 
   get isConnected(): boolean {

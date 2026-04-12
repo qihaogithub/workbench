@@ -36,12 +36,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ConfigFormProps } from "./types";
 import { ImageListWidget, ImageItem } from "./ImageListWidget";
 
@@ -206,7 +201,7 @@ function FieldRenderer({
     if (field.type === "array") {
       const items = (value as Array<string | ImageItem>) || [];
       const imageItems: ImageItem[] = items.map((item) => {
-        if (typeof item === 'string') {
+        if (typeof item === "string") {
           return { url: item };
         }
         return item as ImageItem;
@@ -257,17 +252,27 @@ function FieldRenderer({
     // 数字范围 - 滑块
     if (field.type === "number" || field.type === "integer") {
       if (field.minimum !== undefined && field.maximum !== undefined) {
-        const currentValue = (value as number) ?? field.default ?? field.minimum;
+        const currentValue =
+          (value as number) ?? field.default ?? field.minimum;
 
         // 从字段名或 title 推断单位
         const getUnit = (): string => {
           const name = (field.key + field.title).toLowerCase();
-          if (name.includes("间隔") || name.includes("时间") || name.includes("duration")) {
+          if (
+            name.includes("间隔") ||
+            name.includes("时间") ||
+            name.includes("duration")
+          ) {
             return "ms";
           }
-          if (name.includes("高度") || name.includes("height") ||
-              name.includes("宽度") || name.includes("width") ||
-              name.includes("大小") || name.includes("size")) {
+          if (
+            name.includes("高度") ||
+            name.includes("height") ||
+            name.includes("宽度") ||
+            name.includes("width") ||
+            name.includes("大小") ||
+            name.includes("size")
+          ) {
             return "px";
           }
           return "";
@@ -287,7 +292,8 @@ function FieldRenderer({
             />
             <div className="min-w-[60px] text-right">
               <span className="font-mono text-sm font-medium text-foreground">
-                {currentValue}{unit}
+                {currentValue}
+                {unit}
               </span>
             </div>
           </div>
@@ -377,9 +383,7 @@ function FieldRenderer({
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <Label className="text-xs font-medium text-foreground truncate flex items-center">
             {field.title}
-            {field.required && (
-              <span className="text-red-500 ml-0.5">*</span>
-            )}
+            {field.required && <span className="text-red-500 ml-0.5">*</span>}
           </Label>
         </div>
         {field.description && (
@@ -470,11 +474,25 @@ export function ConfigForm({
     initialData || {},
   );
 
+  console.log(
+    "[ConfigForm] Rendered with schema length:",
+    schema?.length,
+    "initialData keys:",
+    Object.keys(initialData || {}),
+  );
+
   const fieldGroups = useMemo(() => parseSchemaToFields(schema), [schema]);
+
+  console.log(
+    "[ConfigForm] Parsed field groups:",
+    fieldGroups.length,
+    "groups",
+  );
 
   // 同步 initialData 变化
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
+      console.log("[ConfigForm] initialData changed, syncing...");
       setFormData((prev) => {
         // 保留用户已修改的值，但添加新字段的默认值
         const merged = { ...prev };
@@ -483,6 +501,10 @@ export function ConfigForm({
             merged[key] = value;
           }
         }
+        console.log(
+          "[ConfigForm] Merged formData after initialData sync:",
+          merged,
+        );
         return merged;
       });
     }
@@ -490,9 +512,14 @@ export function ConfigForm({
 
   // 当 schema 变化时，重新初始化表单
   useEffect(() => {
+    console.log("[ConfigForm] Schema changed, reinitializing form...");
     if (schema && initialData) {
       try {
         const parsed = JSON.parse(schema);
+        console.log(
+          "[ConfigForm] Schema parsed successfully, keys:",
+          Object.keys(parsed.properties || {}),
+        );
         const properties = parsed.properties || {};
         const required = parsed.required || [];
 
@@ -503,12 +530,20 @@ export function ConfigForm({
             prop.default ?? (required.includes(key) ? "" : undefined);
         });
 
-        setFormData((prev) => ({
-          ...newDefaults,
-          ...prev, // 保留用户已修改的值
-        }));
+        console.log("[ConfigForm] New defaults from schema:", newDefaults);
+        setFormData((prev) => {
+          const merged = {
+            ...newDefaults,
+            ...prev, // 保留用户已修改的值
+          };
+          console.log(
+            "[ConfigForm] Merged formData after schema change:",
+            merged,
+          );
+          return merged;
+        });
       } catch (e) {
-        console.warn("Failed to parse schema for form reset:", e);
+        console.warn("[ConfigForm] Failed to parse schema for form reset:", e);
       }
     }
   }, [schema, initialData]);

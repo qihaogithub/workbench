@@ -416,6 +416,14 @@ export async function registerWebSocketRoutes(
                     break;
 
                   case "file_operation":
+                    logger.info(
+                      {
+                        event: "file_operation",
+                        path: event.fileOperation?.path,
+                        contentLength: event.fileOperation?.content?.length,
+                      },
+                      "[WebSocket] Forwarding file_operation event to client",
+                    );
                     sendMessage({
                       type: "file_operation",
                       sessionId,

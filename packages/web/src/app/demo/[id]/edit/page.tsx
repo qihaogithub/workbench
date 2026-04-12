@@ -102,7 +102,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         console.log("[DemoEdit] Session API response:", sessionData.data);
         setSessionId(sessionData.data.sessionId);
         setTempWorkspace(sessionData.data.tempWorkspace || "");
-    
 
         const filesRes = await fetch(
           `/api/sessions/${sessionData.data.sessionId}/files`,
@@ -267,13 +266,30 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // 处理 AI 代码更新
   const handleCodeUpdate = useCallback(
     (newCode: string) => {
-      setCode(newCode);
-      setEditorContent((prev) =>
-        buildFigmaText(newCode, extractSchemaFromFigma(prev) || schema),
+      console.log(
+        "[DemoEditPage] handleCodeUpdate called, newCode length:",
+        newCode.length,
       );
+      console.log(
+        "[DemoEditPage] Current schema before update:",
+        schema ? "exists" : "missing",
+      );
+      setCode(newCode);
+      setEditorContent((prev) => {
+        const updatedContent = buildFigmaText(
+          newCode,
+          extractSchemaFromFigma(prev) || schema,
+        );
+        console.log(
+          "[DemoEditPage] editorContent updated, new length:",
+          updatedContent.length,
+        );
+        return updatedContent;
+      });
       // 同时触发验证
       if (schema) {
         const result = validateAll(newCode, schema);
+        console.log("[DemoEditPage] Validation result:", result);
         setValidationResult(result);
       }
     },
@@ -282,22 +298,47 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 处理 AI Schema 更新
   const handleSchemaUpdate = useCallback((newSchema: string) => {
-    setSchema(newSchema);
-    setEditorContent((prev) =>
-      buildFigmaText(extractCodeFromFigma(prev) || code, newSchema),
+    console.log(
+      "[DemoEditPage] handleSchemaUpdate called, newSchema length:",
+      newSchema.length,
     );
+    setSchema(newSchema);
+    setEditorContent((prev) => {
+      const updatedContent = buildFigmaText(
+        extractCodeFromFigma(prev) || code,
+        newSchema,
+      );
+      console.log(
+        "[DemoEditPage] editorContent updated after schema change, new length:",
+        updatedContent.length,
+      );
+      return updatedContent;
+    });
     const size = getPreviewSize(newSchema);
+    console.log("[DemoEditPage] Preview size calculated:", size);
     setPreviewSize(size);
     // 更新 configData 为新的默认值
     try {
       const schemaObj = JSON.parse(newSchema);
+      console.log(
+        "[DemoEditPage] Schema parsed successfully, keys:",
+        Object.keys(schemaObj),
+      );
       const newConfigData = getDefaultValues(schemaObj);
-      setConfigData((prev) => ({
-        ...newConfigData,
-        ...prev, // 保留用户已修改的配置
-      }));
+      console.log("[DemoEditPage] New default config data:", newConfigData);
+      setConfigData((prev) => {
+        const merged = {
+          ...newConfigData,
+          ...prev, // 保留用户已修改的配置
+        };
+        console.log("[DemoEditPage] Merged config data:", merged);
+        return merged;
+      });
     } catch (e) {
-      console.error("Failed to parse schema for default values:", e);
+      console.error(
+        "[DemoEditPage] Failed to parse schema for default values:",
+        e,
+      );
     }
   }, []);
 

@@ -50,6 +50,14 @@ export function PreviewPanel({
   className,
   previewSize,
 }: PreviewPanelProps) {
+  // 添加日志追踪 code prop 变化
+  console.log(
+    "[PreviewPanel] Rendered with code length:",
+    code?.length,
+    "isValid code:",
+    typeof code === "string" && code.trim().length > 0,
+  );
+
   // 验证 code 是否为有效的代码（不是文件路径或其他非代码内容）
   const isValidCode =
     typeof code === "string" &&
@@ -62,6 +70,8 @@ export function PreviewPanel({
     // 排除明显不是代码的内容（如 Windows 路径）
     !code.match(/^[A-Z]:\\/) &&
     !code.includes("\\重要文件\\");
+
+  console.log("[PreviewPanel] isValidCode:", isValidCode);
 
   const entryCode = `
 import React from 'react';
@@ -130,7 +140,7 @@ export default function App() {
           dependencies: mergedDependencies,
         }}
         options={{
-          externalResources: ['https://cdn.tailwindcss.com/3.4.17#tailwind.js'],
+          externalResources: ["https://cdn.tailwindcss.com/3.4.17#tailwind.js"],
         }}
         theme={{
           colors: {

@@ -113,6 +113,15 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
     sessionId: string;
   }): void {
     if (operation.method === "fs/write_text_file") {
+      logger.info(
+        {
+          path: operation.path,
+          contentLength: operation.content?.length,
+          sessionId: this.config.sessionId,
+        },
+        "[OpenCode Backend] Handling file operation fs/write_text_file",
+      );
+
       this.files.push({
         path: operation.path,
         action: "modified",
@@ -121,6 +130,13 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
 
       // ✅ 发出正确的 file_operation 事件
       if (this.eventCallback) {
+        logger.info(
+          {
+            path: operation.path,
+            eventCallbackRegistered: true,
+          },
+          "[OpenCode Backend] Emitting file_operation event",
+        );
         this.eventCallback({
           type: "file_operation",
           sessionId: this.config.sessionId,
@@ -130,7 +146,61 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
             content: operation.content,
           },
         });
+      } else {
+        logger.warn(
+          {
+            path: operation.path,
+          },
+          "[OpenCode Backend] file_operation event NOT emitted - no eventCallback registered",
+        );
       }
+    }
+  }
+
+  /**
+   * ✅ 兜底方案：检测 edit 工具造成的文件变更
+   *
+   * 当 AI 使用 edit 工具时，ACP 协议可能不会发出 WRITE_TEXT_FILE 通知，
+   * 所以我们需要在 AI 完成后主动读取工作区中的关键文件。
+   */
+  private async detectFileChangesAfterEdit(): Promise<void> {
+    const workingDir = this.config.workingDir;
+    if (!workingDir) {
+      logger.warn(
+        "[OpenCode Backend] No workingDir, skipping file change detection",
+      );
+      return;
+    }
+
+    // 需要检测的关键文件列表
+    const targetFiles = [
+      "index.tsx",
+      "index.ts",
+      "Demo.tsx",
+      "Demo.ts",
+      "config.schema.json",
+    ];
+
+    logger.info(
+      { workingDir, targetFiles },
+      "[OpenCode Backend] Detecting file changes after edit tool",
+    );
+
+    // 注意：这里我们无法直接读取文件内容（因为没有文件操作权限），
+    // 但我们可以通过检查 this.files 数组来判断是否有通过 ACP 写入的文件
+    // 如果 this.files 为空，说明 AI 可能使用了 edit 工具（绕过 ACP 通知）
+
+    if (this.files.length === 0) {
+      logger.info(
+        "[OpenCode Backend] No file_operation events captured, edit tool may have been used",
+      );
+      // 这里暂时无法做更多，因为 ACP 协议没有提供直接读取文件的机制
+      // 前端需要在 finish 事件中通过其他方式获取文件内容
+    } else {
+      logger.info(
+        { fileCount: this.files.length },
+        "[OpenCode Backend] File changes detected via ACP events",
+      );
     }
   }
 
@@ -162,6 +232,9 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
           this.handleFileOperation(operation);
         },
       });
+
+      // ✅ 兜底：在 AI 完成后主动检查工作区文件变更
+      await this.detectFileChangesAfterEdit();
 
       this.status = "ready";
       return this.fullContent;

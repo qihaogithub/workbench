@@ -65,12 +65,19 @@ export function getSessionPath(sessionId: string, projectId?: string): string {
 }
 
 export function findSessionPath(sessionId: string): string | null {
+  console.log(`[findSessionPath] 查找 session: ${sessionId}`);
+  
   if (!fs.existsSync(SESSIONS_DIR)) {
+    console.error(`[findSessionPath] SESSIONS_DIR 不存在: ${SESSIONS_DIR}`);
     return null;
   }
 
+  console.log(`[findSessionPath] SESSIONS_DIR: ${SESSIONS_DIR}`);
+  
   // 先尝试新结构: {userId}/{projectId}/{sessionId}/
   const level1Entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
+  console.log(`[findSessionPath] level1 目录数: ${level1Entries.length}`);
+  
   for (const level1 of level1Entries) {
     if (!level1.isDirectory()) continue;
 
@@ -79,6 +86,7 @@ export function findSessionPath(sessionId: string): string | null {
     // 直接检查是否为目标 session（兼容旧结构）
     const directPath = path.join(level1Path, sessionId);
     if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
+      console.log(`[findSessionPath] 找到 session (旧结构): ${directPath}`);
       return directPath;
     }
 
@@ -92,11 +100,13 @@ export function findSessionPath(sessionId: string): string | null {
         fs.existsSync(sessionPath) &&
         fs.statSync(sessionPath).isDirectory()
       ) {
+        console.log(`[findSessionPath] 找到 session (新结构): ${sessionPath}`);
         return sessionPath;
       }
     }
   }
 
+  console.error(`[findSessionPath] 未找到 session: ${sessionId}`);
   return null;
 }
 
@@ -265,18 +275,31 @@ export function createSession(projectId: string): SessionMeta {
 }
 
 export function getSessionMeta(sessionId: string): SessionMeta | null {
+  console.log(`[getSessionMeta] 获取 session 元数据: ${sessionId}`);
+  
   if (!sessionExists(sessionId)) {
+    console.error(`[getSessionMeta] session 不存在: ${sessionId}`);
     return null;
   }
 
-  const metaPath = path.join(getSessionPath(sessionId), ".session.json");
+  const sessionPath = getSessionPath(sessionId);
+  console.log(`[getSessionMeta] sessionPath: ${sessionPath}`);
+  
+  const metaPath = path.join(sessionPath, ".session.json");
+  console.log(`[getSessionMeta] metaPath: ${metaPath}`);
 
   if (!fs.existsSync(metaPath)) {
+    console.error(`[getSessionMeta] .session.json 文件不存在: ${metaPath}`);
     return null;
   }
 
   const content = fs.readFileSync(metaPath, "utf-8");
-  return JSON.parse(content) as SessionMeta;
+  console.log(`[getSessionMeta] .session.json 内容: ${content}`);
+  
+  const meta = JSON.parse(content) as SessionMeta;
+  console.log(`[getSessionMeta] 解析后的元数据:`, meta);
+  
+  return meta;
 }
 
 export function getSessionFiles(sessionId: string): DemoFiles | null {
@@ -319,28 +342,52 @@ export function updateSessionFiles(
 }
 
 export function mergeSession(sessionId: string): boolean {
+  console.log(`[mergeSession] 开始合并 session: ${sessionId}`);
+  
   const sessionMeta = getSessionMeta(sessionId);
+  console.log(`[mergeSession] sessionMeta:`, sessionMeta);
 
   if (!sessionMeta) {
+    console.error(`[mergeSession] 无法获取 session 元数据, sessionId: ${sessionId}`);
     return false;
   }
 
   const { demoId: projectId } = sessionMeta;
+  console.log(`[mergeSession] projectId: ${projectId}`);
 
   if (!projectExists(projectId)) {
+    console.error(`[mergeSession] 项目不存在, projectId: ${projectId}`);
     return false;
   }
 
   const sessionPath = getSessionPath(sessionId);
+  console.log(`[mergeSession] sessionPath: ${sessionPath}`);
+  
   const projectPath = getProjectPath(projectId);
+  console.log(`[mergeSession] projectPath: ${projectPath}`);
+  
   const workspacePath = path.join(projectPath, "workspace");
+  console.log(`[mergeSession] workspacePath: ${workspacePath}`);
 
-  fs.rmSync(workspacePath, { recursive: true, force: true });
-  fs.cpSync(sessionPath, workspacePath, { recursive: true });
-  fs.rmSync(path.join(workspacePath, ".session.json"), { force: true });
-  fs.rmSync(sessionPath, { recursive: true, force: true });
-
-  return true;
+  try {
+    console.log(`[mergeSession] 删除旧 workspace...`);
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+    
+    console.log(`[mergeSession] 复制 session 到 workspace...`);
+    fs.cpSync(sessionPath, workspacePath, { recursive: true });
+    
+    console.log(`[mergeSession] 删除 workspace 中的 .session.json...`);
+    fs.rmSync(path.join(workspacePath, ".session.json"), { force: true });
+    
+    console.log(`[mergeSession] 删除 session 目录...`);
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+    
+    console.log(`[mergeSession] 合并成功!`);
+    return true;
+  } catch (error) {
+    console.error(`[mergeSession] 文件操作失败:`, error);
+    return false;
+  }
 }
 
 export function deleteSession(sessionId: string): boolean {

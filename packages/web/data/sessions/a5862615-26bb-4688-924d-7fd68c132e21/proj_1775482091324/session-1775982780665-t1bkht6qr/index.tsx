@@ -2,18 +2,12 @@ import React, { useState, useEffect } from 'react';
 
 interface BannerDemoProps {
   banner: string;
-  title: string;
-  description: string;
   theme: 'light' | 'dark' | 'colorful';
-  showBadge: boolean;
 }
 
 export default function BannerDemo({ 
   banner, 
-  title, 
-  description, 
-  theme,
-  showBadge 
+  theme
 }: BannerDemoProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -91,12 +85,6 @@ export default function BannerDemo({
   return (
     <div className={`min-h-screen ${themeClasses[theme]}`}>
       <div className="container mx-auto px-4 py-8">
-        {showBadge && (
-          <span className="inline-block px-4 py-2 text-sm font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full mb-6 shadow-lg">
-            精彩轮播
-          </span>
-        )}
-
         {/* 轮播容器 */}
         <div 
           className="relative w-full max-w-4xl mx-auto"
@@ -128,14 +116,6 @@ export default function BannerDemo({
 
             {/* 渐变遮罩 */}
             <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-            {/* 标题文字覆盖层 */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                {title} - {currentIndex + 1}/{banners.length}
-              </h2>
-              <p className="text-sm md:text-base opacity-90">{description}</p>
-            </div>
           </div>
 
           {/* 上一张按钮 */}
@@ -173,30 +153,6 @@ export default function BannerDemo({
                 }`}
                 aria-label={`跳转到第 ${index + 1} 张`}
               />
-            ))}
-          </div>
-        </div>
-
-        {/* 缩略图预览区域 */}
-        <div className="mt-8 max-w-4xl mx-auto">
-          <h3 className="text-lg font-semibold mb-4 opacity-80">图片预览</h3>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {banners.map((img, index) => (
-              <button
-                key={index}
-                onClick={() => goToSlide(index)}
-                className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
-                  index === currentIndex
-                    ? 'border-blue-500 shadow-lg ring-2 ring-blue-300'
-                    : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                <img
-                  src={img}
-                  alt={`缩略图 ${index + 1}`}
-                  className="w-24 h-16 object-cover"
-                />
-              </button>
             ))}
           </div>
         </div>
