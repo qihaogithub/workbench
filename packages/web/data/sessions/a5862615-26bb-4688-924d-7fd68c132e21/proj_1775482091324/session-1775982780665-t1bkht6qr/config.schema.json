@@ -3,12 +3,35 @@
   "title": "轮播 Banner 配置",
   "type": "object",
   "properties": {
-    "banner": {
-      "type": "string",
-      "format": "uri",
-      "title": "轮播图片",
-      "description": "轮播的主图片地址，系统会自动生成多张轮播图，支持 JPG、PNG、WebP 格式",
-      "default": "https://picsum.photos/800/400"
+    "banners": {
+      "type": "array",
+      "title": "轮播图片列表",
+      "description": "配置多张轮播图片，支持 JPG、PNG、WebP 格式",
+      "items": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "format": "uri",
+            "title": "图片地址"
+          },
+          "alt": {
+            "type": "string",
+            "title": "图片描述"
+          },
+          "order": {
+            "type": "number",
+            "title": "显示顺序",
+            "description": "图片在轮播中的顺序（数字越小越靠前）"
+          }
+        },
+        "required": ["src"]
+      },
+      "default": [
+        { "src": "https://picsum.photos/800/400?random=1", "alt": "轮播图 1", "order": 1 },
+        { "src": "https://picsum.photos/800/400?random=2", "alt": "轮播图 2", "order": 2 },
+        { "src": "https://picsum.photos/800/400?random=3", "alt": "轮播图 3", "order": 3 }
+      ]
     },
     "theme": {
       "type": "string",
@@ -32,16 +55,28 @@
     },
     "carouselOrder": {
       "type": "number",
-      "title": "轮播图顺序",
-      "description": "轮播图在布局中的位置（数字越小越靠前）",
+      "title": "轮播组件顺序",
+      "description": "轮播组件在布局中的位置（数字越小越靠前）",
       "default": 1
     },
     "buttonOrder": {
       "type": "number",
-      "title": "按钮顺序",
+      "title": "按钮组件顺序",
       "description": "按钮在布局中的位置（数字越小越靠前）",
       "default": 2
+    },
+    "autoPlay": {
+      "type": "boolean",
+      "title": "自动轮播",
+      "description": "是否启用自动轮播",
+      "default": true
+    },
+    "autoPlayInterval": {
+      "type": "number",
+      "title": "自动轮播间隔",
+      "description": "自动轮播的时间间隔（毫秒）",
+      "default": 4000
     }
   },
-  "required": ["banner"]
+  "required": ["banners"]
 }

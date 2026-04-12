@@ -1,59 +1,69 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
+interface BannerItem {
+  src: string;
+  alt?: string;
+  order?: number;
+}
 
 interface BannerDemoProps {
-  banner: string;
+  banners: BannerItem[];
   theme: 'light' | 'dark' | 'colorful';
   buttonText: string;
   buttonVariant: 'primary' | 'secondary' | 'outline' | 'ghost';
   carouselOrder: number;
   buttonOrder: number;
+  autoPlay: boolean;
+  autoPlayInterval: number;
 }
 
-export default function BannerDemo({ 
-  banner, 
+export default function BannerDemo({
+  banners,
   theme,
   buttonText,
   buttonVariant,
   carouselOrder,
-  buttonOrder
+  buttonOrder,
+  autoPlay,
+  autoPlayInterval,
 }: BannerDemoProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // 模拟多张轮播图，使用传入的 banner 作为基础，可添加占位符模拟
-  const banners = [
-    banner,
-    banner.replace(/(\d+)/, (_match, num) => String(parseInt(num) + 1)),
-    banner.replace(/(\d+)/, (_match, num) => String(parseInt(num) + 2)),
-  ];
+  // 根据 order 排序轮播图
+  const sortedBanners = useMemo(() => {
+    return [...banners].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [banners]);
 
   // 自动轮播
   useEffect(() => {
+    if (!autoPlay || sortedBanners.length <= 1) return;
+
     const timer = setInterval(() => {
       goToNext();
-    }, 4000);
+    }, autoPlayInterval);
 
     return () => clearInterval(timer);
-  }, [currentIndex]);
+  }, [autoPlay, autoPlayInterval, currentIndex, sortedBanners.length]);
 
   const goToNext = () => {
-    if (isAnimating) return;
+    if (isAnimating || sortedBanners.length <= 1) return;
     setIsAnimating(true);
-    setCurrentIndex((prev) => (prev + 1) % banners.length);
+    setCurrentIndex((prev) => (prev + 1) % sortedBanners.length);
     setTimeout(() => setIsAnimating(false), 500);
   };
 
   const goToPrev = () => {
-    if (isAnimating) return;
+    if (isAnimating || sortedBanners.length <= 1) return;
     setIsAnimating(true);
-    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
+    setCurrentIndex((prev) => (prev - 1 + sortedBanners.length) % sortedBanners.length);
     setTimeout(() => setIsAnimating(false), 500);
   };
 
   const goToSlide = (index: number) => {
-    if (isAnimating || index === currentIndex) return;
+    if (isAnimating || index === currentIndex || sortedBanners.length <= 1) return;
     setIsAnimating(true);
     setCurrentIndex(index);
     setTimeout(() => setIsAnimating(false), 500);
@@ -100,7 +110,7 @@ export default function BannerDemo({
 
   // 渲染轮播组件
   const renderCarousel = () => (
-    <div 
+    <div
       className="relative w-full max-w-4xl mx-auto"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -108,19 +118,19 @@ export default function BannerDemo({
     >
       {/* 主轮播区域 */}
       <div className="relative overflow-hidden rounded-2xl shadow-2xl">
-        <div 
+        <div
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {banners.map((img, index) => (
+          {sortedBanners.map((banner, index) => (
             <div
-              key={index}
+              key={`${banner.src}-${index}`}
               className="w-full flex-shrink-0"
               style={{ width: '100%' }}
             >
               <img
-                src={img}
-                alt={`轮播图 ${index + 1}`}
+                src={banner.src}
+                alt={banner.alt || `轮播图 ${index + 1}`}
                 className="w-full h-72 md:h-96 object-cover"
                 draggable={false}
               />
@@ -135,7 +145,8 @@ export default function BannerDemo({
       {/* 上一张按钮 */}
       <button
         onClick={goToPrev}
-        className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-50"
+        disabled={sortedBanners.length <= 1}
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
         aria-label="上一张"
       >
         <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +157,8 @@ export default function BannerDemo({
       {/* 下一张按钮 */}
       <button
         onClick={goToNext}
-        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-50"
+        disabled={sortedBanners.length <= 1}
+        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
         aria-label="下一张"
       >
         <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,20 +167,29 @@ export default function BannerDemo({
       </button>
 
       {/* 指示器点 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-        {banners.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all ${
-              index === currentIndex
-                ? 'bg-white w-8'
-                : 'bg-white/50 hover:bg-white/75'
-            }`}
-            aria-label={`跳转到第 ${index + 1} 张`}
-          />
-        ))}
-      </div>
+      {sortedBanners.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          {sortedBanners.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-3 h-3 rounded-full transition-all ${
+                index === currentIndex
+                  ? 'bg-white w-8'
+                  : 'bg-white/50 hover:bg-white/75'
+              }`}
+              aria-label={`跳转到第 ${index + 1} 张`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 轮播序号指示 */}
+      {sortedBanners.length > 1 && (
+        <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+          {currentIndex + 1} / {sortedBanners.length}
+        </div>
+      )}
     </div>
   );
 
@@ -189,9 +210,8 @@ export default function BannerDemo({
     </div>
   );
 
-  // 根据顺序渲染组件 - 使用位置值排序
+  // 根据顺序渲染组件
   const renderContent = () => {
-    // 根据 order 值排序，值越小越靠前
     const components = [
       { order: carouselOrder, render: renderCarousel },
       { order: buttonOrder, render: renderButton },
