@@ -82,21 +82,49 @@ export function PreviewPanel({
     !code.includes("\\重要文件\\");
 
   const entryCode = `
+import React from 'react';
+import './globals.css';
 import Demo from './Demo';
+
 export default function App() {
   return <Demo {...${JSON.stringify(configData)}} />;
 }
+`;
+
+  const tailwindConfig = `module.exports = {
+  content: ['./src/**/*.{js,jsx,ts,tsx}'],
+  theme: { extend: {} },
+  plugins: [],
+}`;
+
+  const postcssConfig = `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`;
+
+  const globalsCss = `
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 `;
 
   const files: Record<string, string> = isValidCode
     ? {
         "/Demo.tsx": code,
         "/App.tsx": entryCode,
+        "/tailwind.config.js": tailwindConfig,
+        "/postcss.config.js": postcssConfig,
+        "/src/globals.css": globalsCss,
         ...sdkFiles,
       }
     : {
         "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
         "/App.tsx": entryCode,
+        "/tailwind.config.js": tailwindConfig,
+        "/postcss.config.js": postcssConfig,
+        "/src/globals.css": globalsCss,
         ...sdkFiles,
       };
 
@@ -120,6 +148,9 @@ export default function App() {
           dependencies: {
             react: "^18.0.0",
             "react-dom": "^18.0.0",
+            tailwindcss: "^3.4.1",
+            autoprefixer: "^10.4.17",
+            postcss: "^8.4.33",
           },
         }}
         theme={{

@@ -3,13 +3,20 @@
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Streamdown } from "streamdown";
-import { Loader2, Check, Copy } from "lucide-react";
-import type { ToolEntry } from "./tool";
+import {
+  Loader2,
+  Check,
+  Copy,
+  Eye,
+  Terminal,
+  Edit3,
+  Wrench,
+  Search,
+} from "lucide-react";
 import {
   ChainOfThought,
   ChainOfThoughtHeader,
   ChainOfThoughtContent,
-  ChainOfThoughtStep,
 } from "./chain-of-thought";
 
 interface MessagePart {
@@ -41,20 +48,16 @@ interface AssistantMessageProps {
     parameters?: Record<string, unknown>;
     result?: unknown;
   }>;
-  /** 有序的内容块数组（推荐） */
   parts?: MessagePart[];
   isStreaming?: boolean;
   className?: string;
 }
 
-/**
- * 统一的 Assistant 消息卡片
- *
- * 使用 parts 数组渲染，保持内容的时间线顺序
- * - ReasoningPart -> ChainOfThoughtStep
- * - ToolCallPart -> ChainOfThoughtStep
- * - TextPart -> 普通 Markdown 正文
- */
+// 渲染块定义：文本块 或 过程块(包含多个连续的思考和工具)
+type RenderBlock =
+  | { type: "text"; content: string }
+  | { type: "process"; parts: MessagePart[] };
+
 export function AssistantMessage({
   content,
   reasonings = [],
@@ -66,22 +69,16 @@ export function AssistantMessage({
   const [copied, setCopied] = useState(false);
   const [chainOpen, setChainOpen] = useState(isStreaming);
 
-  // 当 isStreaming 从 true 变为 false 时，自动折叠 ChainOfThought
   useEffect(() => {
-    if (!isStreaming) {
-      setChainOpen(false);
-    } else {
-      setChainOpen(true);
-    }
+    setChainOpen(isStreaming);
   }, [isStreaming]);
 
-  // 兼容旧的 reasonings/tools 格式，转换为 parts
   const normalizedParts: MessagePart[] = parts ? [...parts] : [];
 
-  // 如果没有 parts 但有旧的 reasonings/tools，进行兼容转换
+  // 兼容旧的 reasonings/tools 格式，转换为 parts
   if (
     normalizedParts.length === 0 &&
-    (reasonings.length > 0 || tools.length > 0)
+    (reasonings.length > 0 || tools.length > 0 || content)
   ) {
     const converted: MessagePart[] = [];
 
@@ -108,7 +105,7 @@ export function AssistantMessage({
     }
 
     // 如果有文本内容，添加到末尾
-    if (content) {
+    if (content && normalizedParts.length === 0) {
       converted.push({
         type: "text",
         content,
@@ -118,25 +115,40 @@ export function AssistantMessage({
     normalizedParts.push(...converted);
   }
 
-  // 检查是否有中间过程内容（reasoning 或 tool）
-  const hasProcessContent = normalizedParts.some(
-    (p) => p.type === "reasoning" || p.type === "tool",
-  );
+  if (normalizedParts.length === 0 && content) {
+    normalizedParts.push({ type: "text", content });
+  }
 
-  // 提取纯文本内容（TextPart 或 content 字段）
-  const textParts = normalizedParts.filter((p) => p.type === "text");
-  const finalContent =
-    textParts.length > 0
-      ? textParts.map((p) => p.content).join("\n\n")
-      : content;
+  // 1. 核心修复：按时间线分组连续的块（保持 AI 说话和做事的先后顺序）
+  const renderBlocks: RenderBlock[] = [];
+  let currentProcessGroup: MessagePart[] = [];
 
-  // 如果什么都没有，显示加载状态
-  if (!hasProcessContent && !finalContent) {
+  normalizedParts.forEach((part) => {
+    if (part.type === "reasoning" || part.type === "tool") {
+      currentProcessGroup.push(part);
+    } else if (part.type === "text") {
+      // 遇到文本时，先把前面积累的过程块推入数组
+      if (currentProcessGroup.length > 0) {
+        renderBlocks.push({ type: "process", parts: currentProcessGroup });
+        currentProcessGroup = [];
+      }
+      // 再推入当前的文本块
+      if (part.content?.trim()) {
+        renderBlocks.push({ type: "text", content: part.content });
+      }
+    }
+  });
+  // 收尾：如果最后全是过程，推入最后一个过程块
+  if (currentProcessGroup.length > 0) {
+    renderBlocks.push({ type: "process", parts: currentProcessGroup });
+  }
+
+  // 如果什么都没有，显示初始加载状态
+  if (renderBlocks.length === 0) {
     if (!isStreaming) return null;
-
     return (
-      <div className={cn("flex flex-col gap-4 w-full", className)}>
-        <div className="flex items-center gap-3 px-3 py-3">
+      <div className={cn("flex flex-col gap-4 w-full py-2", className)}>
+        <div className="flex items-center gap-3">
           <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
           <span className="text-sm text-muted-foreground">思考中...</span>
         </div>
@@ -144,160 +156,140 @@ export function AssistantMessage({
     );
   }
 
+  // 获取所有纯文本用于一键复制
+  const allTextContent = renderBlocks
+    .filter((b) => b.type === "text")
+    .map((b) => b.content)
+    .join("\n\n");
+
   const handleCopy = async () => {
-    if (finalContent) {
-      await navigator.clipboard.writeText(finalContent);
+    if (allTextContent) {
+      await navigator.clipboard.writeText(allTextContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  // 按文件路径合并工具调用
-  const groupToolsByPath = (
-    toolParts: Array<{
-      toolName: string;
-      status: any;
-      parameters?: Record<string, unknown>;
-      result?: unknown;
-    }>,
-  ) => {
-    const groups = new Map<string, { path?: string; entries: ToolEntry[] }>();
-    for (const tool of toolParts) {
-      const path = (tool.parameters?.path || tool.parameters?.file_path) as
-        | string
-        | undefined;
-      const key = path || tool.toolName;
-      if (!groups.has(key)) {
-        groups.set(key, { path, entries: [] });
-      }
-      groups.get(key)!.entries.push({
-        name: tool.toolName,
-        status: tool.status,
-        parameters: tool.parameters,
-        result: tool.result,
-      });
-    }
-    return Array.from(groups.values());
-  };
-
   return (
-    <div className={cn("flex flex-col gap-4 w-full", className)}>
-      {/* ChainOfThought - 渲染中间过程 */}
-      {hasProcessContent && (
-        <ChainOfThought open={chainOpen} onOpenChange={setChainOpen}>
-          <ChainOfThoughtHeader>
-            {isStreaming ? "处理中" : "处理过程"}
-          </ChainOfThoughtHeader>
-          <ChainOfThoughtContent>
-            {normalizedParts.map((part, index) => {
-              // 渲染 ReasoningPart
-              if (part.type === "reasoning") {
-                const reasoningContent = part.content || "";
-                return (
-                  <ChainOfThoughtStep
-                    key={`reasoning-${index}`}
-                    status="complete"
-                    title={
-                      reasoningContent.length > 50
-                        ? reasoningContent.slice(0, 50) + "..."
-                        : reasoningContent
-                    }
-                    description={
-                      part.duration
-                        ? `耗时 ${(part.duration / 1000).toFixed(1)}s`
-                        : undefined
-                    }
-                  >
-                    <div className="text-xs text-muted-foreground mt-1">
-                      <Streamdown>{reasoningContent}</Streamdown>
-                    </div>
-                  </ChainOfThoughtStep>
-                );
-              }
-
-              // 渲染 ToolCallPart
-              if (part.type === "tool") {
-                const status =
-                  part.status === "running"
-                    ? "active"
-                    : part.status === "completed"
-                      ? "complete"
-                      : part.status === "error"
-                        ? "complete"
-                        : "pending";
-
-                return (
-                  <ChainOfThoughtStep
-                    key={`tool-${part.toolCallId || index}`}
-                    status={status}
-                    title={`调用工具: ${part.toolName || "未知"}`}
-                  >
-                    <div className="mt-2 flex flex-col gap-2">
-                      {/* 展示入参 */}
-                      {part.parameters &&
-                        typeof part.parameters === "object" &&
-                        Object.keys(part.parameters).length > 0 && (
-                          <div className="bg-muted/50 rounded-md p-3">
-                            <div className="text-xs text-muted-foreground mb-1 select-none font-medium">
-                              输入
-                            </div>
-                            <pre className="text-xs overflow-x-auto text-foreground font-mono">
-                              {JSON.stringify(part.parameters, null, 2)}
-                            </pre>
-                          </div>
-                        )}
-
-                      {/* 展示结果（如果有） */}
-                      {part.result != null && (
-                        <div className="bg-muted/50 rounded-md p-3">
-                          <div className="text-xs text-muted-foreground mb-1 select-none font-medium">
-                            结果
-                          </div>
-                          <pre className="text-xs overflow-x-auto text-foreground font-mono">
-                            {typeof part.result === "object"
-                              ? JSON.stringify(part.result, null, 2)
-                              : String(part.result)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </ChainOfThoughtStep>
-                );
-              }
-
-              return null;
-            })}
-          </ChainOfThoughtContent>
-        </ChainOfThought>
+    <div
+      className={cn(
+        "flex flex-col gap-3 w-full group relative py-1",
+        className,
       )}
-
-      {/* 正文内容 */}
-      {finalContent && (
-        <div className="group relative w-full">
-          <div className="py-2">
-            <div className="text-sm prose prose-sm dark:prose-invert max-w-none overflow-hidden">
-              <div className="overflow-x-auto">
-                <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
-                  {finalContent}
-                </Streamdown>
-              </div>
-            </div>
-          </div>
-
-          {/* 消息操作按钮 */}
-          <div className="flex items-center gap-1 px-3 pb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded transition-colors"
+    >
+      {renderBlocks.map((block, index) => {
+        // 渲染纯文本内容（现在它会老老实实呆在正确的时间线位置了）
+        if (block.type === "text") {
+          return (
+            <div
+              key={`text-${index}`}
+              className="prose prose-sm dark:prose-invert max-w-none"
             >
-              {copied ? (
-                <Check className="h-3 w-3 text-green-500" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-              {copied ? "已复制" : "复制"}
-            </button>
-          </div>
+              <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+                {block.content}
+              </Streamdown>
+            </div>
+          );
+        }
+
+        // 渲染中间过程（取代旧的 ChainOfThoughtStep，直接用原生 DIV）
+        if (block.type === "process") {
+          return (
+            <ChainOfThought
+              key={`process-${index}`}
+              open={chainOpen}
+              onOpenChange={setChainOpen}
+            >
+              <ChainOfThoughtHeader>
+                {isStreaming && index === renderBlocks.length - 1
+                  ? "处理中..."
+                  : "处理过程"}
+              </ChainOfThoughtHeader>
+
+              <ChainOfThoughtContent>
+                <div className="flex flex-col gap-3 py-1">
+                  {block.parts.map((part, pIndex) => {
+                    // 2. 官方风格的思考呈现：直接是普通的灰色小字，没有前面的绿勾和圆圈
+                    if (part.type === "reasoning") {
+                      return (
+                        <div
+                          key={pIndex}
+                          className="text-[13px] text-muted-foreground leading-relaxed"
+                        >
+                          <Streamdown>{part.content || ""}</Streamdown>
+                        </div>
+                      );
+                    }
+
+                    // 3. 官方风格的工具呈现：一个图标 + 简短的动作描述，没有乱七八糟的 JSON
+                    if (part.type === "tool") {
+                      const name = (part.toolName || "").toLowerCase();
+                      const path = (part.parameters?.path ||
+                        part.parameters?.file_path) as string;
+
+                      // 智能映射图标与文案
+                      let ToolIcon = Wrench;
+                      let actionText = part.toolName || "未知操作";
+
+                      if (name.includes("read")) {
+                        ToolIcon = Eye;
+                        actionText = path ? `读取 ${path}` : "读取文件";
+                      } else if (
+                        name.includes("edit") ||
+                        name.includes("write")
+                      ) {
+                        ToolIcon = Edit3;
+                        actionText = path ? `修改 ${path}` : "修改文件";
+                      } else if (
+                        name.includes("execute") ||
+                        name.includes("cmd") ||
+                        name.includes("terminal")
+                      ) {
+                        ToolIcon = Terminal;
+                        actionText = "执行命令";
+                      } else if (name.includes("search")) {
+                        ToolIcon = Search;
+                        actionText = "搜索资料";
+                      }
+
+                      return (
+                        <div
+                          key={pIndex}
+                          className="flex items-center gap-2.5 text-[13px] font-medium text-foreground/90 my-0.5"
+                        >
+                          <ToolIcon className="h-4 w-4 text-muted-foreground/80" />
+                          <span>{actionText}</span>
+                          {/* 如果正在运行，跟一个加载圈 */}
+                          {part.status === "running" && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </ChainOfThoughtContent>
+            </ChainOfThought>
+          );
+        }
+        return null;
+      })}
+
+      {/* 消息的整体操作按钮 (只在鼠标 Hover 时显示) */}
+      {allTextContent && (
+        <div className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-10 bg-background/80 backdrop-blur rounded p-1 shadow-sm">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded transition-colors"
+          >
+            {copied ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+            {copied ? "已复制" : "复制"}
+          </button>
         </div>
       )}
     </div>
