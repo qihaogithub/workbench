@@ -15,6 +15,7 @@ import {
   type StreamEvent,
 } from "@opencode-workbench/agent-client";
 import { Bot, Sparkles } from "lucide-react";
+import type { MessagePart } from "@/components/ai-elements";
 
 interface PermissionRequest {
   sessionId: string;
@@ -58,9 +59,7 @@ export function AIChat({
   const [currentMessage, setCurrentMessage] = useState<ChatMessage>({
     role: "assistant",
     content: "",
-    reasoning: undefined,
-    reasonings: [],
-    tools: [],
+    parts: [],
   });
   // 用 ref 追踪最新值，避免闭包问题
   const currentMessageRef = useRef(currentMessage);
@@ -75,12 +74,12 @@ export function AIChat({
   // Plan 状态
   const [plan, setPlan] = useState<string>("");
 
-  console.log(
-    "[AIChat] Props received - workingDir:",
-    workingDir,
-    "agentSessionId:",
-    agentSessionId,
-  );
+  // console.log(
+  //   "[AIChat] Props received - workingDir:",
+  //   workingDir,
+  //   "agentSessionId:",
+  //   agentSessionId,
+  // );
 
   // 自动滚动到底部
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -144,59 +143,79 @@ export function AIChat({
       setCurrentMessage({
         role: "assistant",
         content: "",
-        reasoning: undefined,
-        reasonings: [],
-        tools: [],
+        parts: [],
       });
 
-      // 监听流式文本
+      // 监听流式文本 - 追加到 parts 数组的最后一个 TextPart
       stream.on("stream", (event: StreamEvent) => {
         connectionEstablished = true;
         if (event.content) {
           accumulatedContent += event.content;
           setStreamContent(accumulatedContent);
-          setCurrentMessage((prev) => ({
-            ...prev,
-            content: accumulatedContent,
-          }));
+
+          setCurrentMessage((prev) => {
+            const parts = prev.parts || [];
+            const lastPart = parts[parts.length - 1];
+
+            // 如果最后一个 part 是 text，追加内容
+            if (lastPart && lastPart.type === "text") {
+              return {
+                ...prev,
+                content: accumulatedContent,
+                parts: [
+                  ...parts.slice(0, -1),
+                  { ...lastPart, content: lastPart.content + event.content! },
+                ],
+              };
+            }
+
+            // 否则创建新的 TextPart
+            return {
+              ...prev,
+              content: accumulatedContent,
+              parts: [...parts, { type: "text", content: event.content! }],
+            };
+          });
         }
       });
 
-      // 监听思考过程 - 支持多次独立思考
+      // 监听思考过程 - 追加到 parts 数组
       stream.on("thought", (event: StreamEvent) => {
         if (event.content) {
-          // 检查是否有新的思考开始（通过事件ID或内容重置）
           setCurrentMessage((prev) => {
-            const currentReasonings = prev.reasonings || [];
+            const parts = prev.parts || [];
+            const lastPart = parts[parts.length - 1];
 
-            // 如果是新的思考片段（通过检查最后一个reasoning是否已经有内容）
-            const lastReasoning =
-              currentReasonings[currentReasonings.length - 1];
-
-            if (!lastReasoning || lastReasoning.content.length > 500) {
-              // 创建新的reasoning条目
+            // 如果最后一个 part 是 reasoning 且内容不太长，追加
+            if (
+              lastPart &&
+              lastPart.type === "reasoning" &&
+              lastPart.content.length < 500
+            ) {
               return {
                 ...prev,
-                reasonings: [
-                  ...currentReasonings,
+                parts: [
+                  ...parts.slice(0, -1),
                   {
-                    content: event.content!,
-                    timestamp: Date.now(),
+                    ...lastPart,
+                    content: lastPart.content + event.content!,
                   },
                 ],
               };
-            } else {
-              // 追加到最后一个reasoning
-              const updatedReasonings = [...currentReasonings];
-              updatedReasonings[updatedReasonings.length - 1] = {
-                ...lastReasoning,
-                content: lastReasoning.content + event.content,
-              };
-              return {
-                ...prev,
-                reasonings: updatedReasonings,
-              };
             }
+
+            // 否则创建新的 ReasoningPart
+            return {
+              ...prev,
+              parts: [
+                ...parts,
+                {
+                  type: "reasoning",
+                  content: event.content!,
+                  timestamp: Date.now(),
+                },
+              ],
+            };
           });
         }
       });
@@ -208,95 +227,112 @@ export function AIChat({
         }
       });
 
-      // 监听工具调用开始
+      // 监听工具调用开始 - 添加新的 ToolCallPart
       stream.on("tool_call", (event: StreamEvent) => {
-        // 从 title 中提取路径（格式: "fs/read_text_file › path/to/file"）
+        const eventAny = event as any;
+
+        // 打印完整事件以便调试
+        console.log("[AIChat] Tool Call Event:", event);
+
+        // 从 ACP 协议中提取工具信息
+        // 优先使用 name 字段，其次从 title 中提取
+        let toolName = "未知工具";
+        if (eventAny.name) {
+          toolName = eventAny.name;
+        } else if (eventAny.toolName) {
+          toolName = eventAny.toolName;
+        } else if (event.title) {
+          // 从 title 中提取工具名（格式: "fs/read_text_file › path/to/file"）
+          toolName = event.title.includes("›")
+            ? event.title.split("›")[0].trim()
+            : event.title;
+        }
+
+        // 提取参数
+        const parameters = eventAny.arguments || eventAny.parameters || {};
+
+        // 从 title 中提取路径
         let extractedPath: string | undefined;
         if (event.title && event.title.includes("›")) {
           extractedPath = event.title.split("›").pop()?.trim();
         }
 
-        const eventAny = event as any;
-        setCurrentMessage((prev) => ({
-          ...prev,
-          tools: [
-            ...(prev.tools || []),
-            {
-              name: event.title || event.kind || "未知工具",
-              kind: event.kind as "read" | "edit" | "execute",
-              path:
-                extractedPath ||
-                eventAny.path ||
-                eventAny?.parameters?.path ||
-                eventAny?.parameters?.file_path,
-              status: "running",
-              parameters: {
-                toolCallId: event.toolCallId,
-                kind: event.kind,
-                ...(event.title && { title: event.title }),
+        // 合并参数中的路径
+        const finalParameters = {
+          ...parameters,
+          path: extractedPath || parameters.path || parameters.file_path,
+        };
+
+        setCurrentMessage((prev) => {
+          const parts = prev.parts || [];
+          const toolCallId = event.toolCallId || `tool-${Date.now()}`;
+
+          return {
+            ...prev,
+            parts: [
+              ...parts,
+              {
+                type: "tool",
+                toolCallId,
+                toolName,
+                status: "running" as const,
+                parameters: finalParameters,
               },
-            },
-          ],
-        }));
+            ],
+          };
+        });
       });
 
-      // 监听工具调用状态更新
+      // 监听工具调用状态更新 - 根据 toolCallId 更新对应的 ToolCallPart
       stream.on("tool_call_update", (event: StreamEvent) => {
         setCurrentMessage((prev) => {
-          const updatedTools = (prev.tools || []).map((tool, index) => {
-            // 通过 toolCallId 匹配
-            if (
-              event.toolCallId &&
-              tool.parameters?.toolCallId === event.toolCallId
-            ) {
+          const parts = prev.parts || [];
+          const toolCallId = event.toolCallId;
+
+          if (!toolCallId) {
+            console.warn("[AIChat] tool_call_update 缺少 toolCallId");
+            return prev;
+          }
+
+          // 查找并更新对应的工具 part
+          const updatedParts = parts.map((part) => {
+            if (part.type === "tool" && part.toolCallId === toolCallId) {
               const newStatus =
                 event.toolCallStatus === "completed"
                   ? "completed"
                   : event.toolCallStatus === "failed"
                     ? "error"
-                    : tool.status;
+                    : part.status;
 
-              // 如果失败，尝试从事件中提取错误信息
-              let errorResult = event.content || tool.result;
-              if (event.toolCallStatus === "failed" && !errorResult) {
-                errorResult = {
+              // 提取结果
+              let result = part.result;
+              if (event.content) {
+                try {
+                  // 尝试解析 JSON 结果
+                  result = JSON.parse(event.content);
+                } catch {
+                  result = event.content;
+                }
+              }
+
+              // 如果失败，提取错误信息
+              if (event.toolCallStatus === "failed" && !result) {
+                result = {
                   error: "工具执行失败",
                   details: event.error?.message || "未知错误",
                 };
               }
 
               return {
-                ...tool,
+                ...part,
                 status: newStatus,
-                result: errorResult,
+                result,
               };
             }
-            // 兜底:匹配最后一个工具
-            if (index === prev.tools!.length - 1) {
-              const newStatus =
-                event.toolCallStatus === "completed"
-                  ? "completed"
-                  : event.toolCallStatus === "failed"
-                    ? "error"
-                    : tool.status;
-
-              let errorResult = event.content || tool.result;
-              if (event.toolCallStatus === "failed" && !errorResult) {
-                errorResult = {
-                  error: "工具执行失败",
-                  details: event.error?.message || "未知错误",
-                };
-              }
-
-              return {
-                ...tool,
-                status: newStatus,
-                result: errorResult,
-              };
-            }
-            return tool;
+            return part;
           });
-          return { ...prev, tools: updatedTools };
+
+          return { ...prev, parts: updatedParts };
         });
       });
 
@@ -332,16 +368,22 @@ export function AIChat({
 
           // 实时提取代码和 schema 更新
           for (const file of files) {
-            if (
-              (file.path.includes("index.tsx") ||
-                file.path.includes("index.ts")) &&
-              file.content
-            ) {
+            // 优化：使用精确路径匹配，避免误匹配（如 index.tsx.bak）
+            const normalizedPath = file.path.replace(/\\/g, "/");
+            const isCodeFile =
+              normalizedPath.endsWith("index.tsx") ||
+              normalizedPath.endsWith("index.ts") ||
+              normalizedPath.endsWith("Demo.tsx") ||
+              normalizedPath.endsWith("Demo.ts");
+
+            if (isCodeFile && file.content) {
+              console.log("[AIChat] Code update detected:", file.path);
               onCodeUpdate?.(file.content);
             } else if (
-              file.path.includes("config.schema.json") &&
+              normalizedPath.endsWith("config.schema.json") &&
               file.content
             ) {
+              console.log("[AIChat] Schema update detected:", file.path);
               onSchemaUpdate?.(file.content);
             }
           }
@@ -365,10 +407,11 @@ export function AIChat({
               clearTimeout(fileUpdateTimer);
             }
 
+            // 优化：防抖时间从 100ms 增加到 300ms，避免批量更新被拆分
             fileUpdateTimer = setTimeout(() => {
               processRealtimeFiles();
               fileUpdateTimer = null;
-            }, 100);
+            }, 300);
           }
         }
       });
@@ -383,9 +426,7 @@ export function AIChat({
             accumulatedContent ||
             event.content ||
             "抱歉，我没有收到有效的回复。",
-          reasoning: currentMsg.reasoning,
-          reasonings: currentMsg.reasonings,
-          tools: currentMsg.tools,
+          parts: currentMsg.parts,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -393,9 +434,7 @@ export function AIChat({
         setCurrentMessage({
           role: "assistant",
           content: "",
-          reasoning: undefined,
-          reasonings: [],
-          tools: [],
+          parts: [],
         });
         setStreamContent("");
         setIsStreaming(false);
@@ -421,18 +460,25 @@ export function AIChat({
         if (finalFiles.length > 0) {
           onFilesChange?.(finalFiles);
 
-          // 从文件变更中提取代码和 schema
+          // 从文件变更中提取代码和 schema 更新
           for (const file of finalFiles) {
-            if (
-              file.path.includes("index.tsx") ||
-              file.path.includes("index.ts")
-            ) {
+            // 优化：使用精确路径匹配
+            const normalizedPath = file.path.replace(/\\/g, "/");
+            const isCodeFile =
+              normalizedPath.endsWith("index.tsx") ||
+              normalizedPath.endsWith("index.ts") ||
+              normalizedPath.endsWith("Demo.tsx") ||
+              normalizedPath.endsWith("Demo.ts");
+
+            if (isCodeFile) {
               // 文件对象包含 content 属性，可以直接读取
               if ("content" in file && typeof file.content === "string") {
+                console.log("[AIChat] Finish - code update:", file.path);
                 onCodeUpdate?.(file.content);
               }
-            } else if (file.path.includes("config.schema.json")) {
+            } else if (normalizedPath.endsWith("config.schema.json")) {
               if ("content" in file && typeof file.content === "string") {
+                console.log("[AIChat] Finish - schema update:", file.path);
                 onSchemaUpdate?.(file.content);
               }
             }
@@ -573,17 +619,24 @@ export function AIChat({
         if (result.data?.files && result.data.files.length > 0) {
           onFilesChange?.(result.data.files);
 
-          // 从文件变更中提取代码和 schema
+          // 从文件变更中提取代码和 schema 更新
           for (const file of result.data.files) {
-            if (
-              file.path.includes("index.tsx") ||
-              file.path.includes("index.ts")
-            ) {
+            // 优化：使用精确路径匹配
+            const normalizedPath = file.path.replace(/\\/g, "/");
+            const isCodeFile =
+              normalizedPath.endsWith("index.tsx") ||
+              normalizedPath.endsWith("index.ts") ||
+              normalizedPath.endsWith("Demo.tsx") ||
+              normalizedPath.endsWith("Demo.ts");
+
+            if (isCodeFile) {
               if ("content" in file && typeof file.content === "string") {
+                console.log("[AIChat] HTTP - code update:", file.path);
                 onCodeUpdate?.(file.content);
               }
-            } else if (file.path.includes("config.schema.json")) {
+            } else if (normalizedPath.endsWith("config.schema.json")) {
               if ("content" in file && typeof file.content === "string") {
+                console.log("[AIChat] HTTP - schema update:", file.path);
                 onSchemaUpdate?.(file.content);
               }
             }
@@ -677,15 +730,17 @@ export function AIChat({
       streamRef.current = null;
     }
     setIsStreaming(false);
-    if (streamContent || currentMessage.reasonings?.length || currentMessage.tools?.length) {
+    if (
+      streamContent ||
+      (currentMessage.parts && currentMessage.parts.length > 0)
+    ) {
       setMessages((prev) => [
         ...prev,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
           content: streamContent || "已取消",
-          reasonings: currentMessage.reasonings,
-          tools: currentMessage.tools,
+          parts: currentMessage.parts,
         },
       ]);
       setStreamContent("");
@@ -694,11 +749,9 @@ export function AIChat({
     setCurrentMessage({
       role: "assistant",
       content: "",
-      reasoning: undefined,
-      reasonings: [],
-      tools: [],
+      parts: [],
     });
-  }, [streamContent, currentMessage.reasonings, currentMessage.tools]);
+  }, [streamContent, currentMessage.parts]);
 
   return (
     <div className="flex flex-col h-full">
@@ -738,13 +791,14 @@ export function AIChat({
             if (msg.role === "user") {
               return <Message key={msg.id} message={msg} />;
             }
-            // Assistant 消息使用统一卡片
+            // Assistant 消息使用统一卡片，传递 parts 属性
             return (
               <AssistantMessage
                 key={msg.id}
                 content={msg.content}
                 reasonings={msg.reasonings}
                 tools={msg.tools}
+                parts={msg.parts}
               />
             );
           })}
@@ -755,6 +809,7 @@ export function AIChat({
               content={currentMessage.content || undefined}
               reasonings={currentMessage.reasonings}
               tools={currentMessage.tools}
+              parts={currentMessage.parts}
               isStreaming={true}
             />
           )}

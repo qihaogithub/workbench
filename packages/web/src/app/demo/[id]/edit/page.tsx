@@ -92,10 +92,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         console.log("[DemoEdit] Session API response:", sessionData.data);
         setSessionId(sessionData.data.sessionId);
         setTempWorkspace(sessionData.data.tempWorkspace || "");
-        console.log(
-          "[DemoEdit] tempWorkspace set to:",
-          sessionData.data.tempWorkspace,
-        );
+    
 
         const filesRes = await fetch(
           `/api/sessions/${sessionData.data.sessionId}/files`,
@@ -260,6 +257,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // 处理 AI 代码更新
   const handleCodeUpdate = useCallback(
     (newCode: string) => {
+      console.log(
+        "[DemoEdit] handleCodeUpdate called, code length:",
+        newCode.length,
+      );
       setCode(newCode);
       setEditorContent((prev) =>
         buildFigmaText(newCode, extractSchemaFromFigma(prev) || schema),
@@ -275,6 +276,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 处理 AI Schema 更新
   const handleSchemaUpdate = useCallback((newSchema: string) => {
+    console.log(
+      "[DemoEdit] handleSchemaUpdate called, schema length:",
+      newSchema.length,
+    );
     setSchema(newSchema);
     setEditorContent((prev) =>
       buildFigmaText(extractCodeFromFigma(prev) || code, newSchema),

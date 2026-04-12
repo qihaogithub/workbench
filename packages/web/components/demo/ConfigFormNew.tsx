@@ -1,7 +1,20 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { ChevronDown, ChevronRight, Info, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Info,
+  Sparkles,
+  Settings,
+  Palette,
+  Ruler,
+  Type,
+  Image,
+  Eye,
+  Layout,
+  LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -22,9 +35,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import type { ConfigFormProps } from "./types";
+import { ImageListWidget, ImageItem } from "./ImageListWidget";
 
 interface FieldConfig {
   key: string;
@@ -183,6 +202,26 @@ function FieldRenderer({
   onChange: (value: unknown) => void;
 }) {
   const renderInput = () => {
+    // 数组类型 - 图片列表
+    if (field.type === "array") {
+      const items = (value as Array<string | ImageItem>) || [];
+      const imageItems: ImageItem[] = items.map((item) => {
+        if (typeof item === 'string') {
+          return { url: item };
+        }
+        return item as ImageItem;
+      });
+
+      return (
+        <ImageListWidget
+          value={imageItems}
+          onChange={(newItems) => onChange(newItems)}
+          maxItems={20}
+          title={field.title}
+        />
+      );
+    }
+
     // 颜色选择器
     if (field.format === "color" || field.type === "color") {
       return (
@@ -206,14 +245,11 @@ function FieldRenderer({
     // 布尔值 - 开关
     if (field.type === "boolean") {
       return (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <Switch
             checked={(value as boolean) || false}
             onCheckedChange={(checked: boolean) => onChange(checked)}
           />
-          <Badge variant={(value as boolean) ? "default" : "secondary"} className="text-xs">
-            {(value as boolean) ? "开启" : "关闭"}
-          </Badge>
         </div>
       );
     }
@@ -221,21 +257,38 @@ function FieldRenderer({
     // 数字范围 - 滑块
     if (field.type === "number" || field.type === "integer") {
       if (field.minimum !== undefined && field.maximum !== undefined) {
+        const currentValue = (value as number) ?? field.default ?? field.minimum;
+
+        // 从字段名或 title 推断单位
+        const getUnit = (): string => {
+          const name = (field.key + field.title).toLowerCase();
+          if (name.includes("间隔") || name.includes("时间") || name.includes("duration")) {
+            return "ms";
+          }
+          if (name.includes("高度") || name.includes("height") ||
+              name.includes("宽度") || name.includes("width") ||
+              name.includes("大小") || name.includes("size")) {
+            return "px";
+          }
+          return "";
+        };
+
+        const unit = getUnit();
+
         return (
-          <div className="space-y-2">
+          <div className="flex items-center gap-3">
             <Slider
-              value={[(value as number) || field.minimum || 0]}
+              value={[currentValue]}
               min={field.minimum}
               max={field.maximum}
               step={field.type === "integer" ? 1 : 0.1}
               onValueChange={(vals: number[]) => onChange(vals[0])}
+              className="flex-1"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{field.minimum}</span>
-              <span className="font-mono font-medium text-foreground">
-                {(value as number) || field.minimum}
+            <div className="min-w-[60px] text-right">
+              <span className="font-mono text-sm font-medium text-foreground">
+                {currentValue}{unit}
               </span>
-              <span>{field.maximum}</span>
             </div>
           </div>
         );
@@ -322,20 +375,18 @@ function FieldRenderer({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Label className="text-xs font-medium text-foreground truncate">
+          <Label className="text-xs font-medium text-foreground truncate flex items-center">
             {field.title}
+            {field.required && (
+              <span className="text-red-500 ml-0.5">*</span>
+            )}
           </Label>
-          {field.required && (
-            <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">
-              必填
-            </Badge>
-          )}
         </div>
         {field.description && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
+                <Info className="h-4 w-4 text-muted-foreground/70 cursor-help shrink-0" />
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs max-w-[200px]">{field.description}</p>
@@ -349,6 +400,29 @@ function FieldRenderer({
   );
 }
 
+function getGroupIcon(title: string): LucideIcon {
+  switch (title) {
+    case "基础配置":
+      return Settings;
+    case "颜色配置":
+      return Palette;
+    case "尺寸设置":
+      return Ruler;
+    case "文本内容":
+      return Type;
+    case "图片资源":
+      return Image;
+    case "显示选项":
+      return Eye;
+    case "动画效果":
+      return Sparkles;
+    case "布局设置":
+      return Layout;
+    default:
+      return Settings;
+  }
+}
+
 function FieldGroupSection({
   group,
   formData,
@@ -358,21 +432,20 @@ function FieldGroupSection({
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
 }) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 px-1">
-        <div
-          className={cn("w-1 h-4 rounded-full bg-gradient-to-b", group.color)}
-        />
-        <h3 className="text-sm font-semibold text-foreground">
-          {group.title}
-        </h3>
-        <Badge variant="secondary" className="text-xs h-5">
-          {group.fields.length}
-        </Badge>
-      </div>
+  const Icon = getGroupIcon(group.title);
 
-      <div className="space-y-3">
+  return (
+    <Card>
+      <CardHeader className="bg-muted/30 py-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-semibold">{group.title}</CardTitle>
+          <Badge variant="secondary" className="text-xs h-5">
+            {group.fields.length} 字段
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 space-y-3">
         {group.fields.map((field) => (
           <FieldRenderer
             key={field.key}
@@ -381,8 +454,8 @@ function FieldGroupSection({
             onChange={(value) => onChange(field.key, value)}
           />
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -468,18 +541,14 @@ export function ConfigForm({
   return (
     <div className={cn("h-full", className)}>
       <ScrollArea className="h-full">
-        <div className="space-y-6 px-1 pb-4">
+        <div className="space-y-4 px-1 pb-4">
           {fieldGroups.map((group, index) => (
-            <div key={index}>
-              <FieldGroupSection
-                group={group}
-                formData={formData}
-                onChange={handleFieldChange}
-              />
-              {index < fieldGroups.length - 1 && (
-                <Separator className="my-6" />
-              )}
-            </div>
+            <FieldGroupSection
+              key={index}
+              group={group}
+              formData={formData}
+              onChange={handleFieldChange}
+            />
           ))}
         </div>
       </ScrollArea>

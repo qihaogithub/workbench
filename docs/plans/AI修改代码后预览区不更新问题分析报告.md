@@ -10,9 +10,12 @@
 
 ## 二、问题根因分析
 
-### 核心问题：`sdkFiles` prop 缺失导致预览区无法正常工作
+### 核心问题：`sdkFiles` prop 缺失 + SandpackProvider 未触发重新渲染
 
-经过详细分析代码，发现 **预览区不更新的核心原因是 `PreviewPanel` 组件缺少必要的 `sdkFiles` prop**。
+经过详细分析代码，发现 **预览区不更新的核心原因有两个**：
+
+1. **`PreviewPanel` 组件缺少必要的 `sdkFiles` prop**（次要问题）
+2. **`SandpackProvider` 没有使用 `key` 属性，导致代码更新时不触发重新渲染**（主要问题）⭐
 
 #### 2.1 代码证据
 
@@ -62,15 +65,66 @@ const files: Record<string, string> = isValidCode
 3. **展开运算符失效**：`{ ...undefined }` 会得到空对象 `{}`，不会报错但也不会添加任何文件
 4. **Sandpack 依赖缺失**：SDK 文件（如 React 组件依赖的基础设施文件）未被加载到 Sandpack 沙箱中
 
-#### 2.3 为什么代码更新后预览不刷新？
+#### 2.3 为什么代码更新后预览不刷新？（关键缺陷）
+
+**SandpackProvider 不会在 files prop 变化时自动重新渲染**：
 
 当 AI 修改代码并通过 `onCodeUpdate` 回调触发 `setCode(newCode)` 时：
 
 1. ✅ `code` 状态正确更新
 2. ✅ `PreviewPanel` 接收到新的 `code` prop
 3. ✅ `files` 对象重新构建（包含新的 `/Demo.tsx` 内容）
-4. ❌ **但 `sdkFiles` 仍为 `undefined`**，可能导致 Sandpack 内部编译失败
-5. ❌ Sandpack 可能因为缺少必要的 SDK 文件而无法正确渲染组件
+4. ❌ **但 `SandpackProvider` 没有使用 `key` 属性**，React 认为这是同一个组件，不会重新初始化沙箱
+5. ❌ Sandpack 内部的文件系统不会更新，导致预览仍然显示旧代码
+
+**代码证据**（`PreviewPanel.tsx` 第 96-120 行）：
+
+```tsx
+<SandpackProvider
+  template="react-ts"
+  files={files}  // ← 虽然 files 是响应式对象，但 Sandpack 不会自动检测深层变化
+  customSetup={{
+    dependencies: {
+      react: "^18.0.0",
+      "react-dom": "^18.0.0",
+    },
+  }}
+  // ← 缺少 key 属性！
+>
+  <SandpackLayout>
+    <SandpackPreview
+      showNavigator={false}
+      showRefreshButton={true}
+      style={previewStyle}
+    />
+  </SandpackLayout>
+</SandpackProvider>
+```
+
+**Sandpack 的工作原理**：
+- `SandpackProvider` 在首次渲染时会创建内部文件系统和编译环境
+- 当 `files` prop 变化时，Sandpack 会尝试更新文件内容，但这依赖于文件引用的一致性
+- 如果 `files` 对象每次都是新创建的（在 `PreviewPanel` 中确实如此），Sandpack 可能无法正确检测到变化
+- **添加 `key` 属性可以强制 React 销毁旧组件并创建新组件，确保 Sandpack 重新初始化**
+
+**解决方案**：
+```tsx
+<SandpackProvider
+  key={code}  // ← 添加此行，当 code 变化时强制重新渲染
+  template="react-ts"
+  files={files}
+  // ...
+>
+```
+
+#### 2.4 `sdkFiles` 问题分析
+
+1. **`sdkFiles` 未传递**：父组件在调用 `PreviewPanel` 时没有传递 `sdkFiles` prop
+2. **`sdkFiles` 为 `undefined`**：当 prop 未传递时，`sdkFiles` 值为 `undefined`
+3. **展开运算符失效**：`{ ...undefined }` 会得到空对象 `{}`，不会报错但也不会添加任何文件
+4. **Sandpack 依赖缺失**：SDK 文件（如 React 组件依赖的基础设施文件）未被加载到 Sandpack 沙箱中
+
+**注意**：根据代码审查，项目中并没有定义或加载任何 SDK 文件，因此 `sdkFiles` 缺失可能不是导致预览不更新的直接原因。但如果未来需要添加 SDK 文件，也需要修复此问题。
 
 ---
 
@@ -202,7 +256,57 @@ SandpackPreview 渲染预览
 
 ## 五、解决方案
 
-### 方案 1：修复 `sdkFiles` 传递（推荐）⭐
+### 方案 0：添加 `key` 属性强制 Sandpack 重新渲染（最高优先级）⭐⭐⭐
+
+**问题**：`SandpackProvider` 在 `files` 变化时不会自动重新渲染
+
+**位置**：`packages/web/components/demo/PreviewPanel.tsx` 第 96 行
+
+**修复**：
+
+```tsx
+// 修复前
+<SandpackProvider
+  template="react-ts"
+  files={files}
+  customSetup={{
+    dependencies: {
+      react: "^18.0.0",
+      "react-dom": "^18.0.0",
+    },
+  }}
+  // ...
+>
+
+// 修复后
+<SandpackProvider
+  key={code}  // ← 添加此行，当 code 变化时强制重新渲染
+  template="react-ts"
+  files={files}
+  customSetup={{
+    dependencies: {
+      react: "^18.0.0",
+      "react-dom": "^18.0.0",
+    },
+  }}
+  // ...
+>
+```
+
+**原理**：
+- React 的 `key` 属性用于标识组件实例
+- 当 `key` 变化时，React 会销毁旧组件实例并创建新实例
+- 这会触发 `SandpackProvider` 重新初始化内部文件系统和编译环境
+- 从而确保新的代码能够正确编译和渲染
+
+**影响**：
+- ✅ 修复 AI 修改代码后预览区不更新的问题
+- ✅ 修复手动编辑代码后预览区可能不更新的问题
+- ⚠️ 每次代码变化都会重新初始化 Sandpack，可能有短暂的性能开销（通常 < 1 秒）
+
+---
+
+### 方案 1：修复 `sdkFiles` 传递（中等优先级）⭐
 
 **步骤**：
 
@@ -256,6 +360,42 @@ const sdkFiles = {
   // ...
 };
 ```
+
+**注意**：根据代码审查，当前项目中并没有定义或加载任何 SDK 文件。此方案的优先级较低，可以暂缓实施。
+
+---
+
+### 方案 1.5：优化 SandpackProvider 的文件更新机制（可选优化）⭐
+
+**问题**：使用 `key={code}` 会导致整个 Sandpack 重新初始化，可能有性能开销
+
+**更优方案**：使用 Sandpack 的 `useSandpack` hook 和 `dispatch` API 来更新文件
+
+```tsx
+import { useSandpack } from "@codesandbox/sandpack-react";
+import { useEffect } from "react";
+
+// 在 PreviewPanel 组件内部添加
+const { sandpack } = useSandpack();
+
+useEffect(() => {
+  // 当 code 变化时，更新 Sandpack 文件系统
+  if (sandpack.status === "running") {
+    sandpack.updateFile("/Demo.tsx", code);
+  }
+}, [code, sandpack]);
+```
+
+**优点**：
+- ✅ 不会重新初始化整个 Sandpack 环境
+- ✅ 性能更好，更新是增量的
+- ✅ 预览更新更流畅
+
+**缺点**：
+- ⚠️ 需要重构组件结构（将 `files` 构建逻辑移到 `SandpackProvider` 内部）
+- ⚠️ 实现复杂度较高
+
+**建议**：先实施方案 0，如果性能有问题再考虑此方案。
 
 ### 方案 2：优化文件路径匹配逻辑
 
@@ -384,15 +524,21 @@ useEffect(() => {
 
 ## 七、总结
 
-| 问题 | 严重程度 | 影响 | 解决难度 |
-|------|---------|------|---------|
-| `sdkFiles` 未传递 | **高** | 预览区可能无法正常编译和渲染 | 低 |
-| 文件路径匹配不精确 | 中 | 可能漏匹配或误匹配 | 低 |
-| `content` 字段可能缺失 | 中 | `onCodeUpdate` 不会被调用 | 中 |
-| 防抖时间过短 | 低 | 批量更新可能被拆分 | 低 |
-| 代码块提取失败 | 低 | 备选方案失效 | 低 |
+| 问题 | 严重程度 | 影响 | 解决难度 | 优先级 |
+|------|---------|------|---------|--------|
+| **SandpackProvider 缺少 key 属性** | **极高** | 预览区完全不会更新 | **极低** | **P0** |
+| `sdkFiles` 未传递 | 中 | 未来可能需要，当前无影响 | 低 | P2 |
+| 文件路径匹配不精确 | 中 | 可能漏匹配或误匹配 | 低 | P1 |
+| `content` 字段可能缺失 | 中 | `onCodeUpdate` 不会被调用 | 中 | P1 |
+| 防抖时间过短 | 低 | 批量更新可能被拆分 | 低 | P2 |
+| 代码块提取失败 | 低 | 备选方案失效 | 低 | P3 |
 
-**建议优先修复 `sdkFiles` 传递问题**，这是最可能导致预览不更新的根因。修复后，再根据实际效果决定是否需要优化其他问题。
+**实施建议**：
+
+1. **立即实施方案 0**（添加 `key={code}`）- 这是解决预览不更新问题的关键
+2. **实施方案 2**（优化文件路径匹配）- 提高代码检测的准确性
+3. **增加调试日志**（方案 3）- 方便后续排查问题
+4. **暂缓实施方案 1**（sdkFiles 传递）- 当前项目未使用 SDK 文件，可以暂缓
 
 ---
 

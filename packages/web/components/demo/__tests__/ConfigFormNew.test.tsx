@@ -67,9 +67,9 @@ describe('ConfigFormNew', () => {
     );
 
     expect(screen.getByText('标题')).toBeInTheDocument();
-    // 有多个必填标记，使用 getAllByText
-    const requiredBadges = screen.getAllByText('必填');
-    expect(requiredBadges.length).toBeGreaterThanOrEqual(1);
+    // 必填标记现在使用红色星号 * 而不是 Badge "必填"
+    const titleLabel = screen.getByText('标题').closest('label');
+    expect(titleLabel).toHaveTextContent('*');
   });
 
   it('应处理配置变更', () => {
@@ -105,7 +105,7 @@ describe('ConfigFormNew', () => {
     expect(screen.getByText('暂无配置项')).toBeInTheDocument();
   });
 
-  it('应支持折叠/展开分组', () => {
+  it('应使用卡片样式显示分组', () => {
     render(
       <ConfigForm
         schema={mockSchema}
@@ -114,15 +114,43 @@ describe('ConfigFormNew', () => {
       />
     );
 
-    const groupButtons = screen.getAllByRole('button');
-    const baseConfigButton = groupButtons.find(button => 
-      button.textContent?.includes('基础配置')
+    // 验证分组标题显示字段数量（可能有多个分组，使用 getAllByText）
+    const fieldCounts = screen.getAllByText(/\d+ 字段/);
+    expect(fieldCounts.length).toBeGreaterThan(0);
+    
+    // 验证分组使用卡片样式（通过检查 Card 组件的类名）
+    const cards = document.querySelectorAll('.rounded-lg.border.bg-card');
+    expect(cards.length).toBeGreaterThan(0);
+  });
+
+  it('应显示滑块数值', () => {
+    render(
+      <ConfigForm
+        schema={mockSchema}
+        onChange={jest.fn()}
+        initialData={{ fontSize: 16 }}
+      />
     );
 
-    if (baseConfigButton) {
-      fireEvent.click(baseConfigButton);
-      // 折叠后应该看不到字段
-      expect(screen.queryByText('标题')).not.toBeInTheDocument();
-    }
+    // 滑块旁边应显示当前数值（字体大小字段）
+    expect(screen.getByText('16px')).toBeInTheDocument();
+  });
+
+  it('应渲染开关组件而不显示开启/关闭文字', () => {
+    render(
+      <ConfigForm
+        schema={mockSchema}
+        onChange={jest.fn()}
+        initialData={{ showHeader: true }}
+      />
+    );
+
+    // 开关旁边不应再有"开启"或"关闭"文字
+    expect(screen.queryByText('开启')).not.toBeInTheDocument();
+    expect(screen.queryByText('关闭')).not.toBeInTheDocument();
+    
+    // 但应该有 Switch 组件（role="switch"）
+    const switches = screen.getAllByRole('switch');
+    expect(switches.length).toBeGreaterThan(0);
   });
 });

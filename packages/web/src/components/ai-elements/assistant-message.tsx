@@ -3,24 +3,36 @@
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Streamdown } from "streamdown";
-import {
-  ChevronDown,
-  ChevronRight,
-  Bot,
-  Sparkles,
-  Loader2,
-  Check,
-  Copy,
-} from "lucide-react";
+import { Loader2, Check, Copy } from "lucide-react";
 import { Tool, type ToolEntry } from "./tool";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+} from "./chain-of-thought";
+
+interface MessagePart {
+  type: "text" | "reasoning" | "tool" | "image" | "file";
+  content?: string;
+  toolCallId?: string;
+  toolName?: string;
+  status?: "running" | "completed" | "error" | "awaiting-approval";
+  parameters?: Record<string, unknown>;
+  result?: unknown;
+  duration?: number;
+  timestamp?: number;
+}
 
 interface AssistantMessageProps {
   content?: string;
+  /** @deprecated 使用 parts 替代 */
   reasonings?: Array<{
     content: string;
     duration?: number;
     timestamp?: number;
   }>;
+  /** @deprecated 使用 parts 替代 */
   tools?: Array<{
     name: string;
     kind?: "read" | "edit" | "execute";
@@ -29,6 +41,8 @@ interface AssistantMessageProps {
     parameters?: Record<string, unknown>;
     result?: unknown;
   }>;
+  /** 有序的内容块数组（推荐） */
+  parts?: MessagePart[];
   isStreaming?: boolean;
   className?: string;
 }
@@ -36,45 +50,90 @@ interface AssistantMessageProps {
 /**
  * 统一的 Assistant 消息卡片
  *
- * 布局策略（与 Cursor/Trae 一致）：
- * 1. 思考过程（折叠，顶部）
- * 2. 工具调用（折叠，中部）
- * 3. 正文内容（始终可见，底部）
- *
- * 流式和完成状态使用同一套布局，仅展开状态不同
+ * 使用 parts 数组渲染，保持内容的时间线顺序
+ * - ReasoningPart -> ChainOfThoughtStep
+ * - ToolCallPart -> ChainOfThoughtStep
+ * - TextPart -> 普通 Markdown 正文
  */
 export function AssistantMessage({
   content,
   reasonings = [],
   tools = [],
+  parts,
   isStreaming = false,
   className,
 }: AssistantMessageProps) {
-  // 流式时 reasoning 默认展开，完成后默认折叠
-  const [reasoningOpen, setReasoningOpen] = useState(isStreaming);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [chainOpen, setChainOpen] = useState(isStreaming);
 
-  // 当 isStreaming 从 true 变为 false 时，自动折叠 reasoning
-  // 但如果是用户手动展开的，不要强制折叠
+  // 当 isStreaming 从 true 变为 false 时，自动折叠 ChainOfThought
   useEffect(() => {
     if (!isStreaming) {
-      // 完成后折叠，但如果用户已经手动展开 tools，保持 reasoning 不动
-      setReasoningOpen(false);
+      setChainOpen(false);
     } else {
-      // 流式开始时展开
-      setReasoningOpen(true);
+      setChainOpen(true);
     }
   }, [isStreaming]);
 
-  const hasReasoning = reasonings.length > 0;
-  const hasTools = tools.length > 0;
-  const hasContent = !!content;
+  // 兼容旧的 reasonings/tools 格式，转换为 parts
+  const normalizedParts: MessagePart[] = parts ? [...parts] : [];
+
+  // 如果没有 parts 但有旧的 reasonings/tools，进行兼容转换
+  if (
+    normalizedParts.length === 0 &&
+    (reasonings.length > 0 || tools.length > 0)
+  ) {
+    const converted: MessagePart[] = [];
+
+    // 转换 reasonings
+    for (const r of reasonings) {
+      converted.push({
+        type: "reasoning",
+        content: r.content,
+        duration: r.duration,
+        timestamp: r.timestamp,
+      });
+    }
+
+    // 转换 tools
+    for (const t of tools) {
+      converted.push({
+        type: "tool",
+        toolCallId: (t.parameters?.toolCallId as string) || `tool-${t.name}`,
+        toolName: t.name,
+        status: t.status,
+        parameters: t.parameters,
+        result: t.result,
+      });
+    }
+
+    // 如果有文本内容，添加到末尾
+    if (content) {
+      converted.push({
+        type: "text",
+        content,
+      });
+    }
+
+    normalizedParts.push(...converted);
+  }
+
+  // 检查是否有中间过程内容（reasoning 或 tool）
+  const hasProcessContent = normalizedParts.some(
+    (p) => p.type === "reasoning" || p.type === "tool",
+  );
+
+  // 提取纯文本内容（TextPart 或 content 字段）
+  const textParts = normalizedParts.filter((p) => p.type === "text");
+  const finalContent =
+    textParts.length > 0
+      ? textParts.map((p) => p.content).join("\n\n")
+      : content;
 
   // 如果什么都没有，显示加载状态
-  if (!hasReasoning && !hasTools && !hasContent) {
+  if (!hasProcessContent && !finalContent) {
     if (!isStreaming) return null;
-    
+
     return (
       <div className={cn("w-full rounded-lg border bg-card", className)}>
         <div className="flex items-center gap-3 px-3 py-3">
@@ -85,134 +144,129 @@ export function AssistantMessage({
     );
   }
 
+  const handleCopy = async () => {
+    if (finalContent) {
+      await navigator.clipboard.writeText(finalContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   // 按文件路径合并工具调用
-  const groupedTools = (() => {
+  const groupToolsByPath = (
+    toolParts: Array<{
+      toolName: string;
+      status: any;
+      parameters?: Record<string, unknown>;
+      result?: unknown;
+    }>,
+  ) => {
     const groups = new Map<string, { path?: string; entries: ToolEntry[] }>();
-    for (const tool of tools) {
-      const path = (tool.path ||
-        tool.parameters?.path ||
-        tool.parameters?.file_path) as string | undefined;
-      const key = path || tool.name;
+    for (const tool of toolParts) {
+      const path = (tool.parameters?.path || tool.parameters?.file_path) as
+        | string
+        | undefined;
+      const key = path || tool.toolName;
       if (!groups.has(key)) {
         groups.set(key, { path, entries: [] });
       }
       groups.get(key)!.entries.push({
-        name: tool.name,
-        kind: tool.kind,
+        name: tool.toolName,
         status: tool.status,
         parameters: tool.parameters,
         result: tool.result,
       });
     }
     return Array.from(groups.values());
-  })();
-
-  const handleCopy = async () => {
-    if (content) {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
   };
 
   return (
     <div className={cn("w-full rounded-lg border bg-card", className)}>
-      {/* 顶部：思考过程 */}
-      {hasReasoning && (
-        <div className={cn(hasContent && "border-b border-border/40")}>
-          <button
-            onClick={() => setReasoningOpen(!reasoningOpen)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted/50 transition-colors"
-          >
-            {reasoningOpen ? (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-            {isStreaming ? (
-              <Loader2 className="h-3.5 w-3.5 text-violet-500 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-            )}
-            <span className="font-medium text-foreground">
-              {isStreaming ? "思考中" : `思考过程 (${reasonings.length})`}
-            </span>
-            {reasonings.length > 1 && (
-              <span className="ml-auto text-[10px] text-muted-foreground">
-                {reasonings.reduce((acc, r) => acc + (r.duration || 0), 0) > 0
-                  ? `${(reasonings.reduce((acc, r) => acc + (r.duration || 0), 0) / 1000).toFixed(1)}s`
-                  : ""}
-              </span>
-            )}
-          </button>
+      {/* ChainOfThought - 渲染中间过程 */}
+      {hasProcessContent && (
+        <ChainOfThought open={chainOpen} onOpenChange={setChainOpen}>
+          <ChainOfThoughtHeader>
+            {isStreaming ? "处理中" : "处理过程"}
+          </ChainOfThoughtHeader>
+          <ChainOfThoughtContent>
+            {normalizedParts.map((part, index) => {
+              // 渲染 ReasoningPart
+              if (part.type === "reasoning") {
+                const reasoningContent = part.content || "";
+                return (
+                  <ChainOfThoughtStep
+                    key={`reasoning-${index}`}
+                    status="complete"
+                    title={
+                      reasoningContent.length > 50
+                        ? reasoningContent.slice(0, 50) + "..."
+                        : reasoningContent
+                    }
+                    description={
+                      part.duration
+                        ? `耗时 ${(part.duration / 1000).toFixed(1)}s`
+                        : undefined
+                    }
+                  >
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <Streamdown>{reasoningContent}</Streamdown>
+                    </div>
+                  </ChainOfThoughtStep>
+                );
+              }
 
-          {reasoningOpen && (
-            <div className="px-3 pb-3 space-y-2">
-              {reasonings.map((r, index) => (
-                <div
-                  key={index}
-                  className="rounded-md border border-border/40 bg-muted/30 px-3 py-2"
-                >
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
-                    <span>思考 {index + 1}</span>
-                    {r.duration && (
-                      <span>({(r.duration / 1000).toFixed(1)}s)</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <Streamdown>{r.content}</Streamdown>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+              // 渲染 ToolCallPart
+              if (part.type === "tool") {
+                const status =
+                  part.status === "running"
+                    ? "active"
+                    : part.status === "completed"
+                      ? "complete"
+                      : part.status === "error"
+                        ? "complete"
+                        : "pending";
+
+                return (
+                  <ChainOfThoughtStep
+                    key={`tool-${part.toolCallId || index}`}
+                    status={status}
+                    title={part.toolName || "工具调用"}
+                  >
+                    <div className="mt-1">
+                      <Tool
+                        entries={[
+                          {
+                            name: part.toolName || "未知工具",
+                            status: part.status || "completed",
+                            parameters: part.parameters,
+                            result: part.result,
+                          },
+                        ]}
+                      />
+                    </div>
+                  </ChainOfThoughtStep>
+                );
+              }
+
+              return null;
+            })}
+          </ChainOfThoughtContent>
+        </ChainOfThought>
       )}
 
-      {/* 中部：工具调用 */}
-      {hasTools && (
-        <div className={cn(hasContent && "border-b border-border/40")}>
-          <button
-            onClick={() => setToolsOpen(!toolsOpen)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted/50 transition-colors"
-          >
-            {toolsOpen ? (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-            <Bot className="h-3.5 w-3.5 text-blue-500" />
-            <span className="font-medium text-foreground">
-              工具调用 ({tools.length})
-            </span>
-            {tools.some((t) => t.status === "running") && (
-              <Loader2 className="h-3 w-3 ml-auto text-yellow-500 animate-spin" />
-            )}
-          </button>
-
-          {toolsOpen && (
-            <div className="px-3 pb-2 space-y-1">
-              {groupedTools.map((group, index) => (
-                <Tool
-                  key={index}
-                  path={group.path}
-                  entries={group.entries}
-                  className="text-xs"
-                />
-              ))}
-            </div>
+      {/* 正文内容 */}
+      {finalContent && (
+        <div
+          className={cn(
+            "group relative",
+            hasProcessContent && "border-t border-border/40",
           )}
-        </div>
-      )}
-
-      {/* 底部：正文内容 */}
-      {hasContent && (
-        <div className="group relative">
+        >
           <div className="px-3 py-3">
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none overflow-hidden">
               <div className="overflow-x-auto">
                 <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
-                  {content}
+                  {finalContent}
                 </Streamdown>
               </div>
             </div>

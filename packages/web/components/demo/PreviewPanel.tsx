@@ -5,6 +5,7 @@ import {
   SandpackLayout,
   SandpackPreview,
 } from "@codesandbox/sandpack-react";
+import { useEffect } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
 
 // 默认预览尺寸（iPhone 8/SE 标准）
@@ -49,6 +50,24 @@ export function PreviewPanel({
   className,
   previewSize,
 }: PreviewPanelProps) {
+  // 调试日志：监听 code prop 变化
+  useEffect(() => {
+    console.log(
+      "[PreviewPanel] code prop changed, length:",
+      code?.length,
+      "isValid:",
+      typeof code === "string" && code.length > 0,
+    );
+  }, [code]);
+
+  // 调试日志：监听 sdkFiles
+  useEffect(() => {
+    console.log(
+      "[PreviewPanel] sdkFiles:",
+      sdkFiles ? Object.keys(sdkFiles) : "undefined",
+    );
+  }, [sdkFiles]);
+
   // 验证 code 是否为有效的代码（不是文件路径或其他非代码内容）
   const isValidCode =
     typeof code === "string" &&
@@ -63,9 +82,40 @@ export function PreviewPanel({
     !code.includes("\\重要文件\\");
 
   const entryCode = `
+import React from 'react';
+import './globals.css';
 import Demo from './Demo';
+
 export default function App() {
   return <Demo {...${JSON.stringify(configData)}} />;
+}
+`;
+
+  const tailwindConfig = `
+module.exports = {
+  content: ['./src/**/*.{js,jsx,ts,tsx}', './Demo.tsx', './App.tsx'],
+  theme: { extend: {} },
+  plugins: [],
+  corePlugins: { preflight: false },
+};
+`;
+
+  const postcssConfig = `
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+`;
+
+  const globalsCss = `
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
 }
 `;
 
@@ -73,11 +123,17 @@ export default function App() {
     ? {
         "/Demo.tsx": code,
         "/App.tsx": entryCode,
+        "/tailwind.config.js": tailwindConfig,
+        "/postcss.config.js": postcssConfig,
+        "/src/globals.css": globalsCss,
         ...sdkFiles,
       }
     : {
         "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
         "/App.tsx": entryCode,
+        "/tailwind.config.js": tailwindConfig,
+        "/postcss.config.js": postcssConfig,
+        "/src/globals.css": globalsCss,
         ...sdkFiles,
       };
 
@@ -94,12 +150,16 @@ export default function App() {
         </div>
       )}
       <SandpackProvider
+        key={code}
         template="react-ts"
         files={files}
         customSetup={{
           dependencies: {
             react: "^18.0.0",
             "react-dom": "^18.0.0",
+            tailwindcss: "^3.4.1",
+            autoprefixer: "^10.4.17",
+            postcss: "^8.4.33",
           },
         }}
         theme={{

@@ -9,7 +9,10 @@ import {
   Search,
   Code,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import { useState } from "react";
 
 export interface ToolEntry {
   name: string;
@@ -64,27 +67,29 @@ const getAggregateInfo = (entries: ToolEntry[]) => {
   return { icon, status, label };
 };
 
-export function Tool({ path, entries, className }: ToolProps) {
-  const { icon: ToolIcon, status } = getAggregateInfo(entries);
+// 格式化 JSON
+const formatJSON = (data: unknown): string => {
+  if (!data) return "";
+  if (typeof data === "string") return data;
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+};
 
-  // 提取文件路径（优先使用传入的 path，其次从 entries 的 parameters 或 name 中提取）
+export function Tool({ path, entries, className }: ToolProps) {
+  const { icon: ToolIcon, status, label } = getAggregateInfo(entries);
+  const [expanded, setExpanded] = useState(false);
+
+  // 提取文件路径
   let resolvedPath = path;
   if (!resolvedPath && entries.length > 0) {
     const firstEntry = entries[0];
     resolvedPath =
       (firstEntry.parameters?.path as string) ||
       (firstEntry.parameters?.file_path as string);
-
-    // 如果还是没有，尝试从 name 中提取（格式: "fs/read_text_file › path/to/file"）
-    if (!resolvedPath && firstEntry.name.includes("›")) {
-      resolvedPath = firstEntry.name.split("›").pop()?.trim();
-    }
   }
-
-  // 提取文件名
-  const fileName = resolvedPath
-    ? resolvedPath.split(/[\/\\]/).pop() || resolvedPath
-    : undefined;
 
   // 状态图标
   const StatusIcon =
@@ -92,45 +97,110 @@ export function Tool({ path, entries, className }: ToolProps) {
       <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
     ) : null;
 
+  const statusText =
+    status === "running"
+      ? "运行中"
+      : status === "completed"
+        ? "已完成"
+        : status === "error"
+          ? "错误"
+          : "等待";
+
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs",
+        "border border-border/40 rounded-lg overflow-hidden",
         className,
       )}
     >
-      {/* 左侧图标 */}
-      <span className="text-muted-foreground flex-shrink-0">
-        <ToolIcon className="h-4 w-4" />
-      </span>
+      {/* 工具头部 - 可点击展开 */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2.5 px-3 py-2 hover:bg-muted/50 transition-colors"
+      >
+        {/* 展开/折叠图标 */}
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        )}
 
-      {/* 文件名 */}
-      {fileName ? (
-        <span className="text-muted-foreground flex-shrink-0">{fileName}</span>
-      ) : (
-        <span className="text-muted-foreground/60 flex-shrink-0">未知文件</span>
-      )}
-
-      {/* 完整路径（小字） */}
-      {resolvedPath && (
-        <span className="text-muted-foreground/40 truncate text-[11px] flex-1 min-w-0">
-          {resolvedPath}
+        {/* 左侧工具图标 */}
+        <span className="text-muted-foreground flex-shrink-0">
+          <ToolIcon className="h-4 w-4" />
         </span>
-      )}
 
-      {/* 右侧状态 */}
-      <div className="flex-shrink-0 ml-auto flex items-center gap-2">
-        <span className="text-muted-foreground">
-          {status === "running"
-            ? "运行中"
-            : status === "completed"
-              ? "已完成"
-              : status === "error"
-                ? "错误"
-                : "等待"}
+        {/* 工具名称 */}
+        <span className="text-sm font-medium flex-shrink-0">
+          {entries.length === 1 ? entries[0].name : label}
         </span>
-        {StatusIcon}
-      </div>
+
+        {/* 文件路径 */}
+        {resolvedPath && (
+          <span className="text-xs text-muted-foreground/60 truncate flex-1 min-w-0">
+            {resolvedPath}
+          </span>
+        )}
+
+        {/* 右侧状态 */}
+        <div className="flex-shrink-0 ml-auto flex items-center gap-2">
+          <span
+            className={cn(
+              "text-xs",
+              status === "running" && "text-yellow-600",
+              status === "completed" && "text-green-600",
+              status === "error" && "text-red-600",
+            )}
+          >
+            {statusText}
+          </span>
+          {StatusIcon}
+        </div>
+      </button>
+
+      {/* 工具详情 - 展开时显示 */}
+      {expanded && entries.length > 0 && (
+        <div className="border-t border-border/40 bg-muted/20">
+          {entries.map((entry, index) => (
+            <div
+              key={index}
+              className={cn(
+                "px-3 py-2",
+                index > 0 && "border-t border-border/40",
+              )}
+            >
+              {/* 入参 */}
+              {entry.parameters && Object.keys(entry.parameters).length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[10px] font-medium text-muted-foreground mb-1">
+                    入参
+                  </div>
+                  <pre className="text-xs bg-background/50 rounded-md p-2 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
+                    {formatJSON(entry.parameters)}
+                  </pre>
+                </div>
+              )}
+
+              {/* 执行结果 */}
+              {entry.result !== undefined && entry.result !== null && (
+                <div>
+                  <div className="text-[10px] font-medium text-muted-foreground mb-1">
+                    结果
+                  </div>
+                  <pre
+                    className={cn(
+                      "text-xs bg-background/50 rounded-md p-2 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all",
+                      entry.status === "error" && "text-red-600",
+                    )}
+                  >
+                    {formatJSON(entry.result)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
