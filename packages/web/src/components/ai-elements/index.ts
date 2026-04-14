@@ -11,10 +11,34 @@ export { AssistantMessage } from "./assistant-message";
 
 export {
   PromptInput,
+  PromptInputHeader,
+  PromptInputBody,
+  PromptInputTextarea,
   PromptInputFooter,
   PromptInputTools,
   PromptInputButton,
+  PromptInputSubmit,
+  PromptInputSelect,
+  PromptInputSelectTrigger,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectValue,
+  PromptInputAddImage,
+  usePromptInputAttachments,
+  usePromptInput,
+  PromptInputContext,
+  type PromptInputFile,
+  type PromptInputMessage,
 } from "./prompt-input";
+
+export {
+  Attachments,
+  Attachment,
+  AttachmentPreview,
+  AttachmentInfo,
+  AttachmentRemove,
+  AttachmentContext,
+} from "./attachments";
 
 export {
   Reasoning,

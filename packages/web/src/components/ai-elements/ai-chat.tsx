@@ -1,21 +1,61 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Conversation,
   ConversationContent,
   Message,
   PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputSubmit,
+  PromptInputAddImage,
+  PromptInputHeader,
+  usePromptInputAttachments,
   AssistantMessage,
   PermissionDialog,
   type ChatMessage,
+  type PromptInputMessage,
 } from "@/components/ai-elements";
+import {
+  Attachment,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments,
+} from "@/components/ai-elements/attachments";
+import { HistoryDialog } from "@/components/ai-elements/history-dialog";
 import {
   AgentStream,
   type StreamEvent,
 } from "@opencode-workbench/agent-client";
-import { Bot, Sparkles } from "lucide-react";
+import { Bot, Sparkles, History } from "lucide-react";
 import type { MessagePart } from "@/components/ai-elements";
+
+const PromptInputAttachmentsDisplay = () => {
+  const attachments = usePromptInputAttachments();
+
+  if (attachments.files.length === 0) {
+    return null;
+  }
+
+  return (
+    <Attachments variant="inline">
+      {attachments.files.map((attachment) => (
+        <Attachment
+          data={attachment}
+          key={attachment.id}
+          onRemove={() => attachments.remove(attachment.id)}
+        >
+          <AttachmentPreview />
+          <AttachmentRemove />
+        </Attachment>
+      ))}
+    </Attachments>
+  );
+};
 
 interface PermissionRequest {
   sessionId: string;
@@ -47,6 +87,9 @@ interface AIChatProps {
   onIsStreamingChange?: (isStreaming: boolean) => void;
   onStreamContentChange?: (content: string) => void;
   onCurrentMessageChange?: (message: ChatMessage) => void;
+  onNewSession?: () => void;
+  onSelectSession?: (sessionId: string) => void;
+  currentSessionId?: string;
 }
 
 const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
@@ -70,7 +113,12 @@ export function AIChat({
   onIsStreamingChange,
   onStreamContentChange,
   onCurrentMessageChange,
+  onNewSession,
+  onSelectSession,
+  currentSessionId,
 }: AIChatProps) {
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+
   // 1. Messages 状态处理
   const isControlled = externalMessages !== undefined;
   const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
@@ -158,7 +206,6 @@ export function AIChat({
     [currentMessageControlled, onCurrentMessageChange],
   );
 
-  const [input, setInput] = useState("");
   const streamRef = useRef<AgentStream | null>(null);
 
   // 待处理的权限请求
@@ -191,11 +238,8 @@ export function AIChat({
   }, []);
 
   // 处理发送消息
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isStreaming || !agentSessionId) return;
-
-    const userMessage = input.trim();
-    setInput("");
+  const handleSend = useCallback(async (userMessage: string) => {
+    if (!userMessage.trim() || isStreaming || !agentSessionId) return;
 
     // 添加用户消息
     setMessages((prev) => [
@@ -203,7 +247,7 @@ export function AIChat({
       {
         id: `user-${Date.now()}`,
         role: "user",
-        content: userMessage,
+        content: userMessage.trim(),
       },
     ]);
 
@@ -895,15 +939,33 @@ export function AIChat({
       }
     }
   }, [
-    input,
     isStreaming,
     agentSessionId,
     workingDir,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
+    setMessages,
+    setIsStreaming,
+    setStreamContent,
+    setCurrentMessage,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
+
+  // 处理 PromptInput 提交
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      const hasText = Boolean(message.text);
+      const hasAttachments = Boolean(message.files?.length);
+
+      if (!(hasText || hasAttachments)) {
+        return;
+      }
+
+      handleSend(message.text || "处理附件文件");
+    },
+    [handleSend],
+  );
 
   // 处理权限响应
   const handlePermissionResponse = useCallback(
@@ -1059,13 +1121,42 @@ export function AIChat({
 
       {/* 输入区域 */}
       <PromptInput
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSend}
-        onCancel={handleCancel}
-        placeholder="输入指令，按 Enter 发送..."
-        loading={isStreaming}
+        onSubmit={handleSubmit}
+        status={isStreaming ? "streaming" : "idle"}
         className="flex-shrink-0"
+        globalDrop
+        multiple
+      >
+        <PromptInputHeader>
+          <PromptInputAttachmentsDisplay />
+        </PromptInputHeader>
+        <PromptInputBody>
+          <PromptInputTextarea placeholder="输入指令，按 Enter 发送..." />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputTools>
+            <PromptInputAddImage />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setHistoryDialogOpen(true)}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+          </PromptInputTools>
+          <PromptInputSubmit />
+        </PromptInputFooter>
+      </PromptInput>
+
+      {/* 历史记录对话框 */}
+      <HistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        projectId={sessionId}
+        currentSessionId={currentSessionId}
+        onSelectSession={onSelectSession || (() => {})}
+        onNewSession={onNewSession || (() => {})}
       />
 
       {/* 权限请求对话框 */}

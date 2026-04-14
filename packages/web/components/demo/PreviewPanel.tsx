@@ -8,10 +8,10 @@ import {
 import type { PreviewPanelProps, PreviewSize } from "./types";
 import { extractDependenciesFromComments } from "@/lib/sandpack-deps";
 
-// 默认预览尺寸（iPhone 8/SE 标准）
+// 默认预览尺寸（iPhone X/11 Pro 标准）
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   width: 375,
-  height: 667,
+  height: 812,
 };
 
 function buildPreviewStyle(size?: PreviewSize): React.CSSProperties {

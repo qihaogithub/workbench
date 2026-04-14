@@ -36,7 +36,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import type { ConfigFormProps } from "./types";
 import { ImageListWidget, ImageItem } from "./ImageListWidget";
 
@@ -431,25 +431,26 @@ function FieldGroupSection({
   group,
   formData,
   onChange,
+  isFirst,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  isFirst?: boolean;
 }) {
   const Icon = getGroupIcon(group.title);
 
   return (
-    <Card>
-      <CardHeader className="bg-muted/30 py-3">
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-sm font-semibold">{group.title}</CardTitle>
-          <Badge variant="secondary" className="text-xs h-5">
-            {group.fields.length} 字段
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-3">
+    <div className="py-4">
+      {!isFirst && <div style={{ marginBottom: '24px', borderTop: '2px solid #475569' }} />}
+      <div className="flex items-center gap-2 mb-4">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">{group.title}</h3>
+        <Badge variant="secondary" className="text-xs h-5">
+          {group.fields.length} 字段
+        </Badge>
+      </div>
+      <div className="space-y-3">
         {group.fields.map((field) => (
           <FieldRenderer
             key={field.key}
@@ -458,8 +459,8 @@ function FieldGroupSection({
             onChange={(value) => onChange(field.key, value)}
           />
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -576,13 +577,14 @@ export function ConfigForm({
   return (
     <div className={cn("h-full", className)}>
       <ScrollArea className="h-full">
-        <div className="space-y-4 px-1 pb-4">
+        <div className="px-1 pb-4">
           {fieldGroups.map((group, index) => (
             <FieldGroupSection
               key={index}
               group={group}
               formData={formData}
               onChange={handleFieldChange}
+              isFirst={index === 0}
             />
           ))}
         </div>

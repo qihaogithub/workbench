@@ -360,7 +360,7 @@ export function mergeSession(sessionId: string): boolean {
     return false;
   }
 
-  const sessionPath = getSessionPath(sessionId);
+  const sessionPath = getSessionPath(sessionId, projectId);
   console.log(`[mergeSession] sessionPath: ${sessionPath}`);
   
   const projectPath = getProjectPath(projectId);

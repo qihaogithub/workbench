@@ -26,9 +26,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
 import {
+  ResizablePanelGroup,
+  ResizablePanel,
+} from "@/components/ui/resizable";
+import {
   Bot,
   Code2,
-  Send,
   Loader2,
   AlertCircle,
   CheckCircle2,
@@ -359,13 +362,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">编辑 Demo</h1>
-          <Badge variant="secondary">{demoId.slice(0, 8)}</Badge>
-          {sessionId && (
-            <Badge variant="outline" className="font-mono text-xs">
-              Session: {sessionId.slice(0, 8)}...
-            </Badge>
-          )}
+          <h1 className="text-lg font-semibold">{demoId}</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>
@@ -387,143 +384,157 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[320px] flex flex-col border-r bg-card">
-          <Tabs
-            defaultValue="ai"
-            className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
-          >
-            <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
-              <TabsTrigger value="ai" className="gap-2">
-                <Bot className="h-4 w-4" />
-                AI 对话
-              </TabsTrigger>
-              <TabsTrigger value="code" className="gap-2">
-                <Code2 className="h-4 w-4" />
-                代码编辑
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent
-              value="ai"
-              className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+      <div className="flex-1 overflow-hidden">
+        <ResizablePanelGroup
+          direction="horizontal"
+          defaultSizes={[35, 35, 30]}
+          minSizes={[20, 20, 20]}
+          className="h-full"
+        >
+          <ResizablePanel className="flex flex-col border-r bg-card">
+            <Tabs
+              defaultValue="ai"
+              className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
             >
-              <AIChat
-                sessionId={sessionId}
-                agentSessionId={agentSessionId}
-                workingDir={tempWorkspace || undefined}
-                onCodeUpdate={handleCodeUpdate}
-                onSchemaUpdate={handleSchemaUpdate}
-                externalMessages={aiMessages}
-                externalIsStreaming={aiIsStreaming}
-                externalStreamContent={aiStreamContent}
-                externalCurrentMessage={aiCurrentMessage}
-                onMessagesChange={setAiMessages}
-                onIsStreamingChange={setAiIsStreaming}
-                onStreamContentChange={setAiStreamContent}
-                onCurrentMessageChange={setAiCurrentMessage}
-              />
-            </TabsContent>
+              <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
+                <TabsTrigger value="ai" className="gap-2">
+                  <Bot className="h-4 w-4" />
+                  AI 对话
+                </TabsTrigger>
+                <TabsTrigger value="code" className="gap-2">
+                  <Code2 className="h-4 w-4" />
+                  代码编辑
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent
-              value="code"
-              className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden"
-            >
-              <div className="flex-1 relative w-full">
-                <Textarea
-                  value={editorContent}
-                  onChange={(e) => handleEditorChange(e.target.value)}
-                  spellCheck={false}
-                  className="w-full h-full resize-none outline-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-none"
-                  style={{ tabSize: 2 }}
-                  placeholder={`${"=== DEMO CODE ==="}
+              <TabsContent
+                value="ai"
+                className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+              >
+                <AIChat
+                  sessionId={sessionId}
+                  agentSessionId={agentSessionId}
+                  workingDir={tempWorkspace || undefined}
+                  onCodeUpdate={handleCodeUpdate}
+                  onSchemaUpdate={handleSchemaUpdate}
+                  externalMessages={aiMessages}
+                  externalIsStreaming={aiIsStreaming}
+                  externalStreamContent={aiStreamContent}
+                  externalCurrentMessage={aiCurrentMessage}
+                  onMessagesChange={setAiMessages}
+                  onIsStreamingChange={setAiIsStreaming}
+                  onStreamContentChange={setAiStreamContent}
+                  onCurrentMessageChange={setAiCurrentMessage}
+                  currentSessionId={sessionId}
+                  onNewSession={async () => {
+                    console.log("新建对话");
+                  }}
+                  onSelectSession={(newSessionId) => {
+                    console.log("切换到会话:", newSessionId);
+                  }}
+                />
+              </TabsContent>
+
+              <TabsContent
+                value="code"
+                className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden"
+              >
+                <div className="flex-1 relative w-full">
+                  <Textarea
+                    value={editorContent}
+                    onChange={(e) => handleEditorChange(e.target.value)}
+                    spellCheck={false}
+                    className="w-full h-full resize-none outline-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-none"
+                    style={{ tabSize: 2 }}
+                    placeholder={`${"=== DEMO CODE ==="}
 // 在此处粘贴 React 组件代码
 
 ${"=== DEMO SCHEMA ==="}
 // 在此处粘贴 JSON Schema 配置
 
 ${"=== END ==="}`}
-                />
-              </div>
+                  />
+                </div>
 
-              {validationResult.errors.length > 0 && (
-                <ScrollArea className="h-[120px] border-t bg-destructive/5">
-                  <div className="p-3 space-y-2">
-                    {validationResult.errors.map((error, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-2 text-xs"
-                      >
-                        <AlertCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
-                        <span className="text-destructive">
-                          {error.type === "json_syntax"
-                            ? "[语法]"
-                            : error.type === "props_mismatch"
-                              ? "[不匹配]"
-                              : error.type === "required_missing"
-                                ? "[必填]"
-                                : "[警告]"}{" "}
-                          {error.message}
-                          {error.line && ` (第 ${error.line} 行)`}
-                        </span>
-                      </div>
-                    ))}
+                {validationResult.errors.length > 0 && (
+                  <ScrollArea className="h-[120px] border-t bg-destructive/5">
+                    <div className="p-3 space-y-2">
+                      {validationResult.errors.map((error, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-2 text-xs"
+                        >
+                          <AlertCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
+                          <span className="text-destructive">
+                            {error.type === "json_syntax"
+                              ? "[语法]"
+                              : error.type === "props_mismatch"
+                                ? "[不匹配]"
+                                : error.type === "required_missing"
+                                  ? "[必填]"
+                                  : "[警告]"}{" "}
+                            {error.message}
+                            {error.line && ` (第 ${error.line} 行)`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                <div className="px-4 py-2 border-t bg-muted/50 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4">
+                    <span>{editorContent.length} 字符</span>
+                    <span>{editorContent.split("\n").length} 行</span>
                   </div>
-                </ScrollArea>
-              )}
-
-              <div className="px-4 py-2 border-t bg-muted/50 flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-4">
-                  <span>{editorContent.length} 字符</span>
-                  <span>{editorContent.split("\n").length} 行</span>
+                  <div className="flex items-center gap-1">
+                    {validationResult.isValid ? (
+                      <>
+                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        <span className="text-green-500">有效</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-3 w-3 text-destructive" />
+                        <span className="text-destructive">
+                          {validationResult.errors.length} 个错误
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  {validationResult.isValid ? (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      <span className="text-green-500">有效</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-3 w-3 text-destructive" />
-                      <span className="text-destructive">
-                        {validationResult.errors.length} 个错误
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+              </TabsContent>
+            </Tabs>
+          </ResizablePanel>
 
-        <div className="flex-1 p-4 bg-muted/30">
-          <div className="h-full border rounded-lg overflow-hidden bg-background shadow-sm">
-            <PreviewPanel
-              code={code}
-              configData={configData}
-              previewSize={previewSize}
-            />
-          </div>
-        </div>
-
-        <div className="w-[300px] border-l bg-card flex flex-col">
-          <div className="px-4 py-3 border-b">
-            <h2 className="text-sm font-medium">配置面板</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              修改配置项，预览区将实时更新
-            </p>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4">
-              <ConfigForm
-                schema={schema}
-                onChange={handleConfigChange}
-                initialData={configData}
+          <ResizablePanel className="p-4 bg-muted/30">
+            <div className="h-full border rounded-lg overflow-hidden bg-background shadow-sm">
+              <PreviewPanel
+                code={code}
+                configData={configData}
+                previewSize={previewSize}
               />
             </div>
-          </ScrollArea>
-        </div>
+          </ResizablePanel>
+
+          <ResizablePanel className="border-l bg-card flex flex-col">
+            <div className="px-4 py-3 border-b">
+              <h2 className="text-sm font-medium">配置面板</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                修改配置项，预览区将实时更新
+              </p>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                <ConfigForm
+                  schema={schema}
+                  onChange={handleConfigChange}
+                  initialData={configData}
+                />
+              </div>
+            </ScrollArea>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   );
