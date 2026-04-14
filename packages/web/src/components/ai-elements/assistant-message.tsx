@@ -161,18 +161,13 @@ export function AssistantMessage({
     return blocks;
   }, [normalizedParts]);
 
-  // 如果什么都没有，显示初始加载状态
-  if (renderBlocks.length === 0) {
-    if (!isStreaming) return null;
-    return (
-      <div className={cn("flex flex-col gap-4 w-full py-2", className)}>
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
-          <span className="text-sm text-muted-foreground">思考中...</span>
-        </div>
-      </div>
-    );
+  // 如果没有内容且不在流式传输中，返回 null
+  if (renderBlocks.length === 0 && !isStreaming) {
+    return null;
   }
+
+  // 如果正在流式传输但没有内容块，显示初始加载状态
+  const showInitialLoading = isStreaming && renderBlocks.length === 0;
 
   // 获取所有纯文本用于一键复制
   const allTextContent = renderBlocks
@@ -195,6 +190,14 @@ export function AssistantMessage({
         className,
       )}
     >
+      {/* 初始加载状态 - 使用 Reasoning 组件保持样式统一 */}
+      {showInitialLoading && (
+        <Reasoning isStreaming={true}>
+          <ReasoningTrigger />
+          <ReasoningContent>{""}</ReasoningContent>
+        </Reasoning>
+      )}
+
       {renderBlocks.map((block, index) => {
         // 渲染推理内容（使用官方的 Reasoning 组件）
         if (block.type === "reasoning") {
