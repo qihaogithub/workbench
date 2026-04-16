@@ -927,7 +927,7 @@ export function AIChat({
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `错误: ${httpError instanceof Error ? httpError.message : "未知错误"}。请确保 Agent Service 已启动（http://localhost:3001）`,
+          content: `错误: ${httpError instanceof Error ? httpError.message : "未知错误"}。请确保 Agent Service 已启动（http://localhost:3201）`,
         };
         setMessages((prev) => [...prev, errorMessage]);
       } finally {

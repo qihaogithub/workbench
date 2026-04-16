@@ -1,6 +1,6 @@
 import { AgentClient } from '@opencode-workbench/agent-client';
 
-const AGENT_SERVICE_URL = process.env.AGENT_SERVICE_URL || 'http://localhost:3101';
+const AGENT_SERVICE_URL = process.env.AGENT_SERVICE_URL || 'http://localhost:3201';
 
 let clientInstance: AgentClient | null = null;
 

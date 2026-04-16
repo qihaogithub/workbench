@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: 'AGENT_SERVICE_UNAVAILABLE',
-            message: 'Agent 服务不可用，请确保服务已启动 (http://localhost:3101)'
+            message: 'Agent 服务不可用，请确保服务已启动 (http://localhost:3201)'
           }
         },
         { status: 503 }

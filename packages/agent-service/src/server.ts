@@ -41,7 +41,7 @@ async function start() {
   // 配置 CORS 允许的来源
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:3100', 'http://127.0.0.1:3100'];
+    : ['http://localhost:3200', 'http://127.0.0.1:3200'];
 
   await fastify.register(cors, {
     origin: allowedOrigins,

@@ -12,7 +12,7 @@ import type {
 } from '@opencode-workbench/shared';
 
 // Agent Service 的基础 URL（可以通过环境变量配置）
-const AGENT_SERVICE_URL = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || 'http://localhost:3101';
+const AGENT_SERVICE_URL = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || 'http://localhost:3201';
 
 /**
  * API 响应类型
