@@ -8,9 +8,13 @@
     "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
     "build": "pnpm --filter @opencode-workbench/web build",
     "lint": "pnpm --filter @opencode-workbench/web lint",
-    "typecheck": "pnpm --filter @opencode-workbench/web typecheck"
+    "typecheck": "pnpm --filter @opencode-workbench/web typecheck",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.3.3"
   },

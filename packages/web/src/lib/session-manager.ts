@@ -5,10 +5,19 @@ import {
   getSessionsDir,
   getProjectPath,
   getSessionPath,
+  getSnapshotPath,
   projectExists,
   sessionExists,
   deleteSession,
+  getLatestVersion,
+  readProjectMeta,
+  writeProjectMeta,
+  generateVersionId,
+  countFiles,
+  cleanupOldVersions,
+  ensureWorkspaceFiles,
 } from "./fs-utils";
+import type { Project, VersionInfo } from "@opencode-workbench/shared";
 
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
@@ -163,6 +172,12 @@ export function findActiveSession(
           continue;
         }
 
+        // 跳过已保存或已放弃的 session
+        const status = meta.status || 'editing';
+        if (status !== 'editing') {
+          continue;
+        }
+
         if (meta.demoId === projectId) {
           return meta.sessionId;
         }
@@ -191,13 +206,19 @@ export async function createEditSession(
   const sessionDir = getProjectSessionDir(userId, projectId);
   const sessionPath = path.join(sessionDir, sessionId);
 
+  ensureWorkspaceFiles(workspacePath);
+
   fs.mkdirSync(sessionDir, { recursive: true });
   fs.cpSync(workspacePath, sessionPath, { recursive: true });
+
+  const latestVersion = getLatestVersion(projectId);
 
   const sessionMeta = {
     sessionId,
     userId,
     demoId: projectId,
+    status: 'editing' as const,
+    basedOnVersion: latestVersion?.versionId || 'v0',
     opencodeSessionId: null,
     createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
@@ -239,6 +260,9 @@ export function getEditSession(sessionId: string) {
   return {
     sessionId: meta.sessionId,
     demoId: meta.demoId,
+    userId: meta.userId,
+    status: meta.status || 'editing',
+    basedOnVersion: meta.basedOnVersion || 'v0',
     createdAt: meta.createdAt,
     expiresAt: meta.expiresAt,
     code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
@@ -248,10 +272,26 @@ export function getEditSession(sessionId: string) {
   };
 }
 
-export function saveEditSession(sessionId: string): boolean {
+export interface SaveEditSessionResult {
+  success: boolean;
+  version?: string;
+  savedAt?: number;
+  error?: string;
+}
+
+export function saveEditSession(
+  sessionId: string,
+  userId?: string,
+  note?: string,
+): SaveEditSessionResult {
   const sessionMeta = getEditSession(sessionId);
   if (!sessionMeta) {
-    return false;
+    return { success: false, error: 'Session not found' };
+  }
+
+  const status = sessionMeta.status || 'editing';
+  if (status !== 'editing') {
+    return { success: false, error: 'Session not in editing status' };
   }
 
   const { demoId: projectId } = sessionMeta;
@@ -259,20 +299,99 @@ export function saveEditSession(sessionId: string): boolean {
   const projectPath = getProjectPath(projectId);
   const workspacePath = path.join(projectPath, "workspace");
 
-  fs.rmSync(workspacePath, { recursive: true, force: true });
-  fs.cpSync(sessionPath, workspacePath, { recursive: true });
-
-  const metaInWorkspace = path.join(workspacePath, ".session.json");
-  if (fs.existsSync(metaInWorkspace)) {
-    fs.rmSync(metaInWorkspace, { force: true });
+  // 读取项目元数据
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: 'Project not found' };
   }
 
-  deleteSession(sessionId);
-  return true;
+  // 生成新版本号
+  const versionId = generateVersionId(project);
+  const snapshotPath = getSnapshotPath(projectId, versionId);
+
+  try {
+    // 1. 创建快照：备份当前 workspace 到 snapshots
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+    if (fs.existsSync(workspacePath)) {
+      fs.cpSync(workspacePath, snapshotPath, { recursive: true });
+    }
+
+    // 2. 临时空间覆盖正式空间
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+    fs.cpSync(sessionPath, workspacePath, { recursive: true });
+
+    // 删除 workspace 中的 .session.json
+    const metaInWorkspace = path.join(workspacePath, ".session.json");
+    if (fs.existsSync(metaInWorkspace)) {
+      fs.rmSync(metaInWorkspace, { force: true });
+    }
+
+    // 3. 记录版本信息
+    const versionInfo: VersionInfo = {
+      versionId,
+      savedAt: Date.now(),
+      savedBy: userId || sessionMeta.userId || 'anonymous',
+      sessionId,
+      snapshotPath,
+      fileCount: countFiles(workspacePath),
+      note,
+    };
+
+    project.versions.push(versionInfo);
+    project.updatedAt = Date.now();
+
+    // 4. 清理旧版本（保留最近 MAX_VERSIONS_KEEP 个）
+    cleanupOldVersions(project);
+
+    // 5. 保存项目元数据
+    writeProjectMeta(projectId, project);
+
+    // 6. 更新 session 状态为 saved
+    const metaPath = path.join(sessionPath, ".session.json");
+    if (fs.existsSync(metaPath)) {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      meta.status = 'saved';
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    }
+
+    // 7. 清理 session
+    deleteSession(sessionId);
+
+    return {
+      success: true,
+      version: versionId,
+      savedAt: versionInfo.savedAt,
+    };
+  } catch (error) {
+    console.error(`[saveEditSession] 保存失败:`, error);
+    return { success: false, error: 'Save failed' };
+  }
 }
 
 export function dropEditSession(sessionId: string): boolean {
   return deleteSession(sessionId);
+}
+
+export function discardEditSession(sessionId: string): boolean {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath || !fs.existsSync(sessionPath)) {
+    return false;
+  }
+
+  const metaPath = path.join(sessionPath, ".session.json");
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      meta.status = 'discarded';
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    } catch {
+      // 忽略写入错误
+    }
+  }
+
+  // 延迟删除，保留 discarded 状态一段时间便于调试
+  fs.rmSync(sessionPath, { recursive: true, force: true });
+  return true;
 }
 
 /**

@@ -7,6 +7,8 @@ import {
   ErrorCodeType,
   ERROR_MESSAGES,
 } from "@opencode-workbench/shared";
+import type { Project, VersionInfo } from "@opencode-workbench/shared";
+import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const PROJECTS_DIR =
@@ -58,7 +60,16 @@ export function getSnapshotPath(projectId: string, versionId: string): string {
 
 export function getSessionPath(sessionId: string, projectId?: string): string {
   if (projectId) {
-    return path.join(SESSIONS_DIR, projectId, sessionId);
+    // 先尝试旧结构路径（兼容）
+    const directPath = path.join(SESSIONS_DIR, projectId, sessionId);
+    if (fs.existsSync(directPath)) {
+      return directPath;
+    }
+    // 否则使用 findSessionPath 搜索（支持新结构 sessions/{userId}/{projectId}/{sessionId}/）
+    const foundPath = findSessionPath(sessionId);
+    if (foundPath) return foundPath;
+    // fallback
+    return directPath;
   }
   const foundPath = findSessionPath(sessionId);
   return foundPath || path.join(SESSIONS_DIR, sessionId);
@@ -146,16 +157,7 @@ export function listProjects(): DemoMeta[] {
   return projects.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function createProject(name: string): DemoMeta {
-  ensureDirsExist();
-
-  const projectId = `proj_${Date.now()}`;
-  const projectPath = getProjectPath(projectId);
-  const workspacePath = path.join(projectPath, "workspace");
-
-  fs.mkdirSync(workspacePath, { recursive: true });
-
-  const defaultCode = `import React from 'react';
+const DEFAULT_DEMO_CODE = `import React from 'react';
 
 interface DemoProps {
   title: string;
@@ -172,28 +174,53 @@ export default function Demo({ title, description }: DemoProps) {
 }
 `;
 
-  const defaultSchema = JSON.stringify(
-    {
-      $schema: "https://json-schema.org/draft/2020-12/schema",
-      title: "Demo 配置",
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          title: "标题",
-          default: "Hello World",
-        },
-        description: {
-          type: "string",
-          title: "描述",
-          default: "This is a demo",
-        },
+const DEFAULT_DEMO_SCHEMA = JSON.stringify(
+  {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "Demo 配置",
+    type: "object",
+    properties: {
+      title: {
+        type: "string",
+        title: "标题",
+        default: "Hello World",
       },
-      required: ["title"],
+      description: {
+        type: "string",
+        title: "描述",
+        default: "This is a demo",
+      },
     },
-    null,
-    2,
-  );
+    required: ["title"],
+  },
+  null,
+  2,
+);
+
+export function ensureWorkspaceFiles(workspacePath: string): void {
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
+  }
+
+  const codePath = path.join(workspacePath, "index.tsx");
+  const schemaPath = path.join(workspacePath, "config.schema.json");
+
+  if (!fs.existsSync(codePath)) {
+    fs.writeFileSync(codePath, DEFAULT_DEMO_CODE, "utf-8");
+  }
+  if (!fs.existsSync(schemaPath)) {
+    fs.writeFileSync(schemaPath, DEFAULT_DEMO_SCHEMA, "utf-8");
+  }
+}
+
+export function createProject(name: string): DemoMeta {
+  ensureDirsExist();
+
+  const projectId = `proj_${Date.now()}`;
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, "workspace");
+
+  ensureWorkspaceFiles(workspacePath);
 
   const projectJson = JSON.stringify(
     {
@@ -208,12 +235,6 @@ export default function Demo({ title, description }: DemoProps) {
     2,
   );
 
-  fs.writeFileSync(path.join(workspacePath, "index.tsx"), defaultCode, "utf-8");
-  fs.writeFileSync(
-    path.join(workspacePath, "config.schema.json"),
-    defaultSchema,
-    "utf-8",
-  );
   fs.writeFileSync(
     path.join(projectPath, "project.json"),
     projectJson,
@@ -253,6 +274,8 @@ export function createSession(projectId: string): SessionMeta {
   const sessionPath = path.join(sessionDir, sessionId);
   const projectPath = getProjectPath(projectId);
   const workspacePath = path.join(projectPath, "workspace");
+
+  ensureWorkspaceFiles(workspacePath);
 
   fs.mkdirSync(sessionDir, { recursive: true });
   fs.cpSync(workspacePath, sessionPath, { recursive: true });
@@ -341,55 +364,6 @@ export function updateSessionFiles(
   return true;
 }
 
-export function mergeSession(sessionId: string): boolean {
-  console.log(`[mergeSession] 开始合并 session: ${sessionId}`);
-  
-  const sessionMeta = getSessionMeta(sessionId);
-  console.log(`[mergeSession] sessionMeta:`, sessionMeta);
-
-  if (!sessionMeta) {
-    console.error(`[mergeSession] 无法获取 session 元数据, sessionId: ${sessionId}`);
-    return false;
-  }
-
-  const { demoId: projectId } = sessionMeta;
-  console.log(`[mergeSession] projectId: ${projectId}`);
-
-  if (!projectExists(projectId)) {
-    console.error(`[mergeSession] 项目不存在, projectId: ${projectId}`);
-    return false;
-  }
-
-  const sessionPath = getSessionPath(sessionId, projectId);
-  console.log(`[mergeSession] sessionPath: ${sessionPath}`);
-  
-  const projectPath = getProjectPath(projectId);
-  console.log(`[mergeSession] projectPath: ${projectPath}`);
-  
-  const workspacePath = path.join(projectPath, "workspace");
-  console.log(`[mergeSession] workspacePath: ${workspacePath}`);
-
-  try {
-    console.log(`[mergeSession] 删除旧 workspace...`);
-    fs.rmSync(workspacePath, { recursive: true, force: true });
-    
-    console.log(`[mergeSession] 复制 session 到 workspace...`);
-    fs.cpSync(sessionPath, workspacePath, { recursive: true });
-    
-    console.log(`[mergeSession] 删除 workspace 中的 .session.json...`);
-    fs.rmSync(path.join(workspacePath, ".session.json"), { force: true });
-    
-    console.log(`[mergeSession] 删除 session 目录...`);
-    fs.rmSync(sessionPath, { recursive: true, force: true });
-    
-    console.log(`[mergeSession] 合并成功!`);
-    return true;
-  } catch (error) {
-    console.error(`[mergeSession] 文件操作失败:`, error);
-    return false;
-  }
-}
-
 export function deleteSession(sessionId: string): boolean {
   if (!sessionExists(sessionId)) {
     return false;
@@ -425,6 +399,162 @@ export function createApiSuccess<T>(data: T) {
     success: true as const,
     data,
   };
+}
+
+// ========================================
+// 项目元数据操作
+// ========================================
+
+export function readProjectMeta(projectId: string): Project | null {
+  const projectPath = getProjectPath(projectId);
+  const projectJsonPath = path.join(projectPath, "project.json");
+
+  if (!fs.existsSync(projectJsonPath)) {
+    return null;
+  }
+
+  try {
+    const content = fs.readFileSync(projectJsonPath, "utf-8");
+    return JSON.parse(content) as Project;
+  } catch {
+    return null;
+  }
+}
+
+export function writeProjectMeta(projectId: string, project: Project): void {
+  const projectPath = getProjectPath(projectId);
+  const projectJsonPath = path.join(projectPath, "project.json");
+  fs.writeFileSync(projectJsonPath, JSON.stringify(project, null, 2), "utf-8");
+}
+
+// ========================================
+// 版本管理工具函数
+// ========================================
+
+export function countFiles(dir: string): number {
+  let count = 0;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
+
+    if (entry.isDirectory()) {
+      count += countFiles(path.join(dir, entry.name));
+    } else {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+export function generateVersionId(project: Project): string {
+  return `v${project.versions.length + 1}`;
+}
+
+export function cleanupOldVersions(project: Project): void {
+  if (project.versions.length <= MAX_VERSIONS_KEEP) return;
+
+  const toDelete = project.versions.slice(
+    0,
+    project.versions.length - MAX_VERSIONS_KEEP,
+  );
+
+  for (const version of toDelete) {
+    if (fs.existsSync(version.snapshotPath)) {
+      fs.rmSync(version.snapshotPath, { recursive: true, force: true });
+    }
+  }
+
+  project.versions = project.versions.slice(-MAX_VERSIONS_KEEP);
+}
+
+// ========================================
+// 版本历史查询
+// ========================================
+
+export function getVersionHistory(projectId: string): VersionInfo[] {
+  const project = readProjectMeta(projectId);
+  if (!project) return [];
+  return [...project.versions].reverse();
+}
+
+export function getLatestVersion(projectId: string): VersionInfo | null {
+  const project = readProjectMeta(projectId);
+  if (!project || project.versions.length === 0) return null;
+  return project.versions[project.versions.length - 1];
+}
+
+// ========================================
+// 版本恢复
+// ========================================
+
+export function restoreVersion(
+  projectId: string,
+  versionId: string,
+  userId?: string,
+): { success: boolean; newVersionId?: string; error?: string } {
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: "项目不存在" };
+  }
+
+  const targetVersion = project.versions.find((v) => v.versionId === versionId);
+  if (!targetVersion) {
+    return { success: false, error: `版本 ${versionId} 不存在` };
+  }
+
+  if (!fs.existsSync(targetVersion.snapshotPath)) {
+    return { success: false, error: `版本快照已丢失: ${versionId}` };
+  }
+
+  const workspacePath = path.join(getProjectPath(projectId), "workspace");
+
+  // 1. 备份当前 workspace
+  const backupVersionId = generateVersionId(project);
+  const backupSnapshotPath = getSnapshotPath(projectId, backupVersionId);
+  fs.mkdirSync(path.dirname(backupSnapshotPath), { recursive: true });
+  fs.cpSync(workspacePath, backupSnapshotPath, { recursive: true });
+
+  const backupVersion: VersionInfo = {
+    versionId: backupVersionId,
+    savedAt: Date.now(),
+    savedBy: userId || "system",
+    sessionId: `restore-from-${versionId}`,
+    snapshotPath: backupSnapshotPath,
+    fileCount: countFiles(workspacePath),
+    note: `恢复版本前的自动备份 (基于 ${versionId})`,
+  };
+  project.versions.push(backupVersion);
+
+  // 2. 用目标版本快照覆盖 workspace
+  fs.rmSync(workspacePath, { recursive: true, force: true });
+  fs.cpSync(targetVersion.snapshotPath, workspacePath, { recursive: true });
+
+  // 3. 记录恢复操作作为新版本
+  const restoreVersionId = generateVersionId(project);
+  const restoreSnapshotPath = getSnapshotPath(projectId, restoreVersionId);
+  fs.cpSync(workspacePath, restoreSnapshotPath, { recursive: true });
+
+  const restoreVersionInfo: VersionInfo = {
+    versionId: restoreVersionId,
+    savedAt: Date.now(),
+    savedBy: userId || "system",
+    sessionId: `restore-${versionId}`,
+    snapshotPath: restoreSnapshotPath,
+    fileCount: countFiles(workspacePath),
+    note: `恢复到版本 ${versionId}`,
+  };
+  project.versions.push(restoreVersionInfo);
+  project.updatedAt = Date.now();
+
+  // 4. 清理旧版本
+  cleanupOldVersions(project);
+
+  // 5. 保存项目元数据
+  writeProjectMeta(projectId, project);
+
+  return { success: true, newVersionId: restoreVersionId };
 }
 
 // ========================================

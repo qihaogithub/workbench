@@ -87,28 +87,35 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       try {
         setIsLoading(true);
 
+        console.log(`[loadDemo] 开始加载 demo: ${demoId}`);
+
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ demoId }),
         });
 
+        console.log(`[loadDemo] Session API 响应状态: ${sessionRes.status}`);
+
         if (!sessionRes.ok) {
           throw new Error("创建 Session 失败");
         }
 
         const sessionData = await sessionRes.json();
+        console.log(`[loadDemo] Session API JSON:`, sessionData);
+
         if (!sessionData.success) {
           throw new Error(sessionData.error?.message || "创建 Session 失败");
         }
 
-        console.log("[DemoEdit] Session API response:", sessionData.data);
+        console.log("[loadDemo] Session 创建成功, sessionId:", sessionData.data.sessionId);
         setSessionId(sessionData.data.sessionId);
         setTempWorkspace(sessionData.data.tempWorkspace || "");
 
         const filesRes = await fetch(
           `/api/sessions/${sessionData.data.sessionId}/files`,
         );
+        console.log(`[loadDemo] Files API 响应状态: ${filesRes.status}`);
         if (!filesRes.ok) {
           throw new Error("加载文件失败");
         }
@@ -189,6 +196,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, []);
 
   const handleSave = async () => {
+    console.log(`[handleSave] 开始保存, sessionId: "${sessionId}"`);
+
+    if (!sessionId) {
+      console.error('[handleSave] sessionId 为空!');
+      toast({
+        title: "保存失败",
+        description: "Session 未创建，请刷新页面重试",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!validationResult.isValid) {
       toast({
         title: "保存失败",
@@ -201,6 +220,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     try {
       setIsSaving(true);
 
+      console.log(`[handleSave] 发送 PUT 请求到 /api/sessions/${sessionId}/files`);
       const saveRes = await fetch(`/api/sessions/${sessionId}/files`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -211,11 +231,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         throw new Error("保存文件失败");
       }
 
-      const mergeRes = await fetch(`/api/sessions/${sessionId}/merge`, {
+      const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
 
-      if (!mergeRes.ok) {
+      if (!saveRes2.ok) {
         throw new Error("合并到 Demo 失败");
       }
 

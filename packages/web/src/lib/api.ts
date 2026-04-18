@@ -77,12 +77,6 @@ export async function saveSessionFiles(
   }).then((res) => res.json())
 }
 
-export async function mergeSession(sessionId: string): Promise<ApiResponse<void>> {
-  return fetch(`/api/sessions/${sessionId}/merge`, {
-    method: 'POST',
-  }).then((res) => res.json())
-}
-
 export async function deleteSession(sessionId: string): Promise<ApiResponse<void>> {
   return fetch(`/api/sessions/${sessionId}`, {
     method: 'DELETE',

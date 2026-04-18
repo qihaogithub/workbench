@@ -14,8 +14,12 @@ export interface DemoFiles {
 export interface SessionMeta {
   sessionId: string;
   demoId: string;
+  userId?: string;
   createdAt: number;
   expiresAt: number;
+  status?: 'editing' | 'saved' | 'discarded';
+  basedOnVersion?: string;
+  opencodeSessionId?: string | null;
 }
 
 export interface ApiSuccessResponse<T> {
