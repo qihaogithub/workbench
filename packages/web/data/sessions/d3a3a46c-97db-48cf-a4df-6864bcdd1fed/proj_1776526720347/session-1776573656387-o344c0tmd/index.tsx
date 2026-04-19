@@ -15,6 +15,12 @@ export default function BannerDemo({
   theme,
   showBadge 
 }: BannerDemoProps) {
+  const bgClasses = {
+    light: 'bg-gradient-to-br from-gray-50 to-gray-100',
+    dark: 'bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900',
+    colorful: 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500',
+  };
+
   const textClasses = {
     light: 'text-black',
     dark: 'text-white',
@@ -24,17 +30,17 @@ export default function BannerDemo({
   const descClasses = {
     light: 'text-gray-700',
     dark: 'text-white/80',
-    colorful: 'text-white/80',
+    colorful: 'text-white/90',
   };
 
   const badgeClasses = {
     light: 'bg-white text-gray-900 border-2 border-gray-300',
     dark: 'bg-white text-gray-900',
-    colorful: 'bg-white/80 text-purple-600',
+    colorful: 'bg-white/90 text-purple-600 font-bold',
   };
 
   return (
-    <div className={`min-h-screen bg-white ${textClasses[theme]}`}>
+    <div className={`min-h-screen ${bgClasses[theme]} ${textClasses[theme]}`}>
       <div className="container mx-auto px-4 py-8">
         {showBadge && (
           <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full mb-4 ${badgeClasses[theme]}`}>
