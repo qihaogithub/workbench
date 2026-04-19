@@ -22,7 +22,7 @@ export default function BannerDemo({
   };
 
   const descClasses = {
-    light: 'text-gray-900',
+    light: 'text-gray-700',
     dark: 'text-white/80',
     colorful: 'text-white/80',
   };

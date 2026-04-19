@@ -4,6 +4,7 @@ import React, { useState, useEffect, Component, type ErrorInfo } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
 import { compileCode } from "@/lib/compiler-client";
 import { executeComponent } from "@/lib/component-executor";
+import { PreviewScope } from "./PreviewScope";
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   width: 375,
@@ -163,17 +164,19 @@ export function PreviewPanel({
 
       {compiledComponent && !isCompiling && (
         <PreviewErrorBoundary onError={onError}>
-          <div style={previewStyle}>
-            <React.Suspense
-              fallback={
-                <div className="flex items-center justify-center p-8">
-                  <div role="status" aria-label="加载中" className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-                </div>
-              }
-            >
-              {React.createElement(compiledComponent, configData)}
-            </React.Suspense>
-          </div>
+          <PreviewScope>
+            <div style={previewStyle}>
+              <React.Suspense
+                fallback={
+                  <div className="flex items-center justify-center p-8">
+                    <div role="status" aria-label="加载中" className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+                  </div>
+                }
+              >
+                {React.createElement(compiledComponent, configData)}
+              </React.Suspense>
+            </div>
+          </PreviewScope>
         </PreviewErrorBoundary>
       )}
     </div>
