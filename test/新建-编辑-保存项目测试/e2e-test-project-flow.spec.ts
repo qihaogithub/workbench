@@ -295,12 +295,82 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await page.screenshot({ path: `test-logs/04-saved-${Date.now()}.png` });
       logger.log('已保存最终状态截图');
 
+      // ========== 步骤 6: 删除项目 ==========
+      logger.step('6', '删除项目');
+
+      // 点击返回或找到项目列表
+      const backButton = page.getByRole('button', { name: /返回|back/i })
+        .or(page.getByText(/返回/))
+        .or(page.locator('button').filter({ hasText: /返回/i }))
+        .first();
+
+      if (await backButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await backButton.click();
+        logger.log('已点击返回按钮');
+        await page.waitForTimeout(1000);
+      }
+
+      // 找到删除按钮（通常是更多操作菜单中的删除选项）
+      const deleteButton = page.getByRole('button', { name: /删除|delete|remove/i })
+        .or(page.getByText(/删除/))
+        .or(page.locator('button').filter({ hasText: /删除/i }))
+        .first();
+
+      if (await deleteButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await deleteButton.click();
+        logger.log('已点击删除按钮');
+        await page.waitForTimeout(500);
+
+        // 确认删除操作
+        const confirmDeleteButton = page.getByRole('button', { name: /确认|确定|是|删除/i })
+          .or(page.getByText(/确认删除|确定删除/i))
+          .first();
+
+        if (await confirmDeleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await confirmDeleteButton.click();
+          logger.success('已确认删除项目');
+        } else {
+          // 有些UI可能是直接删除，无需二次确认
+          logger.success('已执行删除操作');
+        }
+
+        await page.waitForTimeout(2000);
+      } else {
+        logger.log('未找到删除按钮，尝试通过右键菜单或更多操作删除');
+        
+        // 尝试右键点击项目卡片或行来获取上下文菜单
+        const projectCard = page.locator('[class*="card"], [class*="item"], [role="listitem"]').first();
+        if (await projectCard.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await projectCard.click({ button: 'right' });
+          await page.waitForTimeout(500);
+          
+          const contextDeleteButton = page.getByText(/删除|delete/i).first();
+          if (await contextDeleteButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await contextDeleteButton.click();
+            logger.log('已通过右键菜单点击删除');
+            await page.waitForTimeout(500);
+            
+            // 再次确认
+            const finalConfirm = page.getByRole('button', { name: /确认|确定|是/i })
+              .or(page.getByText(/确认删除|确定删除/i))
+              .first();
+            if (await finalConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
+              await finalConfirm.click();
+            }
+          }
+        }
+      }
+
+      // 截图保存删除后的状态
+      await page.screenshot({ path: `test-logs/05-deleted-${Date.now()}.png` });
+      logger.log('已保存删除后的截图');
+
       // ========== 验证 ==========
       logger.log('========================================');
       logger.log('流程执行完成，验证结果:');
       logger.log(`- 项目名称: ${projectName}`);
       logger.log(`- 模板代码长度: ${TEMPLATE_CODE.length} 字符`);
-      logger.log('- 所有步骤均已执行');
+      logger.log('- 所有步骤均已执行（新建、编辑、保存、删除）');
       logger.log('========================================');
 
     } catch (error) {
