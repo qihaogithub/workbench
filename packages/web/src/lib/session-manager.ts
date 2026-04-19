@@ -289,13 +289,30 @@ export function saveEditSession(
     return { success: false, error: 'Session not found' };
   }
 
+  const sessionPath = getSessionPath(sessionId);
   const status = sessionMeta.status || 'editing';
   if (status !== 'editing') {
-    return { success: false, error: 'Session not in editing status' };
+    // Session 状态不是 editing，但目录仍然存在，
+    // 可能是之前保存时 deleteSession 失败（如 Windows 文件锁）导致的残留
+    if (sessionPath && fs.existsSync(sessionPath)) {
+      try {
+        const metaPath = path.join(sessionPath, ".session.json");
+        if (fs.existsSync(metaPath)) {
+          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+          meta.status = 'editing';
+          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+          console.log(`[saveEditSession] 修复 session ${sessionId} 状态为 editing`);
+        }
+      } catch (e) {
+        console.error(`[saveEditSession] 修复 session 状态失败:`, e);
+        return { success: false, error: 'Session not in editing status' };
+      }
+    } else {
+      return { success: false, error: 'Session not in editing status' };
+    }
   }
 
   const { demoId: projectId } = sessionMeta;
-  const sessionPath = getSessionPath(sessionId);
   const projectPath = getProjectPath(projectId);
   const workspacePath = path.join(projectPath, "workspace");
 
@@ -354,8 +371,12 @@ export function saveEditSession(
       fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     }
 
-    // 7. 清理 session
-    deleteSession(sessionId);
+    // 7. 清理 session（失败不影响保存结果）
+    try {
+      deleteSession(sessionId);
+    } catch (e) {
+      console.warn(`[saveEditSession] 清理 session 失败，但保存已成功:`, e);
+    }
 
     return {
       success: true,

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [previewSize, setPreviewSize] =
     useState<import("../../../../../components/demo/types").PreviewSize>();
 
+  const [demoName, setDemoName] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
   const [aiStreamContent, setAiStreamContent] = useState("");
@@ -82,12 +87,68 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const handleNameClick = () => {
+    setNameDraft(demoName);
+    setIsEditingName(true);
+  };
+
+  const handleNameSave = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      setIsEditingName(false);
+      return;
+    }
+    if (trimmed === demoName) {
+      setIsEditingName(false);
+      return;
+    }
+
+    const res = await fetch(`/api/demos/${demoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
+
+    if (res.ok) {
+      setDemoName(trimmed);
+      toast({ title: "名称已更新" });
+    } else {
+      toast({
+        title: "更新失败",
+        description: "项目名称更新失败",
+        variant: "destructive",
+      });
+    }
+    setIsEditingName(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleNameSave();
+    } else if (e.key === "Escape") {
+      setIsEditingName(false);
+    }
+  };
+
   useEffect(() => {
     const loadDemo = async () => {
       try {
         setIsLoading(true);
 
         console.log(`[loadDemo] 开始加载 demo: ${demoId}`);
+
+        // 并行获取项目名称
+        const demosRes = await fetch("/api/demos");
+        const demosData = await demosRes.json();
+        if (demosData.success) {
+          const demo = demosData.data.find(
+            (d: { id: string; name: string }) => d.id === demoId,
+          );
+          if (demo) {
+            setDemoName(demo.name);
+          }
+        }
 
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
@@ -384,7 +445,24 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">{demoId}</h1>
+          {isEditingName ? (
+            <Input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={handleNameSave}
+              onKeyDown={handleNameKeyDown}
+              className="h-8 w-64 text-lg font-semibold px-2 py-1"
+            />
+          ) : (
+            <h1
+              className="text-lg font-semibold cursor-pointer hover:text-primary transition-colors"
+              onClick={handleNameClick}
+              title="点击修改名称"
+            >
+              {demoName || demoId}
+            </h1>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>

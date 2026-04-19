@@ -146,9 +146,11 @@ export function listProjects(): DemoMeta[] {
     const projectPath = path.join(PROJECTS_DIR, entry.name);
     const stats = fs.statSync(projectPath);
 
+    const project = readProjectMeta(entry.name);
+
     projects.push({
       id: entry.name,
-      name: entry.name,
+      name: project?.name || entry.name,
       createdAt: stats.birthtimeMs,
       updatedAt: stats.mtimeMs,
     });

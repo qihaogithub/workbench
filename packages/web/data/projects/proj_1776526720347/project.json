@@ -1,6 +1,6 @@
 {
   "id": "proj_1776526720347",
-  "name": "测试",
+  "name": "测试123",
   "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\projects\\proj_1776526720347\\workspace",
   "versions": [
     {
@@ -26,8 +26,64 @@
       "sessionId": "session-1776563021001-70q3njjcl",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v3",
       "fileCount": 2
+    },
+    {
+      "versionId": "v4",
+      "savedAt": 1776564122248,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776564020679-upefz0764",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v4",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v5",
+      "savedAt": 1776564176098,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776564145560-ie1zhxwg3",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v5",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v6",
+      "savedAt": 1776564569697,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776564145560-ie1zhxwg3",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v6",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v7",
+      "savedAt": 1776565184531,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776564582929-mk6gabbqy",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v7",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v8",
+      "savedAt": 1776565381969,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776565186088-v4888h4jd",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v8",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v9",
+      "savedAt": 1776565752327,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776565385194-j6fnmpo9r",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v9",
+      "fileCount": 2
+    },
+    {
+      "versionId": "v10",
+      "savedAt": 1776566845242,
+      "savedBy": "d3a3a46c-97db-48cf-a4df-6864bcdd1fed",
+      "sessionId": "session-1776566566578-zvqy63kee",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v10",
+      "fileCount": 2
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1776564015024
+  "updatedAt": 1776566845242
 }

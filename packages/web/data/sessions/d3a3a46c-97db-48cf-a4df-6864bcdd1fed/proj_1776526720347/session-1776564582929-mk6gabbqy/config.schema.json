@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Banner Demo 配置",
+  "type": "object",
+  "properties": {
+    "banner": {
+      "type": "string",
+      "format": "uri",
+      "title": "Banner",
+      "description": "建议尺寸: 750x400px，支持 JPG、PNG、WebP 格式",
+      "default": "https://picsum.photos/750/400"
+    },
+    "title": {
+      "type": "string",
+      "title": "活动标题",
+      "default": "精彩活动来袭",
+      "maxLength": 20
+    },
+    "description": {
+      "type": "string",
+      "title": "活动描述",
+      "default": "限时优惠，不容错过"
+    },
+    "theme": {
+      "type": "string",
+      "title": "主题颜色",
+      "enum": ["light", "dark", "colorful"],
+      "enumNames": ["浅色模式", "深色模式", "多彩渐变"],
+      "default": "light"
+    },
+    "showBadge": {
+      "type": "boolean",
+      "title": "显示活动标签",
+      "default": true
+    }
+  },
+  "required": ["banner", "title"]
+}

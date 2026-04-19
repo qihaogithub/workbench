@@ -7,6 +7,7 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import { MainLayout } from '@/components/layout/main-layout'
 import { PreviewPanel, ConfigForm } from '../../../../components/demo'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast-provider'
 import { getDefaultValues, getPreviewSize } from '../../../../lib/validator'
 
@@ -27,6 +28,8 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
   const [previewSize, setPreviewSize] = useState<import('../../../../components/demo/types').PreviewSize>()
   const [isLoading, setIsLoading] = useState(true)
   const [demoName, setDemoName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
 
   // 加载 Demo 数据
   useEffect(() => {
@@ -107,6 +110,46 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
     setConfigData(data)
   }, [])
 
+  const handleNameClick = () => {
+    setNameDraft(demoName)
+    setIsEditingName(true)
+  }
+
+  const handleNameSave = async () => {
+    const trimmed = nameDraft.trim()
+    if (!trimmed || trimmed === demoName) {
+      setIsEditingName(false)
+      return
+    }
+
+    const res = await fetch(`/api/demos/${demoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    })
+
+    if (res.ok) {
+      setDemoName(trimmed)
+      toast({ title: '名称已更新' })
+    } else {
+      toast({
+        title: '更新失败',
+        description: '项目名称更新失败',
+        variant: 'destructive',
+      })
+    }
+    setIsEditingName(false)
+  }
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleNameSave()
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -129,7 +172,24 @@ export default function DemoUsePage({ params }: DemoUsePageProps) {
               返回首页
             </Button>
           </Link>
-          <h1 className="text-lg font-semibold">{demoName || 'Demo'}</h1>
+          {isEditingName ? (
+            <Input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={handleNameSave}
+              onKeyDown={handleNameKeyDown}
+              className="h-8 w-64 text-lg font-semibold px-2 py-1"
+            />
+          ) : (
+            <h1
+              className="text-lg font-semibold cursor-pointer hover:text-primary transition-colors"
+              onClick={handleNameClick}
+              title="点击修改名称"
+            >
+              {demoName || 'Demo'}
+            </h1>
+          )}
           <span className="text-sm text-muted-foreground">{demoId}</span>
         </div>
         <div className="flex items-center gap-2">
