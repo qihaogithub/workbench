@@ -25,28 +25,25 @@
 - 每个属性都有合理的 `default` 值
 - properties 与组件 Props 一一对应
 
-### 依赖使用规范
+### 样式隔离规范（必须遵守）
 
-你的 Demo 组件运行在独立的 iframe 沙箱中，可以任意使用 npm 包，系统会自动从 CDN 加载。
+你的 Demo 组件渲染在宿主应用的 DOM 树中，宿主应用有全局样式（如深色主题的 body 背景）。如果不显式声明颜色，未设色的元素会继承宿主样式，导致显示异常。
 
-- 可以 `import` 任何 npm 包（如 `date-fns`、`framer-motion`、`lucide-react` 等）
-- 可以使用 CSS 导入（如 `import 'some-lib/dist/style.css'`），系统会自动处理
-- 推荐优先使用 shadcn/ui 组件库保持风格一致
+为避免样式污染，请严格遵守：
 
-### 单文件组件约束
-
-所有代码必须写在单一 `index.tsx` 文件中：
-
-- 禁止 `import './xxx'` 形式的相对路径模块导入
-- 如有复用逻辑，以内联函数形式实现
-- 图片等资源使用绝对 URL 或 base64
+1. **根容器必须显式声明背景和文字色**：最外层 `<div>` 必须有明确的背景色和文字色类，不要依赖默认颜色。
+2. **不使用 shadcn/ui 语义变量类**：禁止使用 `bg-background`、`text-foreground`、`border-border`、`bg-primary`、`text-muted-foreground` 等。这些变量的值由宿主应用全局控制，不受你的组件控制。
+3. **使用具体的 Tailwind 颜色类**：如 `bg-white`、`bg-gray-900`、`text-gray-900`、`text-white`、`border-gray-200` 等。不要使用依赖 CSS 变量的语义类。
+4. **所有可见文字必须有颜色类**：不要假设文字颜色会正确继承，每个 `<p>`、`<span>`、`<h1>` 等文本元素都要有明确的 `text-*` 类。
+5. **如果使用 shadcn/ui 组件**：为其显式传入 `className` 覆盖默认样式，不要依赖组件的默认变量。例如：`<Button className="bg-blue-600 text-white">`。
 
 ### 禁止行为
 - ❌ 修改 .session.json 或其他系统文件
 - ❌ 创建除 index.tsx 和 config.schema.json 外的新文件
-- ❌ 使用 `import './xxx'` 形式的相对路径导入
+- ❌ 使用其他 UI 组件库（如 Ant Design、Material-UI）
 - ❌ 使用 `as any`、`@ts-ignore`、`@ts-expect-error`
 - ❌ 留下 TODO 或占位符
+- ❌ 使用 `bg-background`、`text-foreground`、`border-border` 等语义变量类
 
 ## 工作流程
 
@@ -63,6 +60,8 @@
 **自检清单**：
 - [ ] 只修改了 index.tsx 和 config.schema.json
 - [ ] Props 接口与 Schema properties 一一对应
-- [ ] 所有代码在单一文件中，没有相对路径导入
+- [ ] 根容器有显式的背景色和文字色（如 bg-white text-gray-900 或 bg-gray-900 text-white）
+- [ ] 没有使用 bg-background / text-foreground / border-border 等语义变量类
+- [ ] 所有可见文字都有 text-* 颜色类
 - [ ] 没有使用不安全的类型转换
 - [ ] 代码完整可运行

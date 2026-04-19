@@ -91,12 +91,21 @@ ${cssLinks}
     }
 
     function renderComponent() {
-      if (!currentComponent) return;
+      console.log('[iframe] renderComponent 调用', { hasComponent: !!currentComponent, config: currentConfig });
+      if (!currentComponent) {
+        console.warn('[iframe] currentComponent 为空，无法渲染');
+        return;
+      }
       const container = document.getElementById('root');
-      if (!container) return;
+      if (!container) {
+        console.error('[iframe] 找不到 #root 元素');
+        return;
+      }
       if (!currentRoot) {
+        console.log('[iframe] 创建 React root');
         currentRoot = ReactDOM.createRoot(container);
       }
+      console.log('[iframe] 开始渲染组件');
       currentRoot.render(
         React.createElement(ErrorBoundary, null,
           React.createElement(currentComponent, currentConfig)
@@ -120,25 +129,33 @@ ${cssLinks}
 
       const { type, code, configData: newConfigData, cssImports: newCssImports } = event.data;
 
+      console.log('[iframe] 收到消息', { type, codeLength: code?.length });
+
       if (type === 'UPDATE_CODE') {
+        console.log('[iframe] 处理 UPDATE_CODE', { configData: newConfigData, cssImports: newCssImports });
         currentConfig = newConfigData || {};
         updateCssLinks(newCssImports || []);
 
         const blob = new Blob([code], { type: 'application/javascript' });
         const moduleUrl = URL.createObjectURL(blob);
 
+        console.log('[iframe] 开始加载模块', { moduleUrl });
+
         import(moduleUrl)
           .then((module) => {
+            console.log('[iframe] 模块加载成功', { hasDefault: !!module.default });
             currentComponent = module.default;
             renderComponent();
             window.parent.postMessage({ type: 'LOADED' }, '*');
           })
           .catch((err) => {
+            console.error('[iframe] 模块加载失败', err);
             window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
           });
       }
 
       if (type === 'UPDATE_CONFIG') {
+        console.log('[iframe] 处理 UPDATE_CONFIG', { configData: newConfigData });
         currentConfig = newConfigData || {};
         if (currentComponent) {
           renderComponent();
@@ -173,7 +190,10 @@ ${cssLinks}
       }, '*');
     });
 
+    console.log('[iframe] 脚本开始执行');
+
     // 通知父窗口 iframe 已就绪
+    console.log('[iframe] 发送 READY 消息');
     window.parent.postMessage({ type: 'READY' }, '*');
 
     // 如果有预置代码（嵌入场景），直接加载

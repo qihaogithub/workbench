@@ -118,10 +118,14 @@ export function rewriteImportsToCdn(
 ): string {
   let result = compiledCode;
 
+  console.log('[compiler] rewriteImportsToCdn - 输入依赖:', dependencies);
+
   for (const dep of dependencies) {
     if (!isNpmPackage(dep) || isCssImport(dep)) continue;
 
     const cdnUrl = toCdnUrl(dep, lockedDependencies?.[dep]);
+    console.log('[compiler] 转换依赖:', { dep, cdnUrl });
+    
     // 替换 from 'package' 和 from "package"
     const fromPattern = new RegExp(
       `from\\s+(['"])${escapeRegex(dep)}\\1`,
@@ -136,6 +140,8 @@ export function rewriteImportsToCdn(
     );
     result = result.replace(importPattern, `import '${cdnUrl}'`);
   }
+
+  console.log('[compiler] rewriteImportsToCdn - 输出代码前100字符:', result.substring(0, 200));
 
   return result;
 }
@@ -161,8 +167,8 @@ export function compileCode(
     production: true,
   });
 
-  // 2. 提取依赖
-  const dependencies = extractImports(code);
+  // 2. 从编译后的代码中提取依赖（包括自动添加的 react/jsx-runtime）
+  const dependencies = extractImports(result.code);
 
   // 3. 分类处理
   const cssImports = dependencies.filter(isCssImport);
