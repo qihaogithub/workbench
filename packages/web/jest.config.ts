@@ -13,7 +13,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!( @codesandbox/sandpack-react|@rjsf|@react-hook|@x0k)/)',
+    'node_modules/(?!( @rjsf|@react-hook|@x0k)/)',
   ],
 };
 

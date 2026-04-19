@@ -1,9 +1,21 @@
 # 预览系统动态编译替换 Sandpack 方案
 
-> **文档版本**: v1.2
+> **文档版本**: v1.3
 > **创建时间**: 2026-04-19
 > **更新日期**: 2026-04-19
-> **状态**: ✅ 已确认（已根据审核意见修正）
+> **状态**: 🚧 实施中
+>
+> **当前进度**:
+> - ✅ 第一阶段：后端编译服务（`sucrase` 安装、`/api/compile` 路由、`compiler-client.ts`、`component-executor.ts`）
+> - ✅ 第二阶段：重写 `PreviewPanel`（移除 Sandpack，改为动态编译渲染）
+> - ✅ 第三阶段：测试与验证（`PreviewPanel` 单元测试 8/8 通过，TypeScript 类型检查通过）
+> - ✅ 第四阶段：清理（移除 `@codesandbox/sandpack-react`，更新 Jest 配置）
+>
+> **待手动验证项**（需启动 `pnpm dev:web` 后确认）:
+> - [ ] `/demo-test` 页面正常预览
+> - [ ] 配置实时联动响应
+> - [ ] 代码编辑后重新编译
+> - [ ] 错误提示显示
 
 ---
 
@@ -267,14 +279,17 @@ Demo 制作完成后，需要嵌入到其他内部系统（如设计规范平台
 
 #### 步骤 1.1：安装 sucrase
 
+- [x] 已完成
+
 ```bash
 pnpm --filter @opencode-workbench/web add sucrase
 ```
 
 #### 步骤 1.2：创建编译 API 路由
 
-新建 `packages/web/src/app/api/compile/route.ts`，实现：
+- [x] 已完成 — `packages/web/src/app/api/compile/route.ts`
 
+实现：
 - `POST` 方法接收 `{ code: string }`
 - 扫描代码中的 `import` 语句，提取依赖列表
 - 校验依赖是否均在白名单内（`react`、`lucide-react`、`clsx`、`tailwind-merge`、`class-variance-authority`、`framer-motion`）
@@ -300,8 +315,9 @@ const result = transform(code, {
 
 #### 步骤 1.3：创建编译客户端
 
-新建 `packages/web/src/lib/compiler-client.ts`，封装 `/api/compile` 的 HTTP 调用：
+- [x] 已完成 — `packages/web/src/lib/compiler-client.ts`
 
+实现：
 - `compileCode(code: string)` — 调用 API，返回编译结果
 - 客户端缓存（`Map`）— 相同代码不重复请求
 - `clearCompileCache()` — 手动清空缓存
@@ -320,8 +336,9 @@ function getCacheKey(code: string): string {
 
 #### 步骤 1.4：创建组件执行器
 
-新建 `packages/web/src/lib/component-executor.ts`，实现 `executeComponent(compiledCode: string)`：
+- [x] 已完成 — `packages/web/src/lib/component-executor.ts`
 
+实现 `executeComponent(compiledCode: string)`：
 - 创建虚拟 `module` 对象（`{ exports: {} }`）
 - 注入 `require` 函数，映射项目已有依赖（含 `react/jsx-runtime`）
 - 通过 `new Function` 执行编译后的 CommonJS 代码
@@ -333,7 +350,7 @@ function getCacheKey(code: string): string {
 
 ### 6.2 第二阶段：重写 PreviewPanel（1 天）
 
-修改 `packages/web/components/demo/PreviewPanel.tsx`：
+- [x] 已完成 — `packages/web/components/demo/PreviewPanel.tsx`
 
 #### 状态管理
 
@@ -365,13 +382,14 @@ function getCacheKey(code: string): string {
 
 #### 单元测试
 
-修改 `packages/web/components/demo/__tests__/PreviewPanel.test.tsx`：
+- [x] 已完成 — `packages/web/components/demo/__tests__/PreviewPanel.test.tsx` 全部 8 个测试通过
 
-- Mock `@/lib/compiler-client` 的 `compileCode`
-- Mock `@/lib/component-executor` 的 `executeComponent`
-- 测试场景：编译中状态、编译成功渲染、编译错误处理、无效代码路径、自定义 className、默认预览尺寸
+Mock `@/lib/compiler-client` 的 `compileCode` 和 `@/lib/component-executor` 的 `executeComponent`。
+测试场景：编译中状态、编译成功渲染、编译错误处理、无效代码路径、自定义 className、默认预览尺寸、配置变更不触发重新编译。
 
 #### 手动验证
+
+- [ ] 待进行 — 需启动 `pnpm dev:web` 后确认
 
 1. 启动开发服务器：`pnpm dev:web`
 2. 访问 `http://localhost:3200/demo-test`
@@ -379,13 +397,15 @@ function getCacheKey(code: string): string {
 
 ### 6.4 第四阶段：清理（0.5 天）
 
+- [x] 已完成
+
 1. 卸载 Sandpack：`pnpm --filter @opencode-workbench/web remove @codesandbox/sandpack-react`
-2. 清理 Next.js 缓存：`pnpm --filter @opencode-workbench/web exec rimraf .next`（或手动删除 `packages/web/.next`）
+2. 清理 Next.js 缓存：`pnpm --filter @opencode-workbench/web exec rimraf .next`
 3. 运行全量检查：
    ```bash
-   pnpm --filter @opencode-workbench/web typecheck
-   pnpm --filter @opencode-workbench/web test
-   pnpm --filter @opencode-workbench/web lint
+   pnpm --filter @opencode-workbench/web typecheck  # ✅ 通过
+   pnpm --filter @opencode-workbench/web test       # ✅ PreviewPanel 8/8 通过
+   pnpm --filter @opencode-workbench/web lint       # ✅ 无新增错误
    ```
 
 ---

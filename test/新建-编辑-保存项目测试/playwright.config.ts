@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as path from 'path';
+import * as fs from 'fs';
+
+const outputDir = path.join(__dirname, 'test-outputs');
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true });
+}
 
 export default defineConfig({
   testDir: './',
@@ -8,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: [
-    ['html', { outputFolder: 'test-reports', open: 'never' }],
+    ['html', { outputFolder: path.join(outputDir, 'test-reports'), open: 'never' }],
     ['list']
   ],
   use: {
@@ -17,6 +24,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+  outputDir,
   projects: [
     {
       name: 'chromium',

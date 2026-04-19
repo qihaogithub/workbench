@@ -100,15 +100,18 @@ function generateLogFilename(): string {
 class TestLogger {
   private logs: string[] = [];
   private logPath: string;
+  private outputDir: string;
 
   constructor() {
-    const scriptDir = __dirname;
-    const rootDir = path.resolve(scriptDir, '..', '..');
-    const logDir = path.join(rootDir, 'test-logs');
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
+    this.outputDir = path.join(__dirname, 'test-outputs');
+    if (!fs.existsSync(this.outputDir)) {
+      fs.mkdirSync(this.outputDir, { recursive: true });
     }
-    this.logPath = path.join(logDir, generateLogFilename());
+    this.logPath = path.join(this.outputDir, generateLogFilename());
+  }
+
+  getOutputDir(): string {
+    return this.outputDir;
   }
 
   log(message: string): void {
@@ -139,10 +142,11 @@ class TestLogger {
 }
 
 test.describe('项目创建和代码编辑完整流程', () => {
-  const logger = new TestLogger();
+  let logger: TestLogger;
   let projectName = '';
 
   test.beforeAll(async () => {
+    logger = new TestLogger();
     logger.log('========================================');
     logger.log('测试开始: 项目创建和代码编辑完整流程');
     logger.log('========================================');
@@ -156,6 +160,8 @@ test.describe('项目创建和代码编辑完整流程', () => {
   });
 
   test('完整流程: 打开首页 -> 新建项目 -> 编辑代码 -> 保存', async ({ page }) => {
+    const outputDir = logger.getOutputDir();
+    const screenshot = (name: string) => path.join(outputDir, name);
     try {
       // ========== 步骤 1: 打开项目首页 ==========
       logger.step('1', '打开项目首页 http://localhost:3200');
@@ -163,7 +169,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       logger.success('已打开首页');
 
       // 截图保存首页状态
-      await page.screenshot({ path: `test-logs/01-homepage-${Date.now()}.png` });
+      await page.screenshot({ path: screenshot(`01-homepage-${Date.now()}.png`) });
       logger.log('已保存首页截图');
 
       // ========== 步骤 2: 新建项目 ==========
@@ -222,7 +228,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await page.waitForTimeout(2000);
 
       // 截图保存编辑页状态
-      await page.screenshot({ path: `test-logs/02-edit-page-${Date.now()}.png` });
+      await page.screenshot({ path: screenshot(`02-edit-page-${Date.now()}.png`) });
       logger.log('已保存编辑页截图');
 
       // ========== 步骤 4: 粘贴模板代码到代码编辑区 ==========
@@ -273,7 +279,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       }
 
       // 截图保存粘贴后的状态
-      await page.screenshot({ path: `test-logs/03-code-pasted-${Date.now()}.png` });
+      await page.screenshot({ path: screenshot(`03-code-pasted-${Date.now()}.png`) });
       logger.log('已保存粘贴代码后的截图');
 
       // ========== 步骤 5: 点击保存按钮 ==========
@@ -292,7 +298,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await page.waitForTimeout(2000);
 
       // 截图保存最终状态
-      await page.screenshot({ path: `test-logs/04-saved-${Date.now()}.png` });
+      await page.screenshot({ path: screenshot(`04-saved-${Date.now()}.png`) });
       logger.log('已保存最终状态截图');
 
       // ========== 步骤 6: 删除项目 ==========
@@ -362,7 +368,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       }
 
       // 截图保存删除后的状态
-      await page.screenshot({ path: `test-logs/05-deleted-${Date.now()}.png` });
+      await page.screenshot({ path: screenshot(`05-deleted-${Date.now()}.png`) });
       logger.log('已保存删除后的截图');
 
       // ========== 验证 ==========
@@ -377,7 +383,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       logger.error('测试执行', error);
 
       // 截图保存错误状态
-      await page.screenshot({ path: `test-logs/error-${Date.now()}.png` }).catch(() => {});
+      await page.screenshot({ path: screenshot(`error-${Date.now()}.png`) }).catch(() => {});
 
       throw error;
     }

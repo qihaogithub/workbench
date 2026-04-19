@@ -1,30 +1,23 @@
 "use client";
 
-import {
-  SandpackProvider,
-  SandpackLayout,
-  SandpackPreview,
-} from "@codesandbox/sandpack-react";
+import React, { useState, useEffect, Component, type ErrorInfo } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
-import { extractDependenciesFromComments } from "@/lib/sandpack-deps";
+import { compileCode } from "@/lib/compiler-client";
+import { executeComponent } from "@/lib/component-executor";
 
-// 默认预览尺寸（iPhone X/11 Pro 标准）
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   width: 375,
   height: 812,
 };
 
 function buildPreviewStyle(size?: PreviewSize): React.CSSProperties {
-  // 使用传入的尺寸或默认尺寸
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
 
   const style: React.CSSProperties = {
     width: effectiveSize.width,
     height: effectiveSize.height,
     minHeight: effectiveSize.minHeight ?? "400px",
-    // 居中显示
     margin: "0 auto",
-    // 添加边框和圆角以突出设备感
     border: "1px solid #e5e7eb",
     borderRadius: "8px",
     overflow: "hidden",
@@ -42,89 +35,109 @@ function buildPreviewStyle(size?: PreviewSize): React.CSSProperties {
   return style;
 }
 
-export function PreviewPanel({
-  code,
-  configData,
-  sdkFiles,
-  onError,
-  className,
-  previewSize,
-}: PreviewPanelProps) {
-  // 添加日志追踪 code prop 变化
-  console.log(
-    "[PreviewPanel] Rendered with code length:",
-    code?.length,
-    "isValid code:",
-    typeof code === "string" && code.trim().length > 0,
-  );
-
-  // 验证 code 是否为有效的代码（不是文件路径或其他非代码内容）
-  const isValidCode =
+function isValidCode(code: string): boolean {
+  return (
     typeof code === "string" &&
     code.trim().length > 0 &&
-    // 检查是否包含代码特征（import、function、export、< 等）
     (code.includes("import") ||
       code.includes("function") ||
       code.includes("export") ||
       code.includes("<")) &&
-    // 排除明显不是代码的内容（如 Windows 路径）
     !code.match(/^[A-Z]:\\/) &&
-    !code.includes("\\重要文件\\");
-
-  console.log("[PreviewPanel] isValidCode:", isValidCode);
-
-  const entryCode = `
-import React from 'react';
-import Demo from './Demo';
-
-export default function App() {
-  return <Demo {...${JSON.stringify(configData)}} />;
+    !code.includes("\\重要文件\\")
+  );
 }
-`;
 
-  const files: Record<string, string> = isValidCode
-    ? {
-        "/Demo.tsx": code,
-        "/App.tsx": entryCode,
-        ...sdkFiles,
-      }
-    : {
-        "/Demo.tsx": `export default function Demo() { return <div>代码加载失败</div>; }`,
-        "/App.tsx": entryCode,
-        ...sdkFiles,
-      };
+class PreviewErrorBoundary extends Component<
+  { children: React.ReactNode; onError?: (error: Error) => void },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; onError?: (error: Error) => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
+    this.props.onError?.(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800 font-medium">渲染出错</p>
+          <p className="text-red-600 text-sm mt-1">
+            {this.state.error?.message || "组件运行时发生错误"}
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export function PreviewPanel({
+  code,
+  configData,
+  sdkFiles: _sdkFiles,
+  onError,
+  className,
+  previewSize,
+}: PreviewPanelProps) {
+  const [compiledComponent, setCompiledComponent] =
+    useState<React.ComponentType<Record<string, unknown>> | null>(null);
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const [isCompiling, setIsCompiling] = useState(false);
+
+  const validCode = isValidCode(code);
+
+  useEffect(() => {
+    if (!validCode) {
+      setCompiledComponent(null);
+      setCompileError(null);
+      setIsCompiling(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsCompiling(true);
+    setCompileError(null);
+
+    compileCode(code)
+      .then((result) => {
+        if (cancelled) return;
+        try {
+          const Component = executeComponent(result.compiledCode);
+          setCompiledComponent(() => Component);
+        } catch (err) {
+          setCompileError(err instanceof Error ? err.message : "执行编译后代码失败");
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCompileError(err instanceof Error ? err.message : "编译失败");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsCompiling(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, validCode]);
 
   const previewStyle = buildPreviewStyle(previewSize);
 
-  // 从代码注释中提取依赖声明
-  const declaredDependencies = isValidCode
-    ? extractDependenciesFromComments(code)
-    : {};
-
-  // 合并依赖
-  const mergedDependencies = {
-    // 核心依赖
-    react: "^18.0.0",
-    "react-dom": "^18.0.0",
-
-    // shadcn/ui 工具库
-    clsx: "^2.1.0",
-    "tailwind-merge": "^2.2.0",
-    "class-variance-authority": "^0.7.0",
-
-    // UI 库
-    "lucide-react": "^0.323.0",
-
-    // 动画库
-    "framer-motion": "^10.0.0",
-
-    // AI 声明的额外依赖
-    ...declaredDependencies,
-  };
-
   return (
     <div className={className || "h-full w-full"}>
-      {!isValidCode && (
+      {!validCode && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
           <p className="text-red-800 font-medium">⚠️ 代码加载失败</p>
           <p className="text-red-600 text-sm mt-1">
@@ -132,32 +145,37 @@ export default function App() {
           </p>
         </div>
       )}
-      <SandpackProvider
-        key={code}
-        template="react-ts"
-        files={files}
-        customSetup={{
-          dependencies: mergedDependencies,
-        }}
-        options={{
-          externalResources: ["https://cdn.tailwindcss.com/3.4.17#tailwind.js"],
-        }}
-        theme={{
-          colors: {
-            surface1: "#ffffff",
-            surface2: "#f7f7f7",
-            surface3: "#e8e8e8",
-          },
-        }}
-      >
-        <SandpackLayout>
-          <SandpackPreview
-            showNavigator={false}
-            showRefreshButton={true}
-            style={previewStyle}
-          />
-        </SandpackLayout>
-      </SandpackProvider>
+
+      {isCompiling && (
+        <div className="flex items-center justify-center p-8" style={previewStyle}>
+          <div role="status" aria-label="编译中" className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        </div>
+      )}
+
+      {compileError && !isCompiling && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4" style={previewStyle}>
+          <p className="text-red-800 font-medium">编译错误</p>
+          <pre className="text-red-600 text-sm mt-2 whitespace-pre-wrap overflow-auto max-h-60">
+            {compileError}
+          </pre>
+        </div>
+      )}
+
+      {compiledComponent && !isCompiling && (
+        <PreviewErrorBoundary onError={onError}>
+          <div style={previewStyle}>
+            <React.Suspense
+              fallback={
+                <div className="flex items-center justify-center p-8">
+                  <div role="status" aria-label="加载中" className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+                </div>
+              }
+            >
+              {React.createElement(compiledComponent, configData)}
+            </React.Suspense>
+          </div>
+        </PreviewErrorBoundary>
+      )}
     </div>
   );
 }
