@@ -119,7 +119,7 @@ export function Message({
   // 用户消息使用原有样式
   if (isUser) {
     return (
-      <div className={cn("flex flex-col gap-3 group items-end", className)}>
+      <div className={cn("flex flex-col gap-3 group items-end min-w-0", className)}>
         {message.content && (
           <div className="text-sm max-w-full overflow-hidden text-right">
             <div className="whitespace-pre-wrap break-words text-foreground inline-block">

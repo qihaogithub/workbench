@@ -1,0 +1,150 @@
+- generic:
+  - generic:
+    - banner:
+      - generic:
+        - link:
+          - /url: /
+          - generic: UI Demo
+          - generic: 工作台
+        - navigation:
+          - generic:
+            - link:
+              - /url: /
+              - text: 首页
+        - generic:
+          - link:
+            - /url: /
+            - img
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - img
+            - textbox:
+              - /placeholder: 搜索 Demo...
+          - button:
+            - img
+            - text: 新建 Demo
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - img
+            - generic:
+              - heading [level=3]: proj_1776526720347
+              - paragraph: 更新于 2026/04/19 10:00
+            - generic:
+              - generic:
+                - link:
+                  - /url: /demo/proj_1776526720347
+                  - button:
+                    - img
+                    - text: 使用
+                - link:
+                  - /url: /demo/proj_1776526720347/edit
+                  - button:
+                    - img
+                    - text: 编辑
+              - button:
+                - img
+          - generic:
+            - generic:
+              - generic:
+                - img
+            - generic:
+              - heading [level=3]: proj_1776563965149
+              - paragraph: 更新于 2026/04/19 09:59
+            - generic:
+              - generic:
+                - link:
+                  - /url: /demo/proj_1776563965149
+                  - button:
+                    - img
+                    - text: 使用
+                - link:
+                  - /url: /demo/proj_1776563965149/edit
+                  - button:
+                    - img
+                    - text: 编辑
+              - button:
+                - img
+          - generic:
+            - generic:
+              - generic:
+                - img
+            - generic:
+              - heading [level=3]: proj_1776563942135
+              - paragraph: 更新于 2026/04/19 09:59
+            - generic:
+              - generic:
+                - link:
+                  - /url: /demo/proj_1776563942135
+                  - button:
+                    - img
+                    - text: 使用
+                - link:
+                  - /url: /demo/proj_1776563942135/edit
+                  - button:
+                    - img
+                    - text: 编辑
+              - button:
+                - img
+          - generic:
+            - generic:
+              - generic:
+                - img
+            - generic:
+              - heading [level=3]: proj_1776563815626
+              - paragraph: 更新于 2026/04/19 09:56
+            - generic:
+              - generic:
+                - link:
+                  - /url: /demo/proj_1776563815626
+                  - button:
+                    - img
+                    - text: 使用
+                - link:
+                  - /url: /demo/proj_1776563815626/edit
+                  - button:
+                    - img
+                    - text: 编辑
+              - button:
+                - img
+          - generic:
+            - generic:
+              - generic:
+                - img
+            - generic:
+              - heading [level=3]: proj_1776563792442
+              - paragraph: 更新于 2026/04/19 09:56
+            - generic:
+              - generic:
+                - link:
+                  - /url: /demo/proj_1776563792442
+                  - button:
+                    - img
+                    - text: 使用
+                - link:
+                  - /url: /demo/proj_1776563792442/edit
+                  - button:
+                    - img
+                    - text: 编辑
+              - button:
+                - img
+  - list
+  - alert
+  - dialog "新建 Demo" [ref=e158]:
+    - generic [ref=e159]:
+      - generic [ref=e160]:
+        - heading "新建 Demo" [level=2] [ref=e161]
+        - paragraph [ref=e162]: 创建一个新的 Demo，创建后将跳转至编辑页面。
+      - generic [ref=e163]:
+        - text: Demo 名称
+        - textbox "Demo 名称" [active] [ref=e164]:
+          - /placeholder: 请输入 Demo 名称
+      - generic [ref=e165]:
+        - button "取消" [ref=e166] [cursor=pointer]
+        - button "创建" [disabled]
+    - button "Close" [ref=e167] [cursor=pointer]:
+      - img [ref=e168]
+      - generic [ref=e171]: Close

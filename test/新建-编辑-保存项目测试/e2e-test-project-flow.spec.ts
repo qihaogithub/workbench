@@ -165,7 +165,39 @@ test.describe('项目创建和代码编辑完整流程', () => {
     try {
       // ========== 步骤 1: 打开项目首页 ==========
       logger.step('1', '打开项目首页 http://localhost:3200');
-      await page.goto('http://localhost:3200', { waitUntil: 'networkidle' });
+      await page.goto('http://localhost:3200', { waitUntil: 'domcontentloaded' });
+      
+      // 检查是否需要登录
+      const loginPage = await page.getByRole('textbox', { name: /账号|用户名|用户名|username/i }).isVisible({ timeout: 3000 }).catch(() => false);
+      
+      if (loginPage) {
+        logger.log('检测到登录页面，正在登录...');
+        
+        // 填写账号
+        const accountInput = page.getByRole('textbox', { name: /账号|用户名|用户名|username/i })
+          .or(page.locator('input[type="text"], input[type="email"]').first());
+        await accountInput.fill('qihao');
+        logger.log('已填写账号');
+        await page.waitForTimeout(500);
+        
+        // 填写密码
+        const passwordInput = page.getByRole('textbox', { name: /密码|password/i })
+          .or(page.locator('input[type="password"]').first());
+        await passwordInput.fill('130015');
+        logger.log('已填写密码');
+        await page.waitForTimeout(500);
+        
+        // 点击登录按钮
+        const loginButton = page.getByRole('button', { name: /登录|login/i })
+          .or(page.getByText(/登录/i));
+        await loginButton.click();
+        logger.log('已点击登录按钮');
+        
+        // 等待登录完成
+        await page.waitForTimeout(3000);
+      }
+      
+      await page.waitForLoadState('networkidle');
       logger.success('已打开首页');
 
       // 截图保存首页状态
@@ -186,17 +218,43 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await newProjectButton.click();
       logger.success('已点击新建项目按钮');
 
-      // 等待对话框或表单出现
-      await page.waitForTimeout(1000);
-
       // 生成随机项目名称
       projectName = `测试项目-${crypto.randomBytes(4).toString('hex')}`;
       logger.log(`项目名称: ${projectName}`);
 
-      // 查找项目名称输入框并填写
-      const nameInput = page.getByPlaceholder(/项目.*名称/i)
-        .or(page.getByLabel(/项目.*名称/i))
-        .or(page.locator('input[type="text"]').first());
+      // 等待对话框出现并查找输入框
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(1500);
+
+      // 尝试多种输入框定位方式
+      const nameInputSelectors = [
+        page.getByPlaceholder(/项目.*名称/i),
+        page.getByLabel(/项目.*名称/i),
+        page.getByLabel(/名称/i),
+        page.locator('input[type="text"]').first(),
+        page.locator('input').first(),
+        page.locator('textarea').first(),
+      ];
+
+      let nameInput = null;
+      for (const selector of nameInputSelectors) {
+        if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
+          nameInput = selector;
+          logger.log(`找到输入框`);
+          break;
+        }
+      }
+
+      if (!nameInput) {
+        // 尝试点击对话框主体让它获取焦点
+        const dialog = page.locator('[role="dialog"], [class*="dialog"], [class*="modal"]').first();
+        if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await dialog.click();
+          await page.waitForTimeout(500);
+        }
+        // 再试一次
+        nameInput = page.locator('input[type="text"], input, textarea').first();
+      }
 
       await nameInput.fill(projectName);
       logger.log(`已填写项目名称: ${projectName}`);

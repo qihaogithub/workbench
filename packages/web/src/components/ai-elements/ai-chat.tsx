@@ -1089,12 +1089,12 @@ export function AIChat({
 
       {/* Plan 展示 - 输入框顶部 */}
       {plan && (
-        <div className="flex-shrink-0 border-t border-muted">
+        <div className="flex-shrink-0 border-t border-border/40">
           <details className="group">
-            <summary className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors list-none">
-              <div className="flex items-center gap-2">
+            <summary className="flex items-center justify-between px-4 py-1.5 text-[11px] text-muted-foreground/60 cursor-pointer hover:bg-muted/30 transition-colors list-none select-none">
+              <div className="flex items-center gap-1.5">
                 <svg
-                  className="h-3 w-3 transition-transform group-open:rotate-90"
+                  className="h-3 w-3 transition-transform group-open:rotate-90 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1106,13 +1106,13 @@ export function AIChat({
                     d="M9 5l7 7-7 7"
                   />
                 </svg>
-                <span className="font-medium">Plan</span>
+                <span className="truncate">Plan</span>
               </div>
-              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-muted-foreground/40 flex-shrink-0">
                 {isStreaming ? "生成中..." : "已完成"}
               </span>
             </summary>
-            <div className="px-4 py-2 border-t border-muted text-xs text-muted-foreground">
+            <div className="px-4 py-2 border-t border-border/20 text-[11px] text-muted-foreground/60">
               <div className="whitespace-pre-wrap break-words">{plan}</div>
             </div>
           </details>

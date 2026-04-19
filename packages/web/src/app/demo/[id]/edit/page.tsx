@@ -431,8 +431,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
               <TabsContent
                 value="ai"
-                className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-              >
+                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
+>
                 <AIChat
                   sessionId={sessionId}
                   agentSessionId={agentSessionId}

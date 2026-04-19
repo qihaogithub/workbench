@@ -26,7 +26,7 @@ const ConversationContent = React.forwardRef<
       className={cn('h-full', className)}
       {...props}
     >
-      <div className="flex flex-col gap-4 p-4 max-w-full">{children}</div>
+      <div className="flex flex-col gap-4 p-4 max-w-full min-w-0">{children}</div>
     </ScrollAreaPrimitive>
   </div>
 ))

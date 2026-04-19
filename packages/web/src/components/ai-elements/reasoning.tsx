@@ -62,10 +62,16 @@ function Reasoning({
     [onOpenChange],
   );
 
-  // 当 isStreaming 变化时，自动展开
+  // 当 isStreaming 变化时，自动展开；思考结束后自动折叠
   React.useEffect(() => {
     if (isStreaming) {
       setIsOpen(true);
+    } else {
+      // 思考结束后短暂延迟再折叠，让用户看到结果
+      const timer = setTimeout(() => {
+        setIsOpen(false);
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [isStreaming, setIsOpen]);
 
@@ -77,7 +83,7 @@ function Reasoning({
         open={isOpen}
         onOpenChange={setIsOpen}
         className={cn(
-          "w-full rounded-lg border border-border/50 bg-muted/30",
+          "w-full min-w-0",
           className,
         )}
         {...props}
@@ -106,33 +112,27 @@ function ReasoningTrigger({
   const { isStreaming, isOpen, duration } = useReasoning();
 
   const defaultThinkingMessage = (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 flex-1 min-w-0">
       <Sparkles
         className={cn(
-          "h-3.5 w-3.5 text-muted-foreground",
+          "h-3 w-3 text-muted-foreground/50 flex-shrink-0",
           isStreaming && "animate-pulse",
         )}
       />
-      <span className="text-sm text-muted-foreground">
+      <span className="text-[11px] text-muted-foreground/60 truncate">
         {isStreaming
           ? "思考中..."
           : duration
-            ? `思考了${(duration / 1000).toFixed(0)}秒钟`
+            ? `思考了 ${(duration / 1000).toFixed(0)} 秒`
             : "思考过程"}
       </span>
-      <ChevronDown
-        className={cn(
-          "h-4 w-4 text-muted-foreground/50 transition-transform duration-200",
-          isOpen && "rotate-180",
-        )}
-      />
     </div>
   );
 
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between px-3 py-2.5 text-sm transition-colors rounded-lg hover:bg-muted/50",
+        "flex w-full items-center gap-1 py-0.5 text-[11px] transition-colors select-none min-w-0 group/reasoning",
         className,
       )}
       {...props}
@@ -140,6 +140,12 @@ function ReasoningTrigger({
       {getThinkingMessage
         ? getThinkingMessage(isStreaming ?? false, duration)
         : defaultThinkingMessage}
+      <ChevronDown
+        className={cn(
+          "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/reasoning:text-muted-foreground/50",
+          isOpen && "rotate-180",
+        )}
+      />
     </CollapsibleTrigger>
   );
 }
@@ -163,8 +169,8 @@ function ReasoningContent({
       )}
       {...props}
     >
-      <div className="px-3 pb-3">
-        <div className="text-[13px] text-muted-foreground/90 leading-relaxed">
+      <div className="pl-4 py-1 border-l border-border/20 ml-[5px] mt-0.5">
+        <div className="text-[11px] text-muted-foreground/70 leading-relaxed max-w-full">
           <Streamdown>{children}</Streamdown>
         </div>
       </div>

@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "UI Demo 工作台" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: UI Demo
+          - generic [ref=e7]: 工作台
+        - navigation [ref=e8]:
+          - link "首页" [ref=e10] [cursor=pointer]:
+            - /url: /
+        - link [ref=e12] [cursor=pointer]:
+          - /url: /
+          - img [ref=e13]
+    - main [ref=e16]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - img [ref=e20]
+          - textbox "搜索 Demo..." [ref=e23]
+        - button "新建 Demo" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+          - text: 新建 Demo
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e31]

@@ -186,7 +186,7 @@ export function AssistantMessage({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 w-full group relative py-1",
+        "flex flex-col gap-2 w-full min-w-0 group relative py-1",
         className,
       )}
     >
@@ -218,7 +218,7 @@ export function AssistantMessage({
           return (
             <div
               key={`text-${index}`}
-              className="prose prose-sm dark:prose-invert max-w-none"
+              className="prose prose-sm dark:prose-invert max-w-none min-w-0"
             >
               <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
                 {block.content}
@@ -240,10 +240,10 @@ export function AssistantMessage({
 
           if (name.includes("read")) {
             ToolIcon = Eye;
-            actionText = path ? `读取 ${path}` : "读取文件";
+            actionText = path ? path : "读取文件";
           } else if (name.includes("edit") || name.includes("write")) {
             ToolIcon = Edit3;
-            actionText = path ? `修改 ${path}` : "修改文件";
+            actionText = path ? path : "修改文件";
           } else if (
             name.includes("execute") ||
             name.includes("cmd") ||
@@ -259,13 +259,12 @@ export function AssistantMessage({
           return (
             <div
               key={`tool-${index}`}
-              className="flex items-center gap-2.5 text-[13px] font-medium text-foreground/90 py-0.5"
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5 min-w-0"
             >
-              <ToolIcon className="h-4 w-4 text-muted-foreground/80" />
-              <span>{actionText}</span>
-              {/* 如果正在运行，跟一个加载圈 */}
+              <ToolIcon className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{actionText}</span>
               {part.status === "running" && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
               )}
             </div>
           );

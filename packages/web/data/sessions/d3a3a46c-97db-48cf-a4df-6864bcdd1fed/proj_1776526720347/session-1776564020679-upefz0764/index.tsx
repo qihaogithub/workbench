@@ -16,16 +16,22 @@ export default function BannerDemo({
   showBadge 
 }: BannerDemoProps) {
   const themeClasses = {
-    light: 'bg-white text-gray-900',
+    light: 'bg-white text-slate-800',
     dark: 'bg-gray-900 text-white',
     colorful: 'bg-gradient-to-r from-pink-500 to-purple-500 text-white',
+  };
+
+  const badgeClasses = {
+    light: 'bg-blue-600 text-white',
+    dark: 'bg-blue-500 text-white',
+    colorful: 'bg-white/80 text-purple-600',
   };
 
   return (
     <div className={`min-h-screen ${themeClasses[theme]}`}>
       <div className="container mx-auto px-4 py-8">
         {showBadge && (
-          <span className="inline-block px-3 py-1 text-sm font-semibold bg-blue-500 text-white rounded-full mb-4">
+          <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full mb-4 ${badgeClasses[theme]}`}>
             活动中
           </span>
         )}
