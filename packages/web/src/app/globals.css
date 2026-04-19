@@ -6,26 +6,26 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 90%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --radius: 0.5rem;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 63%;
+    --radius: 0.75rem;
   }
 }
 
@@ -75,10 +75,16 @@
 
   /* 2. 显式重置关键继承属性
      这些属性可能从 body / * 选择器继承而来 */
-  text-align: left;
-  line-height: 1.5;
+  color: initial;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: initial;
+  font-weight: initial;
+  line-height: 1.5;
+  text-align: left;
+  letter-spacing: initial;
+  text-transform: initial;
+  text-decoration: initial;
 
   /* 3. 重写 shadcn/ui 核心 CSS 变量为中性默认值
      作用：当 AI 生成的组件使用 bg-background/text-foreground 等语义类时，
@@ -105,13 +111,7 @@
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
 
-  /* 4. 应用基础颜色（阻断从 body 的继承链）
-     子元素显式声明的 Tailwind 类名会覆盖这些值 */
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  border-color: hsl(var(--border));
-
-  /* 5. 布局属性 */
+  /* 4. 布局属性 */
   display: block;
   width: 100%;
   height: 100%;
@@ -157,8 +157,6 @@
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 224.3 76.3% 48%;
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
 }
 
 /* Portal 逃逸兜底：当 Portal 内容包含 preview-scope 内的元素时 */

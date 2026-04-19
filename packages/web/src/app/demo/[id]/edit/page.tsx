@@ -607,14 +607,12 @@ ${"=== END ==="}`}
             </Tabs>
           </ResizablePanel>
 
-          <ResizablePanel className="p-4 bg-muted/30">
-            <div className="h-full border rounded-lg overflow-hidden bg-background shadow-sm">
-              <PreviewPanel
-                code={code}
-                configData={configData}
-                previewSize={previewSize}
-              />
-            </div>
+          <ResizablePanel className="p-4 bg-muted/30 relative border rounded-lg overflow-hidden bg-background shadow-sm">
+            <PreviewPanel
+              sessionId={sessionId}
+              configData={configData}
+              previewSize={previewSize}
+            />
           </ResizablePanel>
 
           <ResizablePanel className="border-l bg-card flex flex-col">

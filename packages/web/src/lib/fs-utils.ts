@@ -106,13 +106,37 @@ export function findSessionPath(sessionId: string): string | null {
     for (const level2 of level2Entries) {
       if (!level2.isDirectory()) continue;
 
-      const sessionPath = path.join(level1Path, level2.name, sessionId);
+      const level2Path = path.join(level1Path, level2.name);
+
+      // 先检查目录名是否匹配
+      const sessionPathByName = path.join(level2Path, sessionId);
       if (
-        fs.existsSync(sessionPath) &&
-        fs.statSync(sessionPath).isDirectory()
+        fs.existsSync(sessionPathByName) &&
+        fs.statSync(sessionPathByName).isDirectory()
       ) {
-        console.log(`[findSessionPath] 找到 session (新结构): ${sessionPath}`);
-        return sessionPath;
+        console.log(`[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`);
+        return sessionPathByName;
+      }
+
+      // 遍历第三层，检查 .session.json 中的 sessionId 字段
+      const level3Entries = fs.readdirSync(level2Path, { withFileTypes: true });
+      for (const level3 of level3Entries) {
+        if (!level3.isDirectory()) continue;
+
+        const level3Path = path.join(level2Path, level3.name);
+        const metaPath = path.join(level3Path, ".session.json");
+
+        if (fs.existsSync(metaPath)) {
+          try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+            if (meta.sessionId === sessionId) {
+              console.log(`[findSessionPath] 找到 session (新结构-meta): ${level3Path}`);
+              return level3Path;
+            }
+          } catch {
+            // 忽略解析错误的文件
+          }
+        }
       }
     }
   }
@@ -153,6 +177,7 @@ export function listProjects(): DemoMeta[] {
       name: project?.name || entry.name,
       createdAt: stats.birthtimeMs,
       updatedAt: stats.mtimeMs,
+      thumbnail: project?.thumbnail,
     });
   }
 

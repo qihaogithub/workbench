@@ -1,5 +1,4 @@
 export { PreviewPanel } from './PreviewPanel';
-export { PreviewScope } from './PreviewScope';
 export { ConfigForm } from './ConfigFormNew';
 export type { PreviewPanelProps, ConfigFormProps } from './types';
 export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';

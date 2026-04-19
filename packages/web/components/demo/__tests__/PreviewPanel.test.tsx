@@ -1,20 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { PreviewPanel } from "../PreviewPanel";
 
-jest.mock("@/lib/compiler-client", () => ({
-  compileCode: jest.fn(),
-  clearCompileCache: jest.fn(),
-}));
-
-jest.mock("@/lib/component-executor", () => ({
-  executeComponent: jest.fn(),
-}));
-
-import { compileCode } from "@/lib/compiler-client";
-import { executeComponent } from "@/lib/component-executor";
-
-const mockCompileCode = compileCode as jest.MockedFunction<typeof compileCode>;
-const mockExecuteComponent = executeComponent as jest.MockedFunction<typeof executeComponent>;
+global.fetch = jest.fn();
+const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe("PreviewPanel", () => {
   const mockCode = `export default function Demo({ title }: { title: string }) {
@@ -25,31 +13,27 @@ describe("PreviewPanel", () => {
     jest.clearAllMocks();
   });
 
-  it("应显示加载状态（编译中）", () => {
-    mockCompileCode.mockReturnValue(new Promise(() => {})); // 永不 resolve
+  it("应渲染 iframe", () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByTitle("预览")).toBeInTheDocument();
   });
 
-  it("应正确渲染编译后的组件", async () => {
-    const MockComponent = ({ title }: { title: string }) => <h1>{title}</h1>;
-    mockCompileCode.mockResolvedValue({
-      compiledCode: "compiled-mock-code",
-      dependencies: [],
-    });
-    mockExecuteComponent.mockReturnValue(MockComponent as React.ComponentType<Record<string, unknown>>);
+  it("应显示加载状态（编译中）", () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Test")).toBeInTheDocument();
-    });
+    expect(screen.getByRole("status", { name: "编译中" })).toBeInTheDocument();
   });
 
   it("应处理编译错误", async () => {
-    mockCompileCode.mockRejectedValue(new Error("语法错误: 第3行"));
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: false, error: { message: "语法错误: 第3行" } }),
+    } as Response);
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
@@ -60,6 +44,7 @@ describe("PreviewPanel", () => {
   });
 
   it("应处理无效代码路径", () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
     const invalidCode = "E:\\重要文件\\Programming\\file.tsx";
 
     render(<PreviewPanel code={invalidCode} configData={{ title: "Test" }} />);
@@ -68,57 +53,37 @@ describe("PreviewPanel", () => {
     expect(screen.getByText(/检测到无效的代码文件/)).toBeInTheDocument();
   });
 
-  it("应支持自定义 className", async () => {
-    const MockComponent = () => <div>Demo</div>;
-    mockCompileCode.mockResolvedValue({
-      compiledCode: "compiled-mock-code",
-      dependencies: [],
-    });
-    mockExecuteComponent.mockReturnValue(MockComponent as React.ComponentType<Record<string, unknown>>);
+  it("应渲染 iframe 并正确加载", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { compiledCode: "", dependencies: [], cssImports: [] },
+      }),
+    } as Response);
 
     render(
       <PreviewPanel
         code={mockCode}
         configData={{ title: "Test" }}
-        className="custom-class"
       />,
     );
 
     await waitFor(() => {
-      expect(document.querySelector(".custom-class")).toBeInTheDocument();
-    });
-  });
-
-  it("应支持传入自定义 previewSize", async () => {
-    const MockComponent = () => <div>Demo</div>;
-    mockCompileCode.mockResolvedValue({
-      compiledCode: "compiled-mock-code",
-      dependencies: [],
-    });
-    mockExecuteComponent.mockReturnValue(MockComponent as React.ComponentType<Record<string, unknown>>);
-
-    const { container } = render(
-      <PreviewPanel
-        code={mockCode}
-        configData={{ title: "Test" }}
-        previewSize={{ width: 768, height: 1024 }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Demo")).toBeInTheDocument();
+      expect(screen.getByTitle("预览")).toBeInTheDocument();
     });
   });
 
   it("应支持 scale 缩放属性", async () => {
-    const MockComponent = () => <div>Demo</div>;
-    mockCompileCode.mockResolvedValue({
-      compiledCode: "compiled-mock-code",
-      dependencies: [],
-    });
-    mockExecuteComponent.mockReturnValue(MockComponent as React.ComponentType<Record<string, unknown>>);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { compiledCode: "", dependencies: [], cssImports: [] },
+      }),
+    } as Response);
 
-    const { container } = render(
+    render(
       <PreviewPanel
         code={mockCode}
         configData={{ title: "Test" }}
@@ -127,36 +92,50 @@ describe("PreviewPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Demo")).toBeInTheDocument();
+      expect(screen.getByTitle("预览")).toBeInTheDocument();
     });
   });
 
-  it("配置变更不应触发重新编译，应直接传递 props", async () => {
-    const MockComponent = jest.fn(({ title }: { title: string }) => <h1>{title}</h1>);
-    mockCompileCode.mockResolvedValue({
-      compiledCode: "compiled-mock-code",
-      dependencies: [],
-    });
-    mockExecuteComponent.mockReturnValue(MockComponent as unknown as React.ComponentType<Record<string, unknown>>);
+  it("配置变更不应触发重新编译，应发送 UPDATE_CONFIG", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    } as Response);
 
     const { rerender } = render(
       <PreviewPanel code={mockCode} configData={{ title: "First" }} />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("First")).toBeInTheDocument();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
-
-    expect(mockCompileCode).toHaveBeenCalledTimes(1);
 
     // 仅变更 configData，code 不变
     rerender(<PreviewPanel code={mockCode} configData={{ title: "Second" }} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Second")).toBeInTheDocument();
-    });
+    // fetch 不应被再次调用
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 
-    // compileCode 不应被再次调用
-    expect(mockCompileCode).toHaveBeenCalledTimes(1);
+  it("应支持 sessionId 模式", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    } as Response);
+
+    render(<PreviewPanel sessionId="test-session" configData={{}} />);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/compile", expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("test-session"),
+      }));
+    });
   });
 });

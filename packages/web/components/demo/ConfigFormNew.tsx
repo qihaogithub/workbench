@@ -3,7 +3,6 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   ChevronDown,
-  ChevronRight,
   Info,
   Sparkles,
   Settings,
@@ -37,6 +36,11 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { ConfigFormProps } from "./types";
 import { ImageListWidget, ImageItem } from "./ImageListWidget";
 
@@ -378,28 +382,12 @@ function FieldRenderer({
   };
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Label className="text-xs font-medium text-foreground truncate flex items-center">
-            {field.title}
-            {field.required && <span className="text-red-500 ml-0.5">*</span>}
-          </Label>
-        </div>
-        {field.description && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground/70 cursor-help shrink-0" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs max-w-[200px]">{field.description}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-      <div>{renderInput()}</div>
+    <div className="flex items-center justify-between gap-2 py-1.5">
+      <Label className="text-xs font-medium text-foreground truncate flex-1 cursor-default">
+        {field.title}
+        {field.required && <span className="text-red-500 ml-0.5">*</span>}
+      </Label>
+      {renderInput()}
     </div>
   );
 }
@@ -439,27 +427,40 @@ function FieldGroupSection({
   isFirst?: boolean;
 }) {
   const Icon = getGroupIcon(group.title);
+  const [open, setOpen] = useState(true);
 
   return (
-    <div className="py-4">
-      {!isFirst && <div style={{ marginBottom: '24px', borderTop: '2px solid #475569' }} />}
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold">{group.title}</h3>
-        <Badge variant="secondary" className="text-xs h-5">
-          {group.fields.length} 字段
-        </Badge>
-      </div>
-      <div className="space-y-3">
-        {group.fields.map((field) => (
-          <FieldRenderer
-            key={field.key}
-            field={field}
-            value={formData[field.key]}
-            onChange={(value) => onChange(field.key, value)}
-          />
-        ))}
-      </div>
+    <div className="py-3">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <div className="flex items-center gap-2 py-2 cursor-pointer hover:bg-accent/50 rounded-md transition-colors">
+            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
+            <Badge variant="secondary" className="text-xs h-5 font-normal">
+              {group.fields.length} 字段
+            </Badge>
+            <span className="ml-auto">
+              {open ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+              )}
+            </span>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-1 pl-6 pr-2 pt-1 pb-2">
+            {group.fields.map((field) => (
+              <FieldRenderer
+                key={field.key}
+                field={field}
+                value={formData[field.key]}
+                onChange={(value) => onChange(field.key, value)}
+              />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -579,13 +580,17 @@ export function ConfigForm({
       <ScrollArea className="h-full">
         <div className="px-1 pb-4">
           {fieldGroups.map((group, index) => (
-            <FieldGroupSection
-              key={index}
-              group={group}
-              formData={formData}
-              onChange={handleFieldChange}
-              isFirst={index === 0}
-            />
+            <div key={index}>
+              {index > 0 && (
+                <div className="h-px bg-slate-600/30 mx-2 my-2" />
+              )}
+              <FieldGroupSection
+                group={group}
+                formData={formData}
+                onChange={handleFieldChange}
+                isFirst={index === 0}
+              />
+            </div>
           ))}
         </div>
       </ScrollArea>

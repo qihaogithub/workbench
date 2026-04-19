@@ -1,74 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transform } from 'sucrase';
-import { createApiSuccess, createApiError } from '@/lib/fs-utils';
-
-const ALLOWED_DEPENDENCIES = new Set([
-  'react',
-  'react-dom',
-  'react/jsx-runtime',
-  'lucide-react',
-  'clsx',
-  'tailwind-merge',
-  'class-variance-authority',
-  'framer-motion',
-]);
-
-const ALLOWED_PATH_PREFIXES = ['@/lib/', '@/components/'];
-
-function extractImports(code: string): string[] {
-  const imports: string[] = [];
-  const importRegex = /import\s+(?:(?:[^'"]*\s+from\s+)?['"]([^'"]+)['"]|["']([^"']+)["'])/g;
-  let match;
-  while ((match = importRegex.exec(code)) !== null) {
-    imports.push(match[1] || match[2]);
-  }
-  return imports;
-}
-
-function validateDependencies(imports: string[]): { valid: boolean; invalid: string[] } {
-  const invalid: string[] = [];
-  for (const dep of imports) {
-    if (ALLOWED_DEPENDENCIES.has(dep)) continue;
-    if (ALLOWED_PATH_PREFIXES.some(prefix => dep.startsWith(prefix))) continue;
-    invalid.push(dep);
-  }
-  return { valid: invalid.length === 0, invalid };
-}
+import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
+import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { code } = body;
+    const { code, sessionId } = body;
 
-    if (!code || typeof code !== 'string') {
-      return NextResponse.json(
-        createApiError('INVALID_REQUEST', 'code 参数必填且必须为字符串'),
-        { status: 400 }
-      );
+    let result;
+    let projectId: string | undefined;
+
+    // 优先使用 sessionId 模式
+    if (sessionId) {
+      if (typeof sessionId !== 'string') {
+        return NextResponse.json(
+          createApiError('INVALID_REQUEST', 'sessionId 必须为字符串'),
+          { status: 400 }
+        );
+      }
+
+      result = compileSession(sessionId);
+      if (!result) {
+        return NextResponse.json(
+          createApiError('SESSION_NOT_FOUND', '无法读取 Session 文件'),
+          { status: 404 }
+        );
+      }
+
+      // 获取关联的项目 ID，用于后续版本锁定
+      try {
+        const sessionMeta = getSessionMeta(sessionId);
+        projectId = sessionMeta?.demoId;
+      } catch {
+        // 忽略元数据读取错误
+      }
+    } else {
+      // 兼容直接传 code 模式
+      if (!code || typeof code !== 'string') {
+        return NextResponse.json(
+          createApiError('INVALID_REQUEST', 'code 或 sessionId 参数必填'),
+          { status: 400 }
+        );
+      }
+
+      result = compileCode(code);
     }
 
-    const imports = extractImports(code);
-    const { valid, invalid } = validateDependencies(imports);
+    // 异步解析并锁定依赖版本（不阻塞响应）
+    if (projectId && result.dependencies.length > 0) {
+      const project = readProjectMeta(projectId);
+      if (project) {
+        // 筛选出尚未锁定的 npm 依赖
+        const existingLocks = project.lockedDependencies || {};
+        const unresolvedDeps = result.dependencies.filter((dep) => {
+          if (dep.startsWith('.') || dep.startsWith('/')) return false;
+          if (dep.endsWith('.css') || dep.endsWith('.scss') || dep.endsWith('.less')) return false;
+          return !existingLocks[dep];
+        });
 
-    if (!valid) {
-      return NextResponse.json(
-        createApiError('VALIDATION_ERROR', `检测到未声明的依赖: ${invalid.join(', ')}`),
-        { status: 400 }
-      );
+        if (unresolvedDeps.length > 0) {
+          // 后台解析版本并保存（不 await，不阻塞响应）
+          resolveDependencyVersions(unresolvedDeps).then((newLocks) => {
+            if (Object.keys(newLocks).length > 0) {
+              project.lockedDependencies = { ...existingLocks, ...newLocks };
+              writeProjectMeta(projectId, project);
+            }
+          }).catch((err) => {
+            console.error('[compile] 依赖版本锁定失败:', err);
+          });
+        }
+      }
     }
 
-    const result = transform(code, {
-      transforms: ['imports', 'typescript', 'jsx'],
-      jsxRuntime: 'automatic',
-      production: true,
-    });
-
-    return NextResponse.json(
-      createApiSuccess({
-        compiledCode: result.code,
-        dependencies: imports,
-      })
-    );
+    return NextResponse.json(createApiSuccess(result));
   } catch (error) {
     console.error('编译错误:', error);
 

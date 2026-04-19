@@ -63,6 +63,8 @@ export interface Project {
   versions: VersionInfo[];     // 版本历史（最多 50 个）
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
+  lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
+  thumbnail?: string;          // 缩略图路径
 }
 
 /**
