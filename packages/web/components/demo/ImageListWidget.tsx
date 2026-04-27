@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { X, Plus, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Plus, Loader2, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 
 // ========== 工具函数 ==========
 
@@ -94,72 +93,6 @@ export interface ImageListWidgetProps {
   };
 }
 
-interface ImageThumbnailProps {
-  item: ImageItem;
-  onDelete: () => void;
-}
-
-// ========== 子组件 ==========
-
-function ImageThumbnail({ item, onDelete }: ImageThumbnailProps) {
-  const [hasError, setHasError] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  return (
-    <div className="relative aspect-square rounded-lg border border-border bg-muted overflow-hidden group">
-      {!hasError ? (
-        <>
-          <img
-            src={item.url}
-            alt={item.alt || '图片'}
-            className={cn(
-              'w-full h-full object-cover transition-opacity duration-200',
-              isLoaded ? 'opacity-100' : 'opacity-0'
-            )}
-            onError={() => setHasError(true)}
-            onLoad={() => setIsLoaded(true)}
-          />
-          {!isLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
-          <span className="text-[10px] text-muted-foreground text-center px-1">
-            加载失败
-          </span>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onDelete}
-        className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
-        aria-label="删除图片"
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="col-span-3 py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground border-2 border-dashed border-border rounded-lg bg-muted/30">
-      <div className="p-2 rounded-full bg-muted">
-        <ImageIcon className="w-5 h-5 text-muted-foreground/60" />
-      </div>
-      <div className="text-center">
-        <span className="text-sm block">暂无图片</span>
-        <span className="text-xs text-muted-foreground/60 mt-0.5 block">点击下方按钮添加</span>
-      </div>
-    </div>
-  );
-}
-
 // ========== 主组件 ==========
 
 export function ImageListWidget({
@@ -171,7 +104,7 @@ export function ImageListWidget({
   options = {},
 }: ImageListWidgetProps) {
   const maxItems = propMaxItems ?? options.maxItems ?? 20;
-  const maxSize = options.maxSize ?? 5 * 1024 * 1024;
+  const maxSize = options.maxSize ?? 50 * 1024 * 1024;
   const accept = options.accept ?? 'image/*';
 
   const dimensionOptions: DimensionOptions = {
@@ -254,7 +187,6 @@ export function ImageListWidget({
         };
 
         onChange([...value, newItem]);
-        setIsDialogOpen(false);
         setUploadError('');
       } catch {
         setUploadError('上传失败，请重试');
@@ -276,7 +208,9 @@ export function ImageListWidget({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        handleFileUpload(files[0]);
+        Array.from(files).forEach((file) => {
+          handleFileUpload(file);
+        });
       }
       e.target.value = '';
     },
@@ -286,16 +220,17 @@ export function ImageListWidget({
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const file = e.dataTransfer.files?.[0];
-      if (file) {
-        handleFileUpload(file);
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        Array.from(files).forEach((file) => {
+          handleFileUpload(file);
+        });
       }
     },
     [handleFileUpload]
   );
 
   const canAddMore = value.length < maxItems;
-  const isUrlValid = newUrl.trim().length > 0;
 
   return (
     <div className="space-y-2">
@@ -307,49 +242,64 @@ export function ImageListWidget({
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        {value.length === 0 ? (
-          <EmptyState />
-        ) : (
-          value.map((item, index) => (
-            <ImageThumbnail
-              key={`${item.url}-${index}`}
-              item={item}
-              onDelete={() => handleDelete(index)}
+        {value.map((item, index) => (
+          <div
+            key={`${item.url}-${index}`}
+            className="relative aspect-square rounded-lg border border-border bg-muted overflow-hidden group"
+          >
+            <img
+              src={item.url}
+              alt={item.alt || '图片'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                target.parentElement!.classList.add('flex', 'items-center', 'justify-center');
+              }}
             />
-          ))
+            <button
+              type="button"
+              onClick={() => handleDelete(index)}
+              className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+              aria-label="删除图片"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+
+        {isUploading && (
+          <div className="aspect-square rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 p-2">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <span className="text-xs text-muted-foreground">文件上传中</span>
+            <div className="w-full max-w-[80px] h-1 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
+        )}
+
+        {canAddMore && !isUploading && (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          >
+            <Plus className="w-5 h-5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Upload</span>
+          </div>
         )}
       </div>
 
-      {canAddMore && (
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          className={cn(
-            'relative flex flex-col items-center justify-center gap-1.5 py-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
-            isUploading
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-          )}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={accept}
-            onChange={handleInputChange}
-            disabled={isUploading}
-            className="hidden"
-          />
-          {isUploading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          ) : (
-            <div className="flex flex-col items-center gap-1">
-              <Plus className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">点击或拖拽上传图片</span>
-            </div>
-          )}
-        </div>
-      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={accept}
+        onChange={handleInputChange}
+        disabled={isUploading}
+        className="hidden"
+        multiple
+      />
 
       {uploadError && <p className="text-xs text-destructive text-center">{uploadError}</p>}
 

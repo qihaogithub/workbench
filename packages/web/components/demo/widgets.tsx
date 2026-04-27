@@ -147,8 +147,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   } | null>(null);
 
   const accept = rawOptions.accept || 'image/*';
-  const maxSize = rawOptions.maxSize || 5 * 1024 * 1024;
-  const placeholder = rawOptions.placeholder || 'https://example.com/image.png';
+  const maxSize = rawOptions.maxSize || 50 * 1024 * 1024;
 
   const dimensionOptions: DimensionOptions = {
     minWidth: rawOptions.minWidth,
@@ -309,7 +308,6 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         <div>
           {sessionId && (
             <div
-              onClick={() => fileInputRef.current?.click()}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               className={cn(
