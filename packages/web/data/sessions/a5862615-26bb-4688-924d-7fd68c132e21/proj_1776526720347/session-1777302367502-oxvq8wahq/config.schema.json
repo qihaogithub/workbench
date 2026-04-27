@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Simple Button Config",
+  "title": "Button Demo Config",
   "type": "object",
   "properties": {
     "label": {
@@ -10,14 +10,14 @@
     },
     "variant": {
       "type": "string",
-      "title": "Button Variant",
-      "enum": ["primary", "secondary", "outline", "ghost"],
-      "enumNames": ["Primary", "Secondary", "Outline", "Ghost"],
+      "title": "Variant",
+      "enum": ["primary", "secondary", "outline", "ghost", "destructive"],
+      "enumNames": ["Primary", "Secondary", "Outline", "Ghost", "Destructive"],
       "default": "primary"
     },
     "size": {
       "type": "string",
-      "title": "Button Size",
+      "title": "Size",
       "enum": ["sm", "md", "lg"],
       "enumNames": ["Small", "Medium", "Large"],
       "default": "md"
@@ -28,5 +28,5 @@
       "default": false
     }
   },
-  "required": ["label"]
+  "required": ["label", "variant", "size"]
 }

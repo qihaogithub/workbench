@@ -79,12 +79,16 @@ function ImageThumbnail({ item, onDelete }: ImageThumbnailProps) {
 
 function EmptyState() {
   return (
-    <div className="col-span-3 py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground border-2 border-dashed border-border rounded-lg">
-      <ImageIcon className="w-10 h-10 text-muted-foreground/50" />
-      <span className="text-sm">暂无图片</span>
-      <span className="text-xs text-muted-foreground/70">
-        点击下方 + 按钮添加图片
-      </span>
+    <div className="col-span-3 py-10 flex flex-col items-center justify-center gap-3 text-muted-foreground border-2 border-dashed border-border rounded-lg bg-muted/30">
+      <div className="p-3 rounded-full bg-muted">
+        <ImageIcon className="w-6 h-6 text-muted-foreground/60" />
+      </div>
+      <div className="text-center">
+        <span className="text-sm block">暂无图片</span>
+        <span className="text-xs text-muted-foreground/60 mt-1 block">
+          点击下方按钮添加图片
+        </span>
+      </div>
     </div>
   );
 }
@@ -226,7 +230,7 @@ export function ImageListWidget({
         <Button
           type="button"
           variant="outline"
-          className="w-full h-16 border-dashed"
+          className="w-full h-14 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors"
           onClick={() => setIsDialogOpen(true)}
         >
           <Plus className="w-5 h-5 mr-2" />
@@ -277,7 +281,7 @@ export function ImageListWidget({
               <div className="space-y-2">
                 <label
                   htmlFor="image-url"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-sm font-medium text-foreground"
                 >
                   图片 URL
                   <span className="text-destructive ml-1">*</span>
@@ -299,7 +303,7 @@ export function ImageListWidget({
               <div className="space-y-2">
                 <label
                   htmlFor="image-alt"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-sm font-medium text-foreground"
                 >
                   替代文本 (可选)
                 </label>
@@ -324,7 +328,7 @@ export function ImageListWidget({
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-2 py-10 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
+                  'flex flex-col items-center justify-center gap-3 py-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
                   isUploading
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50 hover:bg-muted/50'
@@ -342,14 +346,20 @@ export function ImageListWidget({
                 {isUploading ? (
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 ) : (
-                  <Upload className="w-8 h-8 text-muted-foreground" />
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="p-3 rounded-full bg-muted">
+                      <Upload className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-sm text-muted-foreground block">
+                        点击或拖拽上传图片
+                      </span>
+                      <span className="text-xs text-muted-foreground/60 mt-1 block">
+                        支持 JPG、PNG、GIF、WebP，最大 5MB
+                      </span>
+                    </div>
+                  </div>
                 )}
-                <span className="text-sm text-muted-foreground">
-                  {isUploading ? '上传中...' : '点击或拖拽上传图片'}
-                </span>
-                <span className="text-xs text-muted-foreground/70">
-                  支持 JPG、PNG、GIF、WebP，最大 5MB
-                </span>
               </div>
               {uploadError && (
                 <p className="mt-2 text-xs text-destructive text-center">{uploadError}</p>

@@ -130,9 +130,17 @@
       "sessionId": "session-1777300721866-5ianssdiw",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v16",
       "fileCount": 2
+    },
+    {
+      "versionId": "v17",
+      "savedAt": 1777302365804,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1777301043444-t09hbc838",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v17",
+      "fileCount": 2
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1777301039277,
+  "updatedAt": 1777302365804,
   "thumbnail": "/thumbnails/proj_1776526720347.png"
 }

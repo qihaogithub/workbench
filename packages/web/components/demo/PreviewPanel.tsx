@@ -44,6 +44,30 @@ function buildPreviewStyle(
   return style;
 }
 
+function resolveImageUrls(data: Record<string, unknown>): Record<string, unknown> {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  if (!origin) return data;
+
+  function walk(value: unknown): unknown {
+    if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
+      return origin + value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(walk);
+    }
+    if (value !== null && typeof value === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value)) {
+        result[k] = walk(v);
+      }
+      return result;
+    }
+    return value;
+  }
+
+  return walk(data) as Record<string, unknown>;
+}
+
 function isValidCode(code: string): boolean {
   return (
     typeof code === "string" &&
@@ -97,9 +121,11 @@ export function PreviewPanel({
         return;
       }
 
+      const resolvedConfig = resolveImageUrls(config);
+
       console.log('[PreviewPanel] 发送 UPDATE_CODE 消息', {
         codeLength: result.compiledCode?.length,
-        configData: config,
+        configData: resolvedConfig,
         cssImports: result.cssImports
       });
 
@@ -107,7 +133,7 @@ export function PreviewPanel({
         {
           type: "UPDATE_CODE",
           code: result.compiledCode,
-          configData: config,
+          configData: resolvedConfig,
           cssImports: result.cssImports,
         },
         "*"
@@ -125,12 +151,14 @@ export function PreviewPanel({
         return;
       }
 
-      console.log('[PreviewPanel] 发送 UPDATE_CONFIG 消息', { configData: config });
+      const resolvedConfig = resolveImageUrls(config);
+
+      console.log('[PreviewPanel] 发送 UPDATE_CONFIG 消息', { configData: resolvedConfig });
 
       iframe.contentWindow.postMessage(
         {
           type: "UPDATE_CONFIG",
-          configData: config,
+          configData: resolvedConfig,
         },
         "*"
       );

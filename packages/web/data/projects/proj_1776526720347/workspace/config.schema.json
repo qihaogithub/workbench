@@ -5,10 +5,15 @@
   "properties": {
     "banner": {
       "type": "string",
-      "format": "uri",
       "title": "Banner",
       "description": "Recommended size: 750x400px, supports JPG, PNG, WebP formats",
-      "default": "https://picsum.photos/750/400"
+      "default": "https://picsum.photos/750/400",
+      "ui:widget": "file",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 5242880,
+        "placeholder": "Enter image URL or upload"
+      }
     },
     "title": {
       "type": "string",
