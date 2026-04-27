@@ -321,9 +321,40 @@ try {
             }
         }
 
-        # Check for AI reply using .prose class (actual DOM structure)
+        # Check for AI reply using multiple strategies
         if ($isStreaming -eq "false" -and $elapsed -gt 5) {
-            $aiReply = playwright-cli --raw eval "(function() { var msgs = document.querySelectorAll('.prose'); if (msgs.length > 0) { var lastMsg = msgs[msgs.length - 1]; var txt = lastMsg.innerText.substring(0, 500); if (txt.length > 0) return txt; } return ''; })()" 2>$null
+            $aiReply = ""
+
+            # Strategy 1: Try .prose class (rendered markdown)
+            $proseText = playwright-cli --raw eval "(function() { var proseList = document.querySelectorAll('.prose'); if (proseList.length > 0) { var lastProse = proseList[proseList.length - 1]; var txt = lastProse.innerText.trim(); if (txt.length > 0) return txt.substring(0, 500); } return ''; })()" 2>$null
+            if ($proseText -and $proseText.Length -gt 0) {
+                $aiReply = $proseText
+            }
+
+            # Strategy 2: Try AssistantMessage container
+            if (-not $aiReply) {
+                $assistantText = playwright-cli --raw eval "(function() { var assistantMsgs = document.querySelectorAll('[class*=\\\"group\\\"][class*=\\\"relative\\\"]'); if (assistantMsgs.length > 0) { var lastMsg = assistantMsgs[assistantMsgs.length - 1]; var msgText = lastMsg.innerText.trim(); if (msgText.length > 0) return msgText.substring(0, 500); } return ''; })()" 2>$null
+                if ($assistantText -and $assistantText.Length -gt 0) {
+                    $aiReply = $assistantText
+                }
+            }
+
+            # Strategy 3: Try whitespace-pre-wrap text blocks
+            if (-not $aiReply) {
+                $wrapText = playwright-cli --raw eval "(function() { var textBlocks = document.querySelectorAll('.whitespace-pre-wrap'); if (textBlocks.length > 0) { var lastBlock = textBlocks[textBlocks.length - 1]; var blockText = lastBlock.innerText.trim(); if (blockText.length > 0) return blockText.substring(0, 500); } return ''; })()" 2>$null
+                if ($wrapText -and $wrapText.Length -gt 0) {
+                    $aiReply = $wrapText
+                }
+            }
+
+            # Strategy 4: Fallback - get all text after the last user message
+            if (-not $aiReply) {
+                $userMsgEscaped = $message -replace '"', '\"'
+                $fallbackText = playwright-cli --raw eval "(function() { var bodyText = document.body.innerText; var userMsgIndex = bodyText.lastIndexOf(\"$userMsgEscaped\"); if (userMsgIndex >= 0) { var afterUser = bodyText.substring(userMsgIndex + \"$userMsgEscaped\".length).trim(); var lines = afterUser.split('\n').filter(function(l) { var trimmed = l.trim(); return trimmed.length > 0 && trimmed !== 'AI \u5bf9\u8bdd' && trimmed !== '\u4ee3\u7801\u7f16\u8f91' && trimmed !== '\u914d\u7f6e\u9762\u677f' && trimmed !== '\u4fee\u6539\u914d\u7f6e\u9879\uff0c\u9884\u89c8\u533a\u5c06\u5b9e\u65f6\u66f4\u65b0' && trimmed !== '\u57fa\u7840\u914d\u7f6e' && trimmed !== '\u5c3a\u5bf8\u8bbe\u7f6e' && trimmed !== '\u663e\u793a\u9009\u9879' && !trimmed.includes('\u5b57\u6bb5') && !trimmed.endsWith('*'); }); if (lines.length > 0) return lines.join('\n').substring(0, 500); } return ''; })()" 2>$null
+                if ($fallbackText -and $fallbackText.Length -gt 0) {
+                    $aiReply = $fallbackText
+                }
+            }
 
             if ($aiReply -and $aiReply -ne "Error: No valid response" -and $aiReply.Length -gt 0) {
                 Log "AI response received (elapsed: $([int]$elapsed)s)" "SUCCESS"

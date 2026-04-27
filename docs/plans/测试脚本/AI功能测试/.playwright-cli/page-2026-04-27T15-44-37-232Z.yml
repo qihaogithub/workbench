@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - heading "测试123" [level=1] [ref=e22] [cursor=pointer]
+      - generic [ref=e23]:
+        - button "取消" [ref=e24] [cursor=pointer]
+        - button "保存" [ref=e25] [cursor=pointer]
+    - generic [ref=e27]:
+      - generic [ref=e30]:
+        - tablist [ref=e31]:
+          - tab "AI 对话" [selected] [ref=e32] [cursor=pointer]:
+            - img [ref=e33]
+            - text: AI 对话
+          - tab "代码编辑" [ref=e36] [cursor=pointer]:
+            - img [ref=e37]
+            - text: 代码编辑
+        - tabpanel "AI 对话" [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e48]:
+              - generic [ref=e178]: Hello, please generate a simple button component
+              - button "思考中..." [expanded] [ref=e181] [cursor=pointer]:
+                - generic [ref=e182]:
+                  - img [ref=e183]
+                  - generic [ref=e185]: 思考中...
+                - img [ref=e186]
+            - generic [ref=e64]:
+              - textbox "输入指令，按 Enter 发送..." [disabled] [ref=e66]
+              - generic [ref=e67]:
+                - generic [ref=e68]:
+                  - button "添加图片" [disabled]:
+                    - img
+                  - button [ref=e74] [cursor=pointer]:
+                    - img [ref=e75]
+                - button [ref=e172] [cursor=pointer]:
+                  - img [ref=e190]
+      - iframe [ref=e83]:
+        - button "Click Me" [ref=f1e4] [cursor=pointer]
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - heading "配置面板" [level=2] [ref=e89]
+          - paragraph [ref=e90]: 修改配置项，预览区将实时更新
+        - generic [ref=e99]:
+          - generic [ref=e102]:
+            - generic [ref=e103] [cursor=pointer]:
+              - img [ref=e104]
+              - heading "基础配置" [level=3] [ref=e107]
+              - generic [ref=e108]: 1 字段
+              - img [ref=e110]
+            - generic [ref=e114]:
+              - generic: Button Text*
+              - textbox "请输入Button Text" [ref=e115]: Click Me
+          - generic [ref=e119]:
+            - generic [ref=e120] [cursor=pointer]:
+              - img [ref=e121]
+              - heading "颜色配置" [level=3] [ref=e127]
+              - generic [ref=e128]: 1 字段
+              - img [ref=e130]
+            - generic [ref=e134]:
+              - generic: Color*
+              - combobox [ref=e135] [cursor=pointer]:
+                - generic: Blue
+                - img [ref=e136]
+          - generic [ref=e141]:
+            - generic [ref=e142] [cursor=pointer]:
+              - img [ref=e143]
+              - heading "尺寸设置" [level=3] [ref=e149]
+              - generic [ref=e150]: 1 字段
+              - img [ref=e152]
+            - generic [ref=e156]:
+              - generic: Size*
+              - combobox [ref=e157] [cursor=pointer]:
+                - generic: Medium
+                - img [ref=e158]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e18]

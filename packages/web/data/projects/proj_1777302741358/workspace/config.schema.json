@@ -22,19 +22,27 @@
       "ui:options": {
         "accept": "image/*",
         "maxSize": 5242880,
-        "placeholder": "输入图片 URL 或上传"
+        "placeholder": "输入图片 URL 或上传",
+        "minWidth": 800,
+        "minHeight": 200,
+        "maxWidth": 2000,
+        "maxHeight": 800
       }
     },
     "avatar": {
       "type": "string",
       "title": "头像",
-      "description": "支持 URL 或本地上传",
+      "description": "支持 URL 或本地上传，建议正方形",
       "default": "",
       "ui:widget": "file",
       "ui:options": {
         "accept": "image/*",
         "maxSize": 2097152,
-        "placeholder": "输入图片 URL 或上传"
+        "placeholder": "输入图片 URL 或上传",
+        "minWidth": 100,
+        "minHeight": 100,
+        "maxWidth": 500,
+        "maxHeight": 500
       }
     },
     "gallery": {
@@ -57,7 +65,9 @@
       "ui:options": {
         "accept": "image/*",
         "maxSize": 2097152,
-        "maxItems": 20
+        "maxItems": 20,
+        "minWidth": 200,
+        "minHeight": 200
       }
     }
   },

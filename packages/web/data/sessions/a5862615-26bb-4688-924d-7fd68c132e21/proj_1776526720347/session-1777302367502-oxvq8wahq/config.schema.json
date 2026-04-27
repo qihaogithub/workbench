@@ -1,32 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Button Demo Config",
+  "title": "Simple Button Demo",
   "type": "object",
   "properties": {
     "label": {
       "type": "string",
-      "title": "Button Label",
+      "title": "Button Text",
       "default": "Click Me"
     },
-    "variant": {
+    "color": {
       "type": "string",
-      "title": "Variant",
-      "enum": ["primary", "secondary", "outline", "ghost", "destructive"],
-      "enumNames": ["Primary", "Secondary", "Outline", "Ghost", "Destructive"],
-      "default": "primary"
+      "title": "Color",
+      "enum": ["blue", "green", "red"],
+      "enumNames": ["Blue", "Green", "Red"],
+      "default": "blue"
     },
     "size": {
       "type": "string",
       "title": "Size",
-      "enum": ["sm", "md", "lg"],
+      "enum": ["small", "medium", "large"],
       "enumNames": ["Small", "Medium", "Large"],
-      "default": "md"
-    },
-    "disabled": {
-      "type": "boolean",
-      "title": "Disabled",
-      "default": false
+      "default": "medium"
     }
   },
-  "required": ["label", "variant", "size"]
+  "required": ["label", "color", "size"]
 }

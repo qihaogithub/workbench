@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/collapsible";
 import type { ConfigFormProps } from "./types";
 import { ImageListWidget, ImageItem } from "./ImageListWidget";
+import { FileUploadWidget } from "./widgets";
 
 interface FieldConfig {
   key: string;
@@ -57,6 +58,8 @@ interface FieldConfig {
   maximum?: number;
   maxLength?: number;
   format?: string;
+  uiWidget?: string;
+  uiOptions?: Record<string, unknown>;
 }
 
 interface FieldGroup {
@@ -90,6 +93,8 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
         maximum: prop.maximum,
         maxLength: prop.maxLength,
         format: prop.format,
+        uiWidget: prop["ui:widget"],
+        uiOptions: prop["ui:options"],
       };
 
       // 尝试智能分组
@@ -203,8 +208,22 @@ function FieldRenderer({
   sessionId?: string;
 }) {
   const renderInput = () => {
-    // 数组类型 - 图片列表
-    if (field.type === "array") {
+    // 图片上传 - 单图
+    if (field.uiWidget === "file" || field.uiWidget === "image") {
+      return (
+        <FileUploadWidget
+          value={value as string}
+          onChange={onChange}
+          label={field.title}
+          required={field.required}
+          sessionId={sessionId}
+          options={field.uiOptions as any}
+        />
+      );
+    }
+
+    // 图片列表 - 多图
+    if (field.uiWidget === "imageList" || field.type === "array") {
       const items = (value as Array<string | ImageItem>) || [];
       const imageItems: ImageItem[] = items.map((item) => {
         if (typeof item === "string") {
@@ -213,13 +232,19 @@ function FieldRenderer({
         return item as ImageItem;
       });
 
+      const maxItems =
+        typeof field.uiOptions?.maxItems === "number"
+          ? (field.uiOptions.maxItems as number)
+          : 20;
+
       return (
         <ImageListWidget
           value={imageItems}
           onChange={(newItems) => onChange(newItems)}
-          maxItems={20}
+          maxItems={maxItems}
           title={field.title}
           sessionId={sessionId}
+          options={field.uiOptions as any}
         />
       );
     }
@@ -384,13 +409,28 @@ function FieldRenderer({
     );
   };
 
+  const isComplexField =
+    field.uiWidget === "file" ||
+    field.uiWidget === "image" ||
+    field.uiWidget === "imageList" ||
+    field.type === "array";
+
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5">
-      <Label className="text-xs font-medium text-foreground truncate flex-1 cursor-default">
-        {field.title}
-        {field.required && <span className="text-red-500 ml-0.5">*</span>}
-      </Label>
-      {renderInput()}
+    <div
+      className={cn(
+        "py-1.5",
+        isComplexField
+          ? "flex flex-col gap-2"
+          : "flex items-center justify-between gap-2",
+      )}
+    >
+      {!isComplexField && (
+        <Label className="text-xs font-medium text-foreground truncate flex-1 cursor-default">
+          {field.title}
+          {field.required && <span className="text-red-500 ml-0.5">*</span>}
+        </Label>
+      )}
+      <div className={isComplexField ? "w-full" : ""}>{renderInput()}</div>
     </div>
   );
 }
