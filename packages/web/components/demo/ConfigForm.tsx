@@ -12,6 +12,7 @@ export function ConfigForm({
   initialData,
   readonly,
   className,
+  sessionId,
 }: ConfigFormProps) {
   const parsedSchema = useMemo(() => {
     try {
@@ -32,6 +33,7 @@ export function ConfigForm({
         readonly={readonly}
         liveValidate
         showErrorList="bottom"
+        formContext={{ sessionId }}
       >
         <div />
       </Form>

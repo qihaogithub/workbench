@@ -195,10 +195,12 @@ function FieldRenderer({
   field,
   value,
   onChange,
+  sessionId,
 }: {
   field: FieldConfig;
   value: unknown;
   onChange: (value: unknown) => void;
+  sessionId?: string;
 }) {
   const renderInput = () => {
     // 数组类型 - 图片列表
@@ -217,6 +219,7 @@ function FieldRenderer({
           onChange={(newItems) => onChange(newItems)}
           maxItems={20}
           title={field.title}
+          sessionId={sessionId}
         />
       );
     }
@@ -420,11 +423,13 @@ function FieldGroupSection({
   formData,
   onChange,
   isFirst,
+  sessionId,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
   isFirst?: boolean;
+  sessionId?: string;
 }) {
   const Icon = getGroupIcon(group.title);
   const [open, setOpen] = useState(true);
@@ -456,6 +461,7 @@ function FieldGroupSection({
                 field={field}
                 value={formData[field.key]}
                 onChange={(value) => onChange(field.key, value)}
+                sessionId={sessionId}
               />
             ))}
           </div>
@@ -471,6 +477,7 @@ export function ConfigForm({
   initialData,
   readonly,
   className,
+  sessionId,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
@@ -589,6 +596,7 @@ export function ConfigForm({
                 formData={formData}
                 onChange={handleFieldChange}
                 isFirst={index === 0}
+                sessionId={sessionId}
               />
             </div>
           ))}

@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
+import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function ColorPickerWidget(props: WidgetProps) {
   const { id, value, onChange, label, required } = props;
@@ -33,7 +35,84 @@ export function ColorPickerWidget(props: WidgetProps) {
 }
 
 export function FileUploadWidget(props: WidgetProps) {
-  const { id, value, onChange, label, required } = props;
+  const { id, value, onChange, label, required, formContext, disabled } = props;
+  const sessionId = (formContext as { sessionId?: string } | undefined)?.sessionId;
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const options = (props.options || {}) as {
+    accept?: string;
+    maxSize?: number;
+    placeholder?: string;
+  };
+
+  const accept = options.accept || 'image/*';
+  const maxSize = options.maxSize || 5 * 1024 * 1024;
+  const placeholder = options.placeholder || 'https://example.com/image.png';
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    if (!sessionId) {
+      setError('请先创建 Session');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
+      return;
+    }
+
+    setIsUploading(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error?.message || '上传失败');
+        return;
+      }
+
+      onChange(data.data.url);
+    } catch {
+      setError('上传失败，请重试');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [sessionId, maxSize, onChange]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+    e.target.value = '';
+  }, [handleFileSelect]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  }, [handleFileSelect]);
+
+  const handleClear = useCallback(() => {
+    onChange(undefined);
+    setError('');
+  }, [onChange]);
+
+  const isValueFromUpload = useMemo(() => {
+    return typeof value === 'string' && value.startsWith('/api/sessions/');
+  }, [value]);
 
   return (
     <div className="mb-4">
@@ -41,28 +120,89 @@ export function FileUploadWidget(props: WidgetProps) {
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <div className="space-y-2">
-        <input
-          type="url"
-          id={id}
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://example.com/image.png"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {value && (
-          <div className="mt-2">
+
+      {value ? (
+        <div className="space-y-2">
+          <div className="relative rounded-lg border border-border overflow-hidden bg-muted">
             <img
               src={value}
               alt="Preview"
-              className="max-w-full h-auto max-h-32 rounded border border-gray-200"
+              className="w-full h-32 object-cover"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={disabled || isUploading}
+              className="absolute top-2 right-2 p-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              disabled={disabled || isUploading}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:opacity-50"
+            />
+            {isValueFromUpload && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">已上传</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <input
+            type="text"
+            id={id}
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            disabled={disabled || isUploading}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:opacity-50"
+          />
+
+          {sessionId && (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className={cn(
+                'relative flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
+                isUploading
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50 hover:bg-muted/50'
+              )}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={accept}
+                onChange={handleInputChange}
+                disabled={disabled || isUploading}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              {isUploading ? (
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              ) : (
+                <Upload className="w-6 h-6 text-muted-foreground" />
+              )}
+              <span className="text-sm text-muted-foreground">
+                {isUploading ? '上传中...' : '点击或拖拽上传图片'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-1 text-xs text-destructive">{error}</p>
+      )}
     </div>
   );
 }

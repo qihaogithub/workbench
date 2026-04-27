@@ -50,7 +50,10 @@ export type ErrorCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "INTERNAL_ERROR"
-  | "PROJECT_NOT_FOUND";
+  | "PROJECT_NOT_FOUND"
+  | "INVALID_FILE_TYPE"
+  | "FILE_TOO_LARGE"
+  | "UPLOAD_FAILED";
 
 export type ErrorCodeType = ErrorCode;
 
@@ -67,4 +70,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   FORBIDDEN: "无权访问",
   INTERNAL_ERROR: "内部服务器错误",
   PROJECT_NOT_FOUND: "项目不存在",
+  INVALID_FILE_TYPE: "不支持的文件类型",
+  FILE_TOO_LARGE: "文件大小超过限制",
+  UPLOAD_FAILED: "文件上传失败",
 };

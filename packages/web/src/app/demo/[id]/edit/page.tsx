@@ -628,6 +628,7 @@ ${"=== END ==="}`}
                   schema={schema}
                   onChange={handleConfigChange}
                   initialData={configData}
+                  sessionId={sessionId}
                 />
               </div>
             </ScrollArea>

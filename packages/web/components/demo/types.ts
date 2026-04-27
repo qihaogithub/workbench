@@ -37,4 +37,5 @@ export interface ConfigFormProps {
   initialData?: Record<string, unknown>;
   readonly?: boolean;
   className?: string;
+  sessionId?: string;
 }
