@@ -2,24 +2,26 @@ export interface IframeTemplateOptions {
   cssImports?: string[];
   compiledCode?: string;
   configData?: Record<string, unknown>;
+  cdnBaseUrl?: string;
 }
 
-const ESM_SH_BASE = 'https://esm.sh';
+import { getCdnBaseUrl } from './cdn-config';
 
-function generateCssLinks(cssImports: string[]): string {
+function generateCssLinks(cssImports: string[], cdnBase: string): string {
   if (!cssImports.length) return '';
   return cssImports
     .map((url) => {
-      const href = url.startsWith('http') ? url : `${ESM_SH_BASE}/${url}`;
+      const href = url.startsWith('http') ? url : `${cdnBase}/${url}`;
       return `    <link rel="stylesheet" href="${href}" data-dynamic-css="true">`;
     })
     .join('\n');
 }
 
 export function generateIframeHtml(options: IframeTemplateOptions = {}): string {
-  const { cssImports = [], compiledCode, configData } = options;
+  const { cssImports = [], compiledCode, configData, cdnBaseUrl } = options;
+  const cdnBase = cdnBaseUrl || getCdnBaseUrl();
 
-  const cssLinks = generateCssLinks(cssImports);
+  const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : 'null';
   const initialConfig = JSON.stringify(configData || {});
 
@@ -28,8 +30,8 @@ export function generateIframeHtml(options: IframeTemplateOptions = {}): string 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="preconnect" href="${ESM_SH_BASE}" crossorigin>
-  <link rel="dns-prefetch" href="${ESM_SH_BASE}">
+  <link rel="preconnect" href="${cdnBase}" crossorigin>
+  <link rel="dns-prefetch" href="${cdnBase}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
@@ -42,8 +44,8 @@ ${cssLinks}
   <div id="root"></div>
 
   <script type="module">
-    import React from '${ESM_SH_BASE}/react@18.3.1';
-    import ReactDOM from '${ESM_SH_BASE}/react-dom@18.3.1/client';
+    import React from '${cdnBase}/react@18.3.1';
+    import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
 
     let currentRoot = null;
     let currentConfig = ${initialConfig};
@@ -118,7 +120,7 @@ ${cssLinks}
       cssUrls.forEach(url => {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = url.startsWith('http') ? url : '${ESM_SH_BASE}/' + url;
+        link.href = url.startsWith('http') ? url : '${cdnBase}/' + url;
         link.setAttribute('data-dynamic-css', 'true');
         document.head.appendChild(link);
       });

@@ -8,7 +8,9 @@ export interface CompileResult {
   cssImports: string[];
 }
 
-const ESM_SH_BASE = 'https://esm.sh';
+import { getCdnBaseUrl } from './cdn-config';
+
+const ESM_SH_BASE = getCdnBaseUrl();
 
 // 核心依赖固定版本，确保 iframe 内外一致
 const CORE_DEPENDENCY_VERSIONS: Record<string, string> = {

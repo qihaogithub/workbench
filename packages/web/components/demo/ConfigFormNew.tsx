@@ -249,6 +249,19 @@ function FieldRenderer({
       );
     }
 
+    // 富文本 - 文本域
+    if (field.uiWidget === "richtext") {
+      return (
+        <Textarea
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`请输入${field.title}`}
+          rows={5}
+          className="resize-y min-h-[100px]"
+        />
+      );
+    }
+
     // 颜色选择器
     if (field.format === "color" || field.type === "color") {
       return (
@@ -413,6 +426,7 @@ function FieldRenderer({
     field.uiWidget === "file" ||
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
+    field.uiWidget === "richtext" ||
     field.type === "array";
 
   return (

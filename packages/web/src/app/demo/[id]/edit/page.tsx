@@ -83,6 +83,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     parts: [],
   });
 
+  const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -220,6 +222,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     loadDemo();
   }, [demoId, toast]);
+
+  // 组件卸载时清理 Schema 自动重新生成定时器
+  useEffect(() => {
+    return () => {
+      if (schemaRegenerateTimerRef.current) {
+        clearTimeout(schemaRegenerateTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleEditorChange = useCallback((value: string) => {
     setEditorContent(value);
@@ -378,8 +389,67 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         console.log("[DemoEditPage] Validation result:", result);
         setValidationResult(result);
       }
+
+      // 防抖触发 Schema 自动重新生成
+      // 如果 AI 在 1.5 秒内也更新了 Schema，则取消自动生成（避免覆盖 AI 的 Schema）
+      if (schemaRegenerateTimerRef.current) {
+        clearTimeout(schemaRegenerateTimerRef.current);
+      }
+      schemaRegenerateTimerRef.current = setTimeout(async () => {
+        schemaRegenerateTimerRef.current = null;
+        if (!sessionId) return;
+
+        try {
+          console.log("[DemoEditPage] 自动重新生成 Schema...");
+          const res = await fetch("/api/generate-schema", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+          });
+          const data = await res.json();
+
+          if (data.success && data.data?.schema) {
+            const newSchemaStr = JSON.stringify(data.data.schema, null, 2);
+            console.log("[DemoEditPage] Schema 自动生成成功");
+
+            setSchema((prevSchema) => {
+              try {
+                const prevObj = JSON.parse(prevSchema);
+                const newObj = data.data.schema;
+                const prevKeys = Object.keys(prevObj.properties || {});
+                const newKeys = Object.keys(newObj.properties || {});
+                const keysChanged =
+                  prevKeys.length !== newKeys.length ||
+                  prevKeys.some((k) => !newKeys.includes(k));
+
+                if (!keysChanged) {
+                  console.log("[DemoEditPage] Schema 字段未变化，跳过更新");
+                  return prevSchema;
+                }
+
+                console.log("[DemoEditPage] Schema 字段有变化，更新配置面板");
+                return newSchemaStr;
+              } catch {
+                return newSchemaStr;
+              }
+            });
+
+            setEditorContent((prev) => {
+              const currentCode = extractCodeFromFigma(prev) || newCode;
+              return buildFigmaText(currentCode, newSchemaStr);
+            });
+
+            setPreviewSize(getPreviewSize(newSchemaStr));
+
+            const newDefaults = getDefaultValues(data.data.schema);
+            setConfigData((prev) => ({ ...newDefaults, ...prev }));
+          }
+        } catch (err) {
+          console.warn("[DemoEditPage] Schema 自动生成失败:", err);
+        }
+      }, 1500);
     },
-    [schema],
+    [schema, sessionId],
   );
 
   // 处理 AI Schema 更新
@@ -388,6 +458,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       "[DemoEditPage] handleSchemaUpdate called, newSchema length:",
       newSchema.length,
     );
+
+    // AI 主动更新了 Schema，取消自动重新生成的防抖定时器
+    if (schemaRegenerateTimerRef.current) {
+      clearTimeout(schemaRegenerateTimerRef.current);
+      schemaRegenerateTimerRef.current = null;
+      console.log("[DemoEditPage] 已取消 Schema 自动重新生成定时器");
+    }
+
     setSchema(newSchema);
     setEditorContent((prev) => {
       const updatedContent = buildFigmaText(
