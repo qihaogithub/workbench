@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { X, Plus, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Plus, Loader2, AlertTriangle, ZoomIn } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -124,6 +124,8 @@ export function ImageListWidget({
     message: string;
   } | null>(null);
 
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   const handleDelete = useCallback(
     async (index: number) => {
       const item = value[index];
@@ -241,11 +243,11 @@ export function ImageListWidget({
         </span>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="flex flex-wrap gap-3">
         {value.map((item, index) => (
           <div
             key={`${item.url}-${index}`}
-            className="relative aspect-square rounded-lg border border-border bg-muted overflow-hidden group"
+            className="relative w-[120px] h-[120px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
           >
             <img
               src={item.url}
@@ -257,19 +259,30 @@ export function ImageListWidget({
                 target.parentElement!.classList.add('flex', 'items-center', 'justify-center');
               }}
             />
-            <button
-              type="button"
-              onClick={() => handleDelete(index)}
-              className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
-              aria-label="删除图片"
-            >
-              <X className="w-3 h-3" />
-            </button>
+            {/* 悬浮遮罩层 */}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPreviewImage(item.url)}
+                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+                aria-label="放大查看"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(index)}
+                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                aria-label="删除图片"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ))}
 
         {isUploading && (
-          <div className="aspect-square rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 p-2">
+          <div className="w-[120px] h-[120px] rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 shrink-0">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <span className="text-xs text-muted-foreground">文件上传中</span>
             <div className="w-full max-w-[80px] h-1 bg-muted rounded-full overflow-hidden">
@@ -283,7 +296,7 @@ export function ImageListWidget({
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+            className="w-[120px] h-[120px] min-w-[120px] min-h-[120px] rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors shrink-0"
           >
             <Plus className="w-5 h-5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Upload</span>
@@ -329,6 +342,25 @@ export function ImageListWidget({
               继续上传
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 图片放大预览弹窗 */}
+      <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="sm:max-w-3xl p-1 bg-background/95 backdrop-blur-sm">
+          <div className="relative flex items-center justify-center min-h-[200px] max-h-[70vh]">
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="预览"
+                className="max-w-full max-h-[70vh] object-contain rounded-md"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

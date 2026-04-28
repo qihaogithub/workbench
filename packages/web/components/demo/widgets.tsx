@@ -271,7 +271,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
       {value ? (
         <div className="flex items-start gap-3">
-          <div className="relative w-16 h-16 rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
+          <div className="relative w-[120px] h-[120px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
             <img
               src={value}
               alt="Preview"
@@ -281,27 +281,27 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
               }}
             />
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={disabled || isUploading}
-              className="absolute top-0.5 right-0.5 p-1 rounded-full bg-background/80 text-foreground backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            {isValueFromUpload && (
-              <span className="text-xs text-muted-foreground">已上传</span>
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isUploading}
-              className="text-xs text-primary hover:underline disabled:opacity-50"
-            >
-              重新上传
-            </button>
+            {/* 悬浮遮罩层 */}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || isUploading}
+                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                aria-label="重新上传"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={disabled || isUploading}
+                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                aria-label="删除图片"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -311,7 +311,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-1.5 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
+                'relative w-[120px] h-[120px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
                 isUploading
                   ? 'border-primary bg-primary/5'
                   : 'border-border hover:border-primary/50 hover:bg-muted/50'
@@ -332,7 +332,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                   <div className="p-1.5 rounded-full bg-muted">
                     <Upload className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <span className="text-xs text-muted-foreground">点击或拖拽上传图片</span>
+                  <span className="text-xs text-muted-foreground">Upload</span>
                 </div>
               )}
             </div>

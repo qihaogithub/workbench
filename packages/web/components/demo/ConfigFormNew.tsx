@@ -326,16 +326,17 @@ function FieldRenderer({
         const unit = getUnit();
 
         return (
-          <div className="flex items-center gap-3">
-            <Slider
-              value={[currentValue]}
-              min={field.minimum}
-              max={field.maximum}
-              step={field.type === "integer" ? 1 : 0.1}
-              onValueChange={(vals: number[]) => onChange(vals[0])}
-              className="flex-1"
-            />
-            <div className="min-w-[60px] text-right">
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex-1 min-w-[120px]">
+              <Slider
+                value={[currentValue]}
+                min={field.minimum}
+                max={field.maximum}
+                step={field.type === "integer" ? 1 : 0.1}
+                onValueChange={(vals: number[]) => onChange(vals[0])}
+              />
+            </div>
+            <div className="min-w-[60px] text-right shrink-0">
               <span className="font-mono text-sm font-medium text-foreground">
                 {currentValue}
                 {unit}
@@ -435,16 +436,16 @@ function FieldRenderer({
         "py-1.5",
         isComplexField
           ? "flex flex-col gap-2"
-          : "flex items-center justify-between gap-2",
+          : "flex items-center gap-2",
       )}
     >
       {!isComplexField && (
-        <Label className="text-xs font-medium text-foreground truncate flex-1 cursor-default">
+        <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
           {field.title}
           {field.required && <span className="text-red-500 ml-0.5">*</span>}
         </Label>
       )}
-      <div className={isComplexField ? "w-full" : ""}>{renderInput()}</div>
+      <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>{renderInput()}</div>
     </div>
   );
 }
