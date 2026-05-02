@@ -6,7 +6,7 @@ import {
   getSessionFiles,
   getSessionPath,
 } from "@/lib/fs-utils";
-import { findActiveSession, createEditSession } from "@/lib/session-manager";
+import { findActiveSession, createEditSession, archiveActiveSession } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function POST(request: NextRequest) {
@@ -28,13 +28,17 @@ export async function POST(request: NextRequest) {
 
     const userId = payload.userId;
     const body = await request.json();
-    const { demoId: projectId } = body;
+    const { demoId: projectId, forceNew } = body;
 
     if (!projectId || typeof projectId !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "projectId 参数必填"),
         { status: 400 },
       );
+    }
+
+    if (forceNew) {
+      archiveActiveSession(userId, projectId);
     }
 
     const activeSessionId = findActiveSession(userId, projectId);

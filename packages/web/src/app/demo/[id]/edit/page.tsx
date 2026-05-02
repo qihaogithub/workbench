@@ -610,7 +610,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       const res = await fetch("/api/sessions", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ demoId }),
+                        body: JSON.stringify({ demoId, forceNew: true }),
                       });
                       const data = await res.json();
                       if (!data.success) {
@@ -644,6 +644,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   }}
                   onSelectSession={async (newSessionId) => {
                     try {
+                      if (sessionId && sessionId !== newSessionId) {
+                        await fetch(`/api/sessions/${sessionId}/meta`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status: "archived" }),
+                        });
+                      }
+
+                      await fetch(`/api/sessions/${newSessionId}/meta`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "editing" }),
+                      });
+
                       const sessionRes = await fetch(`/api/sessions/${newSessionId}`);
                       if (!sessionRes.ok) {
                         toast({ title: "会话不存在", variant: "destructive" });

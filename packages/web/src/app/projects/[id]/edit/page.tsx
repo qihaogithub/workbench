@@ -192,6 +192,20 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
               onFilesChange={(files) => setFileChanges(files.length)}
               onSelectSession={async (newSessionId) => {
                 try {
+                  if (sessionInfo.sessionId && sessionInfo.sessionId !== newSessionId) {
+                    await fetch(`/api/sessions/${sessionInfo.sessionId}/meta`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "archived" }),
+                    });
+                  }
+
+                  await fetch(`/api/sessions/${newSessionId}/meta`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "editing" }),
+                  });
+
                   const sessionRes = await fetch(`/api/sessions/${newSessionId}`);
                   if (!sessionRes.ok) {
                     toast({ title: "会话不存在", variant: "destructive" });
@@ -227,7 +241,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                   const res = await fetch("/api/sessions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ demoId: params.id }),
+                    body: JSON.stringify({ demoId: params.id, forceNew: true }),
                   });
                   const data = await res.json();
                   if (!data.success) {

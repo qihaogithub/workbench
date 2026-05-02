@@ -48,11 +48,15 @@ export async function PATCH(
 
     const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 
-    const allowedFields = ["title", "opencodeSessionId"];
+    const allowedFields = ["title", "opencodeSessionId", "status"];
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         meta[field] = updates[field];
       }
+    }
+
+    if (updates.status === "editing") {
+      meta.expiresAt = Date.now() + 2 * 60 * 60 * 1000;
     }
 
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");

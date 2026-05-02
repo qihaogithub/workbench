@@ -148,6 +148,52 @@ function getProjectSessionDir(userId: string, projectId: string): string {
   return path.join(getSessionsDir(), userId, projectId);
 }
 
+export function archiveActiveSession(
+  userId: string,
+  projectId: string,
+): string | null {
+  const projectSessionDir = getProjectSessionDir(userId, projectId);
+  if (!fs.existsSync(projectSessionDir)) {
+    return null;
+  }
+
+  try {
+    const entries = fs.readdirSync(projectSessionDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const metaPath = path.join(
+        projectSessionDir,
+        entry.name,
+        ".session.json",
+      );
+      if (!fs.existsSync(metaPath)) continue;
+
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+
+        if (meta.userId && meta.userId !== userId) continue;
+        if (Date.now() > meta.expiresAt) continue;
+
+        const status = meta.status || "editing";
+        if (status !== "editing") continue;
+
+        if (meta.demoId === projectId) {
+          meta.status = "archived";
+          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+          return entry.name;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export function findActiveSession(
   userId: string,
   projectId: string,

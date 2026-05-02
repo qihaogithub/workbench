@@ -167,3 +167,39 @@
 [data-radix-popper-content-wrapper] {
   --border: 214.3 31.8% 91.4%;
 }
+
+/* ============================================
+   Streamdown 表格样式覆盖
+   去掉卡片式包装器，显示为常规 Markdown 表格
+   ============================================ */
+
+/* 去掉外层表格包装器的卡片样式 */
+[data-streamdown="table-wrapper"] {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* 去掉内层表格容器的背景、圆角和边框 */
+[data-streamdown="table-wrapper"] > div {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+/* 表格添加单元格边框，显示为带描边的常规 markdown 表格 */
+[data-streamdown="table"] {
+  border-collapse: collapse !important;
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+[data-streamdown="table"] th,
+[data-streamdown="table"] td {
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+/* 表头添加轻微背景色区分 */
+[data-streamdown="table"] thead {
+  background: hsl(var(--muted) / 0.3) !important;
+}
