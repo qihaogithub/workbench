@@ -483,18 +483,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setPreviewSize(size);
     // 更新 configData 为新的默认值
     try {
-      const schemaObj = JSON.parse(newSchema);
-      console.log(
-        "[DemoEditPage] Schema parsed successfully, keys:",
-        Object.keys(schemaObj),
-      );
-      const newConfigData = getDefaultValues(schemaObj);
+      const newConfigData = getDefaultValues(newSchema);
       console.log("[DemoEditPage] New default config data:", newConfigData);
       setConfigData((prev) => {
         const merged = {
           ...newConfigData,
-          ...prev, // 保留用户已修改的配置
+          ...prev,
         };
+        if (newConfigData.__order) {
+          merged.__order = newConfigData.__order;
+        }
         console.log("[DemoEditPage] Merged config data:", merged);
         return merged;
       });

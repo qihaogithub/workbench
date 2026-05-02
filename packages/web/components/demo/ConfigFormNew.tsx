@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   ChevronDown,
+  ChevronUp,
   Info,
   Sparkles,
   Settings,
@@ -12,6 +13,7 @@ import {
   Image,
   Eye,
   Layout,
+  ArrowUpDown,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,8 @@ import {
 import type { ConfigFormProps } from "./types";
 import { ImageListWidget, ImageItem } from "./ImageListWidget";
 import { FileUploadWidget } from "./widgets";
+import { getOrderable } from "../../lib/validator";
+import { Button } from "@/components/ui/button";
 
 interface FieldConfig {
   key: string;
@@ -526,6 +530,120 @@ function FieldGroupSection({
   );
 }
 
+function OrderControl({
+  orderable,
+  order,
+  defaultOrder,
+  titleMap,
+  onOrderChange,
+}: {
+  orderable: string[];
+  order: string[];
+  defaultOrder: string[];
+  titleMap: Record<string, string>;
+  onOrderChange: (newOrder: string[]) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    const newOrder = [...order];
+    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+    onOrderChange(newOrder);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= order.length - 1) return;
+    const newOrder = [...order];
+    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+    onOrderChange(newOrder);
+  };
+
+  const handleReset = () => {
+    onOrderChange([...defaultOrder]);
+  };
+
+  const isDefault = order.join(",") === defaultOrder.join(",");
+
+  return (
+    <div className="py-3">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <div className="flex items-center gap-2 py-2 cursor-pointer hover:bg-accent/50 rounded-md transition-colors">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            <h3 className="text-sm font-medium text-muted-foreground">组件排序</h3>
+            <Badge variant="secondary" className="text-xs h-5 font-normal">
+              {orderable.length} 项
+            </Badge>
+            <span className="ml-auto">
+              {open ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+              )}
+            </span>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-1 pl-6 pr-2 pt-1 pb-2">
+            {order.map((key, index) => (
+              <div
+                key={key}
+                className="flex items-center gap-2 py-1.5 transition-all duration-150"
+              >
+                <span className="text-xs font-mono text-muted-foreground w-4 text-center shrink-0">
+                  {index + 1}
+                </span>
+                <span className="text-xs font-medium text-foreground flex-1 truncate">
+                  {titleMap[key] || key}
+                </span>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveUp(index);
+                    }}
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === order.length - 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveDown(index);
+                    }}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {!isDefault && (
+              <div className="pt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={handleReset}
+                >
+                  恢复默认顺序
+                </Button>
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 export function ConfigForm({
   schema,
   onChange,
@@ -546,6 +664,33 @@ export function ConfigForm({
   );
 
   const fieldGroups = useMemo(() => parseSchemaToFields(schema), [schema]);
+
+  const orderable = useMemo(() => getOrderable(schema), [schema]);
+
+  const titleMap = useMemo(() => {
+    if (!orderable) return {};
+    try {
+      const parsed = JSON.parse(schema);
+      const properties = parsed.properties || {};
+      const map: Record<string, string> = {};
+      for (const key of orderable) {
+        const prop = properties[key] as { title?: string } | undefined;
+        map[key] = prop?.title || formatFieldName(key);
+      }
+      return map;
+    } catch {
+      return {};
+    }
+  }, [schema, orderable]);
+
+  const currentOrder = useMemo(() => {
+    if (!orderable) return [];
+    const existing = formData.__order as string[] | undefined;
+    if (Array.isArray(existing) && existing.length === orderable.length) {
+      return existing;
+    }
+    return [...orderable];
+  }, [orderable, formData.__order]);
 
   console.log(
     "[ConfigForm] Parsed field groups:",
@@ -618,6 +763,12 @@ export function ConfigForm({
     onChange(newData);
   };
 
+  const handleOrderChange = (newOrder: string[]) => {
+    const newData = { ...formData, __order: newOrder };
+    setFormData(newData);
+    onChange(newData);
+  };
+
   if (fieldGroups.length === 0) {
     return (
       <div
@@ -641,6 +792,18 @@ export function ConfigForm({
     <div className={cn("h-full", className)}>
       <ScrollArea className="h-full">
         <div className="px-1 pb-4">
+          {orderable && orderable.length >= 2 && (
+            <>
+              <OrderControl
+                orderable={orderable}
+                order={currentOrder}
+                defaultOrder={orderable}
+                titleMap={titleMap}
+                onOrderChange={handleOrderChange}
+              />
+              <div className="h-px bg-slate-600/30 mx-2 my-2" />
+            </>
+          )}
           {fieldGroups.map((group, index) => (
             <div key={index}>
               {index > 0 && (

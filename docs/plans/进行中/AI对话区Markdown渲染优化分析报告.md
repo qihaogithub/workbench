@@ -16,17 +16,19 @@
 - 缺少数学公式（LaTeX）渲染
 - 流式输出时缺少光标指示器
 - 链接安全性未配置
+- ~~表格被渲染为代码框样式~~ ✅ 已修复
 
 ### 1.2 预期行为 vs 实际行为
 
-| 维度 | 预期行为 | 实际行为 |
-|------|---------|---------|
-| 代码高亮 | 代码块应带有语法高亮，区分关键字、字符串、注释等 | 代码块为纯文本，无颜色区分 |
-| 代码交互 | 代码块右上角应有复制/下载按钮 | 无交互按钮 |
-| 图表渲染 | Mermaid代码块应可渲染为流程图/时序图等 | Mermaid代码块仅显示原始文本 |
-| 数学公式 | LaTeX公式应渲染为数学符号 | LaTeX公式显示为原始文本 |
-| 流式指示 | AI生成内容时应有光标闪烁提示 | 无光标指示 |
-| 链接安全 | 外部链接应有安全确认机制 | 无链接安全配置 |
+| 维度 | 预期行为 | 实际行为 | 状态 |
+|------|---------|---------|------|
+| 代码高亮 | 代码块应带有语法高亮，区分关键字、字符串、注释等 | 代码块为纯文本，无颜色区分 | ✅ 已修复 |
+| 代码交互 | 代码块右上角应有复制/下载按钮 | 无交互按钮 | ✅ 已修复 |
+| 图表渲染 | Mermaid代码块应可渲染为流程图/时序图等 | Mermaid代码块仅显示原始文本 | ✅ 已修复 |
+| 数学公式 | LaTeX公式应渲染为数学符号 | LaTeX公式显示为原始文本 | ✅ 已修复 |
+| 流式指示 | AI生成内容时应有光标闪烁提示 | 无光标指示 | ✅ 已修复 |
+| 链接安全 | 外部链接应有安全确认机制 | 无链接安全配置 | ⚠️ 待实施 |
+| 表格样式 | 表格显示为带描边的常规Markdown表格 | 表格被渲染为代码框样式 | ✅ 已修复 |
 
 ### 1.3 涉及环境
 
@@ -128,15 +130,32 @@ className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wr
 
 **影响**：AI生成的内容可能包含外部链接，缺少安全确认机制可能导致用户误点击恶意链接。
 
+#### 根因6：表格被渲染为代码框样式
+
+**证据**：streamdown 默认会给表格添加一个带有控制按钮（复制/下载/全屏）的包装器，包装器的样式（圆角、边框、背景色）和代码块非常相似：
+
+```css
+/* streamdown 表格包装器默认样式 */
+[data-streamdown="table-wrapper"] {
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+```
+
+**影响**：用户看到表格被包裹在一个类似代码块的容器中，感到困惑。
+
 ### 2.3 根因总结
 
-| 根因 | 优先级 | 影响范围 | 修复复杂度 |
-|------|--------|---------|-----------|
-| 未安装插件包 | 高 | 代码高亮、图表、公式全部缺失 | 低（安装依赖+配置） |
-| 未传递plugins prop | 高 | 插件功能无法启用 | 低（修改组件代码） |
-| 未配置流式指示 | 中 | 用户体验下降 | 低（添加prop） |
-| 手动CSS覆盖 | 中 | 样式维护成本高 | 中（需重构样式） |
-| 未配置链接安全 | 低 | 安全风险 | 低（添加配置） |
+| 根因 | 优先级 | 影响范围 | 修复状态 |
+|------|--------|---------|---------|
+| 未安装插件包 | 高 | 代码高亮、图表、公式全部缺失 | ✅ 已修复 |
+| 未传递plugins prop | 高 | 插件功能无法启用 | ✅ 已修复 |
+| 未配置流式指示 | 中 | 用户体验下降 | ✅ 已修复 |
+| 手动CSS覆盖 | 中 | 样式维护成本高 | ✅ 已修复（已移除手动CSS） |
+| 表格样式问题 | 中 | 用户体验下降 | ✅ 已修复（禁用controls + CSS覆盖） |
+| 未配置链接安全 | 低 | 安全风险 | ⚠️ 待实施 |
 
 ---
 
@@ -181,6 +200,7 @@ import { cjk } from "@streamdown/cjk";
   plugins={{ code, mermaid, math, cjk }}
   isAnimating={isStreaming && index === renderBlocks.length - 1}
   caret="block"
+  controls={{ table: false, code: true, mermaid: true }}
   className="max-w-none min-w-0"
 >
   {block.content}
@@ -195,7 +215,43 @@ import { cjk } from "@streamdown/cjk";
 
 并更新Streamdown使用：
 ```tsx
-<Streamdown plugins={{ code, cjk }}>{children}</Streamdown>
+<Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+  {children}
+</Streamdown>
+```
+
+7. **表格样式覆盖** — 在[globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css#L172)末尾添加：
+```css
+/* 去掉外层表格包装器的卡片样式 */
+[data-streamdown="table-wrapper"] {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* 去掉内层表格容器的背景、圆角和边框 */
+[data-streamdown="table-wrapper"] > div {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+/* 表格添加单元格边框，显示为带描边的常规 markdown 表格 */
+[data-streamdown="table"] {
+  border-collapse: collapse !important;
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+[data-streamdown="table"] th,
+[data-streamdown="table"] td {
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+/* 表头添加轻微背景色区分 */
+[data-streamdown="table"] thead {
+  background: hsl(var(--muted) / 0.3) !important;
+}
 ```
 
 **优势**：
@@ -206,6 +262,7 @@ import { cjk } from "@streamdown/cjk";
 - 中日韩文本优化
 - 流式光标指示
 - 完整的交互体验
+- 表格显示为常规Markdown表格样式
 
 **风险**：
 - 增加约200-300KB打包体积（插件按需加载）
@@ -229,89 +286,136 @@ export default {
 };
 ```
 
-### 方案B：最小优化（仅代码高亮）
-
-仅安装代码高亮插件，满足最基本需求。
-
-**实施步骤**：
-
-1. 仅安装code插件：
-```bash
-pnpm --filter @opencode-workbench/web add @streamdown/code
-```
-
-2. 配置Tailwind扫描+导入+组件修改（同方案A，仅code插件）
-
-**优势**：
-- 打包体积增加最小（约50-80KB）
-- 无Mermaid依赖问题
-- 快速见效
-
-**劣势**：
-- 无图表、公式、CJK优化
-- 后续如需其他功能需再次改造
-
-### 方案C：暂不优化
-
-保持现状，待后续有明确需求时再实施。
-
-**适用场景**：
-- 当前用户对Markdown渲染满意度较高
-- 团队资源紧张，优先级较低
-
 ---
 
-## 四、相关代码路径
+## 四、实施记录
 
-### 4.1 核心文件清单
+### 4.1 已完成的修改
 
-| 文件 | 作用 | 需修改 |
-|------|------|--------|
-| [packages/web/package.json](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/package.json) | 依赖管理 | 是（添加插件依赖） |
-| [packages/web/src/app/globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css#L5) | Tailwind扫描配置 | 是（添加插件@source） |
-| [packages/web/src/components/ai-elements/assistant-message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/assistant-message.tsx#L1-L15) | AI消息渲染 | 是（导入插件+更新Streamdown） |
-| [packages/web/src/components/ai-elements/reasoning.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/reasoning.tsx#L11) | 推理内容渲染 | 是（导入插件+更新Streamdown） |
-| [packages/web/src/components/ai-elements/message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/message.tsx#L16) | 消息组件入口 | 否（委托给AssistantMessage） |
-| [packages/web/src/components/ai-elements/ai-chat.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/ai-chat.tsx) | AI对话主组件 | 可能（KaTeX样式导入） |
+#### 1. 依赖安装
 
-### 4.2 调用链路
+已在 [package.json](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/package.json) 中添加：
+
+```json
+"@streamdown/code": "^1.1.1",
+"@streamdown/mermaid": "^1.0.2",
+"@streamdown/math": "^1.0.2",
+"@streamdown/cjk": "^1.0.3",
+```
+
+#### 2. Tailwind 扫描配置
+
+已在 [globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css#L5-L9) 中添加 `@source` 配置：
+
+```css
+@source "../node_modules/@streamdown/code/dist/*.js";
+@source "../node_modules/@streamdown/mermaid/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
+@source "../node_modules/@streamdown/cjk/dist/*.js";
+```
+
+#### 3. Streamdown 组件配置
+
+**[assistant-message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/assistant-message.tsx#L228-L235)**：
+
+```tsx
+<Streamdown
+  plugins={{ code, mermaid, math, cjk }}
+  isAnimating={isStreaming && index === renderBlocks.length - 1}
+  caret="block"
+  controls={{ table: false, code: true, mermaid: true }}
+>
+  {block.content}
+</Streamdown>
+```
+
+**[reasoning.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/reasoning.tsx#L176-L178)**：
+
+```tsx
+<Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+  {children}
+</Streamdown>
+```
+
+#### 4. 表格样式覆盖
+
+已在 [globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css#L172-L207) 末尾添加：
+
+```css
+/* Streamdown 表格样式覆盖 */
+[data-streamdown="table-wrapper"] {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+[data-streamdown="table-wrapper"] > div {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+[data-streamdown="table"] {
+  border-collapse: collapse !important;
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+[data-streamdown="table"] th,
+[data-streamdown="table"] td {
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+}
+
+[data-streamdown="table"] thead {
+  background: hsl(var(--muted) / 0.3) !important;
+}
+```
+
+### 4.2 核心文件清单
+
+| 文件 | 作用 | 状态 |
+|------|------|------|
+| [packages/web/package.json](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/package.json) | 依赖管理 | ✅ 已修改 |
+| [packages/web/src/app/globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css) | Tailwind扫描配置 + 表格样式覆盖 | ✅ 已修改 |
+| [packages/web/src/components/ai-elements/assistant-message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/assistant-message.tsx) | AI消息渲染 | ✅ 已修改 |
+| [packages/web/src/components/ai-elements/reasoning.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/reasoning.tsx) | 推理内容渲染 | ✅ 已修改 |
+| [packages/web/src/components/ai-elements/message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/message.tsx) | 消息组件入口 | ❌ 无需修改 |
+| [packages/web/src/components/ai-elements/ai-chat.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/ai-chat.tsx) | AI对话主组件 | ❌ 无需修改 |
+
+### 4.3 调用链路（更新后）
 
 ```
 AIChat组件 (ai-chat.tsx)
   └── AssistantMessage组件 (assistant-message.tsx)
-        ├── 文本块 → Streamdown (无plugins)
-        ├── 推理块 → Reasoning组件 → ReasoningContent → Streamdown (无plugins)
+        ├── 文本块 → Streamdown (已配置plugins + controls + caret)
+        ├── 推理块 → Reasoning组件 → ReasoningContent → Streamdown (已配置plugins + controls)
         └── 工具块 → 自定义渲染
 ```
 
-### 4.3 问题起源定位
-
-- **问题起始点**：[assistant-message.tsx:L217-L222](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/assistant-message.tsx#L217-L222) — Streamdown组件未配置plugins
-- **次要问题点**：[reasoning.tsx:L163](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/components/ai-elements/reasoning.tsx#L163) — ReasoningContent中Streamdown同样未配置plugins
-- **依赖缺失**：[package.json:L49](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/package.json#L49) — 仅安装streamdown核心包
-
-### 4.4 涉及组件
-
-- **Streamdown** — streamdown v2.5.0核心渲染组件
-- **AssistantMessage** — AI助手消息卡片组件
-- **Reasoning/ReasoningContent** — 推理过程折叠展示组件
-- **Message** — 通用消息组件（用户/AI消息）
-
 ---
 
-## 五、优化效果预期
+## 五、优化效果对比
 
 ### 5.1 代码块优化前后对比
 
 | 特性 | 优化前 | 优化后 |
 |------|--------|--------|
-| 语法高亮 |  纯文本 | ✅ Shiki高亮（200+语言） |
+| 语法高亮 | ❌ 纯文本 | ✅ Shiki高亮（200+语言） |
 | 复制按钮 | ❌ 无 | ✅ 代码块右上角复制按钮 |
 | 语言标识 | ❌ 无 | ✅ 显示语言名称 |
 | 主题适配 | ️ 手动CSS | ✅ 自动跟随深色/浅色主题 |
 | 行号显示 | ❌ 无 | ✅ 可选行号 |
 
-### 5.2 新增能力
+### 5.2 表格优化前后对比
+
+| 特性 | 优化前 | 优化后 |
+|------|--------|--------|
+| 控制按钮 | ❌ 有复制/下载/全屏按钮 | ✅ 已禁用 |
+| 外层容器 | ❌ 有圆角卡片包装器 | ✅ 已移除 |
+| 表格边框 | ❌ 只有行分隔线 | ✅ 完整网格边框 |
+| 显示效果 | 像代码块 | ✅ 常规Markdown表格 |
+
+### 5.3 新增能力
 
 | 能力 | 描述 |
 |------|------|
@@ -319,13 +423,83 @@ AIChat组件 (ai-chat.tsx)
 | 数学公式 | 支持LaTeX行内公式`$E=mc^2$`和块级公式`$$...$$` |
 | CJK优化 | 中日韩文本排版优化（标点挤压、字间距等） |
 | 流式光标 | AI生成时显示闪烁光标，提升实时感 |
-| 链接安全 | 外部链接点击前安全确认弹窗 |
 
 ---
 
-## 六、建议优先级
+## 六、截图实测发现的新问题（2026-05-02）
 
-1. **P0（立即实施）**：安装`@streamdown/code`插件，解决代码高亮问题
-2. **P1（近期实施）**：添加`@streamdown/cjk`插件，优化中文显示
-3. **P2（按需实施）**：添加`@streamdown/mermaid`和`@streamdown/math`插件
-4. **P3（持续优化）**：配置链接安全、自定义主题等高级功能
+基于实际渲染截图（见文档附件），发现以下可优化项：
+
+| 序号 | 问题描述 | 截图表现 | 优先级 | 状态 |
+|------|---------|---------|--------|------|
+| 1 | **代码块上下间距过大** | 两个代码块（TypeScript / Python）之间留白过多，视觉上被分割成独立卡片，阅读连贯性差 | P1 | ⚠️ 待优化 |
+| 2 | **代码块语言标签与内容区融为一体** | `typescript` / `python` 标签没有独立背景，与代码内容区分不明显 | P2 | ⚠️ 待优化 |
+| 3 | **行内代码样式缺失** | "这是 `行内代码`" 中的行内代码与普通文本几乎无区别，无背景色或边框 | P2 | ⚠️ 待优化 |
+| 4 | **无序列表嵌套缩进过浅** | "嵌套子项" 与父级 "第二项" 视觉上几乎对齐，层级关系不清晰 | P2 | ⚠️ 待优化 |
+| 5 | **引用块左侧边框/背景缺失** | "这是一段引用文字" 没有左侧竖线或背景色，与普通段落无区别 | P2 | ⚠️ 待优化 |
+| 6 | **链接无悬停效果/下划线** | "这是一个示例链接" 没有下划线，且颜色与正文接近，可识别性差 | P3 | ⚠️ 待优化 |
+| 7 | **分隔线不够明显** | "七、分隔线" 下方的 `---` 渲染后几乎不可见 | P3 | ⚠️ 待优化 |
+| 8 | **表格行高/内边距偏小** | 表格单元格文字过于紧凑，阅读舒适度不足 | P3 | ⚠️ 待优化 |
+| 9 | **代码块工具栏按钮样式简陋** | 复制/下载图标为灰色线框，无 hover 状态反馈 | P3 | ⚠️ 待优化 |
+
+### 6.1 问题根因分析
+
+| 问题 | 根因 | 修复思路 |
+|------|------|---------|
+| 代码块间距过大 | `@streamdown/code` 默认给每个代码块加了较大的 `margin-bottom` | 通过 CSS 覆盖 `[data-streamdown="code-block"]` 的 `margin` |
+| 语言标签无独立样式 | streamdown 默认标签样式与代码区背景一致 | 自定义 `[data-streamdown="code-language"]` 的背景和文字色 |
+| 行内代码无样式 | 未配置 `<code>` 标签在段落内的样式 | 添加 `p code` 或 `[data-streamdown="code-inline"]` 的背景/圆角/字号 |
+| 列表嵌进过浅 | streamdown 默认 `padding-left` 较小 | 覆盖 `ul ul` / `ol ol` 的 `padding-left` |
+| 引用块无样式 | 未配置 `blockquote` 的左侧边框和背景 | 添加 `[data-streamdown="blockquote"]` 的 `border-left` 和 `background` |
+| 链接无下划线 | 全局 `text-decoration: none` 或 streamdown 默认 | 覆盖 `a` 标签的 `text-decoration` 和 `color` |
+| 分隔线不明显 | `hr` 颜色与背景接近 | 提高 `[data-streamdown="hr"]` 的 `border-color` 对比度 |
+| 表格行高偏小 | 默认 `padding` 较小 | 增加 `th, td` 的 `padding` |
+| 工具栏按钮简陋 | 默认图标样式无交互反馈 | 添加 `hover` 状态的背景色和颜色变化 |
+
+---
+
+## 七、下一步优化计划
+
+### 7.1 第一阶段：排版与间距优化（P1-P2）
+
+**目标**：解决代码块间距、行内代码、列表缩进、引用块等核心阅读体验问题。
+
+| 任务 | 具体修改 | 涉及文件 |
+|------|---------|---------|
+| 1. 缩小代码块间距 | 覆盖 `[data-streamdown="code-block"]` 的 `margin: 0.5rem 0` | `globals.css` |
+| 2. 美化语言标签 | 给 `[data-streamdown="code-language"]` 添加独立背景色、圆角、字号 | `globals.css` |
+| 3. 添加行内代码样式 | 给 `p code` / `[data-streamdown="code-inline"]` 添加背景、圆角、边框 | `globals.css` |
+| 4. 加深列表嵌进 | 覆盖 `ul ul` / `ol ol` 的 `padding-left: 1.5rem` | `globals.css` |
+| 5. 美化引用块 | 给 `[data-streamdown="blockquote"]` 添加左侧竖线 + 轻微背景 | `globals.css` |
+
+### 7.2 第二阶段：细节与交互优化（P2-P3）
+
+**目标**：提升链接、分隔线、表格、工具栏的视觉可识别性。
+
+| 任务 | 具体修改 | 涉及文件 |
+|------|---------|---------|
+| 6. 链接样式增强 | 给 `a` 添加下划线 + hover 颜色变化 | `globals.css` |
+| 7. 分隔线加粗 | 提高 `hr` 的 `border-top` 对比度 | `globals.css` |
+| 8. 表格内边距增大 | 增加 `th, td` 的 `padding: 0.5rem 0.75rem` | `globals.css` |
+| 9. 工具栏按钮交互 | 给复制/下载按钮添加 `hover:bg-muted` 等反馈 | `globals.css` |
+
+### 7.3 第三阶段：高级功能（可选）
+
+| 优先级 | 项目 | 状态 |
+|--------|------|------|
+| P3 | 配置链接安全（`linkSafety`） | ⚠️ 待实施 |
+| P3 | 自定义代码高亮主题（如 GitHub Dark） | ⚠️ 待实施 |
+| P3 | 支持代码块折叠/展开 | ⚠️ 待实施 |
+| P3 | 图片懒加载与点击放大 | ⚠️ 待实施 |
+
+---
+
+## 八、历史已完成的优化
+
+| 优先级 | 项目 | 状态 |
+|--------|------|------|
+| P0 | ~~安装`@streamdown/code`插件，解决代码高亮问题~~ | ✅ 已完成 |
+| P1 | ~~添加`@streamdown/cjk`插件，优化中文显示~~ | ✅ 已完成 |
+| P2 | ~~添加`@streamdown/mermaid`和`@streamdown/math`插件~~ | ✅ 已完成 |
+| P3 | ~~修复表格样式问题~~ | ✅ 已完成 |
+| P3 | ~~配置流式光标指示（`isAnimating` + `caret`）~~ | ✅ 已完成 |

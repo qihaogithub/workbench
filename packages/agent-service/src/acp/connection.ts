@@ -383,6 +383,19 @@ export class AcpConnection extends EventEmitter {
     sessionId?: string;
   }): Promise<void> {
     const resolvedPath = this.resolveWorkspacePath(params.path);
+
+    if (!params.content) {
+      logger.warn(
+        {
+          method: "fs/write_text_file",
+          originalPath: params.path,
+          resolvedPath,
+          sessionId: params.sessionId,
+        },
+        "[ACP Connection] WRITE_TEXT_FILE notification received WITHOUT content - frontend will not be able to update preview",
+      );
+    }
+
     logger.info(
       {
         method: "fs/write_text_file",

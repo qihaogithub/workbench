@@ -82,7 +82,7 @@ export default function Demo({
             </div>
           )}
           <div className="flex-1 pt-1">
-            <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">
               {title}
             </h1>
             {subtitle && (

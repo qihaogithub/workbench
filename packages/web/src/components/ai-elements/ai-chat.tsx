@@ -32,6 +32,8 @@ import {
   type StreamEvent,
 } from "@opencode-workbench/agent-client";
 import { Bot, Sparkles, History } from "lucide-react";
+import { useToast } from "@/components/ui/toast-provider";
+import { cn } from "@/lib/utils";
 import type { MessagePart } from "@/components/ai-elements";
 
 const PromptInputAttachmentsDisplay = () => {
@@ -120,6 +122,7 @@ export function AIChat({
   currentSessionId,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   // 1. Messages 状态处理
   const isControlled = externalMessages !== undefined;
@@ -209,6 +212,7 @@ export function AIChat({
   );
 
   const streamRef = useRef<AgentStream | null>(null);
+  const streamSessionIdRef = useRef<string>("");
 
   // 待处理的权限请求
   const [pendingPermissionRequest, setPendingPermissionRequest] =
@@ -238,6 +242,29 @@ export function AIChat({
       }
     };
   }, []);
+
+  // 会话切换时关闭旧流，防止旧流事件污染新会话状态
+  useEffect(() => {
+    if (streamRef.current && streamSessionIdRef.current && streamSessionIdRef.current !== sessionId) {
+      console.log(
+        "[AIChat] Session changed from",
+        streamSessionIdRef.current,
+        "to",
+        sessionId,
+        "- closing old stream",
+      );
+      streamRef.current.close();
+      streamRef.current = null;
+      streamSessionIdRef.current = "";
+      setIsStreaming(false);
+      setStreamContent("");
+      setCurrentMessage({
+        role: "assistant",
+        content: "",
+        parts: [],
+      });
+    }
+  }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage]);
 
   // 处理发送消息
   const handleSend = useCallback(async (userMessage: string) => {
@@ -269,6 +296,9 @@ export function AIChat({
       // 每次发送消息时创建新的流连接
       const stream = agentClient.stream(agentSessionId);
       streamRef.current = stream;
+      streamSessionIdRef.current = sessionId;
+
+      const streamId = sessionId;
 
       console.log("[AIChat] WebSocket URL:", (stream as any).url);
 
@@ -288,6 +318,7 @@ export function AIChat({
 
       // 监听流式文本 - 追加到 parts 数组的最后一个 TextPart
       stream.on("stream", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         connectionEstablished = true;
         if (event.content) {
           accumulatedContent += event.content;
@@ -321,6 +352,7 @@ export function AIChat({
 
       // 监听思考过程 - 追加到 parts 数组
       stream.on("thought", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         if (event.content) {
           setCurrentMessage((prev) => {
             const parts = prev.parts || [];
@@ -362,6 +394,7 @@ export function AIChat({
 
       // 监听 Plan 更新
       stream.on("plan", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         if (event.content) {
           setPlan((prev) => prev + event.content);
         }
@@ -369,6 +402,7 @@ export function AIChat({
 
       // 监听工具调用开始 - 添加新的 ToolCallPart
       stream.on("tool_call", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         const eventAny = event as any;
 
         // 打印完整事件以便调试
@@ -434,6 +468,7 @@ export function AIChat({
 
       // 监听工具调用状态更新 - 根据 toolCallId 更新对应的 ToolCallPart
       stream.on("tool_call_update", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         console.log("[AIChat] Tool Call Update Event:", event);
 
         setCurrentMessage((prev) => {
@@ -502,6 +537,7 @@ export function AIChat({
 
       // 监听权限请求
       stream.on("permission_request", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         if (event.permissionRequest) {
           setPendingPermissionRequest(
             event.permissionRequest as PermissionRequest,
@@ -571,6 +607,7 @@ export function AIChat({
       };
 
       stream.on("file_operation", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         console.log("[AIChat] file_operation event received:", event);
         if (event.fileOperation) {
           const { method, path, content } = event.fileOperation;
@@ -607,6 +644,11 @@ export function AIChat({
       });
 
       stream.on("finish", async (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) {
+          console.log("[AIChat] Ignoring finish event from stale stream");
+          stream.close();
+          return;
+        }
         // 完成流式响应,将当前消息添加到消息列表
         const currentMsg = currentMessageRef.current;
         const assistantMessage: ChatMessage = {
@@ -686,12 +728,13 @@ export function AIChat({
           finalFiles.map((f) => ({ path: f.path, hasContent: !!f.content })),
         );
 
+        let codeFileUpdatedWithContent = false;
+        let schemaFileUpdatedWithContent = false;
+
         if (finalFiles.length > 0) {
           onFilesChange?.(finalFiles);
 
-          // 从文件变更中提取代码和 schema 更新
           for (const file of finalFiles) {
-            // 优化：使用精确路径匹配
             const normalizedPath = file.path.replace(/\\/g, "/");
             const isCodeFile =
               normalizedPath.endsWith("index.tsx") ||
@@ -700,72 +743,59 @@ export function AIChat({
               normalizedPath.endsWith("Demo.ts");
 
             if (isCodeFile) {
-              // 文件对象包含 content 属性，可以直接读取
-              if ("content" in file && typeof file.content === "string") {
+              if ("content" in file && typeof file.content === "string" && file.content.length > 0) {
                 console.log("[AIChat] Finish - code update:", file.path);
+                codeFileUpdatedWithContent = true;
                 onCodeUpdate?.(file.content);
+              } else {
+                console.warn("[AIChat] Finish - code file found but content is missing:", file.path);
               }
             } else if (normalizedPath.endsWith("config.schema.json")) {
               if ("content" in file && typeof file.content === "string") {
                 console.log("[AIChat] Finish - schema update:", file.path);
+                schemaFileUpdatedWithContent = true;
                 onSchemaUpdate?.(file.content);
               }
             }
           }
         }
 
-        // ✅ 兜底：如果 realtimeFilesRef 为空（说明 edit 工具绕过 ACP 通知），通过 HTTP API 读取文件
-        if (
-          realtimeFilesRef.size === 0 &&
-          (!event.files || event.files.length === 0)
-        ) {
+        if (!codeFileUpdatedWithContent || !schemaFileUpdatedWithContent) {
           console.log(
-            "[AIChat] No file changes detected via ACP, fetching files via HTTP API as fallback...",
+            "[AIChat] Code or schema not updated via file_operation events, fetching via HTTP API. codeUpdated:",
+            codeFileUpdatedWithContent,
+            "schemaUpdated:",
+            schemaFileUpdatedWithContent,
           );
           try {
             const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
             if (filesRes.ok) {
               const filesData = await filesRes.json();
-              console.log("[AIChat] Fetched files from API:", filesData);
-
               if (filesData.success && filesData.data) {
                 const { code, schema } = filesData.data;
-                console.log(
-                  "[AIChat] Fetched code length:",
-                  code?.length,
-                  "schema length:",
-                  schema?.length,
-                );
 
-                if (code) {
-                  console.log("[AIChat] Applying code update from HTTP API");
+                if (code && !codeFileUpdatedWithContent) {
+                  console.log("[AIChat] Applying code update from HTTP API, length:", code.length);
                   onCodeUpdate?.(code);
                 }
-                if (schema) {
-                  console.log("[AIChat] Applying schema update from HTTP API");
+                if (schema && !schemaFileUpdatedWithContent) {
+                  console.log("[AIChat] Applying schema update from HTTP API, length:", schema.length);
                   onSchemaUpdate?.(schema);
                 }
 
-                // 通知父组件文件变更
-                const fetchedFiles = [
-                  {
-                    path: "index.tsx",
-                    action: "modified" as const,
-                    content: code,
-                  },
-                  {
-                    path: "config.schema.json",
-                    action: "modified" as const,
-                    content: schema,
-                  },
-                ];
-                onFilesChange?.(fetchedFiles);
+                if (!codeFileUpdatedWithContent || !schemaFileUpdatedWithContent) {
+                  const fetchedFiles = [];
+                  if (!codeFileUpdatedWithContent) {
+                    fetchedFiles.push({ path: "index.tsx", action: "modified" as const, content: code });
+                  }
+                  if (!schemaFileUpdatedWithContent) {
+                    fetchedFiles.push({ path: "config.schema.json", action: "modified" as const, content: schema });
+                  }
+                  if (fetchedFiles.length > 0) {
+                    onFilesChange?.(fetchedFiles);
+                  }
+                }
               }
-            } else {
-              console.warn(
-                "[AIChat] Failed to fetch files from API, status:",
-                filesRes.status,
-              );
             }
           } catch (error) {
             console.error("[AIChat] Error fetching files via HTTP:", error);
@@ -777,6 +807,7 @@ export function AIChat({
       });
 
       stream.on("error", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
         // 如果连接未建立且发生错误，降级到非流式模式
         if (!connectionEstablished) {
           console.warn("WebSocket 连接失败，降级到非流式模式");
@@ -1135,8 +1166,15 @@ export function AIChat({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
-              onClick={() => setHistoryDialogOpen(true)}
+              className={cn("h-8 w-8", isStreaming && "opacity-40 cursor-not-allowed")}
+              disabled={isStreaming}
+              onClick={() => {
+                if (isStreaming) {
+                  toast({ title: "AI 输出中，无法切换对话" });
+                  return;
+                }
+                setHistoryDialogOpen(true);
+              }}
             >
               <History className="h-4 w-4" />
             </Button>

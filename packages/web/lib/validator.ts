@@ -214,7 +214,7 @@ export function validatePropsSchema(
 
   // 检查 code 中有但 schema 中没有的 props
   for (const prop of codeProps) {
-    if (!schemaPropsSet.has(prop)) {
+    if (!schemaPropsSet.has(prop) && !prop.startsWith("__")) {
       errors.push({
         type: "props_mismatch",
         message: `代码中的 props "${prop}" 未在 Schema 的 properties 中定义`,
@@ -222,9 +222,9 @@ export function validatePropsSchema(
     }
   }
 
-  // 检查 schema 中有但 code 中没有的 props
+  // 检查 schema 中有但 code 中没有的 props（跳过 __ 前缀系统属性）
   for (const prop of schemaProps) {
-    if (!codePropsSet.has(prop)) {
+    if (!codePropsSet.has(prop) && !prop.startsWith("__")) {
       errors.push({
         type: "props_mismatch",
         message: `Schema 中的 property "${prop}" 未在代码的 DemoProps 中定义`,
@@ -287,6 +287,7 @@ export function isValidJson(schema: string): boolean {
 
 /**
  * 获取 Schema 的默认值
+ * 当 Schema 包含 $demo.orderable 时，自动生成 __order 默认值
  * @param schema JSON Schema 字符串
  * @returns 默认值对象
  */
@@ -302,6 +303,11 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
           defaults[key] = prop.default;
         }
       }
+    }
+
+    const orderable = getOrderable(schema);
+    if (orderable) {
+      defaults.__order = [...orderable];
     }
 
     return defaults;
@@ -376,6 +382,32 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
     }
 
     return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 从 Schema 中提取可排序属性列表
+ * 读取 $demo.orderable 字段，至少包含 2 项才返回
+ * orderable 引用组件代码中的 section 名称，不要求与 properties 中的属性名一致
+ * @param schema JSON Schema 字符串
+ * @returns 可排序属性名数组，未声明或不足 2 项返回 undefined
+ */
+export function getOrderable(schema: string): string[] | undefined {
+  try {
+    const parsed = JSON.parse(schema);
+
+    const orderable = parsed.$demo?.orderable;
+    if (!Array.isArray(orderable) || orderable.length < 2) {
+      return undefined;
+    }
+
+    const validKeys = orderable.filter(
+      (key): key is string => typeof key === "string",
+    );
+
+    return validKeys.length >= 2 ? validKeys : undefined;
   } catch {
     return undefined;
   }

@@ -164,6 +164,9 @@ export abstract class BaseAcpBackend implements IBackendAdapter {
         onPermissionRequest: async (request: AcpPermissionRequest) => {
           return this.handlePermissionRequest(request);
         },
+        onFileOperation: (operation) => {
+          this.handleFileOperation(operation);
+        },
       });
 
       this.status = "ready";

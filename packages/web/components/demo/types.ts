@@ -9,6 +9,7 @@ export interface PreviewSize {
 // 新增：config.schema.json 中的元数据扩展字段
 export interface DemoMeta {
   previewSize?: PreviewSize;
+  orderable?: string[];
   [key: string]: unknown;
 }
 
