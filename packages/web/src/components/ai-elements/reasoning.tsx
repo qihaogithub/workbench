@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import { cjk } from "@streamdown/cjk";
 
 interface ReasoningContextValue {
   isStreaming?: boolean;
@@ -171,7 +173,9 @@ function ReasoningContent({
     >
       <div className="pl-4 py-1 border-l border-border/20 ml-[5px] mt-0.5">
         <div className="text-[11px] text-muted-foreground/70 leading-relaxed max-w-full">
-          <Streamdown>{children}</Streamdown>
+          <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+            {children}
+          </Streamdown>
         </div>
       </div>
     </CollapsibleContent>

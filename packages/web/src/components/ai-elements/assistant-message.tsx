@@ -3,6 +3,11 @@
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import { mermaid } from "@streamdown/mermaid";
+import { math } from "@streamdown/math";
+import { cjk } from "@streamdown/cjk";
+import "katex/dist/katex.min.css";
 import {
   Loader2,
   Check,
@@ -220,7 +225,12 @@ export function AssistantMessage({
               key={`text-${index}`}
               className="prose prose-sm dark:prose-invert max-w-none min-w-0"
             >
-              <Streamdown className="[&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:whitespace-pre-wrap [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+              <Streamdown
+                plugins={{ code, mermaid, math, cjk }}
+                isAnimating={isStreaming && index === renderBlocks.length - 1}
+                caret="block"
+                controls={{ table: false, code: true, mermaid: true }}
+              >
                 {block.content}
               </Streamdown>
             </div>

@@ -74,6 +74,7 @@ interface AIChatProps {
   sessionId: string;
   agentSessionId: string;
   workingDir?: string;
+  projectId?: string;
   onCodeUpdate?: (code: string) => void;
   onSchemaUpdate?: (schema: string) => void;
   onFilesChange?: (
@@ -102,6 +103,7 @@ export function AIChat({
   sessionId,
   agentSessionId,
   workingDir,
+  projectId,
   onCodeUpdate,
   onSchemaUpdate,
   onFilesChange,
@@ -617,7 +619,8 @@ export function AIChat({
           parts: currentMsg.parts,
         };
 
-        setMessages((prev) => [...prev, assistantMessage]);
+        const updatedMessages = [...messagesRef.current, assistantMessage];
+        setMessages(updatedMessages);
         // 重置 currentMessage，避免思维链重复显示
         setCurrentMessage({
           role: "assistant",
@@ -629,10 +632,43 @@ export function AIChat({
         stream.close();
         streamRef.current = null;
 
-        // 清理文件更新定时器
+        // 持久化消息历史到文件系统
+        try {
+          const now = Date.now();
+          const messagesToSave = updatedMessages.map((m, i) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: now - (updatedMessages.length - i) * 1000,
+          }));
+          await fetch(`/api/sessions/${sessionId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: messagesToSave }),
+          });
+        } catch (e) {
+          console.warn("[AIChat] Failed to persist messages:", e);
+        }
+
+        // 首条消息时更新会话标题
+        if (messagesRef.current.length === 0 && userMessage.trim()) {
+          try {
+            const title = userMessage.trim().slice(0, 50) + (userMessage.trim().length > 50 ? "..." : "");
+            await fetch(`/api/sessions/${sessionId}/meta`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title }),
+            });
+          } catch (e) {
+            console.warn("[AIChat] Failed to update session title:", e);
+          }
+        }
+
+        // 清理文件更新定时器：先处理待处理的文件变更，再清除
         if (fileUpdateTimer) {
           clearTimeout(fileUpdateTimer);
           fileUpdateTimer = null;
+          processRealtimeFiles();
         }
 
         // 处理文件变更（优先使用 event.files，兜底使用 realtimeFiles）
@@ -738,37 +774,6 @@ export function AIChat({
 
         // 清空实时文件缓存
         realtimeFilesRef.clear();
-
-        // 尝试从内容中提取代码和 schema 更新（作为备选方案）
-        try {
-          // 提取 index.tsx 代码块
-          const codeMatch = accumulatedContent.match(
-            /```(?:tsx|tsx?|typescript|javascript)\n([\s\S]*?)```/,
-          );
-          if (codeMatch && onCodeUpdate) {
-            onCodeUpdate(codeMatch[1].trim());
-          }
-
-          // 提取 config.schema.json 代码块
-          const schemaMatch = accumulatedContent.match(
-            /```(?:json:schema|json)\n([\s\S]*?)```/,
-          );
-          if (schemaMatch && onSchemaUpdate) {
-            try {
-              const schemaContent = schemaMatch[1].trim();
-              // 验证是否为有效的 JSON
-              JSON.parse(schemaContent);
-              onSchemaUpdate(schemaContent);
-            } catch (parseError) {
-              console.warn(
-                "Failed to parse schema from AI response:",
-                parseError,
-              );
-            }
-          }
-        } catch {
-          // 忽略解析错误
-        }
       });
 
       stream.on("error", (event: StreamEvent) => {
@@ -864,7 +869,26 @@ export function AIChat({
           content: aiReply,
         };
 
-        setMessages((prev) => [...prev, assistantMessage]);
+        const httpUpdatedMessages = [...messagesRef.current, assistantMessage];
+        setMessages(httpUpdatedMessages);
+
+        // 持久化消息历史到文件系统（非流式降级路径）
+        try {
+          const httpNow = Date.now();
+          const messagesToSave = httpUpdatedMessages.map((m, i) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: httpNow - (httpUpdatedMessages.length - i) * 1000,
+          }));
+          await fetch(`/api/sessions/${sessionId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: messagesToSave }),
+          });
+        } catch (e) {
+          console.warn("[AIChat] Failed to persist messages (HTTP):", e);
+        }
 
         // 处理文件变更
         if (result.data?.files && result.data.files.length > 0) {
@@ -893,36 +917,6 @@ export function AIChat({
             }
           }
         }
-
-        // 尝试从内容中提取代码和 schema 更新（作为备选方案）
-        try {
-          // 提取 index.tsx 代码块
-          const codeMatch = aiReply.match(
-            /```(?:tsx|tsx?|typescript|javascript)\n([\s\S]*?)```/,
-          );
-          if (codeMatch && onCodeUpdate) {
-            onCodeUpdate(codeMatch[1].trim());
-          }
-
-          // 提取 config.schema.json 代码块
-          const schemaMatch = aiReply.match(
-            /```(?:json:schema|json)\n([\s\S]*?)```/,
-          );
-          if (schemaMatch && onSchemaUpdate) {
-            try {
-              const schemaContent = schemaMatch[1].trim();
-              JSON.parse(schemaContent);
-              onSchemaUpdate(schemaContent);
-            } catch (parseError) {
-              console.warn(
-                "Failed to parse schema from AI response:",
-                parseError,
-              );
-            }
-          }
-        } catch {
-          // 忽略解析错误
-        }
       } catch (httpError) {
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
@@ -941,6 +935,7 @@ export function AIChat({
   }, [
     isStreaming,
     agentSessionId,
+    sessionId,
     workingDir,
     onCodeUpdate,
     onSchemaUpdate,
@@ -1122,6 +1117,7 @@ export function AIChat({
       {/* 输入区域 */}
       <PromptInput
         onSubmit={handleSubmit}
+        onCancel={handleCancel}
         status={isStreaming ? "streaming" : "idle"}
         className="flex-shrink-0"
         globalDrop
@@ -1153,7 +1149,7 @@ export function AIChat({
       <HistoryDialog
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
-        projectId={sessionId}
+        projectId={projectId || sessionId}
         currentSessionId={currentSessionId}
         onSelectSession={onSelectSession || (() => {})}
         onNewSession={onNewSession || (() => {})}

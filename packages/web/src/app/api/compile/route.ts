@@ -10,8 +10,24 @@ export async function POST(request: NextRequest) {
     let result;
     let projectId: string | undefined;
 
-    // 优先使用 sessionId 模式
-    if (sessionId) {
+    if (code && typeof code === 'string') {
+      let lockedDependencies: Record<string, string> | undefined;
+      if (sessionId && typeof sessionId === 'string') {
+        try {
+          const sessionMeta = getSessionMeta(sessionId);
+          if (sessionMeta?.demoId) {
+            projectId = sessionMeta.demoId;
+            const project = readProjectMeta(projectId);
+            if (project?.lockedDependencies) {
+              lockedDependencies = project.lockedDependencies;
+            }
+          }
+        } catch {
+          // 忽略元数据读取错误
+        }
+      }
+      result = compileCode(code, lockedDependencies);
+    } else if (sessionId) {
       if (typeof sessionId !== 'string') {
         return NextResponse.json(
           createApiError('INVALID_REQUEST', 'sessionId 必须为字符串'),
@@ -27,7 +43,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 获取关联的项目 ID，用于后续版本锁定
       try {
         const sessionMeta = getSessionMeta(sessionId);
         projectId = sessionMeta?.demoId;
@@ -35,15 +50,10 @@ export async function POST(request: NextRequest) {
         // 忽略元数据读取错误
       }
     } else {
-      // 兼容直接传 code 模式
-      if (!code || typeof code !== 'string') {
-        return NextResponse.json(
-          createApiError('INVALID_REQUEST', 'code 或 sessionId 参数必填'),
-          { status: 400 }
-        );
-      }
-
-      result = compileCode(code);
+      return NextResponse.json(
+        createApiError('INVALID_REQUEST', 'code 或 sessionId 参数必填'),
+        { status: 400 }
+      );
     }
 
     // 异步解析并锁定依赖版本（不阻塞响应）

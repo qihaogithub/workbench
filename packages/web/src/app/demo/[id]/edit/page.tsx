@@ -593,6 +593,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   sessionId={sessionId}
                   agentSessionId={agentSessionId}
                   workingDir={tempWorkspace || undefined}
+                  projectId={demoId}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
                   externalMessages={aiMessages}
@@ -605,10 +606,91 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   onCurrentMessageChange={setAiCurrentMessage}
                   currentSessionId={sessionId}
                   onNewSession={async () => {
-                    console.log("新建对话");
+                    try {
+                      const res = await fetch("/api/sessions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ demoId }),
+                      });
+                      const data = await res.json();
+                      if (!data.success) {
+                        toast({ title: "新建对话失败", variant: "destructive" });
+                        return;
+                      }
+                      setSessionId(data.data.sessionId);
+                      setTempWorkspace(data.data.tempWorkspace || "");
+                      setAgentSessionId(`demo-${demoId}-${Date.now()}`);
+                      setAiMessages([]);
+                      setAiCurrentMessage({ role: "assistant", content: "", parts: [] });
+                      setAiIsStreaming(false);
+                      setAiStreamContent("");
+                      setCode(data.data.code || "");
+                      setSchema(data.data.schema || "");
+                      setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
+                      const defaults = getDefaultValues(data.data.schema || "");
+                      setConfigData(defaults);
+                      const result = validateAll(data.data.code || "", data.data.schema || "");
+                      setValidationResult(result);
+                      const size = getPreviewSize(data.data.schema || "");
+                      setPreviewSize(size);
+                      toast({ title: "已创建新对话" });
+                    } catch (error) {
+                      toast({
+                        title: "新建对话失败",
+                        description: error instanceof Error ? error.message : "未知错误",
+                        variant: "destructive",
+                      });
+                    }
                   }}
-                  onSelectSession={(newSessionId) => {
-                    console.log("切换到会话:", newSessionId);
+                  onSelectSession={async (newSessionId) => {
+                    try {
+                      const sessionRes = await fetch(`/api/sessions/${newSessionId}`);
+                      if (!sessionRes.ok) {
+                        toast({ title: "会话不存在", variant: "destructive" });
+                        return;
+                      }
+                      const sessionData = await sessionRes.json();
+                      if (!sessionData.success || sessionData.data?.isExpired) {
+                        toast({ title: "会话已过期", variant: "destructive" });
+                        return;
+                      }
+                      const filesRes = await fetch(`/api/sessions/${newSessionId}/files`);
+                      const filesData = await filesRes.json();
+                      if (filesData.success && filesData.data) {
+                        setCode(filesData.data.code);
+                        setSchema(filesData.data.schema);
+                        setEditorContent(buildFigmaText(filesData.data.code, filesData.data.schema));
+                        const defaults = getDefaultValues(filesData.data.schema);
+                        setConfigData(defaults);
+                        const result = validateAll(filesData.data.code, filesData.data.schema);
+                        setValidationResult(result);
+                        const size = getPreviewSize(filesData.data.schema);
+                        setPreviewSize(size);
+                      }
+                      const messagesRes = await fetch(`/api/sessions/${newSessionId}/messages`);
+                      const messagesData = await messagesRes.json();
+                      setAiMessages(messagesData.success ? (messagesData.data || []) : []);
+                      setAiCurrentMessage({ role: "assistant", content: "", parts: [] });
+                      setAiIsStreaming(false);
+                      setAiStreamContent("");
+                      const { getAgentClient } = await import("@/lib/agent-client");
+                      const agentClient = getAgentClient();
+                      try {
+                        await agentClient.getSession(newSessionId);
+                        setAgentSessionId(newSessionId);
+                      } catch {
+                        setAgentSessionId(`demo-${demoId}-${Date.now()}`);
+                      }
+                      setSessionId(newSessionId);
+                      setTempWorkspace(filesData.data?.workspacePath || "");
+                      toast({ title: "已切换会话" });
+                    } catch (error) {
+                      toast({
+                        title: "切换失败",
+                        description: error instanceof Error ? error.message : "未知错误",
+                        variant: "destructive",
+                      });
+                    }
                   }}
                 />
               </TabsContent>
@@ -687,6 +769,7 @@ ${"=== END ==="}`}
 
           <ResizablePanel className="p-4 bg-muted/30 relative border rounded-lg overflow-hidden bg-background shadow-sm">
             <PreviewPanel
+              code={code}
               sessionId={sessionId}
               configData={configData}
               previewSize={previewSize}

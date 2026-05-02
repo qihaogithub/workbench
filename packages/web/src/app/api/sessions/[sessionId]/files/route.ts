@@ -3,6 +3,7 @@ import {
   getSessionFiles,
   updateSessionFiles,
   getSessionMeta,
+  getSessionPath,
   sessionExists,
   isSessionExpired,
   createApiSuccess,
@@ -41,7 +42,10 @@ export async function GET(
       );
     }
     
-    return NextResponse.json(createApiSuccess(files));
+    return NextResponse.json(createApiSuccess({
+      ...files,
+      workspacePath: getSessionPath(sessionId),
+    }));
   } catch (error) {
     console.error('Error getting session files:', error);
     return NextResponse.json(

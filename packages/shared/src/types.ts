@@ -15,6 +15,7 @@ export interface SessionMeta {
   sessionId: string;
   demoId: string;
   userId?: string;
+  title?: string;
   createdAt: number;
   expiresAt: number;
   status?: 'editing' | 'saved' | 'discarded';

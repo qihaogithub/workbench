@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { projectApiClient } from '@/lib/project-api';
 import { getAgentClient } from '@/lib/agent-client';
 import { AIChat } from '@/components/ai-elements/ai-chat';
+import { useToast } from '@/components/ui/toast-provider';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +37,7 @@ interface EditSessionInfo {
 
 export default function ProjectEditPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId');
   const basedOn = searchParams.get('basedOn');
@@ -185,7 +187,70 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
               sessionId={sessionInfo.sessionId}
               agentSessionId={agentSessionId}
               workingDir={sessionInfo.tempWorkspace}
+              projectId={params.id}
+              currentSessionId={sessionInfo.sessionId}
               onFilesChange={(files) => setFileChanges(files.length)}
+              onSelectSession={async (newSessionId) => {
+                try {
+                  const sessionRes = await fetch(`/api/sessions/${newSessionId}`);
+                  if (!sessionRes.ok) {
+                    toast({ title: "会话不存在", variant: "destructive" });
+                    return;
+                  }
+                  const sessionData = await sessionRes.json();
+                  if (!sessionData.success || sessionData.data?.isExpired) {
+                    toast({ title: "会话已过期", variant: "destructive" });
+                    return;
+                  }
+                  const filesRes = await fetch(`/api/sessions/${newSessionId}/files`);
+                  const filesData = await filesRes.json();
+                  const workspace = filesData.data?.workspacePath || "";
+                  setSessionInfo({
+                    sessionId: newSessionId,
+                    projectId: params.id,
+                    basedOnVersion: sessionInfo.basedOnVersion,
+                    username: sessionInfo.username,
+                    tempWorkspace: workspace,
+                  });
+                  setAgentSessionId(`project-${params.id}-${Date.now()}`);
+                  toast({ title: "已切换会话" });
+                } catch (error) {
+                  toast({
+                    title: "切换失败",
+                    description: error instanceof Error ? error.message : "未知错误",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              onNewSession={async () => {
+                try {
+                  const res = await fetch("/api/sessions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ demoId: params.id }),
+                  });
+                  const data = await res.json();
+                  if (!data.success) {
+                    toast({ title: "新建对话失败", variant: "destructive" });
+                    return;
+                  }
+                  setSessionInfo({
+                    sessionId: data.data.sessionId,
+                    projectId: params.id,
+                    basedOnVersion: sessionInfo.basedOnVersion,
+                    username: sessionInfo.username,
+                    tempWorkspace: data.data.tempWorkspace || "",
+                  });
+                  setAgentSessionId(`project-${params.id}-${Date.now()}`);
+                  toast({ title: "已创建新对话" });
+                } catch (error) {
+                  toast({
+                    title: "新建对话失败",
+                    description: error instanceof Error ? error.message : "未知错误",
+                    variant: "destructive",
+                  });
+                }
+              }}
             />
           </CardContent>
         </Card>

@@ -8,16 +8,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Trash2, Plus, Clock, AlertCircle } from 'lucide-react'
+import { Trash2, Plus, Clock, AlertCircle, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SessionItem {
   sessionId: string
   demoId: string
+  title?: string | null
   createdAt: number
   expiresAt: number
   isExpired: boolean
+  messageCount: number
+  lastMessageAt: number
+  hasUnsavedChanges: boolean
 }
 
 interface HistoryDialogProps {
@@ -146,19 +151,30 @@ export function HistoryDialog({
                     }}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium truncate">
-                          {formatTime(session.createdAt)}
+                          {session.title || formatTime(session.createdAt)}
                         </span>
                         {session.isExpired && (
-                          <span className="flex items-center gap-1 text-xs text-orange-500">
-                            <AlertCircle className="h-3 w-3" />
+                          <Badge variant="outline" className="text-orange-500 text-[10px] px-1.5 py-0">
+                            <AlertCircle className="h-3 w-3 mr-0.5" />
                             已过期
-                          </span>
+                          </Badge>
+                        )}
+                        {session.hasUnsavedChanges && !session.isExpired && (
+                          <Badge variant="outline" className="text-yellow-600 text-[10px] px-1.5 py-0">
+                            未保存
+                          </Badge>
+                        )}
+                        {session.messageCount > 0 && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            <MessageSquare className="h-3 w-3 mr-0.5" />
+                            {session.messageCount}
+                          </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        Session: {session.sessionId.slice(0, 16)}...
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {session.title ? formatTime(session.createdAt) : `Session: ${session.sessionId.slice(0, 16)}...`}
                       </p>
                     </div>
                     <Button

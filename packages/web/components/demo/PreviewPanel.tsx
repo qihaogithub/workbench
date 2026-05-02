@@ -185,7 +185,7 @@ export function PreviewPanel({
     const compile = async () => {
       try {
         const body = sessionId
-          ? { sessionId }
+          ? { sessionId, code }
           : { code };
 
         const response = await fetch("/api/compile", {

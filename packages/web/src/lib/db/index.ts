@@ -1,15 +1,22 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import { initializeDatabase } from './schema';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'users.db');
 
 let db: Database.Database | null = null;
+let initialized = false;
 
 export function getDb(): Database.Database {
   if (!db) {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');  // 提升并发性能
     db.pragma('foreign_keys = ON');
+
+    if (!initialized) {
+      initializeDatabase();
+      initialized = true;
+    }
   }
   return db;
 }

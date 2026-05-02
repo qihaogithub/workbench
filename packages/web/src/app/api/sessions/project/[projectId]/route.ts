@@ -9,6 +9,8 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import fs from "fs";
 import path from "path";
 
+const MESSAGES_FILE = ".messages.json";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { projectId: string } },
@@ -55,12 +57,34 @@ export async function GET(
 
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+
+        let messageCount = 0;
+        let lastMessageAt = meta.createdAt;
+        const messagesPath = path.join(projectSessionsDir, dir.name, MESSAGES_FILE);
+        if (fs.existsSync(messagesPath)) {
+          try {
+            const messages = JSON.parse(fs.readFileSync(messagesPath, "utf-8"));
+            if (Array.isArray(messages)) {
+              messageCount = messages.length;
+              if (messages.length > 0 && messages[messages.length - 1].timestamp) {
+                lastMessageAt = messages[messages.length - 1].timestamp;
+              }
+            }
+          } catch {
+            // 忽略消息文件解析错误
+          }
+        }
+
         sessions.push({
           sessionId: meta.sessionId,
           demoId: meta.demoId,
+          title: meta.title || null,
           createdAt: meta.createdAt,
           expiresAt: meta.expiresAt,
           isExpired: Date.now() > meta.expiresAt,
+          messageCount,
+          lastMessageAt,
+          hasUnsavedChanges: meta.status === "editing",
         });
       } catch {
         continue;

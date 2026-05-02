@@ -48,6 +48,7 @@ interface PromptInputContextValue {
   status: 'idle' | 'loading' | 'streaming'
   setStatus: (status: 'idle' | 'loading' | 'streaming') => void
   onSubmit?: (message: PromptInputMessage) => void
+  onCancel?: () => void
   maxFiles?: number
   maxSize?: number
   accept?: string
@@ -96,6 +97,7 @@ export function usePromptInputAttachments() {
 interface PromptInputProps
   extends Omit<React.HTMLAttributes<HTMLFormElement>, 'onSubmit'> {
   onSubmit?: (message: PromptInputMessage) => void
+  onCancel?: () => void
   status?: 'idle' | 'loading' | 'streaming'
   maxFiles?: number
   maxSize?: number
@@ -107,6 +109,7 @@ interface PromptInputProps
 export function PromptInput({
   children,
   onSubmit,
+  onCancel,
   status = 'idle',
   maxFiles = 5,
   maxSize = 10 * 1024 * 1024,
@@ -218,6 +221,7 @@ export function PromptInput({
     status: internalStatus,
     setStatus: setInternalStatus,
     onSubmit: handleSubmit,
+    onCancel,
     maxFiles,
     maxSize,
     accept,
@@ -428,6 +432,10 @@ export function PromptInputSubmit({
   const status = propStatus || context.status
 
   const handleClick = () => {
+    if (status === 'streaming') {
+      context.onCancel?.()
+      return
+    }
     if (status === 'idle' && (context.text.trim() || context.files.length > 0)) {
       context.onSubmit?.({ text: context.text.trim(), files: context.files })
       context.setText('')

@@ -5,17 +5,74 @@ import {
   createApiSuccess,
   createApiError,
   getSessionPath,
+  getSessionMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { getAgentClient } from "@/lib/agent-client";
 import fs from "fs";
 import path from "path";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: { sessionId: string } },
+) {
+  try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
+    const { sessionId } = params;
+
+    if (!sessionExists(sessionId)) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    const meta = getSessionMeta(sessionId);
+    if (!meta) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    if (meta.userId && meta.userId !== payload.userId) {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "无权访问其他用户的 Session"),
+        { status: 403 },
+      );
+    }
+
+    return NextResponse.json(
+      createApiSuccess({
+        ...meta,
+        isExpired: Date.now() > meta.expiresAt,
+      }),
+    );
+  } catch (error) {
+    console.error("Error getting session:", error);
+    return NextResponse.json(
+      createApiError("FILE_READ_ERROR", "获取 Session 信息失败"),
+      { status: 500 },
+    );
+  }
+}
 
 export async function DELETE(
   _request: Request,
   { params }: { params: { sessionId: string } },
 ) {
   try {
-    // 从 Cookie 读取 userId
     const token = getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
@@ -39,7 +96,6 @@ export async function DELETE(
       });
     }
 
-    // 验证 session 属于当前用户（安全检查）
     const sessionPath = getSessionPath(sessionId);
     const metaPath = path.join(sessionPath, ".session.json");
     if (fs.existsSync(metaPath)) {
@@ -59,6 +115,14 @@ export async function DELETE(
         createApiError("FILE_WRITE_ERROR", "删除 Session 失败"),
         { status: 500 },
       );
+    }
+
+    // 同步清理 agent-service 中的会话
+    try {
+      const agentClient = getAgentClient();
+      await agentClient.destroySession(sessionId);
+    } catch (error) {
+      console.warn("Failed to destroy session from agent-service:", error);
     }
 
     return NextResponse.json(createApiSuccess(null));
