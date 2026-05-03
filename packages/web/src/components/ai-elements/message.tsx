@@ -116,13 +116,13 @@ export function Message({
     }
   };
 
-  // 用户消息使用原有样式
+  // 用户消息使用气泡样式
   if (isUser) {
     return (
       <div className={cn("flex flex-col gap-3 group items-end min-w-0", className)}>
         {message.content && (
-          <div className="text-sm max-w-full overflow-hidden text-right">
-            <div className="whitespace-pre-wrap break-words text-foreground inline-block">
+          <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50">
+            <div className="whitespace-pre-wrap break-words">
               {message.content}
             </div>
           </div>

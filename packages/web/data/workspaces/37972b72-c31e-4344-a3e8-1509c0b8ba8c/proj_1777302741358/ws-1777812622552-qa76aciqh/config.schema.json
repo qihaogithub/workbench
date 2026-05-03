@@ -111,21 +111,6 @@
         "maxHeight": 800
       }
     },
-    "avatar": {
-      "type": "string",
-      "title": "头像图片",
-      "description": "使用 ui:widget=file 单图上传控件",
-      "default": "",
-      "ui:widget": "file",
-      "ui:options": {
-        "accept": "image/*",
-        "maxSize": 2097152,
-        "minWidth": 50,
-        "minHeight": 50,
-        "maxWidth": 500,
-        "maxHeight": 500
-      }
-    },
     "gallery": {
       "type": "array",
       "title": "图片画廊",
@@ -137,7 +122,28 @@
           "alt": { "type": "string" }
         }
       },
-      "default": [],
+      "default": [
+        {
+          "url": "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=400&h=300&fit=crop",
+          "alt": "风景图片1"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
+          "alt": "风景图片2"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=300&fit=crop",
+          "alt": "风景图片3"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop",
+          "alt": "风景图片4"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop",
+          "alt": "风景图片5"
+        }
+      ],
       "ui:widget": "imageList",
       "ui:options": {
         "accept": "image/*",
@@ -150,6 +156,6 @@
   },
   "required": ["title"],
   "$demo": {
-    "orderable": ["header", "banner", "content", "cards", "gallery", "footer"]
+    "orderable": ["header", "banner", "gallery", "content", "cards", "footer"]
   }
 }

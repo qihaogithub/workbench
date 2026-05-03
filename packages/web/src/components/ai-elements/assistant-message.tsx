@@ -223,7 +223,7 @@ export function AssistantMessage({
           return (
             <div
               key={`text-${index}`}
-              className="prose prose-sm dark:prose-invert max-w-none min-w-0"
+              className="prose prose-sm dark:prose-invert max-w-none min-w-0 text-[14px]"
             >
               <Streamdown
                 plugins={{ code, mermaid, math, cjk }}

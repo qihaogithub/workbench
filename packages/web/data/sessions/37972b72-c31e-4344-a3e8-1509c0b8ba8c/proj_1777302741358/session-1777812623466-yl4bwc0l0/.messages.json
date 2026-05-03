@@ -1,0 +1,38 @@
+[
+  {
+    "id": "user-1777812899266",
+    "role": "user",
+    "content": "你好",
+    "timestamp": 1777813248479
+  },
+  {
+    "id": "assistant-1777812911619",
+    "role": "assistant",
+    "content": "你好！我是 OpenCode Workbench 的 Demo 生成专家。\n\n我可以帮助你：\n- 创建新的 Demo 组件（React + TypeScript + Tailwind CSS）\n- 修改现有的 Demo 组件\n- 配置 Demo 的参数和属性\n\n请告诉我你想要做什么？比如：\n- \"帮我创建一个用户登录表单的 Demo\"\n- \"我想做一个数据仪表盘的 Demo\"\n- \"帮我修改现有的 Demo，添加一个按钮\"\n\n随时告诉我你的需求！",
+    "timestamp": 1777813249479
+  },
+  {
+    "id": "user-1777812986494",
+    "role": "user",
+    "content": "优化这个页面，使其更美观，删除头像图片，因为头像和横幅用的相同的配置控件，这个demo目标是全貌展示配置面板不同控件类型",
+    "timestamp": 1777813250479
+  },
+  {
+    "id": "assistant-1777813224116",
+    "role": "assistant",
+    "content": "理解了你的需求：\n1. 删除头像图片（avatar）相关功能\n2. 优化页面使其更美观\n3. 目标是展示配置面板不同控件类型\n\n让我先更新 config.schema.json 删除 avatar，然后优化 index.tsx。\n\n已完成优化，主要修改：\n\n**config.schema.json**\n- 删除了 `avatar` 头像图片配置项\n\n**index.tsx**\n- 删除了 `avatar` 相关 Props 和渲染逻辑\n- 优化了标题区域布局，去掉了头像后更简洁\n- 调整",
+    "timestamp": 1777813251479
+  },
+  {
+    "id": "user-1777813227116",
+    "role": "user",
+    "content": "继续",
+    "timestamp": 1777813252479
+  },
+  {
+    "id": "assistant-1777813254479",
+    "role": "assistant",
+    "content": "你好！我刚完成了第一轮优化（删除头像、调整样式）。\n\n关于\"继续\"，我想确认一下你的具体需求：\n\n**你希望我在哪个方向继续优化？**\n\nA. 继续美化页面视觉效果（如添加更多装饰元素、改进色彩层次、优化动画效果）\n\nB. 调整配置控件的展示方式（如增加更多控件类型的示例、重新组织布局结构）\n\nC. 其他具体需求（请告诉我）\n\n请告诉我你的选择，或者描述你想要的效果！",
+    "timestamp": 1777813253479
+  }
+]
