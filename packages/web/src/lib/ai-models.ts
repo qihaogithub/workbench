@@ -40,11 +40,11 @@ export type ResolvedModel = {
 export const MODEL_CONFIGS: ModelConfig[] = [
   // === OpenCode Zen 白名单 ===
   // Nemotron 3 Super(含 low/medium/high 推理变体)
-  { matcher: /nemotron/i },
+  { matcher: /nemotron/i, alias: "Nemotron 3 Super" },
   // MiniMax M2.5
-  { matcher: /minimax/i },
+  { matcher: /minimax/i, alias: "MiniMax M2.5" },
   // Hy3 preview(含 low/medium/high 推理变体)
-  { matcher: /hy3/i },
+  { matcher: /hy3/i, alias: "Hy3 preview" },
 
   // === 其他全部禁用 ===
   { matcher: /.*/, enabled: false },
