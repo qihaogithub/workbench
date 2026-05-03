@@ -79,20 +79,20 @@ export default function Demo({
       </div>
     ) : null,
 
-    banner: bannerUrl ? (
+    banner: (
       <div className="mb-12">
         <div
           className="overflow-hidden bg-gray-100 shadow-sm"
           style={{ borderRadius }}
         >
           <img
-            src={bannerUrl}
+            src={bannerUrl || 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=1200&h=400&fit=crop'}
             alt="banner"
             className={`w-full h-64 object-cover ${transitionClass} hover:scale-[1.02]`}
           />
         </div>
       </div>
-    ) : null,
+    ),
 
     content: (textContent || richtextContent) ? (
       <div

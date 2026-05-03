@@ -100,7 +100,7 @@
       "type": "string",
       "title": "横幅图片",
       "description": "使用 ui:widget=file 单图上传控件",
-      "default": "",
+      "default": "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=1200&h=400&fit=crop",
       "ui:widget": "file",
       "ui:options": {
         "accept": "image/*",
