@@ -420,16 +420,41 @@ stream.on("models", (event: StreamEvent) => {
 });
 ```
 
-- [ ] **Step 2: 检查并按需修复第 484 行附近的 `set_model` 响应处理**
+- [ ] **Step 2: 修改第 482-490 行的另一处 `stream.on("models", ...)` 处理(在聊天消息流 `streamRef` 上)**
 
-用 Read 工具读取 `packages/web/src/components/ai-elements/ai-chat.tsx` 第 478-498 行,定位另一处 `setModelState((prev) => ({ ... }))`。判断标准:
-
-- 若该处**仅更新 `currentModelId` / `isLoading` 等字段、不传 `models`** → 无需改动,跳过本步。
-- 若该处**给 `models` 赋值并使用了 `event.models`** → 同样需要包一层 `applyModelConfigs`,改为:
+将第 482-490 行:
 
 ```typescript
-models: event.models ? applyModelConfigs(event.models) : prev.models,
+      // 监听模型列表更新
+      stream.on("models", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
+        setModelState((prev) => ({
+          currentModelId: event.currentModelId || prev.currentModelId,
+          models: event.models ?? prev.models,
+          canSwitch: event.canSwitch ?? prev.canSwitch,
+          isLoading: false,
+        }));
+      });
 ```
+
+替换为:
+
+```typescript
+      // 监听模型列表更新
+      stream.on("models", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
+        setModelState((prev) => ({
+          currentModelId: event.currentModelId || prev.currentModelId,
+          models: event.models ? applyModelConfigs(event.models) : prev.models,
+          canSwitch: event.canSwitch ?? prev.canSwitch,
+          isLoading: false,
+        }));
+      });
+```
+
+(此处与 Task 3.2 Step 1 是镜像处理:聊天消息流和持久模型流都可能收到 `models` 事件,均需走配置过滤。)
+
+不需要修改第 915 行附近的 `setModelState((prev) => ({ ...prev, isLoading: false }))` —— 它不涉及 `models` 字段。
 
 - [ ] **Step 3: 跑 typecheck**
 
@@ -488,7 +513,7 @@ pnpm dev:web
 3. 选中带 alias 的多模态模型(例如 `Claude Sonnet 4.5`)→ **预期**:输入区显示图片按钮
 4. 切换到非多模态模型(若没有则临时把某模型 `supportsImages` 设为 false 测试)→ **预期**:图片按钮消失
 5. 后端返回但 `enabled:false` 的模型(如 `o1-preview`)→ **预期**:不出现在下拉框中
-6. 后端返回未配置的模型 → **预期**:出现在下拉框,显示后端原始 label,且图片按钮在选中它时隐藏
+6. 后端返回未配置的模型 → **预期**:出现在下拉,显示后端原始 label,且图片按钮在选中它时隐藏
 
 - [ ] **Step 5: 提交**
 
