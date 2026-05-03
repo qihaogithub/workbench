@@ -1,15 +1,11 @@
 /**
- * AI 模型前端配置表
+ * AI 模型前端配置表(白名单模式)
  *
  * 维护规则:
- * - 添加新模型:在 MODEL_CONFIGS 中追加一条,matcher 用正则覆盖日期/版本变体
- * - 禁用某家族:在配置中加 `enabled: false`
- * - 自定义展示名:在配置中加 `alias`
- * - 标记多模态:在配置中加 `supportsImages: true`
- *
- * 后端返回但未在此处配置的模型:
- * - 默认显示在下拉框中(`enabled = true`)
- * - 默认按非多模态处理(`supportsImages = false`)
+ * - 添加新模型:在 catch-all 之前追加一条,matcher 用正则覆盖 id 变体
+ * - 标记多模态:在条目中加 `supportsImages: true`
+ * - 自定义展示名:在条目中加 `alias`(否则使用后端 label)
+ * - 末尾的 catch-all `{ matcher: /.*\/, enabled: false }` 禁用所有未列入白名单的模型
  */
 
 export type ModelMatcher = RegExp | string;
@@ -37,28 +33,21 @@ export type ResolvedModel = {
 };
 
 /**
- * 模型配置表 — 维护此数组以管控前端可见模型
+ * 模型配置表 — 仅放行白名单内的模型
  *
- * 列表顺序即匹配优先级,首个命中的配置生效。
+ * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
  */
 export const MODEL_CONFIGS: ModelConfig[] = [
-  // === Claude 系列(全部多模态)===
-  { matcher: /^claude-sonnet-4-5/, alias: "Claude Sonnet 4.5", supportsImages: true },
-  { matcher: /^claude-opus-4-7/, alias: "Claude Opus 4.7", supportsImages: true },
-  { matcher: /^claude-haiku-4-5/, alias: "Claude Haiku 4.5", supportsImages: true },
+  // === OpenCode Zen 白名单 ===
+  // Nemotron 3 Super(含 low/medium/high 推理变体)
+  { matcher: /nemotron/i },
+  // MiniMax M2.5
+  { matcher: /minimax/i },
+  // Hy3 preview(含 low/medium/high 推理变体)
+  { matcher: /hy3/i },
 
-  // === OpenAI 系列 ===
-  { matcher: /^gpt-4o/, alias: "GPT-4o", supportsImages: true },
-  { matcher: /^gpt-5/, alias: "GPT-5", supportsImages: true },
-  // o1 暂不启用(无 ACP 后端稳定支持)
-  { matcher: /^o1$|^o1-/, enabled: false },
-
-  // === Gemini 系列 ===
-  { matcher: /^gemini-2/, alias: "Gemini 2", supportsImages: true },
-
-  // === 国内多模态 ===
-  { matcher: /^qwen-vl|^qwen3-vl/, alias: "Qwen VL", supportsImages: true },
-  { matcher: /^kimi-vl/, alias: "Kimi VL", supportsImages: true },
+  // === 其他全部禁用 ===
+  { matcher: /.*/, enabled: false },
 ];
 
 export function matchesId(matcher: ModelMatcher, id: string): boolean {
