@@ -434,6 +434,22 @@ export function AIChat({
         });
       });
 
+      // Agent 初始化完成后获取模型列表
+      let modelsRequested = false;
+      stream.on("status", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
+        if (
+          !modelsRequested &&
+          (event.status === "processing" || event.status === "ready")
+        ) {
+          modelsRequested = true;
+          const ws = (stream as any).ws;
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "get_models" }));
+          }
+        }
+      });
+
       // 监听工具调用开始 - 添加新的 ToolCallPart
       stream.on("tool_call", (event: StreamEvent) => {
         if (streamSessionIdRef.current !== streamId) return;
@@ -851,6 +867,16 @@ export function AIChat({
           return;
         }
 
+        // 过滤模型列表获取的内部错误，不显示给用户
+        const isModelError =
+          event.error?.code === "SESSION_NOT_FOUND" ||
+          event.error?.code === "GET_MODELS_ERROR";
+        if (isModelError) {
+          console.warn("[AIChat] Model info error:", event.error?.message);
+          setModelState((prev) => ({ ...prev, isLoading: false }));
+          return;
+        }
+
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
           role: "assistant",
@@ -894,12 +920,6 @@ export function AIChat({
       });
 
       await connectionTimeout;
-
-      // WebSocket 连接建立后获取模型列表
-      const wsAfterConnect = (stream as any).ws;
-      if (wsAfterConnect?.readyState === WebSocket.OPEN) {
-        wsAfterConnect.send(JSON.stringify({ type: "get_models" }));
-      }
 
       // 发送消息
       console.log("[AIChat] Sending message with workingDir:", workingDir);
