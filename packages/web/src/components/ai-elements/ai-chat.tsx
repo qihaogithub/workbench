@@ -1277,13 +1277,6 @@ export function AIChat({
         <PromptInputFooter>
           <PromptInputTools>
             <PromptInputAddImage />
-            <PromptInputModelSelect
-              currentModelId={modelState.currentModelId}
-              models={modelState.models}
-              canSwitch={modelState.canSwitch}
-              onModelChange={handleModelChange}
-              isLoading={modelState.isLoading}
-            />
             <Button
               variant="ghost"
               size="icon"
@@ -1299,6 +1292,13 @@ export function AIChat({
             >
               <History className="h-4 w-4" />
             </Button>
+            <PromptInputModelSelect
+              currentModelId={modelState.currentModelId}
+              models={modelState.models}
+              canSwitch={modelState.canSwitch}
+              onModelChange={handleModelChange}
+              isLoading={modelState.isLoading}
+            />
           </PromptInputTools>
           <PromptInputSubmit />
         </PromptInputFooter>
