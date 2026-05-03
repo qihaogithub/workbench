@@ -559,7 +559,8 @@ export function PromptInputAddImage({
 
 interface PromptInputModelSelectProps {
   currentModelId: string
-  models: Array<{ id: string; label: string }>
+  /** 模型列表;可选携带 supportsImages 用于上层逻辑,本组件 UI 不消费该字段 */
+  models: Array<{ id: string; label: string; supportsImages?: boolean }>
   canSwitch: boolean
   onModelChange: (modelId: string) => void
   isLoading: boolean
