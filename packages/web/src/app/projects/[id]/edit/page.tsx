@@ -33,6 +33,7 @@ interface EditSessionInfo {
   basedOnVersion: string;
   username: string;
   tempWorkspace: string;
+  workspaceId: string;
 }
 
 export default function ProjectEditPage({ params }: { params: { id: string } }) {
@@ -71,7 +72,19 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
       basedOnVersion: basedOn,
       username,
       tempWorkspace: searchParams.get('workspace') || '',
+      workspaceId: '',
     });
+
+    fetch(`/api/sessions/${sessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setSessionInfo((prev) =>
+            prev ? { ...prev, workspaceId: data.data.workspaceId || '' } : prev,
+          );
+        }
+      })
+      .catch(() => {});
 
     // 创建 Agent 会话
     try {
@@ -188,6 +201,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
               agentSessionId={agentSessionId}
               workingDir={sessionInfo.tempWorkspace}
               projectId={params.id}
+              workspaceId={sessionInfo.workspaceId || undefined}
               currentSessionId={sessionInfo.sessionId}
               onFilesChange={(files) => setFileChanges(files.length)}
               onSelectSession={async (newSessionId) => {
@@ -223,6 +237,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                     basedOnVersion: sessionInfo.basedOnVersion,
                     username: sessionInfo.username,
                     tempWorkspace: sessionInfo.tempWorkspace,
+                    workspaceId: sessionInfo.workspaceId,
                   });
                   setAgentSessionId(`project-${params.id}-${Date.now()}`);
                   toast({ title: "已切换会话" });
@@ -256,6 +271,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                     basedOnVersion: sessionInfo.basedOnVersion,
                     username: sessionInfo.username,
                     tempWorkspace: data.data.tempWorkspace || "",
+                    workspaceId: data.data.workspaceId || "",
                   });
                   setAgentSessionId(`project-${params.id}-${Date.now()}`);
                   toast({ title: "已创建新对话" });

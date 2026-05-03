@@ -2,7 +2,7 @@
 
 > 项目代号：AI对话区 Markdown 渲染优化
 > 维护者：前端团队
-> 状态：进行中（阶段一、二已完成，进入阶段三）
+> 状态：✅ 已完成（阶段一、二、三全部完成）
 
 ***
 
@@ -216,11 +216,76 @@ AIChat (ai-chat.tsx)
 | 排版与间距优化（代码块头部、行内代码、列表缩进、引用块）                 | 阶段一    | ✅  |
 | 细节打磨（链接、分隔线、表格内边距、按钮交互）                      | 阶段二    | ✅  |
 
-### 进行中
+### 阶段三：已完成 ✅
 
-| 任务                           | 阶段   | 状态     |
-| ---------------------------- | ---- | ------ |
-| 修复内容溢出对话框                    | 阶段三  | ⚠️ 待实施 |
-| 修复列表无项目符号                    | 阶段三  | ⚠️ 待实施 |
-| 修正代码块头部选择器（阶段一 CSS 未生效需调整）   | 阶段三  | ⚠️ 待实施 |
-| 修正链接样式选择器（阶段二 CSS 未生效需调整）     | 阶段三  | ⚠️ 待实施 |
+| 任务                           | 阶段   | 状态  |
+| ---------------------------- | ---- | --- |
+| 修复内容溢出对话框                    | 阶段三  | ✅  |
+| 修复列表无项目符号                    | 阶段三  | ✅  |
+| 修正代码块头部选择器                   | 阶段三  | ✅  |
+| 修正链接样式选择器                    | 阶段三  | ✅  |
+| 修复 Tailwind 扫描配置（v3/v4 语法混用）   | 阶段三  | ✅  |
+
+***
+
+## 七、阶段三根因与修复总结
+
+### 7.1 根因 1：Tailwind v3 不支持 `@source` 指令
+
+**问题**：[globals.css](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/src/app/globals.css) 顶部使用了 `@source "../node_modules/streamdown/dist/*.js";` 指令试图让 Tailwind 扫描 streamdown 包内部的 `className`，但项目使用的是 **Tailwind v3.4**，`@source` 是 Tailwind v4 的指令，在 v3 中被静默忽略。
+
+**结果**：streamdown 内部使用的 `list-disc`、`list-decimal`、`flex` 等 class 没有被生成到最终的 CSS 中，导致列表无项目符号、代码块头部布局异常。
+
+**修复**：将扫描路径迁移到 [tailwind.config.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/tailwind.config.ts) 的 `content` 数组（v3 标准做法）：
+
+```ts
+content: [
+  './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+  './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+  './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  './components/**/*.{js,ts,jsx,tsx,mdx}',
+  './node_modules/streamdown/dist/**/*.js',
+  './node_modules/@streamdown/code/dist/**/*.js',
+  './node_modules/@streamdown/mermaid/dist/**/*.js',
+  './node_modules/@streamdown/math/dist/**/*.js',
+  './node_modules/@streamdown/cjk/dist/**/*.js',
+],
+```
+
+同时移除 globals.css 中无效的 `@source` 指令。
+
+### 7.2 根因 2：data-streamdown 选择器写错
+
+阶段一/二 CSS 中使用了**错误的 data-streamdown 值**（凭直觉猜测，未查证 streamdown 源码）：
+
+| 错误选择器（阶段一/二）                            | 正确选择器                                 | 修复影响                |
+| ----------------------------------------- | ------------------------------------- | ------------------- |
+| `[data-streamdown="code"]`                | `[data-streamdown="code-block"]`      | 代码块工具栏按钮的 hover 样式 |
+| `[data-streamdown="code"] > div:first-child` | `[data-streamdown="code-block-header"]` | 代码块头部不换行             |
+| `[data-streamdown="code-inline"]`         | `[data-streamdown="inline-code"]`     | 行内代码背景色与边框          |
+| `[data-streamdown="hr"]`                  | `[data-streamdown="horizontal-rule"]` | 分隔线加粗               |
+| `.prose a`                                | `[data-streamdown="link"]`            | 链接颜色                |
+
+**为什么 `.prose a` 不匹配链接**：streamdown 在启用 link safety 时将链接渲染为 `<button type="button">`（而非 `<a>`），用于触发安全确认弹窗。
+
+### 7.3 根因 3：链接颜色与正文同色
+
+streamdown 默认给链接添加 `text-primary` class，但深色主题下：
+- `--primary: 0 0% 90%`（浅灰）
+- `--foreground: 0 0% 98%`（白）
+
+两个值过于接近，链接看不出区别。修复：直接为 `[data-streamdown="link"]` 指定蓝色 `hsl(217 91% 65%)`。
+
+### 7.4 根因 4：内容溢出对话框
+
+streamdown 的 `code-block-body` 已自带 `overflow-x-auto`，但 `code-block` 容器（`flex w-full`）和 `table-wrapper` 没有 `max-width: 100%` 与 `overflow-x: auto` 的双重保险。当父级是 flex/grid 容器时，子元素默认 `min-width: auto`（≈内容宽度），会撑破布局。
+
+修复：为 `code-block`、`code-block-body`、`table-wrapper`、`image` 显式添加 `max-width: 100% !important; min-width: 0 !important;`。
+
+### 7.5 验证
+
+- ✅ `pnpm --filter @opencode-workbench/web lint` 通过（仅有项目原有的 React Hook 与 `<img>` 警告）
+- ✅ `pnpm --filter @opencode-workbench/web typecheck` 通过
+- ✅ `pnpm --filter @opencode-workbench/web build` CSS 编译成功（`/login` 预渲染错误为既存问题，与本次修改无关）
+
+> **注**：视觉效果需在浏览器中由用户最终验证。所有 CSS 选择器均已查证 streamdown v2.5.0 源码 (`packages/web/node_modules/streamdown/dist/chunk-BO2N2NFS.js`)，确认 `data-streamdown` 属性值正确。

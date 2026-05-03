@@ -331,6 +331,12 @@ function FieldRenderer({
 
         return (
           <div className="flex items-center gap-3 w-full">
+            <div className="min-w-[60px] text-left shrink-0">
+              <span className="font-mono text-sm font-medium text-foreground">
+                {currentValue}
+                {unit}
+              </span>
+            </div>
             <div className="flex-1 min-w-[120px]">
               <Slider
                 value={[currentValue]}
@@ -339,12 +345,6 @@ function FieldRenderer({
                 step={field.type === "integer" ? 1 : 0.1}
                 onValueChange={(vals: number[]) => onChange(vals[0])}
               />
-            </div>
-            <div className="min-w-[60px] text-right shrink-0">
-              <span className="font-mono text-sm font-medium text-foreground">
-                {currentValue}
-                {unit}
-              </span>
             </div>
           </div>
         );
@@ -432,7 +432,12 @@ function FieldRenderer({
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
     field.uiWidget === "richtext" ||
-    field.type === "array";
+    field.type === "array" ||
+    (field.maxLength !== undefined && field.maxLength > 100);
+
+  const isTextareaField =
+    field.uiWidget === "richtext" ||
+    (field.maxLength !== undefined && field.maxLength > 100);
 
   return (
     <div
@@ -443,7 +448,7 @@ function FieldRenderer({
           : "flex items-center gap-2",
       )}
     >
-      {!isComplexField && (
+      {(isComplexField || !isTextareaField) && (
         <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
           {field.title}
           {field.required && <span className="text-red-500 ml-0.5">*</span>}

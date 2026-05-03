@@ -66,6 +66,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const [sessionId, setSessionId] = useState("");
+  const [workspaceId, setWorkspaceId] = useState("");
   const [tempWorkspace, setTempWorkspace] = useState("");
   const [previewSize, setPreviewSize] =
     useState<import("../../../../../components/demo/types").PreviewSize>();
@@ -173,6 +174,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         console.log("[loadDemo] Session 创建成功, sessionId:", sessionData.data.sessionId);
         setSessionId(sessionData.data.sessionId);
+        setWorkspaceId(sessionData.data.workspaceId || "");
         setTempWorkspace(sessionData.data.tempWorkspace || "");
 
         const filesRes = await fetch(
@@ -595,6 +597,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   agentSessionId={agentSessionId}
                   workingDir={tempWorkspace || undefined}
                   projectId={demoId}
+                  workspaceId={workspaceId || undefined}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
                   externalMessages={aiMessages}
@@ -623,6 +626,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         return;
                       }
                       setSessionId(data.data.sessionId);
+                      setWorkspaceId(data.data.workspaceId || "");
                       setTempWorkspace(data.data.tempWorkspace || "");
                       setAgentSessionId(`demo-${demoId}-${Date.now()}`);
                       setAiMessages([]);

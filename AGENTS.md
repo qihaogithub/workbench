@@ -314,6 +314,7 @@ packages/
 - [React高频事件状态覆盖.md](docs/plans/归档/经验/React高频事件状态覆盖.md) — React 受控模式 Bug、useRef 同步追踪
 - [Sandpack集成经验.md](docs/plans/归档/经验/Sandpack集成经验.md) — Sandpack 配置陷阱、依赖管理方案
 - [配置与工作空间管理.md](docs/plans/归档/经验/配置与工作空间管理.md) — 配置单一来源、workingDir 链路、文件同步
+- [Streamdown集成经验.md](docs/plans/归档/经验/Streamdown集成经验.md) — Tailwind v3/v4 语法混用、data-streamdown 选择器、flex 子元素溢出
 
 ## 注意事项
 - 无 Cursor/Copilot 规则文件
