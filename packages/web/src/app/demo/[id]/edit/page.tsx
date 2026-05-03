@@ -38,12 +38,6 @@ import {
   CheckCircle2,
   ImageIcon,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 
 interface DemoEditPageProps {
@@ -555,21 +549,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               {demoName || demoId}
             </h1>
           )}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setCoverDialogOpen(true)}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>设置封面图</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setCoverDialogOpen(true)}
+          >
+            <ImageIcon className="h-4 w-4" />
+            <span className="text-xs">设置封面</span>
+          </Button>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>

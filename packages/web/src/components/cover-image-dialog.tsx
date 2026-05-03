@@ -7,12 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
 import { uploadCover, deleteCover } from '@/lib/api'
-import { ImagePlus, Trash2, Upload, Loader2 } from 'lucide-react'
+import { ImagePlus, Trash2, RefreshCcw, Loader2 } from 'lucide-react'
 
 interface CoverImageDialogProps {
   open: boolean
@@ -117,86 +116,94 @@ export function CoverImageDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
-            {currentThumbnail ? (
+          {currentThumbnail ? (
+            <div
+              className={`relative aspect-video rounded-md overflow-hidden border-2 border-dashed transition-colors ${
+                isDragOver
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <img
                 src={currentThumbnail}
                 alt="封面图预览"
                 className="h-full w-full object-cover"
               />
-            ) : (
+              <div className="absolute top-2 right-2 flex gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessing}
+                  title="重新上传"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background text-destructive hover:text-destructive"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  title="删除封面图"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className={`relative aspect-video rounded-md overflow-hidden border-2 border-dashed transition-colors cursor-pointer ${
+                isDragOver
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25 hover:border-primary/50'
+              }`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <div className="flex h-full items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <ImagePlus className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">暂无封面图</p>
-                </div>
+                {isUploading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    上传中...
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground">
+                    <ImagePlus className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">点击或拖拽上传封面图</p>
+                    <p className="text-xs mt-1 opacity-60">
+                      支持 JPG / PNG / WebP，最大 5MB，建议 16:9 比例
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div
-            className={`border-2 border-dashed rounded-md p-6 text-center transition-colors cursor-pointer ${
-              isDragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary/50'
-            }`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isUploading ? (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                上传中...
-              </div>
-            ) : (
-              <>
-                <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
-                <p className="text-sm text-muted-foreground">
-                  点击或拖拽上传封面图
-                </p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  支持 JPG / PNG / WebP，最大 5MB，建议 16:9 比例
-                </p>
-              </>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  handleFileSelect(file)
-                }
-                e.target.value = ''
-              }}
-            />
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-destructive hover:text-destructive"
-            onClick={handleDelete}
-            disabled={isProcessing || !currentThumbnail}
-          >
-            {isDeleting ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            删除封面图
-          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) {
+                handleFileSelect(file)
+              }
+              e.target.value = ''
+            }}
+          />
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            关闭
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -135,6 +135,7 @@ import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
   - 组件位于 `src/components/ui/` 目录
   - 使用 `npx shadcn@latest add <component>` 添加新组件
   - 基于 Radix UI 原语 + `class-variance-authority` 变体系统
+- **图标库**：[lucide.dev/icons](https://lucide.dev/icons)
 - **AI 组件库**：[AI Elements](https://ai.sdk.dev/)
   - 使用 `npx ai-elements@latest add <component>` 添加 AI 相关组件
   - 依赖 shadcn/ui 基础架构，必须在 shadcn/ui 初始化后才能使用
