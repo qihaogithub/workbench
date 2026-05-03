@@ -12,9 +12,11 @@ import { useDemos, createDemo, deleteDemo } from '@/lib/api'
 import { useToast } from '@/components/ui/toast-provider'
 import type { DemoMeta } from '@opencode-workbench/shared'
 
-export function HomePage() {
+export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const router = useRouter()
-  const { demos, isLoading, error, revalidate } = useDemos()
+  const { demos, error, revalidate } = useDemos({
+    fallbackData: initialDemos,
+  })
   const { toast } = useToast()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -102,16 +104,7 @@ export function HomePage() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[280px] rounded-lg bg-muted animate-pulse"
-            />
-          ))}
-        </div>
-      ) : filteredDemos.length === 0 ? (
+      {filteredDemos.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
           <div className="text-muted-foreground text-lg">
             {searchQuery ? '没有找到匹配的 Demo' : '暂无 Demo'}

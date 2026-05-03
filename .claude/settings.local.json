@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(rm \"E:/重要文件/Programming/1_Work/opencode工作台/docs/项目文档/Web前端/会话管理/技术/02_生命周期设计.md\")",
-      "Bash(rm \"E:/重要文件/Programming/1_Work/opencode工作台/docs/项目文档/Web前端/会话管理/技术/03_草稿工作区.md\")"
+      "Bash(rm \"E:/重要文件/Programming/1_Work/opencode工作台/docs/项目文档/Web前端/会话管理/技术/03_草稿工作区.md\")",
+      "Read(//private/tmp/**)"
     ]
   }
 }

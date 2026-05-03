@@ -7,12 +7,15 @@ const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
   return res.json()
 }
 
-export function useDemos() {
+export function useDemos(options?: { fallbackData?: DemoMeta[] }) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     '/api/demos',
     () => fetcher<DemoMeta[]>('/api/demos'),
     {
       revalidateOnFocus: false,
+      fallbackData: options?.fallbackData
+        ? { success: true as const, data: options.fallbackData }
+        : undefined,
     }
   )
 
