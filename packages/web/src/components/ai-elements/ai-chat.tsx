@@ -77,6 +77,7 @@ interface AIChatProps {
   agentSessionId: string;
   workingDir?: string;
   projectId?: string;
+  workspaceId?: string;
   onCodeUpdate?: (code: string) => void;
   onSchemaUpdate?: (schema: string) => void;
   onFilesChange?: (
@@ -90,8 +91,8 @@ interface AIChatProps {
   onIsStreamingChange?: (isStreaming: boolean) => void;
   onStreamContentChange?: (content: string) => void;
   onCurrentMessageChange?: (message: ChatMessage) => void;
-  onNewSession?: () => void;
-  onSelectSession?: (sessionId: string) => void;
+  onNewSession?: (workspaceId?: string) => void;
+  onSelectSession?: (sessionId: string, workspaceId?: string) => void;
   currentSessionId?: string;
 }
 
@@ -106,6 +107,7 @@ export function AIChat({
   agentSessionId,
   workingDir,
   projectId,
+  workspaceId,
   onCodeUpdate,
   onSchemaUpdate,
   onFilesChange,
@@ -1188,6 +1190,7 @@ export function AIChat({
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
         projectId={projectId || sessionId}
+        workspaceId={workspaceId}
         currentSessionId={currentSessionId}
         onSelectSession={onSelectSession || (() => {})}
         onNewSession={onNewSession || (() => {})}

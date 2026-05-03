@@ -18,9 +18,10 @@ export interface SessionMeta {
   title?: string;
   createdAt: number;
   expiresAt: number;
-  status?: 'editing' | 'saved' | 'discarded';
+  status?: 'editing' | 'saved' | 'discarded' | 'archived';
   basedOnVersion?: string;
   opencodeSessionId?: string | null;
+  workspaceId?: string;
 }
 
 export interface ApiSuccessResponse<T> {

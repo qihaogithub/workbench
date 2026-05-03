@@ -606,12 +606,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   onStreamContentChange={setAiStreamContent}
                   onCurrentMessageChange={setAiCurrentMessage}
                   currentSessionId={sessionId}
-                  onNewSession={async () => {
+                  onNewSession={async (existingWorkspaceId) => {
                     try {
+                      const body: Record<string, unknown> = { demoId, forceNew: true };
+                      if (existingWorkspaceId) {
+                        body.workspaceId = existingWorkspaceId;
+                      }
                       const res = await fetch("/api/sessions", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ demoId, forceNew: true }),
+                        body: JSON.stringify(body),
                       });
                       const data = await res.json();
                       if (!data.success) {
@@ -625,15 +629,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       setAiCurrentMessage({ role: "assistant", content: "", parts: [] });
                       setAiIsStreaming(false);
                       setAiStreamContent("");
-                      setCode(data.data.code || "");
-                      setSchema(data.data.schema || "");
-                      setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
-                      const defaults = getDefaultValues(data.data.schema || "");
-                      setConfigData(defaults);
-                      const result = validateAll(data.data.code || "", data.data.schema || "");
-                      setValidationResult(result);
-                      const size = getPreviewSize(data.data.schema || "");
-                      setPreviewSize(size);
+                      if (!existingWorkspaceId) {
+                        setCode(data.data.code || "");
+                        setSchema(data.data.schema || "");
+                        setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
+                        const defaults = getDefaultValues(data.data.schema || "");
+                        setConfigData(defaults);
+                        const result = validateAll(data.data.code || "", data.data.schema || "");
+                        setValidationResult(result);
+                        const size = getPreviewSize(data.data.schema || "");
+                        setPreviewSize(size);
+                      }
                       toast({ title: "已创建新对话" });
                     } catch (error) {
                       toast({
@@ -649,7 +655,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         await fetch(`/api/sessions/${sessionId}/meta`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ status: "archived" }),
+                          body: JSON.stringify({ status: "discarded" }),
                         });
                       }
 
@@ -669,19 +675,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         toast({ title: "会话已过期", variant: "destructive" });
                         return;
                       }
-                      const filesRes = await fetch(`/api/sessions/${newSessionId}/files`);
-                      const filesData = await filesRes.json();
-                      if (filesData.success && filesData.data) {
-                        setCode(filesData.data.code);
-                        setSchema(filesData.data.schema);
-                        setEditorContent(buildFigmaText(filesData.data.code, filesData.data.schema));
-                        const defaults = getDefaultValues(filesData.data.schema);
-                        setConfigData(defaults);
-                        const result = validateAll(filesData.data.code, filesData.data.schema);
-                        setValidationResult(result);
-                        const size = getPreviewSize(filesData.data.schema);
-                        setPreviewSize(size);
-                      }
+
                       const messagesRes = await fetch(`/api/sessions/${newSessionId}/messages`);
                       const messagesData = await messagesRes.json();
                       setAiMessages(messagesData.success ? (messagesData.data || []) : []);
@@ -697,7 +691,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         setAgentSessionId(`demo-${demoId}-${Date.now()}`);
                       }
                       setSessionId(newSessionId);
-                      setTempWorkspace(filesData.data?.workspacePath || "");
                       toast({ title: "已切换会话" });
                     } catch (error) {
                       toast({
@@ -801,6 +794,7 @@ ${"=== END ==="}`}
             <ScrollArea className="flex-1">
               <div className="p-4">
                 <ConfigForm
+                  key={schema}
                   schema={schema}
                   onChange={handleConfigChange}
                   initialData={configData}

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 interface SessionItem {
   sessionId: string
   demoId: string
+  workspaceId?: string | null
   title?: string | null
   createdAt: number
   expiresAt: number
@@ -29,15 +30,17 @@ interface HistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   projectId: string
+  workspaceId?: string
   currentSessionId?: string
-  onSelectSession: (sessionId: string) => void
-  onNewSession: () => void
+  onSelectSession: (sessionId: string, workspaceId?: string) => void
+  onNewSession: (workspaceId?: string) => void
 }
 
 export function HistoryDialog({
   open,
   onOpenChange,
   projectId,
+  workspaceId,
   currentSessionId,
   onSelectSession,
   onNewSession,
@@ -85,7 +88,7 @@ export function HistoryDialog({
   }
 
   const handleNewSession = () => {
-    onNewSession()
+    onNewSession(workspaceId)
     onOpenChange(false)
   }
 
@@ -145,7 +148,7 @@ export function HistoryDialog({
                     )}
                     onClick={() => {
                       if (!session.isExpired) {
-                        onSelectSession(session.sessionId)
+                        onSelectSession(session.sessionId, session.workspaceId || undefined)
                         onOpenChange(false)
                       }
                     }}

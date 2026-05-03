@@ -48,7 +48,7 @@ export async function PATCH(
 
     const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 
-    const allowedFields = ["title", "opencodeSessionId", "status"];
+    const allowedFields = ["title", "opencodeSessionId", "status", "workspaceId"];
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         meta[field] = updates[field];

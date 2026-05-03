@@ -78,6 +78,7 @@ export async function GET(
         sessions.push({
           sessionId: meta.sessionId,
           demoId: meta.demoId,
+          workspaceId: meta.workspaceId || null,
           title: meta.title || null,
           createdAt: meta.createdAt,
           expiresAt: meta.expiresAt,

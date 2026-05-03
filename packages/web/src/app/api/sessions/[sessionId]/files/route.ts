@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getSessionFiles,
-  updateSessionFiles,
   getSessionMeta,
-  getSessionPath,
   sessionExists,
   isSessionExpired,
   createApiSuccess,
   createApiError,
+  getWorkspaceFiles,
+  updateWorkspaceFiles,
+  findWorkspacePath,
 } from '@/lib/fs-utils';
 
 export async function GET(
@@ -32,8 +32,15 @@ export async function GET(
         { status: 410 }
       );
     }
-    
-    const files = getSessionFiles(sessionId);
+
+    let files;
+    let workspacePath = "";
+
+    if (sessionMeta?.workspaceId) {
+      files = getWorkspaceFiles(sessionMeta.workspaceId);
+      const wsPath = findWorkspacePath(sessionMeta.workspaceId);
+      if (wsPath) workspacePath = wsPath;
+    }
     
     if (!files) {
       return NextResponse.json(
@@ -44,7 +51,7 @@ export async function GET(
     
     return NextResponse.json(createApiSuccess({
       ...files,
-      workspacePath: getSessionPath(sessionId),
+      workspacePath,
     }));
   } catch (error) {
     console.error('Error getting session files:', error);
@@ -103,8 +110,13 @@ export async function PUT(
       );
     }
 
-    const success = updateSessionFiles(sessionId, { code, schema });
-    console.log(`[API files PUT] updateSessionFiles result: ${success}`);
+    let success: boolean;
+    if (sessionMeta?.workspaceId) {
+      success = updateWorkspaceFiles(sessionMeta.workspaceId, { code, schema });
+    } else {
+      success = false;
+    }
+    console.log(`[API files PUT] updateFiles result: ${success}`);
 
     if (!success) {
       return NextResponse.json(

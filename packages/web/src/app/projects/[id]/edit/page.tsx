@@ -196,7 +196,7 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                     await fetch(`/api/sessions/${sessionInfo.sessionId}/meta`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ status: "archived" }),
+                      body: JSON.stringify({ status: "discarded" }),
                     });
                   }
 
@@ -216,15 +216,13 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                     toast({ title: "会话已过期", variant: "destructive" });
                     return;
                   }
-                  const filesRes = await fetch(`/api/sessions/${newSessionId}/files`);
-                  const filesData = await filesRes.json();
-                  const workspace = filesData.data?.workspacePath || "";
+
                   setSessionInfo({
                     sessionId: newSessionId,
                     projectId: params.id,
                     basedOnVersion: sessionInfo.basedOnVersion,
                     username: sessionInfo.username,
-                    tempWorkspace: workspace,
+                    tempWorkspace: sessionInfo.tempWorkspace,
                   });
                   setAgentSessionId(`project-${params.id}-${Date.now()}`);
                   toast({ title: "已切换会话" });
@@ -236,12 +234,16 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
                   });
                 }
               }}
-              onNewSession={async () => {
+              onNewSession={async (existingWorkspaceId) => {
                 try {
+                  const body: Record<string, unknown> = { demoId: params.id, forceNew: true };
+                  if (existingWorkspaceId) {
+                    body.workspaceId = existingWorkspaceId;
+                  }
                   const res = await fetch("/api/sessions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ demoId: params.id, forceNew: true }),
+                    body: JSON.stringify(body),
                   });
                   const data = await res.json();
                   if (!data.success) {

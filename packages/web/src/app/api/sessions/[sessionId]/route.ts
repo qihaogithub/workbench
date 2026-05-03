@@ -57,6 +57,7 @@ export async function GET(
       createApiSuccess({
         ...meta,
         isExpired: Date.now() > meta.expiresAt,
+        workspacePath: getSessionPath(sessionId),
       }),
     );
   } catch (error) {

@@ -5,13 +5,15 @@ import {
   createApiError,
   getSessionFiles,
   getSessionPath,
+  getSessionMeta,
+  getWorkspaceFiles,
+  findWorkspacePath,
 } from "@/lib/fs-utils";
 import { findActiveSession, createEditSession, archiveActiveSession } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function POST(request: NextRequest) {
   try {
-    // 从 Cookie 读取 userId
     const token = getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const userId = payload.userId;
     const body = await request.json();
-    const { demoId: projectId, forceNew } = body;
+    const { demoId: projectId, forceNew, workspaceId } = body;
 
     if (!projectId || typeof projectId !== "string") {
       return NextResponse.json(
@@ -42,23 +44,37 @@ export async function POST(request: NextRequest) {
     }
 
     const activeSessionId = findActiveSession(userId, projectId);
-    if (activeSessionId) {
-      const files = getSessionFiles(activeSessionId);
-      if (files) {
-        // 获取 session 的工作空间路径
-        const sessionPath = getSessionPath(activeSessionId);
-        return NextResponse.json(
-          createApiSuccess({
-            sessionId: activeSessionId,
-            code: files.code,
-            schema: files.schema,
-            tempWorkspace: sessionPath,
-          }),
-        );
+    if (activeSessionId && !workspaceId) {
+      const meta = getSessionMeta(activeSessionId);
+      let code = "";
+      let schema = "";
+      let tempWorkspace = "";
+
+      if (meta?.workspaceId) {
+        const wsPath = findWorkspacePath(meta.workspaceId);
+        const files = getWorkspaceFiles(meta.workspaceId);
+        code = files?.code || "";
+        schema = files?.schema || "";
+        tempWorkspace = wsPath || getSessionPath(activeSessionId) || "";
+      } else {
+        const files = getSessionFiles(activeSessionId);
+        code = files?.code || "";
+        schema = files?.schema || "";
+        tempWorkspace = getSessionPath(activeSessionId) || "";
       }
+
+      return NextResponse.json(
+        createApiSuccess({
+          sessionId: activeSessionId,
+          workspaceId: meta?.workspaceId || null,
+          code,
+          schema,
+          tempWorkspace,
+        }),
+      );
     }
 
-    const result = await createEditSession(userId, projectId);
+    const result = await createEditSession(userId, projectId, workspaceId);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {
     console.error("Error creating session:", error);
