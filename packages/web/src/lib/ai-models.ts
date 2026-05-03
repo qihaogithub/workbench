@@ -70,6 +70,22 @@ export function resolveModelConfig(rawId: string): {
   };
 }
 
+function stripPrefix(label: string): string {
+  return label.replace(/^OpenCode Zen\//i, "");
+}
+
+function buildLabel(alias: string, rawLabel: string): string {
+  const stripped = stripPrefix(rawLabel);
+  // 去掉 stripped 中与 alias 重复的前缀部分
+  const aliasLower = alias.toLowerCase();
+  const strippedLower = stripped.toLowerCase();
+  if (strippedLower.startsWith(aliasLower)) {
+    const remainder = stripped.slice(alias.length).trim();
+    return remainder ? `${alias} ${remainder}` : alias;
+  }
+  return stripped;
+}
+
 export function applyModelConfigs(
   raw: Array<{ id: string; label: string }>,
 ): ResolvedModel[] {
@@ -79,7 +95,7 @@ export function applyModelConfigs(
     if (!r.enabled) continue;
     result.push({
       id: m.id,
-      label: r.alias ?? m.label,
+      label: r.alias ? buildLabel(r.alias, m.label) : m.label,
       supportsImages: r.supportsImages,
     });
   }
