@@ -315,12 +315,12 @@ export function AIChat({
       });
 
       stream.on("models", (event: StreamEvent) => {
-        setModelState({
-          currentModelId: event.currentModelId || "",
-          models: event.models || [],
-          canSwitch: event.canSwitch ?? false,
+        setModelState((prev) => ({
+          currentModelId: event.currentModelId || prev.currentModelId,
+          models: event.models ?? prev.models,
+          canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: false,
-        });
+        }));
       });
 
       stream.on("error", (event: StreamEvent) => {
@@ -481,12 +481,12 @@ export function AIChat({
       // 监听模型列表更新
       stream.on("models", (event: StreamEvent) => {
         if (streamSessionIdRef.current !== streamId) return;
-        setModelState({
-          currentModelId: event.currentModelId || "",
-          models: event.models || [],
-          canSwitch: event.canSwitch ?? false,
+        setModelState((prev) => ({
+          currentModelId: event.currentModelId || prev.currentModelId,
+          models: event.models ?? prev.models,
+          canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: false,
-        });
+        }));
       });
 
       // 监听工具调用开始 - 添加新的 ToolCallPart
