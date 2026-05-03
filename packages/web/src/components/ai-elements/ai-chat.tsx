@@ -35,6 +35,11 @@ import {
 import { Bot, Sparkles, History } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
+import {
+  applyModelConfigs,
+  UNCONFIGURED_DEFAULT,
+  type ResolvedModel,
+} from "@/lib/ai-models";
 import type { MessagePart } from "@/components/ai-elements";
 
 const PromptInputAttachmentsDisplay = () => {
@@ -228,7 +233,7 @@ export function AIChat({
   // 模型状态
   const [modelState, setModelState] = useState<{
     currentModelId: string;
-    models: Array<{ id: string; label: string }>;
+    models: ResolvedModel[];
     canSwitch: boolean;
     isLoading: boolean;
   }>({
@@ -317,7 +322,7 @@ export function AIChat({
       stream.on("models", (event: StreamEvent) => {
         setModelState((prev) => ({
           currentModelId: event.currentModelId || prev.currentModelId,
-          models: event.models ?? prev.models,
+          models: event.models ? applyModelConfigs(event.models) : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: false,
         }));
@@ -483,7 +488,7 @@ export function AIChat({
         if (streamSessionIdRef.current !== streamId) return;
         setModelState((prev) => ({
           currentModelId: event.currentModelId || prev.currentModelId,
-          models: event.models ?? prev.models,
+          models: event.models ? applyModelConfigs(event.models) : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: false,
         }));
@@ -1147,6 +1152,11 @@ export function AIChat({
     });
   }, [streamContent, currentMessage.parts]);
 
+  // 当前模型是否支持图片输入(用于条件渲染图片按钮)
+  const currentSupportsImages =
+    modelState.models.find((m) => m.id === modelState.currentModelId)
+      ?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages;
+
   // 切换模型
   const handleModelChange = useCallback(
     (modelId: string) => {
@@ -1276,7 +1286,7 @@ export function AIChat({
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools>
-            <PromptInputAddImage />
+            {currentSupportsImages && <PromptInputAddImage />}
             <Button
               variant="ghost"
               size="icon"
