@@ -557,6 +557,70 @@ export function PromptInputAddImage({
   )
 }
 
+interface PromptInputModelSelectProps {
+  currentModelId: string
+  models: Array<{ id: string; label: string }>
+  canSwitch: boolean
+  onModelChange: (modelId: string) => void
+  isLoading: boolean
+}
+
+export function PromptInputModelSelect({
+  currentModelId,
+  models,
+  canSwitch,
+  onModelChange,
+  isLoading,
+}: PromptInputModelSelectProps) {
+  const context = usePromptInput()
+
+  const currentModel = models.find((m) => m.id === currentModelId)
+  const displayLabel = isLoading
+    ? '模型...'
+    : currentModel?.label || currentModelId || '选择模型'
+
+  if (!canSwitch && !isLoading) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs text-muted-foreground cursor-not-allowed"
+              disabled
+            >
+              <span className="truncate max-w-[120px]">{displayLabel}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <span>当前后端不支持切换模型</span>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  return (
+    <PromptInputSelect
+      value={currentModelId}
+      onValueChange={onModelChange}
+      disabled={!canSwitch || isLoading || context.status !== 'idle'}
+    >
+      <PromptInputSelectTrigger className="text-xs">
+        <span className="truncate max-w-[120px]">{displayLabel}</span>
+      </PromptInputSelectTrigger>
+      <PromptInputSelectContent>
+        {models.map((model) => (
+          <PromptInputSelectItem key={model.id} value={model.id}>
+            {model.label}
+          </PromptInputSelectItem>
+        ))}
+      </PromptInputSelectContent>
+    </PromptInputSelect>
+  )
+}
+
 export {
   PromptInputContext,
   usePromptInput,

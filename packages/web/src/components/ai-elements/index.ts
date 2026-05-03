@@ -24,6 +24,7 @@ export {
   PromptInputSelectItem,
   PromptInputSelectValue,
   PromptInputAddImage,
+  PromptInputModelSelect,
   usePromptInputAttachments,
   usePromptInput,
   PromptInputContext,

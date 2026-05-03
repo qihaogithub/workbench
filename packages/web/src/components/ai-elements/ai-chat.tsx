@@ -13,6 +13,7 @@ import {
   PromptInputTools,
   PromptInputSubmit,
   PromptInputAddImage,
+  PromptInputModelSelect,
   PromptInputHeader,
   usePromptInputAttachments,
   AssistantMessage,
@@ -223,6 +224,19 @@ export function AIChat({
   // Plan 状态
   const [plan, setPlan] = useState<string>("");
 
+  // 模型状态
+  const [modelState, setModelState] = useState<{
+    currentModelId: string;
+    models: Array<{ id: string; label: string }>;
+    canSwitch: boolean;
+    isLoading: boolean;
+  }>({
+    currentModelId: "",
+    models: [],
+    canSwitch: false,
+    isLoading: true,
+  });
+
   // console.log(
   //   "[AIChat] Props received - workingDir:",
   //   workingDir,
@@ -264,6 +278,13 @@ export function AIChat({
         role: "assistant",
         content: "",
         parts: [],
+      });
+      // 会话切换时重置模型状态
+      setModelState({
+        currentModelId: "",
+        models: [],
+        canSwitch: false,
+        isLoading: true,
       });
     }
   }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage]);
@@ -400,6 +421,17 @@ export function AIChat({
         if (event.content) {
           setPlan((prev) => prev + event.content);
         }
+      });
+
+      // 监听模型列表更新
+      stream.on("models", (event: StreamEvent) => {
+        if (streamSessionIdRef.current !== streamId) return;
+        setModelState({
+          currentModelId: event.currentModelId || "",
+          models: event.models || [],
+          canSwitch: event.canSwitch ?? false,
+          isLoading: false,
+        });
       });
 
       // 监听工具调用开始 - 添加新的 ToolCallPart
@@ -863,6 +895,12 @@ export function AIChat({
 
       await connectionTimeout;
 
+      // WebSocket 连接建立后获取模型列表
+      const wsAfterConnect = (stream as any).ws;
+      if (wsAfterConnect?.readyState === WebSocket.OPEN) {
+        wsAfterConnect.send(JSON.stringify({ type: "get_models" }));
+      }
+
       // 发送消息
       console.log("[AIChat] Sending message with workingDir:", workingDir);
       stream.send(userMessage, `msg-${Date.now()}`, {
@@ -1050,6 +1088,21 @@ export function AIChat({
     });
   }, [streamContent, currentMessage.parts]);
 
+  // 切换模型
+  const handleModelChange = useCallback(
+    (modelId: string) => {
+      if (modelId === modelState.currentModelId) return;
+
+      setModelState((prev) => ({ ...prev, isLoading: true }));
+
+      const ws = (streamRef.current as any)?.ws;
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "set_model", modelId }));
+      }
+    },
+    [modelState.currentModelId],
+  );
+
   return (
     <div className="flex flex-col h-full">
       {/* 消息列表 */}
@@ -1165,6 +1218,13 @@ export function AIChat({
         <PromptInputFooter>
           <PromptInputTools>
             <PromptInputAddImage />
+            <PromptInputModelSelect
+              currentModelId={modelState.currentModelId}
+              models={modelState.models}
+              canSwitch={modelState.canSwitch}
+              onModelChange={handleModelChange}
+              isLoading={modelState.isLoading}
+            />
             <Button
               variant="ghost"
               size="icon"
