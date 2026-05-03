@@ -216,6 +216,7 @@ export function AIChat({
 
   const streamRef = useRef<AgentStream | null>(null);
   const streamSessionIdRef = useRef<string>("");
+  const modelStreamRef = useRef<AgentStream | null>(null);
 
   // 待处理的权限请求
   const [pendingPermissionRequest, setPendingPermissionRequest] =
@@ -256,6 +257,9 @@ export function AIChat({
       if (streamRef.current) {
         streamRef.current.close();
       }
+      if (modelStreamRef.current) {
+        modelStreamRef.current.close();
+      }
     };
   }, []);
 
@@ -288,6 +292,57 @@ export function AIChat({
       });
     }
   }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage]);
+
+  // agentSessionId 变化时建立持久连接，提前获取模型列表
+  useEffect(() => {
+    if (!agentSessionId) return;
+
+    const setupModelStream = async () => {
+      const { getAgentClient } = await import("@/lib/agent-client");
+      const agentClient = getAgentClient();
+      const stream = agentClient.stream(agentSessionId);
+      modelStreamRef.current = stream;
+
+      let connected = false;
+      stream.on("status", (event: StreamEvent) => {
+        if (event.status === "connected" && !connected) {
+          connected = true;
+          const ws = (stream as any).ws;
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "get_models" }));
+          }
+        }
+      });
+
+      stream.on("models", (event: StreamEvent) => {
+        setModelState({
+          currentModelId: event.currentModelId || "",
+          models: event.models || [],
+          canSwitch: event.canSwitch ?? false,
+          isLoading: false,
+        });
+      });
+
+      stream.on("error", (event: StreamEvent) => {
+        const isModelError =
+          event.error?.code === "SESSION_NOT_FOUND" ||
+          event.error?.code === "GET_MODELS_ERROR";
+        if (isModelError) {
+          console.warn("[AIChat] Model info error:", event.error?.message);
+          setModelState((prev) => ({ ...prev, isLoading: false }));
+        }
+      });
+    };
+
+    setupModelStream();
+
+    return () => {
+      if (modelStreamRef.current) {
+        modelStreamRef.current.close();
+        modelStreamRef.current = null;
+      }
+    };
+  }, [agentSessionId]);
 
   // 处理发送消息
   const handleSend = useCallback(async (userMessage: string) => {
@@ -432,22 +487,6 @@ export function AIChat({
           canSwitch: event.canSwitch ?? false,
           isLoading: false,
         });
-      });
-
-      // Agent 初始化完成后获取模型列表
-      let modelsRequested = false;
-      stream.on("status", (event: StreamEvent) => {
-        if (streamSessionIdRef.current !== streamId) return;
-        if (
-          !modelsRequested &&
-          (event.status === "processing" || event.status === "ready")
-        ) {
-          modelsRequested = true;
-          const ws = (stream as any).ws;
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "get_models" }));
-          }
-        }
       });
 
       // 监听工具调用开始 - 添加新的 ToolCallPart
@@ -1115,7 +1154,7 @@ export function AIChat({
 
       setModelState((prev) => ({ ...prev, isLoading: true }));
 
-      const ws = (streamRef.current as any)?.ws;
+      const ws = (modelStreamRef.current as any)?.ws;
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "set_model", modelId }));
       }

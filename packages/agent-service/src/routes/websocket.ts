@@ -617,7 +617,23 @@ export async function registerWebSocketRoutes(
 
           case "get_models": {
             try {
-              const agent = manager.get(sessionId);
+              let agent = manager.get(sessionId);
+              if (!agent) {
+                const config: AgentConfig = {
+                  sessionId,
+                  backend: "opencode",
+                  workingDir: process.cwd(),
+                };
+                agent = manager.getOrCreate(sessionId, config);
+                if (agent.status === "initializing") {
+                  sendMessage({
+                    type: "status",
+                    sessionId,
+                    status: "initializing",
+                  });
+                  await agent.start();
+                }
+              }
               if (agent && "getModelInfo" in agent) {
                 const modelInfo = await (
                   agent as {
