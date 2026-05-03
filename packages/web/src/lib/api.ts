@@ -85,3 +85,36 @@ export async function deleteSession(sessionId: string): Promise<ApiResponse<void
     method: 'DELETE',
   }).then((res) => res.json())
 }
+
+export async function uploadCover(
+  projectId: string,
+  file: File,
+): Promise<ApiResponse<{ thumbnail: string }>> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`/api/demos/${projectId}/cover`, {
+    method: 'POST',
+    body: formData,
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/demos')
+  }
+
+  return response
+}
+
+export async function deleteCover(
+  projectId: string,
+): Promise<ApiResponse<{ thumbnail: string | null }>> {
+  const response = await fetch(`/api/demos/${projectId}/cover`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/demos')
+  }
+
+  return response
+}

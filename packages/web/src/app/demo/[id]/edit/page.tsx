@@ -36,7 +36,15 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  ImageIcon,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CoverImageDialog } from "@/components/cover-image-dialog";
 
 interface DemoEditPageProps {
   params: {
@@ -74,6 +82,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+  const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(undefined);
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -146,10 +156,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         const demosData = await demosRes.json();
         if (demosData.success) {
           const demo = demosData.data.find(
-            (d: { id: string; name: string }) => d.id === demoId,
+            (d: { id: string; name: string; thumbnail?: string }) => d.id === demoId,
           );
           if (demo) {
             setDemoName(demo.name);
+            setCurrentThumbnail(demo.thumbnail);
           }
         }
 
@@ -544,6 +555,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               {demoName || demoId}
             </h1>
           )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setCoverDialogOpen(true)}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>设置封面图</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>
@@ -809,6 +835,14 @@ ${"=== END ==="}`}
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <CoverImageDialog
+        open={coverDialogOpen}
+        onOpenChange={setCoverDialogOpen}
+        projectId={demoId}
+        currentThumbnail={currentThumbnail}
+        onThumbnailChange={(thumbnail) => setCurrentThumbnail(thumbnail ?? undefined)}
+      />
     </div>
   );
 }

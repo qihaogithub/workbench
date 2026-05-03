@@ -59,6 +59,7 @@ export const ErrorCode = {
   INVALID_FILE_TYPE: "INVALID_FILE_TYPE",
   FILE_TOO_LARGE: "FILE_TOO_LARGE",
   UPLOAD_FAILED: "UPLOAD_FAILED",
+  COVER_UPLOAD_FAILED: "COVER_UPLOAD_FAILED",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -83,6 +84,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   INVALID_FILE_TYPE: "不支持的文件类型",
   FILE_TOO_LARGE: "文件大小超过限制",
   UPLOAD_FAILED: "文件上传失败",
+  COVER_UPLOAD_FAILED: "封面图上传失败",
 };
 
 export * from "./workspace";

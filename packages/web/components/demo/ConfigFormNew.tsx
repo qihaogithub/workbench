@@ -14,6 +14,7 @@ import {
   Eye,
   Layout,
   ArrowUpDown,
+  GripVertical,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,23 @@ import { ImageListWidget, ImageItem } from "./ImageListWidget";
 import { FileUploadWidget } from "./widgets";
 import { getOrderable } from "../../lib/validator";
 import { Button } from "@/components/ui/button";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface FieldConfig {
   key: string;
@@ -535,6 +553,88 @@ function FieldGroupSection({
   );
 }
 
+function SortableItem({
+  id,
+  title,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
+}: {
+  id: string;
+  title: string;
+  index: number;
+  total: number;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 py-1.5 px-1 rounded-md transition-colors duration-150 ${
+        isDragging ? "bg-accent/50 shadow-sm" : ""
+      }`}
+    >
+      <button
+        type="button"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 touch-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <span className="text-xs font-mono text-muted-foreground w-4 text-center shrink-0">
+        {index + 1}
+      </span>
+      <span className="text-xs font-medium text-foreground flex-1 truncate">
+        {title}
+      </span>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          disabled={index === 0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveUp();
+          }}
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          disabled={index === total - 1}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveDown();
+          }}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function OrderControl({
   orderable,
   order,
@@ -550,6 +650,15 @@ function OrderControl({
 }) {
   const [open, setOpen] = useState(true);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
   const handleMoveUp = (index: number) => {
     if (index <= 0) return;
     const newOrder = [...order];
@@ -562,6 +671,17 @@ function OrderControl({
     const newOrder = [...order];
     [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
     onOrderChange(newOrder);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = order.indexOf(active.id as string);
+    const newIndex = order.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    onOrderChange(arrayMove(order, oldIndex, newIndex));
   };
 
   const handleReset = () => {
@@ -590,46 +710,31 @@ function OrderControl({
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="space-y-1 pl-6 pr-2 pt-1 pb-2">
-            {order.map((key, index) => (
-              <div
-                key={key}
-                className="flex items-center gap-2 py-1.5 transition-all duration-150"
+          <div className="pl-4 pr-2 pt-1 pb-2">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={order}
+                strategy={verticalListSortingStrategy}
               >
-                <span className="text-xs font-mono text-muted-foreground w-4 text-center shrink-0">
-                  {index + 1}
-                </span>
-                <span className="text-xs font-medium text-foreground flex-1 truncate">
-                  {titleMap[key] || key}
-                </span>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={index === 0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMoveUp(index);
-                    }}
-                  >
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={index === order.length - 1}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMoveDown(index);
-                    }}
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </Button>
+                <div className="space-y-0.5">
+                  {order.map((key, index) => (
+                    <SortableItem
+                      key={key}
+                      id={key}
+                      title={titleMap[key] || key}
+                      index={index}
+                      total={order.length}
+                      onMoveUp={() => handleMoveUp(index)}
+                      onMoveDown={() => handleMoveDown(index)}
+                    />
+                  ))}
                 </div>
-              </div>
-            ))}
+              </SortableContext>
+            </DndContext>
             {!isDefault && (
               <div className="pt-1">
                 <Button

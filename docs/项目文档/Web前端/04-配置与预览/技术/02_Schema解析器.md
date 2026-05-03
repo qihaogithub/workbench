@@ -1,7 +1,8 @@
 # 配置系统 - Schema 解析器
 
-> 版本：v1.0
+> 版本：v1.1
 > 创建日期：2026-04-06
+> 更新日期：2026-05-03
 
 ---
 
@@ -91,20 +92,18 @@ interface ParsedContent {
 
 **功能**：从 Schema 中提取 `$demo.orderable` 可排序属性列表
 
+**文件位置**：`lib/validator.ts`
+
 **参数**：
 
 | 参数 | 类型 | 说明 |
 |:-----|:-----|:-----|
 | `schema` | string | JSON Schema 字符串 |
 
-**返回值**：
+**返回值**：`string[] | undefined`
 
-```typescript
-interface OrderableResult {
-  orderable: string[]     // 可排序属性名列表
-  hasOrderable: boolean   // 是否声明了 orderable
-}
-```
+- 当 Schema 包含有效的 `$demo.orderable`（至少 2 个字符串元素）时，返回属性名数组
+- 否则返回 `undefined`
 
 **Schema 示例**：
 
@@ -125,19 +124,19 @@ interface OrderableResult {
 **返回值示例**：
 
 ```typescript
-{
-  orderable: ["header", "content", "footer"],
-  hasOrderable: true
-}
+getOrderable(schema)  // → ["header", "content", "footer"]
+getOrderable(schemaWithoutOrderable)  // → undefined
 ```
 
 **规则说明**：
 
 | 规则 | 说明 |
 |:-----|:-----|
-| 可选字段 | `orderable` 为可选，未声明时 `hasOrderable` 返回 `false` |
-| 最低数量 | `orderable` 至少 2 项才有排序意义 |
-| 默认值 | 未声明时 `orderable` 返回空数组 `[]` |
+| 可选字段 | `orderable` 为可选，未声明时返回 `undefined` |
+| 最低数量 | `orderable` 至少 2 项才有排序意义，否则返回 `undefined` |
+| 类型过滤 | 仅保留 `string` 类型的元素，过滤后不足 2 项则返回 `undefined` |
+
+**与 `getDefaultValues` 的协作**：当 Schema 包含 `orderable` 时，`getDefaultValues()` 自动生成 `__order` 默认值，等于 `orderable` 数组的原始顺序。
 
 ### 3.6 fixFigmaTextFormat
 
