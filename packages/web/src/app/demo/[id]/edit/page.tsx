@@ -388,6 +388,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         const result = validateAll(newCode, schema);
         console.log("[DemoEditPage] Validation result:", result);
         setValidationResult(result);
+
+        // 代码变更时重置 configData 为空，让组件默认值生效
+        setConfigData({});
       }
 
       // 防抖触发 Schema 自动重新生成
@@ -442,7 +445,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             setPreviewSize(getPreviewSize(newSchemaStr));
 
             const newDefaults = getDefaultValues(data.data.schema);
-            setConfigData((prev) => ({ ...newDefaults, ...prev }));
+            setConfigData((prev) => ({ ...prev, ...newDefaults }));
           }
         } catch (err) {
           console.warn("[DemoEditPage] Schema 自动生成失败:", err);
@@ -487,8 +490,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       console.log("[DemoEditPage] New default config data:", newConfigData);
       setConfigData((prev) => {
         const merged = {
-          ...newConfigData,
           ...prev,
+          ...newConfigData,
         };
         if (newConfigData.__order) {
           merged.__order = newConfigData.__order;

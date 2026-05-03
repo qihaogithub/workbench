@@ -81,13 +81,65 @@ interface ParsedContent {
 
 **返回值**：分隔符格式的完整文本
 
-### 3.3 isValidFigmaFormat
+### 3.4 isValidFigmaFormat
 
 **功能**：检查文本是否为有效的 Figma 导出格式
 
 **返回值**：`boolean`
 
-### 3.4 fixFigmaTextFormat
+### 3.5 getOrderable
+
+**功能**：从 Schema 中提取 `$demo.orderable` 可排序属性列表
+
+**参数**：
+
+| 参数 | 类型 | 说明 |
+|:-----|:-----|:-----|
+| `schema` | string | JSON Schema 字符串 |
+
+**返回值**：
+
+```typescript
+interface OrderableResult {
+  orderable: string[]     // 可排序属性名列表
+  hasOrderable: boolean   // 是否声明了 orderable
+}
+```
+
+**Schema 示例**：
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "header": { "type": "string" },
+    "content": { "type": "string" },
+    "footer": { "type": "string" }
+  },
+  "$demo": {
+    "orderable": ["header", "content", "footer"]
+  }
+}
+```
+
+**返回值示例**：
+
+```typescript
+{
+  orderable: ["header", "content", "footer"],
+  hasOrderable: true
+}
+```
+
+**规则说明**：
+
+| 规则 | 说明 |
+|:-----|:-----|
+| 可选字段 | `orderable` 为可选，未声明时 `hasOrderable` 返回 `false` |
+| 最低数量 | `orderable` 至少 2 项才有排序意义 |
+| 默认值 | 未声明时 `orderable` 返回空数组 `[]` |
+
+### 3.6 fixFigmaTextFormat
 
 **功能**：尝试修复常见格式问题
 
