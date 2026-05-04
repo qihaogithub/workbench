@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,14 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Copy, Save } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
+import Editor from "react-simple-code-editor";
+import Prism from "prismjs";
+import "prismjs/components/prism-jsx";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-tsx";
+import "prismjs/components/prism-json";
 
 interface CodeViewDialogProps {
   open: boolean;
@@ -25,14 +30,32 @@ interface CodeViewDialogProps {
   onSave: (type: "code" | "schema", content: string) => Promise<void>;
 }
 
+const EDITOR_STYLE: React.CSSProperties = {
+  fontFamily: '"Fira code", "Fira Mono", monospace',
+  fontSize: 13,
+  lineHeight: 1.5,
+  minHeight: 400,
+  backgroundColor: "#09090b",
+  borderRadius: 6,
+  padding: 16,
+};
+
+function highlightTsx(code: string): string {
+  if (!Prism.languages.tsx) return code;
+  return Prism.highlight(code, Prism.languages.tsx, "tsx");
+}
+
+function highlightJson(code: string): string {
+  if (!Prism.languages.json) return code;
+  return Prism.highlight(code, Prism.languages.json, "json");
+}
+
 export function CodeViewDialog({
   open,
   onOpenChange,
   code,
   schema,
   pageName,
-  sessionId,
-  demoId,
   onSave,
 }: CodeViewDialogProps) {
   const [activeCode, setActiveCode] = useState(code);
@@ -41,11 +64,15 @@ export function CodeViewDialog({
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
+  const syncPropsToState = useCallback(() => {
+    setActiveCode(code);
+    setActiveSchema(schema);
+    setActiveTab("code");
+  }, [code, schema]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
-      setActiveCode(code);
-      setActiveSchema(schema);
-      setActiveTab("code");
+      syncPropsToState();
     }
     onOpenChange(nextOpen);
   };
@@ -93,23 +120,31 @@ export function CodeViewDialog({
             </Button>
           </div>
 
-          <TabsContent value="code" className="flex-1 overflow-auto mt-2">
-            <Textarea
+          <TabsContent
+            value="code"
+            className="flex-1 overflow-auto mt-2 data-[state=inactive]:hidden"
+          >
+            <Editor
               value={activeCode}
-              onChange={(e) => setActiveCode(e.target.value)}
-              spellCheck={false}
-              className="w-full h-full min-h-[400px] resize-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-md"
-              style={{ tabSize: 2 }}
+              onValueChange={setActiveCode}
+              highlight={highlightTsx}
+              padding={16}
+              style={EDITOR_STYLE}
+              textareaClassName="code-editor-textarea"
             />
           </TabsContent>
 
-          <TabsContent value="schema" className="flex-1 overflow-auto mt-2">
-            <Textarea
+          <TabsContent
+            value="schema"
+            className="flex-1 overflow-auto mt-2 data-[state=inactive]:hidden"
+          >
+            <Editor
               value={activeSchema}
-              onChange={(e) => setActiveSchema(e.target.value)}
-              spellCheck={false}
-              className="w-full h-full min-h-[400px] resize-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-md"
-              style={{ tabSize: 2 }}
+              onValueChange={setActiveSchema}
+              highlight={highlightJson}
+              padding={16}
+              style={EDITOR_STYLE}
+              textareaClassName="code-editor-textarea"
             />
           </TabsContent>
         </Tabs>
