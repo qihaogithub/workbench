@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -64,18 +64,13 @@ export function CodeViewDialog({
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const syncPropsToState = useCallback(() => {
-    setActiveCode(code);
-    setActiveSchema(schema);
-    setActiveTab("code");
-  }, [code, schema]);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      syncPropsToState();
+  useEffect(() => {
+    if (open) {
+      setActiveCode(code);
+      setActiveSchema(schema);
+      setActiveTab("code");
     }
-    onOpenChange(nextOpen);
-  };
+  }, [open, code, schema]);
 
   const handleCopyCode = () => {
     const content = activeTab === "code" ? activeCode : activeSchema;
@@ -98,7 +93,7 @@ export function CodeViewDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>查看代码 - {pageName}</DialogTitle>

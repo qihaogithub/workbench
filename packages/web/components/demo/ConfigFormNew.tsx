@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -66,6 +66,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { NoteButton } from "./NoteButton";
+import { NotePreview, stripHtml } from "./NotePreview";
+import { NoteDialog } from "./NoteDialog";
 
 interface FieldConfig {
   key: string;
@@ -82,6 +85,7 @@ interface FieldConfig {
   format?: string;
   uiWidget?: string;
   uiOptions?: Record<string, unknown>;
+  note?: string;
 }
 
 interface FieldGroup {
@@ -117,6 +121,7 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
         format: prop.format,
         uiWidget: prop["ui:widget"],
         uiOptions: prop["ui:options"],
+        note: prop.$demo?.note,
       };
 
       // 尝试智能分组
@@ -223,11 +228,15 @@ function FieldRenderer({
   value,
   onChange,
   sessionId,
+  readonly,
+  onNoteClick,
 }: {
   field: FieldConfig;
   value: unknown;
   onChange: (value: unknown) => void;
   sessionId?: string;
+  readonly?: boolean;
+  onNoteClick: (fieldKey: string) => void;
 }) {
   const renderInput = () => {
     // 图片上传 - 单图
@@ -457,6 +466,9 @@ function FieldRenderer({
     field.uiWidget === "richtext" ||
     (field.maxLength !== undefined && field.maxLength > 100);
 
+  const hasNote = !!field.note && !!stripHtml(field.note);
+  const showNoteButton = hasNote || !readonly;
+
   return (
     <div
       className={cn(
@@ -467,10 +479,22 @@ function FieldRenderer({
       )}
     >
       {(isComplexField || !isTextareaField) && (
-        <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
-          {field.title}
-          {field.required && <span className="text-red-500 ml-0.5">*</span>}
-        </Label>
+        <div className="flex items-center gap-1 min-w-0">
+          <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
+            {field.title}
+            {field.required && <span className="text-red-500 ml-0.5">*</span>}
+          </Label>
+          {showNoteButton && (
+            <NoteButton
+              hasNote={hasNote}
+              readonly={readonly}
+              onClick={() => onNoteClick(field.key)}
+            />
+          )}
+        </div>
+      )}
+      {hasNote && isComplexField && (
+        <NotePreview noteHtml={field.note!} />
       )}
       <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>{renderInput()}</div>
     </div>
@@ -506,12 +530,16 @@ function FieldGroupSection({
   onChange,
   isFirst,
   sessionId,
+  readonly,
+  onNoteClick,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
   isFirst?: boolean;
   sessionId?: string;
+  readonly?: boolean;
+  onNoteClick: (fieldKey: string) => void;
 }) {
   const Icon = getGroupIcon(group.title);
   const [open, setOpen] = useState(true);
@@ -544,6 +572,8 @@ function FieldGroupSection({
                 value={formData[field.key]}
                 onChange={(value) => onChange(field.key, value)}
                 sessionId={sessionId}
+                readonly={readonly}
+                onNoteClick={onNoteClick}
               />
             ))}
           </div>
@@ -757,6 +787,7 @@ function OrderControl({
 export function ConfigForm({
   schema,
   onChange,
+  onSchemaChange,
   initialData,
   readonly,
   className,
@@ -765,6 +796,8 @@ export function ConfigForm({
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
   );
+
+  const [noteDialogField, setNoteDialogField] = useState<string | null>(null);
 
   console.log(
     "[ConfigForm] Rendered with schema length:",
@@ -879,6 +912,57 @@ export function ConfigForm({
     onChange(newData);
   };
 
+  const updateSchemaNote = useCallback(
+    (fieldKey: string, noteHtml: string) => {
+      if (!onSchemaChange || !schema) return;
+      try {
+        const parsed = JSON.parse(schema);
+        if (parsed.properties?.[fieldKey]) {
+          if (!parsed.properties[fieldKey].$demo) {
+            parsed.properties[fieldKey].$demo = {};
+          }
+          parsed.properties[fieldKey].$demo.note = noteHtml;
+          onSchemaChange(JSON.stringify(parsed, null, 2));
+        }
+      } catch (e) {
+        console.warn("[ConfigForm] Failed to update schema note:", e);
+      }
+    },
+    [schema, onSchemaChange],
+  );
+
+  const deleteSchemaNote = useCallback(
+    (fieldKey: string) => {
+      if (!onSchemaChange || !schema) return;
+      try {
+        const parsed = JSON.parse(schema);
+        if (parsed.properties?.[fieldKey]?.$demo) {
+          delete parsed.properties[fieldKey].$demo.note;
+          if (Object.keys(parsed.properties[fieldKey].$demo).length === 0) {
+            delete parsed.properties[fieldKey].$demo;
+          }
+          onSchemaChange(JSON.stringify(parsed, null, 2));
+        }
+      } catch (e) {
+        console.warn("[ConfigForm] Failed to delete schema note:", e);
+      }
+    },
+    [schema, onSchemaChange],
+  );
+
+  const handleNoteClick = useCallback((fieldKey: string) => {
+    setNoteDialogField(fieldKey);
+  }, []);
+
+  const currentNoteField = useMemo(() => {
+    if (!noteDialogField) return null;
+    for (const group of fieldGroups) {
+      const found = group.fields.find((f) => f.key === noteDialogField);
+      if (found) return found;
+    }
+    return null;
+  }, [noteDialogField, fieldGroups]);
+
   if (fieldGroups.length === 0) {
     return (
       <div
@@ -925,11 +1009,27 @@ export function ConfigForm({
                 onChange={handleFieldChange}
                 isFirst={index === 0}
                 sessionId={sessionId}
+                readonly={readonly}
+                onNoteClick={handleNoteClick}
               />
             </div>
           ))}
         </div>
       </ScrollArea>
+
+      {currentNoteField && (
+        <NoteDialog
+          open={!!noteDialogField}
+          onOpenChange={(open) => {
+            if (!open) setNoteDialogField(null);
+          }}
+          fieldTitle={currentNoteField.title}
+          noteHtml={currentNoteField.note || ""}
+          readonly={readonly}
+          onSave={(html) => updateSchemaNote(currentNoteField.key, html)}
+          onDelete={() => deleteSchemaNote(currentNoteField.key)}
+        />
+      )}
     </div>
   );
 }

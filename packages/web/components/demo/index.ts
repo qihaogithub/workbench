@@ -3,3 +3,6 @@ export { ConfigForm } from './ConfigFormNew';
 export type { PreviewPanelProps, ConfigFormProps } from './types';
 export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';
 export { ImageListWidget, type ImageItem, type ImageListWidgetProps } from './ImageListWidget';
+export { NoteButton } from './NoteButton';
+export { NoteDialog } from './NoteDialog';
+export { NotePreview, stripHtml } from './NotePreview';

@@ -36,6 +36,7 @@ export interface PreviewPanelProps {
 export interface ConfigFormProps {
   schema: string;
   onChange: (data: Record<string, unknown>) => void;
+  onSchemaChange?: (schema: string) => void;
   initialData?: Record<string, unknown>;
   readonly?: boolean;
   className?: string;

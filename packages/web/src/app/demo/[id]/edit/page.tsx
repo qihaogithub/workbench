@@ -319,6 +319,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setConfigData((prev) => ({ ...prev, ...data }));
   }, []);
 
+  const handleSchemaChange = useCallback((newSchema: string) => {
+    setSchema(newSchema);
+    setEditorContent((prev) => {
+      const currentCode = extractCodeFromFigma(prev) || code;
+      return buildFigmaText(currentCode, newSchema);
+    });
+  }, [code]);
+
+  const handleProjectSchemaChange = useCallback((newSchema: string) => {
+    setProjectConfigSchema(newSchema);
+  }, []);
+
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
     (pageSchema: string) => {
@@ -1097,9 +1109,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       key={`project-${projectConfigSchema}`}
                       schema={projectConfigSchema}
                       onChange={(data) => {
-                        // 项目配置变更时合并到当前 configData
                         setConfigData((prev) => ({ ...prev, ...data }));
                       }}
+                      onSchemaChange={handleProjectSchemaChange}
                       initialData={configData}
                       sessionId={sessionId}
                     />
@@ -1118,6 +1130,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                     key={schema}
                     schema={schema}
                     onChange={handleConfigChange}
+                    onSchemaChange={handleSchemaChange}
                     initialData={configData}
                     sessionId={sessionId}
                   />
