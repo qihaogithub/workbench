@@ -1,136 +1,176 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 import {
   getSessionMeta,
   sessionExists,
   isSessionExpired,
   createApiSuccess,
   createApiError,
-  getWorkspaceFiles,
-  updateWorkspaceFiles,
   findWorkspacePath,
-} from '@/lib/fs-utils';
+  getWorkspaceMultiDemoFiles,
+  getWorkspaceDemoPageFiles,
+  updateWorkspaceDemoFiles,
+  listWorkspaceDemoPages,
+} from "@/lib/fs-utils";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { sessionId: string } }
+  _request: NextRequest,
+  { params }: { params: { sessionId: string } },
 ) {
   try {
     const { sessionId } = params;
-    
+
     if (!sessionExists(sessionId)) {
-      return NextResponse.json(
-        createApiError('SESSION_NOT_FOUND'),
-        { status: 404 }
-      );
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
     }
-    
+
     const sessionMeta = getSessionMeta(sessionId);
-    
-    if (sessionMeta && isSessionExpired(sessionMeta)) {
+    if (!sessionMeta) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    if (isSessionExpired(sessionMeta)) {
+      return NextResponse.json(createApiError("SESSION_EXPIRED"), {
+        status: 410,
+      });
+    }
+
+    if (!sessionMeta.workspaceId) {
       return NextResponse.json(
-        createApiError('SESSION_EXPIRED'),
-        { status: 410 }
+        createApiError("INVALID_REQUEST", "Session 未绑定 workspaceId"),
+        { status: 400 },
       );
     }
 
-    let files;
-    let workspacePath = "";
-
-    if (sessionMeta?.workspaceId) {
-      files = getWorkspaceFiles(sessionMeta.workspaceId);
-      const wsPath = findWorkspacePath(sessionMeta.workspaceId);
-      if (wsPath) workspacePath = wsPath;
-    }
-    
-    if (!files) {
+    const workspacePath = findWorkspacePath(sessionMeta.workspaceId) ?? "";
+    const multi = getWorkspaceMultiDemoFiles(sessionMeta.workspaceId);
+    if (!multi) {
       return NextResponse.json(
-        createApiError('FILE_READ_ERROR', '读取 Session 文件失败'),
-        { status: 500 }
+        createApiError("FILE_READ_ERROR", "读取 Session 文件失败"),
+        { status: 500 },
       );
     }
-    
-    return NextResponse.json(createApiSuccess({
-      ...files,
-      workspacePath,
-    }));
-  } catch (error) {
-    console.error('Error getting session files:', error);
+
+    const demoPages = listWorkspaceDemoPages(sessionMeta.workspaceId);
+
     return NextResponse.json(
-      createApiError('FILE_READ_ERROR', '读取 Session 文件失败'),
-      { status: 500 }
+      createApiSuccess({
+        ...multi,
+        demoPages,
+        workspacePath,
+      }),
+    );
+  } catch (error) {
+    console.error("Error getting session files:", error);
+    return NextResponse.json(
+      createApiError("FILE_READ_ERROR", "读取 Session 文件失败"),
+      { status: 500 },
     );
   }
 }
 
+/**
+ * 兼容层：PUT /api/sessions/[sessionId]/files
+ * 旧前端按单页面格式保存（code + schema）。
+ * 多页面架构下，将数据保存到 workspace 的第一个页面作为兼容。
+ * Stage 4 完成后，前端应改用 PUT /api/sessions/[sessionId]/files/[demoId]。
+ */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: { sessionId: string } },
 ) {
   try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
     const { sessionId } = params;
-    console.log(`[API files PUT] 收到请求, sessionId: ${sessionId}`);
 
-    if (!sessionId) {
-      console.error('[API files PUT] sessionId 为空!');
+    if (!sessionExists(sessionId)) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    const meta = getSessionMeta(sessionId);
+    if (!meta) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    if (meta.userId && meta.userId !== payload.userId) {
       return NextResponse.json(
-        createApiError('INVALID_REQUEST', 'sessionId 参数必填'),
-        { status: 400 }
+        createApiError("FORBIDDEN", "无权操作其他用户的 Session"),
+        { status: 403 },
       );
     }
 
-    const exists = sessionExists(sessionId);
-    console.log(`[API files PUT] sessionExists(${sessionId}): ${exists}`);
+    if (isSessionExpired(meta)) {
+      return NextResponse.json(createApiError("SESSION_EXPIRED"), {
+        status: 410,
+      });
+    }
 
-    if (!exists) {
+    if (!meta.workspaceId) {
       return NextResponse.json(
-        createApiError('SESSION_NOT_FOUND'),
-        { status: 404 }
+        createApiError("INVALID_REQUEST", "Session 未绑定 workspaceId"),
+        { status: 400 },
       );
     }
 
-    const sessionMeta = getSessionMeta(sessionId);
-    console.log(`[API files PUT] sessionMeta:`, sessionMeta);
+    const body = await request.json().catch(() => ({}));
+    const { code, schema } = body as { code?: string; schema?: string };
 
-    if (sessionMeta && isSessionExpired(sessionMeta)) {
-      console.log('[API files PUT] session 已过期');
+    if (code === undefined && schema === undefined) {
       return NextResponse.json(
-        createApiError('SESSION_EXPIRED'),
-        { status: 410 }
+        createApiError("INVALID_REQUEST", "code 或 schema 至少需提供一个"),
+        { status: 400 },
       );
     }
 
-    const body = await request.json();
-    const { code, schema } = body;
-    console.log(`[API files PUT] 收到文件数据, code length: ${code?.length}, schema length: ${schema?.length}`);
-
-    if (typeof code !== 'string' || typeof schema !== 'string') {
+    // 查找第一个页面作为保存目标
+    const demoPages = listWorkspaceDemoPages(meta.workspaceId);
+    if (demoPages.length === 0) {
       return NextResponse.json(
-        createApiError('INVALID_REQUEST', 'code 和 schema 参数必填'),
-        { status: 400 }
+        createApiError("DEMO_PAGE_NOT_FOUND", "工作空间中暂无页面"),
+        { status: 404 },
       );
     }
 
-    let success: boolean;
-    if (sessionMeta?.workspaceId) {
-      success = updateWorkspaceFiles(sessionMeta.workspaceId, { code, schema });
-    } else {
-      success = false;
-    }
-    console.log(`[API files PUT] updateFiles result: ${success}`);
+    const targetDemoId = demoPages[0].id;
+    const success = updateWorkspaceDemoFiles(meta.workspaceId, targetDemoId, {
+      code,
+      schema,
+    });
 
     if (!success) {
       return NextResponse.json(
-        createApiError('FILE_WRITE_ERROR', '更新 Session 文件失败'),
-        { status: 500 }
+        createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
+        { status: 500 },
       );
     }
 
     return NextResponse.json(createApiSuccess(null));
   } catch (error) {
-    console.error('[API files PUT] Error:', error);
+    console.error("Error updating session files:", error);
     return NextResponse.json(
-      createApiError('FILE_WRITE_ERROR', '更新 Session 文件失败'),
-      { status: 500 }
+      createApiError("FILE_WRITE_ERROR", "更新 Session 文件失败"),
+      { status: 500 },
     );
   }
 }

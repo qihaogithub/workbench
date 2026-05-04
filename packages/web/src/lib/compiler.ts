@@ -1,6 +1,11 @@
 import { transform } from 'sucrase';
 import { createHash } from 'crypto';
-import { getSessionFiles, readProjectMeta, getSessionMeta } from './fs-utils';
+import {
+  readProjectMeta,
+  getSessionMeta,
+  findWorkspacePath,
+  getWorkspaceDemoPageFiles,
+} from './fs-utils';
 
 export interface CompileResult {
   compiledCode: string;
@@ -251,12 +256,29 @@ export async function resolveDependencyVersions(
 }
 
 /**
- * 从 Session 读取代码并编译
+ * 从 Session/Workspace 读取代码并编译
  * 自动读取关联项目的依赖版本锁定
+ * @param sessionId Session ID
+ * @param demoId 多页面模式下必填，指定要编译的页面
  */
-export function compileSession(sessionId: string): CompileResult | null {
-  const files = getSessionFiles(sessionId);
-  if (!files) {
+export function compileSession(
+  sessionId: string,
+  demoId?: string,
+): CompileResult | null {
+  let code: string | undefined;
+
+  // 多页面模式：通过 workspace 读取指定页面
+  if (demoId) {
+    const sessionMeta = getSessionMeta(sessionId);
+    if (sessionMeta?.workspaceId) {
+      const files = getWorkspaceDemoPageFiles(sessionMeta.workspaceId, demoId);
+      if (files) {
+        code = files.code;
+      }
+    }
+  }
+
+  if (!code) {
     return null;
   }
 
@@ -274,5 +296,5 @@ export function compileSession(sessionId: string): CompileResult | null {
     // 忽略元数据读取错误，使用默认版本
   }
 
-  return compileCode(files.code, lockedDependencies);
+  return compileCode(code, lockedDependencies);
 }

@@ -80,6 +80,54 @@ export default function ProjectsPage() {
       {/* 用户名选择器 */}
       {!username && <UsernameSelector onUsernameChange={handleUsernameChange} />}
 
+      {/* 配置项类型说明 */}
+      <div className="mb-8 p-6 bg-card rounded-lg border">
+        <h2 className="text-xl font-semibold mb-4">支持的配置项类型</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">📝 字符串 (string)</h3>
+            <p className="text-sm text-muted-foreground">文本输入，支持 maxLength、minLength、pattern 等验证</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">🔢 数字 (number/integer)</h3>
+            <p className="text-sm text-muted-foreground">数字输入，支持 minimum、maximum 范围限制</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">✅ 布尔 (boolean)</h3>
+            <p className="text-sm text-muted-foreground">开关控件，用于启用/禁用功能</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">📋 枚举 (enum)</h3>
+            <p className="text-sm text-muted-foreground">下拉选择，从预定义选项中选择</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">📚 数组 (array)</h3>
+            <p className="text-sm text-muted-foreground">列表输入，支持动态添加/删除元素</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">🗂️ 对象 (object)</h3>
+            <p className="text-sm text-muted-foreground">嵌套结构，支持复杂的配置组合</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">📅 日期 (format: date)</h3>
+            <p className="text-sm text-muted-foreground">日期选择器，用于选择日期</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">📧 邮箱 (format: email)</h3>
+            <p className="text-sm text-muted-foreground">邮箱输入，自动验证格式</p>
+          </div>
+          <div className="p-4 border rounded-md">
+            <h3 className="font-medium mb-2">🔗 URL (format: uri)</h3>
+            <p className="text-sm text-muted-foreground">URL 输入，用于链接和图片地址</p>
+          </div>
+        </div>
+        <div className="mt-4 p-3 bg-muted rounded-md">
+          <p className="text-sm text-muted-foreground">
+            💡 提示：访问 <a href="/demo-test" className="text-primary hover:underline">Demo 测试页面</a> 查看配置面板的实际效果
+          </p>
+        </div>
+      </div>
+
       {/* 页面头部 */}
       <div className="flex justify-between items-center mb-8">
         <div>

@@ -26,6 +26,7 @@ export interface DemoSchema extends Record<string, unknown> {
 export interface PreviewPanelProps {
   code?: string;                        // 编译前的原始代码（兼容旧模式）
   sessionId?: string;                   // 优先：从 session 读取草稿代码
+  demoId?: string;                      // 多页面模式下指定要编译的页面
   configData?: Record<string, unknown>;
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;

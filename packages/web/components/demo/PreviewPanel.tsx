@@ -90,6 +90,7 @@ interface CompileResult {
 export function PreviewPanel({
   code,
   sessionId,
+  demoId,
   configData,
   sdkFiles: _sdkFiles,
   onError,
@@ -184,9 +185,12 @@ export function PreviewPanel({
 
     const compile = async () => {
       try {
-        const body = sessionId
+        const body: Record<string, unknown> = sessionId
           ? { sessionId, code }
           : { code };
+        if (demoId) {
+          body.demoId = demoId;
+        }
 
         const response = await fetch("/api/compile", {
           method: "POST",

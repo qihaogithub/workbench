@@ -5,7 +5,7 @@ import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/co
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { code, sessionId } = body;
+    const { code, sessionId, demoId } = body;
 
     let result;
     let projectId: string | undefined;
@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      result = compileSession(sessionId);
+      // 多页面模式下需要 demoId
+      result = compileSession(sessionId, demoId);
       if (!result) {
         return NextResponse.json(
           createApiError('SESSION_NOT_FOUND', '无法读取 Session 文件'),

@@ -33,11 +33,19 @@ import {
 import {
   Bot,
   Code2,
+  Layers,
   Loader2,
   AlertCircle,
   CheckCircle2,
   ImageIcon,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 
 interface DemoEditPageProps {
@@ -78,6 +86,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [nameDraft, setNameDraft] = useState("");
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(undefined);
+
+  // 多页面状态
+  const [demoPages, setDemoPages] = useState<{ id: string; name: string; order: number }[]>([]);
+  const [activeDemoId, setActiveDemoId] = useState<string>("");
+  const [projectConfigSchema, setProjectConfigSchema] = useState<string | undefined>(undefined);
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -195,8 +208,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           throw new Error(filesData.error?.message || "加载文件失败");
         }
 
-        const loadedCode = filesData.data.code;
-        const loadedSchema = filesData.data.schema;
+        // 多页面格式适配
+        const multi = filesData.data;
+        const pages = multi.demoPages || [];
+        setDemoPages(pages);
+        setProjectConfigSchema(multi.projectConfigSchema);
+
+        let loadedCode = "";
+        let loadedSchema = "";
+
+        if (multi.demos && Object.keys(multi.demos).length > 0) {
+          // 多页面模式：取第一个页面作为默认
+          const firstDemoId = Object.keys(multi.demos)[0];
+          const firstDemo = multi.demos[firstDemoId];
+          loadedCode = firstDemo.code;
+          loadedSchema = firstDemo.schema;
+          setActiveDemoId(firstDemoId);
+        } else if (multi.code !== undefined && multi.schema !== undefined) {
+          // 旧格式兼容
+          loadedCode = multi.code;
+          loadedSchema = multi.schema;
+        }
 
         setCode(loadedCode);
         setSchema(loadedSchema);
@@ -414,7 +446,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           const res = await fetch("/api/generate-schema", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId }),
+            body: JSON.stringify({ sessionId, demoId: activeDemoId }),
           });
           const data = await res.json();
 
@@ -600,6 +632,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   <Code2 className="h-4 w-4" />
                   代码编辑
                 </TabsTrigger>
+                <TabsTrigger value="pages" className="gap-2">
+                  <Layers className="h-4 w-4" />
+                  页面
+                  {demoPages.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1">
+                      {demoPages.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent
@@ -725,6 +766,49 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                 value="code"
                 className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden"
               >
+                {demoPages.length > 0 && (
+                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">当前编辑页面：</span>
+                    <Select
+                      value={activeDemoId}
+                      onValueChange={async (newDemoId) => {
+                        setActiveDemoId(newDemoId);
+                        // 重新加载该页面的代码和 schema
+                        if (sessionId) {
+                          try {
+                            const res = await fetch(`/api/sessions/${sessionId}/files/${newDemoId}`);
+                            const data = await res.json();
+                            if (data.success) {
+                              setCode(data.data.code);
+                              setSchema(data.data.schema);
+                              setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                              const defaults = getDefaultValues(data.data.schema);
+                              setConfigData(defaults);
+                              const result = validateAll(data.data.code, data.data.schema);
+                              setValidationResult(result);
+                              const size = getPreviewSize(data.data.schema);
+                              setPreviewSize(size);
+                            }
+                          } catch (err) {
+                            console.error("切换页面失败:", err);
+                            toast({ title: "切换页面失败", variant: "destructive" });
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {demoPages.map((page) => (
+                          <SelectItem key={page.id} value={page.id}>
+                            {page.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="flex-1 relative w-full">
                   <Textarea
                     value={editorContent}
@@ -790,6 +874,127 @@ ${"=== END ==="}`}
                   </div>
                 </div>
               </TabsContent>
+
+              <TabsContent
+                value="pages"
+                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
+              >
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
+                    {/* 项目配置 */}
+                    <div className="rounded-lg border bg-card p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium">📋 项目配置</h3>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs"
+                          onClick={() => {
+                            toast({ title: "项目配置编辑", description: "高级功能，请通过 AI 对话管理项目配置" });
+                          }}
+                        >
+                          {projectConfigSchema ? "编辑配置" : "添加配置"}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {projectConfigSchema
+                          ? "已设置项目级共享配置"
+                          : "未设置项目级共享配置"}
+                      </p>
+                    </div>
+
+                    {/* 页面列表 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium">📄 页面列表</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={async () => {
+                            if (!sessionId) {
+                              toast({ title: "未创建 Session", variant: "destructive" });
+                              return;
+                            }
+                            try {
+                              const res = await fetch(`/api/projects/${demoId}/demos`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ sessionId, name: "新建页面" }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setDemoPages((prev) => [...prev, data.data].sort((a, b) => a.order - b.order));
+                                toast({ title: "页面创建成功" });
+                              } else {
+                                toast({ title: "创建失败", description: data.error?.message, variant: "destructive" });
+                              }
+                            } catch (err) {
+                              toast({ title: "创建失败", variant: "destructive" });
+                            }
+                          }}
+                        >
+                          + 新建页面
+                        </Button>
+                      </div>
+
+                      {demoPages.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          暂无页面
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {demoPages.map((page, index) => (
+                            <div
+                              key={page.id}
+                              className={`flex items-center justify-between px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
+                                activeDemoId === page.id
+                                  ? "bg-primary/10 border border-primary/20"
+                                  : "hover:bg-muted border border-transparent"
+                              }`}
+                              onClick={async () => {
+                                setActiveDemoId(page.id);
+                                if (sessionId) {
+                                  try {
+                                    const res = await fetch(`/api/sessions/${sessionId}/files/${page.id}`);
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      setCode(data.data.code);
+                                      setSchema(data.data.schema);
+                                      setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                                      const defaults = getDefaultValues(data.data.schema);
+                                      setConfigData(defaults);
+                                      const result = validateAll(data.data.code, data.data.schema);
+                                      setValidationResult(result);
+                                      const size = getPreviewSize(data.data.schema);
+                                      setPreviewSize(size);
+                                    }
+                                  } catch (err) {
+                                    console.error("加载页面失败:", err);
+                                  }
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-5">
+                                  {index + 1}
+                                </span>
+                                <span className="font-medium">{page.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {activeDemoId === page.id && (
+                                  <Badge variant="secondary" className="text-[10px] h-5">当前</Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      💡 提示：你也可以通过 AI 对话直接管理页面和项目配置
+                    </p>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
             </Tabs>
           </ResizablePanel>
 
@@ -797,6 +1002,7 @@ ${"=== END ==="}`}
             <PreviewPanel
               code={code}
               sessionId={sessionId}
+              demoId={activeDemoId}
               configData={configData}
               previewSize={previewSize}
             />
@@ -810,14 +1016,42 @@ ${"=== END ==="}`}
               </p>
             </div>
             <ScrollArea className="flex-1">
-              <div className="p-4">
-                <ConfigForm
-                  key={schema}
-                  schema={schema}
-                  onChange={handleConfigChange}
-                  initialData={configData}
-                  sessionId={sessionId}
-                />
+              <div className="p-4 space-y-4">
+                {/* 项目级配置 */}
+                {projectConfigSchema && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">📋 项目配置（所有页面共享）</span>
+                    </div>
+                    <ConfigForm
+                      key={`project-${projectConfigSchema}`}
+                      schema={projectConfigSchema}
+                      onChange={(data) => {
+                        // 项目配置变更时合并到当前 configData
+                        setConfigData((prev) => ({ ...prev, ...data }));
+                      }}
+                      initialData={configData}
+                      sessionId={sessionId}
+                    />
+                    <Separator />
+                  </div>
+                )}
+
+                {/* 页面级配置 */}
+                <div className="space-y-2">
+                  {projectConfigSchema && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">📄 当前页面配置</span>
+                    </div>
+                  )}
+                  <ConfigForm
+                    key={schema}
+                    schema={schema}
+                    onChange={handleConfigChange}
+                    initialData={configData}
+                    sessionId={sessionId}
+                  />
+                </div>
               </div>
             </ScrollArea>
           </ResizablePanel>

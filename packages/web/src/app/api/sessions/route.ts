@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
+import fs from "fs";
 import { getAgentClient } from "@/lib/agent-client";
 import {
   createApiSuccess,
   createApiError,
-  getSessionFiles,
   getSessionPath,
   getSessionMeta,
-  getWorkspaceFiles,
   findWorkspacePath,
+  getWorkspaceMultiDemoFiles,
+  getWorkspaceFiles,
 } from "@/lib/fs-utils";
 import { findActiveSession, createEditSession, archiveActiveSession } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
@@ -52,15 +54,28 @@ export async function POST(request: NextRequest) {
 
       if (meta?.workspaceId) {
         const wsPath = findWorkspacePath(meta.workspaceId);
-        const files = getWorkspaceFiles(meta.workspaceId);
-        code = files?.code || "";
-        schema = files?.schema || "";
+        // 多页面模式：读取所有页面，返回第一个页面的 code/schema 作为兼容
+        const multiFiles = getWorkspaceMultiDemoFiles(meta.workspaceId);
+        if (multiFiles && Object.keys(multiFiles.demos).length > 0) {
+          const firstDemoId = Object.keys(multiFiles.demos)[0];
+          const firstDemo = multiFiles.demos[firstDemoId];
+          code = firstDemo.code;
+          schema = firstDemo.schema;
+        } else {
+          // fallback 到旧格式（workspace 根目录）
+          const files = getWorkspaceFiles(meta.workspaceId);
+          code = files?.code || "";
+          schema = files?.schema || "";
+        }
         tempWorkspace = wsPath || getSessionPath(activeSessionId) || "";
       } else {
-        const files = getSessionFiles(activeSessionId);
-        code = files?.code || "";
-        schema = files?.schema || "";
-        tempWorkspace = getSessionPath(activeSessionId) || "";
+        // 无 workspaceId 的 legacy session，尝试从 session 路径读取
+        const sessionPath = getSessionPath(activeSessionId);
+        const codePath = path.join(sessionPath, "index.tsx");
+        const schemaPath = path.join(sessionPath, "config.schema.json");
+        if (fs.existsSync(codePath)) code = fs.readFileSync(codePath, "utf-8");
+        if (fs.existsSync(schemaPath)) schema = fs.readFileSync(schemaPath, "utf-8");
+        tempWorkspace = sessionPath || "";
       }
 
       return NextResponse.json(

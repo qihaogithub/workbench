@@ -10,6 +10,8 @@ import {
   getWorkspaceMeta as getWorkspaceMetaFromFs,
   writeWorkspaceMeta,
   getWorkspaceMultiDemoFiles,
+  readProjectMeta,
+  listDemoPages,
   type WorkspaceMeta,
 } from "./fs-utils";
 import type { MultiDemoFiles } from "@opencode-workbench/shared";
@@ -21,7 +23,7 @@ export interface CreateWorkspaceResult {
   demos: MultiDemoFiles;
 }
 
-function injectOpencodeAgentConfig(workspacePath: string): void {
+function injectOpencodeAgentConfig(workspacePath: string, projectId: string): void {
   const opencodeDir = path.join(workspacePath, ".opencode");
   const agentsDir = path.join(opencodeDir, "agents");
 
@@ -53,75 +55,45 @@ function injectOpencodeAgentConfig(workspacePath: string): void {
     "utf-8",
   );
 
-  const agentMd = `# Demo Generator Agent
+  // 读取模板文件
+  const templatePath = path.join(
+    process.cwd(),
+    "src",
+    "lib",
+    "agent-prompts",
+    "demo-generator.template.md",
+  );
+  let template = "# Demo Generator Agent\n\n";
+  if (fs.existsSync(templatePath)) {
+    template = fs.readFileSync(templatePath, "utf-8");
+  }
 
-你是 OpenCode Workbench 的 Demo 生成专家。你的职责是根据用户需求，修改和生成符合 OpenCode 标准的 Demo 文件。
+  // 构建运行时上下文
+  const project = readProjectMeta(projectId);
+  const projectName = project?.name ?? projectId;
+  const demoPages = listDemoPages(workspacePath);
 
-## 核心规则
+  const hasProjectConfig = fs.existsSync(
+    path.join(workspacePath, "project.config.schema.json"),
+  );
+  const projectConfigLine = hasProjectConfig
+    ? "项目级共享配置：✅ 已设置（project.config.schema.json）"
+    : "项目级共享配置：未设置";
 
-### 工作文件要求
-在 Session 工作区中，你只能操作以下两个文件：
+  const pageCount = demoPages.length;
+  const pageList = demoPages
+    .map(
+      (p) =>
+        `  📄 "${p.name}" → demos/${p.id}/ (index.tsx + config.schema.json)`,
+    )
+    .join("\n");
 
-1. **\`index.tsx\`** - React 组件实现
-2. **\`config.schema.json\`** - Demo 配置定义
-
-### 代码质量标准
-
-**index.tsx 要求**：
-- 使用 TypeScript，定义完整的 Props 接口（\`interface DemoProps\`）
-- 使用 Tailwind CSS 进行样式设计（不使用内联 style）
-- 可使用 shadcn/ui 组件库
-- 导出默认组件
-- 代码完整可运行，包含必要的 import
-
-**config.schema.json 要求**：
-- 符合 JSON Schema draft 2020-12 规范
-- 包含 \`title\`、\`type\`、\`properties\`、\`required\`
-- 每个属性都有合理的 \`default\` 值
-- properties 与组件 Props 一一对应
-
-### 依赖使用规范
-
-你的 Demo 组件运行在独立的 iframe 沙箱中，可以任意使用 npm 包，系统会自动从 CDN 加载。
-
-- 可以 \`import\` 任何 npm 包（如 \`date-fns\`、\`framer-motion\`、\`lucide-react\` 等）
-- 可以使用 CSS 导入（如 \`import 'some-lib/dist/style.css'\`），系统会自动处理
-- 推荐优先使用 shadcn/ui 组件库保持风格一致
-
-### 单文件组件约束
-
-所有代码必须写在单一 \`index.tsx\` 文件中：
-
-- 禁止 \`import './xxx'\` 形式的相对路径模块导入
-- 如有复用逻辑，以内联函数形式实现
-- 图片等资源使用绝对 URL 或 base64
-
-### 禁止行为
-- ❌ 修改 .session.json 或其他系统文件
-- ❌ 创建除 index.tsx 和 config.schema.json 外的新文件
-- ❌ 使用 \`import './xxx'\` 形式的相对路径导入
-- ❌ 使用 \`as any\`、\`@ts-ignore\`、\`@ts-expect-error\`
-- ❌ 留下 TODO 或占位符
-
-## 工作流程
-
-1. 理解用户需求（修改或创建）
-2. 如需新配置：先更新 config.schema.json
-3. 根据 Schema 更新 index.tsx 的 Props 和实现
-4. 验证样式隔离规范已遵守
-5. 验证两个文件的一致性
-
-## 输出格式
-
-修改完成后，直接写入文件，无需额外说明。
-
-**自检清单**：
-- [ ] 只修改了 index.tsx 和 config.schema.json
-- [ ] Props 接口与 Schema properties 一一对应
-- [ ] 所有代码在单一文件中，没有相对路径导入
-- [ ] 没有使用不安全的类型转换
-- [ ] 代码完整可运行
-`;
+  // 替换占位符
+  const agentMd = template
+    .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
+    .replace(/\{\{PROJECT_CONFIG_LINE\}\}/g, projectConfigLine)
+    .replace(/\{\{PAGE_COUNT\}\}/g, String(pageCount))
+    .replace(/\{\{PAGE_LIST\}\}/g, pageList || "  （暂无页面）");
 
   fs.writeFileSync(path.join(agentsDir, "demo-generator.md"), agentMd, "utf-8");
 }
@@ -158,7 +130,7 @@ export function createWorkspace(
     "utf-8",
   );
 
-  injectOpencodeAgentConfig(workspacePath);
+  injectOpencodeAgentConfig(workspacePath, projectId);
 
   const demos = getWorkspaceMultiDemoFiles(workspaceId) ?? {
     demos: {},
@@ -179,14 +151,24 @@ export function getWorkspace(workspaceId: string) {
   const meta = getWorkspaceMetaFromFs(workspaceId);
   if (!meta) return null;
 
+  // 多页面模式：读取所有页面
+  const multi = getWorkspaceMultiDemoFiles(workspaceId);
+  const demos = multi?.demos ?? {};
+  const projectConfigSchema = multi?.projectConfigSchema;
+
+  // 兼容：如果 workspace 根目录有旧格式文件，也读取
   const codePath = path.join(wsPath, "index.tsx");
   const schemaPath = path.join(wsPath, "config.schema.json");
+  const hasLegacyFiles = fs.existsSync(codePath) && fs.existsSync(schemaPath);
 
   return {
     ...meta,
-    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
-    schema: fs.existsSync(schemaPath) ? fs.readFileSync(schemaPath, "utf-8") : "",
+    demos,
+    projectConfigSchema,
     workspacePath: wsPath,
+    // 兼容旧格式前端
+    code: hasLegacyFiles ? fs.readFileSync(codePath, "utf-8") : (Object.values(demos)[0]?.code ?? ""),
+    schema: hasLegacyFiles ? fs.readFileSync(schemaPath, "utf-8") : (Object.values(demos)[0]?.schema ?? ""),
   };
 }
 
