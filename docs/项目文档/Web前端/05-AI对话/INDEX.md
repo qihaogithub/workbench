@@ -1,6 +1,6 @@
 # AI 对话模块 - 索引
 
-> 更新日期：2026-05-03
+> 更新日期：2026-07-05
 
 ## 文档列表
 
@@ -14,4 +14,5 @@
 
 | 文档 | 说明 |
 |:-----|:-----|
-| [01_对话组件设计.md](./技术/01_对话组件设计.md) | AIChat/HistoryDialog 组件设计、workspaceId 传递链路 |
+| [01_对话组件设计.md](./技术/01_对话组件设计.md) | AIChat/HistoryDialog 组件设计、workspaceId 传递链路、组合逻辑 |
+| [02_AIChat分层架构.md](./技术/02_AIChat分层架构.md) | AIChat 重构后的四层架构（Hooks/Service/Utils/UI）、数据流、关键设计决策 |

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
+import fs from 'fs';
 import {
   createApiSuccess,
   createApiError,
@@ -8,8 +10,11 @@ import {
   findWorkspacePath,
   getWorkspaceDemoPageFiles,
   getProjectConfigSchema,
+  listDemoPages,
+  getDemoDirPath,
 } from '@/lib/fs-utils';
 import { generateSchemaFromCode, mergeWithExistingSchema } from '@/lib/schema-generator';
+import { validateNoSchemaConflictFromStrings } from '@/lib/schema-validator';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +23,8 @@ export async function POST(request: NextRequest) {
 
     let code: string;
     let existingSchema: Record<string, unknown> = {};
+    let workspacePath: string | null = null;
+    let resolvedDemoId: string | null = null;
 
     if (sessionId) {
       if (!sessionExists(sessionId)) {
@@ -49,6 +56,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      workspacePath = findWorkspacePath(meta.workspaceId);
+
       // 如果传了 demoId，读取对应页面；否则尝试读取 workspace 根目录的旧格式（兼容）
       if (demoId && typeof demoId === 'string') {
         const files = getWorkspaceDemoPageFiles(meta.workspaceId, demoId);
@@ -59,6 +68,7 @@ export async function POST(request: NextRequest) {
           );
         }
         code = files.code;
+        resolvedDemoId = demoId;
         try {
           existingSchema = JSON.parse(files.schema);
         } catch {
@@ -104,6 +114,47 @@ export async function POST(request: NextRequest) {
     const merged = Object.keys(existingSchema).length > 0
       ? mergeWithExistingSchema(generated, existingSchema)
       : generated;
+
+    // Schema 冲突校验：当本次生成可定位到具体页面时，确保字段不与项目级 / 其他页面冲突
+    if (workspacePath && resolvedDemoId) {
+      const allDemoPages = listDemoPages(workspacePath);
+      const pageSchemas: Record<string, string> = {};
+
+      for (const page of allDemoPages) {
+        if (page.id === resolvedDemoId) {
+          pageSchemas[page.id] = JSON.stringify(merged);
+        } else {
+          const otherSchemaPath = path.join(
+            getDemoDirPath(workspacePath, page.id),
+            'config.schema.json',
+          );
+          if (fs.existsSync(otherSchemaPath)) {
+            pageSchemas[page.id] = fs.readFileSync(otherSchemaPath, 'utf-8');
+          }
+        }
+      }
+
+      if (!(resolvedDemoId in pageSchemas)) {
+        pageSchemas[resolvedDemoId] = JSON.stringify(merged);
+      }
+
+      const projectSchemaStr = getProjectConfigSchema(workspacePath);
+      const conflictResult = validateNoSchemaConflictFromStrings(
+        projectSchemaStr,
+        pageSchemas,
+      );
+
+      if (!conflictResult.ok) {
+        return NextResponse.json(
+          createApiError(
+            'SCHEMA_CONFLICT',
+            '生成的 Schema 字段与项目级配置冲突',
+            { conflicts: conflictResult.conflicts },
+          ),
+          { status: 400 },
+        );
+      }
+    }
 
     return NextResponse.json(createApiSuccess({
       schema: merged,

@@ -51,6 +51,9 @@ ${cssLinks}
     let currentConfig = ${initialConfig};
     let currentComponent = null;
 
+    // 同步暴露给组件模块顶层使用（读取合并后的 props）
+    window.__DEMO_PROPS__ = currentConfig;
+
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props);
@@ -136,6 +139,8 @@ ${cssLinks}
       if (type === 'UPDATE_CODE') {
         console.log('[iframe] 处理 UPDATE_CODE', { configData: newConfigData, cssImports: newCssImports });
         currentConfig = newConfigData || {};
+        // 必须在 import 之前设置，组件模块在顶层读取 window.__DEMO_PROPS__ 时才能拿到最新值
+        window.__DEMO_PROPS__ = currentConfig;
         updateCssLinks(newCssImports || []);
 
         const blob = new Blob([code], { type: 'application/javascript' });
@@ -159,6 +164,7 @@ ${cssLinks}
       if (type === 'UPDATE_CONFIG') {
         console.log('[iframe] 处理 UPDATE_CONFIG', { configData: newConfigData });
         currentConfig = newConfigData || {};
+        window.__DEMO_PROPS__ = currentConfig;
         if (currentComponent) {
           renderComponent();
         }
@@ -201,6 +207,7 @@ ${cssLinks}
     // 如果有预置代码（嵌入场景），直接加载
     const initialCode = ${initialCode};
     if (initialCode) {
+      window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
       import(moduleUrl)

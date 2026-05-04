@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { projectApiClient } from '@/lib/project-api';
 import type { ProjectListResponse } from '@opencode-workbench/shared';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UsernameSelector, getCurrentUsername, setCurrentUsername, clearCurrentUsername, UsernameDisplay } from '@/components/username-selector';
 import { FolderOpen, History, Plus, RefreshCw } from 'lucide-react';
@@ -187,6 +188,11 @@ export default function ProjectsPage() {
                 <CardTitle className="flex items-center gap-2">
                   <FolderOpen className="h-5 w-5" />
                   {project.name}
+                  {typeof project.demoCount === 'number' && (
+                    <Badge variant="secondary" className="text-[10px] h-5">
+                      {project.demoCount} 页面
+                    </Badge>
+                  )}
                 </CardTitle>
                 {project.description && (
                   <CardDescription>{project.description}</CardDescription>

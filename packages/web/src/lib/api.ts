@@ -1,5 +1,5 @@
 import useSWR, { mutate } from 'swr'
-import type { DemoMeta, ApiResponse, DemoFiles, SessionMeta } from '@opencode-workbench/shared'
+import type { DemoMeta, ApiResponse, SessionMeta } from '@opencode-workbench/shared'
 
 // 真实 API 调用
 const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
@@ -62,21 +62,6 @@ export async function createSession(demoId: string): Promise<ApiResponse<Session
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ demoId }),
-  }).then((res) => res.json())
-}
-
-export async function getSessionFiles(sessionId: string): Promise<ApiResponse<DemoFiles>> {
-  return fetch(`/api/sessions/${sessionId}/files`).then((res) => res.json())
-}
-
-export async function saveSessionFiles(
-  sessionId: string,
-  files: DemoFiles
-): Promise<ApiResponse<void>> {
-  return fetch(`/api/sessions/${sessionId}/files`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(files),
   }).then((res) => res.json())
 }
 

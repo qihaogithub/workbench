@@ -4,6 +4,7 @@ export interface DemoMeta {
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;
+  demoCount?: number;
 }
 
 export interface DemoFiles {

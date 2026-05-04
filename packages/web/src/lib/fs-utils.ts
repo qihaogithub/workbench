@@ -192,6 +192,7 @@ export function listProjects(): DemoMeta[] {
       createdAt: stats.birthtimeMs,
       updatedAt: stats.mtimeMs,
       thumbnail: project?.thumbnail,
+      demoCount: project?.demoPages?.length ?? 1,
     });
   }
 
@@ -537,45 +538,6 @@ export function getSessionMeta(sessionId: string): SessionMeta | null {
   console.log(`[getSessionMeta] 解析后的元数据:`, meta);
   
   return meta;
-}
-
-export function getSessionFiles(sessionId: string): DemoFiles | null {
-  if (!sessionExists(sessionId)) {
-    return null;
-  }
-
-  const sessionPath = getSessionPath(sessionId);
-  const codePath = path.join(sessionPath, "index.tsx");
-  const schemaPath = path.join(sessionPath, "config.schema.json");
-
-  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) {
-    return null;
-  }
-
-  return {
-    code: fs.readFileSync(codePath, "utf-8"),
-    schema: fs.readFileSync(schemaPath, "utf-8"),
-  };
-}
-
-export function updateSessionFiles(
-  sessionId: string,
-  files: DemoFiles,
-): boolean {
-  if (!sessionExists(sessionId)) {
-    return false;
-  }
-
-  const sessionPath = getSessionPath(sessionId);
-
-  fs.writeFileSync(path.join(sessionPath, "index.tsx"), files.code, "utf-8");
-  fs.writeFileSync(
-    path.join(sessionPath, "config.schema.json"),
-    files.schema,
-    "utf-8",
-  );
-
-  return true;
 }
 
 export function deleteSession(sessionId: string): boolean {
@@ -1124,6 +1086,44 @@ export function createWorkspaceDemoPage(
   const meta: DemoPageMeta = {
     id: demoId,
     name: name?.trim() || "新建页面",
+    order: nextOrder,
+    createdAt: now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(demoDir, ".demo.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
+  return meta;
+}
+
+/**
+ * 复制 Workspace 内某 Demo 页面（含目录及所有文件），返回新页面元数据。
+ */
+export function copyWorkspaceDemoPage(
+  workspaceId: string,
+  sourceDemoId: string,
+  name: string,
+): DemoPageMeta | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const sourceDir = getDemoDirPath(wsPath, sourceDemoId);
+  if (!fs.existsSync(sourceDir)) return null;
+
+  const existing = listDemoPages(wsPath);
+  const nextOrder =
+    existing.length > 0 ? Math.max(...existing.map((d) => d.order)) + 1 : 0;
+
+  const demoId = generateDemoPageId();
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  fs.cpSync(sourceDir, demoDir, { recursive: true });
+
+  const now = Date.now();
+  const meta: DemoPageMeta = {
+    id: demoId,
+    name: name?.trim() || "复制的页面",
     order: nextOrder,
     createdAt: now,
     updatedAt: now,

@@ -7,6 +7,7 @@ import {
   getProjectPath,
   listDemoPages,
   createWorkspaceDemoPage,
+  copyWorkspaceDemoPage,
   getSessionMeta,
   sessionExists,
   isSessionExpired,
@@ -67,7 +68,7 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { sessionId, name } = body as { sessionId?: string; name?: string };
+    const { sessionId, name, sourcePageId } = body as { sessionId?: string; name?: string; sourcePageId?: string };
 
     if (!sessionId || typeof sessionId !== "string") {
       return NextResponse.json(
@@ -140,7 +141,9 @@ export async function POST(
       );
     }
 
-    const demoMeta = createWorkspaceDemoPage(meta.workspaceId, name.trim());
+    const demoMeta = sourcePageId
+      ? copyWorkspaceDemoPage(meta.workspaceId, sourcePageId, name.trim())
+      : createWorkspaceDemoPage(meta.workspaceId, name.trim());
     if (!demoMeta) {
       return NextResponse.json(
         createApiError("FILE_WRITE_ERROR", "创建页面失败"),

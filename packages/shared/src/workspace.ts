@@ -226,6 +226,7 @@ export interface ProjectListResponse {
     lastSavedAt: number;       // 最后保存时间
     lastSavedBy: string;       // 最后保存者
     fileCount: number;         // 文件数量
+    demoCount?: number;        // 页面数量
     createdAt: number;
     updatedAt: number;
   }>;

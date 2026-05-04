@@ -15,15 +15,14 @@ import {
   getDefaultValues,
   getPreviewSize,
 } from "../../../../../lib/validator";
+import { mergeConfigToProps, SchemaConflictError } from "@/lib/runtime-props";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
 import {
@@ -32,20 +31,22 @@ import {
 } from "@/components/ui/resizable";
 import {
   Bot,
-  Code2,
   Layers,
   Loader2,
-  AlertCircle,
-  CheckCircle2,
   ImageIcon,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  Eye,
+  Copy,
 } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CodeViewDialog } from "@/components/demo/code-view-dialog";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 
 interface DemoEditPageProps {
@@ -91,6 +92,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoPages, setDemoPages] = useState<{ id: string; name: string; order: number }[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [projectConfigSchema, setProjectConfigSchema] = useState<string | undefined>(undefined);
+
+  // 页面管理编辑状态
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [editingPageName, setEditingPageName] = useState("");
+
+  const [viewCodeDialogOpen, setViewCodeDialogOpen] = useState(false);
+  const [viewCodeData, setViewCodeData] = useState<{
+    code: string;
+    schema: string;
+    pageName: string;
+    pageId: string;
+  }>({ code: "", schema: "", pageName: "", pageId: "" });
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -234,7 +247,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setSchema(loadedSchema);
         setEditorContent(buildFigmaText(loadedCode, loadedSchema));
 
-        const defaults = getDefaultValues(loadedSchema);
+        const defaults = getSafeMergedDefaults(loadedSchema);
         setConfigData(defaults);
 
         const result = validateAll(loadedCode, loadedSchema);
@@ -295,7 +308,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     const result = validateAll(parsed.code, parsed.schema);
     setValidationResult(result);
 
-    const defaults = getDefaultValues(parsed.schema);
+    const defaults = getSafeMergedDefaults(parsed.schema);
     setConfigData((prev) => ({ ...defaults, ...prev }));
 
     const size = getPreviewSize(parsed.schema);
@@ -303,8 +316,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, []);
 
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
-    setConfigData(data);
+    setConfigData((prev) => ({ ...prev, ...data }));
   }, []);
+
+  // 安全合并项目级 + 页面级 Schema 默认值
+  const getSafeMergedDefaults = useCallback(
+    (pageSchema: string) => {
+      try {
+        return mergeConfigToProps(projectConfigSchema, pageSchema);
+      } catch (err) {
+        if (err instanceof SchemaConflictError) {
+          toast({
+            title: "Schema 冲突",
+            description: err.message,
+            variant: "destructive",
+          });
+        }
+        return getDefaultValues(pageSchema);
+      }
+    },
+    [projectConfigSchema],
+  );
 
   const handleSave = async () => {
     console.log(`[handleSave] 开始保存, sessionId: "${sessionId}"`);
@@ -483,7 +515,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
             setPreviewSize(getPreviewSize(newSchemaStr));
 
-            const newDefaults = getDefaultValues(data.data.schema);
+            const newDefaults = getSafeMergedDefaults(data.data.schema);
             setConfigData((prev) => ({ ...prev, ...newDefaults }));
           }
         } catch (err) {
@@ -525,7 +557,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setPreviewSize(size);
     // 更新 configData 为新的默认值
     try {
-      const newConfigData = getDefaultValues(newSchema);
+      const newConfigData = getSafeMergedDefaults(newSchema);
       console.log("[DemoEditPage] New default config data:", newConfigData);
       setConfigData((prev) => {
         const merged = {
@@ -628,10 +660,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   <Bot className="h-4 w-4" />
                   AI 对话
                 </TabsTrigger>
-                <TabsTrigger value="code" className="gap-2">
-                  <Code2 className="h-4 w-4" />
-                  代码编辑
-                </TabsTrigger>
                 <TabsTrigger value="pages" className="gap-2">
                   <Layers className="h-4 w-4" />
                   页面
@@ -692,7 +720,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         setCode(data.data.code || "");
                         setSchema(data.data.schema || "");
                         setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
-                        const defaults = getDefaultValues(data.data.schema || "");
+                        const defaults = getSafeMergedDefaults(data.data.schema || "");
                         setConfigData(defaults);
                         const result = validateAll(data.data.code || "", data.data.schema || "");
                         setValidationResult(result);
@@ -763,143 +791,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </TabsContent>
 
               <TabsContent
-                value="code"
-                className="flex-1 flex flex-col mt-0 h-full data-[state=inactive]:hidden"
-              >
-                {demoPages.length > 0 && (
-                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">当前编辑页面：</span>
-                    <Select
-                      value={activeDemoId}
-                      onValueChange={async (newDemoId) => {
-                        setActiveDemoId(newDemoId);
-                        // 重新加载该页面的代码和 schema
-                        if (sessionId) {
-                          try {
-                            const res = await fetch(`/api/sessions/${sessionId}/files/${newDemoId}`);
-                            const data = await res.json();
-                            if (data.success) {
-                              setCode(data.data.code);
-                              setSchema(data.data.schema);
-                              setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                              const defaults = getDefaultValues(data.data.schema);
-                              setConfigData(defaults);
-                              const result = validateAll(data.data.code, data.data.schema);
-                              setValidationResult(result);
-                              const size = getPreviewSize(data.data.schema);
-                              setPreviewSize(size);
-                            }
-                          } catch (err) {
-                            console.error("切换页面失败:", err);
-                            toast({ title: "切换页面失败", variant: "destructive" });
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {demoPages.map((page) => (
-                          <SelectItem key={page.id} value={page.id}>
-                            {page.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="flex-1 relative w-full">
-                  <Textarea
-                    value={editorContent}
-                    onChange={(e) => handleEditorChange(e.target.value)}
-                    spellCheck={false}
-                    className="w-full h-full resize-none outline-none font-mono text-sm bg-zinc-950 text-zinc-100 border-0 rounded-none"
-                    style={{ tabSize: 2 }}
-                    placeholder={`${"=== DEMO CODE ==="}
-// 在此处粘贴 React 组件代码
-
-${"=== DEMO SCHEMA ==="}
-// 在此处粘贴 JSON Schema 配置
-
-${"=== END ==="}`}
-                  />
-                </div>
-
-                {validationResult.errors.length > 0 && (
-                  <ScrollArea className="h-[120px] border-t bg-destructive/5">
-                    <div className="p-3 space-y-2">
-                      {validationResult.errors.map((error, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-2 text-xs"
-                        >
-                          <AlertCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
-                          <span className="text-destructive">
-                            {error.type === "json_syntax"
-                              ? "[语法]"
-                              : error.type === "props_mismatch"
-                                ? "[不匹配]"
-                                : error.type === "required_missing"
-                                  ? "[必填]"
-                                  : "[警告]"}{" "}
-                            {error.message}
-                            {error.line && ` (第 ${error.line} 行)`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-
-                <div className="px-4 py-2 border-t bg-muted/50 flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-4">
-                    <span>{editorContent.length} 字符</span>
-                    <span>{editorContent.split("\n").length} 行</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {validationResult.isValid ? (
-                      <>
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        <span className="text-green-500">有效</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-3 w-3 text-destructive" />
-                        <span className="text-destructive">
-                          {validationResult.errors.length} 个错误
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent
                 value="pages"
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
               >
                 <ScrollArea className="flex-1">
                   <div className="p-4 space-y-4">
-                    {/* 项目配置 */}
-                    <div className="rounded-lg border bg-card p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-medium">📋 项目配置</h3>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs"
-                          onClick={() => {
-                            toast({ title: "项目配置编辑", description: "高级功能，请通过 AI 对话管理项目配置" });
-                          }}
-                        >
-                          {projectConfigSchema ? "编辑配置" : "添加配置"}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {projectConfigSchema
-                          ? "已设置项目级共享配置"
-                          : "未设置项目级共享配置"}
-                      </p>
-                    </div>
-
                     {/* 页面列表 */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -944,12 +840,13 @@ ${"=== END ==="}`}
                           {demoPages.map((page, index) => (
                             <div
                               key={page.id}
-                              className={`flex items-center justify-between px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
+                              className={`group flex items-center justify-between px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
                                 activeDemoId === page.id
                                   ? "bg-primary/10 border border-primary/20"
                                   : "hover:bg-muted border border-transparent"
                               }`}
                               onClick={async () => {
+                                if (editingPageId === page.id) return;
                                 setActiveDemoId(page.id);
                                 if (sessionId) {
                                   try {
@@ -959,7 +856,7 @@ ${"=== END ==="}`}
                                       setCode(data.data.code);
                                       setSchema(data.data.schema);
                                       setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                                      const defaults = getDefaultValues(data.data.schema);
+                                      const defaults = getSafeMergedDefaults(data.data.schema);
                                       setConfigData(defaults);
                                       const result = validateAll(data.data.code, data.data.schema);
                                       setValidationResult(result);
@@ -972,16 +869,189 @@ ${"=== END ==="}`}
                                 }
                               }}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground w-5">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-xs text-muted-foreground w-5 shrink-0">
                                   {index + 1}
                                 </span>
-                                <span className="font-medium">{page.name}</span>
+                                {editingPageId === page.id ? (
+                                  <Input
+                                    autoFocus
+                                    value={editingPageName}
+                                    onChange={(e) => setEditingPageName(e.target.value)}
+                                    onBlur={async () => {
+                                      const trimmed = editingPageName.trim();
+                                      if (trimmed && trimmed !== page.name) {
+                                        try {
+                                          const res = await fetch(`/api/projects/${demoId}/demos/${page.id}`, {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ sessionId, name: trimmed }),
+                                          });
+                                          const data = await res.json();
+                                          if (data.success) {
+                                            setDemoPages((prev) =>
+                                              prev.map((p) => (p.id === page.id ? { ...p, name: trimmed } : p))
+                                            );
+                                            toast({ title: "名称已更新" });
+                                          } else {
+                                            toast({ title: "更新失败", description: data.error?.message, variant: "destructive" });
+                                          }
+                                        } catch {
+                                          toast({ title: "更新失败", variant: "destructive" });
+                                        }
+                                      }
+                                      setEditingPageId(null);
+                                      setEditingPageName("");
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.currentTarget.blur();
+                                      } else if (e.key === "Escape") {
+                                        setEditingPageId(null);
+                                        setEditingPageName("");
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-7 text-sm px-2 py-0"
+                                  />
+                                ) : (
+                                  <span className="font-medium truncate">{page.name}</span>
+                                )}
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 shrink-0">
                                 {activeDemoId === page.id && (
                                   <Badge variant="secondary" className="text-[10px] h-5">当前</Badge>
                                 )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                                      style={{ opacity: editingPageId === page.id ? 0 : undefined }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!sessionId) return;
+                                        try {
+                                          const res = await fetch(`/api/sessions/${sessionId}/files/${page.id}`);
+                                          const data = await res.json();
+                                          if (data.success) {
+                                            setViewCodeData({
+                                              code: data.data.code,
+                                              schema: data.data.schema,
+                                              pageName: page.name,
+                                              pageId: page.id,
+                                            });
+                                            setViewCodeDialogOpen(true);
+                                          }
+                                        } catch {
+                                          toast({ title: "加载代码失败", variant: "destructive" });
+                                        }
+                                      }}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      查看代码
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingPageId(page.id);
+                                        setEditingPageName(page.name);
+                                      }}
+                                    >
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      重命名
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!sessionId) {
+                                          toast({ title: "未创建 Session", variant: "destructive" });
+                                          return;
+                                        }
+                                        try {
+                                          const res = await fetch(`/api/projects/${demoId}/demos`, {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ sessionId, name: `${page.name} - 副本`, sourcePageId: page.id }),
+                                          });
+                                          const data = await res.json();
+                                          if (data.success) {
+                                            setDemoPages((prev) => [...prev, data.data].sort((a, b) => a.order - b.order));
+                                            toast({ title: "页面复制成功" });
+                                          } else {
+                                            toast({ title: "复制失败", description: data.error?.message, variant: "destructive" });
+                                          }
+                                        } catch {
+                                          toast({ title: "复制失败", variant: "destructive" });
+                                        }
+                                      }}
+                                    >
+                                      <Copy className="mr-2 h-4 w-4" />
+                                      复制页面
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!sessionId) {
+                                          toast({ title: "未创建 Session", variant: "destructive" });
+                                          return;
+                                        }
+                                        if (demoPages.length <= 1) {
+                                          toast({ title: "无法删除", description: "至少需要保留一个页面", variant: "destructive" });
+                                          return;
+                                        }
+                                        if (!confirm(`确定要删除页面「${page.name}」吗？`)) return;
+                                        try {
+                                          const res = await fetch(
+                                            `/api/projects/${demoId}/demos/${page.id}?sessionId=${encodeURIComponent(sessionId)}`,
+                                            { method: "DELETE" }
+                                          );
+                                          const data = await res.json();
+                                          if (data.success) {
+                                            setDemoPages((prev) => prev.filter((p) => p.id !== page.id));
+                                            if (activeDemoId === page.id) {
+                                              const remaining = demoPages.filter((p) => p.id !== page.id);
+                                              const nextPage = remaining[0];
+                                              if (nextPage) {
+                                                setActiveDemoId(nextPage.id);
+                                                const fileRes = await fetch(`/api/sessions/${sessionId}/files/${nextPage.id}`);
+                                                const fileData = await fileRes.json();
+                                                if (fileData.success) {
+                                                  setCode(fileData.data.code);
+                                                  setSchema(fileData.data.schema);
+                                                  setEditorContent(buildFigmaText(fileData.data.code, fileData.data.schema));
+                                                  const defaults = getSafeMergedDefaults(fileData.data.schema);
+                                                  setConfigData(defaults);
+                                                  const result = validateAll(fileData.data.code, fileData.data.schema);
+                                                  setValidationResult(result);
+                                                  const size = getPreviewSize(fileData.data.schema);
+                                                  setPreviewSize(size);
+                                                }
+                                              }
+                                            }
+                                            toast({ title: "页面已删除" });
+                                          } else {
+                                            toast({ title: "删除失败", description: data.error?.message, variant: "destructive" });
+                                          }
+                                        } catch {
+                                          toast({ title: "删除失败", variant: "destructive" });
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      删除页面
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
                           ))}
@@ -990,7 +1060,7 @@ ${"=== END ==="}`}
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                      💡 提示：你也可以通过 AI 对话直接管理页面和项目配置
+                      💡 提示：你也可以通过 AI 对话直接管理页面
                     </p>
                   </div>
                 </ScrollArea>
@@ -1064,6 +1134,44 @@ ${"=== END ==="}`}
         projectId={demoId}
         currentThumbnail={currentThumbnail}
         onThumbnailChange={(thumbnail) => setCurrentThumbnail(thumbnail ?? undefined)}
+      />
+
+      <CodeViewDialog
+        open={viewCodeDialogOpen}
+        onOpenChange={setViewCodeDialogOpen}
+        code={viewCodeData.code}
+        schema={viewCodeData.schema}
+        pageName={viewCodeData.pageName}
+        sessionId={sessionId}
+        demoId={viewCodeData.pageId}
+        onSave={async (type, content) => {
+          if (!sessionId) return;
+          const body = type === "code" ? { code: content } : { schema: content };
+          const res = await fetch(`/api/sessions/${sessionId}/files/${viewCodeData.pageId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.error?.message || "保存失败");
+          }
+          if (type === "code") {
+            setCode(content);
+            setEditorContent(buildFigmaText(content, schema));
+            const result = validateAll(content, schema);
+            setValidationResult(result);
+          } else {
+            setSchema(content);
+            setEditorContent(buildFigmaText(code, content));
+            const defaults = getSafeMergedDefaults(content);
+            setConfigData(defaults);
+            const result = validateAll(code, content);
+            setValidationResult(result);
+            const size = getPreviewSize(content);
+            setPreviewSize(size);
+          }
+        }}
       />
     </div>
   );
