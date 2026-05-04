@@ -262,13 +262,6 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   return (
     <div className="space-y-2">
-      {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-foreground">
-          {label}
-          {required && <span className="text-destructive ml-1">*</span>}
-        </label>
-      )}
-
       {value ? (
         <div className="flex items-start gap-3">
           <div className="relative w-[120px] h-[120px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">

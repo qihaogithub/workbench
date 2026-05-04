@@ -236,8 +236,7 @@ export function ImageListWidget({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{title}</span>
+      <div className="flex items-center justify-end">
         <span className="text-xs text-muted-foreground">
           {value.length} / {maxItems}
         </span>
