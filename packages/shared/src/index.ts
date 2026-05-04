@@ -11,6 +11,27 @@ export interface DemoFiles {
   schema: string;
 }
 
+/**
+ * 多页面文件集合（取代旧的单页 DemoFiles 顶层结构）
+ *
+ * - demos: demoId -> 单页 { code, schema } 对
+ * - projectConfigSchema: workspace/project.config.schema.json 内容（不存在时为 undefined）
+ *   是否存在项目级配置由该字段是否为 undefined 判定，不引入额外标记字段。
+ */
+export interface MultiDemoFiles {
+  demos: Record<string, DemoFiles>;
+  projectConfigSchema?: string;
+}
+
+/**
+ * 运行时合并后传入 iframe 组件的 Props
+ *
+ * 由项目配置 Schema + 页面配置 Schema 的 default 值合并而成。
+ * - 字段必须互斥不重名（写入时已强校验，运行时再兜底检测）
+ * - 配置面板展示合并后的所有字段供用户填写
+ */
+export type MergedComponentProps = Record<string, unknown>;
+
 export interface SessionMeta {
   sessionId: string;
   demoId: string;
@@ -60,6 +81,8 @@ export const ErrorCode = {
   FILE_TOO_LARGE: "FILE_TOO_LARGE",
   UPLOAD_FAILED: "UPLOAD_FAILED",
   COVER_UPLOAD_FAILED: "COVER_UPLOAD_FAILED",
+  DEMO_PAGE_NOT_FOUND: "DEMO_PAGE_NOT_FOUND",
+  SCHEMA_CONFLICT: "SCHEMA_CONFLICT",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -85,6 +108,8 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   FILE_TOO_LARGE: "文件大小超过限制",
   UPLOAD_FAILED: "文件上传失败",
   COVER_UPLOAD_FAILED: "封面图上传失败",
+  DEMO_PAGE_NOT_FOUND: "Demo 页面不存在",
+  SCHEMA_CONFLICT: "Schema 字段命名冲突",
 };
 
 export * from "./workspace";

@@ -6,7 +6,6 @@ import {
   getSessionPath,
   getSnapshotPath,
   projectExists,
-  sessionExists,
   deleteSession,
   getLatestVersion,
   readProjectMeta,
@@ -15,10 +14,13 @@ import {
   countFiles,
   cleanupOldVersions,
   findWorkspacePath,
-  getWorkspaceFiles,
+  getWorkspaceMultiDemoFiles,
 } from "./fs-utils";
-import { createWorkspace, findActiveWorkspace } from "./workspace-manager";
-import type { Project, VersionInfo } from "@opencode-workbench/shared";
+import { createWorkspace } from "./workspace-manager";
+import type {
+  VersionInfo,
+  MultiDemoFiles,
+} from "@opencode-workbench/shared";
 import { generateThumbnail } from "./screenshot";
 
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
@@ -26,9 +28,25 @@ const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 export interface CreateSessionResult {
   sessionId: string;
   workspaceId: string;
+  /** 第一个 demo 页面的代码（兼容字段，Stage 2 将由前端切换为 demos 字段） */
   code: string;
+  /** 第一个 demo 页面的 Schema（兼容字段） */
   schema: string;
   tempWorkspace: string;
+  /** 多页面文件集合 + 项目级配置 Schema */
+  demos: MultiDemoFiles;
+}
+
+/** 从 MultiDemoFiles 提取第一个 demo 的 code/schema，便于 Stage 1 兼容旧调用方 */
+function pickFirstDemoFiles(multi: MultiDemoFiles | null | undefined): {
+  code: string;
+  schema: string;
+} {
+  if (!multi) return { code: "", schema: "" };
+  const ids = Object.keys(multi.demos);
+  if (ids.length === 0) return { code: "", schema: "" };
+  const first = multi.demos[ids[0]];
+  return { code: first.code, schema: first.schema };
 }
 
 /**
@@ -170,8 +188,7 @@ export async function createEditSession(
 
   let workspaceId: string;
   let workspacePath: string;
-  let code: string;
-  let schema: string;
+  let demos: MultiDemoFiles;
 
   if (existingWorkspaceId) {
     const wsPath = findWorkspacePath(existingWorkspaceId);
@@ -180,16 +197,18 @@ export async function createEditSession(
     }
     workspaceId = existingWorkspaceId;
     workspacePath = wsPath;
-    const files = getWorkspaceFiles(existingWorkspaceId);
-    code = files?.code || "";
-    schema = files?.schema || "";
+    demos = getWorkspaceMultiDemoFiles(existingWorkspaceId) ?? {
+      demos: {},
+      projectConfigSchema: undefined,
+    };
   } else {
     const wsResult = createWorkspace(userId, projectId);
     workspaceId = wsResult.workspaceId;
     workspacePath = wsResult.workspacePath;
-    code = wsResult.code;
-    schema = wsResult.schema;
+    demos = wsResult.demos;
   }
+
+  const { code, schema } = pickFirstDemoFiles(demos);
 
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const sessionDir = getProjectSessionDir(userId, projectId);
@@ -222,6 +241,7 @@ export async function createEditSession(
     code,
     schema,
     tempWorkspace: workspacePath,
+    demos,
   };
 }
 
@@ -238,19 +258,18 @@ export function getEditSession(sessionId: string) {
 
   const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 
-  let code = "";
-  let schema = "";
   let workspacePath = "";
+  let demos: MultiDemoFiles = { demos: {}, projectConfigSchema: undefined };
 
   if (meta.workspaceId) {
     const wsPath = findWorkspacePath(meta.workspaceId);
     if (wsPath) {
       workspacePath = wsPath;
-      const files = getWorkspaceFiles(meta.workspaceId);
-      code = files?.code || "";
-      schema = files?.schema || "";
+      demos = getWorkspaceMultiDemoFiles(meta.workspaceId) ?? demos;
     }
   }
+
+  const { code, schema } = pickFirstDemoFiles(demos);
 
   return {
     sessionId: meta.sessionId,
@@ -264,6 +283,7 @@ export function getEditSession(sessionId: string) {
     code,
     schema,
     workspacePath,
+    demos,
   };
 }
 

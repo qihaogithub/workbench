@@ -9,14 +9,16 @@ import {
   findWorkspacePath,
   getWorkspaceMeta as getWorkspaceMetaFromFs,
   writeWorkspaceMeta,
+  getWorkspaceMultiDemoFiles,
   type WorkspaceMeta,
 } from "./fs-utils";
+import type { MultiDemoFiles } from "@opencode-workbench/shared";
 
 export interface CreateWorkspaceResult {
   workspaceId: string;
-  code: string;
-  schema: string;
   workspacePath: string;
+  /** 多页面文件集合（取代旧 code/schema 单文件返回） */
+  demos: MultiDemoFiles;
 }
 
 function injectOpencodeAgentConfig(workspacePath: string): void {
@@ -158,14 +160,15 @@ export function createWorkspace(
 
   injectOpencodeAgentConfig(workspacePath);
 
-  const codePath = path.join(workspacePath, "index.tsx");
-  const schemaPath = path.join(workspacePath, "config.schema.json");
+  const demos = getWorkspaceMultiDemoFiles(workspaceId) ?? {
+    demos: {},
+    projectConfigSchema: undefined,
+  };
 
   return {
     workspaceId,
-    code: fs.readFileSync(codePath, "utf-8"),
-    schema: fs.readFileSync(schemaPath, "utf-8"),
     workspacePath,
+    demos,
   };
 }
 

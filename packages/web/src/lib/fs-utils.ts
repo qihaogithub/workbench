@@ -7,7 +7,12 @@ import {
   ErrorCodeType,
   ERROR_MESSAGES,
 } from "@opencode-workbench/shared";
-import type { Project, VersionInfo } from "@opencode-workbench/shared";
+import type {
+  Project,
+  VersionInfo,
+  DemoPageMeta,
+  MultiDemoFiles,
+} from "@opencode-workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
@@ -233,20 +238,178 @@ const DEFAULT_DEMO_SCHEMA = JSON.stringify(
   2,
 );
 
-export function ensureWorkspaceFiles(workspacePath: string): void {
+// ============================================================
+// Demo 页面 ID 与目录工具函数（多页面架构）
+// ============================================================
+
+/**
+ * 生成 Demo 页面 ID。
+ * 格式 `demo_${Date.now()}_${random6}` 与现有 workspaceId 风格一致，
+ * 防止快速 AI 操作中毫秒级时间戳碰撞。
+ */
+export function generateDemoPageId(): string {
+  return `demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * 获取页面目录的绝对路径
+ */
+export function getDemoDirPath(workspacePath: string, demoId: string): string {
+  return path.join(workspacePath, "demos", demoId);
+}
+
+/**
+ * 读取页面元数据 `.demo.json`
+ * 文件缺失或损坏时返回 null（容错），让上层根据目录列表兜底
+ */
+export function readDemoPageMeta(
+  workspacePath: string,
+  demoId: string,
+): DemoPageMeta | null {
+  const metaPath = path.join(getDemoDirPath(workspacePath, demoId), ".demo.json");
+  if (!fs.existsSync(metaPath)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    if (
+      typeof parsed?.id === "string" &&
+      typeof parsed?.name === "string" &&
+      typeof parsed?.order === "number" &&
+      typeof parsed?.createdAt === "number" &&
+      typeof parsed?.updatedAt === "number"
+    ) {
+      return parsed as DemoPageMeta;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 写入或合并页面元数据 `.demo.json`
+ * 自动维护 `updatedAt` 字段
+ */
+export function writeDemoPageMeta(
+  workspacePath: string,
+  demoId: string,
+  patch: Partial<DemoPageMeta>,
+): DemoPageMeta {
+  const demoDir = getDemoDirPath(workspacePath, demoId);
+  if (!fs.existsSync(demoDir)) {
+    fs.mkdirSync(demoDir, { recursive: true });
+  }
+  const existing = readDemoPageMeta(workspacePath, demoId);
+  const now = Date.now();
+  const merged: DemoPageMeta = {
+    id: existing?.id ?? demoId,
+    name: patch.name ?? existing?.name ?? demoId,
+    order: patch.order ?? existing?.order ?? 0,
+    createdAt: existing?.createdAt ?? patch.createdAt ?? now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(demoDir, ".demo.json"),
+    JSON.stringify(merged, null, 2),
+    "utf-8",
+  );
+  return merged;
+}
+
+/**
+ * 列出 workspace 内所有有效的 Demo 页面（按 order/createdAt 升序）。
+ * 真值来源是文件系统 `demos/` 目录；元数据由 `.demo.json` 提供，缺失时用 id 兜底。
+ */
+export function listDemoPages(workspacePath: string): DemoPageMeta[] {
+  const demosDir = path.join(workspacePath, "demos");
+  if (!fs.existsSync(demosDir)) return [];
+
+  const result: DemoPageMeta[] = [];
+  for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(demosDir, entry.name);
+    if (
+      !fs.existsSync(path.join(dir, "index.tsx")) ||
+      !fs.existsSync(path.join(dir, "config.schema.json"))
+    ) {
+      continue;
+    }
+    const meta = readDemoPageMeta(workspacePath, entry.name);
+    if (meta) {
+      result.push(meta);
+    } else {
+      // .demo.json 缺失 / 损坏时使用目录 mtime 与 id 兜底
+      const stat = fs.statSync(dir);
+      result.push({
+        id: entry.name,
+        name: entry.name,
+        order: result.length,
+        createdAt: stat.birthtimeMs,
+        updatedAt: stat.mtimeMs,
+      });
+    }
+  }
+
+  return result.sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    return a.createdAt - b.createdAt;
+  });
+}
+
+export function ensureWorkspaceFiles(workspacePath: string): {
+  demoIds: string[];
+  defaultDemoMeta?: DemoPageMeta;
+} {
   if (!fs.existsSync(workspacePath)) {
     fs.mkdirSync(workspacePath, { recursive: true });
   }
 
-  const codePath = path.join(workspacePath, "index.tsx");
-  const schemaPath = path.join(workspacePath, "config.schema.json");
+  const demosDir = path.join(workspacePath, "demos");
+  if (!fs.existsSync(demosDir)) {
+    fs.mkdirSync(demosDir, { recursive: true });
+  }
 
-  if (!fs.existsSync(codePath)) {
-    fs.writeFileSync(codePath, DEFAULT_DEMO_CODE, "utf-8");
+  const existing: string[] = [];
+  for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(demosDir, entry.name);
+    if (
+      fs.existsSync(path.join(dir, "index.tsx")) &&
+      fs.existsSync(path.join(dir, "config.schema.json"))
+    ) {
+      existing.push(entry.name);
+    }
   }
-  if (!fs.existsSync(schemaPath)) {
-    fs.writeFileSync(schemaPath, DEFAULT_DEMO_SCHEMA, "utf-8");
+
+  if (existing.length > 0) {
+    return { demoIds: existing };
   }
+
+  // 仓库为空：创建默认页面
+  const demoId = generateDemoPageId();
+  const demoDir = path.join(demosDir, demoId);
+  fs.mkdirSync(demoDir, { recursive: true });
+  fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
+  fs.writeFileSync(
+    path.join(demoDir, "config.schema.json"),
+    DEFAULT_DEMO_SCHEMA,
+    "utf-8",
+  );
+
+  const now = Date.now();
+  const meta: DemoPageMeta = {
+    id: demoId,
+    name: "默认页面",
+    order: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(demoDir, ".demo.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
+
+  return { demoIds: [demoId], defaultDemoMeta: meta };
 }
 
 export function createProject(name: string): DemoMeta {
@@ -256,24 +419,39 @@ export function createProject(name: string): DemoMeta {
   const projectPath = getProjectPath(projectId);
   const workspacePath = path.join(projectPath, "workspace");
 
-  ensureWorkspaceFiles(workspacePath);
+  const { demoIds, defaultDemoMeta } = ensureWorkspaceFiles(workspacePath);
 
-  const projectJson = JSON.stringify(
-    {
-      id: projectId,
-      name: name || projectId,
-      workspacePath: workspacePath,
-      versions: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    null,
-    2,
-  );
+  // 多页面架构：项目元数据需记录所有 demo 页面的 meta
+  const now = Date.now();
+  const demoPages: DemoPageMeta[] = demoIds.map((demoId, index) => {
+    if (defaultDemoMeta && demoId === defaultDemoMeta.id) {
+      return defaultDemoMeta;
+    }
+    const meta = readDemoPageMeta(workspacePath, demoId);
+    return (
+      meta ?? {
+        id: demoId,
+        name: demoId,
+        order: index,
+        createdAt: now,
+        updatedAt: now,
+      }
+    );
+  });
+
+  const project: Project = {
+    id: projectId,
+    name: name || projectId,
+    workspacePath,
+    demoPages,
+    versions: [],
+    createdAt: now,
+    updatedAt: now,
+  };
 
   fs.writeFileSync(
     path.join(projectPath, "project.json"),
-    projectJson,
+    JSON.stringify(project, null, 2),
     "utf-8",
   );
 
@@ -451,7 +629,18 @@ export function readProjectMeta(projectId: string): Project | null {
 
   try {
     const content = fs.readFileSync(projectJsonPath, "utf-8");
-    return JSON.parse(content) as Project;
+    const parsed = JSON.parse(content) as Partial<Project>;
+    // 防御性兜底：旧版 project.json 可能缺少 demoPages / versions
+    return {
+      ...parsed,
+      id: parsed.id ?? projectId,
+      name: parsed.name ?? projectId,
+      workspacePath: parsed.workspacePath ?? path.join(projectPath, "workspace"),
+      demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
+      versions: Array.isArray(parsed.versions) ? parsed.versions : [],
+      createdAt: parsed.createdAt ?? Date.now(),
+      updatedAt: parsed.updatedAt ?? Date.now(),
+    } as Project;
   } catch {
     return null;
   }
@@ -810,4 +999,260 @@ export function createDemo(name: string): DemoMeta {
 
 export function deleteDemo(demoId: string): boolean {
   return deleteProject(demoId);
+}
+
+// ============================================================
+// 多页面 Workspace CRUD（基于 workspaceId）
+// ============================================================
+
+/**
+ * 读取 Workspace 内所有 Demo 页面的代码 + Schema，并附带项目级配置 Schema。
+ * 取代旧的 `getWorkspaceFiles()` 单页面读取。
+ */
+export function getWorkspaceMultiDemoFiles(
+  workspaceId: string,
+): MultiDemoFiles | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath || !fs.existsSync(wsPath)) return null;
+
+  const demosDir = path.join(wsPath, "demos");
+  const demos: Record<string, DemoFiles> = {};
+
+  if (fs.existsSync(demosDir)) {
+    for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const dir = path.join(demosDir, entry.name);
+      const codePath = path.join(dir, "index.tsx");
+      const schemaPath = path.join(dir, "config.schema.json");
+      if (fs.existsSync(codePath) && fs.existsSync(schemaPath)) {
+        demos[entry.name] = {
+          code: fs.readFileSync(codePath, "utf-8"),
+          schema: fs.readFileSync(schemaPath, "utf-8"),
+        };
+      }
+    }
+  }
+
+  const projectConfigSchema = getProjectConfigSchema(wsPath);
+  return { demos, projectConfigSchema };
+}
+
+/**
+ * 读取 Workspace 内单个 Demo 页面的文件，便于代码编辑 Tab 切换。
+ */
+export function getWorkspaceDemoPageFiles(
+  workspaceId: string,
+  demoId: string,
+): DemoFiles | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  const codePath = path.join(demoDir, "index.tsx");
+  const schemaPath = path.join(demoDir, "config.schema.json");
+
+  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+  return {
+    code: fs.readFileSync(codePath, "utf-8"),
+    schema: fs.readFileSync(schemaPath, "utf-8"),
+  };
+}
+
+/**
+ * 写入 Workspace 内某 Demo 页面的代码 / Schema，可选地合并 `.demo.json` 元数据。
+ */
+export function updateWorkspaceDemoFiles(
+  workspaceId: string,
+  demoId: string,
+  files: Partial<DemoFiles>,
+  meta?: Partial<DemoPageMeta>,
+): boolean {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return false;
+
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  if (!fs.existsSync(demoDir)) {
+    fs.mkdirSync(demoDir, { recursive: true });
+  }
+
+  if (typeof files.code === "string") {
+    fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+  }
+  if (typeof files.schema === "string") {
+    fs.writeFileSync(
+      path.join(demoDir, "config.schema.json"),
+      files.schema,
+      "utf-8",
+    );
+  }
+  if (meta) {
+    writeDemoPageMeta(wsPath, demoId, meta);
+  } else {
+    // 即使无显式 meta，也维护一次 updatedAt
+    writeDemoPageMeta(wsPath, demoId, {});
+  }
+
+  return true;
+}
+
+/**
+ * 创建一个新的 Demo 页面，写入默认 `index.tsx`、`config.schema.json` 与 `.demo.json` 元数据。
+ * `order` 取当前最大 order + 1。
+ */
+export function createWorkspaceDemoPage(
+  workspaceId: string,
+  name: string,
+): DemoPageMeta | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const existing = listDemoPages(wsPath);
+  const nextOrder =
+    existing.length > 0 ? Math.max(...existing.map((d) => d.order)) + 1 : 0;
+
+  const demoId = generateDemoPageId();
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  fs.mkdirSync(demoDir, { recursive: true });
+  fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
+  fs.writeFileSync(
+    path.join(demoDir, "config.schema.json"),
+    DEFAULT_DEMO_SCHEMA,
+    "utf-8",
+  );
+
+  const now = Date.now();
+  const meta: DemoPageMeta = {
+    id: demoId,
+    name: name?.trim() || "新建页面",
+    order: nextOrder,
+    createdAt: now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(demoDir, ".demo.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
+  return meta;
+}
+
+/**
+ * 删除 Workspace 内某 Demo 页面（含目录及所有文件）。
+ */
+export function deleteWorkspaceDemoPage(
+  workspaceId: string,
+  demoId: string,
+): boolean {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return false;
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  if (!fs.existsSync(demoDir)) return false;
+  fs.rmSync(demoDir, { recursive: true, force: true });
+  return true;
+}
+
+/**
+ * 列出 Workspace 中所有 Demo 页面的元数据（按 order 升序）
+ */
+export function listWorkspaceDemoPages(workspaceId: string): DemoPageMeta[] {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return [];
+  return listDemoPages(wsPath);
+}
+
+// ============================================================
+// 项目级共享配置（workspace/project.config.schema.json）
+// 是否存在由文件存在性实时判定，不在 project.json 中持久化任何标记字段。
+// ============================================================
+
+const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
+
+export function getProjectConfigPath(workspacePath: string): string {
+  return path.join(workspacePath, PROJECT_CONFIG_FILENAME);
+}
+
+/**
+ * 读取项目级配置 Schema 内容（不存在时返回 undefined）
+ */
+export function getProjectConfigSchema(
+  workspacePath: string,
+): string | undefined {
+  const filePath = getProjectConfigPath(workspacePath);
+  if (!fs.existsSync(filePath)) return undefined;
+  return fs.readFileSync(filePath, "utf-8");
+}
+
+/**
+ * 写入项目级配置 Schema（创建或覆盖）
+ */
+export function saveProjectConfigSchema(
+  workspacePath: string,
+  schema: string,
+): void {
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
+  }
+  fs.writeFileSync(getProjectConfigPath(workspacePath), schema, "utf-8");
+}
+
+/**
+ * 删除项目级配置 Schema 文件（无项目级配置）
+ */
+export function deleteProjectConfigSchema(workspacePath: string): boolean {
+  const filePath = getProjectConfigPath(workspacePath);
+  if (!fs.existsSync(filePath)) return false;
+  fs.rmSync(filePath, { force: true });
+  return true;
+}
+
+/**
+ * 通过 workspaceId 读取项目级配置 Schema
+ */
+export function getWorkspaceProjectConfigSchema(
+  workspaceId: string,
+): string | undefined {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return undefined;
+  return getProjectConfigSchema(wsPath);
+}
+
+/**
+ * 通过 workspaceId 写入项目级配置 Schema
+ */
+export function saveWorkspaceProjectConfigSchema(
+  workspaceId: string,
+  schema: string,
+): boolean {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return false;
+  saveProjectConfigSchema(wsPath, schema);
+  return true;
+}
+
+/**
+ * 通过 workspaceId 删除项目级配置 Schema
+ */
+export function deleteWorkspaceProjectConfigSchema(
+  workspaceId: string,
+): boolean {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return false;
+  return deleteProjectConfigSchema(wsPath);
+}
+
+/**
+ * 保存流程使用：通过 workspace 当前 demos 目录回写 project.json 的 demoPages 数组。
+ * 真值来源是 workspace 文件系统；调用方需要传入持久化路径所属的 workspacePath。
+ */
+export function syncProjectDemoPagesFromWorkspace(
+  projectId: string,
+  workspacePath: string,
+): DemoPageMeta[] {
+  const project = readProjectMeta(projectId);
+  if (!project) return [];
+  const fresh = listDemoPages(workspacePath);
+  project.demoPages = fresh;
+  project.updatedAt = Date.now();
+  writeProjectMeta(projectId, project);
+  return fresh;
 }

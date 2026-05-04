@@ -53,6 +53,20 @@ export interface VersionInfo {
 }
 
 /**
+ * Demo 页面元数据
+ *
+ * 持久化在 workspace/demos/{id}/.demo.json 中。
+ * 保存项目时由后端扫描 demos/ 目录 + 读取各 .demo.json 合并到 Project.demoPages。
+ */
+export interface DemoPageMeta {
+  id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
+  name: string;                // 显示名称，如 "首页"、"详情页"
+  order: number;               // 在页面列表中的展示顺序（小者在前）
+  createdAt: number;           // 创建时间戳
+  updatedAt: number;           // 最后更新时间戳
+}
+
+/**
  * 项目定义
  */
 export interface Project {
@@ -60,11 +74,62 @@ export interface Project {
   name: string;                // 项目名称
   description?: string;        // 项目描述
   workspacePath: string;       // 正式工作空间绝对路径
+  demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
   versions: VersionInfo[];     // 版本历史（最多 50 个）
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
   thumbnail?: string;          // 缩略图路径
+}
+
+/**
+ * Demo 页面完整数据（含代码和页面级配置内容）
+ */
+export interface DemoPageDetail {
+  meta: DemoPageMeta;
+  code: string;                // index.tsx 内容
+  schema: string;              // config.schema.json 内容
+}
+
+/**
+ * 创建 Demo 页面请求
+ */
+export interface CreateDemoPageRequest {
+  name: string;
+}
+
+/**
+ * 更新 Demo 代码/配置请求（按职责拆分）
+ */
+export interface UpdateDemoPageFilesRequest {
+  code?: string;               // index.tsx 内容
+  schema?: string;             // config.schema.json 内容
+}
+
+/**
+ * 更新 Demo 页面元数据请求
+ */
+export interface PatchDemoPageMetaRequest {
+  name?: string;
+  order?: number;
+}
+
+/**
+ * 项目级共享配置
+ *
+ * 是否存在项目级配置由 fs.existsSync(workspace/project.config.schema.json) 实时判定，
+ * 不在 Project 上持久化任何标记字段。
+ */
+export interface ProjectConfig {
+  schema: string;              // project.config.schema.json 内容
+  exists: boolean;             // 是否存在项目级配置
+}
+
+/**
+ * 创建/更新项目级共享配置请求
+ */
+export interface UpdateProjectConfigRequest {
+  schema: string;
 }
 
 /**
