@@ -1,0 +1,14 @@
+[
+  {
+    "id": "user-1777897130773",
+    "role": "user",
+    "content": "你好",
+    "timestamp": 1777897134256
+  },
+  {
+    "id": "assistant-1777897136256",
+    "role": "assistant",
+    "content": "你好！有什么我可以帮你的吗？",
+    "timestamp": 1777897135256
+  }
+]
