@@ -331,6 +331,12 @@ export abstract class BaseAcpBackend implements IBackendAdapter {
     }
   }
 
+  cancelPrompt(): void {
+    if (this.connection) {
+      this.connection.cancelPrompt();
+    }
+  }
+
   getWorkingDir(): string | null {
     return this.config.workingDir || null;
   }

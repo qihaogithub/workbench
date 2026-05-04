@@ -8,6 +8,7 @@ interface BackendWithModelSupport extends IBackendAdapter {
   getCurrentSessionId?: () => string | null;
   start?: (options?: { resumeSessionId?: string }) => Promise<void>;
   getFiles?: () => Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+  cancelPrompt?: () => void;
 }
 
 export class BackendAgent extends BaseAgent {
@@ -77,7 +78,9 @@ export class BackendAgent extends BaseAgent {
   }
 
   cancel(): void {
+    this.backend.cancelPrompt?.();
     this.busy = false;
+    this.setStatus('ready');
   }
 
   async kill(): Promise<void> {

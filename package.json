@@ -6,9 +6,13 @@
     "dev": "concurrently -n web,agent -c blue,green \"pnpm --filter @opencode-workbench/web dev\" \"pnpm --filter @opencode-workbench/agent-service dev\"",
     "dev:web": "pnpm --filter @opencode-workbench/web dev",
     "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
+    "dev:viewer": "pnpm --filter @opencode-workbench/viewer-site dev",
+    "dev:all": "concurrently -n web,agent,viewer -c blue,green,cyan \"pnpm --filter @opencode-workbench/web dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
     "build": "pnpm --filter @opencode-workbench/web build",
+    "build:viewer": "pnpm --filter @opencode-workbench/viewer-site build",
     "lint": "pnpm --filter @opencode-workbench/web lint",
     "typecheck": "pnpm --filter @opencode-workbench/web typecheck",
+    "typecheck:viewer": "pnpm --filter @opencode-workbench/viewer-site typecheck",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed"

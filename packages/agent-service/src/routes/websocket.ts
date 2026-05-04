@@ -106,6 +106,7 @@ let wss: WebSocketServer | null = null;
 
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
+const MESSAGE_TIMEOUT_MS = 600000;
 
 function heartbeat(): void {
   const now = Date.now();
@@ -442,45 +443,73 @@ export async function registerWebSocketRoutes(
               agent.on("status", eventHandler);
               agent.on("file_operation", eventHandler);
 
-              const result: AgentResult = await agent.sendMessage(
-                message.content,
-                message.options,
-              );
-
-              agent.off("stream", eventHandler);
-              agent.off("thought", eventHandler);
-              agent.off("tool_call", eventHandler);
-              agent.off("tool_call_update", eventHandler);
-              agent.off("plan", eventHandler);
-              agent.off("error", eventHandler);
-              agent.off("status", eventHandler);
-              agent.off("file_operation", eventHandler);
-
-              if (result.success) {
-                sendMessage({
-                  type: "finish",
-                  id: message.id,
-                  sessionId,
-                  files: result.files,
-                  metadata: result.metadata,
+              let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+              try {
+                const sendPromise = agent.sendMessage(
+                  message.content,
+                  message.options,
+                );
+                const timeoutPromise = new Promise<AgentResult>((resolve) => {
+                  timeoutHandle = setTimeout(() => {
+                    logger.warn(
+                      { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS },
+                      "Agent sendMessage timed out, cancelling",
+                    );
+                    agent.cancel();
+                    resolve({
+                      success: false,
+                      error: {
+                        code: "MESSAGE_TIMEOUT",
+                        message: `消息处理超时（${Math.round(
+                          MESSAGE_TIMEOUT_MS / 1000,
+                        )}s 无响应），已自动取消`,
+                        retryable: true,
+                      },
+                    });
+                  }, MESSAGE_TIMEOUT_MS);
                 });
-              } else {
+
+                const result: AgentResult = await Promise.race([
+                  sendPromise,
+                  timeoutPromise,
+                ]);
+
+                if (result.success) {
+                  sendMessage({
+                    type: "finish",
+                    id: message.id,
+                    sessionId,
+                    files: result.files,
+                    metadata: result.metadata,
+                  });
+                } else {
+                  sendMessage({
+                    type: "error",
+                    id: message.id,
+                    sessionId,
+                    error: result.error || {
+                      code: "INTERNAL_ERROR",
+                      message: "Unknown error",
+                    },
+                  });
+                }
+
                 sendMessage({
-                  type: "error",
-                  id: message.id,
+                  type: "status",
                   sessionId,
-                  error: result.error || {
-                    code: "INTERNAL_ERROR",
-                    message: "Unknown error",
-                  },
+                  status: "ready",
                 });
+              } finally {
+                if (timeoutHandle) clearTimeout(timeoutHandle);
+                agent.off("stream", eventHandler);
+                agent.off("thought", eventHandler);
+                agent.off("tool_call", eventHandler);
+                agent.off("tool_call_update", eventHandler);
+                agent.off("plan", eventHandler);
+                agent.off("error", eventHandler);
+                agent.off("status", eventHandler);
+                agent.off("file_operation", eventHandler);
               }
-
-              sendMessage({
-                type: "status",
-                sessionId,
-                status: "ready",
-              });
             } catch (error) {
               sendMessage({
                 type: "error",

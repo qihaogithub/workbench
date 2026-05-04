@@ -16,5 +16,6 @@ export interface IBackendAdapter {
   getCurrentSessionId?(): string | null;
   getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
   setPromptTimeout?(seconds: number): void;
+  cancelPrompt?(): void;
   getWorkingDir?(): string | null;
 }

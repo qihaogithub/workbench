@@ -26,11 +26,11 @@ workspace/
 
 ## 页面信息
 
-当前项目：「{{PROJECT_NAME}}」
-{{PROJECT_CONFIG_LINE}}
-包含 {{PAGE_COUNT}} 个页面：
+当前项目：「测试123」
+项目级共享配置：未设置
+包含 1 个页面：
 
-{{PAGE_LIST}}
+  📄 "默认页面" → demos/demo_1777907138495_frij3g/ (index.tsx + config.schema.json)
 
 用户会通过自然语言告诉你操作哪个页面或项目配置。
 如果需要操作某个页面，请在 `demos/{id}/` 目录下编辑 `index.tsx` 或 `config.schema.json`。
@@ -47,40 +47,16 @@ workspace/
 
 ## 页面管理操作
 
-### 创建页面
+页面管理（创建 / 删除 / 重命名 / 改顺序）必须通过 API 端点执行：
 
-直接在工作空间中创建文件：
-
-1. 生成唯一 demoId，格式：`demo_{时间戳}_{6位随机字母数字}`，例：`demo_1777894487658_a3f2k1`
-2. 在 `demos/{demoId}/` 目录下创建三个文件：
-   - `index.tsx` — 页面组件代码
-   - `config.schema.json` — 页面配置定义
-   - `.demo.json` — 页面元数据
-3. `.demo.json` 格式：
-   ```json
-   {
-     "id": "{demoId}",
-     "name": "页面名称",
-     "order": 1,
-     "createdAt": 1777894487658,
-     "updatedAt": 1777894487658
-   }
-   ```
-4. `order` 取当前所有页面最大 order + 1
-5. **自检**：新建页面的 `config.schema.json` 中不得包含 `project.config.schema.json` 中已有的字段名
-
-### 重命名 / 改顺序
-
-编辑对应页面的 `.demo.json`，修改 `name` 或 `order` 字段，同时更新 `updatedAt` 为当前时间戳。
-
-### 删除页面
-
-请提示用户在界面中执行删除操作（当前工具不支持删除目录）。
+- 创建页面：调用 `POST /api/projects/{projectId}/demos`，后端创建目录、写入默认 `index.tsx` + `config.schema.json` + `.demo.json`，并更新 `demoPages`
+- 删除页面：调用 `DELETE /api/projects/{projectId}/demos/{demoId}`，后端删除目录并更新 `demoPages`
+- 重命名 / 改顺序：调用 `PATCH /api/projects/{projectId}/demos/{demoId}`，更新 `.demo.json` 的 `name` / `order`
 
 ## 项目级配置管理（运行时注入，简化约束）
 
 项目级配置允许定义所有页面共享的配置项（如 Logo、品牌色）。
-**关键机制：项目级字段不通过 Props 接口声明，由 PreviewPanel / embed 在运行时统一注入到组件 props。**
+**关键机制：项目级字段不通过 Props 接口声明，由 PreviewPanel / embed 在编译时统一注入到组件 props。**
 
 ### 新增项目配置字段
 1. 创建或编辑 `workspace/project.config.schema.json`，加入新字段
@@ -101,7 +77,7 @@ workspace/
 2. 无需更新页面组件
 
 ### 重要约束（强校验）
-- **禁止页面级 Schema 与项目级 Schema 出现同名字段** —— 写入前必须自检：读取 `project.config.schema.json` 的 properties，确保新页面的 `config.schema.json` 中没有重名字段
+- **禁止页面级 Schema 与项目级 Schema 出现同名字段** —— 后端在所有 Schema 写入入口运行 `validateNoSchemaConflict`，重名直接拒绝
 - 新建页面时使用默认模板（在 Props 中**只**声明页面级字段，项目级字段通过 props 解构使用）
 
 ## 代码质量标准（每个页面内）
@@ -123,6 +99,7 @@ workspace/
 ## 禁止行为
 
 - ❌ 修改 `.session.json`、`.opencode/`、`.workspace.json` 等系统文件
-- ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入前必须自检）
+- ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入会被后端拒绝）
+- ❌ 修改任何 `.config.data.json`（配置值由用户在配置面板中填写，当前版本不持久化）
 - ❌ 在单个页面中使用 `import './xxx'` 相对路径导入
 - ❌ 在 Props 接口中重复声明项目级字段（违反运行时注入约定）
