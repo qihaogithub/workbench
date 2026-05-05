@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Demo 配置",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "Hello World"
+    },
+    "description": {
+      "type": "string",
+      "title": "描述",
+      "default": "This is a demo"
+    }
+  },
+  "required": [
+    "title"
+  ]
+}
