@@ -52,6 +52,7 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
 
     await this.connection.connect();
     await this.connection.createSession({ model: this.config.model });
+    await this.ensureModel();
     this.status = "ready";
     logger.info(
       { sessionId: this.connection.currentSessionId },
@@ -106,11 +107,32 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
       await this.connection.createSession({ model: this.config.model });
     }
 
+    await this.ensureModel();
+
     this.status = "ready";
     logger.info(
       { sessionId: this.connection.currentSessionId },
       "OpenCode ACP backend started",
     );
+  }
+
+  private async ensureModel(): Promise<void> {
+    if (!this.config.model || !this.connection) return;
+    const modelInfo = this.connection.getModelInfo();
+    if (modelInfo?.currentModelId && modelInfo.currentModelId !== this.config.model) {
+      logger.info(
+        { requested: this.config.model, current: modelInfo.currentModelId },
+        "Switching to requested default model",
+      );
+      try {
+        await this.connection.setModel(this.config.model);
+      } catch (error) {
+        logger.warn(
+          { error, modelId: this.config.model },
+          "Failed to switch default model, using CLI default",
+        );
+      }
+    }
   }
 
   private handleFileOperation(operation: {

@@ -8,10 +8,10 @@
       "title": "标题",
       "default": "Hello World"
     },
-    "description": {
+    "subtitle": {
       "type": "string",
-      "title": "描述",
-      "default": "This is a demo"
+      "title": "副标题",
+      "default": "每一张卡片，都是一次灵感的绽放"
     }
   },
   "required": [
