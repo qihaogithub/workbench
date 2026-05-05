@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "配置面板控件示例",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "配置面板控件示例"
+    },
+    "subtitle": {
+      "type": "string",
+      "title": "副标题",
+      "default": "展示所有可用表单控件类型"
+    },
+    "textContent": {
+      "type": "string",
+      "title": "长文本内容",
+      "description": "maxLength > 100 时自动使用文本域控件",
+      "default": "",
+      "maxLength": 500
+    },
+    "richtextContent": {
+      "type": "string",
+      "title": "富文本内容",
+      "description": "使用 ui:widget=richtext 控件",
+      "default": "",
+      "ui:widget": "richtext"
+    },
+    "themeColor": {
+      "type": "string",
+      "title": "主题色",
+      "format": "color",
+      "default": "#3b82f6"
+    },
+    "bgColor": {
+      "type": "string",
+      "title": "背景色",
+      "format": "color",
+      "default": "#fafafa"
+    },
+    "fontSize": {
+      "type": "integer",
+      "title": "字体大小",
+      "description": "有 minimum + maximum 时使用滑块控件",
+      "minimum": 12,
+      "maximum": 48,
+      "default": 16
+    },
+    "borderRadius": {
+      "type": "integer",
+      "title": "圆角大小",
+      "minimum": 0,
+      "maximum": 32,
+      "default": 12
+    },
+    "opacity": {
+      "type": "number",
+      "title": "透明度",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1
+    },
+    "itemCount": {
+      "type": "integer",
+      "title": "项目数量",
+      "description": "无 min/max 时使用数字输入控件",
+      "default": 3
+    },
+    "showHeader": {
+      "type": "boolean",
+      "title": "显示头部",
+      "default": true
+    },
+    "showFooter": {
+      "type": "boolean",
+      "title": "显示底部",
+      "default": false
+    },
+    "enableAnimation": {
+      "type": "boolean",
+      "title": "启用动画",
+      "default": true
+    },
+    "layout": {
+      "type": "string",
+      "title": "布局模式",
+      "enum": ["horizontal", "vertical", "grid"],
+      "enumNames": ["水平布局", "垂直布局", "网格布局"],
+      "default": "grid"
+    },
+    "cardStyle": {
+      "type": "string",
+      "title": "卡片样式",
+      "enum": ["flat", "elevated", "outlined"],
+      "enumNames": ["扁平", "悬浮", "描边"],
+      "default": "elevated"
+    },
+    "banner": {
+      "type": "string",
+      "title": "横幅图片",
+      "description": "使用 ui:widget=file 单图上传控件",
+      "default": "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=1200&h=400&fit=crop",
+      "ui:widget": "file",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 5242880,
+        "minWidth": 400,
+        "minHeight": 100,
+        "maxWidth": 2000,
+        "maxHeight": 800
+      }
+    },
+    "gallery": {
+      "type": "array",
+      "title": "图片画廊",
+      "description": "使用 ui:widget=imageList 多图上传控件",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "alt": { "type": "string" }
+        }
+      },
+      "default": [
+        {
+          "url": "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=400&h=300&fit=crop",
+          "alt": "风景图片1"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
+          "alt": "风景图片2"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=300&fit=crop",
+          "alt": "风景图片3"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop",
+          "alt": "风景图片4"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop",
+          "alt": "风景图片5"
+        }
+      ],
+      "ui:widget": "imageList",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 2097152,
+        "maxItems": 9,
+        "minWidth": 100,
+        "minHeight": 100
+      }
+    }
+  },
+  "required": ["title"],
+  "$demo": {
+    "orderable": ["header", "banner", "gallery", "content", "cards", "footer"]
+  }
+}

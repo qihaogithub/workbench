@@ -13,6 +13,7 @@ import {
   isSessionExpired,
   findWorkspacePath,
   getDemoDirPath,
+  readFoldersMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import fs from "fs";
@@ -192,11 +193,11 @@ export async function PATCH(
     if (!ctx.ok) return ctx.response;
 
     const body = await request.json().catch(() => ({}));
-    const { name, order } = body as { name?: string; order?: number };
+    const { name, order, parentId } = body as { name?: string; order?: number; parentId?: string | null };
 
-    if (name === undefined && order === undefined) {
+    if (name === undefined && order === undefined && parentId === undefined) {
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "name 或 order 至少需提供一个"),
+        createApiError("INVALID_REQUEST", "name、order 或 parentId 至少需提供一个"),
         { status: 400 },
       );
     }
@@ -208,7 +209,17 @@ export async function PATCH(
       });
     }
 
-    const patch: { name?: string; order?: number } = {};
+    if (parentId !== undefined && parentId !== null) {
+      const folders = readFoldersMeta(ctx.ctx.workspacePath);
+      const folder = folders.find(f => f.id === parentId);
+      if (!folder) {
+        return NextResponse.json(createApiError("FOLDER_NOT_FOUND"), {
+          status: 404,
+        });
+      }
+    }
+
+    const patch: { name?: string; order?: number; parentId?: string | null } = {};
     if (typeof name === "string") {
       const trimmed = name.trim();
       if (!trimmed) {
@@ -221,6 +232,9 @@ export async function PATCH(
     }
     if (typeof order === "number" && Number.isFinite(order)) {
       patch.order = order;
+    }
+    if (parentId !== undefined) {
+      patch.parentId = parentId;
     }
 
     const updated = writeDemoPageMeta(ctx.ctx.workspacePath, demoId, patch);

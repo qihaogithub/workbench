@@ -62,8 +62,36 @@ export interface DemoPageMeta {
   id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
   name: string;                // 显示名称，如 "首页"、"详情页"
   order: number;               // 在页面列表中的展示顺序（小者在前）
+  parentId: string | null;     // 所属文件夹 ID，null 表示根级
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
+}
+
+/**
+ * 虚拟文件夹元数据
+ *
+ * 文件夹仅存在于元数据层，物理 demos/ 目录保持扁平结构。
+ * 持久化在 workspace/.folders.json 中，保存时合并到 Project.demoFolders。
+ */
+export interface DemoFolderMeta {
+  id: string;                  // 唯一标识，格式 "folder_{timestamp}_{random6}"
+  name: string;                // 文件夹显示名称
+  parentId: string | null;     // 父文件夹 ID，null 表示根级
+  order: number;               // 同级内的排序（小者在前）
+  createdAt: number;           // 创建时间戳
+  updatedAt: number;           // 最后更新时间戳
+}
+
+/**
+ * 统一树节点类型（页面或文件夹）
+ */
+export type DemoPageItem = DemoFolderMeta | DemoPageMeta;
+
+/**
+ * 类型守卫：判断树节点是否为文件夹
+ */
+export function isDemoFolder(item: DemoPageItem): item is DemoFolderMeta {
+  return item.id.startsWith("folder_");
 }
 
 /**
@@ -75,6 +103,7 @@ export interface Project {
   description?: string;        // 项目描述
   workspacePath: string;       // 正式工作空间绝对路径
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
+  demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
   versions: VersionInfo[];     // 版本历史（最多 50 个）
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
@@ -96,6 +125,7 @@ export interface DemoPageDetail {
  */
 export interface CreateDemoPageRequest {
   name: string;
+  parentId?: string | null;    // 创建时指定所属文件夹
 }
 
 /**
@@ -112,6 +142,40 @@ export interface UpdateDemoPageFilesRequest {
 export interface PatchDemoPageMetaRequest {
   name?: string;
   order?: number;
+  parentId?: string | null;    // 移动到其他文件夹
+}
+
+/**
+ * 创建文件夹请求
+ */
+export interface CreateDemoFolderRequest {
+  name: string;
+  parentId?: string | null;    // 父文件夹 ID，null 为根级
+}
+
+/**
+ * 更新文件夹元数据请求
+ */
+export interface PatchDemoFolderRequest {
+  name?: string;
+  parentId?: string | null;
+  order?: number;
+}
+
+/**
+ * 批量排序请求
+ */
+export interface ReorderDemoPagesRequest {
+  pages: Array<{
+    id: string;
+    order: number;
+    parentId: string | null;
+  }>;
+  folders?: Array<{
+    id: string;
+    order: number;
+    parentId: string | null;
+  }>;
 }
 
 /**

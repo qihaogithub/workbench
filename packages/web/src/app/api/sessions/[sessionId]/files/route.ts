@@ -10,6 +10,7 @@ import {
   getWorkspaceDemoPageFiles,
   updateWorkspaceDemoFiles,
   listWorkspaceDemoPages,
+  readFoldersMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
@@ -56,11 +57,13 @@ export async function GET(
     }
 
     const demoPages = listWorkspaceDemoPages(sessionMeta.workspaceId);
+    const demoFolders = readFoldersMeta(workspacePath);
 
     return NextResponse.json(
       createApiSuccess({
         ...multi,
         demoPages,
+        demoFolders,
         workspacePath,
       }),
     );

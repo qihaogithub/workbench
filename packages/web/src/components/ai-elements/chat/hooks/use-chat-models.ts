@@ -24,11 +24,12 @@ const INITIAL_MODEL_STATE: ModelState = {
 
 interface UseChatModelsOptions {
   agentSessionId: string;
+  workingDir?: string;
   onSessionChange?: () => void;
 }
 
 export function useChatModels(options: UseChatModelsOptions) {
-  const { agentSessionId } = options;
+  const { agentSessionId, workingDir } = options;
 
   const [modelState, setModelState] = useState<ModelState>(INITIAL_MODEL_STATE);
   const modelStreamRef = useRef<AgentStream | null>(null);
@@ -49,7 +50,7 @@ export function useChatModels(options: UseChatModelsOptions) {
           connected = true;
           const ws = (stream as any).ws;
           if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "get_models" }));
+            ws.send(JSON.stringify({ type: "get_models", workingDir }));
           }
         }
       });
@@ -81,7 +82,7 @@ export function useChatModels(options: UseChatModelsOptions) {
         modelStreamRef.current = null;
       }
     };
-  }, [agentSessionId]);
+  }, [agentSessionId, workingDir]);
 
   const handleModelChange = useCallback(
     (modelId: string) => {

@@ -7,6 +7,7 @@ import {
   readProjectMeta,
   getDemoDirPath,
   getProjectConfigSchema,
+  listDemoPages,
 } from "@/lib/fs-utils";
 import { compileCode } from "@/lib/compiler";
 import { generateIframeHtml } from "@/lib/iframe-template";
@@ -24,19 +25,61 @@ export async function GET(
 
     const url = new URL(request.url);
     const page = url.searchParams.get("page");
-    if (!page) {
-      return new NextResponse(
-        "Missing required query parameter: page (demoId)",
-        { status: 400 },
-      );
-    }
 
     if (!projectExists(projectId)) {
       return new NextResponse("Project not found", { status: 404 });
     }
 
     const workspacePath = path.join(getProjectPath(projectId), "workspace");
-    const demoDir = getDemoDirPath(workspacePath, page);
+
+    let effectivePage = page;
+    if (!effectivePage) {
+      const demoPages = listDemoPages(workspacePath);
+      if (demoPages.length > 0) {
+        effectivePage = demoPages[0].id;
+      }
+    }
+
+    if (!effectivePage) {
+      const singleCodePath = path.join(workspacePath, "index.tsx");
+      if (!fs.existsSync(singleCodePath)) {
+        return new NextResponse("No demo pages found", { status: 404 });
+      }
+
+      const code = fs.readFileSync(singleCodePath, "utf-8");
+      const project = readProjectMeta(projectId);
+      const lockedDependencies = project?.lockedDependencies;
+      const compileResult = compileCode(code, lockedDependencies);
+
+      const projectSchemaStr = getProjectConfigSchema(workspacePath);
+      let configData: Record<string, unknown> = {};
+      try {
+        const schema = JSON.parse(projectSchemaStr || "{}");
+        if (schema.properties) {
+          for (const [key, prop] of Object.entries(schema.properties)) {
+            const p = prop as Record<string, unknown>;
+            if (p.default !== undefined) {
+              configData[key] = p.default;
+            }
+          }
+        }
+      } catch {}
+
+      const html = generateIframeHtml({
+        compiledCode: compileResult.compiledCode,
+        cssImports: compileResult.cssImports,
+        configData,
+      });
+
+      return new NextResponse(html, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
+    }
+
+    const demoDir = getDemoDirPath(workspacePath, effectivePage);
     const codePath = path.join(demoDir, "index.tsx");
     const pageSchemaPath = path.join(demoDir, "config.schema.json");
 

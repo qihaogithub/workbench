@@ -38,6 +38,10 @@ export type ResolvedModel = {
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
  */
 export const MODEL_CONFIGS: ModelConfig[] = [
+  // === 默认模型 ===
+  // DeepSeek V4 Flash
+  { matcher: /deepseek-v4-flash/i, alias: "DeepSeek V4 Flash" },
+
   // === OpenCode Zen 白名单 ===
   // Nemotron 3 Super(含 low/medium/high 推理变体)
   { matcher: /nemotron/i, alias: "Nemotron 3 Super" },
@@ -45,6 +49,8 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   { matcher: /minimax/i, alias: "MiniMax M2.5" },
   // Hy3 preview(含 low/medium/high 推理变体)
   { matcher: /hy3/i, alias: "Hy3 preview" },
+  // SenseNova 6.7 Flash Lite
+  { matcher: /sensenova-6.7-flash-lite/i, alias: "SenseNova 6.7 Flash Lite" },
 
   // === 其他全部禁用 ===
   { matcher: /.*/, enabled: false },
@@ -70,20 +76,28 @@ export function resolveModelConfig(rawId: string): {
   };
 }
 
+export const DEFAULT_MODEL_ID = "sensenova/deepseek-v4-flash";
+
 function stripPrefix(label: string): string {
-  return label.replace(/^OpenCode Zen\//i, "");
+  return label.replace(/^[^/]+\//, "");
 }
 
 function buildLabel(alias: string, rawLabel: string): string {
   const stripped = stripPrefix(rawLabel);
-  // 去掉 stripped 中与 alias 重复的前缀部分
-  const aliasLower = alias.toLowerCase();
-  const strippedLower = stripped.toLowerCase();
-  if (strippedLower.startsWith(aliasLower)) {
-    const remainder = stripped.slice(alias.length).trim();
+  const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]+/g, " ").trim();
+  const aliasNorm = normalize(alias);
+  const strippedNorm = normalize(stripped);
+
+  if (strippedNorm === aliasNorm) {
+    return alias;
+  }
+
+  if (strippedNorm.startsWith(aliasNorm)) {
+    const remainder = strippedNorm.slice(aliasNorm.length).trim();
     return remainder ? `${alias} ${remainder}` : alias;
   }
-  return stripped;
+
+  return alias;
 }
 
 export function applyModelConfigs(

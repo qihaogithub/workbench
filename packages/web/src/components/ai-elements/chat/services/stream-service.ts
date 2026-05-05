@@ -113,7 +113,6 @@ export class StreamService {
       throw new Error("Stream not connected");
     }
     this.stream.send(message, `msg-${Date.now()}`, {
-      timeout: 120000,
       stream: true,
       workingDir,
     });
@@ -139,10 +138,10 @@ export class StreamService {
     }
   }
 
-  requestModels(): void {
+  requestModels(workingDir?: string): void {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "get_models" }));
+      ws.send(JSON.stringify({ type: "get_models", workingDir }));
     }
   }
 

@@ -1,6 +1,8 @@
 export { PreviewPanel } from './PreviewPanel';
+export { PreviewGrid } from './PreviewGrid';
 export { ConfigForm } from './ConfigFormNew';
-export type { PreviewPanelProps, ConfigFormProps } from './types';
+export type { PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, GridPageItem, GridIframeProps, PreviewGridProps } from './types';
+export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';
 export { ImageListWidget, type ImageItem, type ImageListWidgetProps } from './ImageListWidget';
 export { NoteButton } from './NoteButton';

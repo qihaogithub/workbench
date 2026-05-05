@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "id": "folder_1777971064717_yr7kgw",
+      "name": "文件夹",
+      "parentId": null,
+      "order": 0,
+      "createdAt": 1777971064717,
+      "updatedAt": 1777971064717
+    },
+    {
+      "id": "folder_1777971071432_exrr96",
+      "name": "文件夹",
+      "parentId": null,
+      "order": 1,
+      "createdAt": 1777971071432,
+      "updatedAt": 1777971071432
+    },
+    {
+      "id": "folder_1777971088458_z3z83k",
+      "name": "123",
+      "parentId": "folder_1777971064717_yr7kgw",
+      "order": 0,
+      "createdAt": 1777971088458,
+      "updatedAt": 1777971110193
+    }
+  ]
+}

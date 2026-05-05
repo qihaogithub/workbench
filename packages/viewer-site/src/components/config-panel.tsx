@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, StickyNote, MessageSquarePlus } from "lucide-react";
+import { Sparkles, StickyNote } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -90,6 +90,17 @@ function extractDefaults(schema: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function mergeDefaults(
+  projectSchema: string | undefined,
+  pageSchema: string | undefined,
+): Record<string, unknown> {
+  const projectDefaults = projectSchema
+    ? extractDefaults(projectSchema)
+    : {};
+  const pageDefaults = pageSchema ? extractDefaults(pageSchema) : {};
+  return { ...projectDefaults, ...pageDefaults };
 }
 
 function NoteButtonReadonly({
@@ -241,7 +252,7 @@ function FieldRenderer({
             onChange(
               field.type === "integer"
                 ? parseInt(e.target.value)
-                : parseFloat(e.target.value)
+                : parseFloat(e.target.value),
             )
           }
           min={field.minimum}
@@ -337,21 +348,41 @@ function FieldRenderer({
 }
 
 interface ConfigPanelProps {
-  schema: string;
+  schema?: string;
+  pageSchema?: string;
   onChange: (configData: Record<string, unknown>) => void;
   className?: string;
 }
 
-export function ConfigPanel({ schema, onChange, className }: ConfigPanelProps) {
-  const fields = useMemo(() => parseSchemaToFields(schema), [schema]);
-  const defaults = useMemo(() => extractDefaults(schema), [schema]);
+export function ConfigPanel({
+  schema,
+  pageSchema,
+  onChange,
+  className,
+}: ConfigPanelProps) {
+  const projectFields = useMemo(
+    () => (schema ? parseSchemaToFields(schema) : []),
+    [schema],
+  );
+  const pageFields = useMemo(
+    () => (pageSchema ? parseSchemaToFields(pageSchema) : []),
+    [pageSchema],
+  );
+  const allFields = useMemo(
+    () => [...projectFields, ...pageFields],
+    [projectFields, pageFields],
+  );
+  const defaults = useMemo(
+    () => mergeDefaults(schema, pageSchema),
+    [schema, pageSchema],
+  );
   const [formData, setFormData] = useState<Record<string, unknown>>(defaults);
   const [noteDialogField, setNoteDialogField] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(defaults);
     onChange(defaults);
-  }, [schema]);
+  }, [schema, pageSchema]);
 
   const handleFieldChange = (key: string, value: unknown) => {
     const newData = { ...formData, [key]: value };
@@ -365,10 +396,14 @@ export function ConfigPanel({ schema, onChange, className }: ConfigPanelProps) {
 
   const currentNoteField = useMemo(() => {
     if (!noteDialogField) return null;
-    return fields.find((f) => f.key === noteDialogField) || null;
-  }, [noteDialogField, fields]);
+    return allFields.find((f) => f.key === noteDialogField) || null;
+  }, [noteDialogField, allFields]);
 
-  if (fields.length === 0) {
+  const hasProjectFields = projectFields.length > 0;
+  const hasPageFields = pageFields.length > 0;
+  const hasAnyFields = hasProjectFields || hasPageFields;
+
+  if (!hasAnyFields) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <Sparkles className="mb-4 h-10 w-10 text-muted-foreground/50" />
@@ -381,15 +416,51 @@ export function ConfigPanel({ schema, onChange, className }: ConfigPanelProps) {
     <TooltipProvider>
       <ScrollArea className={className}>
         <div className="px-3 pb-4">
-          {fields.map((field) => (
-            <FieldRenderer
-              key={field.key}
-              field={field}
-              value={formData[field.key]}
-              onChange={(value) => handleFieldChange(field.key, value)}
-              onNoteClick={handleNoteClick}
-            />
-          ))}
+          {hasProjectFields && (
+            <div className="space-y-0">
+              {hasPageFields && (
+                <div className="flex items-center gap-1.5 pb-2 mb-1 border-b border-border">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    📋 项目配置（所有页面共享）
+                  </span>
+                </div>
+              )}
+              {projectFields.map((field) => (
+                <FieldRenderer
+                  key={field.key}
+                  field={field}
+                  value={formData[field.key]}
+                  onChange={(value) => handleFieldChange(field.key, value)}
+                  onNoteClick={handleNoteClick}
+                />
+              ))}
+            </div>
+          )}
+
+          {hasPageFields && hasProjectFields && (
+            <div className="my-3 border-t border-border" />
+          )}
+
+          {hasPageFields && (
+            <div className="space-y-0">
+              {hasProjectFields && (
+                <div className="flex items-center gap-1.5 pb-2 mb-1 border-b border-border">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    📄 当前页面配置
+                  </span>
+                </div>
+              )}
+              {pageFields.map((field) => (
+                <FieldRenderer
+                  key={field.key}
+                  field={field}
+                  value={formData[field.key]}
+                  onChange={(value) => handleFieldChange(field.key, value)}
+                  onNoteClick={handleNoteClick}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </ScrollArea>
 

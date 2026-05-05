@@ -42,3 +42,38 @@ export interface ConfigFormProps {
   className?: string;
   sessionId?: string;
 }
+
+export type PreviewMode = 'single' | 'grid'
+
+export interface PreviewState {
+  mode: PreviewMode
+  activePageId: string
+  gridColumns: 2 | 3 | 4
+}
+
+export interface GridPageItem {
+  id: string
+  name: string
+  order: number
+}
+
+export interface GridIframeProps {
+  sessionId: string
+  page: GridPageItem
+  visible: boolean
+  hasChanges: boolean
+  configData?: Record<string, unknown>
+  previewSize?: PreviewSize
+}
+
+export interface PreviewGridProps {
+  sessionId: string
+  demoPages: GridPageItem[]
+  activePageId: string
+  gridColumns: 2 | 3 | 4
+  onGridColumnsChange: (columns: 2 | 3 | 4) => void
+  onCardClick: (pageId: string) => void
+  changedPageIds?: Set<string>
+  configData?: Record<string, unknown>
+  previewSize?: PreviewSize
+}

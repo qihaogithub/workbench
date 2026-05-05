@@ -122,7 +122,23 @@ workspace/
 
 ## 禁止行为
 
+- ❌ 访问当前工作空间目录外的任何文件（包括上级目录、packages/、node_modules/ 等）
+- ❌ 访问或修改 `packages/agent-service`、`packages/web`、`packages/shared` 等目录
 - ❌ 修改 `.session.json`、`.opencode/`、`.workspace.json` 等系统文件
 - ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入前必须自检）
 - ❌ 在单个页面中使用 `import './xxx'` 相对路径导入
 - ❌ 在 Props 接口中重复声明项目级字段（违反运行时注入约定）
+- ❌ 询问用户"要修改哪个文件"，你应该根据以下规则自主判断
+
+## 文件修改决策规则
+
+当用户请求修改界面时，按以下规则判断要修改哪个文件：
+
+1. **样式修改**（颜色、大小、布局等）→ 修改 `demos/{demoId}/index.tsx`
+2. **配置项修改**（添加/删除/修改配置字段）→ 修改 `demos/{demoId}/config.schema.json`
+3. **组件结构修改**（添加按钮、卡片等）→ 修改 `demos/{demoId}/index.tsx`
+4. **项目级共享配置**（Logo、品牌色等）→ 修改 `project.config.schema.json`
+5. **页面元数据修改**（名称、顺序等）→ 修改 `demos/{demoId}/.demo.json`
+6. **创建新页面** → 在 `demos/` 下创建新目录，含 `index.tsx` + `config.schema.json` + `.demo.json`
+
+**不要询问用户要修改哪个文件，直接执行。**

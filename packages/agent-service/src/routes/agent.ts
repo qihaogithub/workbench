@@ -95,6 +95,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           backend: backend || 'opencode',
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
+          model: 'sensenova/deepseek-v4-flash',
         };
 
         const agent = manager.getOrCreate(sessionId, config);

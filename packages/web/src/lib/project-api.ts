@@ -10,6 +10,7 @@ import type {
   SaveProjectChangesRequest,
   RestoreVersionRequest,
   DemoPageMeta,
+  DemoFolderMeta,
   DemoFiles,
   MultiDemoFiles,
 } from '@opencode-workbench/shared';
@@ -250,12 +251,13 @@ export class ProjectApiClient {
     projectId: string,
     name: string,
     sessionId: string,
+    parentId?: string | null,
   ): Promise<DemoPageMeta> {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos`,
       {
         method: 'POST',
-        body: JSON.stringify({ sessionId, name }),
+        body: JSON.stringify({ sessionId, name, parentId }),
       }
     );
     if (!response.success || !response.data) {
@@ -300,13 +302,13 @@ export class ProjectApiClient {
   }
 
   /**
-   * 修改 Demo 页面元数据（name / order）
+   * 修改 Demo 页面元数据（name / order / parentId）
    */
   async patchDemoPageMeta(
     projectId: string,
     demoId: string,
     sessionId: string,
-    patch: { name?: string; order?: number },
+    patch: { name?: string; order?: number; parentId?: string | null },
   ): Promise<DemoPageMeta> {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos/${demoId}`,
@@ -386,6 +388,105 @@ export class ProjectApiClient {
     );
     if (!response.success) {
       throw new Error(response.error?.message || '删除项目配置失败');
+    }
+  }
+
+  // ============ 虚拟文件夹管理 ============
+
+  /**
+   * 列出项目下所有文件夹
+   */
+  async listFolders(projectId: string): Promise<DemoFolderMeta[]> {
+    const response = await this.localRequest<{ folders: DemoFolderMeta[] }>(
+      `/api/projects/${projectId}/folders`
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '获取文件夹列表失败');
+    }
+    return response.data.folders;
+  }
+
+  /**
+   * 创建文件夹
+   */
+  async createFolder(
+    projectId: string,
+    name: string,
+    sessionId: string,
+    parentId?: string | null,
+  ): Promise<DemoFolderMeta> {
+    const response = await this.localRequest<DemoFolderMeta>(
+      `/api/projects/${projectId}/folders`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ sessionId, name, parentId }),
+      }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '创建文件夹失败');
+    }
+    return response.data;
+  }
+
+  /**
+   * 更新文件夹元数据
+   */
+  async patchFolder(
+    projectId: string,
+    folderId: string,
+    sessionId: string,
+    patch: { name?: string; parentId?: string | null; order?: number },
+  ): Promise<DemoFolderMeta> {
+    const response = await this.localRequest<DemoFolderMeta>(
+      `/api/projects/${projectId}/folders/${folderId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ sessionId, ...patch }),
+      }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '更新文件夹失败');
+    }
+    return response.data;
+  }
+
+  /**
+   * 删除文件夹
+   */
+  async deleteFolder(
+    projectId: string,
+    folderId: string,
+    sessionId: string,
+    deleteContents: boolean = false,
+  ): Promise<string[]> {
+    const response = await this.localRequest<{ deletedPageIds: string[] }>(
+      `/api/projects/${projectId}/folders/${folderId}?sessionId=${encodeURIComponent(sessionId)}&deleteContents=${deleteContents}`,
+      { method: 'DELETE' }
+    );
+    if (!response.success) {
+      throw new Error(response.error?.message || '删除文件夹失败');
+    }
+    return response.data?.deletedPageIds ?? [];
+  }
+
+  /**
+   * 批量排序页面和文件夹
+   */
+  async reorderDemoPages(
+    projectId: string,
+    sessionId: string,
+    pages: Array<{ id: string; order: number; parentId: string | null }>,
+    folders?: Array<{ id: string; order: number; parentId: string | null }>,
+  ): Promise<void> {
+    const response = await this.localRequest<null>(
+      `/api/projects/${projectId}/demo-pages/reorder`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ sessionId, pages, folders }),
+      }
+    );
+    if (!response.success) {
+      throw new Error(response.error?.message || '批量排序失败');
     }
   }
 

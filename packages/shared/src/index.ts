@@ -84,6 +84,9 @@ export const ErrorCode = {
   COVER_UPLOAD_FAILED: "COVER_UPLOAD_FAILED",
   DEMO_PAGE_NOT_FOUND: "DEMO_PAGE_NOT_FOUND",
   SCHEMA_CONFLICT: "SCHEMA_CONFLICT",
+  FOLDER_NOT_FOUND: "FOLDER_NOT_FOUND",
+  FOLDER_DEPTH_EXCEEDED: "FOLDER_DEPTH_EXCEEDED",
+  CIRCULAR_REFERENCE: "CIRCULAR_REFERENCE",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -111,6 +114,9 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   COVER_UPLOAD_FAILED: "封面图上传失败",
   DEMO_PAGE_NOT_FOUND: "Demo 页面不存在",
   SCHEMA_CONFLICT: "Schema 字段命名冲突",
+  FOLDER_NOT_FOUND: "文件夹不存在",
+  FOLDER_DEPTH_EXCEEDED: "文件夹嵌套不能超过 3 层",
+  CIRCULAR_REFERENCE: "不能将文件夹移动到自身或其子文件夹中",
 };
 
 export * from "./workspace";

@@ -74,9 +74,26 @@
       "sessionId": "session-1777815850083-hyrnxz98f",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1777302741358/v9",
       "fileCount": 7
+    },
+    {
+      "versionId": "v10",
+      "savedAt": 1777957819829,
+      "savedBy": "37972b72-c31e-4344-a3e8-1509c0b8ba8c",
+      "sessionId": "session-1777956894986-cfhwopeec",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1777302741358/v10",
+      "fileCount": 7
+    },
+    {
+      "versionId": "v11",
+      "savedAt": 1777962183139,
+      "savedBy": "37972b72-c31e-4344-a3e8-1509c0b8ba8c",
+      "sessionId": "session-1777957877038-wfpww1lxz",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1777302741358/v11",
+      "fileCount": 9
     }
   ],
   "createdAt": 1777302741361,
-  "updatedAt": 1777821001066,
-  "thumbnail": "/thumbnails/proj_1777302741358_cover.png"
+  "updatedAt": 1777962183140,
+  "thumbnail": "/thumbnails/proj_1777302741358_cover.png",
+  "demoPages": []
 }

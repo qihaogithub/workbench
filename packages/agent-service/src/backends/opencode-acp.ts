@@ -31,9 +31,13 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
     }
 
     this.status = "initializing";
+    const workingDir = this.config.workingDir;
+    if (!workingDir) {
+      logger.warn("[OpenCode ACP Backend] workingDir is not set in initialize(), falling back to process.cwd() — AI may see incorrect directory");
+    }
     this.connection = new AcpConnection(
       "opencode",
-      this.config.workingDir || process.cwd(),
+      workingDir || process.cwd(),
     );
 
     this.connection.on("disconnect", () => {
@@ -61,12 +65,15 @@ export class OpenCodeAcpBackend implements IBackendAdapter {
     }
 
     this.status = "initializing";
-    const workingDir = this.config.workingDir || process.cwd();
+    const workingDir = this.config.workingDir;
+    if (!workingDir) {
+      logger.warn("[OpenCode ACP Backend] workingDir is not set in start(), falling back to process.cwd() — AI may see incorrect directory");
+    }
     logger.info(
-      { workingDir: this.config.workingDir, finalWorkingDir: workingDir },
+      { workingDir: this.config.workingDir, finalWorkingDir: workingDir || process.cwd() },
       "OpenCode ACP backend starting",
     );
-    this.connection = new AcpConnection("opencode", workingDir);
+    this.connection = new AcpConnection("opencode", workingDir || process.cwd());
 
     this.connection.on("disconnect", () => {
       this.status = "error";

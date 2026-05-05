@@ -11,6 +11,7 @@ import type {
   Project,
   VersionInfo,
   DemoPageMeta,
+  DemoFolderMeta,
   MultiDemoFiles,
 } from "@opencode-workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
@@ -278,7 +279,10 @@ export function readDemoPageMeta(
       typeof parsed?.createdAt === "number" &&
       typeof parsed?.updatedAt === "number"
     ) {
-      return parsed as DemoPageMeta;
+      return {
+        ...parsed,
+        parentId: parsed.parentId ?? null,
+      } as DemoPageMeta;
     }
     return null;
   } catch {
@@ -305,6 +309,7 @@ export function writeDemoPageMeta(
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
     order: patch.order ?? existing?.order ?? 0,
+    parentId: patch.parentId !== undefined ? patch.parentId : (existing?.parentId ?? null),
     createdAt: existing?.createdAt ?? patch.createdAt ?? now,
     updatedAt: now,
   };
@@ -344,6 +349,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
         id: entry.name,
         name: entry.name,
         order: result.length,
+        parentId: null,
         createdAt: stat.birthtimeMs,
         updatedAt: stat.mtimeMs,
       });
@@ -401,6 +407,7 @@ export function ensureWorkspaceFiles(workspacePath: string): {
     id: demoId,
     name: "默认页面",
     order: 0,
+    parentId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -434,6 +441,7 @@ export function createProject(name: string): DemoMeta {
         id: demoId,
         name: demoId,
         order: index,
+        parentId: null,
         createdAt: now,
         updatedAt: now,
       }
@@ -445,6 +453,7 @@ export function createProject(name: string): DemoMeta {
     name: name || projectId,
     workspacePath,
     demoPages,
+    demoFolders: [],
     versions: [],
     createdAt: now,
     updatedAt: now,
@@ -592,13 +601,17 @@ export function readProjectMeta(projectId: string): Project | null {
   try {
     const content = fs.readFileSync(projectJsonPath, "utf-8");
     const parsed = JSON.parse(content) as Partial<Project>;
-    // 防御性兜底：旧版 project.json 可能缺少 demoPages / versions
+    // 防御性兜底：旧版 project.json 可能缺少 demoPages / versions / demoFolders
+    const demoPages = Array.isArray(parsed.demoPages)
+      ? parsed.demoPages.map(p => ({ ...p, parentId: p.parentId ?? null }))
+      : [];
     return {
       ...parsed,
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
       workspacePath: parsed.workspacePath ?? path.join(projectPath, "workspace"),
-      demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
+      demoPages,
+      demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
@@ -1064,13 +1077,15 @@ export function updateWorkspaceDemoFiles(
 export function createWorkspaceDemoPage(
   workspaceId: string,
   name: string,
+  parentId?: string | null,
 ): DemoPageMeta | null {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return null;
 
   const existing = listDemoPages(wsPath);
+  const sameParent = existing.filter(d => (d.parentId ?? null) === (parentId ?? null));
   const nextOrder =
-    existing.length > 0 ? Math.max(...existing.map((d) => d.order)) + 1 : 0;
+    sameParent.length > 0 ? Math.max(...sameParent.map((d) => d.order)) + 1 : 0;
 
   const demoId = generateDemoPageId();
   const demoDir = getDemoDirPath(wsPath, demoId);
@@ -1087,6 +1102,7 @@ export function createWorkspaceDemoPage(
     id: demoId,
     name: name?.trim() || "新建页面",
     order: nextOrder,
+    parentId: parentId ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -1112,9 +1128,11 @@ export function copyWorkspaceDemoPage(
   const sourceDir = getDemoDirPath(wsPath, sourceDemoId);
   if (!fs.existsSync(sourceDir)) return null;
 
+  const sourceMeta = readDemoPageMeta(wsPath, sourceDemoId);
   const existing = listDemoPages(wsPath);
+  const sameParent = existing.filter(d => (d.parentId ?? null) === (sourceMeta?.parentId ?? null));
   const nextOrder =
-    existing.length > 0 ? Math.max(...existing.map((d) => d.order)) + 1 : 0;
+    sameParent.length > 0 ? Math.max(...sameParent.map((d) => d.order)) + 1 : 0;
 
   const demoId = generateDemoPageId();
   const demoDir = getDemoDirPath(wsPath, demoId);
@@ -1125,6 +1143,7 @@ export function copyWorkspaceDemoPage(
     id: demoId,
     name: name?.trim() || "复制的页面",
     order: nextOrder,
+    parentId: sourceMeta?.parentId ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -1252,7 +1271,203 @@ export function syncProjectDemoPagesFromWorkspace(
   if (!project) return [];
   const fresh = listDemoPages(workspacePath);
   project.demoPages = fresh;
+  project.demoFolders = readFoldersMeta(workspacePath);
   project.updatedAt = Date.now();
   writeProjectMeta(projectId, project);
   return fresh;
+}
+
+// ============================================================
+// 虚拟文件夹管理（.folders.json）
+// ============================================================
+
+const FOLDERS_META_FILENAME = ".folders.json";
+
+function getFoldersMetaPath(workspacePath: string): string {
+  return path.join(workspacePath, FOLDERS_META_FILENAME);
+}
+
+export function readFoldersMeta(workspacePath: string): DemoFolderMeta[] {
+  const metaPath = getFoldersMetaPath(workspacePath);
+  if (!fs.existsSync(metaPath)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    if (Array.isArray(parsed?.folders)) {
+      return parsed.folders as DemoFolderMeta[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFoldersMeta(workspacePath: string, folders: DemoFolderMeta[]): void {
+  const metaPath = getFoldersMetaPath(workspacePath);
+  fs.writeFileSync(metaPath, JSON.stringify({ folders }, null, 2), "utf-8");
+}
+
+export function generateFolderId(): string {
+  return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function getFolderDepth(folderId: string, folders: DemoFolderMeta[]): number {
+  let depth = 0;
+  let current = folders.find(f => f.id === folderId);
+  while (current?.parentId) {
+    depth++;
+    current = folders.find(f => f.id === current!.parentId);
+  }
+  return depth;
+}
+
+export function isDescendant(folderId: string, targetParentId: string, folders: DemoFolderMeta[]): boolean {
+  let current = folders.find(f => f.id === targetParentId);
+  while (current) {
+    if (current.id === folderId) return true;
+    current = folders.find(f => f.id === current!.parentId);
+  }
+  return false;
+}
+
+export function createDemoFolder(
+  workspacePath: string,
+  name: string,
+  parentId?: string | null,
+): DemoFolderMeta | null {
+  const folders = readFoldersMeta(workspacePath);
+
+  if (parentId) {
+    const parent = folders.find(f => f.id === parentId);
+    if (!parent) return null;
+    if (getFolderDepth(parentId, folders) >= 3) return null;
+  }
+
+  const sameParent = folders.filter(f => (f.parentId ?? null) === (parentId ?? null));
+  const nextOrder =
+    sameParent.length > 0 ? Math.max(...sameParent.map(f => f.order)) + 1 : 0;
+
+  const now = Date.now();
+  const folder: DemoFolderMeta = {
+    id: generateFolderId(),
+    name: name.trim() || "新建文件夹",
+    parentId: parentId ?? null,
+    order: nextOrder,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  folders.push(folder);
+  writeFoldersMeta(workspacePath, folders);
+  return folder;
+}
+
+export function updateDemoFolder(
+  workspacePath: string,
+  folderId: string,
+  patch: { name?: string; parentId?: string | null; order?: number },
+): DemoFolderMeta | null {
+  const folders = readFoldersMeta(workspacePath);
+  const index = folders.findIndex(f => f.id === folderId);
+  if (index === -1) return null;
+
+  if (patch.parentId !== undefined && patch.parentId !== null) {
+    const targetParent = folders.find(f => f.id === patch.parentId);
+    if (!targetParent) return null;
+    if (isDescendant(folderId, patch.parentId, folders)) return null;
+    if (getFolderDepth(folderId, folders) + 1 > 3) return null;
+  }
+
+  const existing = folders[index];
+  folders[index] = {
+    ...existing,
+    ...(patch.name !== undefined && { name: patch.name.trim() }),
+    ...(patch.parentId !== undefined && { parentId: patch.parentId }),
+    ...(patch.order !== undefined && { order: patch.order }),
+    updatedAt: Date.now(),
+  };
+
+  writeFoldersMeta(workspacePath, folders);
+  return folders[index];
+}
+
+export function deleteDemoFolder(
+  workspacePath: string,
+  folderId: string,
+  deleteContents: boolean = false,
+): { success: boolean; deletedPageIds?: string[] } {
+  const folders = readFoldersMeta(workspacePath);
+  const index = folders.findIndex(f => f.id === folderId);
+  if (index === -1) return { success: false };
+
+  const deletedPageIds: string[] = [];
+
+  if (deleteContents) {
+    const descendantFolderIds = new Set<string>();
+    const collectDescendants = (parentId: string) => {
+      for (const f of folders) {
+        if (f.parentId === parentId) {
+          descendantFolderIds.add(f.id);
+          collectDescendants(f.id);
+        }
+      }
+    };
+    collectDescendants(folderId);
+    descendantFolderIds.add(folderId);
+
+    const pages = listDemoPages(workspacePath);
+    for (const page of pages) {
+      if (page.parentId && descendantFolderIds.has(page.parentId)) {
+        const wsId = path.basename(workspacePath);
+        deleteWorkspaceDemoPage(wsId, page.id);
+        deletedPageIds.push(page.id);
+      }
+    }
+
+    const remaining = folders.filter(f => !descendantFolderIds.has(f.id));
+    writeFoldersMeta(workspacePath, remaining);
+  } else {
+    const remaining = folders.filter(f => f.id !== folderId);
+    for (const f of remaining) {
+      if (f.parentId === folderId) {
+        f.parentId = folders.find(fo => fo.id === folderId)?.parentId ?? null;
+      }
+    }
+    writeFoldersMeta(workspacePath, remaining);
+
+    const pages = listDemoPages(workspacePath);
+    let changed = false;
+    for (const page of pages) {
+      if (page.parentId === folderId) {
+        writeDemoPageMeta(workspacePath, page.id, {
+          parentId: folders.find(fo => fo.id === folderId)?.parentId ?? null,
+        });
+        changed = true;
+      }
+    }
+  }
+
+  return { success: true, deletedPageIds };
+}
+
+export function reorderDemoPages(
+  workspacePath: string,
+  pageUpdates: Array<{ id: string; order: number; parentId: string | null }>,
+  folderUpdates?: Array<{ id: string; order: number; parentId: string | null }>,
+): boolean {
+  for (const u of pageUpdates) {
+    writeDemoPageMeta(workspacePath, u.id, { order: u.order, parentId: u.parentId });
+  }
+
+  if (folderUpdates && folderUpdates.length > 0) {
+    const folders = readFoldersMeta(workspacePath);
+    for (const u of folderUpdates) {
+      const idx = folders.findIndex(f => f.id === u.id);
+      if (idx !== -1) {
+        folders[idx] = { ...folders[idx], order: u.order, parentId: u.parentId, updatedAt: Date.now() };
+      }
+    }
+    writeFoldersMeta(workspacePath, folders);
+  }
+
+  return true;
 }

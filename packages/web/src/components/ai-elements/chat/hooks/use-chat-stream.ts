@@ -31,6 +31,7 @@ interface UseChatStreamOptions {
   sessionId: string;
   agentSessionId: string;
   workingDir?: string;
+  demoId?: string;
   onCodeUpdate?: (code: string) => void;
   onSchemaUpdate?: (schema: string) => void;
   onFilesChange?: (
@@ -60,6 +61,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     sessionId,
     agentSessionId,
     workingDir,
+    demoId,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
@@ -76,16 +78,53 @@ export function useChatStream(options: UseChatStreamOptions) {
   const [plan, setPlan] = useState<string>("");
   const [pendingPermissionRequest, setPendingPermissionRequest] =
     useState<PermissionRequest | null>(null);
+  const [silenceSeconds, setSilenceSeconds] = useState<number | null>(null);
 
   const streamServiceRef = useRef<StreamService | null>(null);
   const streamSessionIdRef = useRef<string>("");
+  const lastEventAtRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const SILENCE_THRESHOLD_MS = 30000;
+  const SILENCE_TICK_MS = 1000;
+
+  const stopSilenceTracking = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearInterval(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    lastEventAtRef.current = null;
+    setSilenceSeconds(null);
+  }, []);
+
+  const startSilenceTracking = useCallback(() => {
+    lastEventAtRef.current = Date.now();
+    setSilenceSeconds(null);
+    if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+    silenceTimerRef.current = setInterval(() => {
+      if (lastEventAtRef.current == null) return;
+      const elapsed = Date.now() - lastEventAtRef.current;
+      if (elapsed >= SILENCE_THRESHOLD_MS) {
+        setSilenceSeconds(Math.floor(elapsed / 1000));
+      } else {
+        setSilenceSeconds(null);
+      }
+    }, SILENCE_TICK_MS);
+  }, []);
+
+  const markActivity = useCallback(() => {
+    if (lastEventAtRef.current != null) {
+      lastEventAtRef.current = Date.now();
+    }
+  }, []);
 
   // 清理流
   useEffect(() => {
     return () => {
       streamServiceRef.current?.close();
+      stopSilenceTracking();
     };
-  }, []);
+  }, [stopSilenceTracking]);
 
   // 会话切换时关闭旧流
   useEffect(() => {
@@ -96,6 +135,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     ) {
       streamServiceRef.current.close();
       streamSessionIdRef.current = "";
+      stopSilenceTracking();
       setIsStreaming(false);
       setStreamContent("");
       setCurrentMessage({
@@ -104,7 +144,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         parts: [],
       });
     }
-  }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage]);
+  }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage, stopSilenceTracking]);
 
   const handleSend = useCallback(
     async (userMessage: string) => {
@@ -163,6 +203,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         streamService.setHandlers({
           onStream: (content) => {
+            markActivity();
             accumulatedContent += content;
             setStreamContent(accumulatedContent);
             setCurrentMessage((prev) => ({
@@ -173,6 +214,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onThought: (content) => {
+            markActivity();
             setCurrentMessage((prev) => ({
               ...prev,
               parts: addThoughtPart(prev.parts || [], content),
@@ -180,6 +222,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onPlan: (content) => {
+            markActivity();
             setPlan((prev) => prev + content);
           },
 
@@ -188,6 +231,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onToolCall: (toolCall) => {
+            markActivity();
             setCurrentMessage((prev) => ({
               ...prev,
               parts: addToolPart(prev.parts || [], toolCall),
@@ -195,6 +239,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onToolUpdate: (update) => {
+            markActivity();
             setCurrentMessage((prev) => ({
               ...prev,
               parts: updateToolPart(prev.parts || [], update),
@@ -206,6 +251,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onFileOperation: (operation) => {
+            markActivity();
             if (operation.method === "fs/write_text_file" && operation.path) {
               realtimeFilesRef.set(operation.path, {
                 action: "modified",
@@ -224,6 +270,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onFinish: async (result) => {
+            stopSilenceTracking();
             const currentMsg = currentMessageRef.current;
             const assistantMessage: ChatMessage = {
               id: `assistant-${Date.now()}`,
@@ -274,34 +321,37 @@ export function useChatStream(options: UseChatStreamOptions) {
 
             if (finalFiles.length > 0) {
               onFilesChange?.(finalFiles);
-              const { codeUpdated, schemaUpdated } =
-                extractCodeAndSchemaUpdates(finalFiles, {
-                  onCodeUpdate,
-                  onSchemaUpdate,
-                });
+            }
 
-              if (!codeUpdated || !schemaUpdated) {
-                const filesData = await fetchSessionFiles(sessionId);
-                if (filesData) {
-                  const { code, schema } = filesData;
-                  if (code && !codeUpdated) onCodeUpdate?.(code);
-                  if (schema && !schemaUpdated) onSchemaUpdate?.(schema);
+            const { codeUpdated, schemaUpdated } =
+              finalFiles.length > 0
+                ? extractCodeAndSchemaUpdates(finalFiles, {
+                    onCodeUpdate,
+                    onSchemaUpdate,
+                  })
+                : { codeUpdated: false, schemaUpdated: false };
 
-                  const fetchedFiles: FileChangeEntry[] = [];
-                  if (!codeUpdated && code)
-                    fetchedFiles.push({
-                      path: "index.tsx",
-                      action: "modified",
-                      content: code,
-                    });
-                  if (!schemaUpdated && schema)
-                    fetchedFiles.push({
-                      path: "config.schema.json",
-                      action: "modified",
-                      content: schema,
-                    });
-                  if (fetchedFiles.length > 0) onFilesChange?.(fetchedFiles);
-                }
+            if (!codeUpdated || !schemaUpdated) {
+              const filesData = await fetchSessionFiles(sessionId, demoId);
+              if (filesData) {
+                const { code, schema } = filesData;
+                if (code && !codeUpdated) onCodeUpdate?.(code);
+                if (schema && !schemaUpdated) onSchemaUpdate?.(schema);
+
+                const fetchedFiles: FileChangeEntry[] = [];
+                if (!codeUpdated && code)
+                  fetchedFiles.push({
+                    path: "index.tsx",
+                    action: "modified",
+                    content: code,
+                  });
+                if (!schemaUpdated && schema)
+                  fetchedFiles.push({
+                    path: "config.schema.json",
+                    action: "modified",
+                    content: schema,
+                  });
+                if (fetchedFiles.length > 0) onFilesChange?.(fetchedFiles);
               }
             }
 
@@ -327,12 +377,14 @@ export function useChatStream(options: UseChatStreamOptions) {
             setMessages((prev) => [...prev, errorMessage]);
             setStreamContent("");
             setIsStreaming(false);
+            stopSilenceTracking();
           },
         });
 
         await streamService.waitForConnection(stream);
 
         streamService.sendMessage(userMessage, workingDir);
+        startSilenceTracking();
       } catch (error) {
         console.warn("WebSocket 失败，使用非流式模式:", error);
 
@@ -346,7 +398,6 @@ export function useChatStream(options: UseChatStreamOptions) {
             {
               workingDir,
               options: {
-                timeout: 120000,
                 stream: false,
               },
             },
@@ -375,10 +426,27 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           if (result.data?.files && result.data.files.length > 0) {
             onFilesChange?.(result.data.files);
-            extractCodeAndSchemaUpdates(result.data.files, {
-              onCodeUpdate,
-              onSchemaUpdate,
-            });
+            const { codeUpdated, schemaUpdated } =
+              extractCodeAndSchemaUpdates(result.data.files, {
+                onCodeUpdate,
+                onSchemaUpdate,
+              });
+
+            if (!codeUpdated || !schemaUpdated) {
+              const filesData = await fetchSessionFiles(sessionId, demoId);
+              if (filesData) {
+                const { code, schema } = filesData;
+                if (code && !codeUpdated) onCodeUpdate?.(code);
+                if (schema && !schemaUpdated) onSchemaUpdate?.(schema);
+              }
+            }
+          } else {
+            const filesData = await fetchSessionFiles(sessionId, demoId);
+            if (filesData) {
+              const { code, schema } = filesData;
+              if (code) onCodeUpdate?.(code);
+              if (schema) onSchemaUpdate?.(schema);
+            }
           }
         } catch (httpError) {
           const errorMessage: ChatMessage = {
@@ -389,6 +457,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           setMessages((prev) => [...prev, errorMessage]);
         } finally {
           setIsStreaming(false);
+          stopSilenceTracking();
           streamServiceRef.current?.close();
         }
       }
@@ -397,6 +466,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       agentSessionId,
       sessionId,
       workingDir,
+      demoId,
       onCodeUpdate,
       onSchemaUpdate,
       onFilesChange,
@@ -408,6 +478,9 @@ export function useChatStream(options: UseChatStreamOptions) {
       currentMessageRef,
       onModelsEvent,
       onModelStateError,
+      markActivity,
+      startSilenceTracking,
+      stopSilenceTracking,
     ],
   );
 
@@ -431,6 +504,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const handleCancel = useCallback(
     (streamContent: string, currentMessage: ChatMessage) => {
       streamServiceRef.current?.close();
+      stopSilenceTracking();
       setIsStreaming(false);
       if (
         streamContent ||
@@ -453,13 +527,14 @@ export function useChatStream(options: UseChatStreamOptions) {
         parts: [],
       });
     },
-    [setIsStreaming, setMessages, setStreamContent, setCurrentMessage],
+    [setIsStreaming, setMessages, setStreamContent, setCurrentMessage, stopSilenceTracking],
   );
 
   return {
     plan,
     setPlan,
     pendingPermissionRequest,
+    silenceSeconds,
     handleSend,
     handleCancel,
     handlePermissionResponse,

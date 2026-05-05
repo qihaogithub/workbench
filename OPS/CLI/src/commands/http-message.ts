@@ -73,7 +73,7 @@ export async function testHttpMessage(
     // 显示成功结果
     showSuccess('消息发送成功');
     console.log(chalk.gray(`\n耗时: ${formatDuration(duration)}`));
-    console.log(chalk.gray(`会话 ID: ${response.data.sessionId}`));
+    console.log(chalk.gray(`会话 ID: ${sessionId}`));
 
     if (response.data.content) {
       console.log(chalk.green('\n=== AI 回复 ===\n'));
@@ -82,7 +82,7 @@ export async function testHttpMessage(
 
     if (response.data.files && response.data.files.length > 0) {
       console.log(chalk.cyan('\n=== 文件变更 ===\n'));
-      response.data.files.forEach((file) => {
+      response.data.files.forEach((file: { action: string; path: string }) => {
         console.log(chalk.gray(`  ${file.action}: ${file.path}`));
       });
     }

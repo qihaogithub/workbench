@@ -20,6 +20,7 @@ import {
 } from "./types";
 import { AcpApprovalStore, createAcpApprovalKey } from "./approval-store";
 import { buildAcpModelInfo, AcpModelInfo } from "./model-info";
+import { validateFileAccess } from "../session/session-guard";
 import { logger } from "../utils/logger";
 
 /**
@@ -370,6 +371,11 @@ export class AcpConnection extends EventEmitter {
     sessionId?: string;
   }): Promise<void> {
     const resolvedPath = this.resolveWorkspacePath(params.path);
+    const validation = validateFileAccess(this.workingDir, resolvedPath);
+    if (!validation.valid) {
+      logger.warn({ path: params.path, violations: validation.violations }, "Read operation blocked by security policy");
+      return;
+    }
     this.onFileOperation?.({
       method: "fs/read_text_file",
       path: resolvedPath,
@@ -383,6 +389,12 @@ export class AcpConnection extends EventEmitter {
     sessionId?: string;
   }): Promise<void> {
     const resolvedPath = this.resolveWorkspacePath(params.path);
+
+    const validation = validateFileAccess(this.workingDir, resolvedPath);
+    if (!validation.valid) {
+      logger.warn({ path: params.path, violations: validation.violations }, "Write operation blocked by security policy");
+      return;
+    }
 
     if (!params.content) {
       logger.warn(

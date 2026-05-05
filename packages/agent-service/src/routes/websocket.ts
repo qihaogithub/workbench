@@ -10,6 +10,8 @@ import {
 import { AcpSessionUpdate, AcpPermissionRequest } from "../acp/types";
 import { logger } from "../utils/logger";
 
+const DEFAULT_MODEL_ID = "sensenova/deepseek-v4-flash";
+
 interface StreamParams {
   sessionId: string;
 }
@@ -106,7 +108,7 @@ let wss: WebSocketServer | null = null;
 
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
-const MESSAGE_TIMEOUT_MS = 600000;
+const MESSAGE_TIMEOUT_MS = 300000;
 
 function heartbeat(): void {
   const now = Date.now();
@@ -319,12 +321,8 @@ export async function registerWebSocketRoutes(
                 sessionId,
                 backend: "opencode",
                 workingDir: message.workingDir,
+                model: DEFAULT_MODEL_ID,
               };
-
-              logger.info(
-                { workingDir: config.workingDir },
-                "Agent config created",
-              );
 
               const agent = manager.getOrCreate(sessionId, config);
 
@@ -545,6 +543,7 @@ export async function registerWebSocketRoutes(
                 sessionId: resumeSessionId,
                 backend: "opencode",
                 workingDir: message.workingDir,
+                model: DEFAULT_MODEL_ID,
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -651,7 +650,8 @@ export async function registerWebSocketRoutes(
                 const config: AgentConfig = {
                   sessionId,
                   backend: "opencode",
-                  workingDir: process.cwd(),
+                  workingDir: message.workingDir || process.cwd(),
+                  model: DEFAULT_MODEL_ID,
                 };
                 agent = manager.getOrCreate(sessionId, config);
                 if (agent.status === "initializing") {

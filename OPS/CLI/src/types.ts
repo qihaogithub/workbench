@@ -1,7 +1,3 @@
-/**
- * CLI 测试工具 - 类型定义
- */
-
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -82,6 +78,59 @@ export interface InteractiveModeOptions {
 export interface DiagnoseOptions {
   sessionId?: string;
   testMessage?: string;
+}
+
+export interface SystemCheckResult {
+  timestamp: string;
+  runtime: {
+    node: { version: string; available: boolean };
+    pnpm: { version: string; available: boolean };
+    typescript: { version: string; available: boolean };
+  };
+  agentService: {
+    running: boolean;
+    port: number;
+    pid: string | null;
+    processCommand: string | null;
+    healthOk: boolean | null;
+    uptime: number | null;
+    activeAgents: number | null;
+    backends: string[] | null;
+  };
+  cliBackends: Record<string, { available: boolean; path: string | null }>;
+  project: {
+    rootDir: string;
+    packageJsonExists: boolean;
+    envFileExists: boolean;
+    agentServiceDir: boolean;
+    webDir: boolean;
+    sharedDir: boolean;
+  };
+  ports: {
+    [port: number]: {
+      inUse: boolean;
+      process: string | null;
+    };
+  };
+}
+
+export interface LogsOptions {
+  level?: string;
+  pattern?: string;
+  lines?: number;
+  sessionId?: string;
+}
+
+export interface LogsResult {
+  source: string;
+  totalLines: number;
+  filteredLines: number;
+  logs: Array<{
+    level: string;
+    time: string;
+    msg: string;
+    [key: string]: unknown;
+  }>;
 }
 
 export interface StreamEvent {

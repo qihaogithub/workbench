@@ -22,6 +22,7 @@ interface AIChatProps {
   agentSessionId: string;
   workingDir?: string;
   projectId?: string;
+  demoId?: string;
   workspaceId?: string;
   onCodeUpdate?: (code: string) => void;
   onSchemaUpdate?: (schema: string) => void;
@@ -46,6 +47,7 @@ export function AIChat({
   agentSessionId,
   workingDir,
   projectId,
+  demoId,
   workspaceId,
   onCodeUpdate,
   onSchemaUpdate,
@@ -94,11 +96,12 @@ export function AIChat({
     handleModelsEvent,
     handleModelError,
     resetModelState,
-  } = useChatModels({ agentSessionId });
+  } = useChatModels({ agentSessionId, workingDir });
 
   const {
     plan,
     pendingPermissionRequest,
+    silenceSeconds,
     handleSend,
     handleCancel,
     handlePermissionResponse,
@@ -107,6 +110,7 @@ export function AIChat({
     sessionId,
     agentSessionId,
     workingDir,
+    demoId,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,

@@ -7,6 +7,19 @@ import type {
   ApiResponse,
 } from "@opencode-workbench/shared";
 
+interface PreviewSize {
+  width?: string | number;
+  height?: string | number;
+  minHeight?: string | number;
+  maxHeight?: string | number;
+  scale?: number;
+}
+
+export interface DemoPageWithSchema extends DemoPageMeta {
+  previewSize?: PreviewSize;
+  schema?: string;
+}
+
 const AGENT_SERVICE_URL =
   process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3200";
@@ -28,46 +41,48 @@ export async function getProjects(): Promise<ProjectListResponse> {
 }
 
 export async function getProject(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectDetailResponse> {
   return fetchApi<ProjectDetailResponse>(
     AGENT_SERVICE_URL,
-    `/api/projects/${projectId}`
+    `/api/projects/${projectId}`,
   );
 }
 
 export async function getProjectVersions(
-  projectId: string
+  projectId: string,
 ): Promise<VersionHistoryResponse> {
   return fetchApi<VersionHistoryResponse>(
     AGENT_SERVICE_URL,
-    `/api/projects/${projectId}/versions`
+    `/api/projects/${projectId}/versions`,
   );
 }
 
 export async function getDemoPages(
-  projectId: string
-): Promise<{ demoPages: DemoPageMeta[] }> {
-  return fetchApi<{ demoPages: DemoPageMeta[] }>(
+  projectId: string,
+  options?: { includeSchema?: boolean },
+): Promise<{ demoPages: DemoPageWithSchema[] }> {
+  const query = options?.includeSchema ? "?includeSchema=true" : "";
+  return fetchApi<{ demoPages: DemoPageWithSchema[] }>(
     WEB_URL,
-    `/api/projects/${projectId}/demos`
+    `/api/projects/${projectId}/demos${query}`,
   );
 }
 
 export async function getProjectConfig(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectConfig> {
   return fetchApi<ProjectConfig>(WEB_URL, `/api/projects/${projectId}/config`);
 }
 
 export function getEmbedIframeUrl(
   projectId: string,
-  demoId?: string
+  demoId?: string,
 ): string {
   if (demoId) {
     return `${WEB_URL}/api/embed/${projectId}/iframe?page=${demoId}`;
   }
-  return `${WEB_URL}/embed/${projectId}/iframe`;
+  return `${WEB_URL}/api/embed/${projectId}/iframe`;
 }
 
 export function getWebUrl(): string {

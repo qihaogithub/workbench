@@ -45,13 +45,27 @@ export async function updateSessionTitle(
 
 export async function fetchSessionFiles(
   sessionId: string,
+  demoId?: string,
 ): Promise<{ code?: string; schema?: string } | null> {
   try {
     const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
     if (filesRes.ok) {
       const filesData = await filesRes.json();
       if (filesData.success && filesData.data) {
-        return filesData.data;
+        const data = filesData.data;
+        if (data.demos && typeof data.demos === "object") {
+          const demoIds = Object.keys(data.demos);
+          const targetId = demoId || demoIds[0];
+          if (targetId && data.demos[targetId]) {
+            return {
+              code: data.demos[targetId].code,
+              schema: data.demos[targetId].schema,
+            };
+          }
+        }
+        if (data.code || data.schema) {
+          return { code: data.code, schema: data.schema };
+        }
       }
     }
   } catch (error) {

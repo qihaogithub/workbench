@@ -1,14 +1,7 @@
-/**
- * CLI 测试工具 - 辅助函数
- */
-
 import chalk from "chalk";
 import ora from "ora";
-import type { ApiResponse } from "../types.js";
+import type { ApiResponse } from "./types.js";
 
-/**
- * 发送 HTTP 请求
- */
 export async function request<T>(
   baseUrl: string,
   path: string,
@@ -34,9 +27,6 @@ export async function request<T>(
 
   const data = await response.json();
 
-  // 调试:打印响应数据
-  // console.log('[DEBUG] Response:', JSON.stringify(data, null, 2));
-
   if (!response.ok) {
     return {
       success: false,
@@ -50,19 +40,15 @@ export async function request<T>(
   return data as ApiResponse<T>;
 }
 
-/**
- * 创建加载动画
- */
-export function createSpinner(text: string) {
-  return ora({
-    text,
-    color: "cyan",
-  }).start();
+export function createSpinner(text: string, jsonMode?: boolean) {
+  if (jsonMode) return { stop: () => {}, succeed: (_: string) => {}, fail: (_: string) => {} };
+  return ora({ text, color: "cyan" }).start();
 }
 
-/**
- * 显示成功消息
- */
+export function outputJson(data: unknown) {
+  console.log(JSON.stringify(data, null, 2));
+}
+
 export function showSuccess(
   message: string,
   details?: Record<string, unknown>,
@@ -73,9 +59,6 @@ export function showSuccess(
   }
 }
 
-/**
- * 显示错误消息
- */
 export function showError(
   message: string,
   error?: { code?: string; message?: string },
@@ -87,40 +70,25 @@ export function showError(
   }
 }
 
-/**
- * 显示警告消息
- */
 export function showWarning(message: string) {
   console.log(chalk.yellow(`⚠ ${message}`));
 }
 
-/**
- * 显示信息消息
- */
 export function showInfo(message: string) {
   console.log(chalk.blue(`ℹ ${message}`));
 }
 
-/**
- * 格式化详细信息
- */
 export function formatDetails(details: Record<string, unknown>): string {
   return Object.entries(details)
     .map(([key, value]) => `  ${key}: ${JSON.stringify(value)}`)
     .join("\n");
 }
 
-/**
- * 截断长文本
- */
 export function truncate(text: string, maxLength: number = 100): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
 }
 
-/**
- * 格式化持续时间
- */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const seconds = Math.floor(ms / 1000);
@@ -128,4 +96,43 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes}m ${remainingSeconds}s`;
+}
+
+export async function runCommand(cmd: string, args: string[] = []): Promise<{ success: boolean; stdout: string; stderr: string }> {
+  const { execFile } = await import("child_process");
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout: 10000 }, (error, stdout, stderr) => {
+      resolve({
+        success: !error,
+        stdout: stdout?.trim() || "",
+        stderr: stderr?.trim() || "",
+      });
+    });
+  });
+}
+
+export async function checkPortInUse(port: number): Promise<boolean> {
+  const { execFile } = await import("child_process");
+  return new Promise((resolve) => {
+    execFile("lsof", ["-i", `:${port}`, "-P", "-n"], (error, stdout) => {
+      resolve(!!stdout && stdout.includes(String(port)));
+    });
+  });
+}
+
+export async function getProcessOnPort(port: number): Promise<{ pid: string; command: string } | null> {
+  const { execFile } = await import("child_process");
+  return new Promise((resolve) => {
+    execFile("lsof", ["-i", `:${port}`, "-P", "-n", "-F", "pc"], (error, stdout) => {
+      if (!stdout) return resolve(null);
+      const lines = stdout.trim().split("\n");
+      let pid = "";
+      let command = "";
+      for (const line of lines) {
+        if (line.startsWith("p")) pid = line.slice(1);
+        if (line.startsWith("c")) command = line.slice(1);
+      }
+      resolve(pid ? { pid, command } : null);
+    });
+  });
 }

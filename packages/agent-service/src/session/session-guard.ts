@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { isPathInsideWorkspace, resolveWorkspacePath } from '../workspace/utils';
 
-const ALLOWED_FILES = ['index.tsx', 'config.schema.json', 'AGENTS.md', '.session.json'];
+const ALLOWED_FILES = ['index.tsx', 'config.schema.json', 'project.config.schema.json', '.demo.json', 'AGENTS.md', '.session.json'];
 
 export interface FileValidationResult {
   valid: boolean;
@@ -13,9 +13,14 @@ export function validateFileAccess(
   workingDir: string,
   filePath: string
 ): FileValidationResult {
-  const relativePath = path.relative(workingDir, filePath);
   const violations: string[] = [];
 
+  const pathValidation = validatePath(workingDir, filePath);
+  if (!pathValidation.valid) {
+    violations.push(...pathValidation.violations);
+  }
+
+  const relativePath = path.relative(workingDir, filePath);
   const isAllowed = ALLOWED_FILES.some(
     (allowed) => relativePath === allowed || relativePath.endsWith('/' + allowed)
   );
@@ -84,7 +89,8 @@ export function validatePath(workingDir: string, targetPath: string): FileValida
     try {
       realTargetPath = fs.realpathSync(resolvedPath);
     } catch {
-      realTargetPath = resolvedPath;
+      const relativePath = path.relative(workingDir, resolvedPath);
+      realTargetPath = path.resolve(realWorkingDir, relativePath);
     }
 
     if (!isPathInsideWorkspace(realTargetPath, realWorkingDir)) {
