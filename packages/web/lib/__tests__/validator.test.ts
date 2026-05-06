@@ -374,7 +374,7 @@ describe("getDefaultValues", () => {
 });
 
 describe("getPreviewSize", () => {
-  it("应从 $demo.previewSize 中提取预览尺寸（新标准）", () => {
+  it("应从 $demo.previewSize 中提取预览尺寸", () => {
     const schema = JSON.stringify({
       $schema: "https://json-schema.org/draft/2020-12/schema",
       $demo: {
@@ -393,58 +393,6 @@ describe("getPreviewSize", () => {
     expect(size).toEqual({
       width: 390,
       height: 844,
-    });
-  });
-
-  it("应从 ui.options.preview 中提取预览尺寸（旧格式，向后兼容）", () => {
-    const schema = JSON.stringify({
-      title: "Demo",
-      type: "object",
-      properties: {},
-      ui: {
-        options: {
-          preview: {
-            width: 768,
-            height: 1024,
-          },
-        },
-      },
-    });
-
-    const size = getPreviewSize(schema);
-
-    expect(size).toEqual({
-      width: 768,
-      height: 1024,
-    });
-  });
-
-  it("应优先使用 $demo.previewSize 而非 ui.options.preview", () => {
-    const schema = JSON.stringify({
-      $demo: {
-        previewSize: {
-          width: 375,
-          height: 667,
-        },
-      },
-      ui: {
-        options: {
-          preview: {
-            width: 768,
-            height: 1024,
-          },
-        },
-      },
-      title: "Demo",
-      type: "object",
-      properties: {},
-    });
-
-    const size = getPreviewSize(schema);
-
-    expect(size).toEqual({
-      width: 375,
-      height: 667,
     });
   });
 

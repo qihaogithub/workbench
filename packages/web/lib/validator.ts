@@ -318,9 +318,9 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
 
 /**
  * 从 Schema 中提取预览尺寸配置
- * 支持两种格式：
- * 1. $demo.previewSize（新标准）
- * 2. ui.options.preview（旧格式，向后兼容）
+ *
+ * 仅识别 `$demo.previewSize`。schema 扩展元数据统一收纳在 `$demo.*` 命名空间下，
+ * 与 JSON Schema `$`-前缀扩展惯例一致。
  *
  * @param schema JSON Schema 字符串
  * @returns 预览尺寸配置，如果未定义则返回 undefined
@@ -329,59 +329,30 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
   try {
     const parsed = JSON.parse(schema);
 
-    // 优先读取 $demo.previewSize（新标准）
-    if (parsed.$demo?.previewSize) {
-      const preview = parsed.$demo.previewSize;
-      const size: PreviewSize = {};
-
-      if (preview.width !== undefined) {
-        size.width = preview.width;
-      }
-      if (preview.height !== undefined) {
-        size.height = preview.height;
-      }
-      if (preview.minHeight !== undefined) {
-        size.minHeight = preview.minHeight;
-      }
-      if (preview.maxHeight !== undefined) {
-        size.maxHeight = preview.maxHeight;
-      }
-      if (preview.scale !== undefined) {
-        size.scale = Number(preview.scale);
-      }
-
-      if (Object.keys(size).length > 0) {
-        return size;
-      }
+    if (!parsed.$demo?.previewSize) {
+      return undefined;
     }
 
-    // 向后兼容：读取 ui.options.preview（旧格式）
-    if (parsed.ui?.options?.preview) {
-      const preview = parsed.ui.options.preview;
-      const size: PreviewSize = {};
+    const preview = parsed.$demo.previewSize;
+    const size: PreviewSize = {};
 
-      if (preview.width !== undefined) {
-        size.width = preview.width;
-      }
-      if (preview.height !== undefined) {
-        size.height = preview.height;
-      }
-      if (preview.minHeight !== undefined) {
-        size.minHeight = preview.minHeight;
-      }
-      if (preview.maxHeight !== undefined) {
-        size.maxHeight = preview.maxHeight;
-      }
-      if (preview.scale !== undefined) {
-        size.scale = Number(preview.scale);
-      }
-
-      if (Object.keys(size).length > 0) {
-        return size;
-      }
+    if (preview.width !== undefined) {
+      size.width = preview.width;
+    }
+    if (preview.height !== undefined) {
+      size.height = preview.height;
+    }
+    if (preview.minHeight !== undefined) {
+      size.minHeight = preview.minHeight;
+    }
+    if (preview.maxHeight !== undefined) {
+      size.maxHeight = preview.maxHeight;
+    }
+    if (preview.scale !== undefined) {
+      size.scale = Number(preview.scale);
     }
 
-    return undefined;
+    return Object.keys(size).length > 0 ? size : undefined;
   } catch {
     return undefined;
   }

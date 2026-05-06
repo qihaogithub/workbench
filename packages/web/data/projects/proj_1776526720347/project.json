@@ -226,10 +226,26 @@
       "sessionId": "session-1778060810237-zgfno1ouj",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1776526720347/v28",
       "fileCount": 6
+    },
+    {
+      "versionId": "v29",
+      "savedAt": 1778078459739,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1778077829495-l58lempiv",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v29",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v30",
+      "savedAt": 1778078822396,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1778078470182-sp6l5yuy3",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\snapshots\\proj_1776526720347\\v30",
+      "fileCount": 6
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1778060994324,
+  "updatedAt": 1778078822397,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [],
   "demoFolders": []

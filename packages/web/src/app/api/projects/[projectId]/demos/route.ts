@@ -32,16 +32,6 @@ function extractPreviewSize(schemaStr: string): PreviewSize | undefined {
     if (schema.$demo?.previewSize) {
       return schema.$demo.previewSize;
     }
-    if (schema.ui?.options?.preview) {
-      const p = schema.ui.options.preview;
-      return {
-        width: p.width,
-        height: p.height,
-        minHeight: p.minHeight,
-        maxHeight: p.maxHeight,
-        scale: p.scale ? Number(p.scale) : undefined,
-      };
-    }
   } catch {}
   return undefined;
 }

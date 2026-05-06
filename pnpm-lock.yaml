@@ -14,6 +14,9 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -340,6 +343,9 @@ importers:
       jose:
         specifier: ^6.2.2
         version: 6.2.2
+      katex:
+        specifier: ^0.16.45
+        version: 0.16.45
       lucide-react:
         specifier: ^0.323.0
         version: 0.323.0(react@18.3.1)
