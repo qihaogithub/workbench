@@ -182,7 +182,54 @@ function ReasoningContent({
   );
 }
 
-export { Reasoning, ReasoningTrigger, ReasoningContent, useReasoning };
+interface ReasoningGroupProps {
+  reasonings: Array<{
+    content: string;
+    duration?: number;
+    timestamp?: number;
+  }>;
+  isStreaming?: boolean;
+  className?: string;
+}
+
+function ReasoningGroup({
+  reasonings,
+  isStreaming = false,
+  className,
+}: ReasoningGroupProps) {
+  const totalDuration = reasonings[reasonings.length - 1]?.duration;
+
+  return (
+    <Reasoning
+      isStreaming={isStreaming}
+      duration={totalDuration}
+      className={className}
+    >
+      <ReasoningTrigger
+        getThinkingMessage={(streaming, duration) => (
+          <span>
+            {streaming
+              ? "思考中..."
+              : duration
+                ? `思考了 ${Math.round(duration / 1000)} 秒`
+                : "思考过程"}
+            {" "}({reasonings.length} 阶段)
+          </span>
+        )}
+      />
+      {reasonings.map((r, i) => (
+        <div key={i}>
+          <ReasoningContent>{r.content}</ReasoningContent>
+          {i < reasonings.length - 1 && (
+            <div className="border-t border-dashed border-border/30 my-2 ml-4" />
+          )}
+        </div>
+      ))}
+    </Reasoning>
+  );
+}
+
+export { Reasoning, ReasoningTrigger, ReasoningContent, useReasoning, ReasoningGroup };
 
 // 别名导出，方便在 ai-chat 中使用
 export const ReasoningDisplay = Reasoning;

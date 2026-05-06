@@ -1,0 +1,62 @@
+import React from 'react';
+
+interface BannerDemoProps {
+  banner: string;
+  title: string;
+  description: string;
+  theme: 'light' | 'dark' | 'colorful';
+  showBadge: boolean;
+}
+
+export default function BannerDemo({ 
+  banner, 
+  title, 
+  description, 
+  theme,
+  showBadge 
+}: BannerDemoProps) {
+  const bgClasses = {
+    light: 'bg-gradient-to-br from-gray-50 to-gray-100',
+    dark: 'bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900',
+    colorful: 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500',
+  };
+
+  const textClasses = {
+    light: 'text-black',
+    dark: 'text-white',
+    colorful: 'text-white',
+  };
+
+  const descClasses = {
+    light: 'text-gray-700',
+    dark: 'text-white/80',
+    colorful: 'text-white/90',
+  };
+
+  const badgeClasses = {
+    light: 'bg-white text-gray-900 border-2 border-gray-300',
+    dark: 'bg-white text-gray-900',
+    colorful: 'bg-white/90 text-purple-600 font-bold',
+  };
+
+  return (
+    <div className={`min-h-screen ${bgClasses[theme]} ${textClasses[theme]}`}>
+      <div className="container mx-auto px-4 py-8">
+        {showBadge && (
+          <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full mb-4 ${badgeClasses[theme]}`}>
+            Active
+          </span>
+        )}
+        
+        <img 
+          src={banner} 
+          alt="banner" 
+          className="w-full h-64 object-cover rounded-lg mb-6"
+        />
+        
+        <h1 className="text-3xl font-bold mb-4">{title}</h1>
+        <p className={`text-lg ${descClasses[theme]}`}>{description}</p>
+      </div>
+    </div>
+  );
+}

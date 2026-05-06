@@ -1,39 +1,45 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Weather Mood Widget Config",
+  "title": "Dashboard Config",
   "type": "object",
   "properties": {
-    "city": {
+    "title": {
       "type": "string",
-      "title": "城市名称",
-      "default": "北京",
-      "maxLength": 10
+      "title": "仪表盘标题",
+      "default": "📊 数据仪表盘"
     },
-    "unit": {
+    "period": {
       "type": "string",
-      "title": "温度单位",
-      "enum": ["celsius", "fahrenheit"],
-      "enumNames": ["摄氏度 (°C)", "华氏度 (°F)"],
-      "default": "celsius"
+      "title": "默认时间周期",
+      "enum": ["今日", "本周", "本月"],
+      "default": "今日"
     },
-    "showMood": {
+    "showRevenue": {
       "type": "boolean",
-      "title": "显示心情小贴士",
+      "title": "显示收入卡片",
       "default": true
     },
-    "animationSpeed": {
-      "type": "string",
-      "title": "动画速度",
-      "enum": ["slow", "medium", "fast"],
-      "enumNames": ["慢速", "中速", "快速"],
-      "default": "medium"
+    "showUsers": {
+      "type": "boolean",
+      "title": "显示用户卡片",
+      "default": true
     },
-    "defaultWeather": {
+    "showOrders": {
+      "type": "boolean",
+      "title": "显示订单卡片",
+      "default": true
+    },
+    "showGrowth": {
+      "type": "boolean",
+      "title": "显示增长率卡片",
+      "default": true
+    },
+    "chartStyle": {
       "type": "string",
-      "title": "默认天气",
-      "enum": ["sunny", "cloudy", "rainy", "snowy", "stormy"],
-      "enumNames": ["☀️ 晴天", "☁️ 多云", "🌧️ 雨天", "❄️ 雪天", "⚡ 雷雨"],
-      "default": "sunny"
+      "title": "图表样式",
+      "enum": ["bar", "line", "area"],
+      "enumNames": ["柱状图", "折线图", "面积图"],
+      "default": "bar"
     }
   }
 }

@@ -16,21 +16,16 @@ import {
   Terminal,
   Edit3,
   Wrench,
-  Search,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
-
-interface MessagePart {
-  type: "text" | "reasoning" | "tool" | "image" | "file";
-  content?: string;
-  toolCallId?: string;
-  toolName?: string;
-  status?: "running" | "completed" | "error" | "awaiting-approval";
-  parameters?: Record<string, unknown>;
-  result?: unknown;
-  duration?: number;
-  timestamp?: number;
-}
+import { type MessagePart } from "./message";
 
 interface AssistantMessageProps {
   content?: string;
@@ -54,11 +49,54 @@ interface AssistantMessageProps {
   className?: string;
 }
 
-// 渲染块定义：文本块、推理块、工具块
+function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
+  if (!toolName) return "other";
+  const name = toolName.toLowerCase();
+  if (name.includes("read") || name.includes("get") || name.includes("search") || name.includes("glob") || name.includes("grep")) return "read";
+  if (name.includes("edit") || name.includes("write") || name.includes("create") || name.includes("delete")) return "edit";
+  if (name.includes("bash") || name.includes("exec") || name.includes("run") || name.includes("command")) return "execute";
+  return "other";
+}
+
+type ReasoningPart = Extract<MessagePart, { type: "reasoning" }>;
+type ToolPart = Extract<MessagePart, { type: "tool" }>;
+
 type RenderBlock =
   | { type: "text"; content: string }
-  | { type: "reasoning"; content: string; duration?: number }
-  | { type: "tool"; part: MessagePart };
+  | { type: "reasoning-group"; reasonings: ReasoningPart[] }
+  | { type: "tool-group"; parts: ToolPart[]; toolKind: string }
+  | { type: "tool-single"; part: ToolPart }
+  | { type: "image"; url: string; alt?: string }
+  | { type: "file"; name: string; url: string; size?: number };
+
+function getToolIcon(toolKind: string) {
+  if (toolKind === "read") return Eye;
+  if (toolKind === "edit") return Edit3;
+  if (toolKind === "execute") return Terminal;
+  return Wrench;
+}
+
+function getToolGroupLabel(toolKind: string): string {
+  if (toolKind === "read") return "读取文件";
+  if (toolKind === "edit") return "编辑文件";
+  if (toolKind === "execute") return "执行命令";
+  return "工具操作";
+}
+
+function getToolActionText(part: ToolPart): string {
+  const name = (part.toolName || "").toLowerCase();
+  const path = (part.parameters?.path || part.parameters?.file_path) as string | undefined;
+  if (name.includes("read") || name.includes("search") || name.includes("glob") || name.includes("grep")) {
+    return path || "读取文件";
+  }
+  if (name.includes("edit") || name.includes("write") || name.includes("create") || name.includes("delete")) {
+    return path || "修改文件";
+  }
+  if (name.includes("bash") || name.includes("exec") || name.includes("run") || name.includes("command")) {
+    return "执行命令";
+  }
+  return part.toolName || "未知操作";
+}
 
 export function AssistantMessage({
   content,
@@ -73,14 +111,12 @@ export function AssistantMessage({
   const normalizedParts: MessagePart[] = useMemo(() => {
     const parts_copy = parts ? [...parts] : [];
 
-    // 兼容旧的 reasonings/tools 格式，转换为 parts
     if (
       parts_copy.length === 0 &&
       (reasonings.length > 0 || tools.length > 0 || content)
     ) {
       const converted: MessagePart[] = [];
 
-      // 转换 reasonings
       for (const r of reasonings) {
         converted.push({
           type: "reasoning",
@@ -90,7 +126,6 @@ export function AssistantMessage({
         });
       }
 
-      // 转换 tools
       for (const t of tools) {
         converted.push({
           type: "tool",
@@ -102,7 +137,6 @@ export function AssistantMessage({
         });
       }
 
-      // 如果有文本内容，添加到末尾
       if (content && parts_copy.length === 0) {
         converted.push({
           type: "text",
@@ -120,61 +154,73 @@ export function AssistantMessage({
     return parts_copy;
   }, [parts, reasonings, tools, content]);
 
-  // 按类型分组：每个类型都独立成块
   const renderBlocks: RenderBlock[] = useMemo(() => {
     const blocks: RenderBlock[] = [];
-    let reasoningContent = "";
-    let reasoningDuration: number | undefined;
+    let currentReasonings: ReasoningPart[] = [];
+    let currentToolGroup: { parts: ToolPart[]; toolKind: string } | null = null;
 
-    const flushReasoning = () => {
-      if (reasoningContent.trim()) {
-        blocks.push({
-          type: "reasoning",
-          content: reasoningContent.trim(),
-          duration: reasoningDuration,
-        });
-        reasoningContent = "";
-        reasoningDuration = undefined;
+    const flushReasonings = () => {
+      if (currentReasonings.length > 0) {
+        blocks.push({ type: "reasoning-group", reasonings: currentReasonings });
+        currentReasonings = [];
       }
+    };
+
+    const flushTools = () => {
+      if (!currentToolGroup || currentToolGroup.parts.length === 0) return;
+      if (currentToolGroup.parts.length >= 2) {
+        blocks.push({
+          type: "tool-group",
+          parts: currentToolGroup.parts,
+          toolKind: currentToolGroup.toolKind,
+        });
+      } else {
+        blocks.push({ type: "tool-single", part: currentToolGroup.parts[0] });
+      }
+      currentToolGroup = null;
     };
 
     normalizedParts.forEach((part) => {
       if (part.type === "reasoning") {
-        // 遇到 reasoning 时，先刷新前面的 reasoning 块
-        flushReasoning();
-        reasoningContent +=
-          (reasoningContent ? "\n\n" : "") + (part.content || "");
-        if (part.duration) {
-          reasoningDuration = part.duration;
-        }
+        flushTools();
+        currentReasonings.push(part);
       } else if (part.type === "tool") {
-        // 每个 tool 独立为一个块
-        flushReasoning();
-        blocks.push({ type: "tool", part });
+        flushReasonings();
+        const toolKind = getToolKind(part.toolName);
+        if (currentToolGroup && currentToolGroup.toolKind === toolKind) {
+          currentToolGroup.parts.push(part);
+        } else {
+          flushTools();
+          currentToolGroup = { parts: [part], toolKind };
+        }
       } else if (part.type === "text") {
-        // 遇到文本时，刷新前面的 reasoning
-        flushReasoning();
+        flushReasonings();
+        flushTools();
         if (part.content?.trim()) {
           blocks.push({ type: "text", content: part.content });
         }
+      } else if (part.type === "image") {
+        flushReasonings();
+        flushTools();
+        blocks.push({ type: "image", url: part.url, alt: part.alt });
+      } else if (part.type === "file") {
+        flushReasonings();
+        flushTools();
+        blocks.push({ type: "file", name: part.name, url: part.url, size: part.size });
       }
     });
 
-    // 收尾
-    flushReasoning();
-
+    flushReasonings();
+    flushTools();
     return blocks;
   }, [normalizedParts]);
 
-  // 如果没有内容且不在流式传输中，返回 null
   if (renderBlocks.length === 0 && !isStreaming) {
     return null;
   }
 
-  // 如果正在流式传输但没有内容块，显示初始加载状态
   const showInitialLoading = isStreaming && renderBlocks.length === 0;
 
-  // 获取所有纯文本用于一键复制
   const allTextContent = renderBlocks
     .filter((b) => b.type === "text")
     .map((b) => b.content)
@@ -195,7 +241,6 @@ export function AssistantMessage({
         className,
       )}
     >
-      {/* 初始加载状态 - 使用 Reasoning 组件保持样式统一 */}
       {showInitialLoading && (
         <Reasoning isStreaming={true}>
           <ReasoningTrigger />
@@ -204,21 +249,45 @@ export function AssistantMessage({
       )}
 
       {renderBlocks.map((block, index) => {
-        // 渲染推理内容（使用官方的 Reasoning 组件）
-        if (block.type === "reasoning") {
+        if (block.type === "reasoning-group") {
+          const lastDuration = block.reasonings[block.reasonings.length - 1]?.duration;
           return (
             <Reasoning
-              key={`reasoning-${index}`}
+              key={`reasoning-group-${index}`}
               isStreaming={isStreaming && index === renderBlocks.length - 1}
-              duration={block.duration}
+              duration={lastDuration}
             >
-              <ReasoningTrigger />
-              <ReasoningContent>{block.content}</ReasoningContent>
+              <ReasoningTrigger
+                getThinkingMessage={(streaming, duration) => (
+                  <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <Sparkles
+                      className={cn(
+                        "h-3 w-3 text-muted-foreground/50 flex-shrink-0",
+                        streaming && "animate-pulse",
+                      )}
+                    />
+                    <span className="text-[11px] text-muted-foreground/60 truncate">
+                      {streaming
+                        ? "思考中..."
+                        : duration
+                          ? `思考了 ${Math.round(duration / 1000)} 秒`
+                          : "思考过程"}
+                    </span>
+                  </span>
+                )}
+              />
+              {block.reasonings.map((r, i) => (
+                <div key={i}>
+                  <ReasoningContent>{r.content}</ReasoningContent>
+                  {i < block.reasonings.length - 1 && (
+                    <div className="border-t border-dashed border-border/30 my-1.5 ml-4" />
+                  )}
+                </div>
+              ))}
             </Reasoning>
           );
         }
 
-        // 渲染纯文本内容
         if (block.type === "text") {
           return (
             <div
@@ -237,41 +306,18 @@ export function AssistantMessage({
           );
         }
 
-        // 渲染工具调用（直接展示，不折叠）
-        if (block.type === "tool") {
+        if (block.type === "tool-single") {
           const part = block.part;
-          const name = (part.toolName || "").toLowerCase();
-          const path = (part.parameters?.path ||
-            part.parameters?.file_path) as string;
-
-          // 智能映射图标与文案
-          let ToolIcon = Wrench;
-          let actionText = part.toolName || "未知操作";
-
-          if (name.includes("read")) {
-            ToolIcon = Eye;
-            actionText = path ? path : "读取文件";
-          } else if (name.includes("edit") || name.includes("write")) {
-            ToolIcon = Edit3;
-            actionText = path ? path : "修改文件";
-          } else if (
-            name.includes("execute") ||
-            name.includes("cmd") ||
-            name.includes("terminal")
-          ) {
-            ToolIcon = Terminal;
-            actionText = "执行命令";
-          } else if (name.includes("search")) {
-            ToolIcon = Search;
-            actionText = "搜索资料";
-          }
+          const toolKind = getToolKind(part.toolName);
+          const Icon = getToolIcon(toolKind);
+          const actionText = getToolActionText(part);
 
           return (
             <div
-              key={`tool-${index}`}
+              key={`tool-single-${index}`}
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5 min-w-0"
             >
-              <ToolIcon className="h-3 w-3 flex-shrink-0" />
+              <Icon className="h-3 w-3 flex-shrink-0" />
               <span className="truncate">{actionText}</span>
               {part.status === "running" && (
                 <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
@@ -279,10 +325,50 @@ export function AssistantMessage({
             </div>
           );
         }
+
+        if (block.type === "tool-group") {
+          const Icon = getToolIcon(block.toolKind);
+          const label = getToolGroupLabel(block.toolKind);
+          const hasRunning = block.parts.some((p) => p.status === "running");
+
+          return (
+            <ToolCallGroup
+              key={`tool-group-${index}`}
+              icon={Icon}
+              label={label}
+              count={block.parts.length}
+              parts={block.parts}
+              isRunning={hasRunning}
+            />
+          );
+        }
+
+        if (block.type === "image") {
+          return (
+            <img
+              key={`image-${index}`}
+              src={block.url}
+              alt={block.alt}
+              className="max-w-full rounded-md"
+            />
+          );
+        }
+
+        if (block.type === "file") {
+          return (
+            <a
+              key={`file-${index}`}
+              href={block.url}
+              className="text-sm text-blue-500 underline"
+            >
+              📎 {block.name}
+            </a>
+          );
+        }
+
         return null;
       })}
 
-      {/* 消息的整体操作按钮 (只在鼠标 Hover 时显示) */}
       {allTextContent && (
         <div className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-10 bg-background/80 backdrop-blur rounded p-1 shadow-sm">
           <button
@@ -299,5 +385,56 @@ export function AssistantMessage({
         </div>
       )}
     </div>
+  );
+}
+
+function ToolCallGroup({
+  icon: Icon,
+  label,
+  count,
+  parts,
+  isRunning,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  parts: ToolPart[];
+  isRunning: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1 py-0.5 text-[11px] transition-colors select-none min-w-0 group/tool">
+        <Icon className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+        <span className="text-muted-foreground/60 truncate">
+          {label} ({count} 个)
+        </span>
+        {isRunning && (
+          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/50" />
+        )}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/tool:text-muted-foreground/50",
+            open && "rotate-180",
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5">
+          {parts.map((p, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
+            >
+              <span className="truncate">{getToolActionText(p)}</span>
+              {p.status === "running" && (
+                <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+              )}
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

@@ -555,6 +555,22 @@ export function deleteSession(sessionId: string): boolean {
   }
 
   const sessionPath = getSessionPath(sessionId);
+
+  try {
+    const metaPath = path.join(sessionPath, ".session.json");
+    if (fs.existsSync(metaPath)) {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      if (meta.workspaceId) {
+        const wsPath = findWorkspacePath(meta.workspaceId);
+        if (wsPath && fs.existsSync(wsPath)) {
+          fs.rmSync(wsPath, { recursive: true, force: true });
+        }
+      }
+    }
+  } catch {
+    // 元数据读取失败不影响 session 删除
+  }
+
   fs.rmSync(sessionPath, { recursive: true, force: true });
 
   return true;

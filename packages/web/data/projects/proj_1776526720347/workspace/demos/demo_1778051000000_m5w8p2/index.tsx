@@ -1,274 +1,277 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
-  Sun,
-  Cloud,
-  CloudRain,
-  CloudSnow,
-  CloudLightning,
-  Wind,
-  Thermometer,
-  Heart,
-  Coffee,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  ShoppingCart,
+  DollarSign,
+  Activity,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 
-interface WeatherMoodProps {
-  city?: string;
-  unit?: "celsius" | "fahrenheit";
-  showMood?: boolean;
-  animationSpeed?: "slow" | "medium" | "fast";
-  defaultWeather?: "sunny" | "cloudy" | "rainy" | "snowy" | "stormy";
+interface DashboardProps {
+  title?: string;
+  period?: "今日" | "本周" | "本月";
+  showRevenue?: boolean;
+  showUsers?: boolean;
+  showOrders?: boolean;
+  showGrowth?: boolean;
+  chartStyle?: "bar" | "line" | "area";
 }
 
-type WeatherType = "sunny" | "cloudy" | "rainy" | "snowy" | "stormy";
+// 模拟数据生成
+function generateMockData(period: string) {
+  const multiplier = period === "今日" ? 1 : period === "本周" ? 7 : 30;
+  return {
+    revenue: Math.floor(128000 * multiplier * (0.9 + Math.random() * 0.2)),
+    users: Math.floor(3840 * multiplier * (0.9 + Math.random() * 0.2)),
+    orders: Math.floor(856 * multiplier * (0.9 + Math.random() * 0.2)),
+    growth: +(Math.random() * 30 + 5).toFixed(1),
+  };
+}
 
-interface WeatherConfig {
+function formatCurrency(value: number): string {
+  if (value >= 10000) {
+    return `¥${(value / 10000).toFixed(1)}万`;
+  }
+  return `¥${value.toLocaleString()}`;
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  trend,
+  trendUp,
+  color,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  icon: React.ReactNode;
-  gradient: string;
-  emoji: string;
-  tempRange: [number, number];
-  moodTip: string;
-  activity: string;
-}
-
-const weatherMap: Record<WeatherType, WeatherConfig> = {
-  sunny: {
-    label: "☀️ 晴空万里",
-    icon: <Sun className="w-16 h-16 text-yellow-300" />,
-    gradient: "from-yellow-400 via-orange-300 to-rose-300",
-    emoji: "😎",
-    tempRange: [28, 38],
-    moodTip: "阳光正好，出门走走心情会更好哦！",
-    activity: "去公园散步 / 喝杯冰咖啡",
-  },
-  cloudy: {
-    label: "☁️ 多云转阴",
-    icon: <Cloud className="w-16 h-16 text-gray-300" />,
-    gradient: "from-gray-400 via-slate-300 to-blue-200",
-    emoji: "😊",
-    tempRange: [18, 25],
-    moodTip: "温柔的一天，适合窝在沙发里看书。",
-    activity: "泡杯热茶 / 看一部电影",
-  },
-  rainy: {
-    label: "🌧️ 细雨绵绵",
-    icon: <CloudRain className="w-16 h-16 text-blue-300" />,
-    gradient: "from-blue-500 via-indigo-400 to-purple-300",
-    emoji: "🥺",
-    tempRange: [12, 20],
-    moodTip: "雨声是最好的白噪音，放松一下吧。",
-    activity: "听雨声写日记 / 煮一碗热汤",
-  },
-  snowy: {
-    label: "❄️ 雪花飘飘",
-    icon: <CloudSnow className="w-16 h-16 text-white" />,
-    gradient: "from-cyan-300 via-blue-200 to-white",
-    emoji: "🥶",
-    tempRange: [-5, 5],
-    moodTip: "冬天的浪漫，是雪和热气腾腾的火锅！",
-    activity: "吃火锅 / 堆雪人 ☃️",
-  },
-  stormy: {
-    label: "⚡ 雷雨交加",
-    icon: <CloudLightning className="w-16 h-16 text-yellow-200" />,
-    gradient: "from-gray-700 via-purple-800 to-indigo-900",
-    emoji: "😱",
-    tempRange: [8, 15],
-    moodTip: "宅在家里最安全，来点刺激的冒险吧！",
-    activity: "玩恐怖游戏 / 看悬疑电影",
-  },
-};
-
-const weatherList: WeatherType[] = ["sunny", "cloudy", "rainy", "snowy", "stormy"];
-
-// Inject keyframes once
-function useWeatherKeyframes() {
-  const loaded = useRef(false);
-  useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
-    const style = document.createElement("style");
-    style.textContent = `
-      @keyframes particleFall {
-        0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-}
-
-function AnimatedParticles({ weather }: { weather: WeatherType }) {
-  const count = weather === "stormy" ? 20 : weather === "rainy" ? 15 : weather === "snowy" ? 25 : 0;
-  const isSnow = weather === "snowy";
-  const isRain = weather === "rainy" || weather === "stormy";
-
-  useWeatherKeyframes();
-
-  if (count === 0) return null;
-
+  value: string;
+  trend: string;
+  trendUp: boolean;
+  color: string;
+}) {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `-${Math.random() * 20}%`,
-            animation: `particleFall ${1.5 + Math.random() * 2}s linear infinite`,
-            animationDelay: `${Math.random() * 2}s`,
-            opacity: 0.6 + Math.random() * 0.4,
-          }}
-        >
-          {isSnow ? (
-            <div className="w-2 h-2 bg-white rounded-full" />
-          ) : (
-            <div
-              className="w-0.5 h-4 rounded-full"
-              style={{
-                background: isRain
-                  ? "linear-gradient(to bottom, transparent, #60a5fa)"
-                  : "linear-gradient(to bottom, transparent, #fbbf24)",
-              }}
-            />
-          )}
+    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all duration-300">
+      <div className="flex items-start justify-between mb-3">
+        <div className={`p-2.5 rounded-xl ${color}`}>
+          <Icon className="w-5 h-5 text-white" />
         </div>
-      ))}
+        <div
+          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+            trendUp
+              ? "bg-green-500/20 text-green-300"
+              : "bg-red-500/20 text-red-300"
+          }`}
+        >
+          {trendUp ? (
+            <ArrowUpRight className="w-3 h-3" />
+          ) : (
+            <ArrowDownRight className="w-3 h-3" />
+          )}
+          {trend}
+        </div>
+      </div>
+      <p className="text-white/60 text-xs mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
     </div>
   );
 }
 
-export default function WeatherMoodWidget(props: Record<string, unknown>) {
-  const {
-    city = "北京",
-    unit = "celsius",
-    showMood = true,
-    animationSpeed = "medium",
-    defaultWeather = "sunny",
-  } = props as WeatherMoodProps;
-
-  const [currentWeather, setCurrentWeather] = useState<WeatherType>(defaultWeather);
-  const [temp, setTemp] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  const speedMap = { slow: 4000, medium: 2500, fast: 1200 };
-
-  useEffect(() => {
-    const range = weatherMap[currentWeather].tempRange;
-    const randomTemp = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
-    setTemp(randomTemp);
-  }, [currentWeather]);
-
-  const handleWeatherChange = (w: WeatherType) => {
-    setIsAnimating(true);
-    setTimeout(() => {
-      setCurrentWeather(w);
-      setIsAnimating(false);
-    }, 300);
-  };
-
-  const weather = weatherMap[currentWeather];
-  const displayTemp = unit === "celsius" ? `${temp}°C` : `${Math.round(temp * 1.8 + 32)}°F`;
+function MiniChart({ type, height }: { type: string; height: number }) {
+  const bars = Array.from({ length: 12 }, () => Math.random() * height);
+  const max = Math.max(...bars);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Main Card */}
-      <div
-        className={`relative w-full max-w-md rounded-3xl overflow-hidden bg-gradient-to-br ${weather.gradient} shadow-2xl transition-all duration-500 ${
-          isAnimating ? "scale-95 opacity-80" : "scale-100 opacity-100"
-        }`}
-      >
-        {/* Background Particles */}
-        <AnimatedParticles weather={currentWeather} />
+    <div className="flex items-end gap-1.5" style={{ height }}>
+      {bars.map((h, i) => {
+        const barHeight = (h / max) * (height - 10) + 4;
+        const isHighlight = i === bars.length - 1;
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-sm transition-all duration-300"
+            style={{
+              height: barHeight,
+              background:
+                type === "area"
+                  ? `linear-gradient(to top, ${
+                      isHighlight ? "#a78bfa" : "#6366f1"
+                    }44, ${isHighlight ? "#a78bfa" : "#6366f1"}22)`
+                  : isHighlight
+                  ? "#a78bfa"
+                  : "#6366f1",
+              opacity: type === "line" ? 0.3 + (i / bars.length) * 0.7 : 0.6 + (i / bars.length) * 0.4,
+              borderLeft: type === "line" ? "1px solid rgba(167,139,250,0.3)" : "none",
+              minWidth: 4,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
-        {/* Content */}
-        <div className="relative z-10 p-8">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-white/90">{city}</h2>
-              <p className="text-sm text-white/70">{weather.label}</p>
-            </div>
-            <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
-              <Wind className="w-4 h-4 text-white" />
-              <span className="text-xs text-white">
-                {Math.floor(Math.random() * 20 + 5)} km/h
-              </span>
-            </div>
-          </div>
+export default function DashboardPage(props: Record<string, unknown>) {
+  const {
+    title = "📊 数据仪表盘",
+    period = "今日",
+    showRevenue = true,
+    showUsers = true,
+    showOrders = true,
+    showGrowth = true,
+    chartStyle = "bar",
+  } = props as DashboardProps;
 
-          {/* Weather Icon & Temperature */}
-          <div className="flex items-center justify-center gap-4 my-8">
-            <div className="animate-bounce" style={{ animationDuration: `${speedMap[animationSpeed]}ms` }}>
-              {weather.icon}
-            </div>
-            <div className="text-right">
-              <div className="text-6xl font-bold text-white drop-shadow-lg">
-                {displayTemp}
-              </div>
-              <div className="text-sm text-white/70 flex items-center gap-1 mt-1">
-                <Thermometer className="w-3 h-3" />
-                体感温度 {unit === "celsius" ? `${temp - 2}°C` : `${Math.round((temp - 2) * 1.8 + 32)}°F`}
-              </div>
-            </div>
-          </div>
+  const [selectedPeriod, setSelectedPeriod] = useState(period);
+  const data = generateMockData(selectedPeriod);
 
-          {/* Mood Tip */}
-          {showMood && (
-            <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Heart className="w-5 h-5 text-red-200" />
-                <span className="text-sm font-medium text-white">今日心情小贴士</span>
-              </div>
-              <p className="text-white/90 text-sm leading-relaxed">{weather.moodTip}</p>
-              <div className="flex items-center gap-2 mt-3 text-xs text-white/70">
-                <Coffee className="w-3 h-3" />
-                <span>推荐活动：{weather.activity}</span>
-              </div>
-            </div>
-          )}
+  const periods = ["今日", "本周", "本月"];
 
-          {/* Weather Selector */}
+  const statCards = [
+    {
+      key: "revenue",
+      show: showRevenue,
+      icon: DollarSign,
+      label: "总收入",
+      value: formatCurrency(data.revenue),
+      trend: `+${(data.growth * 0.8).toFixed(1)}%`,
+      trendUp: true,
+      color: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    },
+    {
+      key: "users",
+      show: showUsers,
+      icon: Users,
+      label: "活跃用户",
+      value: `${data.users.toLocaleString()}`,
+      trend: `+${(data.growth * 1.2).toFixed(1)}%`,
+      trendUp: true,
+      color: "bg-gradient-to-br from-blue-500 to-indigo-600",
+    },
+    {
+      key: "orders",
+      show: showOrders,
+      icon: ShoppingCart,
+      label: "订单数",
+      value: data.orders.toLocaleString(),
+      trend: `-${(data.growth * 0.3).toFixed(1)}%`,
+      trendUp: false,
+      color: "bg-gradient-to-br from-orange-500 to-amber-600",
+    },
+    {
+      key: "growth",
+      show: showGrowth,
+      icon: TrendingUp,
+      label: "增长率",
+      value: `+${data.growth}%`,
+      trend: `+${(data.growth * 0.5).toFixed(1)}%`,
+      trendUp: true,
+      color: "bg-gradient-to-br from-purple-500 to-pink-600",
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6">
+      {/* 页面头部 */}
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <p className="text-xs text-white/60 mb-3 font-medium uppercase tracking-wider">
-              切换天气心情
+            <h1 className="text-3xl font-bold text-white">{title}</h1>
+            <p className="text-white/50 text-sm mt-1">
+              实时数据概览，掌握业务动态
             </p>
-            <div className="grid grid-cols-5 gap-2">
-              {weatherList.map((w) => {
-                const isActive = w === currentWeather;
-                const wConfig = weatherMap[w];
-                return (
-                  <button
-                    key={w}
-                    onClick={() => handleWeatherChange(w)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${
-                      isActive
-                        ? "bg-white/30 shadow-lg scale-110"
-                        : "bg-white/10 hover:bg-white/20 hover:scale-105"
-                    }`}
-                  >
-                    <span className="text-lg">{wConfig.emoji}</span>
-                    <span className={`text-[10px] ${isActive ? "text-white font-semibold" : "text-white/60"}`}>
-                      {w === "sunny" ? "晴" : w === "cloudy" ? "云" : w === "rainy" ? "雨" : w === "snowy" ? "雪" : "雷"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          </div>
+
+          {/* 时间段切换 */}
+          <div className="flex gap-2 bg-white/5 backdrop-blur-sm rounded-xl p-1">
+            {periods.map((p) => (
+              <button
+                key={p}
+                onClick={() => setSelectedPeriod(p)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  selectedPeriod === p
+                    ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"
+                    : "text-white/60 hover:text-white/90 hover:bg-white/10"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Bottom decorative strip */}
-        <div className="relative z-10 h-2 bg-gradient-to-r from-white/20 via-white/40 to-white/20" />
-      </div>
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {statCards
+            .filter((card) => card.show)
+            .map((card) => (
+              <StatCard key={card.key} {...card} />
+            ))}
+        </div>
 
-      {/* Floating decoration */}
-      <div className="hidden md:block fixed bottom-8 right-8 text-white/20 text-xs">
-        🌤️ 点击天气图标切换心情
+        {/* 图表区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 趋势图 */}
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-white font-semibold">收入趋势</h3>
+              </div>
+              <span className="text-xs text-white/40">
+                最近 12 期
+              </span>
+            </div>
+            <MiniChart type={chartStyle} height={160} />
+          </div>
+
+          {/* 活跃度 */}
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-white font-semibold">用户活跃度</h3>
+              </div>
+              <span className="text-xs text-white/40">
+                最近 12 期
+              </span>
+            </div>
+            <MiniChart type="area" height={160} />
+          </div>
+
+          {/* 最近活动列表 */}
+          <div className="lg:col-span-2 bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
+            <div className="flex items-center gap-2 mb-6">
+              <Activity className="w-5 h-5 text-purple-400" />
+              <h3 className="text-white font-semibold">最近活动</h3>
+            </div>
+            <div className="space-y-3">
+              {[
+                { action: "新用户注册", detail: "用户 王小明 注册了账号", time: "2 分钟前", color: "bg-green-500" },
+                { action: "新订单", detail: "订单 #20240506 已完成支付", time: "15 分钟前", color: "bg-blue-500" },
+                { action: "提现申请", detail: "商户 张三 申请提现 ¥12,800", time: "1 小时前", color: "bg-orange-500" },
+                { action: "系统通知", detail: "系统备份已完成", time: "2 小时前", color: "bg-purple-500" },
+                { action: "异常告警", detail: "服务器 CPU 使用率超过 80%", time: "3 小时前", color: "bg-red-500" },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <div className={`w-2 h-2 rounded-full ${item.color} flex-shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">{item.action}</p>
+                    <p className="text-xs text-white/50 truncate">{item.detail}</p>
+                  </div>
+                  <span className="text-xs text-white/40 flex-shrink-0">{item.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

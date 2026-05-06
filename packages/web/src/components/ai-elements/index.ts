@@ -46,6 +46,7 @@ export {
   ReasoningDisplay,
   ReasoningTrigger,
   ReasoningContent,
+  ReasoningGroup,
 } from "./reasoning";
 
 export {

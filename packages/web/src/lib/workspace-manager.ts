@@ -4,6 +4,7 @@ import {
   getWorkspacesDir,
   getWorkspaceDir,
   getProjectPath,
+  getSessionsDir,
   projectExists,
   ensureWorkspaceFiles,
   findWorkspacePath,
@@ -215,4 +216,101 @@ export function updateWorkspaceTimestamp(workspaceId: string): void {
 
   meta.updatedAt = Date.now();
   writeWorkspaceMeta(workspaceId, meta);
+}
+
+/**
+ * 收集所有活跃（未过期）session 引用的 workspaceId
+ */
+function collectActiveWorkspaceIds(): Set<string> {
+  const ids = new Set<string>();
+  const sessionsDir = getSessionsDir();
+  if (!fs.existsSync(sessionsDir)) return ids;
+
+  const userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
+    const projectDirs = fs.readdirSync(
+      path.join(sessionsDir, userDir.name),
+      { withFileTypes: true }
+    );
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue;
+      const sessionDirs = fs.readdirSync(
+        path.join(sessionsDir, userDir.name, projectDir.name),
+        { withFileTypes: true }
+      );
+      for (const sessionDir of sessionDirs) {
+        if (!sessionDir.isDirectory()) continue;
+        const metaPath = path.join(
+          sessionsDir, userDir.name, projectDir.name, sessionDir.name, ".session.json"
+        );
+        if (fs.existsSync(metaPath)) {
+          try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+            if (meta.workspaceId && Date.now() <= meta.expiresAt) {
+              ids.add(meta.workspaceId);
+            }
+          } catch { /* 忽略损坏的 session 元数据 */ }
+        }
+      }
+    }
+  }
+
+  return ids;
+}
+
+/**
+ * 清理孤儿 workspace：没有任何活跃 session 引用的过期 workspace
+ * @param ttlMs TTL 时间，默认 24 小时
+ */
+export function cleanupOrphanWorkspaces(ttlMs: number = 24 * 60 * 60 * 1000): string[] {
+  const cleaned: string[] = [];
+  const workspacesDir = getWorkspacesDir();
+  if (!fs.existsSync(workspacesDir)) return cleaned;
+
+  const activeWorkspaceIds = collectActiveWorkspaceIds();
+
+  const userDirs = fs.readdirSync(workspacesDir, { withFileTypes: true });
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
+    const userWsDir = path.join(workspacesDir, userDir.name);
+    const projectDirs = fs.readdirSync(userWsDir, { withFileTypes: true });
+
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue;
+      const projectWsDir = path.join(userWsDir, projectDir.name);
+      const wsEntries = fs.readdirSync(projectWsDir, { withFileTypes: true });
+
+      for (const entry of wsEntries) {
+        if (!entry.isDirectory()) continue;
+
+        const wsId = entry.name;
+        if (activeWorkspaceIds.has(wsId)) continue;
+
+        const wsPath = path.join(projectWsDir, wsId);
+        const metaPath = path.join(wsPath, ".workspace.json");
+
+        let shouldDelete = false;
+        if (fs.existsSync(metaPath)) {
+          try {
+            const wsMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+            shouldDelete = Date.now() - wsMeta.updatedAt > ttlMs;
+          } catch {
+            const stat = fs.statSync(wsPath);
+            shouldDelete = Date.now() - stat.mtimeMs > ttlMs;
+          }
+        } else {
+          const stat = fs.statSync(wsPath);
+          shouldDelete = Date.now() - stat.mtimeMs > ttlMs;
+        }
+
+        if (shouldDelete) {
+          fs.rmSync(wsPath, { recursive: true, force: true });
+          cleaned.push(wsId);
+        }
+      }
+    }
+  }
+
+  return cleaned;
 }

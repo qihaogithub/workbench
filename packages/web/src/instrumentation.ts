@@ -12,6 +12,7 @@ export async function register() {
   // 仅在 Node.js 运行时注册（非 Edge Runtime）
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { cleanupAllExpiredSessions } = await import('@/lib/session-manager');
+    const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
 
     // 启动时立即执行一次清理
     try {
@@ -19,8 +20,12 @@ export async function register() {
       if (cleaned.length > 0) {
         console.log(`[Session Cleanup] Initial cleanup: ${cleaned.length} sessions removed`);
       }
+      const orphaned = cleanupOrphanWorkspaces();
+      if (orphaned.length > 0) {
+        console.log(`[Workspace GC] Initial cleanup: ${orphaned.length} orphan workspaces removed`);
+      }
     } catch (error) {
-      console.error('[Session Cleanup] Initial cleanup failed:', error);
+      console.error('[Cleanup] Initial cleanup failed:', error);
     }
 
     // 每 30 分钟执行一次全局清理
@@ -30,8 +35,12 @@ export async function register() {
         if (cleaned.length > 0) {
           console.log(`[Session Cleanup] Cleaned ${cleaned.length} expired sessions`);
         }
+        const orphaned = cleanupOrphanWorkspaces();
+        if (orphaned.length > 0) {
+          console.log(`[Workspace GC] Cleaned ${orphaned.length} orphan workspaces`);
+        }
       } catch (error) {
-        console.error('[Session Cleanup] Scheduled cleanup failed:', error);
+        console.error('[Cleanup] Scheduled cleanup failed:', error);
       }
     }, 30 * 60 * 1000); // 30 分钟
 

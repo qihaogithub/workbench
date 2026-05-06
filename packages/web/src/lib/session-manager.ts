@@ -138,6 +138,12 @@ export function findActiveSession(
 
         // 发现过期 session，主动删除
         if (Date.now() > meta.expiresAt) {
+          if (meta.workspaceId) {
+            const wsPath = findWorkspacePath(meta.workspaceId);
+            if (wsPath) {
+              fs.rmSync(wsPath, { recursive: true, force: true });
+            }
+          }
           fs.rmSync(path.join(projectSessionDir, entry.name), {
             recursive: true,
             force: true,
@@ -421,10 +427,14 @@ export function discardEditSession(sessionId: string): boolean {
   if (fs.existsSync(metaPath)) {
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      meta.status = 'discarded';
-      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+      if (meta.workspaceId) {
+        const wsPath = findWorkspacePath(meta.workspaceId);
+        if (wsPath) {
+          fs.rmSync(wsPath, { recursive: true, force: true });
+        }
+      }
     } catch {
-      // 忽略写入错误
+      // 元数据读取失败不影响后续删除
     }
   }
 
@@ -465,6 +475,10 @@ export function cleanupExpiredSessions(userId: string): string[] {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         if (Date.now() > meta.expiresAt) {
+          if (meta.workspaceId) {
+            const wsPath = findWorkspacePath(meta.workspaceId);
+            if (wsPath) fs.rmSync(wsPath, { recursive: true, force: true });
+          }
           fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
             recursive: true,
             force: true,
@@ -522,6 +536,10 @@ export function cleanupAllExpiredSessions(): string[] {
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           if (Date.now() > meta.expiresAt) {
+            if (meta.workspaceId) {
+              const wsPath = findWorkspacePath(meta.workspaceId);
+              if (wsPath) fs.rmSync(wsPath, { recursive: true, force: true });
+            }
             fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
               recursive: true,
               force: true,
