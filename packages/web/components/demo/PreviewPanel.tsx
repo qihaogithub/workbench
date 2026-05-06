@@ -11,12 +11,14 @@ const DEFAULT_PREVIEW_SIZE: PreviewSize = {
 
 function buildPreviewStyle(
   size?: PreviewSize,
-  iframeHeight?: number
+  iframeHeight?: number,
+  containerWidth?: number
 ): React.CSSProperties {
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
 
   const style: React.CSSProperties = {
     width: effectiveSize.width,
+    maxWidth: "100%",
     margin: "0 auto",
     background: "#fff",
     display: "block",
@@ -36,7 +38,25 @@ function buildPreviewStyle(
     style.maxHeight = effectiveSize.maxHeight;
   }
 
-  if (effectiveSize.scale !== undefined) {
+  // 自动缩放：当容器宽度小于预览宽度时，按比例缩小
+  const previewWidth =
+    typeof effectiveSize.width === "number"
+      ? effectiveSize.width
+      : (typeof DEFAULT_PREVIEW_SIZE.width === "number" ? DEFAULT_PREVIEW_SIZE.width : 375);
+  if (containerWidth && containerWidth > 0 && containerWidth < previewWidth) {
+    const scale = containerWidth / previewWidth;
+    style.transform = `scale(${scale})`;
+    style.transformOrigin = "top center";
+    // 缩放后减少布局占位，避免溢出
+    style.height =
+      typeof style.height === "number"
+        ? style.height * scale
+        : style.height;
+    style.minHeight =
+      typeof style.minHeight === "number"
+        ? style.minHeight * scale
+        : style.minHeight;
+  } else if (effectiveSize.scale !== undefined) {
     style.transform = `scale(${effectiveSize.scale})`;
     style.transformOrigin = "top center";
   }
@@ -97,6 +117,8 @@ export function PreviewPanel({
   previewSize,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -307,7 +329,21 @@ export function PreviewPanel({
     sendUpdateCode,
   ]);
 
-  const previewStyle = buildPreviewStyle(previewSize, iframeHeight);
+  // 监听容器宽度变化，用于自动缩放
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const previewStyle = buildPreviewStyle(previewSize, iframeHeight, containerWidth);
 
   // 使用 Blob URL 替代 srcdoc，避免 CORS 问题
   useEffect(() => {
@@ -373,14 +409,16 @@ export function PreviewPanel({
       )}
 
       {iframeSrcUrl && (
-        <iframe
-          ref={iframeRef}
-          sandbox="allow-scripts allow-same-origin"
-          src={iframeSrcUrl}
-          style={previewStyle}
-          className="w-full h-full"
-          title="预览"
-        />
+        <div ref={containerRef} className="w-full h-full">
+          <iframe
+            ref={iframeRef}
+            sandbox="allow-scripts allow-same-origin"
+            src={iframeSrcUrl}
+            style={previewStyle}
+            className="w-full h-full"
+            title="预览"
+          />
+        </div>
       )}
     </>
   );
