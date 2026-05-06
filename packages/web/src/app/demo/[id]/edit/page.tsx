@@ -385,11 +385,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     if (!validationResult.isValid) {
       toast({
-        title: "保存失败",
-        description: "请修复所有错误后再保存",
+        title: "验证警告",
+        description: "当前页面存在验证错误，保存后可能无法正常预览",
         variant: "destructive",
       });
-      return;
     }
 
     try {
@@ -676,7 +675,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!validationResult.isValid || isSaving}
+            disabled={isSaving}
           >
             {isSaving ? (
               <>
