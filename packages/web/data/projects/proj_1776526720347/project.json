@@ -218,10 +218,18 @@
       "sessionId": "session-1778060158717-28cknrxhz",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1776526720347/v27",
       "fileCount": 8
+    },
+    {
+      "versionId": "v28",
+      "savedAt": 1778060994323,
+      "savedBy": "37972b72-c31e-4344-a3e8-1509c0b8ba8c",
+      "sessionId": "session-1778060810237-zgfno1ouj",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/web/data/snapshots/proj_1776526720347/v28",
+      "fileCount": 6
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1778060801831,
+  "updatedAt": 1778060994324,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [],
   "demoFolders": []
