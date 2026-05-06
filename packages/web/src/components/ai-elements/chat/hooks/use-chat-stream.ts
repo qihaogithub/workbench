@@ -270,6 +270,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onFinish: async (result) => {
+            streamService.stopKeepalive();
             stopSilenceTracking();
             const currentMsg = currentMessageRef.current;
             const assistantMessage: ChatMessage = {
@@ -358,9 +359,20 @@ export function useChatStream(options: UseChatStreamOptions) {
             realtimeFilesRef.clear();
           },
 
-          onConnectionError: () => {},
+          onConnectionError: () => {
+            // 连接未建立时的错误处理：重置状态并显示错误
+            setIsStreaming(false);
+            stopSilenceTracking();
+            const errorMessage: ChatMessage = {
+              id: `error-${Date.now()}`,
+              role: "assistant",
+              content: "WebSocket 连接失败，请检查 Agent Service 是否运行（http://localhost:3201）",
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+          },
 
           onError: (error) => {
+            streamService.stopKeepalive();
             const isModelError =
               error.code === "SESSION_NOT_FOUND" ||
               error.code === "GET_MODELS_ERROR";
@@ -384,6 +396,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         await streamService.waitForConnection(stream);
 
         streamService.sendMessage(userMessage, workingDir);
+        streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
         console.warn("WebSocket 失败，使用非流式模式:", error);

@@ -9,7 +9,6 @@ import {
   Thermometer,
   Heart,
   Coffee,
-  type LucideProps,
 } from "lucide-react";
 
 interface WeatherMoodProps {
@@ -24,8 +23,7 @@ type WeatherType = "sunny" | "cloudy" | "rainy" | "snowy" | "stormy";
 
 interface WeatherConfig {
   label: string;
-  icon: React.ComponentType<LucideProps>;
-  iconColor: string;
+  icon: React.ReactNode;
   gradient: string;
   emoji: string;
   tempRange: [number, number];
@@ -36,8 +34,7 @@ interface WeatherConfig {
 const weatherMap: Record<WeatherType, WeatherConfig> = {
   sunny: {
     label: "☀️ 晴空万里",
-    icon: Sun,
-    iconColor: "text-yellow-300",
+    icon: <Sun className="w-16 h-16 text-yellow-300" />,
     gradient: "from-yellow-400 via-orange-300 to-rose-300",
     emoji: "😎",
     tempRange: [28, 38],
@@ -46,8 +43,7 @@ const weatherMap: Record<WeatherType, WeatherConfig> = {
   },
   cloudy: {
     label: "☁️ 多云转阴",
-    icon: Cloud,
-    iconColor: "text-gray-300",
+    icon: <Cloud className="w-16 h-16 text-gray-300" />,
     gradient: "from-gray-400 via-slate-300 to-blue-200",
     emoji: "😊",
     tempRange: [18, 25],
@@ -56,8 +52,7 @@ const weatherMap: Record<WeatherType, WeatherConfig> = {
   },
   rainy: {
     label: "🌧️ 细雨绵绵",
-    icon: CloudRain,
-    iconColor: "text-blue-300",
+    icon: <CloudRain className="w-16 h-16 text-blue-300" />,
     gradient: "from-blue-500 via-indigo-400 to-purple-300",
     emoji: "🥺",
     tempRange: [12, 20],
@@ -66,8 +61,7 @@ const weatherMap: Record<WeatherType, WeatherConfig> = {
   },
   snowy: {
     label: "❄️ 雪花飘飘",
-    icon: CloudSnow,
-    iconColor: "text-white",
+    icon: <CloudSnow className="w-16 h-16 text-white" />,
     gradient: "from-cyan-300 via-blue-200 to-white",
     emoji: "🥶",
     tempRange: [-5, 5],
@@ -76,8 +70,7 @@ const weatherMap: Record<WeatherType, WeatherConfig> = {
   },
   stormy: {
     label: "⚡ 雷雨交加",
-    icon: CloudLightning,
-    iconColor: "text-yellow-200",
+    icon: <CloudLightning className="w-16 h-16 text-yellow-200" />,
     gradient: "from-gray-700 via-purple-800 to-indigo-900",
     emoji: "😱",
     tempRange: [8, 15],
@@ -211,7 +204,7 @@ export default function WeatherMoodWidget(props: Record<string, unknown>) {
           {/* Weather Icon & Temperature */}
           <div className="flex items-center justify-center gap-4 my-8">
             <div className="animate-bounce" style={{ animationDuration: `${speedMap[animationSpeed]}ms` }}>
-              <weather.icon className={`w-16 h-16 ${weather.iconColor}`} />
+              {weather.icon}
             </div>
             <div className="text-right">
               <div className="text-6xl font-bold text-white drop-shadow-lg">

@@ -317,11 +317,17 @@ export async function registerWebSocketRoutes(
             );
 
             try {
+              // 获取已存在的 agent，以便复用其当前模型设置
+              const existingAgent = manager.get(sessionId);
+              const currentModelId = existingAgent && "getModelInfo" in existingAgent
+                ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
+                : null;
+
               const config: AgentConfig = {
                 sessionId,
                 backend: "opencode",
                 workingDir: message.workingDir,
-                model: DEFAULT_MODEL_ID,
+                model: currentModelId || DEFAULT_MODEL_ID,
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -442,6 +448,29 @@ export async function registerWebSocketRoutes(
               agent.on("file_operation", eventHandler);
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+              let isCancelled = false;
+
+              const wrappedEventHandler = (event: AgentEvent): void => {
+                if (isCancelled) {
+                  logger.debug(
+                    { sessionId, eventType: event.type },
+                    "Ignoring event after timeout/cancel",
+                  );
+                  return;
+                }
+                eventHandler(event);
+              };
+
+              // 注册包装后的事件处理器
+              agent.on("stream", wrappedEventHandler);
+              agent.on("thought", wrappedEventHandler);
+              agent.on("tool_call", wrappedEventHandler);
+              agent.on("tool_call_update", wrappedEventHandler);
+              agent.on("plan", wrappedEventHandler);
+              agent.on("error", wrappedEventHandler);
+              agent.on("status", wrappedEventHandler);
+              agent.on("file_operation", wrappedEventHandler);
+
               try {
                 const sendPromise = agent.sendMessage(
                   message.content,
@@ -453,6 +482,7 @@ export async function registerWebSocketRoutes(
                       { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS },
                       "Agent sendMessage timed out, cancelling",
                     );
+                    isCancelled = true;
                     agent.cancel();
                     resolve({
                       success: false,
@@ -471,6 +501,11 @@ export async function registerWebSocketRoutes(
                   sendPromise,
                   timeoutPromise,
                 ]);
+
+                // 如果是超时导致的，确保 sendPromise 完成后不会发送额外事件
+                if (!result.success && result.error?.code === "MESSAGE_TIMEOUT") {
+                  isCancelled = true;
+                }
 
                 if (result.success) {
                   sendMessage({
@@ -499,14 +534,15 @@ export async function registerWebSocketRoutes(
                 });
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
-                agent.off("stream", eventHandler);
-                agent.off("thought", eventHandler);
-                agent.off("tool_call", eventHandler);
-                agent.off("tool_call_update", eventHandler);
-                agent.off("plan", eventHandler);
-                agent.off("error", eventHandler);
-                agent.off("status", eventHandler);
-                agent.off("file_operation", eventHandler);
+                // 清理包装后的事件处理器
+                agent.off("stream", wrappedEventHandler);
+                agent.off("thought", wrappedEventHandler);
+                agent.off("tool_call", wrappedEventHandler);
+                agent.off("tool_call_update", wrappedEventHandler);
+                agent.off("plan", wrappedEventHandler);
+                agent.off("error", wrappedEventHandler);
+                agent.off("status", wrappedEventHandler);
+                agent.off("file_operation", wrappedEventHandler);
               }
             } catch (error) {
               sendMessage({
@@ -539,11 +575,17 @@ export async function registerWebSocketRoutes(
             }
 
             try {
+              // 获取已存在的 agent，以便复用其当前模型设置
+              const existingAgent = manager.get(resumeSessionId);
+              const currentModelId = existingAgent && "getModelInfo" in existingAgent
+                ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
+                : null;
+
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 backend: "opencode",
                 workingDir: message.workingDir,
-                model: DEFAULT_MODEL_ID,
+                model: currentModelId || DEFAULT_MODEL_ID,
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -742,6 +784,21 @@ export async function registerWebSocketRoutes(
           "WebSocket connection closed",
         );
         connections.delete(connectionId);
+
+        // 检查是否还有其他连接使用该 session，如果没有则清理 Agent
+        const hasOtherConnections = Array.from(connections.values()).some(
+          (conn) => conn.sessionId === sessionId,
+        );
+        if (!hasOtherConnections) {
+          const agent = manager.get(sessionId);
+          if (agent && agent.status !== "processing") {
+            logger.info(
+              { sessionId },
+              "No active connections for session, cleaning up agent",
+            );
+            void manager.destroy(sessionId);
+          }
+        }
       });
 
       socket.on("error", (error) => {

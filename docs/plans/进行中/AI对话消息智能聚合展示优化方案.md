@@ -28,11 +28,10 @@
 
 1. **思考合并方式粗糙**：连续 reasoning 已被合并为单块，但仅用 `\n\n` 纯文本拼接，无法区分不同阶段的思考，缺少视觉层次
 2. **工具调用零散**：每个 tool 独立成块（极简一行渲染），无法形成完整的操作流程感知；且未使用已有的 `Tool` 组件（支持多工具合并和详情展开）
-3. **缺少整体概览**：用户无法快速了解 AI 做了哪些操作
-4. **信息层级不清**：思考、工具调用、最终回复混杂在一起
-5. **类型定义不一致**：`message.tsx` 和 `assistant-message.tsx` 各有一套 `MessagePart` 定义，结构不统一
-6. **image/file 类型未处理**：`renderBlocks` 逻辑完全忽略了 image 和 file 类型的渲染
-7. **AgentProcessGroup 存在 Bug**：传给 Reasoning 组件的 content prop 不被接收，该组件可能无法正常工作
+3. **信息层级不清**：思考、工具调用、最终回复混杂在一起
+4. **类型定义不一致**：`message.tsx` 和 `assistant-message.tsx` 各有一套 `MessagePart` 定义，结构不统一
+5. **image/file 类型未处理**：`renderBlocks` 逻辑完全忽略了 image 和 file 类型的渲染
+6. **AgentProcessGroup 存在 Bug**（本次不做汇总条，可后续按需修复）：传给 Reasoning 组件的 content prop 不被接收
 
 ## 二、优化方案设计
 
@@ -40,12 +39,6 @@
 
 ```
 AssistantMessage
-├── AIProcessSummary (重构自 AgentProcessGroup)  ← 顶部汇总条
-│   ├── StatusIndicator        ← 状态指示器 (●)
-│   ├── ToolCallSummary       ← 工具调用统计
-│   ├── ReasoningSummary      ← 思考次数统计
-│   └── Duration              ← 耗时统计
-│
 ├── ReasoningGroup (新增，内部复用 Reasoning)  ← 聚合的思考块
 │   ├── ReasoningTrigger       ← 复用现有触发器（自定义 getThinkingMessage）
 │   └── ReasoningContent[]    ← 复用现有内容组件（带分割线）
@@ -59,8 +52,8 @@ AssistantMessage
 
 **组件复用策略**：
 - `ReasoningGroup`：新增外层容器组件，内部组合使用 `Reasoning` + `ReasoningTrigger` + `ReasoningContent`，复用 Context 机制和自动折叠逻辑
-- `ToolCallGroup`：**不新建**，直接在 `assistant-message.tsx` 中使用现有 `Tool` 组件（已支持 `entries: ToolEntry[]` 多工具合并），配合新的分组逻辑传入合并后的 entries
-- `AIProcessSummary`：基于现有 `AgentProcessGroup` 重构，修复 Bug 并优化视觉，替换原组件
+- `Tool`：直接在 `assistant-message.tsx` 中使用现有 `Tool` 组件（已支持 `entries: ToolEntry[]` 多工具合并），配合新的分组逻辑传入合并后的 entries
+- **汇总条功能本次不做**，后续可按需基于 `AgentProcessGroup` 重构
 
 ### 2.2 连续 Reasoning 智能聚合
 
@@ -101,7 +94,8 @@ AssistantMessage
 
 **分组规则**：
 - 按工具类型（read/edit/execute）分组，通过 `getToolKind(toolName)` 从工具名推断类型
-- 同类型连续工具调用合并，传入 `Tool` 组件的 `entries` 数组
+- **合并阈值：连续 2 个及以上同类型工具调用才合并**，少于 2 个时保持独立渲染
+- 合并后传入 `Tool` 组件的 `entries` 数组
 - `Tool` 组件已有 `getAggregateInfo()` 逻辑，自动显示图标 + 类型标签 + 数量
 - 折叠后显示摘要，展开后显示详情
 
@@ -117,54 +111,9 @@ function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
 }
 ```
 
-### 2.4 AI 处理过程汇总条（重构自 AgentProcessGroup）
-
-**位置**：在 AI 回复内容上方，所有过程块之后
-
-**与现有组件关系**：基于 `AgentProcessGroup` 重构，修复其 Bug（传给 Reasoning 的 content prop 不被接收），优化视觉设计，替换原组件
-
-**视觉设计**：
-```
-┌────────────────────────────────────────────────────────┐
-│ ● 完成   │   🔧 3 个工具调用   │   🧠 2 次思考   │  12s  │
-│                                          [展开详情 ▾] │
-└────────────────────────────────────────────────────────┘
-```
-
-**功能**：
-- 显示整体状态（完成/处理中）
-- 工具调用数量和类型统计
-- 思考次数统计
-- 总耗时统计
-- 点击可展开/折叠详情
-
 ## 三、组件详细设计
 
-### 3.1 AIProcessSummary 组件（新增）
-
-**Props 接口**：
-```typescript
-interface AIProcessSummaryProps {
-  reasoningCount: number;
-  toolCallGroups: Array<{
-    type: 'read' | 'edit' | 'execute' | 'other';
-    count: number;
-  }>;
-  status: 'completed' | 'running' | 'error';
-  duration?: number; // 毫秒
-  onExpandToggle: () => void;
-  isExpanded: boolean;
-}
-```
-
-**样式规范**：
-- 高度：32px
-- 背景：`bg-muted/30`
-- 字体：text-[11px]
-- 圆角：`rounded-md`
-- 间距：gap-3
-
-### 3.2 ReasoningGroup 组件（新增，内部复用 Reasoning）
+### 3.1 ReasoningGroup 组件（新增，内部复用 Reasoning）
 
 **Props 接口**：
 ```typescript
@@ -186,7 +135,7 @@ interface ReasoningGroupProps {
 - 使用 `ReasoningContent` 组件渲染每个阶段的思考内容，之间用 `border-t border-dashed` 分割
 - 计算总 duration：取最后一个 reasoning 的 duration（与当前逻辑一致）
 
-### 3.3 Tool 组件（直接使用现有组件，无需新建 ToolCallGroup）
+### 3.2 Tool 组件（直接使用现有组件）
 
 现有 `Tool` 组件已支持 `entries: ToolEntry[]` 多工具合并，无需新建 `ToolCallGroup`。
 
@@ -239,7 +188,7 @@ function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
 }
 ```
 
-**改动 2：重构 renderBlocks 逻辑**
+**改动 2：重构 renderBlocks 逻辑（合并阈值 2）**
 
 将原来的"连续 reasoning 拼接内容 + 每个 tool 独立成块"改为"智能分组"：
 
@@ -248,6 +197,7 @@ type RenderBlock =
   | { type: "text"; content: string }
   | { type: "reasoning-group"; reasonings: MessagePart[] }
   | { type: "tool-group"; parts: MessagePart[]; toolKind: string }
+  | { type: "tool-single"; part: MessagePart }
   | { type: "image"; url: string; alt?: string }
   | { type: "file"; name: string; url: string; size?: number };
 
@@ -264,10 +214,13 @@ const renderBlocks: RenderBlock[] = useMemo(() => {
   };
 
   const flushTools = () => {
-    if (currentToolGroup && currentToolGroup.parts.length > 0) {
+    if (!currentToolGroup || currentToolGroup.parts.length === 0) return;
+    if (currentToolGroup.parts.length >= 2) {
       blocks.push({ type: "tool-group", ...currentToolGroup });
-      currentToolGroup = null;
+    } else {
+      blocks.push({ type: "tool-single", part: currentToolGroup.parts[0] });
     }
+    currentToolGroup = null;
   };
 
   normalizedParts.forEach((part) => {
@@ -334,6 +287,20 @@ const renderBlocks: RenderBlock[] = useMemo(() => {
           parameters: p.parameters,
           result: p.result,
         }))}
+      />
+    );
+  }
+  if (block.type === "tool-single") {
+    return (
+      <Tool
+        key={`tool-single-${index}`}
+        entries={[{
+          name: block.part.toolName || "",
+          kind: getToolKind(block.part.toolName) as "read" | "edit" | "execute",
+          status: block.part.status || "completed",
+          parameters: block.part.parameters,
+          result: block.part.result,
+        }]}
       />
     );
   }
@@ -417,10 +384,11 @@ import { Tool } from "./tool";
 
 | 操作 | 文件路径 | 说明 |
 |------|---------|------|
-| 修改 | `packages/web/src/components/ai-elements/assistant-message.tsx` | 统一 MessagePart 类型、新增 getToolKind、重构 renderBlocks 分组逻辑、导入并使用 Tool 组件 |
+| 修改 | `packages/web/src/components/ai-elements/assistant-message.tsx` | 统一 MessagePart 类型、新增 getToolKind、重构 renderBlocks 分组逻辑（合并阈值 2）、导入并使用 Tool 组件 |
 | 修改 | `packages/web/src/components/ai-elements/reasoning.tsx` | 新增 ReasoningGroup 组件（内部复用 Reasoning） |
-| 修改 | `packages/web/src/components/ai-elements/agent-process-group.tsx` | 重构为 AIProcessSummary，修复 Bug |
 | 修改 | `packages/web/src/components/ai-elements/message.tsx` | 确认 MessagePart 导出供 assistant-message 使用 |
+
+**本次不做**：汇总条功能（可基于 AgentProcessGroup 后续按需重构）
 
 ## 六、设计风格规范
 
@@ -462,10 +430,7 @@ import { Tool } from "./tool";
 
 ## 八、待确认事项
 
-1. 汇总条是否需要始终显示，还是仅在有思考/工具调用时显示？
-2. 连续工具调用合并的阈值是多少？（如连续 2 个及以上才合并？单个 tool 是否也用 Tool 组件渲染？）
-3. 展开/折叠的默认状态如何设置？
-4. 流式输出时，各组件的动画效果是否需要调整？（新块加入时旧块 isStreaming 突变可能导致展开状态闪烁）
-5. `AIProcessSummary` 重构后是否替换 `AgentProcessGroup`，还是两者共存？
-6. `image`/`file` 类型的渲染方案是否需要更丰富的组件（如图片预览、文件大小显示）？
-7. 旧格式兼容性：`reasonings`/`tools`/`content` 等 deprecated props 的 `normalizedParts` 转换逻辑是否需要保留？
+1. 展开/折叠的默认状态如何设置？
+2. 流式输出时，各组件的动画效果是否需要调整？（新块加入时旧块 isStreaming 突变可能导致展开状态闪烁）
+3. `image`/`file` 类型的渲染方案是否需要更丰富的组件（如图片预览、文件大小显示）？
+4. 旧格式兼容性：`reasonings`/`tools`/`content` 等 deprecated props 的 `normalizedParts` 转换逻辑是否需要保留？

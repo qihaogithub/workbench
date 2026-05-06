@@ -52,6 +52,8 @@ export class StreamService {
   private currentSessionId: string = "";
   private handlers: StreamEventHandlers = {};
   private connectionEstablished = false;
+  private keepaliveTimer: NodeJS.Timeout | null = null;
+  private static readonly KEEPALIVE_INTERVAL_MS = 25000; // 每25秒发送一次ping
 
   get isActive(): boolean {
     return this.stream !== null;
@@ -146,11 +148,28 @@ export class StreamService {
   }
 
   close(): void {
+    this.stopKeepalive();
     if (this.stream) {
       this.stream.close();
       this.stream = null;
       this.currentSessionId = "";
       this.connectionEstablished = false;
+    }
+  }
+
+  startKeepalive(): void {
+    this.stopKeepalive();
+    this.keepaliveTimer = setInterval(() => {
+      if (this.stream) {
+        this.stream.ping();
+      }
+    }, StreamService.KEEPALIVE_INTERVAL_MS);
+  }
+
+  stopKeepalive(): void {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
     }
   }
 
@@ -239,12 +258,6 @@ export class StreamService {
     this.stream.on("error", (event: StreamEvent) => {
       if (this.currentSessionId !== streamId) return;
 
-      if (!this.connectionEstablished) {
-        this.handlers.onConnectionError?.();
-        this.close();
-        return;
-      }
-
       const isModelError =
         event.error?.code === "SESSION_NOT_FOUND" ||
         event.error?.code === "GET_MODELS_ERROR";
@@ -256,10 +269,25 @@ export class StreamService {
         return;
       }
 
+      // 无论 connectionEstablished 状态如何，都传播错误
+      const errorMessage =
+        event.error?.message ||
+        "WebSocket 连接失败，请检查 Agent Service 是否运行";
+
+      if (!this.connectionEstablished) {
+        // 连接未建立时，同时触发 onConnectionError 和 onError
+        this.handlers.onConnectionError?.();
+        this.handlers.onError?.({
+          message: errorMessage,
+          code: event.error?.code,
+        });
+        this.close();
+        return;
+      }
+
       this.handlers.onError?.({
-        message:
-          event.error?.message ||
-          "WebSocket 连接失败，请检查 Agent Service 是否运行",
+        message: errorMessage,
+        code: event.error?.code,
       });
     });
   }
