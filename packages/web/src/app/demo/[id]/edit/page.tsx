@@ -242,8 +242,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         // 多页面格式适配
         const multi = filesData.data;
-        const pages = multi.demoPages || [];
-        setDemoPages(pages);
+        const rawPages = multi.demoPages || [];
+        const pagesWithSize = rawPages.map((page: { id: string; name: string; order: number; parentId: string | null; createdAt: number; updatedAt: number }) => ({
+          ...page,
+          previewSize: multi.demos?.[page.id]?.schema
+            ? getPreviewSize(multi.demos[page.id].schema)
+            : undefined,
+        }));
+        setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
 
@@ -692,7 +698,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup
           direction="horizontal"
-          defaultSizes={[35, 35, 30]}
+          defaultSizes={[25, 50, 25]}
           minSizes={[20, 20, 20]}
           className="h-full"
         >

@@ -4,8 +4,9 @@
 
 ## 项目概览
 
-Monorepo 架构，使用 pnpm workspaces 管理四个包：
+Monorepo 架构，使用 pnpm workspaces 管理五个包：
 - `@opencode-workbench/web` — Next.js 14 前端应用（App Router）
+- `@opencode-workbench/viewer-site` — 演示预览站点（Next.js App Router）
 - `@opencode-workbench/shared` — 共享类型定义
 - `@opencode-workbench/agent-service` — 独立 Agent 服务，实现 ACP 协议
 - `@opencode-workbench/agent-client` — Agent Service Client SDK
@@ -14,12 +15,18 @@ Monorepo 架构，使用 pnpm workspaces 管理四个包：
 
 ### 根目录命令
 ```bash
-pnpm dev          # 同时启动 web 和 agent-service 开发服务器
+pnpm dev          # 同时启动 web、agent-service 和 viewer-site 开发服务器
 pnpm dev:web      # 仅启动 web 开发服务器
 pnpm dev:agent    # 仅启动 agent-service 开发服务器
-pnpm build        # 生产构建
+pnpm dev:viewer   # 仅启动 viewer-site 开发服务器
+pnpm build        # 生产构建（web）
+pnpm build:viewer # viewer-site 生产构建
 pnpm lint         # ESLint 检查
-pnpm typecheck    # TypeScript 类型检查
+pnpm typecheck    # TypeScript 类型检查（web）
+pnpm typecheck:viewer # viewer-site 类型检查
+pnpm test:e2e            # 运行 E2E 测试
+pnpm test:e2e:ui         # 运行 E2E 测试（UI 模式）
+pnpm test:e2e:headed     # 运行 E2E 测试（有头模式）
 ```
 
 ### 运行测试
@@ -172,14 +179,21 @@ import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
 - **消息格式**：每行一个 JSON 消息，以换行符分隔
 
 #### 支持的 Agent 后端
-| Backend | CLI 命令 | ACP 参数 |
-|---------|----------|----------|
-| `opencode` | `opencode` | `['acp']` |
-| `claude` | `claude` | `['--experimental-acp']` |
-| `codex` | `codex` | `[]` |
-| `gemini` | `gemini` | `['--experimental-acp']` |
-| `qwen` | `qwen` | `['--acp']` |
-| `goose` | `goose` | `['acp']` |
+| Backend | CLI 命令 | ACP 参数 | 需要认证 |
+|---------|----------|----------|----------|
+| `opencode` | `opencode` | `['acp']` | 否 |
+| `opencode-http` | —（HTTP 直连） | — | 否 |
+| `claude` | `claude` | `['--experimental-acp']` | 是 |
+| `codex` | `codex` / `npx @zed-industries/codex-acp@0.9.5` | `[]` | 是 |
+| `gemini` | `gemini` | `['--experimental-acp']` | 是 |
+| `qwen` | `qwen` / `npx @qwen-code/qwen-code` | `['--acp']` | 是 |
+| `goose` | `goose` | `['acp']` | 否 |
+| `auggie` | `auggie` | `['--acp']` | 否 |
+| `kimi` | `kimi` | `['acp']` | 否 |
+| `copilot` | `copilot` | `['--acp', '--stdio']` | 否 |
+| `qoder` | `qodercli` | `['--acp']` | 否 |
+| `vibe` | `vibe-acp` | `[]` | 否 |
+| `custom` | 自定义 | `[]` | 否 |
 
 #### 日志规范
 - 使用 **pino** 日志库
@@ -212,26 +226,35 @@ packages/
 ├── web/
 │   ├── src/
 │   │   ├── app/          # Next.js App Router（页面和 API 路由）
-│   │   ├── components/   # React 组件
+│   │   ├── components/   # React 组件（ai-elements, auth, demo, explore, layout, providers, ui, wish）
 │   │   └── lib/          # 工具函数和 API 客户端
-│   ├── lib/              # 校验器和解析器
-│   │   └── __tests__/    # 单元测试
-│   └── components/       # 演示组件
+│   └── data/             # 项目数据存储（projects, sessions, workspaces, snapshots）
+├── viewer-site/
+│   ├── src/
+│   │   ├── app/          # 演示预览页面路由
+│   │   ├── components/   # 预览 UI 组件
+│   │   └── lib/          # 工具函数和 API
+│   └── package.json
 ├── shared/
 │   └── src/              # 共享类型和常量
 ├── agent-service/
 │   ├── src/
-│   │   ├── acp/          # ACP 协议实现
-│   │   ├── backends/     # Agent 后端适配器
+│   │   ├── acp/          # ACP 协议实现（types, connection, approval-store, model-info）
+│   │   ├── backends/     # Agent 后端适配器（13 个后端）
 │   │   ├── core/         # 核心逻辑（Agent、工厂、管理器）
 │   │   ├── events/       # 事件系统
 │   │   ├── routes/       # HTTP/WebSocket 路由
 │   │   ├── session/      # 会话管理
-│   │   ├── utils/        # 工具函数
+│   │   ├── workspace/    # 工作空间管理
+│   │   ├── utils/        # 工具函数（config, logger）
 │   │   └── server.ts     # Fastify 服务器入口
-│   └── tests/            # 单元测试和集成测试
+│   └── tests/
+│       ├── fixtures/     # 测试夹具（fake-acp-cli）
+│       ├── unit/         # 单元测试
+│       └── integration/  # 集成测试
 └── agent-client/
     └── src/
+        ├── index.ts      # 入口文件
         ├── client.ts     # AgentClient 类实现
         └── types.ts      # 类型定义
 ```
@@ -240,7 +263,7 @@ packages/
 
 ### 目的
 
-当完成一个功能模块或解决一个复杂问题后，将关键经验沉淀到 `docs/plans/归档/经验/` 目录下，供未来 Agent 参考，避免重复踩坑。
+当完成一个功能模块或解决一个复杂问题后，将关键经验沉淀到 `docs/plans/已完成/归档/经验/` 目录下，供未来 Agent 参考，避免重复踩坑。
 
 ### 何时需要沉淀
 
@@ -304,19 +327,19 @@ packages/
 ### 沉淀流程
 
 1. 识别经验所属的技术领域
-2. 检查 `docs/plans/归档/经验/` 下是否有对应分类文档
+2. 检查 `docs/plans/已完成/归档/经验/` 下是否有对应分类文档
 3. 有则追加，无则新建
 4. 在文档顶部保留 `> 从历史开发文档中提取的...经验` 说明
 5. 确保代码示例可直接复制使用
 
 ### 已有经验文档索引
 
-- [ACP协议消息处理.md](docs/plans/归档/经验/ACP协议消息处理.md) — ACP 协议映射、消息聚合、工具调用语义化
-- [React高频事件状态覆盖.md](docs/plans/归档/经验/React高频事件状态覆盖.md) — React 受控模式 Bug、useRef 同步追踪
-- [Sandpack集成经验.md](docs/plans/归档/经验/Sandpack集成经验.md) — Sandpack 配置陷阱、依赖管理方案
-- [配置与工作空间管理.md](docs/plans/归档/经验/配置与工作空间管理.md) — 配置单一来源、workingDir 链路、文件同步
-- [Streamdown集成经验.md](docs/plans/归档/经验/Streamdown集成经验.md) — Tailwind v3/v4 语法混用、data-streamdown 选择器、flex 子元素溢出
-- [SWR与RSC协作经验.md](docs/plans/归档/经验/SWR与RSC协作经验.md) — SSR fallbackData 与 isLoading 互斥、fallbackData 形态匹配、RSC 预取最小模板
+- [ACP协议消息处理.md](docs/plans/已完成/归档/经验/ACP协议消息处理.md) — ACP 协议映射、消息聚合、工具调用语义化
+- [React高频事件状态覆盖.md](docs/plans/已完成/归档/经验/React高频事件状态覆盖.md) — React 受控模式 Bug、useRef 同步追踪
+- [Sandpack集成经验.md](docs/plans/已完成/归档/经验/Sandpack集成经验.md) — Sandpack 配置陷阱、依赖管理方案
+- [配置与工作空间管理.md](docs/plans/已完成/归档/经验/配置与工作空间管理.md) — 配置单一来源、workingDir 链路、文件同步
+- [Streamdown集成经验.md](docs/plans/已完成/归档/经验/Streamdown集成经验.md) — Tailwind v3/v4 语法混用、data-streamdown 选择器、flex 子元素溢出
+- [SWR与RSC协作经验.md](docs/plans/已完成/归档/经验/SWR与RSC协作经验.md) — SSR fallbackData 与 isLoading 互斥、fallbackData 形态匹配、RSC 预取最小模板
 
 ## 注意事项
 - 无 Cursor/Copilot 规则文件

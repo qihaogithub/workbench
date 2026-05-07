@@ -55,6 +55,7 @@ export interface GridPageItem {
   id: string
   name: string
   order: number
+  previewSize?: PreviewSize
 }
 
 export interface GridIframeProps {

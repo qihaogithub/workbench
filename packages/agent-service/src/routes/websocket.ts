@@ -438,15 +438,6 @@ export async function registerWebSocketRoutes(
                 }
               };
 
-              agent.on("stream", eventHandler);
-              agent.on("thought", eventHandler);
-              agent.on("tool_call", eventHandler);
-              agent.on("tool_call_update", eventHandler);
-              agent.on("plan", eventHandler);
-              agent.on("error", eventHandler);
-              agent.on("status", eventHandler);
-              agent.on("file_operation", eventHandler);
-
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
               let isCancelled = false;
 

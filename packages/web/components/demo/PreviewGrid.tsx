@@ -15,16 +15,31 @@ function getEffectivePreviewSize(size?: PreviewSize): PreviewSize {
   return size ?? DEFAULT_PREVIEW_SIZE
 }
 
+function parseSizeValue(value: string | number | undefined): number | null {
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    const num = parseFloat(value.replace(/px$/, ""))
+    return isNaN(num) ? null : num
+  }
+  return null
+}
+
 function getPreviewAspectRatio(size?: PreviewSize): string {
   const effective = getEffectivePreviewSize(size)
-  const w = typeof effective.width === "number" ? effective.width : null
-  const h = typeof effective.height === "number" ? effective.height : null
+  const w = parseSizeValue(effective.width)
+  const h = parseSizeValue(effective.height)
 
   if (w && h) {
     return `${w}/${h}`
   }
 
   return "375/812"
+}
+
+function getAspectRatioValue(size?: PreviewSize): number {
+  const ratio = getPreviewAspectRatio(size)
+  const [w, h] = ratio.split("/").map(Number)
+  return w / h
 }
 
 function useVisiblePages(
@@ -70,6 +85,44 @@ function useVisiblePages(
   return visiblePages
 }
 
+type AlignmentMode = "center" | "top"
+
+function useAlignmentMode(
+  containerRef: RefObject<HTMLElement | null>,
+  gridRef: RefObject<HTMLElement | null>,
+): AlignmentMode {
+  const [mode, setMode] = useState<AlignmentMode>("top")
+
+  useEffect(() => {
+    const container = containerRef.current
+    const grid = gridRef.current
+    if (!container || !grid) return
+
+    const check = () => {
+      const containerHeight = container.clientHeight
+      const gridHeight = grid.scrollHeight
+      const padding = 32
+      if (gridHeight + padding < containerHeight) {
+        setMode("center")
+      } else {
+        setMode("top")
+      }
+    }
+
+    check()
+
+    const ro = new ResizeObserver(() => {
+      check()
+    })
+    ro.observe(container)
+    ro.observe(grid)
+
+    return () => ro.disconnect()
+  }, [containerRef, gridRef])
+
+  return mode
+}
+
 function resolveImageUrls(data: Record<string, unknown>): Record<string, unknown> {
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   if (!origin) return data
@@ -94,12 +147,12 @@ function resolveImageUrls(data: Record<string, unknown>): Record<string, unknown
   return walk(data) as Record<string, unknown>
 }
 
-function enableIframeScrolling(iframe: HTMLIFrameElement) {
+function disableIframeScrollbar(iframe: HTMLIFrameElement) {
   try {
     const doc = iframe.contentDocument
     if (!doc) return
-    doc.documentElement.style.overflow = "auto"
-    doc.body.style.overflow = "auto"
+    doc.documentElement.style.overflow = "hidden"
+    doc.body.style.overflow = "hidden"
   } catch {}
 }
 
@@ -197,7 +250,7 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
     if (!iframe) return
 
     const handleLoad = () => {
-      enableIframeScrolling(iframe)
+      disableIframeScrollbar(iframe)
     }
 
     iframe.addEventListener("load", handleLoad)
@@ -238,8 +291,8 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
   }
 
   const effective = getEffectivePreviewSize(previewSize)
-  const iframeWidth = typeof effective.width === "number" ? effective.width : 375
-  const iframeHeight = typeof effective.height === "number" ? effective.height : 812
+  const iframeWidth = parseSizeValue(effective.width) ?? 375
+  const iframeHeight = parseSizeValue(effective.height) ?? 812
   const scale = cardWidth > 0 ? cardWidth / iframeWidth : 0.3
 
   return (
@@ -276,9 +329,15 @@ export function PreviewGrid({
   previewSize,
 }: PreviewGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const gridMeasureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const visiblePages = useVisiblePages(containerRef, demoPages)
-  const aspectRatio = getPreviewAspectRatio(previewSize)
+  const alignmentMode = useAlignmentMode(containerRef, gridMeasureRef)
+
+  const rows: GridPageItem[][] = []
+  for (let i = 0; i < demoPages.length; i += gridColumns) {
+    rows.push(demoPages.slice(i, i + gridColumns))
+  }
 
   const handleCardClick = useCallback(
     (pageId: string) => {
@@ -311,43 +370,77 @@ export function PreviewGrid({
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-y-auto p-4"
+      className="h-full overflow-y-auto preview-grid-scroll"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
+      <style>{`
+        .preview-grid-scroll::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div
+        className="min-h-full p-4 flex flex-col"
         style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
-          gap: "16px",
+          justifyContent: alignmentMode === "center" ? "center" : "flex-start",
         }}
       >
-        {demoPages.map((page) => (
-          <div
-            key={page.id}
-            data-page-id={page.id}
-            ref={activePageId === page.id ? scrollRef : undefined}
-            className={cn(
-              "relative rounded-lg overflow-hidden cursor-pointer transition-all",
-              activePageId === page.id
-                ? "border-2 border-primary ring-2 ring-primary/20 scale-[1.02]"
-                : "border border-border hover:border-primary/50"
-            )}
-            style={{ aspectRatio }}
-            onClick={() => handleCardClick(page.id)}
-            onWheel={handleCardWheel}
-          >
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 z-10 pointer-events-none">
-              <span className="text-xs text-white font-medium truncate block">{page.name}</span>
-            </div>
-            <GridIframe
-              sessionId={sessionId}
-              page={page}
-              visible={visiblePages.has(page.id)}
-              hasChanges={changedPageIds?.has(page.id) ?? false}
-              configData={configData}
-              previewSize={previewSize}
-            />
-          </div>
-        ))}
+        <div
+          ref={gridMeasureRef}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          {rows.map((row) => {
+            const ratios = row.map((p) => {
+              const size = p.id === activePageId ? previewSize : (p.previewSize ?? previewSize)
+              return getAspectRatioValue(size)
+            })
+            const columnTemplate = ratios.map((r) => `${r}fr`).join(" ")
+
+            return (
+              <div
+                key={row.map((p) => p.id).join("-")}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: columnTemplate,
+                  gap: "16px",
+                  alignItems: "start",
+                }}
+              >
+                {row.map((page) => {
+                  const effectiveSize = page.id === activePageId ? previewSize : (page.previewSize ?? previewSize)
+                  const pageAspectRatio = getPreviewAspectRatio(effectiveSize)
+                  return (
+                    <div
+                      key={page.id}
+                      data-page-id={page.id}
+                      ref={activePageId === page.id ? scrollRef : undefined}
+                      className={cn(
+                        "relative rounded-lg overflow-hidden cursor-pointer transition-all",
+                        activePageId === page.id
+                          ? "border-2 border-primary ring-2 ring-primary/20 scale-[1.02]"
+                          : "border border-border hover:border-primary/50"
+                      )}
+                      style={{ aspectRatio: pageAspectRatio }}
+                      onClick={() => handleCardClick(page.id)}
+                      onWheel={handleCardWheel}
+                    >
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 z-10 pointer-events-none">
+                        <span className="text-xs text-white font-medium truncate block">{page.name}</span>
+                      </div>
+                      <GridIframe
+                        sessionId={sessionId}
+                        page={page}
+                        visible={visiblePages.has(page.id)}
+                        hasChanges={changedPageIds?.has(page.id) ?? false}
+                        configData={configData}
+                        previewSize={effectiveSize}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
