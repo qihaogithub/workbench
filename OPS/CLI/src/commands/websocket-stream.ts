@@ -16,7 +16,7 @@ export async function testWebSocketStream(
   baseUrl: string,
   options: WebSocketStreamOptions,
 ): Promise<void> {
-  const { sessionId, message, workingDir, timeout, wait = true } = options;
+  const { sessionId, message, workingDir, backend, model, timeout, wait = true } = options;
 
   console.log(chalk.cyan("\n=== WebSocket 流式测试 ===\n"));
   console.log(chalk.gray(`会话 ID: ${sessionId}`));
@@ -26,6 +26,8 @@ export async function testWebSocketStream(
     ),
   );
   if (workingDir) console.log(chalk.gray(`工作目录: ${workingDir}`));
+  if (backend) console.log(chalk.gray(`后端类型: ${backend}`));
+  if (model) console.log(chalk.gray(`模型: ${model}`));
   console.log(chalk.gray(`超时时间: ${timeout || 120000}ms`));
   console.log(chalk.gray(`等待完成: ${wait}`));
   console.log("");
@@ -61,6 +63,8 @@ export async function testWebSocketStream(
         id: `cli-msg-${Date.now()}`,
         content: message,
         workingDir,
+        backend,
+        model,
         options: {
           timeout,
           stream: true,
@@ -91,6 +95,12 @@ export async function testWebSocketStream(
           case "thought":
             if (event.content) {
               console.log(chalk.dim(`\n[思考] ${event.content}`));
+            }
+            break;
+
+          case "plan":
+            if (event.content) {
+              console.log(chalk.magenta(`\n[计划] ${event.content}`));
             }
             break;
 

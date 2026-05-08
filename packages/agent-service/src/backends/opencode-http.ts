@@ -1,6 +1,7 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent } from '../core/types';
 import { logger } from '../utils/logger';
+import EventSource from 'eventsource';
 
 const OPENCODE_SERVER_URL = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
 
@@ -193,9 +194,8 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       this.closeSSE();
     }
 
-    // For testing: if EventSource is a mock, trigger onopen immediately
     const EventSourceClass = globalThis.EventSource || EventSource;
-    this.eventSource = new EventSourceClass(`${OPENCODE_SERVER_URL}/event?sessionId=${this.sessionId}`);
+    this.eventSource = new EventSourceClass(`${OPENCODE_SERVER_URL}/event?sessionId=${this.sessionId}`) as EventSource;
 
     this.eventSource.onmessage = (event) => {
       try {
@@ -233,7 +233,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
   private handleSSEEvent(data: SSEEvent): void {
     switch (data.type) {
-      case 'agent_message_chunk':
+      case 'agent_message_chunk': {
         const chunk = data.content?.text || '';
         this.fullContent += chunk;
         this.eventCallback?.({
@@ -243,6 +243,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
           done: false,
         });
         break;
+      }
 
       case 'agent_thought_chunk':
         this.eventCallback?.({

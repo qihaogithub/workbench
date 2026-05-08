@@ -15,7 +15,10 @@ import {
 } from "../utils.js";
 import type { SystemCheckResult, HealthStatus } from "../types.js";
 
-const BACKENDS = ["opencode", "claude", "codex", "gemini", "qwen", "goose"];
+const BACKENDS = [
+  "opencode", "claude", "codex", "gemini", "qwen", "goose",
+  "auggie", "kimi", "copilot", "qoder", "vibe",
+];
 const PROJECT_ROOT = join(import.meta.dirname, "../../../../");
 const CHECK_PORTS = [3101, 3000];
 

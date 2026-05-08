@@ -11,13 +11,16 @@ import { healthCheck } from "./commands/health.js";
 import { diagnoseError } from "./commands/diagnose.js";
 import { systemCheck } from "./commands/system.js";
 import { collectLogs } from "./commands/logs.js";
+import { listModels } from "./commands/models.js";
+import { getWorkspace, updateWorkspace } from "./commands/workspace.js";
+import { listFiles } from "./commands/files.js";
 
 const program = new Command();
 
 program
   .name("ops-cli")
   .description("CLI 诊断工具 - 测试与诊断 AI Agent 服务")
-  .version("2.0.0")
+  .version("2.1.0")
   .option("-u, --url <url>", "Agent Service 地址", "http://localhost:3101")
   .option("--json", "以 JSON 格式输出（供 Agent 程序化解析）");
 
@@ -53,7 +56,8 @@ program
   .description("通过 HTTP API 发送消息(非流式)")
   .option("-d, --demo-id <demoId>", "Demo ID")
   .option("-w, --working-dir <dir>", "工作目录路径")
-  .option("-b, --backend <backend>", "Agent 后端类型", "opencode")
+  .option("-b, --backend <backend>", "Agent 后端类型", "opencode-http")
+  .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .action(async (sessionId, message, options) => {
     await testHttpMessage(program.opts().url, {
@@ -62,8 +66,9 @@ program
       demoId: options.demoId,
       workingDir: options.workingDir,
       backend: options.backend,
+      model: options.model,
       timeout: parseInt(options.timeout),
-    });
+    }, getJsonMode());
   });
 
 // ============================================================
@@ -73,6 +78,8 @@ program
   .command("stream <sessionId> [message]")
   .description("通过 WebSocket 测试流式响应")
   .option("-w, --working-dir <dir>", "工作目录路径")
+  .option("-b, --backend <backend>", "Agent 后端类型", "opencode-http")
+  .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .option("--no-wait", "发送消息后立即退出,不等待响应完成")
   .action(async (sessionId, message, options) => {
@@ -80,6 +87,8 @@ program
       sessionId,
       message: message || "你好",
       workingDir: options.workingDir,
+      backend: options.backend,
+      model: options.model,
       timeout: parseInt(options.timeout),
       wait: options.wait,
     });
@@ -164,6 +173,50 @@ program
       },
       getJsonMode(),
     );
+  });
+
+// ============================================================
+// 模型列表
+// ============================================================
+program
+  .command("models")
+  .description("获取可用模型列表")
+  .action(async () => {
+    await listModels(program.opts().url, getJsonMode());
+  });
+
+// ============================================================
+// 工作空间管理
+// ============================================================
+program
+  .command("workspace <sessionId>")
+  .description("查看会话工作空间信息")
+  .action(async (sessionId) => {
+    await getWorkspace(program.opts().url, sessionId, getJsonMode());
+  });
+
+program
+  .command("workspace-set <sessionId> <workingDir>")
+  .description("更新会话工作空间目录")
+  .option("--custom", "标记为自定义工作空间")
+  .action(async (sessionId, workingDir, options) => {
+    await updateWorkspace(
+      program.opts().url,
+      sessionId,
+      workingDir,
+      options.custom,
+      getJsonMode(),
+    );
+  });
+
+// ============================================================
+// 变更文件列表
+// ============================================================
+program
+  .command("files <sessionId>")
+  .description("查看会话变更文件列表")
+  .action(async (sessionId) => {
+    await listFiles(program.opts().url, sessionId, getJsonMode());
   });
 
 // ============================================================

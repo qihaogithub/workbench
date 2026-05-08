@@ -58,6 +58,7 @@ export interface HttpMessageOptions {
   demoId?: string;
   workingDir?: string;
   backend?: string;
+  model?: string;
   timeout?: number;
 }
 
@@ -65,6 +66,8 @@ export interface WebSocketStreamOptions {
   sessionId: string;
   message: string;
   workingDir?: string;
+  backend?: string;
+  model?: string;
   timeout?: number;
   wait?: boolean;
 }
@@ -139,6 +142,7 @@ export interface StreamEvent {
     | "thought"
     | "tool_call"
     | "tool_call_update"
+    | "plan"
     | "error"
     | "finish"
     | "pong"

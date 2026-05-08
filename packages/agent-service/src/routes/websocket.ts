@@ -10,7 +10,7 @@ import {
 import { AcpSessionUpdate, AcpPermissionRequest } from "../acp/types";
 import { logger } from "../utils/logger";
 
-const DEFAULT_MODEL_ID = "sensenova/deepseek-v4-flash";
+const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL || "sensenova/deepseek-v4-flash";
 
 interface StreamParams {
   sessionId: string;

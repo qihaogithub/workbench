@@ -171,6 +171,12 @@ export async function interactiveMode(
               }
               break;
 
+            case 'plan':
+              if (event.content) {
+                console.log(chalk.magenta(`\n[计划] ${event.content}`));
+              }
+              break;
+
             case 'finish':
               isStreaming = false;
               console.log(chalk.gray('\n\n✓ 响应完成'));

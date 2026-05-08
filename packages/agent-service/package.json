@@ -19,6 +19,7 @@
     "@fastify/rate-limit": "^9.0.0",
     "@fastify/websocket": "^10.0.0",
     "@opencode-workbench/shared": "workspace:*",
+    "eventsource": "^4.1.0",
     "fastify": "^4.26.0",
     "pino": "^8.0.0",
     "pino-pretty": "^10.0.0",

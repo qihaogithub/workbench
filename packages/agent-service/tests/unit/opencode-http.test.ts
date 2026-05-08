@@ -625,4 +625,201 @@ describe('OpenCodeHttpBackend', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('destroy with active stream', () => {
+    it('should reject pending stream on destroy', async () => {
+      const mockFetch = createSessionFetchMock();
+      vi.stubGlobal('fetch', mockFetch);
+
+      const { handlers, EventSourceMock } = createEventSourceMock();
+      vi.stubGlobal('EventSource', EventSourceMock);
+
+      await backend.initialize();
+      const sendPromise = backend.sendMessage('Test', { stream: true });
+
+      for (let i = 0; i < 50; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        if (handlers.onmessage) break;
+      }
+
+      handlers.onmessage({
+        data: JSON.stringify({
+          type: 'agent_message_chunk',
+          content: { text: 'Partial' },
+        }),
+      });
+
+      await backend.destroy();
+
+      await expect(sendPromise).rejects.toThrow('Backend destroyed');
+      expect(backend.getCurrentSessionId()).toBeNull();
+    }, 10000);
+  });
+
+  describe('setPromptTimeout', () => {
+    it('should set timeout in opencode config', async () => {
+      const configWithOpencode = createMockConfig();
+      configWithOpencode.opencode = { timeout: 30000 };
+      const backendWithConfig = new OpenCodeHttpBackend(configWithOpencode);
+
+      backendWithConfig.setPromptTimeout(60);
+
+      expect(configWithOpencode.opencode!.timeout).toBe(60000);
+    });
+
+    it('should not throw when opencode config is absent', () => {
+      expect(() => backend.setPromptTimeout(60)).not.toThrow();
+    });
+  });
+
+  describe('initialize idempotency', () => {
+    it('should not re-initialize when already ready', async () => {
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'oc-session-456' }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await backend.initialize();
+      await backend.initialize();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not re-initialize when initializing', async () => {
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'oc-session-456' }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await backend.initialize();
+      const status = await backend.getStatus();
+      expect(status).toBe('ready');
+    });
+  });
+
+  describe('sendMessage sync error handling', () => {
+    it('should throw on non-ok response from sync message', async () => {
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'oc-session-456' }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          text: () => Promise.resolve('Bad request'),
+        });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await backend.initialize();
+      await expect(backend.sendMessage('Test')).rejects.toThrow('Failed to send message');
+      const status = await backend.getStatus();
+      expect(status).toBe('error');
+    });
+
+    it('should throw on non-ok response from async message', async () => {
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'oc-session-456' }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          text: () => Promise.resolve('Server error'),
+        });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await backend.initialize();
+      await expect(backend.sendMessage('Test', { stream: true })).rejects.toThrow('Failed to send async message');
+    });
+  });
+
+  describe('sendMessage without session', () => {
+    it('should auto-initialize when session is null', async () => {
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'oc-session-456' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            parts: [{ type: 'text', text: 'Auto-initialized' }],
+          }),
+        });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await backend.sendMessage('Test');
+      expect(result).toBe('Auto-initialized');
+    });
+  });
+
+  describe('permission handling fallback', () => {
+    it('should reject when no allow option found', async () => {
+      const mockFetch = createSessionFetchMock([{ ok: true }]);
+      vi.stubGlobal('fetch', mockFetch);
+
+      const { handlers, EventSourceMock } = createEventSourceMock();
+      vi.stubGlobal('EventSource', EventSourceMock);
+
+      await backend.initialize();
+      const sendPromise = backend.sendMessage('Test', { stream: true });
+
+      for (let i = 0; i < 50; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        if (handlers.onmessage) break;
+      }
+
+      handlers.onmessage({
+        data: JSON.stringify({
+          type: 'permission_request',
+          permissionRequest: {
+            permissionId: 'perm-2',
+            toolCallId: 'tool-2',
+            options: [
+              { optionId: 'deny', name: 'deny' },
+            ],
+          },
+        }),
+      });
+
+      handlers.onmessage({
+        data: JSON.stringify({ type: 'agent_message_done' }),
+      });
+
+      await sendPromise;
+
+      const permissionCall = mockFetch.mock.calls.find(
+        call => call[0].includes('/permissions/')
+      );
+      expect(permissionCall).toBeDefined();
+      expect(permissionCall?.[1].body).toContain('deny');
+    }, 10000);
+  });
+
+  describe('SSE stream timeout', () => {
+    it('should reject on SSE stream timeout', async () => {
+      const shortTimeoutConfig = createMockConfig();
+      shortTimeoutConfig.timeout = 100;
+      const shortTimeoutBackend = new OpenCodeHttpBackend(shortTimeoutConfig);
+
+      const mockFetch = createSessionFetchMock();
+      vi.stubGlobal('fetch', mockFetch);
+
+      const { handlers, EventSourceMock } = createEventSourceMock();
+      vi.stubGlobal('EventSource', EventSourceMock);
+
+      await shortTimeoutBackend.initialize();
+      const sendPromise = shortTimeoutBackend.sendMessage('Test', { stream: true });
+
+      await expect(sendPromise).rejects.toThrow('SSE stream timeout');
+    }, 10000);
+  });
+
+  describe('getWorkingDir', () => {
+    it('should return null (not implemented for HTTP backend)', () => {
+      expect(backend.getWorkingDir?.()).toBeUndefined();
+    });
+  });
 });

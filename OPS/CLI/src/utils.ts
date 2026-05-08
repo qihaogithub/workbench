@@ -113,26 +113,61 @@ export async function runCommand(cmd: string, args: string[] = []): Promise<{ su
 
 export async function checkPortInUse(port: number): Promise<boolean> {
   const { execFile } = await import("child_process");
+  const isWin = process.platform === "win32";
   return new Promise((resolve) => {
-    execFile("lsof", ["-i", `:${port}`, "-P", "-n"], (error, stdout) => {
-      resolve(!!stdout && stdout.includes(String(port)));
-    });
+    if (isWin) {
+      execFile("netstat", ["-ano"], { timeout: 10000 }, (error, stdout) => {
+        if (!stdout) return resolve(false);
+        const lines = stdout.split("\n");
+        resolve(lines.some((line) => {
+          const cols = line.trim().split(/\s+/);
+          return cols[0] === "TCP" && cols[1]?.endsWith(`:${port}`) && cols[3] === "LISTENING";
+        }));
+      });
+    } else {
+      execFile("lsof", ["-i", `:${port}`, "-P", "-n"], (error, stdout) => {
+        resolve(!!stdout && stdout.includes(String(port)));
+      });
+    }
   });
 }
 
 export async function getProcessOnPort(port: number): Promise<{ pid: string; command: string } | null> {
   const { execFile } = await import("child_process");
+  const isWin = process.platform === "win32";
   return new Promise((resolve) => {
-    execFile("lsof", ["-i", `:${port}`, "-P", "-n", "-F", "pc"], (error, stdout) => {
-      if (!stdout) return resolve(null);
-      const lines = stdout.trim().split("\n");
-      let pid = "";
-      let command = "";
-      for (const line of lines) {
-        if (line.startsWith("p")) pid = line.slice(1);
-        if (line.startsWith("c")) command = line.slice(1);
-      }
-      resolve(pid ? { pid, command } : null);
-    });
+    if (isWin) {
+      execFile("netstat", ["-ano"], { timeout: 10000 }, (error, stdout) => {
+        if (!stdout) return resolve(null);
+        const lines = stdout.split("\n");
+        for (const line of lines) {
+          const cols = line.trim().split(/\s+/);
+          if (cols[0] === "TCP" && cols[1]?.endsWith(`:${port}`) && cols[3] === "LISTENING") {
+            const pid = cols[4];
+            if (!pid) continue;
+            execFile("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { timeout: 10000 }, (_, taskOut) => {
+              if (!taskOut) return resolve(pid ? { pid, command: "unknown" } : null);
+              const match = taskOut.match(/"([^"]+)"/);
+              const command = match ? match[1] : "unknown";
+              resolve({ pid, command });
+            });
+            return;
+          }
+        }
+        resolve(null);
+      });
+    } else {
+      execFile("lsof", ["-i", `:${port}`, "-P", "-n", "-F", "pc"], (error, stdout) => {
+        if (!stdout) return resolve(null);
+        const lines = stdout.trim().split("\n");
+        let pid = "";
+        let command = "";
+        for (const line of lines) {
+          if (line.startsWith("p")) pid = line.slice(1);
+          if (line.startsWith("c")) command = line.slice(1);
+        }
+        resolve(pid ? { pid, command } : null);
+      });
+    }
   });
 }
