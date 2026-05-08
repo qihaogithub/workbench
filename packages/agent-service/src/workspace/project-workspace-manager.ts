@@ -177,6 +177,8 @@ export class ProjectWorkspaceManager {
       name: request.name,
       description: request.description,
       workspacePath,
+      demoPages: [],
+      demoFolders: [],
       versions: [],
       createdAt: now,
       updatedAt: now,

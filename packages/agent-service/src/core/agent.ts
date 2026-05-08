@@ -9,6 +9,7 @@ import {
   ThoughtEvent,
   ToolCallEvent,
   ToolCallUpdateEvent,
+  PlanEvent,
   ErrorEvent,
   FinishEvent,
   StatusEvent,
@@ -104,6 +105,7 @@ interface EventMap {
   thought: ThoughtEvent;
   tool_call: ToolCallEvent;
   tool_call_update: ToolCallUpdateEvent;
+  plan: PlanEvent;
   error: ErrorEvent;
   finish: FinishEvent;
   status: StatusEvent;

@@ -21,6 +21,7 @@ import {
   CustomBackend,
 } from './backends';
 import { OpenCodeAcpBackend } from './backends/opencode-acp';
+import { OpenCodeHttpBackend } from './backends/opencode-http';
 import { BackendAgent } from './core/backend-agent';
 import { registerRoutes } from './routes';
 
@@ -58,6 +59,7 @@ async function start() {
   const factory = getAgentFactory();
 
   factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeAcpBackend(agentConfig)));
+  factory.register('opencode-http', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeHttpBackend(agentConfig)));
   factory.register('claude', (agentConfig) => new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)));
   factory.register('codex', (agentConfig) => new BackendAgent(agentConfig, new CodexBackend(agentConfig)));
   factory.register('gemini', (agentConfig) => new BackendAgent(agentConfig, new GeminiBackend(agentConfig)));

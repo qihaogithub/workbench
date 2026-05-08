@@ -61,7 +61,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       throw new Error(`Failed to create OpenCode session: ${await response.text()}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { id: string };
     this.sessionId = data.id;
     logger.info({ sessionId: this.sessionId }, 'Created OpenCode session');
   }
@@ -92,11 +92,11 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
         throw new Error(`Failed to send message: ${await response.text()}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { parts?: Array<{ type: string; text: string }> };
       
       // 提取文本内容
-      const textParts = data.parts?.filter((p: any) => p.type === 'text') || [];
-      this.fullContent = textParts.map((p: any) => p.text).join('');
+      const textParts = data.parts?.filter((p) => p.type === 'text') || [];
+      this.fullContent = textParts.map((p) => p.text).join('');
 
       // 发送流式事件（模拟）
       if (this.eventCallback && this.fullContent) {
@@ -146,5 +146,15 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
   getCurrentSessionId(): string | null {
     return this.sessionId;
+  }
+
+  setPromptTimeout(seconds: number): void {
+    if (this.config.opencode) {
+      this.config.opencode.timeout = seconds * 1000;
+    }
+  }
+
+  cancelPrompt(): void {
+    logger.info({ sessionId: this.sessionId }, 'Cancel prompt requested for OpenCode HTTP backend');
   }
 }

@@ -95,7 +95,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           backend: backend || 'opencode',
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
-          model: 'sensenova/deepseek-v4-flash',
+          model: process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',
         };
 
         const agent = manager.getOrCreate(sessionId, config);
@@ -115,6 +115,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
                 snapshotBranch: snapshotInfo.branch,
               },
             });
+          }
+
+          // 同步 opencodeSessionId 到 SessionMeta（HTTP 后端）
+          if (config.backend === 'opencode-http') {
+            const ocSessionId = agent.getCurrentSessionId?.();
+            if (ocSessionId) {
+              sessionStore.update(sessionId, { opencodeSessionId: ocSessionId });
+            }
           }
         }
 

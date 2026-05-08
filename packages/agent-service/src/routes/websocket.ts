@@ -37,6 +37,7 @@ interface ServerMessage {
     | "thought"
     | "tool_call"
     | "tool_call_update"
+    | "plan"
     | "error"
     | "finish"
     | "status"

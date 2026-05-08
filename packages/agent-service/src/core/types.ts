@@ -2,7 +2,7 @@
 // 基础类型
 // ============================================================
 
-export type AgentType = "opencode" | "claude" | "codex" | "gemini" | string;
+export type AgentType = "opencode" | "opencode-http" | "claude" | "codex" | "gemini" | string;
 
 export type AgentStatus =
   | "initializing"
@@ -32,6 +32,7 @@ export interface AgentConfig {
   workingDir?: string;
   demoId?: string;
   model?: string;
+  timeout?: number;
 
   opencode?: OpenCodeConfig;
   claude?: ClaudeConfig;
@@ -116,6 +117,7 @@ export type EventType =
   | "thought"
   | "tool_call"
   | "tool_call_update"
+  | "plan"
   | "error"
   | "finish"
   | "status";
@@ -178,11 +180,18 @@ export interface FileOperationEvent {
   };
 }
 
+export interface PlanEvent {
+  type: "plan";
+  sessionId: string;
+  content: string;
+}
+
 export type AgentEvent =
   | StreamEvent
   | ThoughtEvent
   | ToolCallEvent
   | ToolCallUpdateEvent
+  | PlanEvent
   | ErrorEvent
   | FinishEvent
   | StatusEvent
