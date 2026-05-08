@@ -7,6 +7,7 @@ import { snapshotService } from '../session/snapshot-service';
 import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig, AgentType } from '../core/types';
+import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
@@ -19,6 +20,7 @@ interface SendMessageBody {
   backend?: AgentType;
   workingDir?: string;
   customWorkspace?: boolean;
+  model?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -77,7 +79,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         
         if (workingDir) {
           workspaceInfo = await workspaceManager.create({
-            backend: backend || 'opencode',
+            backend: backend || 'opencode-http',
             workspace: workingDir,
             customWorkspace,
           });
@@ -85,17 +87,17 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           const existingSession = sessionStore.get(sessionId);
           if (!existingSession) {
             workspaceInfo = await workspaceManager.create({
-              backend: backend || 'opencode',
+              backend: backend || 'opencode-http',
             });
           }
         }
 
         const config: AgentConfig = {
           sessionId,
-          backend: backend || 'opencode',
+          backend: backend || 'opencode-http',
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
-          model: process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',
+          model: request.body.model || process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',
         };
 
         const agent = manager.getOrCreate(sessionId, config);
@@ -471,6 +473,55 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           discarded: discardedFiles,
         },
       });
+    }
+  );
+
+  fastify.get(
+    '/api/llm/models',
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const response = await fetch(`${process.env.OPENCODE_SERVER_URL || 'http://localhost:4096'}/models`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (!response.ok) {
+          return reply.code(502).send({
+            success: false,
+            error: {
+              code: 'BACKEND_UNAVAILABLE',
+              message: '无法从 OpenCode Server 获取模型列表',
+            },
+          });
+        }
+
+        const data = await response.json() as {
+          models?: Array<{ id: string; label?: string; name?: string }>;
+          currentModelId?: string;
+        };
+
+        const models = (data.models || []).map((m) => ({
+          id: m.id,
+          label: m.label || m.name || m.id,
+        }));
+
+        return reply.send({
+          success: true,
+          data: {
+            models,
+            currentModelId: data.currentModelId,
+          },
+        });
+      } catch (error) {
+        logger.error({ error }, 'Failed to fetch models from OpenCode Server');
+        return reply.code(500).send({
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: error instanceof Error ? error.message : '获取模型列表失败',
+          },
+        });
+      }
     }
   );
 }

@@ -21,7 +21,7 @@ export class AgentFactory implements IAgentFactory {
   }
 
   create(config: AgentConfig): BaseAgent {
-    const type = config.backend || 'opencode';
+    const type = config.backend || 'opencode-http';
     const creator = this.creators.get(type);
 
     if (!creator) {

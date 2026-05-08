@@ -12,7 +12,7 @@ export interface IBackendAdapter {
   checkHealth(): Promise<boolean>;
   start?(options?: { resumeSessionId?: string }): Promise<void>;
   setModel?(modelId: string): Promise<void>;
-  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
   getCurrentSessionId?(): string | null;
   getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
   setPromptTimeout?(seconds: number): void;

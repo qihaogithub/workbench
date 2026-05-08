@@ -44,7 +44,7 @@ export class MemorySessionStore implements ISessionStore {
     const meta: SessionMeta = {
       sessionId,
       demoId: config.demoId,
-      backend: config.backend || 'opencode',
+      backend: config.backend || 'opencode-http',
       workingDir: workspaceMeta?.workingDir || config.workingDir || '',
       customWorkspace: workspaceMeta?.customWorkspace ?? false,
       workspaceType: workspaceMeta?.workspaceType || 'temp',

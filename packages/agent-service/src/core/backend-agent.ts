@@ -4,7 +4,7 @@ import { IBackendAdapter } from '../backends/base';
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
-  getModelInfo?: () => { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  getModelInfo?: () => { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
   getCurrentSessionId?: () => string | null;
   start?: (options?: { resumeSessionId?: string }) => Promise<void>;
   getFiles?: () => Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
@@ -102,9 +102,9 @@ export class BackendAgent extends BaseAgent {
     }
   }
 
-  getModelInfo(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null {
+  async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
     if (this.backend.getModelInfo) {
-      return this.backend.getModelInfo();
+      return await this.backend.getModelInfo();
     }
     return null;
   }

@@ -58,6 +58,7 @@ async function start() {
 
   const factory = getAgentFactory();
 
+  // @deprecated ACP 后端仅保留兼容，推荐使用 opencode-http
   factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeAcpBackend(agentConfig)));
   factory.register('opencode-http', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeHttpBackend(agentConfig)));
   factory.register('claude', (agentConfig) => new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)));

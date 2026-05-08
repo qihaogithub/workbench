@@ -96,7 +96,11 @@ export abstract class BaseAgent extends EventEmitter {
     currentModelId: string | null;
     availableModels: Array<{ id: string; label: string }>;
     canSwitch: boolean;
-  } | null;
+  } | null | Promise<{
+    currentModelId: string | null;
+    availableModels: Array<{ id: string; label: string }>;
+    canSwitch: boolean;
+  } | null>;
   abstract getCurrentSessionId?(): string | null;
 }
 

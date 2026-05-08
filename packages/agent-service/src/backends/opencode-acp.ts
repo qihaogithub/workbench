@@ -8,6 +8,10 @@ import {
 import { AgentConfig, AgentEvent } from "../core/types";
 import { logger } from "../utils/logger";
 
+/**
+ * @deprecated 使用 OpenCodeHttpBackend 替代。ACP 后端仅保留兼容，不再主动开发。
+ * 迁移指南：将 backend 从 'opencode' 改为 'opencode-http'
+ */
 export class OpenCodeAcpBackend implements IBackendAdapter {
   readonly name = "opencode";
   private connection: AcpConnection | null = null;
