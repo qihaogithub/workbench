@@ -79,7 +79,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         
         if (workingDir) {
           workspaceInfo = await workspaceManager.create({
-            backend: backend || 'opencode-http',
+            backend: backend || 'opencode',
             workspace: workingDir,
             customWorkspace,
           });
@@ -87,14 +87,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           const existingSession = sessionStore.get(sessionId);
           if (!existingSession) {
             workspaceInfo = await workspaceManager.create({
-              backend: backend || 'opencode-http',
+              backend: backend || 'opencode',
             });
           }
         }
 
         const config: AgentConfig = {
           sessionId,
-          backend: backend || 'opencode-http',
+          backend: backend || 'opencode',
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: request.body.model || process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',

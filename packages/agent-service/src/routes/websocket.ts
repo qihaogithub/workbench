@@ -326,7 +326,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId,
-                backend: "opencode-http",
+                backend: "opencode",
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -575,7 +575,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
-                backend: "opencode-http",
+                backend: "opencode",
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -683,7 +683,7 @@ export async function registerWebSocketRoutes(
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
-                  backend: "opencode-http",
+                  backend: "opencode",
                   workingDir: message.workingDir || process.cwd(),
                   model: DEFAULT_MODEL_ID,
                 };

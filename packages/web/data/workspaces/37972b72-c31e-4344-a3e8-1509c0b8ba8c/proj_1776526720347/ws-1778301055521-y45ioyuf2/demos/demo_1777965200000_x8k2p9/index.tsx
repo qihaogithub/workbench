@@ -92,7 +92,7 @@ const Card: React.FC<{
 };
 
 const GradientCardsPage: React.FC<Props> = ({
-  title = '✨ 炫彩世界',
+  title = '你好叫叫',
   subtitle = '探索色彩的无限可能',
   cardCount = 6,
   enableAnimation = true,
