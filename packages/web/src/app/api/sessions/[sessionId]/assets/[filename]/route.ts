@@ -8,6 +8,7 @@ import {
   createApiSuccess,
   createApiError,
 } from "@/lib/fs-utils";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function GET(
   _request: Request,
@@ -64,6 +65,20 @@ export async function DELETE(
   { params }: { params: { sessionId: string; filename: string } },
 ) {
   try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
     const { sessionId, filename } = params;
 
     if (!sessionExists(sessionId)) {

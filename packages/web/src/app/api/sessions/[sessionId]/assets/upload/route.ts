@@ -6,6 +6,7 @@ import {
   generateAssetFilename,
   saveSessionAsset,
 } from "@/lib/fs-utils";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -22,6 +23,20 @@ export async function POST(
   { params }: { params: { sessionId: string } },
 ) {
   try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
     const { sessionId } = params;
 
     if (!sessionExists(sessionId)) {

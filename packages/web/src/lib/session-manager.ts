@@ -346,7 +346,10 @@ export function saveEditSession(
   try {
     fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
     if (fs.existsSync(workspacePath)) {
-      fs.cpSync(workspacePath, snapshotPath, { recursive: true });
+      fs.cpSync(workspacePath, snapshotPath, {
+        recursive: true,
+        filter: (src: string) => !src.includes('node_modules'),
+      });
     }
 
     let sourcePath: string;
@@ -357,8 +360,16 @@ export function saveEditSession(
       sourcePath = sessionPath || "";
     }
 
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      console.error(`[saveEditSession] sourcePath 不存在: ${sourcePath}`);
+      return { success: false, error: `Workspace source not found: ${workspaceId}` };
+    }
+
     fs.rmSync(workspacePath, { recursive: true, force: true });
-    fs.cpSync(sourcePath, workspacePath, { recursive: true });
+    fs.cpSync(sourcePath, workspacePath, {
+      recursive: true,
+      filter: (src: string) => !src.includes('node_modules'),
+    });
 
     const metaInWorkspace = path.join(workspacePath, ".session.json");
     if (fs.existsSync(metaInWorkspace)) {
@@ -409,6 +420,9 @@ export function saveEditSession(
     };
   } catch (error) {
     console.error(`[saveEditSession] 保存失败:`, error);
+    if (error instanceof Error) {
+      return { success: false, error: `Save failed: ${error.message}` };
+    }
     return { success: false, error: 'Save failed' };
   }
 }

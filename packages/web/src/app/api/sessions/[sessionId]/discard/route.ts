@@ -1,12 +1,27 @@
 import { NextResponse } from 'next/server';
 import { discardEditSession, getEditSession } from '@/lib/session-manager';
 import { createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 
 export async function POST(
   _request: Request,
   { params }: { params: { sessionId: string } }
 ) {
   try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '登录已过期'), {
+        status: 401,
+      });
+    }
+
     const { sessionId } = params;
 
     const sessionMeta = getEditSession(sessionId);

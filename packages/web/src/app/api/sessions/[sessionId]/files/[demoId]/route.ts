@@ -22,6 +22,20 @@ export async function GET(
   { params }: { params: { sessionId: string; demoId: string } },
 ) {
   try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
     const { sessionId, demoId } = params;
 
     if (!sessionExists(sessionId)) {
