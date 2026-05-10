@@ -162,6 +162,9 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
   const [isLoading, setIsLoading] = useState(false)
   const [cardWidth, setCardWidth] = useState(0)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const configDataRef = useRef(configData)
+  configDataRef.current = configData
+  const iframeReadyRef = useRef(false)
 
   useEffect(() => {
     const el = wrapperRef.current
@@ -177,16 +180,32 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
   }, [])
 
   useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const iframe = iframeRef.current
+      if (!iframe || event.source !== iframe.contentWindow) return
+      if (event.data?.type === "READY") {
+        iframeReadyRef.current = true
+        const resolvedConfig = configDataRef.current ? resolveImageUrls(configDataRef.current) : {}
+        iframe.contentWindow?.postMessage({ type: "UPDATE_CONFIG", configData: resolvedConfig }, "*")
+      }
+    }
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
+  }, [])
+
+  useEffect(() => {
     if (!visible) {
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current)
         blobUrlRef.current = null
       }
+      iframeReadyRef.current = false
       return
     }
 
     let cancelled = false
     setIsLoading(true)
+    iframeReadyRef.current = false
 
     const load = async () => {
       const cached = getCachedCompile(sessionId, page.id)
@@ -218,7 +237,7 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
     const mountIframe = (compileResult: { compiledCode: string; cssImports: string[] }) => {
       if (cancelled) return
 
-      const resolvedConfig = configData ? resolveImageUrls(configData) : {}
+      const resolvedConfig = configDataRef.current ? resolveImageUrls(configDataRef.current) : {}
       const html = generateIframeHtml({
         compiledCode: compileResult.compiledCode,
         cssImports: compileResult.cssImports,
@@ -243,7 +262,15 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
     return () => {
       cancelled = true
     }
-  }, [visible, sessionId, page.id, configData])
+  }, [visible, sessionId, page.id])
+
+  useEffect(() => {
+    if (!iframeReadyRef.current || !blobUrlRef.current) return
+    const iframe = iframeRef.current
+    if (!iframe?.contentWindow) return
+    const resolvedConfig = configData ? resolveImageUrls(configData) : {}
+    iframe.contentWindow.postMessage({ type: "UPDATE_CONFIG", configData: resolvedConfig }, "*")
+  }, [configData])
 
   useEffect(() => {
     const iframe = iframeRef.current

@@ -1,7 +1,7 @@
 ---
 covers:
-  - packages/web/src/lib/auth/jwt.ts
-  - packages/web/src/lib/auth/password.ts
+  - packages/author-site/src/lib/auth/jwt.ts
+  - packages/author-site/src/lib/auth/password.ts
 ---
 
 # JWT 认证机制
