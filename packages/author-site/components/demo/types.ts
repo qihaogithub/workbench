@@ -56,10 +56,11 @@ export interface GridPageItem {
   name: string
   order: number
   previewSize?: PreviewSize
+  code?: string
 }
 
 export interface GridIframeProps {
-  sessionId: string
+  sessionId?: string
   page: GridPageItem
   visible: boolean
   hasChanges: boolean
@@ -68,7 +69,7 @@ export interface GridIframeProps {
 }
 
 export interface PreviewGridProps {
-  sessionId: string
+  sessionId?: string
   demoPages: GridPageItem[]
   activePageId: string
   gridColumns: 2 | 3 | 4

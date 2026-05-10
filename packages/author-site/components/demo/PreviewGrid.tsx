@@ -208,18 +208,31 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
     iframeReadyRef.current = false
 
     const load = async () => {
-      const cached = getCachedCompile(sessionId, page.id)
-      if (cached) {
-        if (cancelled) return
-        mountIframe(cached)
-        return
+      if (sessionId) {
+        const cached = getCachedCompile(sessionId, page.id)
+        if (cached) {
+          if (cancelled) return
+          mountIframe(cached)
+          return
+        }
       }
 
       try {
+        const body: Record<string, unknown> = {}
+        if (sessionId) {
+          body.sessionId = sessionId
+          body.demoId = page.id
+        } else if (page.code) {
+          body.code = page.code
+        } else {
+          setIsLoading(false)
+          return
+        }
+
         const res = await fetch("/api/compile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, demoId: page.id }),
+          body: JSON.stringify(body),
         })
         const data = await res.json()
         if (cancelled || !data.success) {
@@ -227,7 +240,9 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
           return
         }
 
-        setCachedCompile(sessionId, page.id, data.data)
+        if (sessionId) {
+          setCachedCompile(sessionId, page.id, data.data)
+        }
         mountIframe(data.data)
       } catch {
         if (!cancelled) setIsLoading(false)
@@ -262,7 +277,7 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
     return () => {
       cancelled = true
     }
-  }, [visible, sessionId, page.id])
+  }, [visible, sessionId, page.id, page.code])
 
   useEffect(() => {
     if (!iframeReadyRef.current || !blobUrlRef.current) return
@@ -389,6 +404,7 @@ export function PreviewGrid({
   }, [activePageId])
 
   useEffect(() => {
+    if (!sessionId) return
     return () => {
       invalidateCompileCache(sessionId)
     }

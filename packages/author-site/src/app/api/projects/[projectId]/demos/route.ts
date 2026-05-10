@@ -17,24 +17,7 @@ import {
   readFoldersMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-
-interface PreviewSize {
-  width?: string | number;
-  height?: string | number;
-  minHeight?: string | number;
-  maxHeight?: string | number;
-  scale?: number;
-}
-
-function extractPreviewSize(schemaStr: string): PreviewSize | undefined {
-  try {
-    const schema = JSON.parse(schemaStr);
-    if (schema.$demo?.previewSize) {
-      return schema.$demo.previewSize;
-    }
-  } catch {}
-  return undefined;
-}
+import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 
 export async function GET(
   request: NextRequest,

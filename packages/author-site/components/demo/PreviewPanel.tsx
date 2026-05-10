@@ -451,14 +451,15 @@ export function PreviewPanel({
             } catch {}
           }}
         >
-          <iframe
-            ref={iframeRef}
-            sandbox="allow-scripts allow-same-origin"
-            src={iframeSrcUrl}
-            style={previewStyle}
-            className="w-full h-full"
-            title="预览"
-          />
+          <div style={previewStyle} className="rounded-lg overflow-hidden border border-border">
+            <iframe
+              ref={iframeRef}
+              sandbox="allow-scripts allow-same-origin"
+              src={iframeSrcUrl}
+              className="w-full h-full"
+              title="预览"
+            />
+          </div>
         </div>
       )}
     </>

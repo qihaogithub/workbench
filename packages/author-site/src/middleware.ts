@@ -38,7 +38,9 @@ export async function middleware(request: NextRequest) {
 
   const origin = request.headers.get('origin');
   const isApiOrEmbedRoute =
-    pathname.startsWith('/api/') || pathname.startsWith('/embed/');
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/embed/') ||
+    pathname.startsWith('/viewer/');
   if (origin && isApiOrEmbedRoute && VIEWER_ORIGINS.includes(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
