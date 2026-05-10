@@ -8,7 +8,7 @@ export default function DemoPreviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const demoId = params.demoId as string;
-  const viewerUrl = `${WEB_URL}/viewer/${projectId}/${demoId}?config=true`;
+  const viewerUrl = `${WEB_URL}/viewer/${projectId}/${demoId}?config=true&background=%230a0a0a&pageList=true`;
 
   return (
     <iframe

@@ -27,11 +27,13 @@ interface ViewerData {
 }
 
 type ViewerIncomingMessage =
-  | { type: "VIEWER_SET_CONFIG"; configData: Record<string, unknown> };
+  | { type: "VIEWER_SET_CONFIG"; configData: Record<string, unknown> }
+  | { type: "VIEWER_SET_PAGE"; pageId: string };
 
 type ViewerOutgoingMessage =
   | { type: "VIEWER_READY" }
-  | { type: "VIEWER_CONFIG_CHANGE"; configData: Record<string, unknown> };
+  | { type: "VIEWER_CONFIG_CHANGE"; configData: Record<string, unknown> }
+  | { type: "VIEWER_PAGE_CHANGE"; pageId: string };
 
 function postOutgoing(msg: ViewerOutgoingMessage) {
   window.parent.postMessage(msg, "*");
@@ -69,16 +71,19 @@ export default function ViewerDemoPage() {
   const themeParam = searchParams.get("theme");
   const backgroundParam = searchParams.get("background");
   const configDataParam = searchParams.get("configData");
+  const pageListParam = searchParams.get("pageList");
 
   const showConfig = configParam !== "false";
   const configWidth = configWidthParam ? parseInt(configWidthParam, 10) : 320;
   const showToolbar = toolbarParam !== "false";
+  const showPageList = pageListParam === "true";
   const previewBackground = backgroundParam || "#fff";
 
   const [data, setData] = useState<ViewerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configVisible, setConfigVisible] = useState(showConfig);
+  const [activeDemoId, setActiveDemoId] = useState(demoId);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
 
@@ -104,6 +109,10 @@ export default function ViewerDemoPage() {
   useEffect(() => {
     applyTheme(themeParam);
   }, [themeParam]);
+
+  useEffect(() => {
+    setActiveDemoId(demoId);
+  }, [demoId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -158,6 +167,10 @@ export default function ViewerDemoPage() {
         if (msg.configData && typeof msg.configData === "object") {
           setConfigData((prev) => ({ ...prev, ...msg.configData }));
         }
+      } else if (msg.type === "VIEWER_SET_PAGE") {
+        if (typeof msg.pageId === "string") {
+          handlePageSwitchRef.current(msg.pageId);
+        }
       }
     };
     window.addEventListener("message", handler);
@@ -171,6 +184,21 @@ export default function ViewerDemoPage() {
       return merged;
     });
   }, []);
+
+  const handlePageSwitch = useCallback((pageId: string) => {
+    if (!data) return;
+    setActiveDemoId(pageId);
+    postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
+    const page = data.demoPages.find((p) => p.id === pageId);
+    if (page?.schema) {
+      const defaults = getSafeMergedDefaults(data.projectConfigSchema, page.schema);
+      setConfigData(defaults);
+      setPreviewSize(getPreviewSize(page.schema));
+    }
+  }, [data, getSafeMergedDefaults]);
+
+  const handlePageSwitchRef = useRef(handlePageSwitch);
+  handlePageSwitchRef.current = handlePageSwitch;
 
   if (isLoading) {
     return (
@@ -193,7 +221,7 @@ export default function ViewerDemoPage() {
     );
   }
 
-  const currentPage = data.demoPages.find((p) => p.id === demoId);
+  const currentPage = data.demoPages.find((p) => p.id === activeDemoId);
   const currentPageSchema = currentPage?.schema;
 
   return (
@@ -221,6 +249,31 @@ export default function ViewerDemoPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
+        {showPageList && data.demoPages.length > 0 && (
+          <div className="w-48 border-r shrink-0 flex flex-col">
+            <div className="px-3 py-3 border-b">
+              <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {data.demoPages.map((page) => (
+                  <button
+                    key={page.id}
+                    onClick={() => handlePageSwitch(page.id)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      page.id === activeDemoId
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    {page.name}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
         <div className="flex-1 overflow-hidden" style={{ backgroundColor: previewBackground }}>
           <div
             className="p-4 h-full overflow-y-auto preview-single-scroll"
@@ -276,7 +329,7 @@ export default function ViewerDemoPage() {
                       </div>
                     )}
                     <ConfigForm
-                      key={`page-${demoId}`}
+                      key={`page-${activeDemoId}`}
                       schema={currentPageSchema}
                       onChange={handleConfigChange}
                       initialData={configData}
