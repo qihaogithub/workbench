@@ -84,7 +84,7 @@ function computePreviewScale(
     wrapperStyle: {
       width: displayWidth,
       height: displayHeight,
-      margin: "16px auto 0",
+      margin: "auto",
       position: "relative",
       overflow: "hidden",
     },
