@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, ConfigScopeWrapper, invalidateCompileCache } from "../../../../../components/demo";
+import { PreviewPanel, ConfigForm, PreviewGrid, invalidateCompileCache } from "../../../../../components/demo";
 import type { PreviewMode } from "../../../../../components/demo";
 import {
   parseFigmaText,
@@ -22,7 +22,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { AIChat } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
@@ -1136,8 +1136,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-4">
+                {/* 项目级配置 */}
                 {projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">📋 项目配置（所有页面共享）</span>
+                    </div>
                     <ConfigForm
                       key={`project-${projectConfigSchema}`}
                       schema={projectConfigSchema}
@@ -1148,10 +1152,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       initialData={configData}
                       sessionId={sessionId}
                     />
-                  </ConfigScopeWrapper>
+                    <Separator />
+                  </div>
                 )}
 
-                <ConfigScopeWrapper scope="page" pageName={demoPages.find(p => p.id === activeDemoId)?.name}>
+                {/* 页面级配置 */}
+                <div className="space-y-2">
+                  {projectConfigSchema && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">📄 当前页面配置</span>
+                    </div>
+                  )}
                   <ConfigForm
                     key={schema}
                     schema={schema}
@@ -1160,7 +1171,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                     initialData={configData}
                     sessionId={sessionId}
                   />
-                </ConfigScopeWrapper>
+                </div>
               </div>
             </ScrollArea>
           </ResizablePanel>

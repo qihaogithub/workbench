@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, ConfigScopeWrapper } from "../../../../components/demo";
+import { PreviewPanel, ConfigForm, PreviewGrid } from "../../../../components/demo";
 import type { PreviewMode, PreviewSize } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -408,7 +408,10 @@ export default function ViewerProjectPage() {
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-4">
                 {data.projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">项目配置</span>
+                    </div>
                     <ConfigForm
                       key={`project-${data.projectConfigSchema}`}
                       schema={data.projectConfigSchema}
@@ -416,11 +419,17 @@ export default function ViewerProjectPage() {
                       initialData={configData}
                       readonly
                     />
-                  </ConfigScopeWrapper>
+                    <Separator />
+                  </div>
                 )}
 
                 {activePageSchema && (
-                  <ConfigScopeWrapper scope="page" pageName={activePage?.name}>
+                  <div className="space-y-2">
+                    {data.projectConfigSchema && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">页面配置</span>
+                      </div>
+                    )}
                     <ConfigForm
                       key={`page-${activeDemoId}`}
                       schema={activePageSchema}
@@ -428,7 +437,7 @@ export default function ViewerProjectPage() {
                       initialData={configData}
                       readonly
                     />
-                  </ConfigScopeWrapper>
+                  </div>
                 )}
               </div>
             </ScrollArea>

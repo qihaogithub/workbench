@@ -5,7 +5,6 @@ export type { PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, Pre
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';
 export { ImageListWidget, type ImageItem, type ImageListWidgetProps } from './ImageListWidget';
-export { ConfigScopeWrapper } from './ConfigScopeWrapper';
 export { NoteButton } from './NoteButton';
 export { NoteDialog } from './NoteDialog';
 export { NotePreview, stripHtml } from './NotePreview';
