@@ -124,7 +124,7 @@ workspace/
 ## 禁止行为
 
 - ❌ 访问当前工作空间目录外的任何文件（包括上级目录、packages/、node_modules/ 等）
-- ❌ 访问或修改 `packages/agent-service`、`packages/author-site`、`packages/shared` 等目录
+- ❌ 访问或修改 `packages/agent-service`、`packages/web`、`packages/shared` 等目录
 - ❌ 修改 `.session.json`、`.opencode/`、`.workspace.json` 等系统文件
 - ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入前必须自检）
 - ❌ 在单个页面中使用 `import './xxx'` 相对路径导入
