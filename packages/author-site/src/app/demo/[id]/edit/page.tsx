@@ -1070,7 +1070,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
             <div className="flex-1 overflow-hidden">
               {previewMode === 'single' ? (
-                <div className="p-4 h-full">
+                <div
+                  className="p-4 h-full overflow-y-auto preview-single-scroll"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                >
+                  <style>{`
+                    .preview-single-scroll::-webkit-scrollbar {
+                      display: none;
+                    }
+                  `}</style>
                   <PreviewPanel
                     code={code}
                     sessionId={sessionId}

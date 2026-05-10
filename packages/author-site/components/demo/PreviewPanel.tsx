@@ -107,6 +107,24 @@ interface CompileResult {
   cssImports: string[];
 }
 
+function hideIframeScrollbar(iframe: HTMLIFrameElement) {
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    const style = doc.createElement("style");
+    style.textContent = `
+      html {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+      html::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    doc.head.appendChild(style);
+  } catch {}
+}
+
 export function PreviewPanel({
   code,
   sessionId,
@@ -343,6 +361,19 @@ export function PreviewPanel({
     return () => ro.disconnect();
   }, []);
 
+  // iframe 加载后隐藏其内部滚动条
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleLoad = () => {
+      hideIframeScrollbar(iframe);
+    };
+
+    iframe.addEventListener("load", handleLoad);
+    return () => iframe.removeEventListener("load", handleLoad);
+  }, [iframeSrcUrl]);
+
   const previewStyle = buildPreviewStyle(previewSize, iframeHeight, containerWidth);
 
   // 使用 Blob URL 替代 srcdoc，避免 CORS 问题
@@ -409,7 +440,17 @@ export function PreviewPanel({
       )}
 
       {iframeSrcUrl && (
-        <div ref={containerRef} className="w-full h-full">
+        <div
+          ref={containerRef}
+          className="w-full h-full"
+          onWheel={(e) => {
+            const iframe = iframeRef.current;
+            if (!iframe?.contentWindow) return;
+            try {
+              iframe.contentWindow.scrollBy(0, e.deltaY);
+            } catch {}
+          }}
+        >
           <iframe
             ref={iframeRef}
             sandbox="allow-scripts allow-same-origin"

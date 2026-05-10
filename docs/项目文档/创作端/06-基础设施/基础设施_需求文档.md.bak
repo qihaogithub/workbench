@@ -1,8 +1,7 @@
 # 基础设施模块 - 需求文档
 
-> 版本：v1.1
-> 更新日期：2026-05-10
-> 变更说明：同步更新错误码列表至实际定义（25个错误码）
+> 版本：v1.0
+> 创建日期：2026-05-02
 
 ---
 
@@ -68,31 +67,13 @@
 
 | 错误码 | HTTP 状态码 | 说明 |
 |:-------|:------------|:-----|
-| DEMO_NOT_FOUND | 404 | Demo 不存在 |
-| SESSION_NOT_FOUND | 404 | Session 不存在 |
 | PROJECT_NOT_FOUND | 404 | 项目不存在 |
+| SESSION_NOT_FOUND | 404 | 会话不存在或已过期 |
 | VERSION_NOT_FOUND | 404 | 版本不存在 |
-| DEMO_PAGE_NOT_FOUND | 404 | Demo 页面不存在 |
-| FOLDER_NOT_FOUND | 404 | 文件夹不存在 |
 | INVALID_REQUEST | 400 | 请求参数无效 |
-| VALIDATION_ERROR | 400 | 数据校验失败 |
-| UNAUTHORIZED | 401 | 未授权访问 |
-| FORBIDDEN | 403 | 无权访问 |
-| SESSION_EXPIRED | 410 | Session 已过期 |
-| SESSION_NOT_EDITING | 409 | 会话不在编辑状态 |
-| SCHEMA_CONFLICT | 409 | Schema 字段命名冲突 |
-| FILE_TOO_LARGE | 413 | 文件大小超过限制 |
 | FILE_READ_ERROR | 500 | 文件读取失败 |
 | FILE_WRITE_ERROR | 500 | 文件写入失败 |
-| WORKSPACE_CREATE_ERROR | 500 | 工作空间创建失败 |
-| SNAPSHOT_CREATE_ERROR | 500 | 快照创建失败 |
-| INTERNAL_ERROR | 500 | 内部服务器错误 |
-| UPLOAD_FAILED | 500 | 文件上传失败 |
-| COVER_UPLOAD_FAILED | 500 | 封面图上传失败 |
-| AGENT_SERVICE_ERROR | 503 | Agent 服务请求失败 |
-| FOLDER_DEPTH_EXCEEDED | 400 | 文件夹嵌套不能超过 3 层 |
-| CIRCULAR_REFERENCE | 400 | 不能将文件夹移动到自身或其子文件夹中 |
-| INVALID_FILE_TYPE | 400 | 不支持的文件类型 |
+| AI_SERVICE_ERROR | 503 | AI 服务不可用 |
 
 ### 3.2 编译约束
 
