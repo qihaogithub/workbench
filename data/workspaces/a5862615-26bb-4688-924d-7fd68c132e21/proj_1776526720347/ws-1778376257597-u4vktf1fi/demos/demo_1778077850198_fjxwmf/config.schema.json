@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": "1024px",
+      "height": "768px"
+    }
+  },
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "页面标题",
+      "default": "✨ 炫彩世界"
+    },
+    "subtitle": {
+      "type": "string",
+      "title": "副标题",
+      "default": "探索色彩的无限可能"
+    },
+    "cardCount": {
+      "type": "number",
+      "title": "卡片数量",
+      "default": 6,
+      "minimum": 3,
+      "maximum": 12
+    },
+    "enableAnimation": {
+      "type": "boolean",
+      "title": "启用动画效果",
+      "default": true
+    }
+  }
+}
