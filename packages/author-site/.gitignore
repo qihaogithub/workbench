@@ -1,0 +1,8 @@
+# Environment
+.env.local
+.env.*.local
+
+# Build
+.next
+.turbo
+dist

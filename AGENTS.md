@@ -5,7 +5,7 @@
 ## 项目概览
 
 Monorepo 架构，使用 pnpm workspaces 管理五个包：
-- `@opencode-workbench/web` — Next.js 14 前端应用（App Router）
+- `@opencode-workbench/author-site` — Next.js 14 前端应用（App Router）
 - `@opencode-workbench/viewer-site` — 演示预览站点（Next.js App Router）
 - `@opencode-workbench/shared` — 共享类型定义
 - `@opencode-workbench/agent-service` — 独立 Agent 服务，实现 ACP 协议
@@ -15,14 +15,14 @@ Monorepo 架构，使用 pnpm workspaces 管理五个包：
 
 ### 根目录命令
 ```bash
-pnpm dev          # 同时启动 web、agent-service 和 viewer-site 开发服务器
-pnpm dev:web      # 仅启动 web 开发服务器
+pnpm dev          # 同时启动 author-site、agent-service 和 viewer-site 开发服务器
+pnpm dev:author   # 仅启动 author-site 开发服务器
 pnpm dev:agent    # 仅启动 agent-service 开发服务器
 pnpm dev:viewer   # 仅启动 viewer-site 开发服务器
-pnpm build        # 生产构建（web）
+pnpm build        # 生产构建（author-site）
 pnpm build:viewer # viewer-site 生产构建
 pnpm lint         # ESLint 检查
-pnpm typecheck    # TypeScript 类型检查（web）
+pnpm typecheck    # TypeScript 类型检查（author-site）
 pnpm typecheck:viewer # viewer-site 类型检查
 pnpm test:e2e            # 运行 E2E 测试
 pnpm test:e2e:ui         # 运行 E2E 测试（UI 模式）
@@ -31,17 +31,17 @@ pnpm test:e2e:headed     # 运行 E2E 测试（有头模式）
 
 ### 运行测试
 ```bash
-# 运行 web 包测试
-pnpm --filter @opencode-workbench/web test
+# 运行 author-site 包测试
+pnpm --filter @opencode-workbench/author-site test
 
 # 运行单个测试文件
-pnpm --filter @opencode-workbench/web test -- --testPathPattern="validator.test.ts"
+pnpm --filter @opencode-workbench/author-site test -- --testPathPattern="validator.test.ts"
 
 # 运行特定测试用例
-pnpm --filter @opencode-workbench/web test -- -t "应验证有效的 JSON"
+pnpm --filter @opencode-workbench/author-site test -- -t "应验证有效的 JSON"
 
 # 监听模式
-pnpm --filter @opencode-workbench/web test:watch
+pnpm --filter @opencode-workbench/author-site test:watch
 
 # 运行 agent-service 包测试（使用 fake-acp-cli）
 pnpm --filter @opencode-workbench/agent-service test
@@ -59,7 +59,7 @@ pnpm --filter @opencode-workbench/agent-service test:smoke
 ### 包管理
 ```bash
 pnpm install                    # 安装依赖
-pnpm --filter @opencode-workbench/web add <pkg>  # 为 web 包添加依赖
+pnpm --filter @opencode-workbench/author-site add <pkg>  # 为 author-site 包添加依赖
 ```
 
 ## 代码思维准则
@@ -223,7 +223,7 @@ stream.send('继续');
 ## 目录结构
 ```
 packages/
-├── web/
+├── author-site/
 │   ├── src/
 │   │   ├── app/          # Next.js App Router（页面和 API 路由）
 │   │   ├── components/   # React 组件（ai-elements, auth, demo, explore, layout, providers, ui, wish）

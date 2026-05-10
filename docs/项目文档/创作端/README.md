@@ -8,7 +8,7 @@
 
 ## 文档概览
 
-本系列文档用于指导 Web 前端（`@opencode-workbench/web`）的开发工作，基于 Next.js 14 App Router 架构，实现 Demo 管理、项目管理、配置预览和 AI 对话功能。
+本系列文档用于指导 Web 前端（`@opencode-workbench/author-site`）的开发工作，基于 Next.js 14 App Router 架构，实现 Demo 管理、项目管理、配置预览和 AI 对话功能。
 
 **核心设计理念**：
 

@@ -115,7 +115,7 @@ export async function systemCheck(
   result.project.packageJsonExists = existsSync(join(PROJECT_ROOT, "package.json"));
   result.project.envFileExists = existsSync(join(PROJECT_ROOT, ".env")) || existsSync(join(PROJECT_ROOT, ".env.local"));
   result.project.agentServiceDir = existsSync(join(PROJECT_ROOT, "packages/agent-service"));
-  result.project.webDir = existsSync(join(PROJECT_ROOT, "packages/web"));
+  result.project.webDir = existsSync(join(PROJECT_ROOT, "packages/author-site"));
   result.project.sharedDir = existsSync(join(PROJECT_ROOT, "packages/shared"));
 
   spinner.stop();

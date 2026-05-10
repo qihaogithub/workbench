@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n web,agent,viewer -c blue,green,cyan \"pnpm --filter @opencode-workbench/web dev\" \"cross-env PROJECTS_BASE_DIR=../web/data pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
-    "dev:web": "pnpm --filter @opencode-workbench/web dev",
-    "dev:agent": "cross-env PROJECTS_BASE_DIR=../web/data pnpm --filter @opencode-workbench/agent-service dev",
+    "dev": "concurrently -n author,agent,viewer -c blue,green,cyan \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
+    "dev:author": "pnpm --filter @opencode-workbench/author-site dev",
+    "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
     "dev:viewer": "pnpm --filter @opencode-workbench/viewer-site dev",
-    "build": "pnpm --filter @opencode-workbench/web build",
+    "build": "pnpm --filter @opencode-workbench/author-site build",
     "build:viewer": "pnpm --filter @opencode-workbench/viewer-site build",
-    "lint": "pnpm --filter @opencode-workbench/web lint",
-    "typecheck": "pnpm --filter @opencode-workbench/web typecheck",
+    "lint": "pnpm --filter @opencode-workbench/author-site lint",
+    "typecheck": "pnpm --filter @opencode-workbench/author-site typecheck",
     "typecheck:viewer": "pnpm --filter @opencode-workbench/viewer-site typecheck",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -19,7 +19,6 @@
   "devDependencies": {
     "@playwright/test": "^1.42.0",
     "concurrently": "^9.2.1",
-    "cross-env": "^7.0.3",
     "typescript": "^5.3.3"
   },
   "packageManager": "pnpm@8.15.0",
