@@ -9,59 +9,96 @@ const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   height: 812,
 };
 
-function buildPreviewStyle(
+const CONTAINER_PADDING = 32;
+
+function parseSizeValue(value: string | number | undefined): number | null {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const num = parseFloat(value.replace(/px$/, ""));
+    return isNaN(num) ? null : num;
+  }
+  return null;
+}
+
+interface PreviewScaleResult {
+  designWidth: number;
+  designHeight: number;
+  scale: number;
+  wrapperStyle: React.CSSProperties;
+  iframeStyle: React.CSSProperties;
+}
+
+function computePreviewScale(
   size?: PreviewSize,
-  iframeHeight?: number,
-  containerWidth?: number
-): React.CSSProperties {
+  containerWidth?: number,
+  containerHeight?: number,
+): PreviewScaleResult {
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
+  const designWidth = parseSizeValue(effectiveSize.width) ?? 375;
+  const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
 
-  const style: React.CSSProperties = {
-    width: effectiveSize.width,
-    maxWidth: "100%",
-    margin: "0 auto",
-    background: "#fff",
-    display: "block",
-  };
+  if (!containerWidth || !containerHeight) {
+    return {
+      designWidth,
+      designHeight,
+      scale: 1,
+      wrapperStyle: {
+        width: designWidth,
+        height: designHeight,
+        margin: "0 auto",
+        position: "relative",
+        overflow: "hidden",
+      },
+      iframeStyle: {
+        width: designWidth,
+        height: designHeight,
+        border: "none",
+        position: "absolute",
+        top: 0,
+        left: 0,
+      },
+    };
+  }
 
-  // 如果有明确的 height，使用固定高度
-  if (effectiveSize.height !== undefined) {
-    style.height = effectiveSize.height;
-  } else if (iframeHeight && iframeHeight > 0) {
-    // 使用 iframe 回传的自适应高度
-    style.height = iframeHeight;
+  const availableHeight = containerHeight - CONTAINER_PADDING;
+  const availableWidth = containerWidth;
+  const aspectRatio = designWidth / designHeight;
+
+  let displayWidth: number;
+  let displayHeight: number;
+
+  if (availableHeight * aspectRatio <= availableWidth) {
+    displayWidth = availableHeight * aspectRatio;
+    displayHeight = availableHeight;
   } else {
-    style.minHeight = effectiveSize.minHeight ?? "400px";
+    displayWidth = availableWidth;
+    displayHeight = availableWidth / aspectRatio;
   }
 
-  if (effectiveSize.maxHeight !== undefined) {
-    style.maxHeight = effectiveSize.maxHeight;
-  }
+  const scale = displayWidth / designWidth;
 
-  // 自动缩放：当容器宽度小于预览宽度时，按比例缩小
-  const previewWidth =
-    typeof effectiveSize.width === "number"
-      ? effectiveSize.width
-      : (typeof DEFAULT_PREVIEW_SIZE.width === "number" ? DEFAULT_PREVIEW_SIZE.width : 375);
-  if (containerWidth && containerWidth > 0 && containerWidth < previewWidth) {
-    const scale = containerWidth / previewWidth;
-    style.transform = `scale(${scale})`;
-    style.transformOrigin = "top center";
-    // 缩放后减少布局占位，避免溢出
-    style.height =
-      typeof style.height === "number"
-        ? style.height * scale
-        : style.height;
-    style.minHeight =
-      typeof style.minHeight === "number"
-        ? style.minHeight * scale
-        : style.minHeight;
-  } else if (effectiveSize.scale !== undefined) {
-    style.transform = `scale(${effectiveSize.scale})`;
-    style.transformOrigin = "top center";
-  }
-
-  return style;
+  return {
+    designWidth,
+    designHeight,
+    scale,
+    wrapperStyle: {
+      width: displayWidth,
+      height: displayHeight,
+      margin: "16px auto 0",
+      position: "relative",
+      overflow: "hidden",
+    },
+    iframeStyle: {
+      width: designWidth,
+      height: designHeight,
+      transform: `scale(${scale})`,
+      transformOrigin: "top left",
+      border: "none",
+      position: "absolute",
+      top: 0,
+      left: 0,
+    },
+  };
 }
 
 function resolveImageUrls(data: Record<string, unknown>): Record<string, unknown> {
@@ -137,10 +174,10 @@ export function PreviewPanel({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerHeight, setContainerHeight] = useState<number>(0);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const [iframeHeight, setIframeHeight] = useState<number>(0);
   const [iframeReady, setIframeReady] = useState(false);
   const iframeReadyRef = useRef(false);
   const [pendingCompileResult, setPendingCompileResult] = useState<CompileResult | null>(null);
@@ -298,9 +335,9 @@ export function PreviewPanel({
       const iframe = iframeRef.current;
       if (!iframe || event.source !== iframe.contentWindow) return;
 
-      const { type, error, height, stack } = event.data;
+      const { type, error, stack } = event.data;
 
-      console.log('[PreviewPanel] 收到 iframe 消息', { type, error, height });
+      console.log('[PreviewPanel] 收到 iframe 消息', { type, error });
 
       switch (type) {
         case "READY":
@@ -327,13 +364,6 @@ export function PreviewPanel({
           setRuntimeError(error || "组件运行时发生错误");
           onError?.(new Error(error || "组件运行时发生错误"));
           break;
-
-        case "RESIZE":
-          if (typeof height === "number" && height > 0) {
-            console.log('[PreviewPanel] iframe 高度调整', { height });
-            setIframeHeight(height);
-          }
-          break;
       }
     };
 
@@ -355,6 +385,7 @@ export function PreviewPanel({
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
+        setContainerHeight(entry.contentRect.height);
       }
     });
     ro.observe(el);
@@ -374,7 +405,7 @@ export function PreviewPanel({
     return () => iframe.removeEventListener("load", handleLoad);
   }, [iframeSrcUrl]);
 
-  const previewStyle = buildPreviewStyle(previewSize, iframeHeight, containerWidth);
+  const { wrapperStyle, iframeStyle } = computePreviewScale(previewSize, containerWidth, containerHeight);
 
   // 使用 Blob URL 替代 srcdoc，避免 CORS 问题
   useEffect(() => {
@@ -405,7 +436,7 @@ export function PreviewPanel({
       {isCompiling && (
         <div
           className="flex items-center justify-center p-8"
-          style={previewStyle}
+          style={wrapperStyle}
         >
           <div
             role="status"
@@ -439,29 +470,22 @@ export function PreviewPanel({
         </div>
       )}
 
-      {iframeSrcUrl && (
-        <div
-          ref={containerRef}
-          className="w-full h-full"
-          onWheel={(e) => {
-            const iframe = iframeRef.current;
-            if (!iframe?.contentWindow) return;
-            try {
-              iframe.contentWindow.scrollBy(0, e.deltaY);
-            } catch {}
-          }}
-        >
-          <div style={previewStyle} className="rounded-lg overflow-hidden border border-border">
+      <div
+        ref={containerRef}
+        className="w-full h-full flex flex-col items-center"
+      >
+        {iframeSrcUrl && (
+          <div style={wrapperStyle} className="rounded-lg border border-border">
             <iframe
               ref={iframeRef}
               sandbox="allow-scripts allow-same-origin"
               src={iframeSrcUrl}
-              className="w-full h-full"
+              style={iframeStyle}
               title="预览"
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }
