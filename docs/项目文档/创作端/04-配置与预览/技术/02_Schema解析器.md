@@ -92,7 +92,7 @@ interface ParsedContent {
 
 **功能**：从 Schema 中提取 `$demo.orderable` 可排序属性列表
 
-**文件位置**：`lib/validator.ts`
+**文件位置**：`lib/parser.ts`
 
 **参数**：
 
