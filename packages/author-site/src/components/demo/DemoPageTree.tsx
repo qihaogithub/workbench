@@ -20,9 +20,12 @@ import {
 } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { useToast } from "@/components/ui/toast-provider";
 import { DemoPageTreeItem, StaticTreeItem } from "./DemoPageTreeItem";
 import { NewFolderDialog } from "./NewFolderDialog";
+import { ImportFromFigmaDialog } from "./ImportFromFigmaDialog";
+import { Plus, FileText, FolderPlus, Upload } from "lucide-react";
 import {
   flattenTree,
   findItemById,
@@ -63,6 +66,8 @@ export function DemoPageTree({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+  const [importFigmaDialogOpen, setImportFigmaDialogOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -225,6 +230,28 @@ export function DemoPageTree({
     [sessionId, projectId, folders, pages, activeDemoId, onFoldersChange, onPagesChange, onPageSelect, toast],
   );
 
+  const handleAddPage = useCallback(async () => {
+    if (!sessionId) {
+      toast({ title: "未创建 Session", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await projectApiClient.createDemoPage(
+        projectId,
+        "新建页面",
+        sessionId,
+      );
+      onPagesChange([...pages, res].sort((a, b) => a.order - b.order));
+      toast({ title: "页面创建成功" });
+    } catch {
+      toast({ title: "创建失败", variant: "destructive" });
+    }
+  }, [sessionId, projectId, pages, onPagesChange, toast]);
+
+  const handleImportFigmaCreated = useCallback((page: DemoPageMeta) => {
+    onPagesChange([...pages, page].sort((a, b) => a.order - b.order));
+  }, [pages, onPagesChange]);
+
   const handleMovePageToFolder = useCallback(
     async (pageId: string, targetParentId: string | null) => {
       if (!sessionId) return;
@@ -251,41 +278,51 @@ export function DemoPageTree({
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h3 className="text-sm font-medium">📄 页面列表</h3>
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={async () => {
-              if (!sessionId) {
-                toast({ title: "未创建 Session", variant: "destructive" });
-                return;
-              }
-              try {
-                const res = await projectApiClient.createDemoPage(
-                  projectId,
-                  "新建页面",
-                  sessionId,
-                );
-                onPagesChange([...pages, res].sort((a, b) => a.order - b.order));
-                toast({ title: "页面创建成功" });
-              } catch {
-                toast({ title: "创建失败", variant: "destructive" });
-              }
-            }}
-          >
-            + 新建页面
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => {
-              setNewFolderParentId(null);
-              setNewFolderDialogOpen(true);
-            }}
-          >
-            + 新建文件夹
-          </Button>
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                添加
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <button
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  handleAddPage();
+                }}
+              >
+                <FileText className="h-4 w-4" />
+                添加页面
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  setNewFolderParentId(null);
+                  setNewFolderDialogOpen(true);
+                }}
+              >
+                <FolderPlus className="h-4 w-4" />
+                添加文件夹
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  setImportFigmaDialogOpen(true);
+                }}
+              >
+                <Upload className="h-4 w-4" />
+                从 Figma 导入
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -361,6 +398,14 @@ export function DemoPageTree({
         parentId={newFolderParentId}
         folders={folders}
         onCreate={handleCreateFolder}
+      />
+
+      <ImportFromFigmaDialog
+        open={importFigmaDialogOpen}
+        onOpenChange={setImportFigmaDialogOpen}
+        projectId={projectId}
+        sessionId={sessionId}
+        onPageCreated={handleImportFigmaCreated}
       />
     </div>
   );
