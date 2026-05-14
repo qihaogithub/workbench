@@ -3,12 +3,14 @@ import WebSocket, { WebSocketServer } from "ws";
 import { getAgentManager } from "../core/agent-manager";
 import {
   AgentConfig,
-  AgentEvent,
   AgentResult,
-  AgentStatus,
 } from "../core/types";
-import { AcpSessionUpdate, AcpPermissionRequest } from "../acp/types";
 import { logger } from "../utils/logger";
+import {
+  WebSocketEventRouter,
+  SendMessageFn,
+  ServerMessage,
+} from "./ws-event-router";
 
 const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL || "sensenova/deepseek-v4-flash";
 
@@ -31,91 +33,29 @@ interface ClientMessage {
   timestamp?: number;
 }
 
-interface ServerMessage {
-  type:
-    | "stream"
-    | "thought"
-    | "tool_call"
-    | "tool_call_update"
-    | "plan"
-    | "error"
-    | "finish"
-    | "status"
-    | "pong"
-    | "permission_request"
-    | "models"
-    | "file_operation";
-  id?: string;
-  sessionId?: string;
-  content?: string;
-  done?: boolean;
-  status?: AgentStatus;
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-  files?: Array<{
-    path: string;
-    action: "created" | "modified" | "deleted";
-    content?: string;
-  }>;
-  metadata?: {
-    model?: string;
-    tokens?: {
-      prompt: number;
-      completion: number;
-    };
-    duration?: number;
-  };
-  toolCallId?: string;
-  title?: string;
-  kind?: "read" | "edit" | "execute";
-  toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
-  timestamp?: number;
-  permissionRequest?: {
-    sessionId: string;
-    options: Array<{
-      optionId: string;
-      name: string;
-    }>;
-    toolCall: {
-      toolCallId: string;
-      title?: string;
-      kind?: string;
-    };
-  };
-  models?: Array<{
-    id: string;
-    label: string;
-  }>;
-  currentModelId?: string;
-  canSwitch?: boolean;
-  fileOperation?: {
-    method: string;
-    path: string;
-    content?: string;
-  };
-}
-
 interface ActiveConnection {
   socket: WebSocket;
   sessionId: string;
   lastPing: number;
+  eventRouter: WebSocketEventRouter;
 }
 
 const connections = new Map<string, ActiveConnection>();
-let wss: WebSocketServer | null = null;
 
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
 const MESSAGE_TIMEOUT_MS = 300000;
+
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
 
 function heartbeat(): void {
   const now = Date.now();
   for (const [sessionId, conn] of connections) {
     if (now - conn.lastPing > HEARTBEAT_TIMEOUT) {
       logger.info({ sessionId }, "WebSocket connection timed out, closing");
+      conn.eventRouter.destroy();
       conn.socket.terminate();
       connections.delete(sessionId);
     }
@@ -127,7 +67,7 @@ export async function registerWebSocketRoutes(
 ): Promise<void> {
   const manager = getAgentManager();
 
-  wss = new WebSocketServer({ noServer: true });
+  new WebSocketServer({ noServer: true });
 
   setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
@@ -146,139 +86,21 @@ export async function registerWebSocketRoutes(
         "WebSocket connection established",
       );
 
-      const connection: ActiveConnection = {
-        socket,
-        sessionId,
-        lastPing: Date.now(),
-      };
-      connections.set(connectionId, connection);
-
-      const sendMessage = (message: ServerMessage): void => {
+      const sendMessage: SendMessageFn = (message: ServerMessage): void => {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(message));
         }
       };
 
-      const handleSessionUpdate = (update: AcpSessionUpdate): void => {
-        const sessionUpdate = update.update;
+      const eventRouter = new WebSocketEventRouter(sessionId, sendMessage);
 
-        switch (sessionUpdate.sessionUpdate) {
-          case "agent_message_chunk":
-            sendMessage({
-              type: "stream",
-              sessionId,
-              content: sessionUpdate.content?.text || "",
-              done: false,
-            });
-            break;
-
-          case "agent_thought_chunk":
-            sendMessage({
-              type: "thought",
-              sessionId,
-              content: sessionUpdate.content?.text || "",
-              done: false,
-            });
-            break;
-
-          case "tool_call":
-            sendMessage({
-              type: "tool_call",
-              sessionId,
-              toolCallId: sessionUpdate.toolCallId || "",
-              title: sessionUpdate.title || "",
-              kind:
-                (sessionUpdate.kind as "read" | "edit" | "execute") ||
-                "execute",
-              toolCallStatus: "pending",
-            });
-            break;
-
-          case "tool_call_update":
-            sendMessage({
-              type: "tool_call_update",
-              sessionId,
-              toolCallId: sessionUpdate.toolCallId || "",
-              toolCallStatus:
-                sessionUpdate.status === "completed" ? "completed" : "failed",
-            });
-            break;
-
-          case "config_option_update":
-            break;
-
-          case "usage_update":
-            break;
-
-          default:
-            logger.debug(
-              { sessionUpdate: sessionUpdate.sessionUpdate },
-              "Unhandled session update type",
-            );
-        }
+      const connection: ActiveConnection = {
+        socket,
+        sessionId,
+        lastPing: Date.now(),
+        eventRouter,
       };
-
-      const handlePermissionRequest = async (
-        request: AcpPermissionRequest,
-      ): Promise<{ optionId: string }> => {
-        return new Promise((resolve) => {
-          const handlePermissionResponse = (data: Buffer): void => {
-            try {
-              const message = JSON.parse(data.toString());
-              if (
-                message.type === "permission_response" &&
-                message.permissionId
-              ) {
-                socket.off("message", handlePermissionResponse);
-                resolve({ optionId: message.optionId });
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          };
-
-          socket.on("message", handlePermissionResponse);
-
-          sendMessage({
-            type: "permission_request",
-            sessionId,
-            permissionRequest: {
-              sessionId: request.sessionId,
-              options: request.options.map((opt) => ({
-                optionId: opt.optionId,
-                name: opt.name,
-              })),
-              toolCall: {
-                toolCallId: request.toolCall.toolCallId,
-                title: request.toolCall.title,
-                kind: request.toolCall.kind,
-              },
-            },
-          });
-
-          setTimeout(() => {
-            socket.off("message", handlePermissionResponse);
-            resolve({ optionId: "reject_once" });
-          }, 60000);
-        });
-      };
-
-      const handleFileOperation = (operation: {
-        method: string;
-        path: string;
-        content?: string;
-        sessionId: string;
-      }): void => {
-        sendMessage({
-          type: "file_operation",
-          sessionId,
-          fileOperation: {
-            method: operation.method,
-            path: operation.path,
-            content: operation.content,
-          },
-        });
-      };
+      connections.set(connectionId, connection);
 
       socket.on("message", async (data: Buffer) => {
         connection.lastPing = Date.now();
@@ -318,7 +140,6 @@ export async function registerWebSocketRoutes(
             );
 
             try {
-              // 获取已存在的 agent，以便复用其当前模型设置
               const existingAgent = manager.get(sessionId);
               const currentModelId = existingAgent && "getModelInfo" in existingAgent
                 ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
@@ -332,6 +153,8 @@ export async function registerWebSocketRoutes(
               };
 
               const agent = manager.getOrCreate(sessionId, config);
+
+              eventRouter.bindAgent(agent);
 
               if (agent.status === "initializing") {
                 sendMessage({
@@ -348,120 +171,10 @@ export async function registerWebSocketRoutes(
                 status: "processing",
               });
 
-              const eventHandler = (event: AgentEvent): void => {
-                if (event.sessionId !== sessionId) return;
-
-                switch (event.type) {
-                  case "stream":
-                    sendMessage({
-                      type: "stream",
-                      id: message.id,
-                      sessionId,
-                      content: event.content,
-                      done: event.done,
-                    });
-                    break;
-
-                  case "thought":
-                    sendMessage({
-                      type: "thought",
-                      id: message.id,
-                      sessionId,
-                      content: event.content,
-                      done: event.done,
-                    });
-                    break;
-
-                  case "tool_call":
-                    sendMessage({
-                      type: "tool_call",
-                      id: message.id,
-                      sessionId,
-                      toolCallId: event.toolCallId,
-                      title: event.title,
-                      kind: event.kind,
-                      toolCallStatus: event.status,
-                    });
-                    break;
-
-                  case "tool_call_update":
-                    sendMessage({
-                      type: "tool_call_update",
-                      id: message.id,
-                      sessionId,
-                      toolCallId: event.toolCallId,
-                      toolCallStatus: event.status,
-                    });
-                    break;
-
-                  case "plan":
-                    sendMessage({
-                      type: "plan",
-                      id: message.id,
-                      sessionId,
-                      content: event.content,
-                    });
-                    break;
-
-                  case "error":
-                    sendMessage({
-                      type: "error",
-                      id: message.id,
-                      sessionId,
-                      error: event.error,
-                    });
-                    break;
-
-                  case "status":
-                    sendMessage({
-                      type: "status",
-                      id: message.id,
-                      sessionId,
-                      status: event.status,
-                    });
-                    break;
-
-                  case "file_operation":
-                    logger.info(
-                      {
-                        event: "file_operation",
-                        path: event.fileOperation?.path,
-                        contentLength: event.fileOperation?.content?.length,
-                      },
-                      "[WebSocket] Forwarding file_operation event to client",
-                    );
-                    sendMessage({
-                      type: "file_operation",
-                      sessionId,
-                      fileOperation: event.fileOperation,
-                    });
-                    break;
-                }
-              };
+              const messageId = message.id || generateMessageId();
+              eventRouter.startMessage(messageId);
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-              let isCancelled = false;
-
-              const wrappedEventHandler = (event: AgentEvent): void => {
-                if (isCancelled) {
-                  logger.debug(
-                    { sessionId, eventType: event.type },
-                    "Ignoring event after timeout/cancel",
-                  );
-                  return;
-                }
-                eventHandler(event);
-              };
-
-              // 注册包装后的事件处理器
-              agent.on("stream", wrappedEventHandler);
-              agent.on("thought", wrappedEventHandler);
-              agent.on("tool_call", wrappedEventHandler);
-              agent.on("tool_call_update", wrappedEventHandler);
-              agent.on("plan", wrappedEventHandler);
-              agent.on("error", wrappedEventHandler);
-              agent.on("status", wrappedEventHandler);
-              agent.on("file_operation", wrappedEventHandler);
 
               try {
                 const sendPromise = agent.sendMessage(
@@ -474,7 +187,7 @@ export async function registerWebSocketRoutes(
                       { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS },
                       "Agent sendMessage timed out, cancelling",
                     );
-                    isCancelled = true;
+                    eventRouter.cancelMessage();
                     agent.cancel();
                     resolve({
                       success: false,
@@ -494,15 +207,14 @@ export async function registerWebSocketRoutes(
                   timeoutPromise,
                 ]);
 
-                // 如果是超时导致的，确保 sendPromise 完成后不会发送额外事件
                 if (!result.success && result.error?.code === "MESSAGE_TIMEOUT") {
-                  isCancelled = true;
+                  eventRouter.cancelMessage();
                 }
 
                 if (result.success) {
                   sendMessage({
                     type: "finish",
-                    id: message.id,
+                    id: messageId,
                     sessionId,
                     files: result.files,
                     metadata: result.metadata,
@@ -510,7 +222,7 @@ export async function registerWebSocketRoutes(
                 } else {
                   sendMessage({
                     type: "error",
-                    id: message.id,
+                    id: messageId,
                     sessionId,
                     error: result.error || {
                       code: "INTERNAL_ERROR",
@@ -526,15 +238,7 @@ export async function registerWebSocketRoutes(
                 });
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
-                // 清理包装后的事件处理器
-                agent.off("stream", wrappedEventHandler);
-                agent.off("thought", wrappedEventHandler);
-                agent.off("tool_call", wrappedEventHandler);
-                agent.off("tool_call_update", wrappedEventHandler);
-                agent.off("plan", wrappedEventHandler);
-                agent.off("error", wrappedEventHandler);
-                agent.off("status", wrappedEventHandler);
-                agent.off("file_operation", wrappedEventHandler);
+                eventRouter.finishMessage();
               }
             } catch (error) {
               sendMessage({
@@ -567,7 +271,6 @@ export async function registerWebSocketRoutes(
             }
 
             try {
-              // 获取已存在的 agent，以便复用其当前模型设置
               const existingAgent = manager.get(resumeSessionId);
               const currentModelId = existingAgent && "getModelInfo" in existingAgent
                 ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
@@ -581,6 +284,8 @@ export async function registerWebSocketRoutes(
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
+
+              eventRouter.bindAgent(agent);
 
               if (agent.status === "initializing") {
                 sendMessage({
@@ -616,6 +321,7 @@ export async function registerWebSocketRoutes(
             const targetSessionId = message.sessionId || sessionId;
             const agent = manager.get(targetSessionId);
             if (agent) {
+              eventRouter.cancelMessage();
               agent.cancel();
               sendMessage({
                 type: "status",
@@ -688,6 +394,9 @@ export async function registerWebSocketRoutes(
                   model: DEFAULT_MODEL_ID,
                 };
                 agent = manager.getOrCreate(sessionId, config);
+
+                eventRouter.bindAgent(agent);
+
                 if (agent.status === "initializing") {
                   sendMessage({
                     type: "status",
@@ -775,9 +484,10 @@ export async function registerWebSocketRoutes(
           { sessionId, connectionId, code, reason: reason.toString() },
           "WebSocket connection closed",
         );
+
+        eventRouter.destroy();
         connections.delete(connectionId);
 
-        // 检查是否还有其他连接使用该 session，如果没有则清理 Agent
         const hasOtherConnections = Array.from(connections.values()).some(
           (conn) => conn.sessionId === sessionId,
         );
@@ -795,6 +505,7 @@ export async function registerWebSocketRoutes(
 
       socket.on("error", (error) => {
         logger.error({ sessionId, connectionId, error }, "WebSocket error");
+        eventRouter.destroy();
         connections.delete(connectionId);
       });
 
@@ -811,7 +522,7 @@ export function broadcastToSession(
   sessionId: string,
   message: ServerMessage,
 ): void {
-  for (const [connectionId, conn] of connections) {
+  for (const [, conn] of connections) {
     if (
       conn.sessionId === sessionId &&
       conn.socket.readyState === WebSocket.OPEN
@@ -822,7 +533,8 @@ export function broadcastToSession(
 }
 
 export function closeAllConnections(): void {
-  for (const [connectionId, conn] of connections) {
+  for (const [, conn] of connections) {
+    conn.eventRouter.destroy();
     conn.socket.close(1000, "Server shutting down");
   }
   connections.clear();

@@ -257,12 +257,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         let loadedSchema = "";
 
         if (multi.demos && Object.keys(multi.demos).length > 0) {
-          // 多页面模式：取第一个页面作为默认
-          const firstDemoId = Object.keys(multi.demos)[0];
-          const firstDemo = multi.demos[firstDemoId];
-          loadedCode = firstDemo.code;
-          loadedSchema = firstDemo.schema;
-          setActiveDemoId(firstDemoId);
+          const demoIds = Object.keys(multi.demos);
+          const targetDemoId = demoIds.includes(demoId as string)
+            ? demoId as string
+            : demoIds[0];
+          const currentDemo = multi.demos[targetDemoId];
+          loadedCode = currentDemo.code;
+          loadedSchema = currentDemo.schema;
+          setActiveDemoId(targetDemoId);
         } else if (multi.code !== undefined && multi.schema !== undefined) {
           // 旧格式兼容
           loadedCode = multi.code;

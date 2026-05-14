@@ -1,0 +1,251 @@
+import { BaseAgent } from "../core/agent";
+import { AgentEvent, AgentStatus } from "../core/types";
+import { logger } from "../utils/logger";
+
+const AGENT_EVENT_TYPES = [
+  "stream",
+  "thought",
+  "tool_call",
+  "tool_call_update",
+  "plan",
+  "error",
+  "status",
+  "file_operation",
+] as const;
+
+export interface ServerMessage {
+  type:
+    | "stream"
+    | "thought"
+    | "tool_call"
+    | "tool_call_update"
+    | "plan"
+    | "error"
+    | "finish"
+    | "status"
+    | "pong"
+    | "permission_request"
+    | "models"
+    | "file_operation";
+  id?: string;
+  sessionId?: string;
+  content?: string;
+  done?: boolean;
+  status?: AgentStatus;
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+  files?: Array<{
+    path: string;
+    action: "created" | "modified" | "deleted";
+    content?: string;
+  }>;
+  metadata?: {
+    model?: string;
+    tokens?: {
+      prompt: number;
+      completion: number;
+    };
+    duration?: number;
+  };
+  toolCallId?: string;
+  title?: string;
+  kind?: "read" | "edit" | "execute";
+  toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
+  timestamp?: number;
+  permissionRequest?: {
+    sessionId: string;
+    options: Array<{
+      optionId: string;
+      name: string;
+    }>;
+    toolCall: {
+      toolCallId: string;
+      title?: string;
+      kind?: string;
+    };
+  };
+  models?: Array<{
+    id: string;
+    label: string;
+  }>;
+  currentModelId?: string;
+  canSwitch?: boolean;
+  fileOperation?: {
+    method: string;
+    path: string;
+    content?: string;
+  };
+}
+
+export type SendMessageFn = (message: ServerMessage) => void;
+
+interface ActiveMessage {
+  id: string;
+  isCancelled: boolean;
+}
+
+export class WebSocketEventRouter {
+  private sendMessage: SendMessageFn;
+  private sessionId: string;
+  private activeMessage: ActiveMessage | null = null;
+  private agent: BaseAgent | null = null;
+  private boundHandler: (event: AgentEvent) => void;
+
+  constructor(sessionId: string, sendMessage: SendMessageFn) {
+    this.sessionId = sessionId;
+    this.sendMessage = sendMessage;
+    this.boundHandler = this.handleEvent.bind(this);
+  }
+
+  bindAgent(agent: BaseAgent): void {
+    if (this.agent === agent) return;
+
+    this.unbindAgent();
+    this.agent = agent;
+
+    for (const eventType of AGENT_EVENT_TYPES) {
+      agent.on(eventType, this.boundHandler);
+    }
+  }
+
+  unbindAgent(): void {
+    if (!this.agent) return;
+
+    for (const eventType of AGENT_EVENT_TYPES) {
+      this.agent.off(eventType, this.boundHandler);
+    }
+    this.agent = null;
+  }
+
+  startMessage(messageId: string): void {
+    this.activeMessage = { id: messageId, isCancelled: false };
+  }
+
+  cancelMessage(): void {
+    if (this.activeMessage) {
+      this.activeMessage.isCancelled = true;
+    }
+  }
+
+  finishMessage(): void {
+    this.activeMessage = null;
+  }
+
+  isActive(): boolean {
+    return this.activeMessage !== null;
+  }
+
+  isCancelled(): boolean {
+    return this.activeMessage?.isCancelled ?? false;
+  }
+
+  destroy(): void {
+    this.unbindAgent();
+    this.activeMessage = null;
+  }
+
+  private handleEvent(event: AgentEvent): void {
+    if (event.sessionId !== this.sessionId) return;
+
+    if (this.activeMessage?.isCancelled) {
+      logger.debug(
+        { sessionId: this.sessionId, eventType: event.type },
+        "Ignoring event after cancel",
+      );
+      return;
+    }
+
+    const messageId = this.activeMessage?.id;
+
+    switch (event.type) {
+      case "stream":
+        this.sendMessage({
+          type: "stream",
+          id: messageId,
+          sessionId: this.sessionId,
+          content: event.content,
+          done: event.done,
+        });
+        break;
+
+      case "thought":
+        this.sendMessage({
+          type: "thought",
+          id: messageId,
+          sessionId: this.sessionId,
+          content: event.content,
+          done: event.done,
+        });
+        break;
+
+      case "tool_call":
+        this.sendMessage({
+          type: "tool_call",
+          id: messageId,
+          sessionId: this.sessionId,
+          toolCallId: event.toolCallId,
+          title: event.title,
+          kind: event.kind,
+          toolCallStatus: event.status,
+        });
+        break;
+
+      case "tool_call_update":
+        this.sendMessage({
+          type: "tool_call_update",
+          id: messageId,
+          sessionId: this.sessionId,
+          toolCallId: event.toolCallId,
+          toolCallStatus: event.status,
+        });
+        break;
+
+      case "plan":
+        this.sendMessage({
+          type: "plan",
+          id: messageId,
+          sessionId: this.sessionId,
+          content: event.content,
+        });
+        break;
+
+      case "error":
+        this.sendMessage({
+          type: "error",
+          id: messageId,
+          sessionId: this.sessionId,
+          error: event.error,
+        });
+        break;
+
+      case "status":
+        this.sendMessage({
+          type: "status",
+          id: messageId,
+          sessionId: this.sessionId,
+          status: event.status,
+        });
+        break;
+
+      case "file_operation":
+        logger.info(
+          {
+            event: "file_operation",
+            path: event.fileOperation?.path,
+            contentLength: event.fileOperation?.content?.length,
+          },
+          "[WebSocket] Forwarding file_operation event to client",
+        );
+        this.sendMessage({
+          type: "file_operation",
+          id: messageId,
+          sessionId: this.sessionId,
+          fileOperation: event.fileOperation,
+        });
+        break;
+    }
+  }
+}

@@ -32,7 +32,7 @@ workspace/
 
   📄 "手机" → demos/demo_1777965200000_x8k2p9/ (index.tsx + config.schema.json)
   📄 "横屏 iPad mini" → demos/demo_1778077850198_fjxwmf/ (index.tsx + config.schema.json)
-  📄 "从Figma导入的页面" → demos/demo_1778751411983_7h2rpo/ (index.tsx + config.schema.json)
+  📄 "从Figma导入的页面" → demos/demo_1778749341627_ecsne8/ (index.tsx + config.schema.json)
 
 用户会通过自然语言告诉你操作哪个页面或项目配置。
 如果需要操作某个页面，请在 `demos/{id}/` 目录下编辑 `index.tsx` 或 `config.schema.json`。
