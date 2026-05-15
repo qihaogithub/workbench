@@ -66,19 +66,17 @@
 
 ### 根本原因
 
-**根因（唯一）：编辑器初始加载时固定展示第一个页面，忽略 URL 参数**
+**根因（唯一，已修复 ✅）：编辑器初始加载时固定展示第一个页面，忽略 URL 参数**
 
-`packages/author-site/src/app/demo/[id]/edit/page.tsx:259-265`：
+`packages/author-site/src/app/demo/[id]/edit/page.tsx:259-265`（修复前）：
 
 ```typescript
-if (multi.demos && Object.keys(multi.demos).length > 0) {
-  // 多页面模式：取第一个页面作为默认
-  const firstDemoId = Object.keys(multi.demos)[0];
-  const firstDemo = multi.demos[firstDemoId];
-  loadedCode = firstDemo.code;
-  loadedSchema = firstDemo.schema;
-  setActiveDemoId(firstDemoId);
-}
+// 修复前
+const firstDemoId = Object.keys(multi.demos)[0];
+const firstDemo = multi.demos[firstDemoId];
+loadedCode = firstDemo.code;
+loadedSchema = firstDemo.schema;
+setActiveDemoId(firstDemoId);
 ```
 
 无论 URL 中的 `demoId` 参数指向哪个页面，编辑器总是取 `demos` 对象中第一个键值对作为展示内容。该逻辑在多页面项目中导致：
@@ -89,7 +87,7 @@ if (multi.demos && Object.keys(multi.demos).length > 0) {
 
 **根因说明**：这不是导入流程的问题——文件系统层面，导入的数据写入完全正确。问题出在编辑器的**展示层**：API 返回了所有 demo 页面的数据，但前端代码固定取第一个。侧边栏和 Select 下拉的手动切换使用独立的 `/api/sessions/{sessionId}/files/{pageId}` 接口，因此能正确加载指定页面。但 useEffect 初始加载使用的是 `/api/sessions/{sessionId}/files`（返回全部 demos），且硬编码取第一个。
 
-### 代码执行路径
+### 代码执行路径（修复前）
 
 ```
 用户打开编辑器
@@ -100,12 +98,6 @@ if (multi.demos && Object.keys(multi.demos).length > 0) {
   → 返回 {demos: {demo_A: {...}, demo_B: {...}, demo_C: {...}}}
   → ⚠️ 第259行：loadedCode = demos[Object.keys(demos)[0]].code
   → 预览区展示第一个页面内容，忽视 URL 中的 demoId
-
-[正确的切换路径]
-  DemoPageTree.onPageSelect(pageId)  [page.tsx:858]
-    → GET /api/sessions/{sessionId}/files/{pageId}  ✅ 正确加载
-  Select.onValueChange(pageId)  [page.tsx:1020]
-    → GET /api/sessions/{sessionId}/files/{pageId}  ✅ 正确加载
 ```
 
 ---
@@ -141,9 +133,9 @@ setActiveDemoId(targetDemoId);
 
 ---
 
-## 3b. 解决方案（待处理）
+## 4. 待处理事项
 
-### 方案一：调用 `syncProjectDemoPagesFromWorkspace` 同步元数据
+### 调用 `syncProjectDemoPagesFromWorkspace` 同步元数据
 
 - **描述**：在 `saveEditSession()` 保存操作完成后调用 `syncProjectDemoPagesFromWorkspace()`，确保 `project.json` 的 `demoPages` 与文件系统一致。
 - **原理**：`syncProjectDemoPagesFromWorkspace()` 读取 `workspace/demos/` 目录下的所有 `.demo.json` 文件，重写 `project.json` 的 `demoPages` 数组。
@@ -165,7 +157,7 @@ setActiveDemoId(targetDemoId);
 
 | 文件路径 | 行号 | 说明 |
 |---------|------|------|
-| `packages/author-site/src/app/demo/[id]/edit/page.tsx` | L259-265 | **根因**：编辑器多页面加载时固定取第一个 demo |
+| `packages/author-site/src/app/demo/[id]/edit/page.tsx` | L259-267 | **根因（已修复）**：优先匹配 URL demoId，回退第一个 |
 | `packages/author-site/src/app/demo/[id]/edit/page.tsx` | L858-880 | 侧边栏 DemoPageTree 页面选择（正确的切换逻辑） |
 | `packages/author-site/src/app/demo/[id]/edit/page.tsx` | L1020-1041 | 顶部 Select 下拉页面选择（正确的切换逻辑） |
 | `packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx` | L39-82 | Figma 导入弹窗逻辑（工作正常） |
@@ -187,8 +179,7 @@ setActiveDemoId(targetDemoId);
   edit/page.tsx:useEffect([demoId])
     → POST /api/sessions {demoId}
     → GET /api/sessions/{sessionId}/files → {demos: {所有页面}, ...}
-    → 第259行：优先匹配 URL demoId → 找到则加载该页，找不到回退第一个
-    → ✅ 预览区展示正确页面内容
+    → 优先匹配 URL demoId → 找到则加载该页，找不到回退第一个 ✅
 
 [编辑器加载特殊情形 — 初次访问项目]
   URL 为 /demo/[项目ID]/edit，demoId 为项目 ID 而非页面 ID
@@ -197,9 +188,6 @@ setActiveDemoId(targetDemoId);
 [编辑器加载特殊情形 — 直接访问页面]
   URL 为 /demo/[页面ID]/edit，demoId 为具体页面 ID
     → 匹配成功，加载该页 ✅
-  Select.onValueChange(pageId)  [page.tsx:1020]
-    → GET /api/sessions/{sessionId}/files/{pageId}  ✅
-```
 
 ### 相关配置
 

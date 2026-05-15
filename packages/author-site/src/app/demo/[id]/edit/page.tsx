@@ -391,6 +391,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return;
     }
 
+    if (!activeDemoId) {
+      console.error('[handleSave] activeDemoId 为空!');
+      toast({
+        title: "保存失败",
+        description: "未选中页面，请先选择要保存的页面",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!validationResult.isValid) {
       toast({
         title: "验证警告",
@@ -403,7 +413,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       setIsSaving(true);
 
       console.log(`[handleSave] 发送 PUT 请求到 /api/sessions/${sessionId}/files`);
-      const saveRes = await fetch(`/api/sessions/${sessionId}/files`, {
+      const saveRes = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, schema }),

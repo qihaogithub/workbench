@@ -250,7 +250,8 @@ export function DemoPageTree({
 
   const handleImportFigmaCreated = useCallback((page: DemoPageMeta) => {
     onPagesChange([...pages, page].sort((a, b) => a.order - b.order));
-  }, [pages, onPagesChange]);
+    onPageSelect(page.id);
+  }, [pages, onPagesChange, onPageSelect]);
 
   const handleMovePageToFolder = useCallback(
     async (pageId: string, targetParentId: string | null) => {
