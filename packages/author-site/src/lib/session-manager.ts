@@ -15,6 +15,7 @@ import {
   cleanupOldVersions,
   findWorkspacePath,
   getWorkspaceMultiDemoFiles,
+  syncProjectDemoPagesFromWorkspace,
 } from "./fs-utils";
 import { createWorkspace } from "./workspace-manager";
 import type {
@@ -395,6 +396,8 @@ export function saveEditSession(
 
     cleanupOldVersions(project);
     writeProjectMeta(projectId, project);
+
+    syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
 
     generateThumbnail(projectId).catch((err) => {
       console.warn(`[saveEditSession] 缩略图生成失败:`, err);

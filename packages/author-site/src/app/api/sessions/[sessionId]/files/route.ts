@@ -156,6 +156,11 @@ export async function PUT(
     }
 
     const targetDemoId = demoPages[0].id;
+    console.warn(
+      `[兼容层警告] PUT /api/sessions/${sessionId}/files 未指定 demoId，` +
+      `默认保存到第一个页面 ${targetDemoId}。` +
+      `前端应改用 PUT /api/sessions/${sessionId}/files/{demoId}`,
+    );
     const success = updateWorkspaceDemoFiles(meta.workspaceId, targetDemoId, {
       code,
       schema,

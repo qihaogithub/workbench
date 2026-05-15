@@ -870,6 +870,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
                     setActiveDemoId(pageId);
+                    router.replace(`/demo/${pageId}/edit`);
                     if (sessionId) {
                       try {
                         const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
@@ -1031,6 +1032,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               {previewMode === 'single' && demoPages.length > 1 && (
                 <Select value={activeDemoId} onValueChange={async (pageId) => {
                   setActiveDemoId(pageId);
+                  router.replace(`/demo/${pageId}/edit`);
                   if (sessionId) {
                     try {
                       const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
