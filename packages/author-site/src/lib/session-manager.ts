@@ -16,6 +16,7 @@ import {
   findWorkspacePath,
   getWorkspaceMultiDemoFiles,
   syncProjectDemoPagesFromWorkspace,
+  listDemoPages,
 } from "./fs-utils";
 import { createWorkspace } from "./workspace-manager";
 import type {
@@ -39,14 +40,20 @@ export interface CreateSessionResult {
 }
 
 /** 从 MultiDemoFiles 提取第一个 demo 的 code/schema，便于 Stage 1 兼容旧调用方 */
-function pickFirstDemoFiles(multi: MultiDemoFiles | null | undefined): {
+function pickFirstDemoFiles(
+  multi: MultiDemoFiles | null | undefined,
+  sortedPageIds?: string[],
+): {
   code: string;
   schema: string;
 } {
   if (!multi) return { code: "", schema: "" };
   const ids = Object.keys(multi.demos);
   if (ids.length === 0) return { code: "", schema: "" };
-  const first = multi.demos[ids[0]];
+  const firstId = sortedPageIds && sortedPageIds.length > 0
+    ? sortedPageIds.find(id => ids.includes(id)) ?? ids[0]
+    : ids[0];
+  const first = multi.demos[firstId];
   return { code: first.code, schema: first.schema };
 }
 
@@ -215,7 +222,8 @@ export async function createEditSession(
     demos = wsResult.demos;
   }
 
-  const { code, schema } = pickFirstDemoFiles(demos);
+  const sortedPageIds = listDemoPages(workspacePath).map(p => p.id);
+  const { code, schema } = pickFirstDemoFiles(demos, sortedPageIds);
 
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const sessionDir = getProjectSessionDir(userId, projectId);
@@ -276,7 +284,8 @@ export function getEditSession(sessionId: string) {
     }
   }
 
-  const { code, schema } = pickFirstDemoFiles(demos);
+  const sortedPageIds = workspacePath ? listDemoPages(workspacePath).map(p => p.id) : undefined;
+  const { code, schema } = pickFirstDemoFiles(demos, sortedPageIds);
 
   return {
     sessionId: meta.sessionId,

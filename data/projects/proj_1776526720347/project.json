@@ -314,11 +314,52 @@
       "sessionId": "session-1778751437882-b9luvdka6",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1776526720347/v39",
       "fileCount": 8
+    },
+    {
+      "versionId": "v40",
+      "savedAt": 1778929599060,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1778924455432-baackukbg",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v40",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v41",
+      "savedAt": 1778929690402,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1778929603504-kes5lmkgu",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v41",
+      "fileCount": 8
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1778751548605,
+  "updatedAt": 1778929690404,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
-  "demoPages": [],
+  "demoPages": [
+    {
+      "id": "demo_1777965200000_x8k2p9",
+      "name": "手机",
+      "order": 4,
+      "parentId": null,
+      "createdAt": 1777965200000,
+      "updatedAt": 1778929656278
+    },
+    {
+      "id": "demo_1778077850198_fjxwmf",
+      "name": "横屏 iPad mini",
+      "order": 5,
+      "parentId": null,
+      "createdAt": 1778077850205,
+      "updatedAt": 1778077867280
+    },
+    {
+      "id": "demo_1778751411983_7h2rpo",
+      "name": "从Figma导入的页面",
+      "order": 7,
+      "parentId": null,
+      "createdAt": 1778751411983,
+      "updatedAt": 1778929690245
+    }
+  ],
   "demoFolders": []
 }

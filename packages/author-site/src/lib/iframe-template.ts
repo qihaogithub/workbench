@@ -50,8 +50,8 @@ ${cssLinks}
     let currentRoot = null;
     let currentConfig = ${initialConfig};
     let currentComponent = null;
+    let updateVersion = 0;
 
-    // 同步暴露给组件模块顶层使用（读取合并后的 props）
     window.__DEMO_PROPS__ = currentConfig;
 
     class ErrorBoundary extends React.Component {
@@ -139,23 +139,33 @@ ${cssLinks}
       if (type === 'UPDATE_CODE') {
         console.log('[iframe] 处理 UPDATE_CODE', { configData: newConfigData, cssImports: newCssImports });
         currentConfig = newConfigData || {};
-        // 必须在 import 之前设置，组件模块在顶层读取 window.__DEMO_PROPS__ 时才能拿到最新值
         window.__DEMO_PROPS__ = currentConfig;
         updateCssLinks(newCssImports || []);
+
+        const thisVersion = ++updateVersion;
 
         const blob = new Blob([code], { type: 'application/javascript' });
         const moduleUrl = URL.createObjectURL(blob);
 
-        console.log('[iframe] 开始加载模块', { moduleUrl });
+        console.log('[iframe] 开始加载模块', { moduleUrl, version: thisVersion });
 
         import(moduleUrl)
           .then((module) => {
+            if (thisVersion !== updateVersion) {
+              console.log('[iframe] 忽略过期的模块加载', { expected: thisVersion, current: updateVersion });
+              return;
+            }
             console.log('[iframe] 模块加载成功', { hasDefault: !!module.default });
-            currentComponent = module.default;
+            currentComponent = module.default || null;
             renderComponent();
-            window.parent.postMessage({ type: 'LOADED' }, '*');
+            if (module.default) {
+              window.parent.postMessage({ type: 'LOADED' }, '*');
+            } else {
+              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
+            }
           })
           .catch((err) => {
+            if (thisVersion !== updateVersion) return;
             console.error('[iframe] 模块加载失败', err);
             window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
           });

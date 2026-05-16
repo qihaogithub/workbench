@@ -125,13 +125,10 @@ export function rewriteImportsToCdn(
 ): string {
   let result = compiledCode;
 
-  console.log('[compiler] rewriteImportsToCdn - 输入依赖:', dependencies);
-
   for (const dep of dependencies) {
     if (!isNpmPackage(dep) || isCssImport(dep)) continue;
 
     const cdnUrl = toCdnUrl(dep, lockedDependencies?.[dep]);
-    console.log('[compiler] 转换依赖:', { dep, cdnUrl });
     
     // 替换 from 'package' 和 from "package"
     const fromPattern = new RegExp(
@@ -148,9 +145,31 @@ export function rewriteImportsToCdn(
     result = result.replace(importPattern, `import '${cdnUrl}'`);
   }
 
-  console.log('[compiler] rewriteImportsToCdn - 输出代码前100字符:', result.substring(0, 200));
-
   return result;
+}
+
+/**
+ * Figma 导入的代码是裸 JSX（无 export default），iframe 无法渲染。
+ * 此函数检测并自动包装：裸 JSX → export default function() { return (...) }
+ * 有组件变量但无 export default → 追加 export default Xxx
+ */
+function autoWrapIfNoDefaultExport(code: string): string {
+  if (/\bexport\s+default\b/.test(removeComments(code))) {
+    return code;
+  }
+
+  const trimmed = code.trim();
+
+  if (trimmed.startsWith('<')) {
+    return `export default function __AutoComponent__() {\n  return (\n${code}\n  );\n}`;
+  }
+
+  const componentMatch = code.match(/(?:const|let|var|function)\s+([A-Z]\w*)\s*[=({]/);
+  if (componentMatch) {
+    return `${code}\nexport default ${componentMatch[1]};\n`;
+  }
+
+  return code;
 }
 
 /**
@@ -161,14 +180,16 @@ export function compileCode(
   code: string,
   lockedDependencies?: Record<string, string>,
 ): CompileResult {
-  const cacheKey = getCodeHash(code + JSON.stringify(lockedDependencies || {}));
+  const wrappedCode = autoWrapIfNoDefaultExport(code);
+
+  const cacheKey = getCodeHash(wrappedCode + JSON.stringify(lockedDependencies || {}));
   const cached = compileCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
   // 1. 使用 sucrase 编译：只转换 TypeScript 和 JSX，保留 ESM import/export
-  const result = transform(code, {
+  const result = transform(wrappedCode, {
     transforms: ['typescript', 'jsx'],
     jsxRuntime: 'automatic',
     production: true,

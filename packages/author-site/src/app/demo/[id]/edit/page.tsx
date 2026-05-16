@@ -257,10 +257,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         let loadedSchema = "";
 
         if (multi.demos && Object.keys(multi.demos).length > 0) {
+          const sortedPageIds = rawPages.map((p: { id: string }) => p.id);
           const demoIds = Object.keys(multi.demos);
-          const targetDemoId = demoIds.includes(demoId as string)
-            ? demoId as string
-            : demoIds[0];
+          const targetDemoId = sortedPageIds.length > 0
+            ? (sortedPageIds.includes(demoId as string)
+              ? demoId as string
+              : sortedPageIds[0])
+            : (demoIds.includes(demoId as string)
+              ? demoId as string
+              : demoIds[0]);
           const currentDemo = multi.demos[targetDemoId];
           loadedCode = currentDemo.code;
           loadedSchema = currentDemo.schema;
@@ -870,7 +875,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
                     setActiveDemoId(pageId);
-                    router.replace(`/demo/${pageId}/edit`);
                     if (sessionId) {
                       try {
                         const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
@@ -991,6 +995,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
                       const data = await res.json();
                       if (data.success) {
+                        setActiveDemoId(pageId);
+                        setCode(data.data.code);
+                        setSchema(data.data.schema);
+                        setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                        const defaults = getSafeMergedDefaults(data.data.schema);
+                        setConfigData(defaults);
+                        const result = validateAll(data.data.code, data.data.schema);
+                        setValidationResult(result);
+                        const size = getPreviewSize(data.data.schema);
+                        setPreviewSize(size);
                         setViewCodeData({
                           code: data.data.code,
                           schema: data.data.schema,
@@ -1032,7 +1046,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               {previewMode === 'single' && demoPages.length > 1 && (
                 <Select value={activeDemoId} onValueChange={async (pageId) => {
                   setActiveDemoId(pageId);
-                  router.replace(`/demo/${pageId}/edit`);
                   if (sessionId) {
                     try {
                       const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);

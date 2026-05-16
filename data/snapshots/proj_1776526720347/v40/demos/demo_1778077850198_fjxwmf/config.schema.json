@@ -2,8 +2,8 @@
   "type": "object",
   "$demo": {
     "previewSize": {
-      "width": "375px",
-      "height": "812px"
+      "width": "1024px",
+      "height": "768px"
     }
   },
   "properties": {
