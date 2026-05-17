@@ -450,14 +450,14 @@ export function PreviewGrid({
         }
       `}</style>
       <div
-        className="min-h-full px-4 pb-4 flex flex-col"
+        className="min-h-full px-4 pb-4 flex flex-col items-center"
         style={{
           justifyContent: alignmentMode === "center" ? "center" : "flex-start",
         }}
       >
         <div
           ref={gridMeasureRef}
-          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+          style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "flex-start" }}
         >
           {rows.map((row) => {
             const rowHeight = getRowHeight(row)
