@@ -110,6 +110,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // 预览模式状态
   const [previewMode, setPreviewMode] = useState<PreviewMode>('single');
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
+  const [gridScale, setGridScale] = useState(1.0);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -1154,6 +1155,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   demoPages={demoPages}
                   activePageId={activeDemoId}
                   gridColumns={gridColumns}
+                  gridScale={gridScale}
+                  onGridScaleChange={setGridScale}
                   onGridColumnsChange={setGridColumns}
                   onCardClick={(pageId) => {
                     if (pageId === activeDemoId) return;

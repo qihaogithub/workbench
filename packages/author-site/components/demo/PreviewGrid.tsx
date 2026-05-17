@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useCallback, type RefObject } from 
 import { cn } from "@/lib/utils"
 import { generateIframeHtml } from "@/lib/iframe-template"
 import { getCachedCompile, setCachedCompile, invalidateCompileCache } from "./compile-cache"
+import { ZoomIn, ZoomOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { PreviewSize, GridPageItem, GridIframeProps, PreviewGridProps } from "./types"
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
@@ -40,6 +42,11 @@ function getAspectRatioValue(size?: PreviewSize): number {
   const ratio = getPreviewAspectRatio(size)
   const [w, h] = ratio.split("/").map(Number)
   return w / h
+}
+
+function getBaseRowHeight(columns: number): number {
+  const map: Record<number, number> = { 2: 500, 3: 380, 4: 300 }
+  return map[columns] ?? 380
 }
 
 function useVisiblePages(
@@ -156,7 +163,7 @@ function disableIframeScrollbar(iframe: HTMLIFrameElement) {
   } catch {}
 }
 
-function GridIframe({ sessionId, page, visible, hasChanges, configData, previewSize }: GridIframeProps) {
+function GridIframe({ sessionId, page, visible, hasChanges, configData, previewSize, rowHeight }: GridIframeProps & { rowHeight?: number }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const blobUrlRef = useRef<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -335,7 +342,9 @@ function GridIframe({ sessionId, page, visible, hasChanges, configData, previewS
   const effective = getEffectivePreviewSize(previewSize)
   const iframeWidth = parseSizeValue(effective.width) ?? 375
   const iframeHeight = parseSizeValue(effective.height) ?? 812
-  const scale = cardWidth > 0 ? cardWidth / iframeWidth : 0.3
+  const scale = rowHeight != null && rowHeight > 0
+    ? rowHeight / iframeHeight
+    : (cardWidth > 0 ? cardWidth / iframeWidth : 0.3)
 
   return (
     <div ref={wrapperRef} className="relative w-full h-full overflow-hidden">
@@ -365,6 +374,8 @@ export function PreviewGrid({
   demoPages,
   activePageId,
   gridColumns,
+  gridScale = 1.0,
+  onGridScaleChange,
   onCardClick,
   changedPageIds,
   configDataMap,
@@ -380,6 +391,25 @@ export function PreviewGrid({
   for (let i = 0; i < demoPages.length; i += gridColumns) {
     rows.push(demoPages.slice(i, i + gridColumns))
   }
+
+  const actualRowHeight = getBaseRowHeight(gridColumns) * gridScale
+
+  const getRowHeight = useCallback((row: GridPageItem[]) => {
+    const gapTotal = (row.length - 1) * 16
+    const totalWidth = row.reduce(
+      (sum, p) => {
+        const size = p.id === activePageId ? previewSize : (p.previewSize ?? previewSize)
+        return sum + actualRowHeight * getAspectRatioValue(size)
+      },
+      0
+    )
+    const containerWidth = containerRef.current?.clientWidth ?? 0
+    const availableWidth = containerWidth - 32
+    if (totalWidth + gapTotal > availableWidth && availableWidth > 0) {
+      return actualRowHeight * ((availableWidth - gapTotal) / totalWidth)
+    }
+    return actualRowHeight
+  }, [actualRowHeight, activePageId, previewSize])
 
   const handleCardClick = useCallback(
     (pageId: string) => {
@@ -421,8 +451,30 @@ export function PreviewGrid({
           display: none;
         }
       `}</style>
+      <div className="flex items-center justify-end gap-2 px-4 py-2 shrink-0">
+        <span className="text-xs text-muted-foreground">缩放</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={() => onGridScaleChange?.(Math.max(0.5, gridScale - 0.1))}
+        >
+          <ZoomOut className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs w-10 text-center tabular-nums">
+          {Math.round(gridScale * 100)}%
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={() => onGridScaleChange?.(Math.min(2.0, gridScale + 0.1))}
+        >
+          <ZoomIn className="h-3.5 w-3.5" />
+        </Button>
+      </div>
       <div
-        className="min-h-full p-4 flex flex-col"
+        className="min-h-full px-4 pb-4 flex flex-col"
         style={{
           justifyContent: alignmentMode === "center" ? "center" : "flex-start",
         }}
@@ -432,25 +484,21 @@ export function PreviewGrid({
           style={{ display: "flex", flexDirection: "column", gap: "16px" }}
         >
           {rows.map((row) => {
-            const ratios = row.map((p) => {
-              const size = p.id === activePageId ? previewSize : (p.previewSize ?? previewSize)
-              return getAspectRatioValue(size)
-            })
-            const columnTemplate = ratios.map((r) => `${r}fr`).join(" ")
-
+            const rowHeight = getRowHeight(row)
             return (
               <div
                 key={row.map((p) => p.id).join("-")}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: columnTemplate,
+                  display: "flex",
                   gap: "16px",
-                  alignItems: "start",
+                  height: `${rowHeight}px`,
+                  justifyContent: "center",
                 }}
               >
                 {row.map((page) => {
                   const effectiveSize = page.id === activePageId ? previewSize : (page.previewSize ?? previewSize)
-                  const pageAspectRatio = getPreviewAspectRatio(effectiveSize)
+                  const aspectRatio = getAspectRatioValue(effectiveSize)
+                  const cardWidth = rowHeight * aspectRatio
                   return (
                     <div
                       key={page.id}
@@ -462,7 +510,11 @@ export function PreviewGrid({
                           ? "border-2 border-primary ring-2 ring-primary/20 scale-[1.02]"
                           : "border border-border hover:border-primary/50"
                       )}
-                      style={{ aspectRatio: pageAspectRatio }}
+                      style={{
+                        height: "100%",
+                        width: `${cardWidth}px`,
+                        flexShrink: 0,
+                      }}
                       onClick={() => handleCardClick(page.id)}
                       onWheel={handleCardWheel}
                     >
@@ -476,6 +528,7 @@ export function PreviewGrid({
                         hasChanges={changedPageIds?.has(page.id) ?? false}
                         configData={configDataMap?.[page.id] ?? {}}
                         previewSize={effectiveSize}
+                        rowHeight={rowHeight}
                       />
                     </div>
                   )

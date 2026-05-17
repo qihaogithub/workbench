@@ -73,6 +73,8 @@ export interface PreviewGridProps {
   demoPages: GridPageItem[]
   activePageId: string
   gridColumns: 2 | 3 | 4
+  gridScale?: number
+  onGridScaleChange?: (scale: number) => void
   onGridColumnsChange: (columns: 2 | 3 | 4) => void
   onCardClick: (pageId: string) => void
   changedPageIds?: Set<string>
