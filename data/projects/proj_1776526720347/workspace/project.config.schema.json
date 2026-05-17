@@ -1,23 +1,4 @@
 {
   "type": "object",
-  "properties": {
-    "brandName": {
-      "type": "string",
-      "title": "品牌名称",
-      "default": "OpenCode"
-    },
-    "primaryColor": {
-      "type": "string",
-      "title": "主题色",
-      "default": "#8b5cf6",
-      "$demo": {
-        "widget": "color"
-      }
-    },
-    "darkMode": {
-      "type": "boolean",
-      "title": "深色模式",
-      "default": true
-    }
-  }
+  "properties": {}
 }

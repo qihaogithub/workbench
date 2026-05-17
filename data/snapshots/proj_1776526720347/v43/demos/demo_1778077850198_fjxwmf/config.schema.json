@@ -28,21 +28,6 @@
       "type": "boolean",
       "title": "启用动画效果",
       "default": true
-    },
-    "brandName": {
-      "type": "string",
-      "title": "品牌名称",
-      "default": "OpenCode"
-    },
-    "primaryColor": {
-      "type": "string",
-      "title": "主题色",
-      "default": "#8b5cf6"
-    },
-    "darkMode": {
-      "type": "boolean",
-      "title": "深色模式",
-      "default": true
     }
   }
 }

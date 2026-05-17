@@ -27,7 +27,7 @@ workspace/
 ## 页面信息
 
 当前项目：「测试123」
-项目级共享配置：✅ 已设置（project.config.schema.json）
+项目级共享配置：未设置
 包含 3 个页面：
 
   📄 "手机" → demos/demo_1777965200000_x8k2p9/ (index.tsx + config.schema.json)

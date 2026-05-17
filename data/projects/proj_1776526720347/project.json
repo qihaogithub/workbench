@@ -338,27 +338,27 @@
       "sessionId": "session-1778976601403-0p16o42ae",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v42",
       "fileCount": 8
+    },
+    {
+      "versionId": "v43",
+      "savedAt": 1779028012456,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779027969051-e4jq7h7we",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v43",
+      "fileCount": 7
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1778981008918,
+  "updatedAt": 1779028012459,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [
-    {
-      "id": "demo_1777965200000_x8k2p9",
-      "name": "手机",
-      "order": 4,
-      "parentId": null,
-      "createdAt": 1777965200000,
-      "updatedAt": 1778981007629
-    },
     {
       "id": "demo_1778077850198_fjxwmf",
       "name": "横屏 iPad mini",
       "order": 5,
       "parentId": null,
       "createdAt": 1778077850205,
-      "updatedAt": 1778077867280
+      "updatedAt": 1779028011381
     },
     {
       "id": "demo_1778751411983_7h2rpo",
