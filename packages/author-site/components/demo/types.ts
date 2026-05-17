@@ -76,6 +76,6 @@ export interface PreviewGridProps {
   onGridColumnsChange: (columns: 2 | 3 | 4) => void
   onCardClick: (pageId: string) => void
   changedPageIds?: Set<string>
-  configData?: Record<string, unknown>
+  configDataMap?: Record<string, Record<string, unknown>>
   previewSize?: PreviewSize
 }

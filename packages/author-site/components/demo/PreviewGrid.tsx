@@ -367,7 +367,7 @@ export function PreviewGrid({
   gridColumns,
   onCardClick,
   changedPageIds,
-  configData,
+  configDataMap,
   previewSize,
 }: PreviewGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -474,7 +474,7 @@ export function PreviewGrid({
                         page={page}
                         visible={visiblePages.has(page.id)}
                         hasChanges={changedPageIds?.has(page.id) ?? false}
-                        configData={configData}
+                        configData={configDataMap?.[page.id] ?? {}}
                         previewSize={effectiveSize}
                       />
                     </div>

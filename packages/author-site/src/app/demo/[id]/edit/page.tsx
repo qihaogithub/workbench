@@ -76,7 +76,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [schema, setSchema] = useState("");
   const [editorContent, setEditorContent] = useState("");
 
-  const [configData, setConfigData] = useState<Record<string, unknown>>({});
+  const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -103,6 +103,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
+  const activeDemoIdRef = useRef(activeDemoId);
+  activeDemoIdRef.current = activeDemoId;
   const [projectConfigSchema, setProjectConfigSchema] = useState<string | undefined>(undefined);
 
   // 预览模式状态
@@ -133,6 +135,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const codeRef = useRef(code);
   codeRef.current = code;
+
+  const configData = configDataMap[activeDemoId] ?? {};
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -254,6 +258,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
         let loadedCode = "";
         let loadedSchema = "";
+        let initialDemoId = "";
 
         if (multi.demos && Object.keys(multi.demos).length > 0) {
           const sortedPageIds = rawPages.map((p: { id: string }) => p.id);
@@ -268,6 +273,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           const currentDemo = multi.demos[targetDemoId];
           loadedCode = currentDemo.code;
           loadedSchema = currentDemo.schema;
+          initialDemoId = targetDemoId;
           setActiveDemoId(targetDemoId);
         } else if (multi.code !== undefined && multi.schema !== undefined) {
           // 旧格式兼容
@@ -280,7 +286,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setEditorContent(buildFigmaText(loadedCode, loadedSchema));
 
         const defaults = getSafeMergedDefaults(loadedSchema);
-        setConfigData(defaults);
+        if (initialDemoId) {
+          setConfigDataMap({ [initialDemoId]: defaults });
+        }
 
         const result = validateAll(loadedCode, loadedSchema);
         setValidationResult(result);
@@ -341,14 +349,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setValidationResult(result);
 
     const defaults = getSafeMergedDefaults(parsed.schema);
-    setConfigData((prev) => ({ ...defaults, ...prev }));
+    setConfigDataMap((prev) => ({
+      ...prev,
+      [activeDemoIdRef.current]: { ...defaults, ...(prev[activeDemoIdRef.current] ?? {}) },
+    }));
 
     const size = getPreviewSize(parsed.schema);
     setPreviewSize(size);
   }, []);
 
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
-    setConfigData((prev) => ({ ...prev, ...data }));
+    setConfigDataMap((prev) => ({
+      ...prev,
+      [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...data },
+    }));
   }, []);
 
   const handleSchemaChange = useCallback((newSchema: string) => {
@@ -517,7 +531,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setValidationResult(result);
 
         // 代码变更时重置 configData 为空，让组件默认值生效
-        setConfigData({});
+        setConfigDataMap((prev) => ({
+          ...prev,
+          [activeDemoIdRef.current]: {},
+        }));
       }
 
       // 防抖触发 Schema 自动重新生成
@@ -572,7 +589,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             setPreviewSize(getPreviewSize(newSchemaStr));
 
             const newDefaults = getSafeMergedDefaults(data.data.schema);
-            setConfigData((prev) => ({ ...prev, ...newDefaults }));
+            setConfigDataMap((prev) => ({
+              ...prev,
+              [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...newDefaults },
+            }));
 
             const currentCode = codeRef.current;
             if (currentCode) {
@@ -620,17 +640,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     // 更新 configData 为新的默认值
     try {
       const newConfigData = getSafeMergedDefaults(newSchema);
-      console.log("[DemoEditPage] New default config data:", newConfigData);
-      setConfigData((prev) => {
-        const merged = {
-          ...prev,
-          ...newConfigData,
-        };
+      setConfigDataMap((prev) => {
+        const current = prev[activeDemoIdRef.current] ?? {};
+        const merged = { ...current, ...newConfigData };
         if (newConfigData.__order) {
           merged.__order = newConfigData.__order;
         }
-        console.log("[DemoEditPage] Merged config data:", merged);
-        return merged;
+        return { ...prev, [activeDemoIdRef.current]: merged };
       });
     } catch (e) {
       console.error(
@@ -790,7 +806,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         setSchema(data.data.schema || "");
                         setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
                         const defaults = getSafeMergedDefaults(data.data.schema || "");
-                        setConfigData(defaults);
+                        setConfigDataMap((prev) => ({
+                          ...prev,
+                          [activeDemoIdRef.current]: defaults,
+                        }));
                         const result = validateAll(data.data.code || "", data.data.schema || "");
                         setValidationResult(result);
                         const size = getPreviewSize(data.data.schema || "");
@@ -882,8 +901,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                           setCode(data.data.code);
                           setSchema(data.data.schema);
                           setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                          const defaults = getSafeMergedDefaults(data.data.schema);
-                          setConfigData(defaults);
+                          setConfigDataMap((prev) => {
+                            if (prev[pageId]) return prev;
+                            const defaults = getSafeMergedDefaults(data.data.schema);
+                            return { ...prev, [pageId]: defaults };
+                          });
                           const result = validateAll(data.data.code, data.data.schema);
                           setValidationResult(result);
                           const size = getPreviewSize(data.data.schema);
@@ -964,13 +986,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                           if (nextPage) {
                             setActiveDemoId(nextPage.id);
                             const fileRes = await fetch(`/api/sessions/${sessionId}/files/${nextPage.id}`);
-                            const fileData = await fileRes.json();
-                            if (fileData.success) {
-                              setCode(fileData.data.code);
-                              setSchema(fileData.data.schema);
-                              setEditorContent(buildFigmaText(fileData.data.code, fileData.data.schema));
-                              const defaults = getSafeMergedDefaults(fileData.data.schema);
-                              setConfigData(defaults);
+                              const fileData = await fileRes.json();
+                              if (fileData.success) {
+                                setCode(fileData.data.code);
+                                setSchema(fileData.data.schema);
+                                setEditorContent(buildFigmaText(fileData.data.code, fileData.data.schema));
+                                setConfigDataMap((prev) => {
+                                  const rest = { ...prev };
+                                  delete rest[pageId];
+                                  if (!rest[nextPage.id]) {
+                                    const defaults = getSafeMergedDefaults(fileData.data.schema);
+                                    rest[nextPage.id] = defaults;
+                                  }
+                                  return rest;
+                                });
                               const result = validateAll(fileData.data.code, fileData.data.schema);
                               setValidationResult(result);
                               const size = getPreviewSize(fileData.data.schema);
@@ -998,8 +1027,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         setCode(data.data.code);
                         setSchema(data.data.schema);
                         setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                        const defaults = getSafeMergedDefaults(data.data.schema);
-                        setConfigData(defaults);
+                        setConfigDataMap((prev) => {
+                          if (prev[pageId]) return prev;
+                          const defaults = getSafeMergedDefaults(data.data.schema);
+                          return { ...prev, [pageId]: defaults };
+                        });
                         const result = validateAll(data.data.code, data.data.schema);
                         setValidationResult(result);
                         const size = getPreviewSize(data.data.schema);
@@ -1053,8 +1085,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         setCode(data.data.code);
                         setSchema(data.data.schema);
                         setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                        const defaults = getSafeMergedDefaults(data.data.schema);
-                        setConfigData(defaults);
+                        setConfigDataMap((prev) => {
+                          if (prev[pageId]) return prev;
+                          const defaults = getSafeMergedDefaults(data.data.schema);
+                          return { ...prev, [pageId]: defaults };
+                        });
                         const result = validateAll(data.data.code, data.data.schema);
                         setValidationResult(result);
                         const size = getPreviewSize(data.data.schema);
@@ -1135,8 +1170,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                             setCode(data.data.code);
                             setSchema(data.data.schema);
                             setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                            const defaults = getSafeMergedDefaults(data.data.schema);
-                            setConfigData(defaults);
+                            setConfigDataMap((prev) => {
+                              if (prev[pageId]) return prev;
+                              const defaults = getSafeMergedDefaults(data.data.schema);
+                              return { ...prev, [pageId]: defaults };
+                            });
                             const result = validateAll(data.data.code, data.data.schema);
                             setValidationResult(result);
                             const size = getPreviewSize(data.data.schema);
@@ -1146,7 +1184,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                         .catch((err) => console.error("加载页面失败:", err));
                     }
                   }}
-                  configData={configData}
+                  configDataMap={configDataMap}
                   previewSize={previewSize}
                 />
               )}
@@ -1168,7 +1206,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       key={`project-${projectConfigSchema}`}
                       schema={projectConfigSchema}
                       onChange={(data) => {
-                        setConfigData((prev) => ({ ...prev, ...data }));
+                        setConfigDataMap((prev) => {
+                          const next = { ...prev };
+                          for (const pageId of Object.keys(next)) {
+                            next[pageId] = { ...next[pageId], ...data };
+                          }
+                          return next;
+                        });
                       }}
                       onSchemaChange={handleProjectSchemaChange}
                       initialData={configData}
@@ -1230,7 +1274,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             setSchema(content);
             setEditorContent(buildFigmaText(code, content));
             const defaults = getSafeMergedDefaults(content);
-            setConfigData(defaults);
+            setConfigDataMap((prev) => ({
+              ...prev,
+              [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...defaults },
+            }));
             const result = validateAll(code, content);
             setValidationResult(result);
             const size = getPreviewSize(content);

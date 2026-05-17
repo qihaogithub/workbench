@@ -274,6 +274,13 @@ export default function ViewerProjectPage() {
     code: p.code,
   }));
 
+  const configDataMap = data.demoPages.reduce<Record<string, Record<string, unknown>>>((acc, p) => {
+    if (p.schema) {
+      acc[p.id] = getSafeMergedDefaults(data.projectConfigSchema, p.schema);
+    }
+    return acc;
+  }, {});
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {showToolbar && (
@@ -390,7 +397,7 @@ export default function ViewerProjectPage() {
               gridColumns={gridColumns}
               onGridColumnsChange={setGridColumns}
               onCardClick={handleGridCardClick}
-              configData={configData}
+              configDataMap={configDataMap}
               previewSize={previewSize}
             />
           )}
