@@ -41,6 +41,8 @@ import {
   Copy,
   LayoutGrid,
   FileText,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1126,6 +1128,30 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       <SelectItem value="4">4</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+              {previewMode === 'grid' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">缩放</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setGridScale(s => Math.max(0.5, s - 0.1))}
+                  >
+                    <ZoomOut className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-xs w-10 text-center tabular-nums">
+                    {Math.round(gridScale * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setGridScale(s => Math.min(2.0, s + 0.1))}
+                  >
+                    <ZoomIn className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               )}
             </div>

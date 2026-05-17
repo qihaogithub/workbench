@@ -4,8 +4,6 @@ import React, { useState, useEffect, useRef, useCallback, type RefObject } from 
 import { cn } from "@/lib/utils"
 import { generateIframeHtml } from "@/lib/iframe-template"
 import { getCachedCompile, setCachedCompile, invalidateCompileCache } from "./compile-cache"
-import { ZoomIn, ZoomOut } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import type { PreviewSize, GridPageItem, GridIframeProps, PreviewGridProps } from "./types"
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
@@ -451,28 +449,6 @@ export function PreviewGrid({
           display: none;
         }
       `}</style>
-      <div className="flex items-center justify-end gap-2 px-4 py-2 shrink-0">
-        <span className="text-xs text-muted-foreground">缩放</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0"
-          onClick={() => onGridScaleChange?.(Math.max(0.5, gridScale - 0.1))}
-        >
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-        <span className="text-xs w-10 text-center tabular-nums">
-          {Math.round(gridScale * 100)}%
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0"
-          onClick={() => onGridScaleChange?.(Math.min(2.0, gridScale + 0.1))}
-        >
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-      </div>
       <div
         className="min-h-full px-4 pb-4 flex flex-col"
         style={{
@@ -492,7 +468,6 @@ export function PreviewGrid({
                   display: "flex",
                   gap: "16px",
                   height: `${rowHeight}px`,
-                  justifyContent: "center",
                 }}
               >
                 {row.map((page) => {
