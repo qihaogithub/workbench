@@ -346,10 +346,18 @@
       "sessionId": "session-1779027969051-e4jq7h7we",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v43",
       "fileCount": 7
+    },
+    {
+      "versionId": "v44",
+      "savedAt": 1779028806396,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779028789490-93w1ag106",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v44",
+      "fileCount": 7
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1779028012459,
+  "updatedAt": 1779028806398,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [
     {
@@ -366,7 +374,7 @@
       "order": 7,
       "parentId": null,
       "createdAt": 1778751411983,
-      "updatedAt": 1778929690245
+      "updatedAt": 1779028806254
     }
   ],
   "demoFolders": []
