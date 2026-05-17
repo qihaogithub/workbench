@@ -5,6 +5,9 @@ interface Props {
   subtitle?: string;
   cardCount?: number;
   enableAnimation?: boolean;
+  brandName?: string;
+  primaryColor?: string;
+  darkMode?: boolean;
 }
 
 const gradients = [
@@ -96,18 +99,24 @@ const GradientCardsPage: React.FC<Props> = ({
   subtitle = '探索色彩的无限可能',
   cardCount = 6,
   enableAnimation = true,
+  brandName = 'OpenCode',
+  primaryColor = '#8b5cf6',
+  darkMode = true,
 }) => {
   const displayCount = Math.min(Math.max(cardCount, 3), 12);
   
   return (
-    <div className="min-h-screen bg-gray-950 p-8">
+    <div className={`min-h-screen p-8 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
       {/* 页面标题区域 */}
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent mb-4">
+        <h1 className="text-5xl font-bold bg-clip-text text-transparent mb-4" style={{ backgroundImage: `linear-gradient(to right, ${primaryColor}, #ec4899, #f43f5e)` }}>
           {title}
         </h1>
-        <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+        <p className={`text-xl max-w-2xl mx-auto ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           {subtitle}
+        </p>
+        <p className={`text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+          Powered by {brandName}
         </p>
       </div>
       
@@ -136,7 +145,7 @@ const GradientCardsPage: React.FC<Props> = ({
             />
           ))}
         </div>
-        <p className="text-gray-600 text-sm mt-4">
+        <p className={`text-sm mt-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
           悬停卡片查看动画效果 ✨
         </p>
       </div>
