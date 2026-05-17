@@ -8,3 +8,4 @@ export { ImageListWidget, type ImageItem, type ImageListWidgetProps } from './Im
 export { NoteButton } from './NoteButton';
 export { NoteDialog } from './NoteDialog';
 export { NotePreview, stripHtml } from './NotePreview';
+export { ConfigScopeWrapper } from './ConfigScopeWrapper';
