@@ -26,12 +26,12 @@ workspace/
 
 ## 页面信息
 
-当前项目：「测试123」
+当前项目：「配置项示例」
 项目级共享配置：✅ 已设置（project.config.schema.json）
 包含 2 个页面：
 
-  📄 "横屏 iPad mini" → demos/demo_1778077850198_fjxwmf/ (index.tsx + config.schema.json)
-  📄 "从Figma导入的页面" → demos/demo_1778751411983_7h2rpo/ (index.tsx + config.schema.json)
+  📄 "配置展示 · 数据内容类" → demos/demo_1778077850198_fjxwmf/ (index.tsx + config.schema.json)
+  📄 "配置展示 · 样式布局类" → demos/demo_1778751411983_7h2rpo/ (index.tsx + config.schema.json)
 
 用户会通过自然语言告诉你操作哪个页面或项目配置。
 如果需要操作某个页面，请在 `demos/{id}/` 目录下编辑 `index.tsx` 或 `config.schema.json`。

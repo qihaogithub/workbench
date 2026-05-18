@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -559,8 +561,7 @@ export function PromptInputAddImage({
 
 interface PromptInputModelSelectProps {
   currentModelId: string
-  /** 模型列表;可选携带 supportsImages 用于上层逻辑,本组件 UI 不消费该字段 */
-  models: Array<{ id: string; label: string; supportsImages?: boolean }>
+  models: Array<{ id: string; label: string; supportsImages?: boolean; group?: string }>
   canSwitch: boolean
   onModelChange: (modelId: string) => void
   isLoading: boolean
@@ -602,6 +603,14 @@ export function PromptInputModelSelect({
     )
   }
 
+  const groups = new Map<string, typeof models>()
+  for (const model of models) {
+    const g = model.group || ''
+    if (!groups.has(g)) groups.set(g, [])
+    groups.get(g)!.push(model)
+  }
+  const groupEntries = Array.from(groups.entries())
+
   return (
     <PromptInputSelect
       value={currentModelId}
@@ -612,9 +621,61 @@ export function PromptInputModelSelect({
         <span className="truncate max-w-[120px]">{displayLabel}</span>
       </PromptInputSelectTrigger>
       <PromptInputSelectContent>
-        {models.map((model) => (
-          <PromptInputSelectItem key={model.id} value={model.id}>
-            {model.label}
+        {groupEntries.map(([group, groupModels]) => (
+          <SelectGroup key={group || '_default'}>
+            {group && (
+              <SelectLabel className="text-[11px] font-normal text-muted-foreground px-2">
+                {group}
+              </SelectLabel>
+            )}
+            {groupModels.map((model) => (
+              <PromptInputSelectItem key={model.id} value={model.id}>
+                {model.label}
+              </PromptInputSelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+      </PromptInputSelectContent>
+    </PromptInputSelect>
+  )
+}
+
+export type ThinkingDepth = 'low' | 'medium' | 'high'
+
+const DEPTH_LABELS: Record<ThinkingDepth, string> = {
+  low: '低',
+  medium: '中',
+  high: '高',
+}
+
+interface PromptInputThinkingDepthSelectProps {
+  currentDepth: ThinkingDepth | null
+  availableDepths: ThinkingDepth[]
+  onDepthChange: (depth: ThinkingDepth) => void
+  disabled?: boolean
+}
+
+export function PromptInputThinkingDepthSelect({
+  currentDepth,
+  availableDepths,
+  onDepthChange,
+  disabled = false,
+}: PromptInputThinkingDepthSelectProps) {
+  if (availableDepths.length < 2 || !currentDepth) return null
+
+  return (
+    <PromptInputSelect
+      value={currentDepth}
+      onValueChange={(v) => onDepthChange(v as ThinkingDepth)}
+      disabled={disabled}
+    >
+      <PromptInputSelectTrigger className="text-xs w-auto min-w-[40px]">
+        <span>{DEPTH_LABELS[currentDepth]}</span>
+      </PromptInputSelectTrigger>
+      <PromptInputSelectContent>
+        {availableDepths.map((depth) => (
+          <PromptInputSelectItem key={depth} value={depth}>
+            {DEPTH_LABELS[depth]}
           </PromptInputSelectItem>
         ))}
       </PromptInputSelectContent>

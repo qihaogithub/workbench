@@ -23,7 +23,7 @@ import {
 import { ModelSelectWithGuard } from "./model-select-with-guard";
 import { History } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ResolvedModel } from "@/lib/ai-models";
+import type { ResolvedModel, ThinkingDepth } from "@/lib/ai-models";
 
 const PromptInputAttachmentsDisplay = () => {
   const attachments = usePromptInputAttachments();
@@ -55,7 +55,10 @@ interface ChatInputProps {
   currentSupportsImages: boolean;
   onHistoryClick: () => void;
   onModelChange: (modelId: string) => void;
+  onDepthChange: (depth: ThinkingDepth) => void;
   currentModelId: string;
+  currentDepth: ThinkingDepth | null;
+  availableDepths: ThinkingDepth[];
   models: ResolvedModel[];
   canSwitch: boolean;
   isModelLoading: boolean;
@@ -68,7 +71,10 @@ export function ChatInput({
   currentSupportsImages,
   onHistoryClick,
   onModelChange,
+  onDepthChange,
   currentModelId,
+  currentDepth,
+  availableDepths,
   models,
   canSwitch,
   isModelLoading,
@@ -119,9 +125,12 @@ export function ChatInput({
           </Button>
           <ModelSelectWithGuard
             currentModelId={currentModelId}
+            currentDepth={currentDepth}
+            availableDepths={availableDepths}
             models={models}
             canSwitch={canSwitch}
             onModelChange={onModelChange}
+            onDepthChange={onDepthChange}
             isLoading={isModelLoading}
           />
         </PromptInputTools>

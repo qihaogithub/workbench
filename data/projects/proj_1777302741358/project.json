@@ -98,11 +98,44 @@
       "sessionId": "session-1778374923861-mxjvj6fxd",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\data\\snapshots\\proj_1777302741358\\v12",
       "fileCount": 9
+    },
+    {
+      "versionId": "v13",
+      "savedAt": 1779076904390,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779076870358-y6o4fmu3o",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1777302741358/v13",
+      "fileCount": 11
     }
   ],
   "createdAt": 1777302741361,
-  "updatedAt": 1778375164419,
+  "updatedAt": 1779076904391,
   "thumbnail": "/thumbnails/proj_1777302741358_cover.png",
-  "demoPages": [],
+  "demoPages": [
+    {
+      "id": "demo_1777866983934_oq2mbx",
+      "name": "默认页面",
+      "order": 0,
+      "parentId": null,
+      "createdAt": 1777866983936,
+      "updatedAt": 1778375163142
+    },
+    {
+      "id": "demo_1777962172995_jjhtgw",
+      "name": "新建页面",
+      "order": 1,
+      "createdAt": 1777962172995,
+      "updatedAt": 1777962172995,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779076889341_chb6wj",
+      "name": "从Figma导入的页面",
+      "order": 2,
+      "parentId": null,
+      "createdAt": 1779076889342,
+      "updatedAt": 1779076903251
+    }
+  ],
   "demoFolders": []
 }

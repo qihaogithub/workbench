@@ -25,11 +25,13 @@ export {
   PromptInputSelectValue,
   PromptInputAddImage,
   PromptInputModelSelect,
+  PromptInputThinkingDepthSelect,
   usePromptInputAttachments,
   usePromptInput,
   PromptInputContext,
   type PromptInputFile,
   type PromptInputMessage,
+  type ThinkingDepth,
 } from "./prompt-input";
 
 export {

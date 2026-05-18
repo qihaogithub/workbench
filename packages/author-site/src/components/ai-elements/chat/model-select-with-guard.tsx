@@ -3,17 +3,21 @@
 import { useCallback } from "react";
 import {
   PromptInputModelSelect,
+  PromptInputThinkingDepthSelect,
   usePromptInputAttachments,
 } from "@/components/ai-elements";
 import { useToast } from "@/components/ui/toast-provider";
-import type { ResolvedModel } from "@/lib/ai-models";
+import type { ResolvedModel, ThinkingDepth } from "@/lib/ai-models";
 
 interface ModelSelectWithGuardProps {
   currentModelId: string;
+  currentDepth: ThinkingDepth | null;
+  availableDepths: ThinkingDepth[];
   models: ResolvedModel[];
   canSwitch: boolean;
   isLoading: boolean;
   onModelChange: (modelId: string) => void;
+  onDepthChange: (depth: ThinkingDepth) => void;
 }
 
 export function ModelSelectWithGuard(props: ModelSelectWithGuardProps) {
@@ -37,12 +41,20 @@ export function ModelSelectWithGuard(props: ModelSelectWithGuardProps) {
   );
 
   return (
-    <PromptInputModelSelect
-      currentModelId={props.currentModelId}
-      models={props.models}
-      canSwitch={props.canSwitch}
-      onModelChange={handleGuardedChange}
-      isLoading={props.isLoading}
-    />
+    <>
+      <PromptInputModelSelect
+        currentModelId={props.currentModelId}
+        models={props.models}
+        canSwitch={props.canSwitch}
+        onModelChange={handleGuardedChange}
+        isLoading={props.isLoading}
+      />
+      <PromptInputThinkingDepthSelect
+        currentDepth={props.currentDepth}
+        availableDepths={props.availableDepths}
+        onDepthChange={props.onDepthChange}
+        disabled={!props.canSwitch || props.isLoading}
+      />
+    </>
   );
 }

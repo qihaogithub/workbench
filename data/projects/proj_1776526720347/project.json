@@ -1,6 +1,6 @@
 {
   "id": "proj_1776526720347",
-  "name": "测试123",
+  "name": "配置项示例",
   "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\projects\\proj_1776526720347\\workspace",
   "versions": [
     {
@@ -354,27 +354,51 @@
       "sessionId": "session-1779028789490-93w1ag106",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1776526720347\\v44",
       "fileCount": 7
+    },
+    {
+      "versionId": "v45",
+      "savedAt": 1779076537523,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779075953790-8g6n4bhtn",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1776526720347/v45",
+      "fileCount": 7
+    },
+    {
+      "versionId": "v46",
+      "savedAt": 1779076596377,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779076542543-hawcblf8k",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1776526720347/v46",
+      "fileCount": 7
+    },
+    {
+      "versionId": "v47",
+      "savedAt": 1779076644548,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779076599368-hdb6rp95k",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1776526720347/v47",
+      "fileCount": 7
     }
   ],
   "createdAt": 1776526720349,
-  "updatedAt": 1779028806398,
+  "updatedAt": 1779076644550,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [
     {
       "id": "demo_1778077850198_fjxwmf",
-      "name": "横屏 iPad mini",
+      "name": "配置展示 · 数据内容类",
       "order": 5,
       "parentId": null,
       "createdAt": 1778077850205,
-      "updatedAt": 1779028011381
+      "updatedAt": 1779076644486
     },
     {
       "id": "demo_1778751411983_7h2rpo",
-      "name": "从Figma导入的页面",
+      "name": "配置展示 · 样式布局类",
       "order": 7,
       "parentId": null,
       "createdAt": 1778751411983,
-      "updatedAt": 1779028806254
+      "updatedAt": 1779076535713
     }
   ],
   "demoFolders": []
