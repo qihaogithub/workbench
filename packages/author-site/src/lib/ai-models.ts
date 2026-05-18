@@ -58,26 +58,19 @@ export type ResolvedModel = {
 };
 
 /**
- * 模型配置表 — 仅放行白名单内的模型
+ * 模型配置表 — 按分组放行
  *
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
+ * 分组即模型 id 中 `/` 前的前缀,如 `opencode/nemotron-3-super` 的分组为 `opencode`。
  */
 export const MODEL_CONFIGS: ModelConfig[] = [
-  // === 默认模型 ===
-  // DeepSeek V4 Flash
-  { matcher: /deepseek-v4-flash/i, alias: "DeepSeek V4 Flash" },
+  // === opencode 分组:全部放行 ===
+  { matcher: "opencode/" },
 
-  // === OpenCode Zen 白名单 ===
-  // Nemotron 3 Super(含 low/medium/high 推理变体)
-  { matcher: /nemotron/i, alias: "Nemotron 3 Super", supportsThinkingDepth: true },
-  // MiniMax M2.5
-  { matcher: /minimax/i, alias: "MiniMax M2.5" },
-  // Hy3 preview(含 low/medium/high 推理变体)
-  { matcher: /hy3/i, alias: "Hy3 preview", supportsThinkingDepth: true },
-  // SenseNova 6.7 Flash Lite
-  { matcher: /sensenova-6.7-flash-lite/i, alias: "SenseNova 6.7 Flash Lite" },
+  // === jojo 分组:全部放行 ===
+  { matcher: "jojo/" },
 
-  // === 其他全部禁用 ===
+  // === 其他分组全部禁用 ===
   { matcher: /.*/, enabled: false },
 ];
 
