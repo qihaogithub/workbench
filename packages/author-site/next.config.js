@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   transpilePackages: ["@opencode-workbench/shared", "@opencode-workbench/agent-client", "shiki"],
   experimental: {
     serverActions: {
@@ -7,7 +8,7 @@ const nextConfig = {
     },
     instrumentationHook: true,
   },
-  serverExternalPackages: ['langium', '@mermaid-js/parser'],
+  serverExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'bcrypt'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.alias = {

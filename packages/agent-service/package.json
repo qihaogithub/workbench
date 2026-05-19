@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/rate-limit --external:@fastify/websocket --external:pino --external:pino-pretty --external:undici --external:ws --external:eventsource",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -33,6 +34,7 @@
     "@typescript-eslint/parser": "^6.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "cross-env": "^7.0.3",
+    "esbuild": "^0.20.0",
     "eslint": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",

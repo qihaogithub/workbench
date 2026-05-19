@@ -1,7 +1,39 @@
-# Docker 部署方案
+# Docker 部署方案（局域网内部工具）
 
 > 分析日期：2026-05-19
-> 状态：进行中
+> 状态：已实施
+> 场景：局域网内公司内部工具部署，避免过度工程化
+
+---
+
+## 〇、方案审查与修正记录
+
+> 实施前对方案进行了代码级验证，发现以下问题并已修正：
+
+| # | 问题 | 严重程度 | 修正措施 |
+|---|------|---------|---------|
+| 1 | agent-service Dockerfile 中直接复制 pnpm node_modules 不可行（符号链接丢失 + shared 包 main 指向 .ts 源码） | 🔴 致命 | 改用 esbuild 打包为单文件，运行时镜像中 `npm install` 生产依赖 |
+| 2 | author-site 的 `serverExternalPackages` 缺少 `better-sqlite3` 和 `bcrypt` | 🔴 致命 | 已添加到 serverExternalPackages，standalone 输出才能正确处理原生模块 |
+| 3 | docker-compose.yml 中 author-site 缺少 `AGENT_SERVICE_URL`（服务端环境变量） | 🔴 致命 | 已添加，Docker 内部用 `http://agent-service:3201` |
+| 4 | healthcheck 使用 curl 但 `node:20-bookworm-slim` 无 curl | 🟡 中等 | 改用 Node.js 原生 fetch 做健康检查 |
+| 5 | `init-db.js` 的 `DB_PATH` 硬编码，未读取 `DATA_DIR` 环境变量 | 🔴 致命 | 已修正为读取 `DATA_DIR`，从"建议修改"升级为"必须修改" |
+| 6 | author-site Dockerfile 运行阶段安装 python3/make/g++ 不必要 | 🟡 中等 | standalone + serverExternalPackages 正确配置后，运行阶段无需编译工具 |
+| 7 | `docker-compose.yml` 中 `version: "3.8"` 已弃用 | 🟢 轻微 | 已移除 |
+| 8 | viewer-site 无 `public` 目录 | 🟢 轻微 | Dockerfile 中不复制 public |
+
+---
+
+## 〇、方案适用性评估
+
+**本方案针对局域网内部工具场景设计**，遵循 AGENTS.md 中"避免过度工程化设计"原则，做出以下简化决策：
+
+| 决策 | 理由 |
+|------|------|
+| 不使用 Nginx 反向代理 | 局域网内直接通过 IP:端口 访问，无需域名和 SSL |
+| 不使用 Docker Secrets | 局域网内 .env 文件管理即可，无需外部密钥管理服务 |
+| 不部署 Prometheus/ELK 等监控 | 内部工具用 docker compose 自带 healthcheck 足够 |
+| 不限制容器资源 | 单机局域网部署，无多租户竞争 |
+| viewer-site 按需部署 | 如果不需要演示预览功能，可以不启动此容器 |
 
 ---
 
@@ -36,11 +68,9 @@
 | 无 Dockerfile | 高 | 需要从零创建 |
 | 原生模块编译 | 高 | `better-sqlite3` 和 `bcrypt` 需要 C++ 编译工具链 |
 | 数据持久化 | 高 | SQLite 数据库 + 文件存储需要 Volume 挂载 |
-| CORS 配置 | 中 | 默认只允许 localhost，生产环境需更新 |
-| JWT_SECRET 硬编码 | 中 | 默认值不安全，生产环境必须更换 |
-| 无 .env 文件管理 | 中 | agent-service 没有独立的 .env 文件 |
-| 无 Nginx/反向代理 | 低 | 生产环境建议加 Nginx |
-| 无健康检查脚本 | 低 | 各服务有 /health 端点但未编排 |
+| CORS 配置 | 中 | 默认只允许 localhost，局域网需添加服务器 IP |
+| JWT_SECRET 默认值 | 中 | 默认值不安全，需更换 |
+| 局域网 IP 配置 | 中 | `NEXT_PUBLIC_*` 环境变量需要使用服务器局域网 IP |
 
 ---
 
@@ -50,12 +80,13 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Docker Compose                           │
+│                     Docker Compose（局域网服务器）               │
 │                                                                 │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐       │
 │  │ author-site  │   │ viewer-site  │   │agent-service │       │
 │  │   :3200      │   │   :3300      │   │   :3201      │       │
 │  │ Next.js SSR  │   │ Next.js SSR  │   │ Fastify      │       │
+│  │ (必需)       │   │ (可选)       │   │ (必需)       │       │
 │  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘       │
 │         │                  │                   │               │
 │         │  AGENT_SERVICE_URL                   │               │
@@ -67,17 +98,15 @@
 │                  │opencode-serve│                               │
 │                  │   :4096      │                               │
 │                  │ opencode CLI │                               │
+│                  │ (必需)       │                               │
 │                  └──────────────┘                               │
 │                                                                 │
-│  ┌──────────────┐                                               │
-│  │   Nginx      │  可选：反向代理 + SSL                         │
-│  │   :80/:443   │                                               │
-│  └──────────────┘                                               │
+│  局域网用户直接通过 http://<服务器IP>:<端口> 访问               │
 └─────────────────────────────────────────────────────────────────┘
          │
          ▼
    ┌──────────────┐
-   │  LLM API     │  外部大模型服务（Anthropic/OpenAI/等）
+   │  LLM API     │  外部大模型服务（需要服务器能访问互联网）
    └──────────────┘
 ```
 
@@ -109,15 +138,14 @@ agent-service → opencode-serve (运行时 HTTP/SSE 调用)
 
 ### 3.1 容器拆分策略
 
-采用 **4 容器 + 1 可选容器** 方案：
+采用 **3 容器（核心）+ 1 可选容器** 方案：
 
-| 容器 | 基础镜像 | 端口 | 职责 |
-|------|---------|------|------|
-| `opencode-serve` | node:20-bookworm-slim | 4096 | OpenCode HTTP Server |
-| `agent-service` | node:20-bookworm-slim | 3201 | Agent 管理服务 |
-| `author-site` | node:20-bookworm-slim | 3200 | 创作端前端 + API |
-| `viewer-site` | node:20-bookworm-slim | 3300 | 预览端前端 |
-| `nginx` (可选) | nginx:alpine | 80/443 | 反向代理 + SSL |
+| 容器 | 基础镜像 | 端口 | 必要性 | 职责 |
+|------|---------|------|--------|------|
+| `opencode-serve` | node:20-bookworm-slim | 4096 | 必需 | OpenCode HTTP Server |
+| `agent-service` | node:20-bookworm-slim | 3201 | 必需 | Agent 管理服务 |
+| `author-site` | node:20-bookworm-slim | 3200 | 必需 | 创作端前端 + API |
+| `viewer-site` | node:20-bookworm-slim | 3300 | 可选 | 预览端前端（如不需要演示预览可不部署） |
 
 ### 3.2 opencode-serve 容器化方案
 
@@ -246,7 +274,7 @@ services:
       - PORT=3201
       - HOST=0.0.0.0
       - OPENCODE_SERVER_URL=http://opencode-serve:4096
-      - CORS_ORIGINS=http://localhost:3200,http://localhost:3300
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data
     volumes:
       - app-data:/app/data
@@ -263,8 +291,8 @@ services:
       - "3200:3200"
     environment:
       - AGENT_SERVICE_URL=http://agent-service:3201
-      - NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201
-      - JWT_SECRET=${JWT_SECRET}
+      - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - DATA_DIR=/app/data
     volumes:
       - app-data:/app/data
@@ -279,15 +307,23 @@ services:
     ports:
       - "3300:3300"
     environment:
-      - NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201
-      - NEXT_PUBLIC_WEB_URL=http://localhost:3200
+      - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
+      - NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}
     depends_on:
       - agent-service
+    profiles:
+      - viewer
     restart: unless-stopped
 
 volumes:
   app-data:
 ```
+
+> **局域网访问说明**：
+> - `NEXT_PUBLIC_AGENT_SERVICE_URL` 需要改为 `http://<服务器局域网IP>:3201`，因为这是浏览器端使用的地址
+> - `NEXT_PUBLIC_WEB_URL` 需要改为 `http://<服务器局域网IP>:3200`
+> - `CORS_ORIGINS` 需要包含 `http://<服务器局域网IP>:3200` 和 `http://<服务器局域网IP>:3300`
+> - viewer-site 使用 `profiles: [viewer]`，默认不启动，需要时用 `docker compose --profile viewer up -d` 启动
 
 ### 4.3 各服务 Dockerfile 设计
 
@@ -424,46 +460,47 @@ OPENCODE_API_KEY=sk-your-api-key-here
 OPENCODE_API_BASE=https://api.anthropic.com
 OPENCODE_MODELS=claude-3-5-sonnet-20240620,claude-opus-4-5
 
-# === 安全配置（必填）===
-JWT_SECRET=change-this-to-a-strong-random-string
+# === 局域网访问地址（必填，替换为服务器实际 IP）===
+# 这些地址是浏览器端使用的，必须是局域网用户能访问到的地址
+NEXT_PUBLIC_AGENT_SERVICE_URL=http://192.168.x.x:3201
+NEXT_PUBLIC_WEB_URL=http://192.168.x.x:3200
 
-# === 服务端口（可选，默认值如下）===
-# AUTHOR_SITE_PORT=3200
-# AGENT_SERVICE_PORT=3201
-# VIEWER_SITE_PORT=3300
-# OPENCODE_SERVE_PORT=4096
+# === CORS（必填，包含局域网访问地址）===
+CORS_ORIGINS=http://192.168.x.x:3200,http://192.168.x.x:3300,http://localhost:3200,http://localhost:3300
+
+# === 安全配置 ===
+# JWT_SECRET 用于用户认证，局域网内可简单设置但不要留空
+JWT_SECRET=change-this-to-a-random-string
 
 # === 日志级别（可选）===
 # LOG_LEVEL=info
-
-# === CORS（可选，Docker 内部已配置，仅当使用自定义域名时需要修改）===
-# CORS_ORIGINS=http://your-domain.com
-
-# === 数据目录（可选，默认使用 Docker Volume）===
-# DATA_DIR=/app/data
 ```
 
 ---
 
-## 五、需要修改的代码项
+## 五、已完成的代码修改
 
-以下列出部署前必须或建议修改的代码配置，**不涉及业务逻辑修改**，仅是配置层面的调整：
+> 以下修改已在实施过程中完成：
 
-### 5.1 必须修改
+### 5.1 已完成的必须修改
 
-| 序号 | 修改项 | 文件 | 说明 |
+| 序号 | 修改项 | 文件 | 状态 |
 |------|--------|------|------|
-| 1 | 添加 `output: 'standalone'` | `packages/author-site/next.config.js` | Next.js standalone 输出模式，Docker 部署必需，否则镜像体积过大 |
-| 2 | 添加 `output: 'standalone'` | `packages/viewer-site/next.config.js` | 同上 |
-| 3 | `OPENCODE_SERVER_URL` 默认值 | `packages/agent-service/src/backends/opencode-http.ts:6` | 当前硬编码为 `http://localhost:4096`，Docker 环境中应为 `http://opencode-serve:4096`，需通过环境变量覆盖（已支持，但默认值不适用于 Docker） |
+| 1 | 添加 `output: 'standalone'` | `packages/author-site/next.config.js` | ✅ 已完成 |
+| 2 | 添加 `output: 'standalone'` | `packages/viewer-site/next.config.js` | ✅ 已完成 |
+| 3 | 添加 `better-sqlite3`、`bcrypt` 到 `serverExternalPackages` | `packages/author-site/next.config.js` | ✅ 已完成 |
+| 4 | `init-db.js` 读取 `DATA_DIR` 环境变量 | `packages/author-site/scripts/init-db.js` | ✅ 已完成 |
+| 5 | 添加 esbuild 打包脚本 `build:docker` | `packages/agent-service/package.json` | ✅ 已完成 |
+| 6 | 添加 esbuild 开发依赖 | `packages/agent-service/package.json` | ✅ 已完成 |
 
-### 5.2 建议修改
+### 5.2 审查中发现的额外问题（已修正）
 
-| 序号 | 修改项 | 文件 | 说明 |
-|------|--------|------|------|
-| 4 | agent-service 添加 .env 支持 | `packages/agent-service/src/utils/config.ts` | 当前只读 `process.env`，建议添加 dotenv 加载，方便 Docker 环境变量管理 |
-| 5 | 数据库初始化自动化 | `packages/author-site/scripts/init-db.js` | 当前 `DB_PATH` 硬编码为相对路径，需适配 Docker Volume 路径 |
-| 6 | 健康检查端点统一 | 各服务 | agent-service 已有 `/health`，author-site 和 viewer-site 依赖 Next.js 默认行为，建议添加显式健康检查 |
+| 序号 | 修改项 | 说明 |
+|------|--------|------|
+| 7 | docker-compose.yml 添加 `AGENT_SERVICE_URL` | author-site 服务端也需要连接 agent-service |
+| 8 | healthcheck 改用 Node.js 原生 fetch | slim 镜像无 curl |
+| 9 | agent-service Dockerfile 改用 esbuild 打包 | 原方案复制 pnpm node_modules 不可行 |
+| 10 | author-site Dockerfile 运行阶段移除编译工具 | standalone + serverExternalPackages 正确配置后无需编译工具 |
 
 ---
 
@@ -562,53 +599,58 @@ docker rm -f opencode-test
 
 ---
 
-## 八、生产环境增强建议
+## 八、局域网部署注意事项
 
-### 8.1 Nginx 反向代理（推荐）
+### 8.1 网络访问
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+| 场景 | 访问方式 |
+|------|---------|
+| 创作端 | `http://<服务器IP>:3200` |
+| 预览端（如需） | `http://<服务器IP>:3300` |
+| Agent 服务（内部） | `http://<服务器IP>:3201`（一般不需要直接访问） |
 
-    location / {
-        proxy_pass http://author-site:3200;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+### 8.2 LLM API 网络要求
 
-    location /api/agent/ {
-        proxy_pass http://agent-service:3201/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+opencode-serve 需要访问外部 LLM API（如 Anthropic、OpenAI），有两种网络场景：
 
-    location /viewer/ {
-        proxy_pass http://viewer-site:3300/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+| 场景 | 解决方案 |
+|------|---------|
+| 服务器可直连互联网 | 直接配置 `OPENCODE_API_BASE`，无需额外处理 |
+| 服务器无法直连互联网 | 需要配置 HTTP 代理，或在局域网内部署 LLM API 代理/中转服务 |
 
-### 8.2 安全加固
+### 8.3 数据安全
+
+局域网内部工具的安全要求较低，但建议：
 
 | 措施 | 说明 |
 |------|------|
-| 不暴露内部端口 | 只暴露 Nginx 的 80/443，其他服务端口仅 Docker 内部可达 |
-| JWT_SECRET 强随机 | 使用 `openssl rand -hex 32` 生成 |
-| API Key 加密存储 | 使用 Docker Secrets 或外部密钥管理 |
-| 限制资源 | 为每个容器设置 `mem_limit` 和 `cpus` |
-| 日志集中管理 | 配置 Docker 日志驱动，统一收集 |
+| JWT_SECRET 不要留空 | 即使局域网内也需要基本的用户认证 |
+| LLM API Key 妥善保管 | 写在 .env 文件中，不要提交到代码仓库 |
+| 定期备份数据 | 参考第六节备份方案 |
 
-### 8.3 监控与告警
+### 8.4 日常运维
 
-| 监控项 | 方式 |
-|--------|------|
-| 服务存活 | Docker healthcheck + 外部探针 |
-| 资源使用 | cAdvisor / Prometheus |
-| 应用日志 | ELK / Loki |
-| 业务指标 | agent-service `/health` 端点中的 `agents` 和 `uptime` |
+```bash
+# 查看所有服务状态
+docker compose ps
+
+# 查看某个服务日志
+docker compose logs -f author-site
+docker compose logs -f agent-service
+docker compose logs -f opencode-serve
+
+# 重启某个服务
+docker compose restart agent-service
+
+# 更新代码后重新部署
+git pull && docker compose up -d --build
+
+# 停止所有服务
+docker compose down
+
+# 停止并删除数据（谨慎！）
+docker compose down -v
+```
 
 ---
 
@@ -625,20 +667,57 @@ server {
 
 | 任务 | 复杂度 | 说明 |
 |------|--------|------|
-| 创建 Dockerfile（4个） | 中 | 多阶段构建，需处理原生模块 |
+| 创建 Dockerfile（3~4个） | 中 | 多阶段构建，需处理原生模块 |
 | 创建 docker-compose.yml | 低 | 标准编排 |
 | opencode-serve 容器化 | 中 | 需验证第三方工具的容器兼容性 |
 | 数据持久化配置 | 低 | 单 Volume 挂载 |
-| 环境变量管理 | 低 | 创建 .env 模板 |
+| 环境变量配置 | 低 | 创建 .env 模板，填写局域网 IP |
 | Next.js standalone 配置 | 低 | 添加一行配置 |
-| Nginx 反向代理 | 低 | 可选，标准配置 |
 | 验证与测试 | 中 | 端到端功能验证 |
 
 ### 9.3 推荐实施顺序
 
-1. 验证 `opencode serve` 容器化可行性（最高优先级，决定方案可行性）
+1. **验证 `opencode serve` 容器化可行性**（最高优先级，决定方案可行性）
 2. 添加 Next.js `output: 'standalone'` 配置
 3. 创建各服务 Dockerfile
 4. 创建 docker-compose.yml + .env 模板
 5. 端到端测试
-6. （可选）添加 Nginx 反向代理
+
+### 9.4 局域网场景下的替代方案
+
+如果 Docker 对运维来说过于复杂，还有一个更简单的方案：**直接在服务器上安装运行**。
+
+```bash
+# 1. 安装 Node.js 20+
+# 2. 安装 pnpm
+npm install -g pnpm@8.15.0
+# 3. 安装 opencode
+npm install -g opencode
+# 4. 克隆代码
+git clone <repo-url> && cd opencode-workbench
+pnpm install
+# 5. 启动 opencode serve（后台运行）
+OPENCODE_API_KEY=xxx OPENCODE_API_BASE=xxx OPENCODE_MODELS=xxx \
+  nohup opencode serve --port 4096 --hostname 0.0.0.0 &
+# 6. 构建并启动各服务
+pnpm build
+# 7. 使用 pm2 管理进程
+npm install -g pm2
+pm2 start "pnpm --filter @opencode-workbench/agent-service start" --name agent-service
+pm2 start "pnpm --filter @opencode-workbench/author-site start" --name author-site
+pm2 start "pnpm --filter @opencode-workbench/viewer-site start" --name viewer-site
+pm2 save && pm2 startup
+```
+
+**Docker vs 直装对比**：
+
+| 维度 | Docker | 直装（pm2） |
+|------|--------|-------------|
+| 环境隔离 | 强（容器隔离） | 弱（共享系统环境） |
+| 部署复杂度 | 中（需写 Dockerfile） | 低（直接安装运行） |
+| opencode 管理 | 容器内安装，干净 | 全局安装，可能版本冲突 |
+| 运维门槛 | 需要 Docker 知识 | 只需基本 Linux 知识 |
+| 可复现性 | 强（镜像一致） | 弱（依赖系统环境） |
+| 适合场景 | 多环境部署、团队协作 | 单机快速部署 |
+
+> **建议**：如果服务器只有一台且团队小，直装 + pm2 更简单；如果希望环境可复现或未来可能迁移，选 Docker。

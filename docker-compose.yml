@@ -1,0 +1,66 @@
+services:
+  opencode-serve:
+    build:
+      context: .
+      dockerfile: docker/opencode-serve/Dockerfile
+    ports:
+      - "4096:4096"
+    environment:
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
+      - OPENCODE_API_BASE=${OPENCODE_API_BASE}
+      - OPENCODE_MODELS=${OPENCODE_MODELS}
+    restart: unless-stopped
+
+  agent-service:
+    build:
+      context: .
+      dockerfile: docker/agent-service/Dockerfile
+    ports:
+      - "3201:3201"
+    environment:
+      - PORT=3201
+      - HOST=0.0.0.0
+      - OPENCODE_SERVER_URL=http://opencode-serve:4096
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+      - DATA_DIR=/app/data
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      opencode-serve:
+        condition: service_healthy
+    restart: unless-stopped
+
+  author-site:
+    build:
+      context: .
+      dockerfile: docker/author-site/Dockerfile
+    ports:
+      - "3200:3200"
+    environment:
+      - AGENT_SERVICE_URL=http://agent-service:3201
+      - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - DATA_DIR=/app/data
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      - agent-service
+    restart: unless-stopped
+
+  viewer-site:
+    build:
+      context: .
+      dockerfile: docker/viewer-site/Dockerfile
+    ports:
+      - "3300:3300"
+    environment:
+      - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
+      - NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}
+    depends_on:
+      - agent-service
+    profiles:
+      - viewer
+    restart: unless-stopped
+
+volumes:
+  app-data:

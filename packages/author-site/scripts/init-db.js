@@ -1,7 +1,17 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const DB_PATH = path.join(__dirname, "..", "data", "users.db");
+function findProjectRoot(startDir) {
+  let dir = startDir;
+  while (dir !== path.dirname(dir)) {
+    if (require("fs").existsSync(path.join(dir, "pnpm-workspace.yaml"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return startDir;
+}
+
+const DATA_DIR = process.env.DATA_DIR || path.join(findProjectRoot(__dirname), "data");
+const DB_PATH = path.join(DATA_DIR, "users.db");
 
 console.log("[Init] Initializing database...");
 

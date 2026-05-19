@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+.git
+*.md
+docs
+tests
+playwright
+OPS
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
