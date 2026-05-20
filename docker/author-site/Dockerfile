@@ -6,6 +6,9 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app
 
+# 构建时参数：前端模型白名单前缀（逗号分隔，如 "custom/,deepseek/"）
+ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
+
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-client/package.json ./packages/agent-client/

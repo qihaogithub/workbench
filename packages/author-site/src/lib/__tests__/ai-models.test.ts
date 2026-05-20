@@ -4,6 +4,7 @@ import {
   resolveModelConfig,
   resolveCurrentModel,
   buildFullModelId,
+  buildModelConfigs,
   MODEL_CONFIGS,
 } from "@/lib/ai-models";
 
@@ -16,6 +17,17 @@ describe("matchesId", () => {
   it("正则 matcher 走 .test()", () => {
     expect(matchesId(/.*/, "any-model")).toBe(true);
     expect(matchesId(/nemotron/i, "opencode/Nemotron-3-Super")).toBe(true);
+  });
+});
+
+describe("buildModelConfigs", () => {
+  it("无环境变量时只包含内置分组和 catch-all", () => {
+    const configs = buildModelConfigs();
+    const matchers = configs.map((c) => c.matcher);
+    expect(matchers).toContain("opencode/");
+    expect(matchers).toContain("jojo/");
+    // 最后一条是 catch-all
+    expect(configs[configs.length - 1].enabled).toBe(false);
   });
 });
 
@@ -41,16 +53,6 @@ describe("resolveModelConfig", () => {
     }
   });
 
-  it("custom 分组下的模型应启用", () => {
-    for (const id of [
-      "custom/deepseek-v4-flash",
-      "custom/any-model",
-    ]) {
-      const r = resolveModelConfig(id);
-      expect(r.enabled).toBe(true);
-    }
-  });
-
   it("不在白名单分组内的模型命中 catch-all,enabled 为 false", () => {
     for (const id of [
       "sensenova/deepseek-v4-flash",
@@ -63,21 +65,34 @@ describe("resolveModelConfig", () => {
       expect(r.enabled).toBe(false);
     }
   });
+
+  it("动态前缀通过 MODEL_CONFIGS 注入后应启用", () => {
+    // 模拟注入动态前缀：临时修改 MODEL_CONFIGS
+    const original = [...MODEL_CONFIGS];
+    const catchAll = MODEL_CONFIGS[MODEL_CONFIGS.length - 1];
+    MODEL_CONFIGS.splice(MODEL_CONFIGS.length - 1, 0, { matcher: "custom/" });
+    try {
+      for (const id of ["custom/deepseek-v4-flash", "custom/any-model"]) {
+        const r = resolveModelConfig(id);
+        expect(r.enabled).toBe(true);
+      }
+    } finally {
+      MODEL_CONFIGS.splice(0, MODEL_CONFIGS.length, ...original);
+    }
+  });
 });
 
 describe("applyModelConfigs", () => {
-  it("仅保留 opencode、jojo 和 custom 分组的模型", () => {
+  it("仅保留白名单分组内的模型", () => {
     const result = applyModelConfigs([
       { id: "opencode/nemotron-3-super", label: "opencode/Nemotron 3 Super" },
       { id: "jojo/some-model", label: "jojo/Some Model" },
-      { id: "custom/deepseek-v4-flash", label: "deepseek-v4-flash" },
       { id: "sensenova/deepseek-v4-flash", label: "sensenova/DeepSeek V4 Flash" },
       { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
     ]);
     expect(result.map((m) => m.id)).toEqual([
       "opencode/nemotron-3-super",
       "jojo/some-model",
-      "custom/deepseek-v4-flash",
     ]);
   });
 

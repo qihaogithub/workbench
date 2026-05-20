@@ -9,6 +9,9 @@ services:
       - OPENCODE_API_KEY=${OPENCODE_API_KEY}
       - OPENCODE_API_BASE=${OPENCODE_API_BASE}
       - OPENCODE_MODELS=${OPENCODE_MODELS}
+      - OPENCODE_PROVIDER_NAME=${OPENCODE_PROVIDER_NAME:-custom}
+      - OPENCODE_PROVIDERS=${OPENCODE_PROVIDERS:-}
+      - OPENCODE_DEFAULT_MODEL=${OPENCODE_DEFAULT_MODEL:-}
     restart: unless-stopped
 
   agent-service:
@@ -35,6 +38,8 @@ services:
     build:
       context: .
       dockerfile: docker/author-site/Dockerfile
+      args:
+        - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
     ports:
       - "3200:3200"
     environment:
