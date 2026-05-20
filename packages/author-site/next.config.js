@@ -7,8 +7,8 @@ const nextConfig = {
       bodySizeLimit: "10mb",
     },
     instrumentationHook: true,
+    serverComponentsExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'bcrypt'],
   },
-  serverExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'bcrypt'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.alias = {

@@ -8,6 +8,8 @@ import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig, AgentType } from '../core/types';
 import { logger } from '../utils/logger';
+
+const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || 'opencode';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
@@ -79,7 +81,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         
         if (workingDir) {
           workspaceInfo = await workspaceManager.create({
-            backend: backend || 'opencode',
+            backend: backend || DEFAULT_BACKEND,
             workspace: workingDir,
             customWorkspace,
           });
@@ -87,14 +89,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           const existingSession = sessionStore.get(sessionId);
           if (!existingSession) {
             workspaceInfo = await workspaceManager.create({
-              backend: backend || 'opencode',
+              backend: backend || DEFAULT_BACKEND,
             });
           }
         }
 
         const config: AgentConfig = {
           sessionId,
-          backend: backend || 'opencode',
+          backend: backend || DEFAULT_BACKEND,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: request.body.model || process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',
@@ -480,7 +482,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/llm/models',
     async (_request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const response = await fetch(`${process.env.OPENCODE_SERVER_URL || 'http://localhost:4096'}/models`, {
+        const serverUrl = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
+
+        // Get models from /provider endpoint (OpenCode Server actual API)
+        const response = await fetch(`${serverUrl}/provider`, {
           method: 'GET',
           signal: AbortSignal.timeout(5000),
         });
@@ -496,20 +501,43 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         }
 
         const data = await response.json() as {
-          models?: Array<{ id: string; label?: string; name?: string }>;
-          currentModelId?: string;
+          all?: Array<{
+            id: string;
+            name?: string;
+            models?: Record<string, { id: string; name?: string }>;
+          }>;
         };
 
-        const models = (data.models || []).map((m) => ({
-          id: m.id,
-          label: m.label || m.name || m.id,
-        }));
+        const models: Array<{ id: string; label: string }> = [];
+        for (const provider of data.all || []) {
+          for (const [, modelInfo] of Object.entries(provider.models || {})) {
+            models.push({
+              id: `${provider.id}/${modelInfo.id}`,
+              label: modelInfo.name || modelInfo.id,
+            });
+          }
+        }
+
+        // Get current model from config
+        let currentModelId: string | undefined;
+        try {
+          const configResp = await fetch(`${serverUrl}/config`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000),
+          });
+          if (configResp.ok) {
+            const configData = await configResp.json() as { model?: string };
+            currentModelId = configData.model;
+          }
+        } catch {
+          // Ignore config fetch errors
+        }
 
         return reply.send({
           success: true,
           data: {
             models,
-            currentModelId: data.currentModelId,
+            currentModelId,
           },
         });
       } catch (error) {

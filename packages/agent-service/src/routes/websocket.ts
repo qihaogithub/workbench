@@ -13,6 +13,7 @@ import {
 } from "./ws-event-router";
 
 const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL || "sensenova/deepseek-v4-flash";
+const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || "opencode";
 
 interface StreamParams {
   sessionId: string;
@@ -147,7 +148,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId,
-                backend: "opencode",
+                backend: DEFAULT_BACKEND,
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -278,7 +279,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
-                backend: "opencode",
+                backend: DEFAULT_BACKEND,
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -389,7 +390,7 @@ export async function registerWebSocketRoutes(
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
-                  backend: "opencode",
+                  backend: DEFAULT_BACKEND,
                   workingDir: message.workingDir || process.cwd(),
                   model: DEFAULT_MODEL_ID,
                 };

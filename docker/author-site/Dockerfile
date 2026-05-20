@@ -11,7 +11,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/author-site/package.json ./packages/author-site/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 COPY packages/shared/ ./packages/shared/
 COPY packages/agent-client/ ./packages/agent-client/
@@ -28,6 +28,9 @@ ENV NODE_ENV=production
 COPY --from=builder /app/packages/author-site/.next/standalone ./
 COPY --from=builder /app/packages/author-site/.next/static ./packages/author-site/.next/static
 COPY --from=builder /app/packages/author-site/public ./packages/author-site/public
+COPY --from=builder /app/packages/author-site/scripts/init-db.js ./packages/author-site/scripts/init-db.js
+# bcrypt 原生模块不在 standalone 输出中，需要从 builder 阶段复制
+COPY --from=builder /app/node_modules/.pnpm/bcrypt@6.0.0/node_modules/bcrypt /app/node_modules/.pnpm/bcrypt@6.0.0/node_modules/bcrypt
 
 EXPOSE 3200
 

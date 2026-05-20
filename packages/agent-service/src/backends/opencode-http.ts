@@ -1,32 +1,42 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent } from '../core/types';
 import { logger } from '../utils/logger';
-import EventSource from 'eventsource';
+import { EventSource } from 'eventsource';
 
 const OPENCODE_SERVER_URL = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
 
-interface SSEEvent {
+/**
+ * OpenCode Server SSE event format.
+ * Each event has a `type` and `properties` with session-specific data.
+ */
+interface OpenCodeSSEEvent {
+  id: string;
   type: string;
-  content?: {
-    text?: string;
-  };
-  toolCallId?: string;
-  title?: string;
-  kind?: string;
-  status?: string;
-  done?: boolean;
-  error?: string;
-  files?: Array<{
-    path: string;
-    action: 'created' | 'modified' | 'deleted';
-    content?: string;
-  }>;
-  permissionRequest?: {
-    permissionId: string;
-    toolCallId: string;
-    title?: string;
-    kind?: string;
-    options: Array<{ optionId: string; name: string }>;
+  properties: {
+    sessionID?: string;
+    messageID?: string;
+    partID?: string;
+    field?: string;
+    delta?: string;
+    part?: {
+      type: string;
+      text?: string;
+      reason?: string;
+      id?: string;
+      messageID?: string;
+      sessionID?: string;
+    };
+    info?: {
+      id?: string;
+      role?: string;
+      modelID?: string;
+      providerID?: string;
+      finish?: string;
+      tokens?: { total?: number; input?: number; output?: number; reasoning?: number };
+    };
+    status?: { type: string };
+    model?: { id: string; providerID: string; variant?: string };
+    diff?: Array<unknown>;
   };
 }
 
@@ -43,7 +53,6 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     content?: string;
   }> = [];
   private eventSource: EventSource | null = null;
-  private pendingPermissions = new Map<string, (optionId: string) => void>();
   private streamDone: {
     resolve: (value: string) => void;
     reject: (reason: Error) => void;
@@ -89,7 +98,6 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: this.config.sessionId || `session-${Date.now()}`,
-        model: this.config.model,
         workingDir: this.config.workingDir,
       }),
       signal: AbortSignal.timeout(10000),
@@ -144,13 +152,17 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       throw new Error(`Failed to send message: ${await response.text()}`);
     }
 
-    const data = await response.json() as { parts?: Array<{ type: string; text: string }> };
-    
-    const textParts = data.parts?.filter((p) => p.type === 'text') || [];
-    this.fullContent = textParts.map((p) => p.text).join('');
+    const data = await response.json() as {
+      info?: { modelID?: string; providerID?: string; tokens?: { total?: number } };
+      parts?: Array<{ type: string; text?: string; reason?: string }>;
+    };
+
+    // Extract text from parts (OpenCode Server response format)
+    const textParts = data.parts?.filter((p) => p.type === 'text' && p.text) || [];
+    this.fullContent = textParts.map((p) => p.text || '').join('');
 
     if (this.eventCallback && this.fullContent) {
-      this.eventCallback?.({
+      this.eventCallback({
         type: 'stream',
         sessionId: this.config.sessionId,
         content: this.fullContent,
@@ -163,6 +175,9 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
   }
 
   private async sendMessageStream(content: string): Promise<string> {
+    // Connect SSE first to avoid missing early events
+    this.connectSSE();
+
     const response = await fetch(`${OPENCODE_SERVER_URL}/session/${this.sessionId}/prompt_async`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -173,10 +188,9 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     });
 
     if (!response.ok) {
+      this.closeSSE();
       throw new Error(`Failed to send async message: ${await response.text()}`);
     }
-
-    this.connectSSE();
 
     return new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -194,23 +208,24 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       this.closeSSE();
     }
 
-    const EventSourceClass = globalThis.EventSource || EventSource;
-    this.eventSource = new EventSourceClass(`${OPENCODE_SERVER_URL}/event?sessionId=${this.sessionId}`) as EventSource;
+    this.eventSource = new EventSource(`${OPENCODE_SERVER_URL}/event?sessionId=${this.sessionId}`);
 
     this.eventSource.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as SSEEvent;
+        const data = JSON.parse(event.data) as OpenCodeSSEEvent;
         this.handleSSEEvent(data);
       } catch (error) {
         logger.error({ error, data: event.data }, 'Failed to parse SSE event');
       }
     };
 
-    this.eventSource.onerror = (error) => {
-      logger.error({ error, sessionId: this.sessionId }, 'SSE connection error');
-      this.status = 'error';
-      this.closeSSE();
+    this.eventSource.onerror = () => {
+      logger.error({ sessionId: this.sessionId }, 'SSE connection error');
+      // Don't immediately set error status - SSE reconnects automatically
+      // Only treat as error if we have a pending stream
       if (this.streamDone) {
+        this.status = 'error';
+        this.closeSSE();
         clearTimeout(this.streamDone.timeout);
         this.streamDone.reject(new Error('SSE connection error'));
         this.streamDone = null;
@@ -220,41 +235,74 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     this.eventSource.onopen = () => {
       logger.info({ sessionId: this.sessionId }, 'SSE connection established');
     };
-
-    // Trigger onopen for mocks
-    if (this.eventSource.onopen && !this.eventSource.readyState) {
-      setTimeout(() => {
-        if (this.eventSource?.onopen) {
-          this.eventSource.onopen({} as Event);
-        }
-      }, 0);
-    }
   }
 
-  private handleSSEEvent(data: SSEEvent): void {
+  private handleSSEEvent(data: OpenCodeSSEEvent): void {
+    const props = data.properties;
+
     switch (data.type) {
-      case 'agent_message_chunk': {
-        const chunk = data.content?.text || '';
-        this.fullContent += chunk;
-        this.eventCallback?.({
-          type: 'stream',
-          sessionId: this.config.sessionId,
-          content: chunk,
-          done: false,
-        });
+      // Streaming text delta (incremental chunk)
+      case 'message.part.delta': {
+        if (props.field === 'text' && props.delta) {
+          // Determine if this is reasoning or text based on part type context
+          // We track part types from message.part.updated events
+          const partId = props.partID || '';
+          const isReasoning = this.reasoningParts.has(partId);
+
+          if (isReasoning) {
+            this.eventCallback?.({
+              type: 'thought',
+              sessionId: this.config.sessionId,
+              content: props.delta,
+              done: false,
+            });
+          } else {
+            this.fullContent += props.delta;
+            this.eventCallback?.({
+              type: 'stream',
+              sessionId: this.config.sessionId,
+              content: props.delta,
+              done: false,
+            });
+          }
+        }
         break;
       }
 
-      case 'agent_thought_chunk':
-        this.eventCallback?.({
-          type: 'thought',
-          sessionId: this.config.sessionId,
-          content: data.content?.text || '',
-          done: false,
-        });
-        break;
+      // Part updated (completed or started)
+      case 'message.part.updated': {
+        if (props.part) {
+          const partType = props.part.type;
+          const partId = props.part.id || '';
 
-      case 'agent_message_done':
+          if (partType === 'reasoning') {
+            this.reasoningParts.add(partId);
+          } else if (partType === 'text' && props.part.text) {
+            // Full text part completed - but we already streamed via deltas
+          } else if (partType === 'step-start') {
+            // AI step started - could indicate tool use
+            this.eventCallback?.({
+              type: 'tool_call',
+              sessionId: this.config.sessionId,
+              toolCallId: partId,
+              title: 'Processing...',
+              kind: 'execute',
+              status: 'pending',
+            });
+          } else if (partType === 'step-finish') {
+            this.eventCallback?.({
+              type: 'tool_call_update',
+              sessionId: this.config.sessionId,
+              toolCallId: partId,
+              status: 'completed',
+            });
+          }
+        }
+        break;
+      }
+
+      // Session became idle = AI finished responding
+      case 'session.idle': {
         this.eventCallback?.({
           type: 'stream',
           sessionId: this.config.sessionId,
@@ -269,67 +317,44 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
           this.streamDone = null;
         }
         break;
+      }
 
-      case 'tool_call':
-        this.eventCallback?.({
-          type: 'tool_call',
-          sessionId: this.config.sessionId,
-          toolCallId: data.toolCallId || '',
-          title: data.title || '',
-          kind: (data.kind as 'read' | 'edit' | 'execute') || 'execute',
-          status: 'pending',
-        });
-        break;
-
-      case 'tool_call_update':
-        this.eventCallback?.({
-          type: 'tool_call_update',
-          sessionId: this.config.sessionId,
-          toolCallId: data.toolCallId || '',
-          status: data.status === 'completed' ? 'completed' : 'failed',
-        });
-        break;
-
-      case 'file_operation':
-        if (data.files) {
-          for (const file of data.files) {
-            this.files.push(file);
-            this.eventCallback?.({
-              type: 'file_operation',
-              sessionId: this.config.sessionId,
-              fileOperation: {
-                method: 'fs/write_text_file',
-                path: file.path,
-                content: file.content,
-              },
-            });
-          }
-        }
-        break;
-
-      case 'permission_request':
-        if (data.permissionRequest) {
-          this.handlePermissionRequest(data.permissionRequest);
-        }
-        break;
-
-      case 'error':
-        this.eventCallback?.({
-          type: 'error',
-          sessionId: this.config.sessionId,
-          error: {
-            code: 'MESSAGE_SEND_ERROR',
-            message: data.error || 'Unknown error',
-            retryable: true,
-          },
-        });
-        this.status = 'error';
-        this.closeSSE();
-        if (this.streamDone) {
+      // Session status updates
+      case 'session.status': {
+        if (props.status?.type === 'idle' && this.streamDone) {
+          this.status = 'ready';
+          this.closeSSE();
           clearTimeout(this.streamDone.timeout);
-          this.streamDone.reject(new Error(data.error || 'Stream ended with error'));
+          this.streamDone.resolve(this.fullContent);
           this.streamDone = null;
         }
+        break;
+      }
+
+      // Session diff (file changes)
+      case 'session.diff': {
+        if (props.diff && Array.isArray(props.diff) && props.diff.length > 0) {
+          logger.info({ diffCount: props.diff.length, sessionId: this.sessionId }, 'Session diff received');
+        }
+        break;
+      }
+
+      // Model switched
+      case 'session.next.model.switched': {
+        if (props.model) {
+          logger.info(
+            { model: props.model.id, provider: props.model.providerID },
+            'Model switched in session'
+          );
+        }
+        break;
+      }
+
+      // Heartbeat and other ignorable events
+      case 'server.heartbeat':
+      case 'server.connected':
+      case 'session.updated':
+      case 'message.updated':
         break;
 
       default:
@@ -337,54 +362,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     }
   }
 
-  private handlePermissionRequest(request: {
-    permissionId: string;
-    toolCallId: string;
-    title?: string;
-    kind?: string;
-    options: Array<{ optionId: string; name: string }>;
-  }): void {
-    const allowAlways = request.options.find((o) => o.name === 'allow_always');
-    const allowOnce = request.options.find((o) => o.name === 'allow_once');
-    const selected = allowAlways || allowOnce;
-
-    if (selected) {
-      logger.info(
-        { toolCallId: request.toolCallId, option: selected.name },
-        'Auto-approving permission'
-      );
-      this.respondToPermission(request.permissionId, selected.optionId);
-    } else {
-      logger.warn(
-        { toolCallId: request.toolCallId },
-        'No allow option found for permission request'
-      );
-      this.respondToPermission(request.permissionId, request.options[0]?.optionId || 'reject_once');
-    }
-  }
-
-  private async respondToPermission(permissionId: string, optionId: string): Promise<void> {
-    try {
-      const response = await fetch(
-        `${OPENCODE_SERVER_URL}/session/${this.sessionId}/permissions/${permissionId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ optionId }),
-          signal: AbortSignal.timeout(10000),
-        }
-      );
-
-      if (!response.ok) {
-        logger.error(
-          { permissionId, optionId, status: response.status },
-          'Failed to respond to permission request'
-        );
-      }
-    } catch (error) {
-      logger.error({ error, permissionId }, 'Error responding to permission request');
-    }
-  }
+  private reasoningParts = new Set<string>();
 
   private closeSSE(): void {
     if (this.eventSource) {
@@ -413,7 +391,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     this.status = 'idle';
     this.fullContent = '';
     this.files = [];
-    this.pendingPermissions.clear();
+    this.reasoningParts.clear();
     logger.info({ sessionId: this.config.sessionId }, 'OpenCode HTTP backend destroyed');
   }
 
@@ -448,30 +426,57 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     availableModels: Array<{ id: string; label: string }>;
     canSwitch: boolean;
   } | null> {
-    if (!this.modelInfoCache) {
-      try {
-        const response = await fetch(`${OPENCODE_SERVER_URL}/models`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000),
-        });
-
-        if (response.ok) {
-          const data = await response.json() as {
-            models?: Array<{ id: string; label?: string; name?: string }>;
-            currentModelId?: string;
-          };
-
-          this.modelInfoCache = {
-            models: (data.models || []).map((m) => ({
-              id: m.id,
-              label: m.label || m.name || m.id,
-            })),
-            currentModelId: data.currentModelId || this.config.model || null,
-          };
+    try {
+      // Get current model from session info
+      let currentModelId = this.config.model || null;
+      if (this.sessionId) {
+        try {
+          const sessionResp = await fetch(`${OPENCODE_SERVER_URL}/session/${this.sessionId}`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000),
+          });
+          if (sessionResp.ok) {
+            const sessionData = await sessionResp.json() as {
+              model?: { id?: string; providerID?: string };
+            };
+            if (sessionData.model?.id) {
+              currentModelId = `${sessionData.model.providerID}/${sessionData.model.id}`;
+            }
+          }
+        } catch {
+          // Ignore session fetch errors
         }
-      } catch (error) {
-        logger.error({ error }, 'Failed to fetch models from OpenCode Server');
       }
+
+      // Get available models from /provider endpoint
+      const response = await fetch(`${OPENCODE_SERVER_URL}/provider`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (response.ok) {
+        const data = await response.json() as {
+          all?: Array<{
+            id: string;
+            name?: string;
+            models?: Record<string, { id: string; name?: string }>;
+          }>;
+        };
+
+        const models: Array<{ id: string; label: string }> = [];
+        for (const provider of data.all || []) {
+          for (const [, modelInfo] of Object.entries(provider.models || {})) {
+            models.push({
+              id: `${provider.id}/${modelInfo.id}`,
+              label: modelInfo.name || modelInfo.id,
+            });
+          }
+        }
+
+        this.modelInfoCache = { models, currentModelId };
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to fetch models from OpenCode Server');
     }
 
     return {
