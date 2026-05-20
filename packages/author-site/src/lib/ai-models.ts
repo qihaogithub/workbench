@@ -58,21 +58,45 @@ export type ResolvedModel = {
 };
 
 /**
+ * 从环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 解析动态白名单前缀
+ *
+ * 格式: 逗号分隔的前缀列表,如 "deepseek/,qwen/,custom/"
+ * 未设置时默认为空(不额外放行任何分组)
+ */
+function parseDynamicPrefixes(): ModelConfig[] {
+  const raw = process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "";
+  if (!raw.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((prefix) => ({ matcher: prefix }));
+}
+
+/**
  * 模型配置表 — 按分组放行
  *
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
  * 分组即模型 id 中 `/` 前的前缀,如 `opencode/nemotron-3-super` 的分组为 `opencode`。
+ *
+ * 动态前缀通过环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 注入,
+ * 无需修改代码即可支持用户自定义的供应商名称。
  */
-export const MODEL_CONFIGS: ModelConfig[] = [
-  // === opencode 分组:全部放行 ===
-  { matcher: "opencode/" },
+export function buildModelConfigs(): ModelConfig[] {
+  return [
+    // === 内置分组:始终放行 ===
+    { matcher: "opencode/" },
+    { matcher: "jojo/" },
 
-  // === jojo 分组:全部放行 ===
-  { matcher: "jojo/" },
+    // === 动态分组:通过环境变量注入的用户自定义供应商前缀 ===
+    ...parseDynamicPrefixes(),
 
-  // === 其他分组全部禁用 ===
-  { matcher: /.*/, enabled: false },
-];
+    // === 其他分组全部禁用 ===
+    { matcher: /.*/, enabled: false },
+  ];
+}
+
+export const MODEL_CONFIGS: ModelConfig[] = buildModelConfigs();
 
 export function matchesId(matcher: ModelMatcher, id: string): boolean {
   if (typeof matcher === "string") return id.startsWith(matcher);

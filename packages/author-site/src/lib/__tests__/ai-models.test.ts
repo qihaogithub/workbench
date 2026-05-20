@@ -41,6 +41,16 @@ describe("resolveModelConfig", () => {
     }
   });
 
+  it("custom 分组下的模型应启用", () => {
+    for (const id of [
+      "custom/deepseek-v4-flash",
+      "custom/any-model",
+    ]) {
+      const r = resolveModelConfig(id);
+      expect(r.enabled).toBe(true);
+    }
+  });
+
   it("不在白名单分组内的模型命中 catch-all,enabled 为 false", () => {
     for (const id of [
       "sensenova/deepseek-v4-flash",
@@ -56,16 +66,18 @@ describe("resolveModelConfig", () => {
 });
 
 describe("applyModelConfigs", () => {
-  it("仅保留 opencode 和 jojo 分组的模型", () => {
+  it("仅保留 opencode、jojo 和 custom 分组的模型", () => {
     const result = applyModelConfigs([
       { id: "opencode/nemotron-3-super", label: "opencode/Nemotron 3 Super" },
       { id: "jojo/some-model", label: "jojo/Some Model" },
+      { id: "custom/deepseek-v4-flash", label: "deepseek-v4-flash" },
       { id: "sensenova/deepseek-v4-flash", label: "sensenova/DeepSeek V4 Flash" },
       { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
     ]);
     expect(result.map((m) => m.id)).toEqual([
       "opencode/nemotron-3-super",
       "jojo/some-model",
+      "custom/deepseek-v4-flash",
     ]);
   });
 
