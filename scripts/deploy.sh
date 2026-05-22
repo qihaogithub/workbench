@@ -50,9 +50,11 @@ print(value)
 PY
 }
 
+OPENCODE_PROVIDER_NAME="$(read_env_value "OPENCODE_PROVIDER_NAME")"
 OPENCODE_API_KEY="$(read_env_value "OPENCODE_API_KEY")"
 OPENCODE_API_BASE="$(read_env_value "OPENCODE_API_BASE")"
 OPENCODE_MODELS="$(read_env_value "OPENCODE_MODELS")"
+NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES="$(read_env_value "NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES")"
 NEXT_PUBLIC_AGENT_SERVICE_URL="$(read_env_value "NEXT_PUBLIC_AGENT_SERVICE_URL")"
 NEXT_PUBLIC_WEB_URL="$(read_env_value "NEXT_PUBLIC_WEB_URL")"
 CORS_ORIGINS="$(read_env_value "CORS_ORIGINS")"
@@ -75,9 +77,11 @@ fi
 
 # 生成部署环境文件
 cat > "${DEPLOY_ENV_FILE}" <<EOF
+OPENCODE_PROVIDER_NAME=${OPENCODE_PROVIDER_NAME:-custom}
 OPENCODE_API_KEY=${OPENCODE_API_KEY}
 OPENCODE_API_BASE=${OPENCODE_API_BASE}
 OPENCODE_MODELS=${OPENCODE_MODELS}
+NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
 NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
 NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL}
 CORS_ORIGINS=${CORS_ORIGINS}
@@ -136,7 +140,6 @@ rsync -avz --progress --delete \
     --exclude '/.agents/' \
     --exclude '/.env' \
     --exclude '/.env.docker' \
-    --exclude '/.deploy.env' \
     --exclude '/.venv/' \
     --exclude '/node_modules/' \
     --exclude '/packages/*/node_modules/' \
