@@ -145,6 +145,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const codeRef = useRef(code);
   codeRef.current = code;
+  const schemaRef = useRef(schema);
+  schemaRef.current = schema;
+  const prevIsStreamingRef = useRef(false);
 
   const configData = configDataMap[activeDemoId] ?? {};
 
@@ -160,29 +163,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }
   }, [validationResult]);
 
-  const handleSendErrorToAI = useCallback((context: { summary: string; details: string; code: string; schema: string }) => {
-    const aiPrompt = `你是一个前端组件开发助手。当前组件存在以下配置问题，请帮我修复：
+  useEffect(() => {
+    prevIsStreamingRef.current = aiIsStreaming;
+    if (!aiIsStreaming) {
+      const result = validateAll(codeRef.current, schemaRef.current);
+      setValidationResult(result);
+    }
+  }, [aiIsStreaming]);
 
-【问题摘要】
+  const handleSendErrorToAI = useCallback((context: { summary: string; details: string }) => {
+    const demoId = activeDemoIdRef.current;
+    const aiPrompt = `【问题摘要】
 ${context.summary}
 
 【技术详情】
 ${context.details}
 
-【当前代码】
-\`\`\`tsx
-${context.code}
-\`\`\`
+【相关文件】
+- demos/${demoId}/index.tsx — 页面 React 组件代码
+- demos/${demoId}/config.schema.json — 页面配置 Schema
 
-【当前配置】
-\`\`\`json
-${context.schema}
-\`\`\`
-
-请：
-1. 分析上述问题
-2. 修改代码和/或配置文件来修复问题
-3. 保持组件的原有功能不变`;
+请使用 read 工具读取上述文件，分析并修复问题，保持组件原有功能不变。`;
 
     isRepairAttemptRef.current = true;
     setTabValue("ai");
@@ -953,6 +954,17 @@ ${context.schema}
                       });
                     }
                   }}
+                  triggerAutoSend={triggerAutoSend}
+                  onTriggerAutoSendHandled={() => setTriggerAutoSend(null)}
+                  errorBanner={
+                    errorBannerVisible && validationResult.errors.length > 0 ? (
+                      <ErrorBanner
+                        errors={validationResult.errors}
+                        disabled={aiIsStreaming}
+                        onSendToAI={handleSendErrorToAI}
+                      />
+                    ) : null
+                  }
                 />
               </TabsContent>
 

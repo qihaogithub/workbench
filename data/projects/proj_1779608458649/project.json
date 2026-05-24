@@ -1,0 +1,52 @@
+{
+  "id": "proj_1779608458649",
+  "name": "学习页-课后",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608458649\\workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460500_a1b2c3",
+      "name": "课后服务-手机",
+      "order": 1,
+      "parentId": null,
+      "createdAt": 1779608460500,
+      "updatedAt": 1779634377435
+    },
+    {
+      "id": "demo_1779608461000_d4e5f6",
+      "name": "课后服务-平板",
+      "order": 2,
+      "createdAt": 1779608461000,
+      "updatedAt": 1779608461000,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "savedAt": 1779609103772,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779608460597-h440norjk",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v1",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v2",
+      "savedAt": 1779610805669,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779609107354-keugldup8",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v2",
+      "fileCount": 4
+    },
+    {
+      "versionId": "v3",
+      "savedAt": 1779634378986,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779631572532-okluhw2zj",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v3",
+      "fileCount": 4
+    }
+  ],
+  "createdAt": 1779608458652,
+  "updatedAt": 1779634378988
+}

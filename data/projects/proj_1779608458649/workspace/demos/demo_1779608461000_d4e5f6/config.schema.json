@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+  "previewSize": {
+    "width": 1024,
+    "height": 768
+  }
+  },
+  "title": "课后服务 - 平板版配置",
+  "type": "object",
+  "properties": {
+    "courseTitle": {
+      "type": "string",
+      "title": "课程名称",
+      "default": "全年系统包-L1"
+    },
+    "teacherName": {
+      "type": "string",
+      "title": "指导师名称",
+      "default": "苹果指导师"
+    },
+    "bannerUrl": {
+      "type": "string",
+      "title": "Banner图片URL",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png"
+    },
+    "feature1Name": {
+      "type": "string",
+      "title": "功能1名称",
+      "default": "学习报告"
+    },
+    "feature1Status": {
+      "type": "string",
+      "title": "功能1状态文字",
+      "default": "3篇报告未读"
+    },
+    "feature2Name": {
+      "type": "string",
+      "title": "功能2名称",
+      "default": "活动挑战"
+    },
+    "feature2Status": {
+      "type": "string",
+      "title": "功能2状态文字",
+      "default": ""
+    },
+    "feature3Name": {
+      "type": "string",
+      "title": "功能3名称",
+      "default": "随堂故事"
+    },
+    "feature3Status": {
+      "type": "string",
+      "title": "功能3状态文字",
+      "default": ""
+    },
+    "historyText": {
+      "type": "string",
+      "title": "底部链接文字",
+      "default": "查看往期课程"
+    }
+  }
+}
