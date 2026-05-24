@@ -691,7 +691,7 @@ function OrderControl({
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
-            <span className="ml-auto">
+            <span>
               {open ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
               ) : (
