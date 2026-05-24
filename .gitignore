@@ -9,3 +9,5 @@ dist
 .playwright-cli/*
 .worktrees
 /data
+!/data/projects/
+!/data/users.db

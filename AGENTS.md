@@ -1,289 +1,68 @@
 # AGENTS.md — opencode-workbench
 
-> 本文件为 AI 编码代理提供在此仓库中工作的指南。
+> AI Agent 工作指南。只包含从文件系统和配置验证过的事实。
 
-## 项目概览
+## Monorepo 结构
 
-Monorepo 架构，使用 pnpm workspaces 管理五个包：
+pnpm workspaces (`pnpm@8.15.0`, `node >=18`, `shamefully-hoist=true`), 6 个包：
 
-- `@opencode-workbench/author-site` — Next.js 14 前端应用（App Router）
-- `@opencode-workbench/viewer-site` — 演示预览站点（Next.js App Router）
-- `@opencode-workbench/shared` — 共享类型定义
-- `@opencode-workbench/agent-service` — 独立 Agent 服务，实现 ACP 协议
-- `@opencode-workbench/agent-client` — Agent Service Client SDK
+| 包名 | 路径 | 类型 | 端口 | 测试框架 | 构建 |
+|---|---|---|---|---|---|
+| `@opencode-workbench/author-site` | `packages/author-site/` | Next.js 14 (App Router) | 3200 | Jest + Testing Library | `next build` |
+| `@opencode-workbench/viewer-site` | `packages/viewer-site/` | Next.js 14 (App Router) | 3300 | — | `next build` |
+| `@opencode-workbench/shared` | `packages/shared/` | 共享类型/常量 | — | — | — |
+| `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify 服务 | 3201 | **vitest** | `tsc` / `esbuild` |
+| `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | — | — | `tsc` |
+| `@opencode-workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具 (ESM) | — | — | `tsc` |
 
-## 构建 / 测试 / 开发命令
-
-### 根目录命令
+## 开发者命令
 
 ```bash
-pnpm dev          # 同时启动 author-site、agent-service 和 viewer-site 开发服务器
-pnpm dev:author   # 仅启动 author-site 开发服务器
-pnpm dev:agent    # 仅启动 agent-service 开发服务器
-pnpm dev:viewer   # 仅启动 viewer-site 开发服务器
-pnpm build        # 生产构建（author-site）
-pnpm build:viewer # viewer-site 生产构建
-pnpm lint         # ESLint 检查
-pnpm typecheck    # TypeScript 类型检查（author-site）
-pnpm typecheck:viewer # viewer-site 类型检查
-pnpm test:e2e            # 运行 E2E 测试
-pnpm test:e2e:ui         # 运行 E2E 测试（UI 模式）
-pnpm test:e2e:headed     # 运行 E2E 测试（有头模式）
+pnpm dev                              # 并行启动 author + agent + viewer
+pnpm dev:author / dev:agent / dev:viewer  # 单服务
+pnpm lint                             # ESLint (author-site next lint)
+pnpm typecheck / typecheck:viewer     # tsc --noEmit
+pnpm test:e2e                         # Playwright (test/新建-编辑-保存项目测试/)
 ```
 
-### 运行测试
+### 包级测试
 
 ```bash
-# 运行 author-site 包测试
+# author-site
 pnpm --filter @opencode-workbench/author-site test
-
-# 运行单个测试文件
-pnpm --filter @opencode-workbench/author-site test -- --testPathPattern="validator.test.ts"
-
-# 运行特定测试用例
-pnpm --filter @opencode-workbench/author-site test -- -t "应验证有效的 JSON"
-
-# 监听模式
+pnpm --filter @opencode-workbench/author-site test -- --testPathPattern="file.test.ts"
 pnpm --filter @opencode-workbench/author-site test:watch
 
-# 运行 agent-service 包测试（使用 fake-acp-cli）
+# agent-service (vitest, 伪 ACP CLI — 无需真实后端)
 pnpm --filter @opencode-workbench/agent-service test
-
-# agent-service 测试监听模式
 pnpm --filter @opencode-workbench/agent-service test:watch
-
-# agent-service 测试覆盖率报告
 pnpm --filter @opencode-workbench/agent-service test:coverage
-
-# agent-service 真实后端冒烟测试（需要安装对应 CLI）
-pnpm --filter @opencode-workbench/agent-service test:smoke
+pnpm --filter @opencode-workbench/agent-service test:smoke  # 需要 ACP_SMOKE_REAL=1
 ```
 
-### 包管理
+## Agent 后端配置
 
-```bash
-pnpm install                    # 安装依赖
-pnpm --filter @opencode-workbench/author-site add <pkg>  # 为 author-site 包添加依赖
-```
+**默认后端是 `opencode-http`** (HTTP 直连 `OPENCODE_SERVER_URL`). 旧 ACP `opencode` 后端已废弃, 仅在 `server.ts:62` 保留兼容注册.
 
-## 代码思维准则
+完整后端列表见 `packages/agent-service/src/server.ts:62-` 的 `factory.register` 调用. ACP 后端 (claude, codex, gemini 等) 通过 stdio 子进程通信.
 
-### 编码前先思考
+## 关键架构细节
 
-- 不主观臆断，不掩饰困惑，明确权衡取舍
-- 实现功能前：
-  - 明确列出你的假设。若存在不确定之处，主动提问
-  - 若存在多种解读方式，逐一说明 —— 不要擅自默认选择
-  - 若存在更简洁的实现方案，主动提出。必要时提出反对意见
-  - 若某部分内容不清晰，立即暂停。指出困惑点并提问
+- **Auth**: JWT (`jose`), `middleware.ts` 保护 `/demo`, `/projects` (重定向到 `/login`) 和 `/api/sessions` (返回 401 JSON). `JWT_SECRET` 环境变量.
+- **数据存储**: 文件系统 `data/` 目录 — `data/projects/`, `data/sessions/`, `data/workspaces/`, `data/snapshots/` + SQLite `data/users.db`. 通过 `DATA_DIR` 环境变量覆盖.
+- **Session**: 2 小时过期 (`SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000`). API 路由在 `packages/author-site/src/app/api/`.
+- **CORS**: 同时由 `middleware.ts` (author-site → viewer 跨域) 和 agent-service `server.ts:47` 管理.
 
-### 简洁优先
+## Docker 部署
 
-- 用最少的代码解决问题，不编写任何推测性代码
-- 不实现需求以外的额外功能
-- 单次使用的代码不做抽象封装
-- 不添加未被要求的"灵活性"或"可配置性"
-- 不为不可能出现的场景编写异常处理
-- 若一段代码本可用 50 行实现却写了 200 行，重新精简
-- 这是一个局域网内使用的公司内部工具，避免过度工程化设计
-- 时常自问："资深工程师会认为这段代码过于复杂吗？" 如果是，就简化
+`docker-compose.yml` 4 服务: opencode-serve (4096), agent-service (3201), author-site (3200), viewer-site (3300). viewer-site 需要 `--profile viewer`. 部署脚本: `scripts/deploy.sh`.
 
-### Agent 友好原则
+## 代码约定
 
-本系统完全由 AI Agent 编程实现，代码需注重可维护性和 Agent 友好性：
-
-- **目录即职责**：目录和文件名应直接反映其功能，Agent 可通过名称推断内容，无需深入阅读代码
-- **文件单一职责**：每个文件专注于一个功能模块，避免文件过大（建议不超过 300 行）
-- **避免隐式依赖**：不依赖未在导入语句中声明的全局状态或魔法值
-- **显式优于隐式**：优先使用显式函数调用和参数传递，避免使用可能引起歧义的默认值或自动行为
-- **按功能组织而非按类型组织**：相关功能放在一起（如 `session/` 包含 session 相关的一切），而非按文件类型分散（如将所有 `types.ts` 集中）
-- **接口与实现分离**：使用接口/类型定义明确数据结构，避免类型弥散
-- **可追溯性**：关键业务逻辑添加简短注释说明"为什么这样做"而非"做什么"，帮助 Agent 理解设计决策
-- **避免循环依赖**：模块间依赖关系应是有向无环图，循环依赖会导致 Agent 难以理解修改顺序
-
-## 代码风格与约定
-
-### TypeScript 配置
-
-- **严格模式**：`strict: true`，禁止使用 `as any`、`@ts-ignore`、`@ts-expect-error`
-- **目标版本**：ES2017
-- **模块系统**：ESNext，模块解析使用 bundler 模式
-- **JSX**：preserve（由 Next.js 处理）
-
-### 路径别名
-
-```typescript
-import { cn } from '@/lib/utils'                    // → ./src/lib/utils
-import type { DemoMeta } from '@opencode-workbench/shared'  // → ../shared/src
-```
-
-### 命名约定
-
-- **组件/接口**：PascalCase（`DemoMeta`, `SessionCard`）
-- **函数/变量**：camelCase（`createSession`, `useDemos`）
-- **常量/枚举值**：UPPER\_SNAKE\_CASE（`DEMO_NOT_FOUND`, `ERROR_MESSAGES`）
-- **类型别名**：PascalCase（`ApiResponse<T>`, `ErrorCodeType`）
-- **测试文件**：`*.test.ts` 放在 `__tests__/` 目录中
-
-### 导入顺序
-
-1. 外部库（React、Next.js、第三方包）
-2. 内部别名导入（`@/`）
-3. 相对路径导入（`../`, `./`）
-
-### API 响应格式
-
-所有 API 路由必须使用统一的响应格式：
-
-```typescript
-// 成功响应
-{ success: true, data: T }
-
-// 错误响应
-{ success: false, error: { code: ErrorCode, message: string, details?: unknown } }
-```
-
-使用 `createApiSuccess()` 和 `createApiError()` 辅助函数（位于 `@/lib/fs-utils`）。
-
-### 错误处理
-
-- API 路由使用 try/catch 包裹逻辑
-- 错误消息使用中文
-- 使用 `@opencode-workbench/shared` 中定义的 `ErrorCode` 常量
-- 客户端使用 SWR 处理数据获取和错误状态
-
-### 组件库
-
-- **基础组件库**：[shadcn/ui](https://ui.shadcn.com/)
-  - 组件位于 `src/components/ui/` 目录
-  - 使用 `npx shadcn@latest add <component>` 添加新组件
-  - 基于 Radix UI 原语 + `class-variance-authority` 变体系统
-- **图标库**：[lucide.dev/icons](https://lucide.dev/icons)
-- **AI 组件库**：[AI Elements](https://ai.sdk.dev/)
-  - 使用 `npx ai-elements@latest add <component>` 添加 AI 相关组件
-  - 依赖 shadcn/ui 基础架构，必须在 shadcn/ui 初始化后才能使用
-  - 用于流式响应、工具调用展示、推理面板、聊天容器等 AI 场景
-- **禁止引入其他 UI 组件库**（如 Ant Design、Material-UI、Chakra UI 等）
-
-### 样式
-
-- **Tailwind CSS** 为主要样式方案
-- 使用 `cn()` 工具函数合并类名（`clsx` + `tailwind-merge`）
-- 组件使用 `class-variance-authority` 处理变体
-
-### 数据获取
-
-- 客户端使用 **SWR** 进行数据获取和缓存
-- 使用 `mutate()` 手动触发重新验证
-- API 调用封装在 `@/lib/api.ts` 中
-
-### 组件结构
-
-- App Router 组件放在 `src/app/`
-- 可复用组件放在 `src/components/`
-- 页面级组件放在 `src/app/[route]/page.tsx`
-
-### 测试规范
-
-- 使用 **Jest** + **Testing Library**
-- 测试环境：jsdom
-- 设置文件：`jest.setup.ts`
-- 模块映射：`@/*` → `<rootDir>/src/*`
-- 测试描述使用中文（`describe('应验证有效的 JSON', ...)`）
-
-### agent-service 特定约定
-
-#### ACP 协议
-
-- **协议说明**：ACP (Agent Client Protocol) 是由 Zed Industries 主导的行业开放标准
-- **通信方式**：通过 stdio 进行 JSON-RPC 通信（子进程标准输入/输出）
-- **消息格式**：每行一个 JSON 消息，以换行符分隔
-
-#### 支持的 Agent 后端
-
-| Backend         | CLI 命令                                          | ACP 参数                   | 需要认证 |
-| --------------- | ----------------------------------------------- | ------------------------ | ---- |
-| `opencode`      | `opencode`                                      | `['acp']`                | 否    |
-| `opencode-http` | —（HTTP 直连）                                      | —                        | 否    |
-| `claude`        | `claude`                                        | `['--experimental-acp']` | 是    |
-| `codex`         | `codex` / `npx @zed-industries/codex-acp@0.9.5` | `[]`                     | 是    |
-| `gemini`        | `gemini`                                        | `['--experimental-acp']` | 是    |
-| `qwen`          | `qwen` / `npx @qwen-code/qwen-code`             | `['--acp']`              | 是    |
-| `goose`         | `goose`                                         | `['acp']`                | 否    |
-| `auggie`        | `auggie`                                        | `['--acp']`              | 否    |
-| `kimi`          | `kimi`                                          | `['acp']`                | 否    |
-| `copilot`       | `copilot`                                       | `['--acp', '--stdio']`   | 否    |
-| `qoder`         | `qodercli`                                      | `['--acp']`              | 否    |
-| `vibe`          | `vibe-acp`                                      | `[]`                     | 否    |
-| `custom`        | 自定义                                             | `[]`                     | 否    |
-
-#### 日志规范
-
-- 使用 **pino** 日志库
-- 通过 `src/utils/logger.ts` 统一导出
-- 日志级别：`debug`, `info`, `warn`, `error`
-
-#### 测试策略
-
-- **单元测试**：纯逻辑测试，位于 `tests/unit/`
-- **集成测试**：使用 `fake-acp-cli` 模拟真实 CLI，位于 `tests/integration/`
-- **真实后端测试**：可选，通过 `ACP_SMOKE_REAL=1` 环境变量启用
-
-### agent-client 使用示例
-
-```typescript
-import { AgentClient } from '@opencode-workbench/agent-client';
-
-const client = new AgentClient({ baseUrl: 'http://localhost:3101' });
-
-// 发送消息
-const result = await client.sendMessage('session-id', '你好');
-
-// 获取 WebSocket 流
-const stream = client.stream('session-id');
-stream.on('stream', (event) => console.log(event.content));
-stream.send('继续');
-```
-
-## 目录结构
-
-```
-packages/
-├── author-site/
-│   ├── src/
-│   │   ├── app/          # Next.js App Router（页面和 API 路由）
-│   │   ├── components/   # React 组件（ai-elements, auth, demo, explore, layout, providers, ui, wish）
-│   │   └── lib/          # 工具函数和 API 客户端
-│   └── data/             # 项目数据存储（projects, sessions, workspaces, snapshots）
-├── viewer-site/
-│   ├── src/
-│   │   ├── app/          # 演示预览页面路由
-│   │   ├── components/   # 预览 UI 组件
-│   │   └── lib/          # 工具函数和 API
-│   └── package.json
-├── shared/
-│   └── src/              # 共享类型和常量
-├── agent-service/
-│   ├── src/
-│   │   ├── acp/          # ACP 协议实现（types, connection, approval-store, model-info）
-│   │   ├── backends/     # Agent 后端适配器（13 个后端）
-│   │   ├── core/         # 核心逻辑（Agent、工厂、管理器）
-│   │   ├── events/       # 事件系统
-│   │   ├── routes/       # HTTP/WebSocket 路由
-│   │   ├── session/      # 会话管理
-│   │   ├── workspace/    # 工作空间管理
-│   │   ├── utils/        # 工具函数（config, logger）
-│   │   └── server.ts     # Fastify 服务器入口
-│   └── tests/
-│       ├── fixtures/     # 测试夹具（fake-acp-cli）
-│       ├── unit/         # 单元测试
-│       └── integration/  # 集成测试
-└── agent-client/
-    └── src/
-        ├── index.ts      # 入口文件
-        ├── client.ts     # AgentClient 类实现
-        └── types.ts      # 类型定义
-```
-
-<br />
-
+- strict: true, 禁止 `as any`/`@ts-ignore`/`@ts-expect-error`
+- 路径别名: `@/` = `./src/*`, `@opencode-workbench/shared` = `../shared/src`
+- API 响应: `{ success: true, data: T }` / `{ success: false, error: { code, message } }` — `createApiSuccess`/`createApiError` (`packages/author-site/src/lib/fs-utils.ts`)
+- 组件: shadcn/ui + Tailwind CSS + lucide-react + `class-variance-authority` + `cn()` (clsx + tailwind-merge). 禁止其他 UI 库.
+- 数据获取: SWR (`@/lib/api.ts`)
+- 测试描述: 中文
+- **agent-service**: `@/` 别名映射到 `./src/` (vitest.config.ts). 导入顺序: Node 内置 → 外部 → 内部相对路径.
