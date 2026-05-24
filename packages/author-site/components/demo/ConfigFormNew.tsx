@@ -6,16 +6,7 @@ import {
   ChevronUp,
   Info,
   Sparkles,
-  Settings,
-  Palette,
-  Ruler,
-  Type,
-  Image,
-  Eye,
-  Layout,
-  ArrowUpDown,
   GripVertical,
-  LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -501,29 +492,6 @@ function FieldRenderer({
   );
 }
 
-function getGroupIcon(title: string): LucideIcon {
-  switch (title) {
-    case "基础配置":
-      return Settings;
-    case "颜色配置":
-      return Palette;
-    case "尺寸设置":
-      return Ruler;
-    case "文本内容":
-      return Type;
-    case "图片资源":
-      return Image;
-    case "显示选项":
-      return Eye;
-    case "动画效果":
-      return Sparkles;
-    case "布局设置":
-      return Layout;
-    default:
-      return Settings;
-  }
-}
-
 function FieldGroupSection({
   group,
   formData,
@@ -541,7 +509,6 @@ function FieldGroupSection({
   readonly?: boolean;
   onNoteClick: (fieldKey: string) => void;
 }) {
-  const Icon = getGroupIcon(group.title);
   const [open, setOpen] = useState(true);
 
   return (
@@ -549,18 +516,17 @@ function FieldGroupSection({
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
-            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-            <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
-            <Badge variant="secondary" className="text-xs h-5 font-normal">
-              {group.fields.length} 字段
-            </Badge>
-            <span className="ml-auto">
+            <span>
               {open ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
               ) : (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
               )}
             </span>
+            <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
+            <Badge variant="secondary" className="text-xs h-5 font-normal px-1.5 min-w-[20px] justify-center">
+              {group.fields.length}
+            </Badge>
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -721,15 +687,10 @@ function OrderControl({
   const isDefault = order.join(",") === defaultOrder.join(",");
 
   return (
-    <div className="py-3">
+    <div className="py-2">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-2 cursor-pointer hover:bg-accent/50 rounded-md transition-colors">
-            <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
-            <h3 className="text-sm font-medium text-muted-foreground">组件排序</h3>
-            <Badge variant="secondary" className="text-xs h-5 font-normal">
-              {orderable.length} 项
-            </Badge>
+          <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
             <span className="ml-auto">
               {open ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
@@ -737,6 +698,10 @@ function OrderControl({
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
               )}
             </span>
+            <h3 className="text-sm font-medium text-muted-foreground">组件排序</h3>
+            <Badge variant="secondary" className="text-xs h-5 font-normal px-1.5 min-w-[20px] justify-center">
+              {orderable.length}
+            </Badge>
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
