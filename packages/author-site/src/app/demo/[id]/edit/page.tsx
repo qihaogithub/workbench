@@ -1245,7 +1245,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
               </p>
             </div>
             <ScrollArea className="flex-1">
-              <div className="p-4 flex flex-col gap-5">
+              <div className="p-4 flex flex-col">
                 {!validationResult.isValid && validationResult.errors.length > 0 && (
                   <ValidationPanel errors={validationResult.errors} />
                 )}
@@ -1268,6 +1268,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                       sessionId={sessionId}
                     />
                   </ConfigScopeWrapper>
+                )}
+
+                {projectConfigSchema && (
+                  <div className="h-[2px] bg-border my-3" />
                 )}
 
                 <ConfigScopeWrapper scope="page" pageName={demoPages.find(p => p.id === activeDemoId)?.name}>

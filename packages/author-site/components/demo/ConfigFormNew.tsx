@@ -545,10 +545,10 @@ function FieldGroupSection({
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="py-3">
+    <div className="py-2">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-2 cursor-pointer hover:bg-accent/50 rounded-md transition-colors">
+          <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
             <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
             <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
             <Badge variant="secondary" className="text-xs h-5 font-normal">
@@ -564,7 +564,7 @@ function FieldGroupSection({
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="space-y-1 pl-6 pr-2 pt-1 pb-2">
+          <div className="space-y-1 pl-6 pr-2 pt-1 pb-1">
             {group.fields.map((field) => (
               <FieldRenderer
                 key={field.key}
@@ -995,14 +995,12 @@ export function ConfigForm({
                 titleMap={titleMap}
                 onOrderChange={handleOrderChange}
               />
-              <div className="h-px bg-slate-600/30 mx-2 my-2" />
+              <Separator className="my-2" />
             </>
           )}
           {fieldGroups.map((group, index) => (
             <div key={index}>
-              {index > 0 && (
-                <div className="h-px bg-slate-600/30 mx-2 my-2" />
-              )}
+              {index > 0 && <Separator className="my-2" />}
               <FieldGroupSection
                 group={group}
                 formData={formData}

@@ -213,6 +213,13 @@ export default function ViewerProjectPage() {
         case "VIEWER_SET_CONFIG":
           if (msg.configData && typeof msg.configData === "object") {
             setConfigData((prev) => ({ ...prev, ...msg.configData }));
+            setConfigDataMap((prev) => {
+              const next = { ...prev };
+              for (const pageId of Object.keys(next)) {
+                next[pageId] = { ...next[pageId], ...msg.configData };
+              }
+              return next;
+            });
           }
           break;
         case "VIEWER_SET_MODE":
@@ -242,6 +249,21 @@ export default function ViewerProjectPage() {
       [activeDemoId]: { ...(prev[activeDemoId] ?? {}), ...newData },
     }));
   }, [activeDemoId]);
+
+  const handleProjectConfigChange = useCallback((newData: Record<string, unknown>) => {
+    setConfigData((prev) => {
+      const merged = { ...prev, ...newData };
+      postOutgoing({ type: "VIEWER_CONFIG_CHANGE", configData: merged });
+      return merged;
+    });
+    setConfigDataMap((prev) => {
+      const next = { ...prev };
+      for (const pageId of Object.keys(next)) {
+        next[pageId] = { ...next[pageId], ...newData };
+      }
+      return next;
+    });
+  }, []);
 
   const handlePageChange = useCallback(
     (pageId: string) => {
@@ -463,17 +485,21 @@ export default function ViewerProjectPage() {
               <h2 className="text-sm font-medium">配置面板</h2>
             </div>
             <ScrollArea className="flex-1">
-              <div className="p-4 flex flex-col gap-5">
+              <div className="p-4 flex flex-col">
                 {data.projectConfigSchema && (
                   <ConfigScopeWrapper scope="project">
                     <ConfigForm
                       key={`project-${data.projectConfigSchema}`}
                       schema={data.projectConfigSchema}
-                      onChange={handleConfigChange}
+                      onChange={handleProjectConfigChange}
                       initialData={configData}
                       readonly
                     />
                   </ConfigScopeWrapper>
+                )}
+
+                {data.projectConfigSchema && activePageSchema && (
+                  <div className="h-[2px] bg-border my-3" />
                 )}
 
                 {activePageSchema && (

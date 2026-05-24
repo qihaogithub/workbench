@@ -305,7 +305,7 @@ function ConfigPanel({
 }) {
   return (
     <div className="w-72 shrink-0">
-      <div className="border rounded-lg bg-card flex flex-col gap-4 p-4">
+      <div className="flex flex-col">
         {projectConfigSchema && (
           <ConfigScopeWrapper scope="project">
             <ConfigForm
@@ -315,6 +315,10 @@ function ConfigPanel({
               initialData={configData}
             />
           </ConfigScopeWrapper>
+        )}
+
+        {projectConfigSchema && (
+          <div className="h-[2px] bg-border my-3" />
         )}
 
         <ConfigScopeWrapper scope="page">
