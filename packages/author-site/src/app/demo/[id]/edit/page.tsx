@@ -58,7 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CodeViewDialog } from "@/components/demo/code-view-dialog";
-import { ValidationPanel } from "@/components/demo/ValidationPanel";
+import { ErrorBanner } from "@/components/demo/ErrorBanner";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
@@ -136,6 +136,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     parts: [],
   });
 
+  const [errorBannerVisible, setErrorBannerVisible] = useState(false);
+  const [tabValue, setTabValue] = useState("ai");
+  const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
+  const [repairFailureCount, setRepairFailureCount] = useState(0);
+  const isRepairAttemptRef = useRef(false);
+
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const codeRef = useRef(code);
   codeRef.current = code;
@@ -145,6 +151,43 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    const hasErrors = !validationResult.isValid && validationResult.errors.length > 0;
+    setErrorBannerVisible(hasErrors);
+    if (!hasErrors) {
+      setRepairFailureCount(0);
+    }
+  }, [validationResult]);
+
+  const handleSendErrorToAI = useCallback((context: { summary: string; details: string; code: string; schema: string }) => {
+    const aiPrompt = `你是一个前端组件开发助手。当前组件存在以下配置问题，请帮我修复：
+
+【问题摘要】
+${context.summary}
+
+【技术详情】
+${context.details}
+
+【当前代码】
+\`\`\`tsx
+${context.code}
+\`\`\`
+
+【当前配置】
+\`\`\`json
+${context.schema}
+\`\`\`
+
+请：
+1. 分析上述问题
+2. 修改代码和/或配置文件来修复问题
+3. 保持组件的原有功能不变`;
+
+    isRepairAttemptRef.current = true;
+    setTabValue("ai");
+    setTriggerAutoSend(aiPrompt);
+  }, []);
 
   const handleNameClick = () => {
     setNameDraft(demoName);
@@ -550,6 +593,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         console.log("[DemoEditPage] Validation result:", result);
         setValidationResult(result);
 
+        if (isRepairAttemptRef.current) {
+          isRepairAttemptRef.current = false;
+          if (!result.isValid) {
+            setRepairFailureCount((prev) => prev + 1);
+          }
+        }
+
         // 代码变更时重置 configData 为空，让组件默认值生效
         setConfigDataMap((prev) => ({
           ...prev,
@@ -679,6 +729,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     if (currentCode) {
       const result = validateAll(currentCode, newSchema);
       setValidationResult(result);
+
+      if (isRepairAttemptRef.current) {
+        isRepairAttemptRef.current = false;
+        if (!result.isValid) {
+          setRepairFailureCount((prev) => prev + 1);
+        }
+      }
     }
   }, []);
 
@@ -756,7 +813,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         >
           <ResizablePanel className="flex flex-col border-r bg-card">
             <Tabs
-              defaultValue="ai"
+              value={tabValue}
+              onValueChange={setTabValue}
               className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
             >
               <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
@@ -1246,9 +1304,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
-                {!validationResult.isValid && validationResult.errors.length > 0 && (
-                  <ValidationPanel errors={validationResult.errors} />
-                )}
                 {projectConfigSchema && (
                   <ConfigScopeWrapper scope="project" hideHeader={!projectConfigSchema}>
                     <ConfigForm
@@ -1335,9 +1390,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             setValidationResult(result);
             const size = getPreviewSize(content);
             setPreviewSize(size);
-          }
-        }}
-      />
+                    }
+                  }}
+                />
     </div>
   );
 }

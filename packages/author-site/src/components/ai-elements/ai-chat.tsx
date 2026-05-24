@@ -40,6 +40,10 @@ interface AIChatProps {
   onNewSession?: (workspaceId?: string) => void;
   onSelectSession?: (sessionId: string, workspaceId?: string) => void;
   currentSessionId?: string;
+  triggerAutoSend?: string | null;
+  onTriggerAutoSendHandled?: () => void;
+  /** 错误提示横幅，渲染在输入框上方 */
+  errorBanner?: React.ReactNode;
 }
 
 export function AIChat({
@@ -63,6 +67,9 @@ export function AIChat({
   onNewSession,
   onSelectSession,
   currentSessionId,
+  triggerAutoSend,
+  onTriggerAutoSendHandled,
+  errorBanner,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -127,6 +134,10 @@ export function AIChat({
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+  const onTriggerAutoSendHandledRef = useRef(onTriggerAutoSendHandled);
+  onTriggerAutoSendHandledRef.current = onTriggerAutoSendHandled;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -144,6 +155,13 @@ export function AIChat({
     setHistoryDialogOpen(true);
   }, [isStreaming, toast]);
 
+  useEffect(() => {
+    if (triggerAutoSend && !isStreaming) {
+      handleSendRef.current(triggerAutoSend);
+      onTriggerAutoSendHandledRef.current?.();
+    }
+  }, [triggerAutoSend, isStreaming]);
+
   return (
     <div className="flex flex-col h-full">
       <Conversation className="flex-1 min-h-0">
@@ -158,6 +176,8 @@ export function AIChat({
       </Conversation>
 
       <ChatPlan plan={plan} isStreaming={isStreaming} />
+
+      {errorBanner}
 
       <ChatInput
         onSubmit={handleSend}
