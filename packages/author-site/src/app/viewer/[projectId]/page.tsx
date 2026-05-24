@@ -20,6 +20,11 @@ import {
   Settings,
   Loader2,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ViewerDemoPage {
   id: string;
@@ -110,7 +115,7 @@ export default function ViewerProjectPage() {
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(
     columnsParam === "3" ? 3 : columnsParam === "4" ? 4 : 2
   );
-  const [configVisible, setConfigVisible] = useState(showConfig);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
@@ -306,36 +311,6 @@ export default function ViewerProjectPage() {
         <header className="flex h-12 items-center border-b px-4 shrink-0 gap-3">
           <h1 className="text-sm font-semibold">{data.project?.name || projectId}</h1>
 
-          {showModeSwitch && (
-            <>
-              <div className="h-5 w-px bg-border" />
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPreviewMode("single")}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors ${
-                    previewMode === "single"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  单页
-                </button>
-                <button
-                  onClick={() => setPreviewMode("grid")}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors ${
-                    previewMode === "grid"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  宫格
-                </button>
-              </div>
-            </>
-          )}
-
           {previewMode === "single" && showPages && hasMultiplePages && (
             <Select value={activeDemoId} onValueChange={handlePageChange}>
               <SelectTrigger className="h-7 w-32 text-xs">
@@ -351,40 +326,72 @@ export default function ViewerProjectPage() {
             </Select>
           )}
 
-          {previewMode === "grid" && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">每行</span>
-              <Select
-                value={String(gridColumns)}
-                onValueChange={(v) => setGridColumns(Number(v) as 2 | 3 | 4)}
-              >
-                <SelectTrigger className="h-7 w-16 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div className="flex-1" />
 
-          {showConfig && (
-            <button
-              onClick={() => setConfigVisible(!configVisible)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors ${
-                configVisible
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              配置
-            </button>
-          )}
+          <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-accent">
+                <Settings className="h-3.5 w-3.5" />
+                设置
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-3">
+              {showModeSwitch && (
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground">预览模式</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPreviewMode("single")}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                        previewMode === "single"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      }`}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      单页
+                    </button>
+                    <button
+                      onClick={() => setPreviewMode("grid")}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                        previewMode === "grid"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      }`}
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      宫格
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {previewMode === "grid" && showModeSwitch && (
+                <div className="mt-3 pt-3 border-t" />
+              )}
+
+              {previewMode === "grid" && (
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground">每行显示</span>
+                  <div className="flex gap-1">
+                    {([2, 3, 4] as const).map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setGridColumns(n)}
+                        className={`flex-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                          gridColumns === n
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
         </header>
       )}
 
@@ -447,7 +454,7 @@ export default function ViewerProjectPage() {
           )}
         </div>
 
-        {configVisible && showConfig && (
+        {showConfig && (
           <div
             className="border-l shrink-0 flex flex-col"
             style={{ width: configWidth }}
