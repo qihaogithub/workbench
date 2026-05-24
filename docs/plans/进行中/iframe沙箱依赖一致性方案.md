@@ -281,13 +281,13 @@ const result = transform(wrappedCode, {
 
 ## 实施步骤
 
-- [ ] **Layer 1（P0）** 修改 `compiler.ts` 的 `toCdnUrl()`，非核心包追加 `?deps=react@18.3.1,react-dom@18.3.1`
-- [ ] **Layer 2（P1）** 修改 `iframe-template.ts`，在 `<head>` 中添加 Import Map
-- [ ] **Layer 3（P2）** 修改三个后端的 `buildSystemPrompt()` 和 `demo-generator.template.md`，补充 React 版本约束
-- [ ] 测试预置 Demo 页面渲染（确保无回归）
-- [ ] 测试使用第三方库（lucide-react、framer-motion、recharts 等）的 Demo 渲染
-- [ ] 测试嵌入模式下的配置更新功能
-- [ ] 测试 `lockedDependencies`（已锁定的依赖 URL）与 `?deps` 的组合兼容性
+- [x] **Layer 1（P0）** 修改 `compiler.ts` 的 `toCdnUrl()`，非核心包追加 `?deps=react@18.3.1,react-dom@18.3.1`
+- [x] **Layer 2（P1）** 修改 `iframe-template.ts`，在 `<head>` 中添加 Import Map
+- [x] **Layer 3（P2）** 修改三个后端的 `buildSystemPrompt()` 和 `demo-generator.template.md`，补充 React 版本约束
+- [x] 测试预置 Demo 页面渲染（确保无回归）
+- [x] 测试使用第三方库（lucide-react、framer-motion、recharts 等）的 Demo 渲染
+- [x] 测试嵌入模式下的配置更新功能
+- [x] 测试 `lockedDependencies`（已锁定的依赖 URL）与 `?deps` 的组合兼容性
 
 ---
 
