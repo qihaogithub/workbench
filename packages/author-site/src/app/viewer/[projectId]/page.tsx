@@ -87,12 +87,16 @@ export default function ViewerProjectPage() {
   const themeParam = searchParams.get("theme");
   const backgroundParam = searchParams.get("background");
   const configDataParam = searchParams.get("configData");
+  const gridSelectOnlyParam = searchParams.get("gridSelectOnly");
+  const pageListParam = searchParams.get("pageList");
 
   const showConfig = configParam !== "false";
   const configWidth = configWidthParam ? parseInt(configWidthParam, 10) : 320;
   const showPages = pagesParam !== "false";
   const showToolbar = toolbarParam !== "false";
   const showModeSwitch = modeSwitchParam !== "false";
+  const gridSelectOnly = gridSelectOnlyParam === "true";
+  const showPageList = pageListParam === "true";
   const previewBackground = backgroundParam || "#fff";
 
   const [data, setData] = useState<ViewerData | null>(null);
@@ -256,9 +260,11 @@ export default function ViewerProjectPage() {
   const handleGridCardClick = useCallback(
     (pageId: string) => {
       handlePageChange(pageId);
-      setPreviewMode("single");
+      if (!gridSelectOnly) {
+        setPreviewMode("single");
+      }
     },
-    [handlePageChange]
+    [handlePageChange, gridSelectOnly]
   );
 
   if (isLoading) {
@@ -383,6 +389,31 @@ export default function ViewerProjectPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
+        {showPageList && hasMultiplePages && (
+          <div className="w-48 border-r shrink-0 flex flex-col">
+            <div className="px-3 py-3 border-b">
+              <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {data.demoPages.map((page) => (
+                  <button
+                    key={page.id}
+                    onClick={() => handlePageChange(page.id)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      page.id === activeDemoId
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    {page.name}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
         <div className="flex-1 overflow-hidden" style={{ backgroundColor: previewBackground }}>
           {previewMode === "single" ? (
             <div

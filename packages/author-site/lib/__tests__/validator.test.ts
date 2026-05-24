@@ -1,7 +1,3 @@
-/**
- * 一致性校验服务单元测试
- */
-
 import {
   validateJsonSyntax,
   validatePropsSchema,
@@ -26,6 +22,8 @@ describe("validateJsonSyntax", () => {
     expect(result).not.toBeNull();
     expect(result?.type).toBe("json_syntax");
     expect(result?.message).toContain("JSON 语法错误");
+    expect(result?.severity).toBe("error");
+    expect(result?.fixSuggestion?.action).toBe("fix_json");
   });
 
   it("应检测出缺少闭合括号", () => {
@@ -34,6 +32,7 @@ describe("validateJsonSyntax", () => {
 
     expect(result).not.toBeNull();
     expect(result?.type).toBe("json_syntax");
+    expect(result?.severity).toBe("error");
   });
 
   it("应检测出无效的 JSON 格式", () => {
@@ -42,6 +41,23 @@ describe("validateJsonSyntax", () => {
 
     expect(result).not.toBeNull();
     expect(result?.type).toBe("json_syntax");
+  });
+
+  it("应包含位置信息（当错误消息包含位置时）", () => {
+    const schema = '{ "title": "test" ';
+    const result = validateJsonSyntax(schema);
+
+    expect(result).not.toBeNull();
+    expect(result?.location?.type).toBe("schema");
+  });
+
+  it("应包含修复建议", () => {
+    const schema = "not json at all";
+    const result = validateJsonSyntax(schema);
+
+    expect(result).not.toBeNull();
+    expect(result?.fixSuggestion?.action).toBe("fix_json");
+    expect(result?.fixSuggestion?.description).toBeTruthy();
   });
 });
 
@@ -70,7 +86,7 @@ export default function Demo({ title, description }: DemoProps) {
     expect(errors).toHaveLength(0);
   });
 
-  it("应检测出 Props 与 Schema 不一致", () => {
+  it("应检测出代码中的 props 未在 Schema 中定义", () => {
     const code = `
 interface DemoProps {
   title: string;
@@ -87,10 +103,11 @@ interface DemoProps {
     const errors = validatePropsSchema(code, schema);
 
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors.some((e) => e.type === "props_mismatch")).toBe(true);
+    expect(errors.some((e) => e.type === "props_code_not_in_schema")).toBe(true);
+    expect(errors.some((e) => e.severity === "warning")).toBe(true);
   });
 
-  it("应检测出代码中的 props 未在 Schema 中定义", () => {
+  it("应检测出代码中的 props 未在 Schema 中定义 - 包含字段和修复建议", () => {
     const code = `
 interface DemoProps {
   title: string;
@@ -106,7 +123,11 @@ interface DemoProps {
 
     const errors = validatePropsSchema(code, schema);
 
-    expect(errors.some((e) => e.message.includes("extraProp"))).toBe(true);
+    const error = errors.find((e) => e.message.includes("extraProp"));
+    expect(error).toBeDefined();
+    expect(error?.type).toBe("props_code_not_in_schema");
+    expect(error?.field?.name).toBe("extraProp");
+    expect(error?.fixSuggestion?.action).toBe("add_to_schema");
   });
 
   it("应检测出 Schema 中的 property 未在代码中定义", () => {
@@ -125,7 +146,12 @@ interface DemoProps {
 
     const errors = validatePropsSchema(code, schema);
 
-    expect(errors.some((e) => e.message.includes("missingInCode"))).toBe(true);
+    const error = errors.find((e) => e.message.includes("missingInCode"));
+    expect(error).toBeDefined();
+    expect(error?.type).toBe("props_schema_not_in_code");
+    expect(error?.severity).toBe("info");
+    expect(error?.field?.name).toBe("missingInCode");
+    expect(error?.fixSuggestion?.action).toBe("remove_from_schema");
   });
 
   it("应支持 type DemoProps 语法", () => {
@@ -203,10 +229,12 @@ interface DemoProps {
 
     const errors = validatePropsSchema(code, schema);
 
-    expect(errors.some((e) => e.type === "required_missing")).toBe(true);
-    expect(errors.some((e) => e.message.includes("missingRequired"))).toBe(
-      true,
-    );
+    const error = errors.find((e) => e.type === "required_missing");
+    expect(error).toBeDefined();
+    expect(error?.message).toContain("missingRequired");
+    expect(error?.severity).toBe("error");
+    expect(error?.field?.name).toBe("missingRequired");
+    expect(error?.fixSuggestion?.action).toBe("remove_from_required");
   });
 
   it("应在找不到 interface 时返回警告", () => {
@@ -224,7 +252,6 @@ export default function Demo() {
 
     const errors = validatePropsSchema(code, schema);
 
-    // 没有 props 使用，不应该报错
     expect(errors).toHaveLength(0);
   });
 
@@ -243,7 +270,6 @@ export default function Demo() {
 
     const errors = validatePropsSchema(code, schema);
 
-    // 空 interface 和空 properties 应该是一致的，没有错误
     expect(errors).toHaveLength(0);
   });
 });
@@ -280,6 +306,7 @@ export default function Demo({ title }: DemoProps) {
 
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.type === "json_syntax")).toBe(true);
+    expect(result.errors[0].severity).toBe("error");
   });
 
   it("应返回包含 Props 不匹配的校验结果", () => {
@@ -299,7 +326,9 @@ interface DemoProps {
     const result = validateAll(code, schema);
 
     expect(result.isValid).toBe(false);
-    expect(result.errors.some((e) => e.type === "props_mismatch")).toBe(true);
+    expect(
+      result.errors.some((e) => e.type === "props_code_not_in_schema"),
+    ).toBe(true);
   });
 });
 

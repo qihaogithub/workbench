@@ -1,18 +1,36 @@
-/**
- * 一致性校验服务
- * 用于校验 JSON Schema 语法和 Props 与 Schema 的一致性
- */
-
 import type { PreviewSize } from "../components/demo/types";
 
+export type ValidationErrorType =
+  | "json_syntax"
+  | "props_code_not_in_schema"
+  | "props_schema_not_in_code"
+  | "required_missing"
+  | "interface_not_found";
+
 export interface ValidationError {
-  type:
-    | "json_syntax"
-    | "props_mismatch"
-    | "required_missing"
-    | "interface_not_found";
+  type: ValidationErrorType;
   message: string;
+  severity: "error" | "warning" | "info";
   line?: number;
+  location?: {
+    type: "code" | "schema";
+    line?: number;
+    column?: number;
+  };
+  field?: {
+    name: string;
+    path?: string;
+  };
+  fixSuggestion?: {
+    action:
+      | "add_to_schema"
+      | "remove_from_schema"
+      | "fix_json"
+      | "add_interface"
+      | "remove_from_required";
+    description: string;
+    example?: string;
+  };
 }
 
 export interface ValidationResult {
@@ -20,11 +38,23 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-/**
- * 校验 JSON Schema 语法
- * @param schema JSON Schema 字符串
- * @returns 校验错误，如果没有错误返回 null
- */
+function positionToLineColumn(
+  text: string,
+  position: number,
+): { line: number; column: number } {
+  let line = 1;
+  let column = 1;
+  for (let i = 0; i < position && i < text.length; i++) {
+    if (text[i] === "\n") {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+  return { line, column };
+}
+
 export function validateJsonSyntax(schema: string): ValidationError | null {
   try {
     JSON.parse(schema);
@@ -32,25 +62,29 @@ export function validateJsonSyntax(schema: string): ValidationError | null {
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
 
-    // 尝试提取行号信息
-    const lineMatch = errorMessage.match(/position\s+(\d+)/);
-    const line = lineMatch ? parseInt(lineMatch[1], 10) : undefined;
+    const positionMatch = errorMessage.match(/position\s+(\d+)/);
+    let location: ValidationError["location"];
+
+    if (positionMatch) {
+      const pos = parseInt(positionMatch[1], 10);
+      const { line, column } = positionToLineColumn(schema, pos);
+      location = { type: "schema", line, column };
+    }
 
     return {
       type: "json_syntax",
       message: `JSON 语法错误: ${errorMessage}`,
-      line,
+      severity: "error",
+      location,
+      fixSuggestion: {
+        action: "fix_json",
+        description: "检查 JSON 语法完整性，确保所有括号和引号正确闭合",
+      },
     };
   }
 }
 
-/**
- * 从 React 组件代码中提取 interface DemoProps 的属性名列表
- * @param code React 组件代码
- * @returns 属性名列表，如果没有找到 interface 返回 null
- */
 function extractPropsFromCode(code: string): string[] | null {
-  // 匹配 interface DemoProps { ... } 或 type DemoProps = { ... }
   const interfacePattern = /interface\s+DemoProps\s*\{([^}]+)\}/;
   const typePattern = /type\s+DemoProps\s*=\s*\{([^}]+)\}/;
 
@@ -63,7 +97,6 @@ function extractPropsFromCode(code: string): string[] | null {
     return null;
   }
 
-  // 提取属性名（支持可选属性标记 ?）
   const propPattern = /(\w+)\??\s*:/g;
   const props: string[] = [];
   let match;
@@ -75,13 +108,7 @@ function extractPropsFromCode(code: string): string[] | null {
   return props;
 }
 
-/**
- * 从解构赋值中提取 props（如：function Demo({ title, description })）
- * @param code React 组件代码
- * @returns 属性名列表
- */
 function extractPropsFromDestructuring(code: string): string[] | null {
-  // 匹配函数组件的解构赋值
   const patterns = [
     /function\s+\w+\s*\(\s*\{([^}]*)\}/,
     /const\s+\w+\s*=\s*\(\s*\{([^}]*)\}\s*\)/,
@@ -92,15 +119,12 @@ function extractPropsFromDestructuring(code: string): string[] | null {
     const match = code.match(pattern);
     if (match) {
       const destructured = match[1];
-      // 提取属性名，支持默认值（如：title = 'default'）和类型注解
-      // 匹配: propName, propName = default, propName?: type, propName: type
       const propPattern = /(\w+)(?:\??:?[^,=]*)?(?:\s*=\s*[^,]+)?/g;
       const props: string[] = [];
       let propMatch;
 
       while ((propMatch = propPattern.exec(destructured)) !== null) {
         const propName = propMatch[1];
-        // 排除 TypeScript 关键字和空字符串
         if (
           propName &&
           !["type", "interface", "const", "let", "var"].includes(propName)
@@ -118,11 +142,6 @@ function extractPropsFromDestructuring(code: string): string[] | null {
   return null;
 }
 
-/**
- * 从 JSON Schema 中提取 properties 的键名
- * @param schema JSON Schema 字符串
- * @returns 键名列表，如果解析失败返回 null
- */
 function extractPropertiesFromSchema(schema: string): string[] | null {
   try {
     const parsed = JSON.parse(schema);
@@ -137,11 +156,6 @@ function extractPropertiesFromSchema(schema: string): string[] | null {
   }
 }
 
-/**
- * 从 JSON Schema 中提取 required 字段
- * @param schema JSON Schema 字符串
- * @returns required 字段列表，如果没有返回空数组
- */
 function extractRequiredFromSchema(schema: string): string[] {
   try {
     const parsed = JSON.parse(schema);
@@ -151,56 +165,66 @@ function extractRequiredFromSchema(schema: string): string[] {
   }
 }
 
-/**
- * 校验 Props 与 Schema 的一致性
- * @param code React 组件代码
- * @param schema JSON Schema 字符串
- * @returns 校验错误列表
- */
 export function validatePropsSchema(
   code: string,
   schema: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  // 1. 提取代码中的 props
   let codeProps = extractPropsFromCode(code);
 
-  // 如果没有找到 interface，尝试从解构赋值中提取
   if (!codeProps || codeProps.length === 0) {
     codeProps = extractPropsFromDestructuring(code);
   }
 
-  // 2. 提取 schema 中的 properties
   const schemaProps = extractPropertiesFromSchema(schema);
 
   if (schemaProps === null) {
     errors.push({
       type: "json_syntax",
       message: "无法解析 Schema 中的 properties",
+      severity: "error",
+      location: { type: "schema" },
+      fixSuggestion: {
+        action: "fix_json",
+        description: "检查 JSON 语法完整性，确保所有括号和引号正确闭合",
+      },
     });
     return errors;
   }
 
-  // 3. 如果没有找到 interface 且代码中有 props 使用，记录警告
   if (!codeProps) {
-    // 检查代码中是否使用了 props
     const hasPropsUsage = /props\.\w+/.test(code) || /\{\s*\w+\s*\}/.test(code);
 
     if (hasPropsUsage) {
       errors.push({
         type: "interface_not_found",
         message: "未找到 DemoProps 接口定义，无法校验 props 一致性",
+        severity: "warning",
+        location: { type: "code" },
+        fixSuggestion: {
+          action: "add_interface",
+          description:
+            "添加 interface DemoProps { ... } 或 type DemoProps = { ... }",
+          example: `interface DemoProps {\n  title: string;\n}`,
+        },
       });
     }
 
-    // 继续校验 required 字段
     const requiredFields = extractRequiredFromSchema(schema);
     for (const field of requiredFields) {
       if (!schemaProps.includes(field)) {
         errors.push({
           type: "required_missing",
           message: `required 字段 "${field}" 未在 properties 中定义`,
+          severity: "error",
+          location: { type: "schema" },
+          field: { name: field, path: `required.${field}` },
+          fixSuggestion: {
+            action: "remove_from_required",
+            description: `从 required 数组中移除 "${field}"，或在 properties 中添加该字段定义`,
+            example: `在 properties 中添加:\n"${field}": { "type": "string" }`,
+          },
         });
       }
     }
@@ -208,37 +232,56 @@ export function validatePropsSchema(
     return errors;
   }
 
-  // 4. 对比 code props 和 schema properties
   const codePropsSet = new Set(codeProps);
   const schemaPropsSet = new Set(schemaProps);
 
-  // 检查 code 中有但 schema 中没有的 props
   for (const prop of codeProps) {
     if (!schemaPropsSet.has(prop) && !prop.startsWith("__")) {
       errors.push({
-        type: "props_mismatch",
+        type: "props_code_not_in_schema",
         message: `代码中的 props "${prop}" 未在 Schema 的 properties 中定义`,
+        severity: "warning",
+        location: { type: "code" },
+        field: { name: prop, path: `DemoProps.${prop}` },
+        fixSuggestion: {
+          action: "add_to_schema",
+          description: `在 Schema 的 properties 中添加 "${prop}" 字段`,
+          example: `"${prop}": { "type": "string" }`,
+        },
       });
     }
   }
 
-  // 检查 schema 中有但 code 中没有的 props（跳过 __ 前缀系统属性）
   for (const prop of schemaProps) {
     if (!codePropsSet.has(prop) && !prop.startsWith("__")) {
       errors.push({
-        type: "props_mismatch",
+        type: "props_schema_not_in_code",
         message: `Schema 中的 property "${prop}" 未在代码的 DemoProps 中定义`,
+        severity: "info",
+        location: { type: "schema" },
+        field: { name: prop, path: `properties.${prop}` },
+        fixSuggestion: {
+          action: "remove_from_schema",
+          description: `从 Schema 的 properties 中移除 "${prop}"，或在代码中使用它`,
+        },
       });
     }
   }
 
-  // 5. 校验 required 字段是否都存在于 properties 中
   const requiredFields = extractRequiredFromSchema(schema);
   for (const field of requiredFields) {
     if (!schemaPropsSet.has(field)) {
       errors.push({
         type: "required_missing",
         message: `required 字段 "${field}" 未在 properties 中定义`,
+        severity: "error",
+        location: { type: "schema" },
+        field: { name: field, path: `required.${field}` },
+        fixSuggestion: {
+          action: "remove_from_required",
+          description: `从 required 数组中移除 "${field}"，或在 properties 中添加该字段定义`,
+          example: `在 properties 中添加:\n"${field}": { "type": "string" }`,
+        },
       });
     }
   }
@@ -246,27 +289,18 @@ export function validatePropsSchema(
   return errors;
 }
 
-/**
- * 执行完整的校验流程
- * @param code React 组件代码
- * @param schema JSON Schema 字符串
- * @returns 完整的校验结果
- */
 export function validateAll(code: string, schema: string): ValidationResult {
   const errors: ValidationError[] = [];
 
-  // 1. 校验 JSON Schema 语法
   const jsonError = validateJsonSyntax(schema);
   if (jsonError) {
     errors.push(jsonError);
-    // JSON 语法错误时，不继续校验 props 一致性
     return {
       isValid: false,
       errors,
     };
   }
 
-  // 2. 校验 Props 与 Schema 一致性
   const propsErrors = validatePropsSchema(code, schema);
   errors.push(...propsErrors);
 
@@ -276,21 +310,10 @@ export function validateAll(code: string, schema: string): ValidationResult {
   };
 }
 
-/**
- * 快速校验 - 仅校验 JSON 语法
- * @param schema JSON Schema 字符串
- * @returns 是否有效
- */
 export function isValidJson(schema: string): boolean {
   return validateJsonSyntax(schema) === null;
 }
 
-/**
- * 获取 Schema 的默认值
- * 当 Schema 包含 $demo.orderable 时，自动生成 __order 默认值
- * @param schema JSON Schema 字符串
- * @returns 默认值对象
- */
 export function getDefaultValues(schema: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(schema);
@@ -316,15 +339,6 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
   }
 }
 
-/**
- * 从 Schema 中提取预览尺寸配置
- *
- * 仅识别 `$demo.previewSize`。schema 扩展元数据统一收纳在 `$demo.*` 命名空间下，
- * 与 JSON Schema `$`-前缀扩展惯例一致。
- *
- * @param schema JSON Schema 字符串
- * @returns 预览尺寸配置，如果未定义则返回 undefined
- */
 export function getPreviewSize(schema: string): PreviewSize | undefined {
   try {
     const parsed = JSON.parse(schema);
@@ -358,13 +372,6 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
   }
 }
 
-/**
- * 从 Schema 中提取可排序属性列表
- * 读取 $demo.orderable 字段，至少包含 2 项才返回
- * orderable 引用组件代码中的 section 名称，不要求与 properties 中的属性名一致
- * @param schema JSON Schema 字符串
- * @returns 可排序属性名数组，未声明或不足 2 项返回 undefined
- */
 export function getOrderable(schema: string): string[] | undefined {
   try {
     const parsed = JSON.parse(schema);

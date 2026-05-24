@@ -58,6 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CodeViewDialog } from "@/components/demo/code-view-dialog";
+import { ValidationPanel } from "@/components/demo/ValidationPanel";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
@@ -339,6 +340,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           {
             type: "json_syntax",
             message: parsed.error || "解析错误",
+            severity: "error",
+            location: { type: "schema" },
+            fixSuggestion: {
+              action: "fix_json",
+              description: "检查代码格式是否正确，确保 Figma 标记语法完整",
+            },
           },
         ],
       });
@@ -423,11 +430,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }
 
     if (!validationResult.isValid) {
-      toast({
-        title: "验证警告",
-        description: "当前页面存在验证错误，保存后可能无法正常预览",
-        variant: "destructive",
-      });
+      const errors = validationResult.errors.filter(e => e.severity === "error");
+      const warnings = validationResult.errors.filter(e => e.severity === "warning");
+
+      if (errors.length > 0) {
+        toast({
+          title: "保存失败：存在语法错误",
+          description: `发现 ${errors.length} 个错误，需要先修复后才能正常预览`,
+          variant: "destructive",
+        });
+      } else if (warnings.length > 0) {
+        toast({
+          title: "存在配置不一致",
+          description: `发现 ${warnings.length} 个警告，保存后预览可能异常`,
+        });
+      }
     }
 
     try {
@@ -1229,6 +1246,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col gap-5">
+                {!validationResult.isValid && validationResult.errors.length > 0 && (
+                  <ValidationPanel errors={validationResult.errors} />
+                )}
                 {projectConfigSchema && (
                   <ConfigScopeWrapper scope="project">
                     <ConfigForm
