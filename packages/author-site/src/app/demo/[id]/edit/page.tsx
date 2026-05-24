@@ -1250,7 +1250,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   <ValidationPanel errors={validationResult.errors} />
                 )}
                 {projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project">
+                  <ConfigScopeWrapper scope="project" hideHeader={!projectConfigSchema}>
                     <ConfigForm
                       key={`project-${projectConfigSchema}`}
                       schema={projectConfigSchema}
@@ -1274,7 +1274,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
                   <div className="h-[2px] bg-border my-3" />
                 )}
 
-                <ConfigScopeWrapper scope="page" pageName={demoPages.find(p => p.id === activeDemoId)?.name}>
+                <ConfigScopeWrapper scope="page" pageName={demoPages.find(p => p.id === activeDemoId)?.name} hideHeader={!projectConfigSchema}>
                   <ConfigForm
                     key={schema}
                     schema={schema}

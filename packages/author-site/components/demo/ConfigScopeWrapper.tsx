@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Globe, FileText } from "lucide-react";
+import { Settings, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ConfigScope = "project" | "page";
@@ -9,6 +9,7 @@ interface ConfigScopeWrapperProps {
   pageName?: string;
   children: React.ReactNode;
   className?: string;
+  hideHeader?: boolean;
 }
 
 const SCOPE_CONFIG: Record<
@@ -20,9 +21,9 @@ const SCOPE_CONFIG: Record<
   }
 > = {
   project: {
-    icon: Globe,
+    icon: Settings,
     title: "全局配置",
-    iconClass: "text-blue-500",
+    iconClass: "text-white",
   },
   page: {
     icon: FileText,
@@ -36,6 +37,7 @@ export function ConfigScopeWrapper({
   pageName,
   children,
   className,
+  hideHeader,
 }: ConfigScopeWrapperProps) {
   const config = SCOPE_CONFIG[scope];
   const Icon = config.icon;
@@ -43,10 +45,12 @@ export function ConfigScopeWrapper({
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <div className="flex items-center gap-2 px-1 py-3">
-        <Icon className={cn("h-[15px] w-[15px]", config.iconClass)} />
-        <span className="text-sm font-semibold text-foreground">{title}</span>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-2 px-1 py-3">
+          <Icon className={cn("h-[15px] w-[15px]", config.iconClass)} />
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+        </div>
+      )}
       <div className="flex-1 min-h-0">{children}</div>
     </div>
   );

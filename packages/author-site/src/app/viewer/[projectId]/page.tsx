@@ -487,7 +487,7 @@ export default function ViewerProjectPage() {
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
                 {data.projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project">
+                  <ConfigScopeWrapper scope="project" hideHeader={!(data.projectConfigSchema && activePageSchema)}>
                     <ConfigForm
                       key={`project-${data.projectConfigSchema}`}
                       schema={data.projectConfigSchema}
@@ -503,7 +503,7 @@ export default function ViewerProjectPage() {
                 )}
 
                 {activePageSchema && (
-                  <ConfigScopeWrapper scope="page" pageName={activePage?.name}>
+                  <ConfigScopeWrapper scope="page" pageName={activePage?.name} hideHeader={!(data.projectConfigSchema && activePageSchema)}>
                     <ConfigForm
                       key={`page-${activeDemoId}`}
                       schema={activePageSchema}

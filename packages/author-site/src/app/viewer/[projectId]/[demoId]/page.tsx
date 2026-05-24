@@ -305,7 +305,7 @@ export default function ViewerDemoPage() {
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
                 {data.projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project">
+                  <ConfigScopeWrapper scope="project" hideHeader={!(data.projectConfigSchema && currentPageSchema)}>
                     <ConfigForm
                       key={`project-${data.projectConfigSchema}`}
                       schema={data.projectConfigSchema}
@@ -321,7 +321,7 @@ export default function ViewerDemoPage() {
                 )}
 
                 {currentPageSchema && (
-                  <ConfigScopeWrapper scope="page" pageName={currentPage?.name}>
+                  <ConfigScopeWrapper scope="page" pageName={currentPage?.name} hideHeader={!(data.projectConfigSchema && currentPageSchema)}>
                     <ConfigForm
                       key={`page-${activeDemoId}`}
                       schema={currentPageSchema}

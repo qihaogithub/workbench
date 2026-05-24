@@ -303,11 +303,13 @@ function ConfigPanel({
   onChange: (data: Record<string, unknown>) => void;
   onProjectConfigChange?: (data: Record<string, unknown>) => void;
 }) {
+  const hasBothScopes = !!projectConfigSchema;
+
   return (
     <div className="w-72 shrink-0">
       <div className="flex flex-col">
         {projectConfigSchema && (
-          <ConfigScopeWrapper scope="project">
+          <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
             <ConfigForm
               key={`project-${projectConfigSchema}`}
               schema={projectConfigSchema}
@@ -321,7 +323,7 @@ function ConfigPanel({
           <div className="h-[2px] bg-border my-3" />
         )}
 
-        <ConfigScopeWrapper scope="page">
+        <ConfigScopeWrapper scope="page" hideHeader={!hasBothScopes}>
           <ConfigForm
             key={schema}
             schema={schema}
