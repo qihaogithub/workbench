@@ -110,6 +110,12 @@ export class ClaudeBackend implements IBackendAdapter {
       "import React from 'react';",
       "// ... 你的代码",
       "```",
+      "",
+      "## React 版本约束",
+      "预览环境使用 React 18.3.1，所有第三方 React 依赖必须兼容此版本。",
+      "禁止手动 import React（由 React JSX Runtime 自动处理）。",
+      "使用第三方 React 库时，优先使用白名单中的库（lucide-react、framer-motion）。",
+      "如需使用白名单外的库，请通过 // @dependency 注释声明。",
     ];
 
     if (this.config.workingDir) {

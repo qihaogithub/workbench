@@ -38,6 +38,16 @@ export function generateIframeHtml(options: IframeTemplateOptions = {}): string 
     #root { min-height: 100vh; }
   </style>
 ${cssLinks}
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "${cdnBase}/react@18.3.1",
+      "react-dom": "${cdnBase}/react-dom@18.3.1/client",
+      "react/jsx-runtime": "${cdnBase}/react@18.3.1/jsx-runtime",
+      "react/jsx-dev-runtime": "${cdnBase}/react@18.3.1/jsx-dev-runtime"
+    }
+  }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
 </head>
 <body>

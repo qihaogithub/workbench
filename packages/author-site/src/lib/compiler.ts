@@ -104,7 +104,9 @@ function toCdnUrl(packageName: string, lockedUrl?: string): string {
     return `${ESM_SH_BASE}/react-dom@${version}${packageName.slice('react-dom'.length)}`;
   }
 
-  return `${ESM_SH_BASE}/${packageName}`;
+  const reactVer = CORE_DEPENDENCY_VERSIONS['react'];
+  const reactDomVer = CORE_DEPENDENCY_VERSIONS['react-dom'];
+  return `${ESM_SH_BASE}/${packageName}?deps=react@${reactVer},react-dom@${reactDomVer}`;
 }
 
 /**

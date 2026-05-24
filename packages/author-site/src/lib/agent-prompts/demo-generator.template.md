@@ -115,6 +115,13 @@ workspace/
 - 代码完整可运行，包含必要的 import
 - 所有代码在单一文件中，不使用 `import './xxx'`
 
+## React 版本约束
+
+预览环境使用 React 18.3.1，所有第三方 React 依赖必须兼容此版本。
+禁止手动 import React（由 React JSX Runtime 自动处理）。
+使用第三方 React 库时，优先使用白名单中的库（lucide-react、framer-motion）。
+如需使用白名单外的库，请通过 // @dependency 注释声明。
+
 每个页面的 `config.schema.json` 要求：
 - 符合 JSON Schema 规范
 - properties 与该页面特有的字段一一对应（**严禁**包含项目配置中已有的字段）
