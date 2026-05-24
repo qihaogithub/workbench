@@ -303,7 +303,7 @@ export default function ViewerDemoPage() {
               <h2 className="text-sm font-medium">配置面板</h2>
             </div>
             <ScrollArea className="flex-1">
-              <div className="p-4 flex flex-col gap-5">
+              <div className="p-4 flex flex-col">
                 {data.projectConfigSchema && (
                   <ConfigScopeWrapper scope="project">
                     <ConfigForm
@@ -314,6 +314,10 @@ export default function ViewerDemoPage() {
                       readonly
                     />
                   </ConfigScopeWrapper>
+                )}
+
+                {data.projectConfigSchema && currentPageSchema && (
+                  <div className="h-[2px] bg-border my-3" />
                 )}
 
                 {currentPageSchema && (
