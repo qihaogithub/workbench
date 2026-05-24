@@ -225,6 +225,7 @@ export class ProjectWorkspaceManager {
             id: project.id,
             name: project.name,
             description: project.description,
+            thumbnail: project.thumbnail,
             currentVersion: lastVersion?.versionId || 'v0',
             lastSavedAt: lastVersion?.savedAt || project.createdAt,
             lastSavedBy: lastVersion?.savedBy || '系统',

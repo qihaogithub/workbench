@@ -1,20 +1,13 @@
 "use client";
 
 import useSWR from "swr";
+import Image from "next/image";
 import Link from "next/link";
-import { FolderOpen, FileCode, Clock } from "lucide-react";
-import { getProjects } from "@/lib/api";
+import { FolderOpen, FileCode } from "lucide-react";
+import { getProjects, getThumbnailUrl } from "@/lib/api";
 import type { ProjectListResponse } from "@opencode-workbench/shared";
 
 const fetcher = () => getProjects();
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-}
 
 export default function ProjectListPage() {
   const { data, error, isLoading } = useSWR<ProjectListResponse>(
@@ -31,7 +24,7 @@ export default function ProjectListPage() {
         </div>
       </header>
 
-      <main className="container px-6 py-8">
+      <main className="container px-6 pt-8 pb-4">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
             <div className="text-muted-foreground">加载中...</div>
@@ -54,35 +47,57 @@ export default function ProjectListPage() {
         )}
 
         {data && data.projects.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/${project.id}`}
-                className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
-              >
-                <h2 className="mb-2 text-base font-medium group-hover:text-accent-foreground">
-                  {project.name}
-                </h2>
-                {project.description && (
-                  <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-                    {project.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  {project.demoCount !== undefined && (
-                    <span className="flex items-center gap-1">
-                      <FileCode className="h-3.5 w-3.5" />
-                      {project.demoCount} 页面
-                    </span>
+          <div
+            className="grid gap-4"
+            style={
+              {
+                "--available-h": "calc(100vh - 56px - 32px)",
+                "--row-h": "calc((var(--available-h) - 32px) / 2.5)",
+                "--name-h": "44px",
+                "--img-h": "calc(var(--row-h) - var(--name-h))",
+                "--col-w": "calc(var(--img-h) * 375 / 812)",
+                gridTemplateColumns: "repeat(auto-fill, var(--col-w))",
+                gridAutoRows: "var(--row-h)",
+              } as React.CSSProperties
+            }
+          >
+            {data.projects.map((project) => {
+              const thumbnailUrl = getThumbnailUrl(project.thumbnail);
+              return (
+                <Link
+                  key={project.id}
+                  href={`/${project.id}`}
+                  className="group overflow-hidden rounded-lg border border-border bg-card transition-colors hover:bg-accent"
+                >
+                  {thumbnailUrl ? (
+                    <div
+                      className="relative w-full overflow-hidden"
+                      style={{ aspectRatio: "375 / 812" }}
+                    >
+                      <Image
+                        src={thumbnailUrl}
+                        alt={project.name}
+                        fill
+                        className="object-cover transition-transform duration-200 group-hover:scale-105"
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex w-full items-center justify-center bg-secondary/50"
+                      style={{ aspectRatio: "375 / 812" }}
+                    >
+                      <FileCode className="h-8 w-8 text-muted-foreground/40" />
+                    </div>
                   )}
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {formatDate(project.updatedAt)}
-                  </span>
-                </div>
-              </Link>
-            ))}
+                  <div className="p-3">
+                    <h2 className="truncate text-sm font-medium group-hover:text-accent-foreground">
+                      {project.name}
+                    </h2>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>

@@ -286,11 +286,12 @@ export interface ProjectListResponse {
     id: string;
     name: string;
     description?: string;
-    currentVersion: string;    // 当前版本
-    lastSavedAt: number;       // 最后保存时间
-    lastSavedBy: string;       // 最后保存者
-    fileCount: number;         // 文件数量
-    demoCount?: number;        // 页面数量
+    thumbnail?: string;
+    currentVersion: string;
+    lastSavedAt: number;
+    lastSavedBy: string;
+    fileCount: number;
+    demoCount?: number;
     createdAt: number;
     updatedAt: number;
   }>;

@@ -1,7 +1,14 @@
 import { notFound } from 'next/navigation'
-import { projectExists } from '@/lib/fs-utils'
-import { Button } from '@/components/ui/button'
-import { Copy } from 'lucide-react'
+import fs from 'fs'
+import path from 'path'
+import {
+  projectExists,
+  getProjectPath,
+  listDemoPages,
+  getDemoDirPath,
+} from '@/lib/fs-utils'
+import { mergeConfigToProps } from '@/lib/runtime-props'
+import { EmbedPageContent } from './EmbedConfigPanel'
 
 interface EmbedPageProps {
   params: {
@@ -23,48 +30,83 @@ export default function EmbedPage({ params }: EmbedPageProps) {
   style="width: 100%; border: none;"
 />`
 
+  const projectPath = getProjectPath(demoId)
+  const workspacePath = path.join(projectPath, 'workspace')
+  const schemaPath = path.join(workspacePath, 'config.schema.json')
+  const projectSchemaPath = path.join(workspacePath, 'project.config.schema.json')
+
+  const projectConfigSchema = fs.existsSync(projectSchemaPath)
+    ? fs.readFileSync(projectSchemaPath, 'utf-8')
+    : undefined
+
+  const demoPages = listDemoPages(workspacePath)
+
+  if (demoPages.length > 1) {
+    const projectConfigData: Record<string, unknown> = {}
+    if (projectConfigSchema) {
+      try {
+        const parsed = JSON.parse(projectConfigSchema)
+        if (parsed.properties) {
+          for (const [key, prop] of Object.entries(parsed.properties)) {
+            const p = prop as Record<string, unknown>
+            if (p.default !== undefined) {
+              projectConfigData[key] = p.default
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const pages = demoPages.map((meta) => {
+      const demoDir = getDemoDirPath(workspacePath, meta.id)
+      const pageSchemaPath = path.join(demoDir, 'config.schema.json')
+      const pageSchema = fs.existsSync(pageSchemaPath)
+        ? fs.readFileSync(pageSchemaPath, 'utf-8')
+        : '{}'
+
+      let pageConfigData: Record<string, unknown> = {}
+      try {
+        pageConfigData = mergeConfigToProps(
+          projectConfigSchema,
+          pageSchema
+        )
+      } catch {}
+
+      return {
+        id: meta.id,
+        name: meta.name,
+        schema: pageSchema,
+        iframeUrl: `/api/embed/${demoId}/iframe?page=${encodeURIComponent(meta.id)}`,
+        initialConfigData: pageConfigData,
+      }
+    })
+
+    return (
+      <EmbedPageContent
+        embedCode={embedCode}
+        iframeUrl=""
+        schema="{}"
+        projectConfigSchema={projectConfigSchema}
+        initialConfigData={projectConfigData}
+        projectConfigData={projectConfigData}
+        pages={pages}
+      />
+    )
+  }
+
+  const schema = fs.existsSync(schemaPath)
+    ? fs.readFileSync(schemaPath, 'utf-8')
+    : '{}'
+
+  const mergedConfigData = mergeConfigToProps(projectConfigSchema, schema)
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <h1 className="text-2xl font-bold mb-2">嵌入 Demo</h1>
-        <p className="text-muted-foreground mb-8">
-          将以下 iframe 代码复制到你的页面中即可嵌入此 Demo。
-        </p>
-
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-sm font-medium mb-2">嵌入代码</h2>
-            <div className="relative">
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono">
-                {embedCode}
-              </pre>
-              <Button
-                variant="outline"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => {
-                  navigator.clipboard.writeText(embedCode)
-                }}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                复制
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-sm font-medium mb-2">预览</h2>
-            <div className="border rounded-lg overflow-hidden">
-              <iframe
-                src={iframeUrl}
-                sandbox="allow-scripts allow-same-origin"
-                className="w-full"
-                style={{ minHeight: '400px' }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <EmbedPageContent
+      embedCode={embedCode}
+      iframeUrl={iframeUrl}
+      schema={schema}
+      projectConfigSchema={projectConfigSchema}
+      initialConfigData={mergedConfigData}
+    />
   )
 }

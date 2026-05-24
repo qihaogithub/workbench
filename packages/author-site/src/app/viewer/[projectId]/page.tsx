@@ -108,6 +108,7 @@ export default function ViewerProjectPage() {
   );
   const [configVisible, setConfigVisible] = useState(showConfig);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
+  const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
 
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
@@ -146,26 +147,37 @@ export default function ViewerProjectPage() {
         setData(result.data);
 
         const pages = result.data.demoPages as ViewerDemoPage[];
+        const initialConfigDataMap: Record<string, Record<string, unknown>> = {};
+
         if (pages.length > 0) {
           const initialPageId = pageParam && pages.find((p: ViewerDemoPage) => p.id === pageParam)
             ? pageParam
             : pages[0].id;
           setActiveDemoId(initialPageId);
 
+          for (const p of pages) {
+            if (p.schema) {
+              initialConfigDataMap[p.id] = getSafeMergedDefaults(
+                result.data.projectConfigSchema,
+                p.schema
+              );
+            }
+          }
+
           const activePage = pages.find((p: ViewerDemoPage) => p.id === initialPageId);
           if (activePage?.schema) {
-            const defaults = getSafeMergedDefaults(
-              result.data.projectConfigSchema,
-              activePage.schema
-            );
+            const defaults = initialConfigDataMap[initialPageId] || {};
             const urlConfig = urlConfigDataRef.current;
             const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
             setConfigData(merged);
+            initialConfigDataMap[initialPageId] = merged;
             setPreviewSize(getPreviewSize(activePage.schema));
           } else if (urlConfigDataRef.current) {
             setConfigData(urlConfigDataRef.current);
           }
         }
+
+        setConfigDataMap(initialConfigDataMap);
       } catch (err) {
         setError(err instanceof Error ? err.message : "加载失败");
       } finally {
@@ -216,7 +228,11 @@ export default function ViewerProjectPage() {
       postOutgoing({ type: "VIEWER_CONFIG_CHANGE", configData: merged });
       return merged;
     });
-  }, []);
+    setConfigDataMap((prev) => ({
+      ...prev,
+      [activeDemoId]: { ...(prev[activeDemoId] ?? {}), ...newData },
+    }));
+  }, [activeDemoId]);
 
   const handlePageChange = useCallback(
     (pageId: string) => {
@@ -227,6 +243,10 @@ export default function ViewerProjectPage() {
       if (page?.schema) {
         const defaults = getSafeMergedDefaults(data.projectConfigSchema, page.schema);
         setConfigData(defaults);
+        setConfigDataMap((prev) => {
+          if (prev[pageId]) return prev;
+          return { ...prev, [pageId]: defaults };
+        });
         setPreviewSize(getPreviewSize(page.schema));
       }
     },
@@ -273,13 +293,6 @@ export default function ViewerProjectPage() {
     previewSize: p.previewSize,
     code: p.code,
   }));
-
-  const configDataMap = data.demoPages.reduce<Record<string, Record<string, unknown>>>((acc, p) => {
-    if (p.schema) {
-      acc[p.id] = getSafeMergedDefaults(data.projectConfigSchema, p.schema);
-    }
-    return acc;
-  }, {});
 
   return (
     <div className="flex flex-col h-screen bg-background">

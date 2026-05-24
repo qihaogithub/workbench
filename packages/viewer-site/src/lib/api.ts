@@ -46,3 +46,8 @@ export async function getProjectVersions(
 export function getWebUrl(): string {
   return WEB_URL;
 }
+
+export function getThumbnailUrl(thumbnail?: string): string | undefined {
+  if (!thumbnail) return undefined;
+  return `${WEB_URL}${thumbnail}`;
+}
