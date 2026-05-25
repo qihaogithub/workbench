@@ -174,7 +174,7 @@ type DemoProps = {
     expect(errors).toHaveLength(0);
   });
 
-  it("应支持从函数参数解构中提取 props", () => {
+  it("应支持从函数参数解构中提取 props（降级提取时附加 info 提示）", () => {
     const code = `
 export default function Demo({ title, description }) {
   return <div>{title}</div>;
@@ -190,7 +190,10 @@ export default function Demo({ title, description }) {
 
     const errors = validatePropsSchema(code, schema);
 
-    expect(errors).toHaveLength(0);
+    // 降级提取成功时，附加 info 级别的 interface_not_found 提示
+    expect(errors).toHaveLength(1);
+    expect(errors[0].type).toBe("interface_not_found");
+    expect(errors[0].severity).toBe("info");
   });
 
   it("应支持可选属性标记", () => {

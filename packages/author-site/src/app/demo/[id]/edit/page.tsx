@@ -333,10 +333,15 @@ ${context.details}
         setSchema(loadedSchema);
         setEditorContent(buildFigmaText(loadedCode, loadedSchema));
 
-        const defaults = getSafeMergedDefaults(loadedSchema);
-        if (initialDemoId) {
-          setConfigDataMap({ [initialDemoId]: defaults });
+        const allDefaults: Record<string, Record<string, unknown>> = {};
+        if (multi.demos) {
+          for (const [pageId, demo] of Object.entries(multi.demos) as [string, { schema: string }][]) {
+            allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+          }
+        } else if (initialDemoId) {
+          allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
         }
+        setConfigDataMap(allDefaults);
 
         const result = validateAll(loadedCode, loadedSchema);
         setValidationResult(result);
@@ -1326,6 +1331,11 @@ ${context.details}
                           const next = { ...prev };
                           for (const pageId of Object.keys(next)) {
                             next[pageId] = { ...next[pageId], ...data };
+                          }
+                          for (const page of demoPages) {
+                            if (!next[page.id]) {
+                              next[page.id] = { ...data };
+                            }
                           }
                           return next;
                         });

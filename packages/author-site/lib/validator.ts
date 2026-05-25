@@ -171,11 +171,12 @@ export function validatePropsSchema(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  let codeProps = extractPropsFromCode(code);
+  const codePropsFromInterface = extractPropsFromCode(code);
+  const codePropsFromDestructuring = extractPropsFromDestructuring(code);
 
-  if (!codeProps || codeProps.length === 0) {
-    codeProps = extractPropsFromDestructuring(code);
-  }
+  // 优先使用接口提取，降级使用解构提取
+  const codeProps = codePropsFromInterface || codePropsFromDestructuring;
+  const usedFallback = !codePropsFromInterface && codePropsFromDestructuring !== null;
 
   const schemaProps = extractPropertiesFromSchema(schema);
 
@@ -194,12 +195,13 @@ export function validatePropsSchema(
   }
 
   if (!codeProps) {
+    // 完全无法提取 props 信息
     const hasPropsUsage = /props\.\w+/.test(code) || /\{\s*\w+\s*\}/.test(code);
 
     if (hasPropsUsage) {
       errors.push({
         type: "interface_not_found",
-        message: "未找到 DemoProps 接口定义，无法校验 props 一致性",
+        message: "无法提取 props 信息，强烈建议添加 DemoProps 接口定义",
         severity: "warning",
         location: { type: "code" },
         fixSuggestion: {
@@ -230,6 +232,22 @@ export function validatePropsSchema(
     }
 
     return errors;
+  }
+
+  // 降级提取成功时，附加 info 提示建议添加接口定义
+  if (usedFallback) {
+    errors.push({
+      type: "interface_not_found",
+      message: "建议添加 DemoProps 接口定义，以获得更完整的类型检查",
+      severity: "info",
+      location: { type: "code" },
+      fixSuggestion: {
+        action: "add_interface",
+          description:
+            "添加 interface DemoProps { ... } 或 type DemoProps = { ... }",
+          example: `interface DemoProps {\n  title: string;\n}`,
+      },
+    });
   }
 
   const codePropsSet = new Set(codeProps);

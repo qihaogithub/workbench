@@ -107,13 +107,27 @@ workspace/
 ## 代码质量标准（每个页面内）
 
 每个页面的 `index.tsx` 要求：
-- 使用 TypeScript，Props 接口**只**声明该页面 `config.schema.json` 中定义的字段
+- 使用 TypeScript，**必须**定义 `interface DemoProps` 或 `type DemoProps` 声明组件 Props（这是编码规范，用于代码-配置一致性校验）
+- Props 接口**只**声明该页面 `config.schema.json` 中定义的字段
 - 项目级字段不在 Props 接口中声明，使用时从 props 解构（运行时注入）
 - 使用 Tailwind CSS 进行样式设计
 - 可使用 shadcn/ui 组件库、`lucide-react` 等
 - 导出默认组件
 - 代码完整可运行，包含必要的 import
 - 所有代码在单一文件中，不使用 `import './xxx'`
+
+**DemoProps 接口示例**：
+```tsx
+interface DemoProps {
+  title: string;
+  description?: string;
+  showBadge?: boolean;
+}
+
+export default function Demo({ title, description, showBadge = false }: DemoProps) {
+  // ...
+}
+```
 
 ## React 版本约束
 

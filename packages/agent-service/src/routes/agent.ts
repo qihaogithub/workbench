@@ -9,6 +9,13 @@ import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig, AgentType } from '../core/types';
 import { logger } from '../utils/logger';
 
+function resolveDefaultModelId(): string {
+  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
+  if (!raw.trim()) return "sensenova/deepseek-v4-flash";
+  const first = raw.split(",")[0]?.trim();
+  return first || "sensenova/deepseek-v4-flash";
+}
+
 const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || 'opencode';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
@@ -99,7 +106,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           backend: backend || DEFAULT_BACKEND,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
-          model: request.body.model || process.env.DEFAULT_MODEL || 'sensenova/deepseek-v4-flash',
+          model: request.body.model || resolveDefaultModelId(),
         };
 
         const agent = manager.getOrCreate(sessionId, config);

@@ -74,6 +74,70 @@ function parseDynamicPrefixes(): ModelConfig[] {
 }
 
 /**
+ * 从环境变量 NEXT_PUBLIC_MODEL_BLACKLIST 解析黑名单模型 ID 集合
+ *
+ * 格式: 逗号分隔的完整模型 ID,如 "xjjj/old-model,xjjj/test-model"
+ * 黑名单中的模型会在白名单过滤之后被排除
+ */
+function parseBlacklist(): Set<string> {
+  const raw = process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "";
+  if (!raw.trim()) return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * 从环境变量 NEXT_PUBLIC_DEFAULT_MODEL_IDS 解析默认模型 ID 列表
+ *
+ * 格式: 逗号分隔的完整模型 ID,按优先级从高到低排列
+ * 如 "xjjj/deepseek-v4-flash,xjjj/gpt-model"
+ * 未设置时为空数组
+ */
+function parseDefaultModelIds(): string[] {
+  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "";
+  if (!raw.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function isModelBlacklisted(id: string): boolean {
+  return parseBlacklist().has(id);
+}
+
+/**
+ * 解析默认模型 ID
+ *
+ * 按优先级顺序尝试匹配默认模型列表中的每个 ID:
+ *   1. 先精确匹配 id
+ *   2. 再尝试匹配深度变体 (depthVariantIds)
+ * 如果默认列表中的所有模型都未在可用模型中找到,
+ * 则回退到可用模型列表的第一个模型。
+ *
+ * 返回最终选定的模型基础 ID,如果可用模型列表为空则返回 null
+ */
+export function resolveDefaultModelId(models: ResolvedModel[]): string | null {
+  if (models.length === 0) return null;
+
+  const defaultIds = parseDefaultModelIds();
+  for (const defaultId of defaultIds) {
+    for (const model of models) {
+      if (model.id === defaultId) return defaultId;
+      for (const variantId of Object.values(model.depthVariantIds)) {
+        if (variantId === defaultId) return model.id;
+      }
+    }
+  }
+
+  return models[0].id;
+}
+
+/**
  * 模型配置表 — 按分组放行
  *
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
@@ -119,8 +183,6 @@ export function resolveModelConfig(rawId: string): {
     supportsThinkingDepth: config?.supportsThinkingDepth ?? UNCONFIGURED_DEFAULT.supportsThinkingDepth,
   };
 }
-
-export const DEFAULT_MODEL_ID = "sensenova/deepseek-v4-flash";
 
 function extractGroup(id: string): string {
   const idx = id.indexOf("/");
@@ -230,7 +292,15 @@ export function applyModelConfigs(
     }
   }
 
-  return result;
+  const blacklist = parseBlacklist();
+
+  return result.filter((model) => {
+    if (blacklist.has(model.id)) return false;
+    for (const variantId of Object.values(model.depthVariantIds)) {
+      if (blacklist.has(variantId)) return false;
+    }
+    return true;
+  });
 }
 
 export function resolveCurrentModel(

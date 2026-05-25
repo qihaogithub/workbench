@@ -15,7 +15,14 @@ import { getSessionStore } from "../session/session-store";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 
-const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL || "sensenova/deepseek-v4-flash";
+function resolveDefaultModelId(): string {
+  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
+  if (!raw.trim()) return "sensenova/deepseek-v4-flash";
+  const first = raw.split(",")[0]?.trim();
+  return first || "sensenova/deepseek-v4-flash";
+}
+
+const DEFAULT_MODEL_ID = resolveDefaultModelId();
 const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || "opencode";
 
 interface StreamParams {
