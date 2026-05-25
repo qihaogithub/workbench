@@ -9,6 +9,14 @@ const OPENCODE_SERVER_URL = process.env.OPENCODE_SERVER_URL || 'http://localhost
  * OpenCode Server SSE event format.
  * Each event has a `type` and `properties` with session-specific data.
  */
+interface FileDiff {
+  file: string;
+  before: string;
+  after: string;
+  additions: number;
+  deletions: number;
+}
+
 interface OpenCodeSSEEvent {
   id: string;
   type: string;
@@ -36,7 +44,8 @@ interface OpenCodeSSEEvent {
     };
     status?: { type: string };
     model?: { id: string; providerID: string; variant?: string };
-    diff?: Array<unknown>;
+    diff?: Array<FileDiff>;
+    file?: string;
   };
 }
 
@@ -331,10 +340,45 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
         break;
       }
 
-      // Session diff (file changes)
+      // Session diff (file changes) — emit file_operation events and populate files
       case 'session.diff': {
         if (props.diff && Array.isArray(props.diff) && props.diff.length > 0) {
           logger.info({ diffCount: props.diff.length, sessionId: this.sessionId }, 'Session diff received');
+
+          for (const fileDiff of props.diff) {
+            if (fileDiff.file && fileDiff.after !== undefined) {
+              // Emit file_operation event for real-time frontend updates
+              this.eventCallback?.({
+                type: 'file_operation',
+                sessionId: this.config.sessionId,
+                fileOperation: {
+                  method: 'fs/write_text_file',
+                  path: fileDiff.file,
+                  content: fileDiff.after,
+                },
+              });
+
+              // Populate this.files for finish event
+              const existingIndex = this.files.findIndex(f => f.path === fileDiff.file);
+              if (existingIndex >= 0) {
+                this.files[existingIndex].content = fileDiff.after;
+              } else {
+                this.files.push({
+                  path: fileDiff.file,
+                  action: fileDiff.before ? 'modified' : 'created',
+                  content: fileDiff.after,
+                });
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      // File edited event — log for diagnostics
+      case 'file.edited': {
+        if (props.file) {
+          logger.info({ file: props.file, sessionId: this.sessionId }, 'File edited event received');
         }
         break;
       }

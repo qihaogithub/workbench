@@ -24,6 +24,7 @@ import { OpenCodeAcpBackend } from './backends/opencode-acp';
 import { OpenCodeHttpBackend } from './backends/opencode-http';
 import { BackendAgent } from './core/backend-agent';
 import { registerRoutes } from './routes';
+import { destroySessionStore } from './session/session-store';
 
 const config = loadConfig();
 const logger = getLogger();
@@ -95,6 +96,7 @@ async function start() {
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
     await getAgentManager().destroyAll();
+    destroySessionStore();
     await fastify.close();
     process.exit(0);
   });

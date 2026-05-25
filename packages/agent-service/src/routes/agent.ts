@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
-import { MemorySessionStore } from '../session/session-store';
+import { getSessionStore } from '../session/session-store';
 import { getChangedFiles, validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
 import { workspaceManager } from '../workspace/workspace-manager';
@@ -58,7 +58,7 @@ interface DiscardFilesBody {
 export async function registerAgentRoutes(fastify: FastifyInstance) {
   const manager = getAgentManager();
 
-  const sessionStore = new MemorySessionStore();
+  const sessionStore = getSessionStore();
 
   fastify.post<{ Params: SessionParams; Body: SendMessageBody }>(
     '/api/agent/:sessionId/message',

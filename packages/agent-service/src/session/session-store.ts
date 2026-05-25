@@ -1,5 +1,12 @@
 import { AgentConfig, AgentStatus } from '../core/types';
 import type { WorkspaceMeta } from '@opencode-workbench/shared';
+import { logger } from '../utils/logger';
+
+/** 会话过期时间，与 author-site SESSION_EXPIRY_MS 对齐 */
+const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
+
+/** 过期清理检查间隔 */
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface SessionMeta {
   sessionId: string;
@@ -40,11 +47,11 @@ export class MemorySessionStore implements ISessionStore {
 
   create(sessionId: string, config: CreateSessionOptions): SessionMeta {
     const workspaceMeta = config.workspaceMeta;
-    
+
     const meta: SessionMeta = {
       sessionId,
       demoId: config.demoId,
-      backend: config.backend || 'opencode',
+      backend: config.backend || 'opencode-http',
       workingDir: workspaceMeta?.workingDir || config.workingDir || '',
       customWorkspace: workspaceMeta?.customWorkspace ?? false,
       workspaceType: workspaceMeta?.workspaceType || 'temp',
@@ -94,5 +101,62 @@ export class MemorySessionStore implements ISessionStore {
     }
 
     return result;
+  }
+
+  /** 清理过期的会话元数据 */
+  cleanupExpired(): string[] {
+    const now = Date.now();
+    const expiredIds: string[] = [];
+
+    for (const [id, meta] of this.sessions) {
+      if (now - meta.updatedAt > SESSION_EXPIRY_MS) {
+        expiredIds.push(id);
+        this.sessions.delete(id);
+      }
+    }
+
+    if (expiredIds.length > 0) {
+      logger.info(
+        { count: expiredIds.length, ids: expiredIds },
+        'Cleaned up expired session metadata',
+      );
+    }
+
+    return expiredIds;
+  }
+}
+
+// ============================================================
+// 全局单例：SessionStoreService
+// ============================================================
+
+let instance: MemorySessionStore | null = null;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * 获取全局 SessionStore 单例。
+ * 首次调用时自动启动过期清理定时器。
+ */
+export function getSessionStore(): MemorySessionStore {
+  if (!instance) {
+    instance = new MemorySessionStore();
+    cleanupTimer = setInterval(() => {
+      instance!.cleanupExpired();
+    }, CLEANUP_INTERVAL_MS);
+  }
+  return instance;
+}
+
+/**
+ * 销毁全局 SessionStore 单例，停止清理定时器。
+ * 仅在服务关闭时调用。
+ */
+export function destroySessionStore(): void {
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
+  if (instance) {
+    instance = null;
   }
 }

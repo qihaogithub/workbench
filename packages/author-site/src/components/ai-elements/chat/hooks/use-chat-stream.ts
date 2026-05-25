@@ -252,6 +252,14 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onFileOperation: (operation) => {
             markActivity();
+            console.log(
+              "[useChatStream] onFileOperation: method=",
+              operation.method,
+              "path=",
+              operation.path,
+              "hasContent:",
+              typeof operation.content === "string" ? `yes (${operation.content.length} chars)` : "no",
+            );
             if (operation.method === "fs/write_text_file" && operation.path) {
               realtimeFilesRef.set(operation.path, {
                 action: "modified",
@@ -320,6 +328,15 @@ export function useChatStream(options: UseChatStreamOptions) {
                     }),
                   );
 
+            console.log(
+              "[useChatStream] onFinish: finalFiles count:",
+              finalFiles.length,
+              "result.files:",
+              result.files?.length ?? 0,
+              "realtimeFilesRef:",
+              realtimeFilesRef.size,
+            );
+
             if (finalFiles.length > 0) {
               onFilesChange?.(finalFiles);
             }
@@ -332,8 +349,27 @@ export function useChatStream(options: UseChatStreamOptions) {
                   })
                 : { codeUpdated: false, schemaUpdated: false };
 
+            console.log(
+              "[useChatStream] onFinish: codeUpdated:",
+              codeUpdated,
+              "schemaUpdated:",
+              schemaUpdated,
+            );
+
             if (!codeUpdated || !schemaUpdated) {
+              console.log(
+                "[useChatStream] HTTP fallback: fetching files for sessionId:",
+                sessionId,
+                "demoId:",
+                demoId,
+              );
               const filesData = await fetchSessionFiles(sessionId, demoId);
+              console.log(
+                "[useChatStream] HTTP fallback: fetchSessionFiles returned:",
+                filesData
+                  ? `code=${filesData.code ? filesData.code.length + "chars" : "undefined"}, schema=${filesData.schema ? filesData.schema.length + "chars" : "undefined"}`
+                  : "null",
+              );
               if (filesData) {
                 const { code, schema } = filesData;
                 if (code && !codeUpdated) onCodeUpdate?.(code);

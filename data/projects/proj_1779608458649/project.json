@@ -9,15 +9,15 @@
       "order": 1,
       "parentId": null,
       "createdAt": 1779608460500,
-      "updatedAt": 1779634377435
+      "updatedAt": 1779687304594
     },
     {
       "id": "demo_1779608461000_d4e5f6",
       "name": "课后服务-平板",
       "order": 2,
+      "parentId": null,
       "createdAt": 1779608461000,
-      "updatedAt": 1779608461000,
-      "parentId": null
+      "updatedAt": 1779681433131
     }
   ],
   "demoFolders": [],
@@ -45,8 +45,32 @@
       "sessionId": "session-1779631572532-okluhw2zj",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v3",
       "fileCount": 4
+    },
+    {
+      "versionId": "v4",
+      "savedAt": 1779681434369,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779681354024-lgz93ktyj",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v4",
+      "fileCount": 4
+    },
+    {
+      "versionId": "v5",
+      "savedAt": 1779681521434,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779681436765-42dfauvl4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v5",
+      "fileCount": 4
+    },
+    {
+      "versionId": "v6",
+      "savedAt": 1779687305430,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779685579980-17zi8f95j",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v6",
+      "fileCount": 4
     }
   ],
   "createdAt": 1779608458652,
-  "updatedAt": 1779634378988
+  "updatedAt": 1779687305432
 }

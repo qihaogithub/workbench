@@ -1,54 +1,33 @@
-import React from 'react';
 import { ChevronRight } from 'lucide-react';
 
 interface DemoProps {
-  courseTitle: string;
-  teacherName: string;
-  bannerUrl: string;
-  feature1Name: string;
-  feature1Status: string;
-  feature2Name: string;
-  feature2Status: string;
-  feature3Name: string;
-  feature3Status: string;
-  historyText: string;
+  bannerImage: string;
 }
 
 export default function PhoneAfterSchool(props: DemoProps) {
-  const {
-    courseTitle = '全年系统包-L1',
-    teacherName = '苹果指导师',
-    bannerUrl = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png',
-    feature1Name = '学习报告',
-    feature1Status = '3篇报告未读',
-    feature2Name = '活动挑战',
-    feature2Status = '',
-    feature3Name = '趣味复习',
-    feature3Status = '',
-    historyText = '查看往期课程服务',
-  } = props;
+  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props;
 
   const features = [
     {
-      name: feature1Name,
-      status: feature1Status,
+      name: '学习报告',
+      status: '3篇报告未读',
       icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon.png',
     },
     {
-      name: feature2Name,
-      status: feature2Status,
+      name: '活动挑战',
+      status: '',
       icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon-1.png',
     },
     {
-      name: feature3Name,
-      status: feature3Status,
+      name: '趣味复习',
+      status: '',
       icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon-2.png',
     },
   ];
 
   return (
     <div
-      className="w-full h-full bg-white flex flex-col overflow-hidden"
+      className="w-full min-h-screen bg-white flex flex-col overflow-hidden"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -70,7 +49,7 @@ export default function PhoneAfterSchool(props: DemoProps) {
         {/* Banner 广告图 */}
         <div className="w-full h-[112px] rounded-[10px] overflow-hidden flex-shrink-0">
           <img
-            src={bannerUrl}
+            src={bannerImage}
             alt="banner"
             className="w-full h-full object-cover"
           />
@@ -84,14 +63,14 @@ export default function PhoneAfterSchool(props: DemoProps) {
               className="text-[20px] font-medium text-[#4d4d4d]"
               style={{ fontFamily: '"PingFang SC", sans-serif' }}
             >
-              {courseTitle}
+              全年系统包-L1
             </span>
             <div className="flex items-center gap-1">
               <span
                 className="text-[14px] text-[#666666]"
                 style={{ fontFamily: '"PingFang SC", sans-serif' }}
               >
-                {teacherName}
+                苹果指导师
               </span>
               <img
                 src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/指导师头像.png"
@@ -143,7 +122,7 @@ export default function PhoneAfterSchool(props: DemoProps) {
               className="text-[14px] text-[#b2b2b2]"
               style={{ fontFamily: '"PingFang SC", sans-serif' }}
             >
-              {historyText}
+              查看往期课程服务
             </span>
             <ChevronRight className="w-4 h-4 text-[#e0dfdf]" />
           </div>

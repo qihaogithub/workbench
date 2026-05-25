@@ -11,6 +11,9 @@ import {
   SendMessageFn,
   ServerMessage,
 } from "./ws-event-router";
+import { getSessionStore } from "../session/session-store";
+import { workspaceManager } from "../workspace/workspace-manager";
+import { snapshotService } from "../session/snapshot-service";
 
 const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL || "sensenova/deepseek-v4-flash";
 const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || "opencode";
@@ -164,12 +167,57 @@ export async function registerWebSocketRoutes(
                   status: "initializing",
                 });
                 await agent.start();
+
+                // 同步会话元数据到全局 SessionStore
+                const sessionStore = getSessionStore();
+                if (!sessionStore.get(sessionId)) {
+                  let workspaceInfo: { path: string; customWorkspace: boolean; type: "user" | "temp" } | undefined;
+                  if (message.workingDir) {
+                    workspaceInfo = await workspaceManager.create({
+                      backend: DEFAULT_BACKEND,
+                      workspace: message.workingDir,
+                    });
+                  }
+
+                  const snapshotInfo = workspaceInfo
+                    ? await snapshotService.init(workspaceInfo.path)
+                    : null;
+
+                  sessionStore.create(sessionId, {
+                    ...config,
+                    workingDir: workspaceInfo?.path || message.workingDir,
+                    workspaceMeta: workspaceInfo
+                      ? {
+                          workingDir: workspaceInfo.path,
+                          customWorkspace: workspaceInfo.customWorkspace,
+                          workspaceType: workspaceInfo.type,
+                          snapshotMode: snapshotInfo?.mode ?? null,
+                          snapshotBranch: snapshotInfo?.branch ?? null,
+                        }
+                      : undefined,
+                  });
+
+                  // 同步 opencodeSessionId（HTTP 后端）
+                  if (config.backend === "opencode-http") {
+                    const ocSessionId = agent.getCurrentSessionId?.();
+                    if (ocSessionId) {
+                      sessionStore.update(sessionId, { opencodeSessionId: ocSessionId });
+                    }
+                  }
+                }
               }
 
               sendMessage({
                 type: "status",
                 sessionId,
                 status: "processing",
+              });
+
+              // 同步处理状态到 SessionStore
+              const sessionStore = getSessionStore();
+              sessionStore.update(sessionId, {
+                status: "processing",
+                messageCount: (sessionStore.get(sessionId)?.messageCount || 0) + 1,
               });
 
               const messageId = message.id || generateMessageId();
@@ -237,6 +285,11 @@ export async function registerWebSocketRoutes(
                   sessionId,
                   status: "ready",
                 });
+
+                // 同步完成状态到 SessionStore
+                getSessionStore().update(sessionId, {
+                  status: result.success ? "ready" : "error",
+                });
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
                 eventRouter.finishMessage();
@@ -295,6 +348,12 @@ export async function registerWebSocketRoutes(
                   status: "initializing",
                 });
                 await agent.start({ resumeSessionId });
+
+                // 同步恢复会话的元数据到全局 SessionStore
+                const sessionStore = getSessionStore();
+                if (!sessionStore.get(resumeSessionId)) {
+                  sessionStore.create(resumeSessionId, config);
+                }
               }
 
               sendMessage({
@@ -480,7 +539,7 @@ export async function registerWebSocketRoutes(
         }
       });
 
-      socket.on("close", (code, reason) => {
+      socket.on("close", async (code, reason) => {
         logger.info(
           { sessionId, connectionId, code, reason: reason.toString() },
           "WebSocket connection closed",
@@ -500,6 +559,15 @@ export async function registerWebSocketRoutes(
               "No active connections for session, cleaning up agent",
             );
             void manager.destroy(sessionId);
+
+            // 清理临时工作空间和会话元数据
+            const sessionStore = getSessionStore();
+            const session = sessionStore.get(sessionId);
+            if (session?.workingDir && session.workspaceType === "temp") {
+              await workspaceManager.cleanup(session.workingDir);
+              snapshotService.clearSnapshot(session.workingDir);
+            }
+            sessionStore.delete(sessionId);
           }
         }
       });

@@ -1,63 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$demo": {
-  "previewSize": {
-    "width": 375,
-    "height": 812
-  }
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
   },
   "title": "课后服务 - 手机版配置",
   "type": "object",
   "properties": {
-    "courseTitle": {
+    "bannerImage": {
       "type": "string",
-      "title": "课程名称",
-      "default": "全年系统包-L1"
-    },
-    "teacherName": {
-      "type": "string",
-      "title": "指导师名称",
-      "default": "苹果指导师"
-    },
-    "bannerUrl": {
-      "type": "string",
-      "title": "Banner图片URL",
+      "format": "image",
+      "title": "Banner图片",
+      "description": "上传Banner展示图片",
       "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png"
-    },
-    "feature1Name": {
-      "type": "string",
-      "title": "功能1名称",
-      "default": "学习报告"
-    },
-    "feature1Status": {
-      "type": "string",
-      "title": "功能1状态文字",
-      "default": "3篇报告未读"
-    },
-    "feature2Name": {
-      "type": "string",
-      "title": "功能2名称",
-      "default": "活动挑战"
-    },
-    "feature2Status": {
-      "type": "string",
-      "title": "功能2状态文字",
-      "default": ""
-    },
-    "feature3Name": {
-      "type": "string",
-      "title": "功能3名称",
-      "default": "趣味复习"
-    },
-    "feature3Status": {
-      "type": "string",
-      "title": "功能3状态文字",
-      "default": ""
-    },
-    "historyText": {
-      "type": "string",
-      "title": "底部链接文字",
-      "default": "查看往期课程服务"
     }
   }
 }
