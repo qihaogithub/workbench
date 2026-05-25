@@ -1,11 +1,9 @@
 import { ChevronRight } from 'lucide-react';
 
-interface DemoProps {
-  bannerImage: string;
-}
+interface DemoProps {}
 
 export default function PhoneAfterSchool(props: DemoProps) {
-  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props;
+  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props as Record<string, unknown>;
 
   const features = [
     {

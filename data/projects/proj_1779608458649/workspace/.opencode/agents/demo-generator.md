@@ -27,7 +27,7 @@ workspace/
 ## 页面信息
 
 当前项目：「学习页-课后」
-项目级共享配置：未设置
+项目级共享配置：✅ 已设置（project.config.schema.json）
 包含 2 个页面：
 
   📄 "课后服务-手机" → demos/demo_1779608460500_a1b2c3/ (index.tsx + config.schema.json)

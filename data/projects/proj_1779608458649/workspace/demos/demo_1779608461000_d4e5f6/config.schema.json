@@ -8,13 +8,5 @@
   },
   "title": "课后服务 - 平板版配置",
   "type": "object",
-  "properties": {
-    "bannerImage": {
-      "type": "string",
-      "format": "image",
-      "title": "Banner图片",
-      "description": "上传Banner展示图片",
-      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png"
-    }
-  }
+  "properties": {}
 }

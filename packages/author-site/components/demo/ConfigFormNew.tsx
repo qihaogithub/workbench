@@ -230,7 +230,8 @@ function FieldRenderer({
   onNoteClick: (fieldKey: string) => void;
 }) {
   const renderInput = () => {
-    // 图片上传 - 单图
+    // ====== Layer 1: ui:widget 显式覆盖 ======
+
     if (field.uiWidget === "file" || field.uiWidget === "image") {
       return (
         <FileUploadWidget
@@ -244,8 +245,7 @@ function FieldRenderer({
       );
     }
 
-    // 图片列表 - 多图
-    if (field.uiWidget === "imageList" || field.type === "array") {
+    if (field.uiWidget === "imageList") {
       const items = (value as Array<string | ImageItem>) || [];
       const imageItems: ImageItem[] = items.map((item) => {
         if (typeof item === "string") {
@@ -271,7 +271,6 @@ function FieldRenderer({
       );
     }
 
-    // 富文本 - 文本域
     if (field.uiWidget === "richtext") {
       return (
         <Textarea
@@ -284,8 +283,22 @@ function FieldRenderer({
       );
     }
 
-    // 颜色选择器
-    if (field.format === "color" || field.type === "color") {
+    // ====== Layer 2: format 语义映射 ======
+
+    if (field.format === "image") {
+      return (
+        <FileUploadWidget
+          value={value as string}
+          onChange={onChange}
+          label={field.title}
+          required={field.required}
+          sessionId={sessionId}
+          options={field.uiOptions as any}
+        />
+      );
+    }
+
+    if (field.format === "color") {
       return (
         <div className="flex gap-2 items-center">
           <input
@@ -304,7 +317,34 @@ function FieldRenderer({
       );
     }
 
-    // 布尔值 - 开关
+    // ====== Layer 3: type 数据类型回退 ======
+
+    if (field.type === "array") {
+      const items = (value as Array<string | ImageItem>) || [];
+      const imageItems: ImageItem[] = items.map((item) => {
+        if (typeof item === "string") {
+          return { url: item };
+        }
+        return item as ImageItem;
+      });
+
+      const maxItems =
+        typeof field.uiOptions?.maxItems === "number"
+          ? (field.uiOptions.maxItems as number)
+          : 20;
+
+      return (
+        <ImageListWidget
+          value={imageItems}
+          onChange={(newItems) => onChange(newItems)}
+          maxItems={maxItems}
+          title={field.title}
+          sessionId={sessionId}
+          options={field.uiOptions as any}
+        />
+      );
+    }
+
     if (field.type === "boolean") {
       return (
         <div className="flex items-center">
@@ -316,13 +356,11 @@ function FieldRenderer({
       );
     }
 
-    // 数字范围 - 滑块
     if (field.type === "number" || field.type === "integer") {
       if (field.minimum !== undefined && field.maximum !== undefined) {
         const currentValue =
           (value as number) ?? field.default ?? field.minimum;
 
-        // 从字段名或 title 推断单位
         const getUnit = (): string => {
           const name = (field.key + field.title).toLowerCase();
           if (
@@ -386,7 +424,6 @@ function FieldRenderer({
       );
     }
 
-    // 枚举值 - 下拉选择
     if (field.enum && field.enum.length > 0) {
       const currentValue = value || field.default || field.enum[0];
       const currentIndex = field.enum.indexOf(currentValue);
@@ -418,7 +455,6 @@ function FieldRenderer({
       );
     }
 
-    // 长文本 - 文本域
     if (field.maxLength && field.maxLength > 100) {
       return (
         <Textarea
@@ -432,7 +468,6 @@ function FieldRenderer({
       );
     }
 
-    // 默认 - 文本输入
     return (
       <Input
         type="text"
@@ -450,6 +485,7 @@ function FieldRenderer({
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
     field.uiWidget === "richtext" ||
+    field.format === "image" ||
     field.type === "array" ||
     (field.maxLength !== undefined && field.maxLength > 100);
 
