@@ -119,7 +119,6 @@ export default function ViewerProjectPage() {
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
-
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);

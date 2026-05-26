@@ -64,7 +64,7 @@ export function useChatModels(options: UseChatModelsOptions) {
         const resolved = resolveCurrentModel(event.currentModelId || "", models);
 
         setModelState((prev) => ({
-          currentModelId: resolved?.baseModelId || event.currentModelId || prev.currentModelId,
+          currentModelId: resolved?.baseModelId || models[0]?.id || prev.currentModelId,
           currentDepth: resolved?.depth ?? prev.currentDepth,
           models: models.length > 0 ? models : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
@@ -152,7 +152,7 @@ export function useChatModels(options: UseChatModelsOptions) {
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
 
     setModelState((prev) => ({
-      currentModelId: resolved?.baseModelId || event.currentModelId || prev.currentModelId,
+      currentModelId: resolved?.baseModelId || models[0]?.id || prev.currentModelId,
       currentDepth: resolved?.depth ?? prev.currentDepth,
       models: models.length > 0 ? models : prev.models,
       canSwitch: event.canSwitch ?? prev.canSwitch,

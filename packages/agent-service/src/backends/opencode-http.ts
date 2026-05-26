@@ -457,6 +457,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
   async setModel(modelId: string): Promise<void> {
     this.config.model = modelId;
+    this.modelInfoCache = null;
     logger.info({ modelId, sessionId: this.sessionId }, 'Model set for OpenCode HTTP backend');
   }
 

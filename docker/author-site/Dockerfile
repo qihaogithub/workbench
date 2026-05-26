@@ -8,6 +8,9 @@ WORKDIR /app
 
 # 构建时参数：前端模型白名单前缀（逗号分隔，如 "custom/,deepseek/"）
 ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
+ARG NEXT_PUBLIC_MODEL_BLACKLIST=
+ARG NEXT_PUBLIC_DEFAULT_MODEL_IDS=
+ARG NEXT_PUBLIC_MODEL_NAME_FILTERS=
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/shared/package.json ./packages/shared/

@@ -91,6 +91,31 @@ function parseBlacklist(): Set<string> {
 }
 
 /**
+ * 从环境变量 NEXT_PUBLIC_MODEL_NAME_FILTERS 解析分组名称过滤器
+ *
+ * 格式: 逗号分隔的 "分组:关键词" 条目,如 "opencode:Free,othergroup:Pro"
+ * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
+ * 大小写不敏感;未配置的分组不受限制
+ */
+function parseNameFilters(): Array<{ group: string; keyword: string }> {
+  const raw = process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "";
+  if (!raw.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const idx = entry.indexOf(":");
+      if (idx < 0) return { group: entry, keyword: "" };
+      return {
+        group: entry.slice(0, idx).trim(),
+        keyword: entry.slice(idx + 1).trim().toLowerCase(),
+      };
+    })
+    .filter((f) => f.keyword.length > 0);
+}
+
+/**
  * 从环境变量 NEXT_PUBLIC_DEFAULT_MODEL_IDS 解析默认模型 ID 列表
  *
  * 格式: 逗号分隔的完整模型 ID,按优先级从高到低排列
@@ -293,12 +318,24 @@ export function applyModelConfigs(
   }
 
   const blacklist = parseBlacklist();
+  const nameFilters = parseNameFilters();
 
   return result.filter((model) => {
     if (blacklist.has(model.id)) return false;
     for (const variantId of Object.values(model.depthVariantIds)) {
       if (blacklist.has(variantId)) return false;
     }
+
+    for (const filter of nameFilters) {
+      if (model.group === filter.group) {
+        const nameLower = model.id.toLowerCase();
+        const labelLower = model.label.toLowerCase();
+        if (!nameLower.includes(filter.keyword) && !labelLower.includes(filter.keyword)) {
+          return false;
+        }
+      }
+    }
+
     return true;
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -797,6 +797,8 @@ export function ConfigForm({
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
   );
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
 
   const [noteDialogField, setNoteDialogField] = useState<string | null>(null);
 
@@ -901,17 +903,20 @@ export function ConfigForm({
     }
   }, [schema, initialData]);
 
-  const handleFieldChange = (key: string, value: unknown) => {
-    const newData = { ...formData, [key]: value };
-    setFormData(newData);
-    onChange(newData);
-  };
+  const handleFieldChange = useCallback(
+    (key: string, value: unknown) => {
+      const newData = { ...formDataRef.current, [key]: value };
+      setFormData(newData);
+      onChange(newData);
+    },
+    [onChange]
+  );
 
-  const handleOrderChange = (newOrder: string[]) => {
-    const newData = { ...formData, __order: newOrder };
+  const handleOrderChange = useCallback((newOrder: string[]) => {
+    const newData = { ...formDataRef.current, __order: newOrder };
     setFormData(newData);
     onChange(newData);
-  };
+  }, [onChange]);
 
   const updateSchemaNote = useCallback(
     (fieldKey: string, noteHtml: string) => {

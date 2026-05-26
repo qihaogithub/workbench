@@ -140,6 +140,21 @@ export default function ViewerDemoPage() {
         } else if (urlConfigDataRef.current) {
           setConfigData(urlConfigDataRef.current);
         }
+
+        // 创建 session 以支持图片上传
+        try {
+          const sessionRes = await fetch("/api/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ demoId }),
+          });
+          const sessionData = await sessionRes.json();
+          if (sessionData?.data?.sessionId) {
+            setSessionId(sessionData.data.sessionId);
+          }
+        } catch {
+          // 静默失败，不影响配置面板其他功能
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "加载失败");
       } finally {
@@ -311,6 +326,7 @@ export default function ViewerDemoPage() {
                       schema={data.projectConfigSchema}
                       onChange={handleConfigChange}
                       initialData={configData}
+                      sessionId={sessionId}
                       readonly
                     />
                   </ConfigScopeWrapper>
@@ -327,6 +343,7 @@ export default function ViewerDemoPage() {
                       schema={currentPageSchema}
                       onChange={handleConfigChange}
                       initialData={configData}
+                      sessionId={sessionId}
                       readonly
                     />
                   </ConfigScopeWrapper>

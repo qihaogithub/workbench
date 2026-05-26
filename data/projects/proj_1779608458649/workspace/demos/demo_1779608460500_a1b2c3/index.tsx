@@ -1,9 +1,12 @@
 import { ChevronRight } from 'lucide-react';
 
-interface DemoProps {}
+interface DemoProps {
+  /** 课后服务包名称（页面级配置） */
+  serviceTitle?: string;
+}
 
-export default function PhoneAfterSchool(props: DemoProps) {
-  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props as Record<string, unknown>;
+export default function PhoneAfterSchool({ serviceTitle = '全年系统包-L1', ...restProps }: DemoProps) {
+  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = restProps as Record<string, unknown>;
 
   const features = [
     {
@@ -61,7 +64,7 @@ export default function PhoneAfterSchool(props: DemoProps) {
               className="text-[20px] font-medium text-[#4d4d4d]"
               style={{ fontFamily: '"PingFang SC", sans-serif' }}
             >
-              全年系统包-L1
+              {serviceTitle}
             </span>
             <div className="flex items-center gap-1">
               <span

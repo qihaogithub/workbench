@@ -160,11 +160,6 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {
-      if (!sessionId) {
-        setError('请先创建 Session');
-        return;
-      }
-
       if (file.size > maxSize) {
         setError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
         return;
@@ -189,27 +184,36 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
       setError('');
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
+        if (sessionId) {
+          const formData = new FormData();
+          formData.append('file', file);
 
-        const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
-          method: 'POST',
-          body: formData,
-        });
+          const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
+            method: 'POST',
+            body: formData,
+          });
 
-        const data = await res.json();
+          const data = await res.json();
 
-        if (!data.success) {
-          setError(data.error?.message || '上传失败');
-          return;
+          if (!data.success) {
+            setError(data.error?.message || '上传失败');
+            return;
+          }
+
+          if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
+            await deleteServerFile(sessionId, value);
+          }
+
+          onChange(data.data.url);
+        } else {
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('读取文件失败'));
+            reader.readAsDataURL(file);
+          });
+          onChange(dataUrl);
         }
-
-        // 如果之前有上传的文件，先删除旧文件
-        if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
-          await deleteServerFile(sessionId, value);
-        }
-
-        onChange(data.data.url);
       } catch {
         setError('上传失败，请重试');
       } finally {
@@ -252,7 +256,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     if (sessionId && typeof value === 'string' && value.startsWith('/api/sessions/')) {
       await deleteServerFile(sessionId, value);
     }
-    onChange(undefined);
+    onChange('');
     setError('');
   }, [sessionId, value, onChange]);
 
@@ -270,8 +274,8 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         disabled={disabled || isUploading}
         className="hidden"
       />
-      {value ? (
-        <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3">
+        {value && (
           <div className="relative w-[120px] h-[120px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
             <img
               src={value}
@@ -282,7 +286,6 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
               }}
             />
-            {/* 悬浮遮罩层 */}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <button
                 type="button"
@@ -304,8 +307,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
               </button>
             </div>
           </div>
-        </div>
-      ) : (
+        )}
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
@@ -328,7 +330,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
