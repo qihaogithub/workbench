@@ -1,6 +1,6 @@
 # opencode 模型不能对话 — 问题记录
 
-> 日期：2026-05-26 | 状态：已修复（openCode Zen 密钥已配置）
+> 日期：2026-05-26 → 2026-05-27 | 状态：✅ 已修复并验证
 
 ### 现象
 
@@ -18,27 +18,29 @@
 
 `setModel()` 方法仅在 agent-service 内存中存储 `this.config.model`，从未传给 OpenCode Server。
 
-**openCode 为什么失败**：openCode 分组来自 OpenCode CLI 内置供应商，未在 `entrypoint.sh` 或 `opencode.json` 中配置 API 凭据。即使前端选择了 opencode 模型，OpenCode Server 实际也是用默认模型（`xjjj/deepseek-v4-flash`）——但消息有时会因模型不匹配失败。
+**真实根因**：OpenCode 内置供应商 `opencode` 运行时读取 `OPENCODE_API_KEY` 环境变量来连接 OpenCode Zen。但之前 `OPENCODE_API_KEY` 存储的是 xjjj 平台的 API 密钥，导致 opencode 供应商认证失败，消息发送后 OpenCode Zen 返回空回复。
 
-**jojo 为什么成功**：jojo 分组可能也有内置凭据或回退机制使其可用。
+**jojo 为什么成功**：jojo 分组的 API 密钥在 `entrypoint.sh` 中写入 `opencode.json` 作为供应商配置，凭据正确。
 
-### 曾尝试的修复及回退原因
+**opencode 为什么失败后「假装成功」**：opencode 供应商凭据错误时，OpenCode Zen 仍返回 200 但 reply 为空字符串，agent-service 无法区分「无回复」和「正常回复」，最终前端收到「抱歉，我没有收到有效的回复。」
 
-| 尝试 | 做法 | 回退原因 |
+### 关键决策记录
+
+| 尝试 | 做法 | 结果 |
 |---|---|---|
-| 在 `createSession()`/`sendMessageSync()`/`sendMessageStream()` 中添加 `body.model` | 将 `this.config.model` 传给 OpenCode Server | 选 opencode 模型时，OpenCode Server 会真的尝试用 opencode 分组（无凭据）→ 直接失败，比原来更差 |
-| 在 `setModel()` 中添加 `PATCH /session/{id}` | 同步模型变更到 OpenCode Server | OpenCode Server 可能不支持 PATCH 或模型 ID 格式不对 → 已回退 |
-
-唯一保留的修改是 `setModel()` 中的 `this.modelInfoCache = null`（切换模型时清除缓存），这不影响对话。
+| 在 `createSession()` 中加入 `body.model` | 将 `this.config.model` 传给 OpenCode Server 创建会话 | ❌ 回退：`POST /session` 不支持 model 参数，做 PATCH 回退太复杂 |
+| 在 `sendMessageSync()`/`sendMessageStream()` 中加入 `body.model` | 将 `this.config.model` 传给消息接口 | ✅ 保留：OpenCode Server 消息端点接受 `model?` 请求体字段 |
+| 用 `OPENCODE_JOJO_API_KEY` 分离两套密钥 | 修改 entrypoint.sh、docker-compose.yml、.env | ✅ 保留：确保 opencode 内置供应商有正确凭据 |
+| 前端隐藏 opencode 模型 | 移除 `{ matcher: "opencode/" }`，注释掉名称过滤 | ⏪ 回退：凭据修复后 opencode 模型可用，恢复显示 |
 
 ### 排查方向
 
-| 方向 | 说明 |
-|---|---|
-| **A：OpenCode Server 是否支持运行时切换模型？** | 查 OpenCode Server API 文档，确认是否有 `PATCH /session/{id}` 或类似端点来切换模型。如果有，在 `setModel()` 中正确调用 |
-| **B：OpenCode Server 消息接口是否接受 model 参数？** | 查 OpenCode Server API，`POST /session/{id}/message` 或 `POST /session/{id}/prompt_async` 的请求体是否支持 `model` 字段。如果支持，传递 model ID 即可实现按选择模型发送 |
-| **C：在 entrypoint.sh 中为 opencode 供应商配置凭据** | 如果 opencode 下的模型可以使用 xjjj 相同的 API Key，在 `OPENCODE_PROVIDERS` JSON 中为 opencode 供应商添加相同凭据 |
-| **D：在会话创建时设置初始模型** | `POST /session` 请求体如果支持 `model` 字段，可以在创建会话时就指定模型，但需要确保该模型有凭据可用 |
+| 方向 | 说明 | 结论 |
+|---|---|---|
+| **A：OpenCode Server 是否支持运行时切换模型？** | 查 OpenCode Server API 文档，确认是否有 `PATCH /session/{id}` 或类似端点来切换模型 | ⏭️ 未实现：`POST /session` 不支持 model 参数，PATCH 更不可能 |
+| **B：OpenCode Server 消息接口是否接受 model 参数？** | 查 OpenCode Server API，`POST /session/{id}/message` 或 `POST /session/{id}/prompt_async` 的请求体是否支持 `model` 字段 | ✅ 已采用：消息接口接受 `model?`，已在 `opencode-http.ts` 中实现 |
+| **C：在 entrypoint.sh 中为 opencode 供应商配置凭据** | 如果 opencode 下的模型可以使用 xjjj 相同的 API Key，在 `OPENCODE_PROVIDERS` JSON 中为 opencode 供应商添加相同凭据 | ⏭️ 不需要：opencode 供应商是 CLI 内置的，不从 `opencode.json` 读 API Key |
+| **D：正确配置 `OPENCODE_API_KEY`** | opencode 内置供应商运行时读取 `OPENCODE_API_KEY`，将其设为正确的 OpenCode Zen 密钥 | ✅ 已修复：密钥分离，`OPENCODE_API_KEY` 放 Zen 密钥，`OPENCODE_JOJO_API_KEY` 放 xjjj 密钥 |
 
 ### 最终修复方案
 
@@ -56,16 +58,15 @@
 
 ### 验证步骤
 
-1. 直接 curl OpenCode Server API，确认模型是否可用：
-   ```bash
-   # 查看所有模型
-   curl http://localhost:4096/provider
+1. ✅ 部署后使用 `opencode/DeepSeek V4 Flash Free` 模型发送消息，获得正常回复
+2. ⏭️ `curl /provider` 查看模型列表 — 未实际执行（直接在前端验证）
+3. ⏭️ `docker logs` 查看 OpenCode Server 日志 — 未实际执行（问题已通过密钥修复解决）
 
-   # 查看会话详情（model 字段）
-   curl http://localhost:4096/session/{sessionId}
-   ```
-2. 在 `opencode-http.ts` 的 `sendMessageSync` 中临时加 `console.log` 输出请求体和响应体
-3. 看 OpenCode Server 日志（docker logs），确认模型切换/调用时的错误信息
+### 架构经验
+
+- **OpenCode 内置供应商凭据来源**：opencode 分组模型（`opencode/xxx`）来自 OpenCode CLI 内置供应商，其 API 密钥**不在** `opencode.json` 中配置，而是通过环境变量 `OPENCODE_API_KEY` 在运行时读取。修改 `entrypoint.sh` 或 `opencode.json` 对此供应商无效。
+- **jojo 等自定义供应商凭据来源**：由 `entrypoint.sh` 写入 `opencode.json`，使用 `OPENCODE_JOJO_API_KEY` 配置。两套密钥机制不同，必须分离。
+- **消息端点 vs 会话端点**：`POST /session` 不支持 model 参数（只接受 `parentID?` 和 `title?`），而 `POST /session/{id}/message` 和 `POST /session/{id}/prompt_async` 接受 `model?`。模型选择只需在消息级别传递，无需修改会话创建。
 
 ---
 
