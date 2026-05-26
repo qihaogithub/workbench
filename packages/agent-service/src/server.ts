@@ -1,3 +1,8 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import rateLimit from '@fastify/rate-limit';

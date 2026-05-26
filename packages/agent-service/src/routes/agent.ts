@@ -11,9 +11,8 @@ import { logger } from '../utils/logger';
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
-  if (!raw.trim()) return "sensenova/deepseek-v4-flash";
   const first = raw.split(",")[0]?.trim();
-  return first || "sensenova/deepseek-v4-flash";
+  return first || "";
 }
 
 const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || 'opencode';

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { ConfigForm, ConfigScopeWrapper } from "../../../../components/demo";
 import { Button } from "@/components/ui/button";
 import { Copy } from "lucide-react";
@@ -303,6 +304,26 @@ function ConfigPanel({
   onChange: (data: Record<string, unknown>) => void;
   onProjectConfigChange?: (data: Record<string, unknown>) => void;
 }) {
+  const params = useParams();
+  const demoId = params?.demoId as string;
+  const [sessionId, setSessionId] = useState("");
+
+  useEffect(() => {
+    if (!demoId) return;
+    fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ demoId }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data?.sessionId) {
+          setSessionId(data.data.sessionId);
+        }
+      })
+      .catch(() => {});
+  }, [demoId]);
+
   const hasBothScopes = !!projectConfigSchema;
 
   return (
@@ -315,6 +336,7 @@ function ConfigPanel({
               schema={projectConfigSchema}
               onChange={onProjectConfigChange ?? onChange}
               initialData={configData}
+              sessionId={sessionId}
             />
           </ConfigScopeWrapper>
         )}
@@ -329,6 +351,7 @@ function ConfigPanel({
             schema={schema}
             onChange={onChange}
             initialData={configData}
+            sessionId={sessionId}
           />
         </ConfigScopeWrapper>
       </div>
