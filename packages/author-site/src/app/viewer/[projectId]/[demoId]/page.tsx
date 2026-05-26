@@ -85,6 +85,7 @@ export default function ViewerDemoPage() {
   const [activeDemoId, setActiveDemoId] = useState(demoId);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
+  const [sessionId, setSessionId] = useState<string | undefined>();
 
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
@@ -240,28 +241,6 @@ export default function ViewerDemoPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {showToolbar && (
-        <header className="flex h-12 items-center border-b px-4 shrink-0 gap-3">
-          <h1 className="text-sm font-semibold">
-            {data.project?.name || projectId}
-          </h1>
-          <div className="flex-1" />
-          {showConfig && (
-            <button
-              onClick={() => setConfigVisible(!configVisible)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors ${
-                configVisible
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              配置
-            </button>
-          )}
-        </header>
-      )}
-
       <div className="flex flex-1 overflow-hidden">
         {showPageList && data.demoPages.length > 0 && (
           <div className="w-48 border-r shrink-0 flex flex-col">
@@ -288,7 +267,20 @@ export default function ViewerDemoPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden" style={{ backgroundColor: previewBackground }}>
+        <div className="flex-1 overflow-hidden relative" style={{ backgroundColor: previewBackground }}>
+          {/* 悬浮配置按钮 */}
+          {showConfig && (
+            <button
+              onClick={() => setConfigVisible(!configVisible)}
+              className={`absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-background/90 border shadow-sm transition-colors ${
+                configVisible
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
           <div
             className="p-4 h-full overflow-y-auto preview-single-scroll"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

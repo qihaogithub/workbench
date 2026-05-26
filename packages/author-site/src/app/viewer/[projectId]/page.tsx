@@ -7,13 +7,7 @@ import type { PreviewMode, PreviewSize } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import {
   FileText,
   LayoutGrid,
@@ -328,32 +322,38 @@ export default function ViewerProjectPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {showToolbar && (
-        <header className="flex h-12 items-center border-b px-4 shrink-0 gap-3">
-          <h1 className="text-sm font-semibold">{data.project?.name || projectId}</h1>
-
-          {previewMode === "single" && showPages && hasMultiplePages && (
-            <Select value={activeDemoId} onValueChange={handlePageChange}>
-              <SelectTrigger className="h-7 w-32 text-xs">
-                <SelectValue placeholder="选择页面" />
-              </SelectTrigger>
-              <SelectContent>
+      <div className="flex flex-1 overflow-hidden">
+        {showPageList && hasMultiplePages && (
+          <div className="w-48 border-r shrink-0 flex flex-col">
+            <div className="px-3 py-3 border-b">
+              <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
                 {data.demoPages.map((page) => (
-                  <SelectItem key={page.id} value={page.id}>
+                  <button
+                    key={page.id}
+                    onClick={() => handlePageChange(page.id)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      page.id === activeDemoId
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    }`}
+                  >
                     {page.name}
-                  </SelectItem>
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-          )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
 
-          <div className="flex-1" />
-
+        <div className="flex-1 overflow-hidden relative" style={{ backgroundColor: previewBackground }}>
+          {/* 悬浮设置按钮 */}
           <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-accent">
+              <button className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-background/90 border shadow-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <Settings className="h-3.5 w-3.5" />
-                设置
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-56 p-3">
@@ -413,36 +413,7 @@ export default function ViewerProjectPage() {
               )}
             </PopoverContent>
           </Popover>
-        </header>
-      )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {showPageList && hasMultiplePages && (
-          <div className="w-48 border-r shrink-0 flex flex-col">
-            <div className="px-3 py-3 border-b">
-              <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {data.demoPages.map((page) => (
-                  <button
-                    key={page.id}
-                    onClick={() => handlePageChange(page.id)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                      page.id === activeDemoId
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    }`}
-                  >
-                    {page.name}
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-hidden" style={{ backgroundColor: previewBackground }}>
           {previewMode === "single" ? (
             <div
               className="p-4 h-full overflow-y-auto preview-single-scroll"

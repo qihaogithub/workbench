@@ -1,37 +1,6 @@
-# xjjj 分组未显示 & opencode 模型不能对话 — 问题记录
+# opencode 模型不能对话 — 问题记录
 
-> 日期：2026-05-26 | 状态：待修复
-
-## 问题一：xjjj 分组未在模型选择列表中显示
-
-### 现象
-
-创作端项目编辑页 AI 对话区的模型选择下拉框中，xjjj 分组的模型不显示。
-
-### 已确认正确
-
-- `.env.local`（`packages/author-site/`）中已配置 `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=xjjj/,jojo/`
-- [ai-models.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/lib/ai-models.ts) 的 `buildModelConfigs()` 中 `parseDynamicPrefixes()` 会从该环境变量读取前缀并生成白名单规则
-- 代码逻辑正确，typecheck 通过
-
-### 排查方向
-
-| 方向 | 说明 |
-|---|---|
-| **编译缓存问题（最可能）** | Next.js `NEXT_PUBLIC_*` 变量是编译时内联的。创建/修改 `.env.local` 后必须完全重启 dev server（`Ctrl+C` 后重新 `pnpm dev`），热重载不会重新读取环境变量 |
-| **后端模型列表来源** | OpenCode Server 的 `/provider` 接口返回的模型中，xjjj 分组模型是否存在？需确认 `OPENCODE_PROVIDER_NAME=xjjj` 在 entrypoint.sh 中正确生成了配置 |
-| **过滤链排查** | 在 `applyModelConfigs()` 入口加 `console.log` 输出原始模型列表和过滤后列表，确认 xjjj 模型是"没从后端来"还是"被过滤掉" |
-
-### 验证步骤
-
-1. **完全重启 dev server**：停止所有进程 → `pnpm dev` 重新启动
-2. **浏览器无痕模式**：避免 Next.js HMR 缓存干扰
-3. **检查编译产物**：在浏览器 DevTools → Sources → 搜索 `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES`，看值是否正确
-4. **抓 WebSocket 数据**：在浏览器 Network → WS → 筛选 `models` 事件 → 查看原始模型列表是否包含 xjjj
-
----
-
-## 问题二：opencode 分组模型不能对话
+> 日期：2026-05-26 | 状态：已修复（openCode Zen 密钥已配置）
 
 ### 现象
 
@@ -71,13 +40,27 @@
 | **C：在 entrypoint.sh 中为 opencode 供应商配置凭据** | 如果 opencode 下的模型可以使用 xjjj 相同的 API Key，在 `OPENCODE_PROVIDERS` JSON 中为 opencode 供应商添加相同凭据 |
 | **D：在会话创建时设置初始模型** | `POST /session` 请求体如果支持 `model` 字段，可以在创建会话时就指定模型，但需要确保该模型有凭据可用 |
 
+### 最终修复方案
+
+**问题根因**：OpenCode 内置供应商 `opencode` 读取 `OPENCODE_API_KEY` 环境变量来连接 OpenCode Zen。但之前 `OPENCODE_API_KEY` 被设置为 xjjj 的 API 密钥，导致 opencode 供应商认证失败。同时 `opencode-http.ts` 的消息接口未传递用户选择的 model 参数。
+
+**修复内容**：
+
+1. **`.env` — 密钥分离**：将 `OPENCODE_API_KEY` 改为 OpenCode Zen 密钥（opencode 内置供应商使用），新增 `OPENCODE_JOJO_API_KEY` 存放 xjjj 平台密钥（jojo 供应商使用）
+
+2. **`entrypoint.sh` — 供应商配置使用独立密钥**：简单模式优先使用 `OPENCODE_JOJO_API_KEY` 生成 opencode.json 供应商配置；若未设置则回落使用 `OPENCODE_API_KEY`（兼容旧配置）
+
+3. **`docker-compose.yml` — 传递新环境变量**：opencode-serve 容器新增 `OPENCODE_JOJO_API_KEY` 环境变量
+
+4. **`opencode-http.ts` — 消息接口传递模型**：`sendMessageSync()` 和 `sendMessageStream()` 中传递 `this.config.model` 给 OpenCode Server，确保使用用户选择的模型
+
 ### 验证步骤
 
 1. 直接 curl OpenCode Server API，确认模型是否可用：
    ```bash
    # 查看所有模型
    curl http://localhost:4096/provider
-   
+
    # 查看会话详情（model 字段）
    curl http://localhost:4096/session/{sessionId}
    ```
@@ -90,10 +73,11 @@
 
 | 文件 | 修改内容 | 状态 |
 |---|---|---|
-| `packages/author-site/src/components/ai-elements/chat/hooks/use-chat-models.ts` | 默认模型 fallback 从 `event.currentModelId` 改为 `models[0]?.id` | ✅ 已修复 |
+| `packages/agent-service/src/backends/opencode-http.ts` | `sendMessageSync()`、`sendMessageStream()` 传递 `this.config.model`（字符串）给 OpenCode Server | ✅ 已修复 |
 | `packages/agent-service/src/backends/opencode-http.ts` | `setModel()` 中新增 `this.modelInfoCache = null` | ✅ 已保留 |
-| `packages/agent-service/src/backends/opencode-http.ts` | 三处 API 调用新增 `body.model`（后回退） | 🔙 已回退 |
-| `packages/agent-service/src/backends/opencode-http.ts` | `setModel()` 中新增 `PATCH /session/{id}`（后回退） | 🔙 已回退 |
+| `.env` | `OPENCODE_API_KEY` 改为 OpenCode Zen 密钥；新增 `OPENCODE_JOJO_API_KEY` 存放 xjjj 平台密钥 | ✅ 已修复 |
+| `docker/opencode-serve/entrypoint.sh` | 简单模式优先使用 `OPENCODE_JOJO_API_KEY` 生成供应商配置，回落 `OPENCODE_API_KEY` | ✅ 已修复 |
+| `docker-compose.yml` | opencode-serve 新增 `OPENCODE_JOJO_API_KEY` 环境变量 | ✅ 已修复 |
 | `packages/author-site/.env.local` | 新建，包含前端环境变量 | ✅ 已创建 |
 | `docker-compose.yml` | author-site 补充 `NEXT_PUBLIC_MODEL_NAME_FILTERS` | ✅ 已修复 |
 | `scripts/deploy.sh` | 补充读取和写入 `NEXT_PUBLIC_MODEL_NAME_FILTERS` | ✅ 已修复 |

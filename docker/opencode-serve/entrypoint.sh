@@ -49,6 +49,46 @@ if [ -n "$OPENCODE_PROVIDERS" ]; then
   echo "OPENCODE_ALLOWED_PREFIXES=${ALLOWED_PREFIXES}" > ~/.opencode/allowed-prefixes.env
 
 # ── 简单模式：单供应商配置 ──
+elif [ -n "$OPENCODE_JOJO_API_KEY" ] && [ -n "$OPENCODE_API_BASE" ] && [ -n "$OPENCODE_MODELS" ]; then
+  PROVIDER_NAME="${OPENCODE_PROVIDER_NAME:-custom}"
+
+  # 支持逗号分隔多模型
+  MODELS_JSON=$(echo "$OPENCODE_MODELS" | awk '{
+    split($0, arr, ",")
+    printf "{"
+    for (i = 1; i <= length(arr); i++) {
+      gsub(/^[ \t]+|[ \t]+$/, "", arr[i])
+      if (i > 1) printf ","
+      printf "\"%s\":{\"name\":\"%s\"}", arr[i], arr[i]
+    }
+    printf "}"
+  }')
+
+  # 第一个模型作为默认模型
+  FIRST_MODEL=$(echo "$OPENCODE_MODELS" | cut -d',' -f1 | xargs)
+
+  cat > ~/.opencode/opencode.json << EOF
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "${PROVIDER_NAME}": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "${PROVIDER_NAME}",
+      "options": {
+        "baseURL": "${OPENCODE_API_BASE}",
+        "apiKey": "${OPENCODE_JOJO_API_KEY}"
+      },
+      "models": ${MODELS_JSON}
+    }
+  },
+  "model": "${PROVIDER_NAME}/${FIRST_MODEL}"
+}
+EOF
+
+  # 写入白名单文件
+  echo "OPENCODE_ALLOWED_PREFIXES=${PROVIDER_NAME}/" > ~/.opencode/allowed-prefixes.env
+
+# ── 兼容旧方式：使用 OPENCODE_API_KEY（当 OPENCODE_JOJO_API_KEY 未设置时）──
 elif [ -n "$OPENCODE_API_KEY" ] && [ -n "$OPENCODE_API_BASE" ] && [ -n "$OPENCODE_MODELS" ]; then
   PROVIDER_NAME="${OPENCODE_PROVIDER_NAME:-custom}"
 

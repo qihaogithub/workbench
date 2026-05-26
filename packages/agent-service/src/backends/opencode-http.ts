@@ -148,12 +148,16 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
   }
 
   private async sendMessageSync(content: string): Promise<string> {
+    const body: Record<string, unknown> = {
+      parts: [{ type: 'text', text: content }],
+    };
+    if (this.config.model) {
+      body.model = this.config.model;
+    }
     const response = await fetch(`${OPENCODE_SERVER_URL}/session/${this.sessionId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        parts: [{ type: 'text', text: content }],
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.config.timeout || 120000),
     });
 
@@ -187,12 +191,16 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     // Connect SSE first to avoid missing early events
     this.connectSSE();
 
+    const body: Record<string, unknown> = {
+      parts: [{ type: 'text', text: content }],
+    };
+    if (this.config.model) {
+      body.model = this.config.model;
+    }
     const response = await fetch(`${OPENCODE_SERVER_URL}/session/${this.sessionId}/prompt_async`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        parts: [{ type: 'text', text: content }],
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.config.timeout || 120000),
     });
 
