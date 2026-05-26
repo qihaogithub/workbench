@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>年课续费 - 可视化编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@latest/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        overflow: hidden;
+      }
+
+      .device-mockup {
+        position: relative;
+        background: #fff;
+        border: 12px solid #1f2937;
+        border-radius: 40px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .device-mockup.phone {
+        width: 375px;
+        height: 812px;
+      }
+
+      .device-mockup.phone.phone-compact {
+        height: 720px;
+      }
+
+      .device-mockup.pad {
+        width: 1133px;
+        height: 812px;
+        border-width: 16px;
+        border-radius: 24px;
+      }
+
+      .screen-container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        background-color: #fff;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .placeholder-img {
+        width: 100%;
+        background-color: #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9ca3af;
+        font-size: 14px;
+      }
+
+      .phone-popup-page {
+        width: 100%;
+        flex: 1;
+        background-color: #e5e7eb;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
+        position: relative;
+      }
+
+      .phone-popup-flex-col {
+        display: flex;
+        flex-direction: column;
+        margin-top: auto;
+        width: 100%;
+      }
+
+      .phone-popup-section {
+        padding-top: 20px;
+        background-color: #eaf8ff;
+        border-radius: 24px 24px 0 0;
+        overflow: hidden;
+      }
+
+      .phone-popup-resource-wrap {
+        margin-left: 21px;
+        margin-right: 18px;
+        width: 335px;
+        background-color: #e5e7eb;
+        min-height: 100px;
+      }
+
+      .phone-popup-resource-wrap img {
+        width: 335px;
+        display: block;
+      }
+
+      .phone-popup-gradation {
+        margin-top: -40px;
+        background-image: linear-gradient(0deg, #ffffff 0%, #ffffff00 100%);
+        height: 60px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .phone-popup-button {
+        width: 100%;
+      }
+
+      .phone-popup-tabbar {
+        width: 100%;
+      }
+
+      .phone-card-page {
+        position: relative;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .phone-card-flex-col {
+        display: flex;
+        flex-direction: column;
+        width: 375px;
+      }
+
+      .phone-card-top {
+        display: flex;
+        flex-direction: column;
+        padding-top: 94px;
+        overflow-x: hidden;
+        position: relative;
+      }
+
+      .phone-card-pos {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        z-index: 1;
+      }
+
+      .phone-card-task-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 20px;
+        padding: 14px 0;
+        background-color: #eaf8ff;
+        border-radius: 24px;
+        overflow: hidden;
+      }
+
+      .phone-card-resource-wrap {
+        width: 307px;
+        background-color: #e5e7eb;
+        min-height: 100px;
+      }
+
+      .phone-card-resource-wrap img {
+        width: 307px;
+        display: block;
+      }
+
+      .phone-card-entrance {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .phone-card-title {
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .phone-card-arrow {
+        width: 24px;
+        height: 24px;
+      }
+
+      .phone-card-tabbar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 375px;
+        z-index: 1;
+      }
+
+      .pad-popup-scale-container {
+        width: 100%;
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #e5e7eb;
+      }
+
+      .pad-popup-popup {
+        display: flex;
+        width: 468px;
+        flex-direction: column;
+        align-items: center;
+        border-radius: 24px;
+        background: #fff;
+        overflow: hidden;
+      }
+
+      .pad-popup-content {
+        width: 100%;
+        display: flex;
+        padding: 24px;
+        flex-direction: column;
+        align-items: center;
+        border-radius: 29.952px 29.952px 0 0;
+        position: relative;
+        overflow: hidden;
+        background-color: #eaf8ff;
+      }
+
+      .pad-popup-content::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 60px;
+        background-image: linear-gradient(0deg, #ffffff 0%, #ffffff00 100%);
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .pad-popup-resource-wrap {
+        width: 100%;
+        background-color: #e5e7eb;
+        min-height: 100px;
+        position: relative;
+        z-index: 0;
+      }
+
+      .pad-popup-resource-wrap img {
+        width: 100%;
+        display: block;
+      }
+
+      .pad-popup-button-wrap {
+        width: 100%;
+      }
+
+      .pad-popup-button-wrap img {
+        width: 100%;
+        display: block;
+      }
+
+      .pad-card-group {
+        width: 100%;
+        flex: 1;
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .pad-card-top {
+        width: 1133px;
+      }
+
+      .pad-card-column {
+        display: flex;
+        flex-direction: column;
+        width: 1133px;
+        padding: 0 40px;
+      }
+
+      .pad-card-two-columns {
+        display: flex;
+        justify-content: space-between;
+        gap: 40px;
+      }
+
+      .pad-card-left-column {
+        display: flex;
+        flex-direction: column;
+        width: 375px;
+      }
+
+      .pad-card-right-column {
+        flex: 1;
+      }
+
+      .pad-card-date {
+        color: #404040;
+        font-size: 30px;
+        font-style: normal;
+        font-weight: 500;
+        line-height: 150%;
+      }
+
+      .pad-card-renewal-card {
+        display: flex;
+        margin-top: 16px;
+        width: 678px;
+        padding: 14px;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border-radius: 24px;
+        background: #fff3eb;
+      }
+
+      .pad-card-resource-wrap {
+        width: 100%;
+        background-color: #e5e7eb;
+        min-height: 100px;
+      }
+
+      .pad-card-resource-wrap img {
+        width: 100%;
+        display: block;
+      }
+
+      .pad-card-entrance {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .pad-card-title {
+        font-size: 16px;
+        font-weight: 500;
+      }
+
+      .pad-card-arrow {
+        width: 30px;
+        height: 30px;
+      }
+
+      .pad-card-tabbar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 1133px;
+        z-index: 999;
+      }
+
+      .subject-reading {
+        background: #fff3eb !important;
+        box-shadow: 0px -4px 10px 0px hsla(24, 100%, 96%, 0.96) inset !important;
+      }
+      .subject-reading .phone-card-title,
+      .subject-reading .pad-card-title {
+        color: #6b2d03 !important;
+      }
+      .subject-reading .phone-card-arrow,
+      .subject-reading .pad-card-arrow {
+        color: #6b2d03 !important;
+      }
+
+      .subject-puzzle {
+        background: #ebf9ff !important;
+        box-shadow: 0px -4px 10px 0px hsla(198, 100%, 92%, 1) inset !important;
+      }
+      .subject-puzzle .phone-card-title,
+      .subject-puzzle .pad-card-title {
+        color: #004161 !important;
+      }
+      .subject-puzzle .phone-card-arrow,
+      .subject-puzzle .pad-card-arrow {
+        color: #004161 !important;
+      }
+
+      .subject-art {
+        background: #f9f5ff !important;
+        box-shadow: 0px -4px 10px 0px hsla(264, 100%, 98%, 0.96) inset !important;
+      }
+      .subject-art .phone-card-title,
+      .subject-art .pad-card-title {
+        color: #452270 !important;
+      }
+      .subject-art .phone-card-arrow,
+      .subject-art .pad-card-arrow {
+        color: #452270 !important;
+      }
+
+      .subject-writing {
+        background: #eefceb !important;
+        box-shadow: 0px -4px 10px 0px hsla(109, 74%, 95%, 0.96) inset !important;
+      }
+      .subject-writing .phone-card-title,
+      .subject-writing .pad-card-title {
+        color: #0e5200 !important;
+      }
+      .subject-writing .phone-card-arrow,
+      .subject-writing .pad-card-arrow {
+        color: #0e5200 !important;
+      }
+
+      .subject-english {
+        background: #fff0f3 !important;
+        box-shadow: 0px -4px 10px 0px hsla(348, 100%, 97%, 0.96) inset !important;
+      }
+      .subject-english .phone-card-title,
+      .subject-english .pad-card-title {
+        color: #cc2d52 !important;
+      }
+      .subject-english .phone-card-arrow,
+      .subject-english .pad-card-arrow {
+        color: #cc2d52 !important;
+      }
+
+      .preview-wrapper {
+        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+        background-size: 20px 20px;
+        overflow: hidden;
+      }
+
+      #presentation-stage {
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transform-origin: center center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 40px;
+      }
+
+      #config-sidebar {
+        transition: width 0.3s ease, transform 0.3s ease;
+      }
+
+      .toggle-btn {
+        position: absolute;
+        left: -24px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 48px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+        z-index: 50;
+      }
+
+      .sidebar-collapsed {
+        width: 0 !important;
+        border: none;
+      }
+
+      .sidebar-collapsed .sidebar-content {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body class="bg-base-200 h-screen flex w-full">
+    <main
+      class="flex-1 h-full flex flex-col bg-slate-100 relative overflow-hidden order-1"
+    >
+      <div
+        class="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 backdrop-blur p-1.5 rounded-full shadow-lg border border-white/50 flex gap-1"
+      >
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-compare"
+          onclick="switchView('compare')"
+          data-active="true"
+        >
+          <i class="fa-solid fa-table-columns"></i> 对比
+        </button>
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-phone"
+          onclick="switchView('phone')"
+          data-active="false"
+        >
+          <i class="fa-solid fa-mobile-screen"></i> 手机
+        </button>
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-pad"
+          onclick="switchView('pad')"
+          data-active="false"
+        >
+          <i class="fa-solid fa-tablet-screen-button"></i> 平板
+        </button>
+      </div>
+
+      <div
+        class="w-full h-full flex items-center justify-center preview-wrapper relative"
+        id="preview-container"
+      >
+        <div id="presentation-stage">
+          <div id="phone-mockup-wrapper" class="device-mockup phone">
+            <div class="screen-container">
+              <div id="phone-popup-group" class="phone-popup-page">
+                <div class="phone-popup-flex-col">
+                  <div class="phone-popup-section subject-reading" id="phone-popup-section">
+                    <div class="phone-popup-resource-wrap">
+                      <div class="placeholder-img" id="phone-popup-resource-placeholder" style="height: 200px;">资源图</div>
+                      <img id="phone-popup-resource" style="display: none;" />
+                    </div>
+                    <div class="phone-popup-gradation"></div>
+                  </div>
+                  <div class="phone-popup-button">
+                    <div class="placeholder-img" style="height: 80px;">按钮图片</div>
+                  </div>
+                  <div class="phone-popup-tabbar">
+                    <div class="placeholder-img" style="height: 80px;">底部标签栏</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="phone-card-group" class="phone-card-page" style="display: none;">
+                <div class="phone-card-flex-col">
+                  <div class="phone-card-top">
+                    <div class="placeholder-img" style="height: 300px;">日历</div>
+                    <div class="placeholder-img phone-card-pos" style="height: 94px;">顶部图片</div>
+                  </div>
+                  <div class="phone-card-task-card subject-reading" id="phone-card-task-card">
+                    <div class="phone-card-resource-wrap">
+                      <div class="placeholder-img" id="phone-card-resource-placeholder" style="height: 150px;">资源图</div>
+                      <img id="phone-card-resource" style="display: none;" />
+                    </div>
+                    <div class="phone-card-entrance">
+                      <span class="phone-card-title">了解益智2阶系统包</span>
+                      <svg class="phone-card-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div class="phone-card-tabbar">
+                  <div class="placeholder-img" style="height: 60px;">底部标签栏</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="pad-mockup-wrapper" class="device-mockup pad">
+            <div class="screen-container">
+              <div id="pad-popup-group" class="pad-popup-scale-container">
+                <div class="pad-popup-popup">
+                  <div class="pad-popup-content subject-reading" id="pad-popup-content">
+                    <div class="pad-popup-resource-wrap">
+                      <div class="placeholder-img" id="pad-popup-resource-placeholder" style="height: 200px;">资源图</div>
+                      <img id="pad-popup-resource" style="display: none;" />
+                    </div>
+                  </div>
+                  <div class="pad-popup-button-wrap">
+                    <div class="placeholder-img" style="height: 80px;">按钮图片</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="pad-card-group" class="pad-card-group" style="display: none;">
+                <div class="placeholder-img pad-card-top" style="height: 50px;">状态栏</div>
+                <div class="placeholder-img pad-card-top" style="height: 60px;">顶部按钮</div>
+                <div class="pad-card-column">
+                  <div class="pad-card-two-columns">
+                    <div class="pad-card-left-column">
+                      <div class="placeholder-img" style="height: 400px;">日历</div>
+                    </div>
+                    <div class="pad-card-right-column">
+                      <span class="pad-card-date">9月15日</span>
+                      <div class="pad-card-renewal-card subject-reading" id="pad-card-renewal-card">
+                        <div class="pad-card-resource-wrap">
+                          <div class="placeholder-img" id="pad-card-resource-placeholder" style="height: 200px;">资源图</div>
+                          <img id="pad-card-resource" style="display: none;" />
+                        </div>
+                        <div class="pad-card-entrance">
+                          <span class="pad-card-title">了解益智2阶系统包</span>
+                          <svg class="pad-card-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="pad-card-tabbar">
+                  <div class="placeholder-img" style="height: 80px;">底部标签栏</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="absolute bottom-4 right-4 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded backdrop-blur"
+      >
+        Zoom: <span id="scale-val">100%</span>
+      </div>
+    </main>
+
+    <aside
+      id="config-sidebar"
+      class="w-[380px] bg-base-100 h-full flex flex-col border-l border-base-300 shadow-xl z-20 relative order-2"
+    >
+      <div
+        class="toggle-btn text-gray-500 hover:text-primary"
+        onclick="toggleSidebar()"
+      >
+        <i class="fa-solid fa-chevron-right" id="toggle-icon"></i>
+      </div>
+
+      <div
+        class="sidebar-content flex flex-col h-full w-[380px] transition-opacity duration-200"
+      >
+        <div class="p-5 border-b border-base-200 bg-white shrink-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-gray-800">年课续费配置</h1>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+          <div class="space-y-4">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="fa-solid fa-layer-group"></i> 视图组
+            </h3>
+            <div class="tabs tabs-boxed bg-base-200 w-full">
+              <a
+                class="tab tab-active flex-1"
+                id="tab-popup"
+                onclick="switchViewGroup('popup')"
+              >弹窗组</a>
+              <a
+                class="tab flex-1"
+                id="tab-card"
+                onclick="switchViewGroup('card')"
+              >卡片组</a>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="fa-regular fa-image"></i> 手机/弹窗资源图
+            </h3>
+            <div
+              class="bg-base-200 rounded-xl p-4 border border-base-300 border-dashed hover:border-primary transition-colors relative group"
+            >
+              <input
+                type="file"
+                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                accept="image/*"
+                id="phone-resource-image"
+              />
+              <div class="text-center" id="phone-resource-upload-placeholder">
+                <div
+                  class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition-transform text-primary"
+                >
+                  <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                </div>
+                <p class="text-sm font-medium text-gray-600">点击上传资源图</p>
+                <p class="text-xs text-gray-400 mt-1">推荐尺寸: 1125 x (最大1500)</p>
+              </div>
+              <div class="hidden relative z-20" id="phone-resource-upload-preview-container">
+                <img
+                  id="phone-resource-preview"
+                  class="w-full h-32 object-contain rounded-lg bg-white"
+                />
+                <button
+                  onclick="clearPhoneResourceImage(event)"
+                  class="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error text-white shadow-md"
+                >
+                  <i class="fa-solid fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="fa-regular fa-image"></i> 平板端资源图
+            </h3>
+            <div
+              class="bg-base-200 rounded-xl p-4 border border-base-300 border-dashed hover:border-primary transition-colors relative group"
+            >
+              <input
+                type="file"
+                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                accept="image/*"
+                id="pad-resource-image"
+              />
+              <div class="text-center" id="pad-resource-upload-placeholder">
+                <div
+                  class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition-transform text-primary"
+                >
+                  <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                </div>
+                <p class="text-sm font-medium text-gray-600">点击上传资源图</p>
+                <p class="text-xs text-gray-400 mt-1">推荐尺寸: 1950</p>
+              </div>
+              <div class="hidden relative z-20" id="pad-resource-upload-preview-container">
+                <img
+                  id="pad-resource-preview"
+                  class="w-full h-32 object-contain rounded-lg bg-white"
+                />
+                <button
+                  onclick="clearPadResourceImage(event)"
+                  class="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error text-white shadow-md"
+                >
+                  <i class="fa-solid fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="fa-solid fa-palette"></i> 配色方案
+            </h3>
+
+            <div class="form-control">
+              <label class="label pt-0">
+                <span class="label-text font-medium">选择科目</span>
+              </label>
+              <select
+                id="subject-select"
+                class="select select-bordered focus:select-primary w-full"
+              >
+                <option value="reading" selected>阅读</option>
+                <option value="puzzle">益智</option>
+                <option value="art">美育</option>
+                <option value="writing">小作家</option>
+                <option value="english">英语</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script>
+      let isSidebarOpen = true;
+      function toggleSidebar() {
+        const sidebar = document.getElementById("config-sidebar");
+        const icon = document.getElementById("toggle-icon");
+
+        isSidebarOpen = !isSidebarOpen;
+
+        if (!isSidebarOpen) {
+          sidebar.classList.add("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-right");
+          icon.classList.add("fa-chevron-left");
+        } else {
+          sidebar.classList.remove("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-left");
+          icon.classList.add("fa-chevron-right");
+        }
+
+        setTimeout(autoFit, 350);
+      }
+
+      let currentMode = "compare";
+
+      function switchView(type) {
+        currentMode = type;
+
+        document.getElementById("btn-view-compare").dataset.active =
+          type === "compare";
+        document.getElementById("btn-view-phone").dataset.active =
+          type === "phone";
+        document.getElementById("btn-view-pad").dataset.active = type === "pad";
+
+        const phoneWrapper = document.getElementById("phone-mockup-wrapper");
+        const padWrapper = document.getElementById("pad-mockup-wrapper");
+
+        if (type === "compare") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        } else if (type === "phone") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "none";
+          phoneWrapper.classList.add("phone-compact");
+        } else if (type === "pad") {
+          phoneWrapper.style.display = "none";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        }
+
+        autoFit();
+      }
+
+      let currentViewGroup = "popup";
+
+      function switchViewGroup(group) {
+        currentViewGroup = group;
+
+        const tabPopup = document.getElementById("tab-popup");
+        const tabCard = document.getElementById("tab-card");
+
+        if (group === "popup") {
+          tabPopup.classList.add("tab-active");
+          tabCard.classList.remove("tab-active");
+        } else {
+          tabPopup.classList.remove("tab-active");
+          tabCard.classList.add("tab-active");
+        }
+
+        const phonePopup = document.getElementById("phone-popup-group");
+        const phoneCard = document.getElementById("phone-card-group");
+        const padPopup = document.getElementById("pad-popup-group");
+        const padCard = document.getElementById("pad-card-group");
+
+        if (group === "popup") {
+          phonePopup.style.display = "";
+          phoneCard.style.display = "none";
+          padPopup.style.display = "";
+          padCard.style.display = "none";
+        } else {
+          phonePopup.style.display = "none";
+          phoneCard.style.display = "";
+          padPopup.style.display = "none";
+          padCard.style.display = "";
+        }
+
+        autoFit();
+      }
+
+      function autoFit() {
+        const container = document.getElementById("preview-container");
+        const stage = document.getElementById("presentation-stage");
+        const toolbar = document.querySelector('[class*="top-6"][class*="left-1/2"]');
+
+        stage.style.transform = "scale(1)";
+
+        const containerRect = container.getBoundingClientRect();
+        const containerW = containerRect.width - 80;
+        const toolbarHeight = toolbar ? toolbar.offsetHeight + 60 : 100;
+        const containerH = containerRect.height - 80 - toolbarHeight;
+
+        let contentW = 0;
+        let contentH = 0;
+
+        const PHONE_W = 399;
+        const PHONE_H = 836;
+        const PHONE_COMPACT_H = 744;
+        const PAD_W = 1165;
+        const PAD_H = 844;
+        const GAP = 40;
+
+        if (currentMode === "compare") {
+          contentW = PHONE_W + GAP + PAD_W;
+          contentH = Math.max(PHONE_H, PAD_H);
+        } else if (currentMode === "phone") {
+          contentW = PHONE_W;
+          contentH = PHONE_COMPACT_H;
+        } else {
+          contentW = PAD_W;
+          contentH = PAD_H;
+        }
+
+        const scaleX = containerW / contentW;
+        const scaleY = containerH / contentH;
+        let scale = Math.min(scaleX, scaleY);
+
+        scale = Math.min(Math.max(scale, 0.2), 1);
+
+        stage.style.transform = `scale(${scale})`;
+        document.getElementById("scale-val").innerText =
+          Math.round(scale * 100) + "%";
+      }
+
+      window.addEventListener("resize", () => {
+        setTimeout(autoFit, 100);
+      });
+
+      function setupPhoneResourceImagePreview() {
+        const input = document.getElementById("phone-resource-image");
+        const preview = document.getElementById("phone-resource-preview");
+        const placeholder = document.getElementById("phone-resource-upload-placeholder");
+        const previewContainer = document.getElementById("phone-resource-upload-preview-container");
+
+        const phonePopupImg = document.getElementById("phone-popup-resource");
+        const phonePopupPlaceholder = document.getElementById("phone-popup-resource-placeholder");
+        const phoneCardImg = document.getElementById("phone-card-resource");
+        const phoneCardPlaceholder = document.getElementById("phone-card-resource-placeholder");
+        const padPopupImg = document.getElementById("pad-popup-resource");
+        const padPopupPlaceholder = document.getElementById("pad-popup-resource-placeholder");
+
+        input.addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const result = e.target.result;
+              preview.src = result;
+
+              phonePopupImg.src = result;
+              phonePopupImg.style.display = "block";
+              phonePopupPlaceholder.style.display = "none";
+
+              phoneCardImg.src = result;
+              phoneCardImg.style.display = "block";
+              phoneCardPlaceholder.style.display = "none";
+
+              padPopupImg.src = result;
+              padPopupImg.style.display = "block";
+              padPopupPlaceholder.style.display = "none";
+
+              placeholder.classList.add("hidden");
+              previewContainer.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      function clearPhoneResourceImage(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const input = document.getElementById("phone-resource-image");
+        const placeholder = document.getElementById("phone-resource-upload-placeholder");
+        const previewContainer = document.getElementById("phone-resource-upload-preview-container");
+
+        const phonePopupImg = document.getElementById("phone-popup-resource");
+        const phonePopupPlaceholder = document.getElementById("phone-popup-resource-placeholder");
+        const phoneCardImg = document.getElementById("phone-card-resource");
+        const phoneCardPlaceholder = document.getElementById("phone-card-resource-placeholder");
+        const padPopupImg = document.getElementById("pad-popup-resource");
+        const padPopupPlaceholder = document.getElementById("pad-popup-resource-placeholder");
+
+        input.value = "";
+
+        phonePopupImg.src = "";
+        phonePopupImg.style.display = "none";
+        phonePopupPlaceholder.style.display = "";
+
+        phoneCardImg.src = "";
+        phoneCardImg.style.display = "none";
+        phoneCardPlaceholder.style.display = "";
+
+        padPopupImg.src = "";
+        padPopupImg.style.display = "none";
+        padPopupPlaceholder.style.display = "";
+
+        placeholder.classList.remove("hidden");
+        previewContainer.classList.add("hidden");
+      }
+
+      function setupPadResourceImagePreview() {
+        const input = document.getElementById("pad-resource-image");
+        const preview = document.getElementById("pad-resource-preview");
+        const placeholder = document.getElementById("pad-resource-upload-placeholder");
+        const previewContainer = document.getElementById("pad-resource-upload-preview-container");
+
+        const padCardImg = document.getElementById("pad-card-resource");
+        const padCardPlaceholder = document.getElementById("pad-card-resource-placeholder");
+
+        input.addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const result = e.target.result;
+              preview.src = result;
+
+              padCardImg.src = result;
+              padCardImg.style.display = "block";
+              padCardPlaceholder.style.display = "none";
+
+              placeholder.classList.add("hidden");
+              previewContainer.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      function clearPadResourceImage(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const input = document.getElementById("pad-resource-image");
+        const placeholder = document.getElementById("pad-resource-upload-placeholder");
+        const previewContainer = document.getElementById("pad-resource-upload-preview-container");
+
+        const padCardImg = document.getElementById("pad-card-resource");
+        const padCardPlaceholder = document.getElementById("pad-card-resource-placeholder");
+
+        input.value = "";
+
+        padCardImg.src = "";
+        padCardImg.style.display = "none";
+        padCardPlaceholder.style.display = "";
+
+        placeholder.classList.remove("hidden");
+        previewContainer.classList.add("hidden");
+      }
+
+      function setupSubjectSelect() {
+        const select = document.getElementById("subject-select");
+        const subjects = ["reading", "puzzle", "art", "writing", "english"];
+
+        const themedElements = [
+          document.getElementById("phone-popup-section"),
+          document.getElementById("phone-card-task-card"),
+          document.getElementById("pad-popup-content"),
+          document.getElementById("pad-card-renewal-card")
+        ];
+
+        select.addEventListener("change", function () {
+          const subject = this.value;
+          themedElements.forEach((el) => {
+            subjects.forEach((s) => {
+              el.classList.remove(`subject-${s}`);
+            });
+            el.classList.add(`subject-${subject}`);
+          });
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        setupPhoneResourceImagePreview();
+        setupPadResourceImagePreview();
+        setupSubjectSelect();
+
+        setTimeout(() => {
+          autoFit();
+        }, 100);
+      });
+    </script>
+  </body>
+</html>

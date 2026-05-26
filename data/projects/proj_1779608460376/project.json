@@ -1,0 +1,27 @@
+{
+  "id": "proj_1779608460376",
+  "name": "年课续费",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460376/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460376_x7k9m2",
+      "name": "年课续费-手机",
+      "order": 1,
+      "parentId": null,
+      "createdAt": 1779608460376,
+      "updatedAt": 1779608460376
+    },
+    {
+      "id": "demo_1779608460376_pq3r8n",
+      "name": "年课续费-平板",
+      "order": 2,
+      "parentId": null,
+      "createdAt": 1779608460377,
+      "updatedAt": 1779608460377
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1779608460376,
+  "updatedAt": 1779608460376
+}

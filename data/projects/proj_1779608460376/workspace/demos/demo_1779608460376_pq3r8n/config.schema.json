@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 1133,
+      "height": 812
+    }
+  },
+  "title": "年课续费 - 平板版配置",
+  "type": "object",
+  "properties": {
+    "buttonImage": {
+      "type": "string",
+      "format": "image",
+      "title": "按钮图片",
+      "description": "弹窗底部按钮图片"
+    }
+  }
+}

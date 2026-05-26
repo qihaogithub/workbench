@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "我的页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "inviteImage1URL": {
+      "type": "string",
+      "format": "image",
+      "title": "邀请活动图片1",
+      "description": "邀请活动第一张图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A801.png"
+    },
+    "inviteImage2URL": {
+      "type": "string",
+      "format": "image",
+      "title": "邀请活动图片2",
+      "description": "邀请活动第二张图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A802.png"
+    },
+    "mallImage1URL": {
+      "type": "string",
+      "format": "image",
+      "title": "商场图片1",
+      "description": "叫叫商场第一张图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA1.png"
+    },
+    "mallImage2URL": {
+      "type": "string",
+      "format": "image",
+      "title": "商场图片2",
+      "description": "叫叫商场第二张图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA2.png"
+    }
+  }
+}

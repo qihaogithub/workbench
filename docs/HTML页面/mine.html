@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的页面 - 可视化编辑器</title>
+    
+    <!-- 引入Tailwind CSS和DaisyUI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@latest/dist/full.min.css" rel="stylesheet" type="text/css" />
+    
+    <!-- 引入图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+      /* 全局样式 */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden;
+      }
+
+      /* 设备外壳模拟 */
+      .device-mockup {
+        position: relative;
+        background: #fff;
+        border: 12px solid #1f2937;
+        border-radius: 40px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        flex-shrink: 0; /* 防止在Flex容器中被压缩 */
+      }
+
+      .device-mockup.phone {
+        width: 375px;
+        height: 812px;
+      }
+
+      /* 手机紧凑模式：高度减小以避开顶部切换按钮 */
+      .device-mockup.phone.phone-compact {
+        height: 720px; /* 减小高度 */
+      }
+
+      .device-mockup.pad {
+        width: 1024px;
+        height: 812px; /* 与手机高度一致 */
+        border-width: 16px;
+        border-radius: 24px;
+      }
+
+      /* 屏幕容器 */
+      .screen-container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        background-color: #fff;
+      }
+
+      /* 我的页面特定样式 */
+      .mine-page {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background-color: #f5f5f5;
+      }
+      
+      .mine-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1em;
+        padding-bottom: 100px;
+        overflow-x: hidden;
+      }
+      
+      .mine-top {
+        width: 100%;
+        height: auto;
+      }
+      
+      .mine-contact {
+        width: 100%;
+        height: auto;
+      }
+      
+      .mine-tabbar {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        z-index: 2;
+      }
+      
+      /* 活动区域样式 */
+      .activity-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+        margin: 0 20px;
+      }
+      
+      .activity-title {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 0.25em;
+        gap: 0.625em;
+      }
+      
+      .activity-title p {
+        color: #666;
+        font-size: 22.5px;
+        font-style: normal;
+        font-weight: 500;
+      }
+      
+      .activity-title-right {
+        display: flex;
+        justify-content: end;
+        align-items: center;
+        flex: 1 0 0;
+        color: #b2b2b2;
+        text-align: right;
+        font-size: 0.9375em;
+        font-style: normal;
+        font-weight: 400;
+        line-height: 1.125em;
+      }
+      
+      .activity-banners {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+        align-self: stretch;
+        height: 4em;
+      }
+      
+      .activity-banner {
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5em;
+        flex: 1 0 0;
+        border-radius: 1em;
+        box-shadow: 0px -4px 0px 0px rgba(0, 0, 0, 0.02) inset;
+      }
+      
+      .activity-banner img {
+        height: 100%;
+      }
+      
+      .banner-invite-1 {
+        background: #ff9045;
+      }
+      
+      .banner-invite-2 {
+        background: #ff715c;
+      }
+      
+      .banner-mall-1,
+      .banner-mall-2 {
+        background: #fef7e5;
+      }
+      
+      /* 平板适配 */
+      .pad-activity-section {
+        margin: 0 177px;
+      }
+      
+      .pad-contact {
+        width: 560px;
+        margin: 0 auto;
+      }
+      
+      /* UI Helper Classes */
+      .preview-wrapper {
+        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+        background-size: 20px 20px;
+        overflow: hidden; /* 禁止滚动，完全依赖缩放 */
+      }
+
+      /* Stage Transition */
+      #presentation-stage {
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transform-origin: center center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 40px;
+      }
+
+      /* Sidebar Transition */
+      #config-sidebar {
+        transition: width 0.3s ease, transform 0.3s ease;
+      }
+
+      .toggle-btn {
+        position: absolute;
+        left: -24px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 48px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+        z-index: 50;
+      }
+
+      .sidebar-collapsed {
+        width: 0 !important;
+        border: none;
+      }
+
+      .sidebar-collapsed .sidebar-content {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body class="bg-base-200 h-screen flex w-full">
+    <!-- 1. 左侧预览区域 (Flex-1) -->
+    <main class="flex-1 h-full flex flex-col bg-slate-100 relative overflow-hidden order-1">
+      <!-- 顶部工具栏 - 固定结构，所有页面相同 -->
+      <div class="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 backdrop-blur p-1.5 rounded-full shadow-lg border border-white/50 flex gap-1">
+        <button class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all" 
+                id="btn-view-compare" onclick="switchView('compare')" data-active="true">
+          <i class="fa-solid fa-table-columns"></i> 对比
+        </button>
+        <button class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all" 
+                id="btn-view-phone" onclick="switchView('phone')" data-active="false">
+          <i class="fa-solid fa-mobile-screen"></i> 手机
+        </button>
+        <button class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all" 
+                id="btn-view-pad" onclick="switchView('pad')" data-active="false">
+          <i class="fa-solid fa-tablet-screen-button"></i> 平板
+        </button>
+      </div>
+
+      <!-- 预览画布容器 - 固定结构，所有页面相同 -->
+      <div class="w-full h-full flex items-center justify-center preview-wrapper relative" id="preview-container">
+        <!-- 舞台：包含所有设备，通过 JS 控制显隐和缩放 -->
+        <div id="presentation-stage">
+          <!-- 手机模型 - 外壳固定，内容动态 -->
+          <div id="phone-mockup-wrapper" class="device-mockup phone">
+            <div class="screen-container phone-bg">
+              <!-- 手机端我的页面内容 -->
+              <div class="page-content-phone">
+                <div class="mine-page">
+                  <!-- 顶部图片 -->
+                  <img class="mine-top" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/phone/顶部.png" alt="顶部" />
+                  
+                  <!-- 活动区域 -->
+                  <div class="mine-content">
+                    <!-- 邀请活动 -->
+                    <div class="activity-section">
+                      <div class="activity-title">
+                        <p>邀请活动</p>
+                        <div class="activity-title-right">
+                          <span class="text_2">邀请奖励记录</span>
+                          <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                      </div>
+                      <div class="activity-banners">
+                        <div class="activity-banner banner-invite-1" id="phone-invite-banner-1">
+                          <img class="hdkpimg" id="phone-invite-img-1" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动01.png" alt="邀请活动01" />
+                        </div>
+                        <div class="activity-banner banner-invite-2" id="phone-invite-banner-2">
+                          <img class="hdkpimg2" id="phone-invite-img-2" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动02.png" alt="邀请活动02" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 叫叫商场 -->
+                    <div class="activity-section">
+                      <div class="activity-title">
+                        <p>叫叫商场</p>
+                        <div class="activity-title-right">
+                          <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                      </div>
+                      <div class="activity-banners">
+                        <div class="activity-banner banner-mall-1">
+                          <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场1.png" alt="商场1" />
+                        </div>
+                        <div class="activity-banner banner-mall-2">
+                          <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场2.png" alt="商场2" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 联系电话 -->
+                    <img class="mine-contact" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/phone/联系电话.png" alt="联系电话" />
+                  </div>
+                  
+                  <!-- 标签栏 -->
+                  <img class="mine-tabbar" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/phone/标签栏.png" alt="标签栏" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 平板模型 - 外壳固定，内容动态 -->
+          <div id="pad-mockup-wrapper" class="device-mockup pad">
+            <div class="screen-container pad-bg">
+              <!-- 平板端我的页面内容 -->
+              <div class="page-content-pad">
+                <div class="mine-page">
+                  <!-- 顶部图片 -->
+                  <img class="mine-top" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/pad/顶部.png" alt="顶部" />
+                  
+                  <!-- 活动区域 -->
+                  <div class="mine-content">
+                    <!-- 邀请活动 -->
+                    <div class="activity-section pad-activity-section">
+                      <div class="activity-title">
+                        <p>邀请活动</p>
+                        <div class="activity-title-right">
+                          <span class="text_2">邀请奖励记录</span>
+                          <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                      </div>
+                      <div class="activity-banners">
+                        <div class="activity-banner banner-invite-1" id="pad-invite-banner-1">
+                          <img class="hdkpimg" id="pad-invite-img-1" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动01.png" alt="邀请活动01" />
+                        </div>
+                        <div class="activity-banner banner-invite-2" id="pad-invite-banner-2">
+                          <img class="hdkpimg2" id="pad-invite-img-2" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动02.png" alt="邀请活动02" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 叫叫商场 -->
+                    <div class="activity-section pad-activity-section">
+                      <div class="activity-title">
+                        <p>叫叫商场</p>
+                        <div class="activity-title-right">
+                          <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                      </div>
+                      <div class="activity-banners">
+                        <div class="activity-banner banner-mall-1">
+                          <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场1.png" alt="商场1" />
+                        </div>
+                        <div class="activity-banner banner-mall-2">
+                          <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场2.png" alt="商场2" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 联系电话 -->
+                    <img class="mine-contact pad-contact" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/pad/联系电话.png" alt="联系电话" />
+                  </div>
+                  
+                  <!-- 标签栏 -->
+                  <img class="mine-tabbar" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/pad/标签栏.png" alt="标签栏" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 缩放提示 - 固定结构，所有页面相同 -->
+      <div class="absolute bottom-4 right-4 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded backdrop-blur">
+        Zoom: <span id="scale-val">100%</span>
+      </div>
+    </main>
+
+    <!-- 2. 右侧配置面板 (Order-2) -->
+    <aside id="config-sidebar" class="w-[380px] bg-base-100 h-full flex flex-col border-l border-base-300 shadow-xl z-20 relative order-2">
+      <!-- 收起/展开按钮 - 固定结构，所有页面相同 -->
+      <div class="toggle-btn text-gray-500 hover:text-primary" onclick="toggleSidebar()">
+        <i class="fa-solid fa-chevron-right" id="toggle-icon"></i>
+      </div>
+
+      <!-- 侧边栏内容容器 - 固定结构，内容动态 -->
+      <div class="sidebar-content flex flex-col h-full w-[380px] transition-opacity duration-200">
+        <!-- 面板标题 - 根据页面自定义标题文字 -->
+        <div class="p-5 border-b border-base-200 bg-white shrink-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-gray-800">我的页面配置</h1>
+          </div>
+        </div>
+
+        <!-- 配置选项区域 - 根据不同页面自定义配置项 -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+          <!-- 邀请活动配置 -->
+          <div class="space-y-4">
+            <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">邀请活动配置</h3>
+            
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动图片1</label>
+                <div class="flex items-center space-x-3">
+                  <input type="file" class="file-input file-input-bordered file-input-sm w-full" id="invite-img-1-upload" accept="image/*" />
+                  <button class="btn btn-sm btn-primary" onclick="uploadImage('invite-img-1')">上传</button>
+                </div>
+                <div class="mt-2">
+                  <img id="invite-img-1-preview" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动01.png" alt="邀请活动01预览" class="w-full h-20 object-cover rounded" />
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动图片2</label>
+                <div class="flex items-center space-x-3">
+                  <input type="file" class="file-input file-input-bordered file-input-sm w-full" id="invite-img-2-upload" accept="image/*" />
+                  <button class="btn btn-sm btn-primary" onclick="uploadImage('invite-img-2')">上传</button>
+                </div>
+                <div class="mt-2">
+                  <img id="invite-img-2-preview" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/邀请活动02.png" alt="邀请活动02预览" class="w-full h-20 object-cover rounded" />
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动背景色1</label>
+                <input type="color" class="input input-bordered w-full h-10" id="invite-bg-color-1" value="#ff9045" onchange="updateInviteColor(1)" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动背景色2</label>
+                <input type="color" class="input input-bordered w-full h-10" id="invite-bg-color-2" value="#ff715c" onchange="updateInviteColor(2)" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- 商场配置 -->
+          <div class="space-y-4">
+            <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">叫叫商场配置</h3>
+            
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">商场图片1</label>
+                <div class="flex items-center space-x-3">
+                  <input type="file" class="file-input file-input-bordered file-input-sm w-full" id="mall-img-1-upload" accept="image/*" />
+                  <button class="btn btn-sm btn-primary" onclick="uploadImage('mall-img-1')">上传</button>
+                </div>
+                <div class="mt-2">
+                  <img id="mall-img-1-preview" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场1.png" alt="商场1预览" class="w-full h-20 object-cover rounded" />
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">商场图片2</label>
+                <div class="flex items-center space-x-3">
+                  <input type="file" class="file-input file-input-bordered file-input-sm w-full" id="mall-img-2-upload" accept="image/*" />
+                  <button class="btn btn-sm btn-primary" onclick="uploadImage('mall-img-2')">上传</button>
+                </div>
+                <div class="mt-2">
+                  <img id="mall-img-2-preview" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/我的页/资源/商场2.png" alt="商场2预览" class="w-full h-20 object-cover rounded" />
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">商场背景色</label>
+                <input type="color" class="input input-bordered w-full h-10" id="mall-bg-color" value="#fef7e5" onchange="updateMallColor()" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- 文案配置 -->
+          <div class="space-y-4">
+            <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">文案配置</h3>
+            
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动标题</label>
+                <input type="text" class="input input-bordered w-full" id="invite-title" value="邀请活动" onchange="updateTextContent('invite-title')" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邀请活动副标题</label>
+                <input type="text" class="input input-bordered w-full" id="invite-subtitle" value="邀请奖励记录" onchange="updateTextContent('invite-subtitle')" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">商场标题</label>
+                <input type="text" class="input input-bordered w-full" id="mall-title" value="叫叫商场" onchange="updateTextContent('mall-title')" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script>
+      // --- 1. 侧边栏收起/展开逻辑 - 固定代码，所有页面相同 ---
+      let isSidebarOpen = true;
+      function toggleSidebar() {
+        const sidebar = document.getElementById("config-sidebar");
+        const icon = document.getElementById("toggle-icon");
+
+        isSidebarOpen = !isSidebarOpen;
+
+        if (!isSidebarOpen) {
+          sidebar.classList.add("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-right");
+          icon.classList.add("fa-chevron-left");
+        } else {
+          sidebar.classList.remove("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-left");
+          icon.classList.add("fa-chevron-right");
+        }
+
+        // 侧边栏动画结束后重新计算缩放
+        setTimeout(autoFit, 350);
+      }
+
+      // --- 2. 视图切换逻辑 - 固定代码，所有页面相同 ---
+      let currentMode = "compare"; // 默认模式
+
+      function switchView(type) {
+        currentMode = type;
+
+        // 更新按钮状态
+        document.getElementById("btn-view-compare").dataset.active = type === "compare";
+        document.getElementById("btn-view-phone").dataset.active = type === "phone";
+        document.getElementById("btn-view-pad").dataset.active = type === "pad";
+
+        const phoneWrapper = document.getElementById("phone-mockup-wrapper");
+        const padWrapper = document.getElementById("pad-mockup-wrapper");
+
+        // 根据模式显示/隐藏设备
+        if (type === "compare") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        } else if (type === "phone") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "none";
+          phoneWrapper.classList.add("phone-compact"); // 手机模式添加紧凑样式
+        } else if (type === "pad") {
+          phoneWrapper.style.display = "none";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        }
+
+        // 触发自动缩放
+        autoFit();
+      }
+
+      // --- 3. 自动缩放逻辑 - 固定代码，所有页面相同 ---
+      function autoFit() {
+        const container = document.getElementById("preview-container");
+        const stage = document.getElementById("presentation-stage");
+        const toolbar = document.querySelector('[class*="top-6"][class*="left-1/2"]');
+
+        // 重置缩放以获取真实尺寸
+        stage.style.transform = "scale(1)";
+
+        // 获取容器尺寸 (优化计算逻辑)
+        const containerRect = container.getBoundingClientRect();
+        const containerW = containerRect.width - 80; // 增加边距
+        const toolbarHeight = toolbar ? toolbar.offsetHeight + 60 : 100; // 工具栏高度 + 间距
+        const containerH = containerRect.height - 80 - toolbarHeight; // 增加边距
+
+        // 计算内容尺寸
+        let contentW = 0;
+        let contentH = 0;
+
+        // 硬件尺寸常量
+        const PHONE_W = 399; // 375 + border 24
+        const PHONE_H = 836; // 812 + border 24
+        const PHONE_COMPACT_H = 744; // 720 + border 24 (紧凑模式)
+        const PAD_W = 1056; // 1024 + border 32
+        const PAD_H = 844; // 812 + border 32 (与手机高度一致)
+        const GAP = 40;
+
+        if (currentMode === "compare") {
+          contentW = PHONE_W + GAP + PAD_W;
+          contentH = Math.max(PHONE_H, PAD_H);
+        } else if (currentMode === "phone") {
+          contentW = PHONE_W;
+          contentH = PHONE_COMPACT_H; // 手机模式使用紧凑高度
+        } else {
+          contentW = PAD_W;
+          contentH = PAD_H;
+        }
+
+        // 计算缩放比例 (优化算法)
+        const scaleX = containerW / contentW;
+        const scaleY = containerH / contentH;
+        let scale = Math.min(scaleX, scaleY);
+
+        // 限制最大缩放为1，最小缩放为0.2 (提高最小缩放限制)
+        scale = Math.min(Math.max(scale, 0.2), 1);
+
+        // 应用缩放
+        stage.style.transform = `scale(${scale})`;
+        document.getElementById("scale-val").innerText = Math.round(scale * 100) + "%";
+      }
+
+      // 监听窗口大小变化和侧边栏动画
+      window.addEventListener("resize", () => {
+        setTimeout(autoFit, 100);
+      });
+
+      // --- 4. 我的页面特定功能 ---
+      
+      // 图片上传功能
+      function uploadImage(type) {
+        const fileInput = document.getElementById(type + '-upload');
+        const preview = document.getElementById(type + '-preview');
+        
+        if (fileInput.files && fileInput.files[0]) {
+          const reader = new FileReader();
+          
+          reader.onload = function(e) {
+            const imageUrl = e.target.result;
+            preview.src = imageUrl;
+            
+            // 更新页面中的图片
+            if (type === 'invite-img-1') {
+              document.getElementById('phone-invite-img-1').src = imageUrl;
+              document.getElementById('pad-invite-img-1').src = imageUrl;
+            } else if (type === 'invite-img-2') {
+              document.getElementById('phone-invite-img-2').src = imageUrl;
+              document.getElementById('pad-invite-img-2').src = imageUrl;
+            } else if (type === 'mall-img-1') {
+              document.querySelectorAll('.banner-mall-1 img').forEach(img => {
+                img.src = imageUrl;
+              });
+            } else if (type === 'mall-img-2') {
+              document.querySelectorAll('.banner-mall-2 img').forEach(img => {
+                img.src = imageUrl;
+              });
+            }
+          };
+          
+          reader.readAsDataURL(fileInput.files[0]);
+        }
+      }
+      
+      // 更新邀请活动背景色
+      function updateInviteColor(index) {
+        const color = document.getElementById('invite-bg-color-' + index).value;
+        
+        if (index === 1) {
+          document.getElementById('phone-invite-banner-1').style.backgroundColor = color;
+          document.getElementById('pad-invite-banner-1').style.backgroundColor = color;
+        } else if (index === 2) {
+          document.getElementById('phone-invite-banner-2').style.backgroundColor = color;
+          document.getElementById('pad-invite-banner-2').style.backgroundColor = color;
+        }
+      }
+      
+      // 更新商场背景色
+      function updateMallColor() {
+        const color = document.getElementById('mall-bg-color').value;
+        document.querySelectorAll('.banner-mall-1, .banner-mall-2').forEach(el => {
+          el.style.backgroundColor = color;
+        });
+      }
+      
+      // 更新文本内容
+      function updateTextContent(type) {
+        const text = document.getElementById(type).value;
+        
+        if (type === 'invite-title') {
+          document.querySelectorAll('.activity-title p').forEach(el => {
+            if (el.textContent.includes('邀请活动')) {
+              el.textContent = text;
+            }
+          });
+        } else if (type === 'invite-subtitle') {
+          document.querySelectorAll('.text_2').forEach(el => {
+            el.textContent = text;
+          });
+        } else if (type === 'mall-title') {
+          document.querySelectorAll('.activity-title p').forEach(el => {
+            if (el.textContent.includes('叫叫商场')) {
+              el.textContent = text;
+            }
+          });
+        }
+      }
+      
+      // --- 5. 初始化 - 固定代码，所有页面相同 ---
+      document.addEventListener("DOMContentLoaded", function () {
+        // 初始化页面特定功能
+        initMinePageFunctions();
+        
+        // 初始执行一次缩放 (延迟执行确保DOM完全渲染)
+        setTimeout(() => {
+          autoFit();
+        }, 100);
+      });
+      
+      // 我的页面初始化函数
+      function initMinePageFunctions() {
+        // 初始化颜色选择器
+        updateInviteColor(1);
+        updateInviteColor(2);
+        updateMallColor();
+        
+        console.log("我的页面初始化完成");
+      }
+    </script>
+  </body>
+</html>

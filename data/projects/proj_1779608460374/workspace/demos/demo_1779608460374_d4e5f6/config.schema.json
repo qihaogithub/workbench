@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 1194,
+      "height": 834
+    }
+  },
+  "title": "扩科卡片 - 平板版配置",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "主标题",
+      "description": "卡片主标题",
+      "default": "趣味英语训练营"
+    },
+    "subtitle": {
+      "type": "string",
+      "title": "副标题",
+      "description": "卡片副标题",
+      "default": "沉浸体验 激发兴趣"
+    }
+  }
+}

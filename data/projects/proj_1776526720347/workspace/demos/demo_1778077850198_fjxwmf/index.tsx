@@ -1,6 +1,6 @@
 import React from 'react';
 
-interface Props {
+interface DemoProps {
   pageTitle?: string;
   description?: string;
   itemCount?: number;
@@ -75,7 +75,7 @@ const formatValue = (item: { label: string; value: number }): string => {
   return item.value.toString();
 };
 
-const ConfigDataPage: React.FC<Props> = (props) => {
+const ConfigDataPage: React.FC<DemoProps> = (props) => {
   const globalProps = props as Record<string, unknown>;
   const brandName = (globalProps.brandName as string) || 'OpenCode Workbench';
   const primaryColor = (globalProps.primaryColor as string) || '#6366f1';

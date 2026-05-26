@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "学习页任务卡片 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机端配图",
+      "description": "手机端的任务卡片配图",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/配图-手机.png"
+    },
+    "padImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板端配图",
+      "description": "平板端的任务卡片配图",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/配图-pad.png"
+    },
+    "auxiliaryText": {
+      "type": "string",
+      "title": "辅助文案",
+      "description": "卡片上方辅助文本",
+      "default": "这里是辅助文案"
+    },
+    "cardTitle": {
+      "type": "string",
+      "title": "活动标题",
+      "description": "卡片标题文本",
+      "default": "这里是活动标题"
+    },
+    "cardBtn": {
+      "type": "string",
+      "title": "按钮文案",
+      "description": "卡片按钮文本",
+      "default": "立即参与"
+    }
+  }
+}

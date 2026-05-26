@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>底部弹窗 - 可视化编辑器</title>
+    <!-- 引入Tailwind CSS和DaisyUI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@latest/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <!-- 引入图标库 -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        overflow: hidden;
+      }
+
+      /* 设备外壳模拟 */
+      .device-mockup {
+        position: relative;
+        background: #fff;
+        border: 12px solid #1f2937;
+        border-radius: 40px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        flex-shrink: 0; /* 防止在Flex容器中被压缩 */
+      }
+
+      .device-mockup.phone {
+        width: 375px;
+        height: 812px;
+      }
+
+      /* 手机紧凑模式：高度减小以避开顶部切换按钮 */
+      .device-mockup.phone.phone-compact {
+        height: 720px; /* 减小高度 */
+      }
+
+      .device-mockup.pad {
+        width: 1024px;
+        height: 812px; /* 修改: 与手机高度一致 */
+        border-width: 16px;
+        border-radius: 24px;
+      }
+
+      /* 屏幕容器 */
+      .screen-container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        background-color: #fff;
+      }
+
+      .phone-bg {
+        background-image: url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/广场页phone.png);
+        background-size: cover;
+        background-position: center;
+      }
+
+      .pad-bg {
+        background-image: url("https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/广场页pad.png");
+        background-size: cover;
+        background-position: center;
+      }
+
+      /* --- 组件 CSS --- */
+      .element {
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        align-items: flex-end;
+      }
+
+      .element-pad {
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      .element .pop-up,
+      .element-pad .pop-up {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .element-pad .pop-up {
+        width: 375px;
+      }
+
+      .element .image,
+      .element-pad .image {
+        width: 100%;
+        display: block;
+        object-fit: cover;
+      }
+
+      .element .bottom {
+        display: flex;
+        padding: 8px 0px 20px 0px;
+        margin-top: -1px;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        align-self: stretch;
+        background-color: #ffffff;
+      }
+
+      .element-pad .bottom {
+        display: flex;
+        padding: 8px 0px 20px 0px;
+        border-radius: 0px 0px 32px 32px;
+        margin-top: -1px;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        align-self: stretch;
+        background-color: #ffffff;
+      }
+
+      .title-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        position: relative;
+        flex: 0 0 auto;
+        width: 100%;
+        padding: 0 16px;
+      }
+
+      .text1 {
+        color: #404040;
+        text-align: center;
+        font-family: "PingFang SC", sans-serif;
+        font-size: 20px;
+        font-style: normal;
+        font-weight: 500;
+        line-height: 150%;
+      }
+
+      .text2 {
+        color: #666;
+        text-align: center;
+        font-family: "PingFang SC", sans-serif;
+        font-size: 18px;
+        font-style: normal;
+        font-weight: 400;
+        line-height: 150%;
+      }
+
+      .btn-group-custom {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        position: relative;
+        flex: 0 0 auto;
+        width: 100%;
+      }
+
+      .main-btn {
+        display: flex;
+        width: 280px;
+        height: 44px;
+        justify-content: center;
+        align-items: center;
+        border-radius: 30px;
+        background: #fcda00;
+        cursor: pointer;
+      }
+
+      .main-btn-text {
+        color: #544300;
+        text-align: center;
+        font-family: "PingFang SC", sans-serif;
+        font-size: 18px;
+        font-weight: 500;
+        line-height: 150%;
+      }
+
+      .sec-btn-text {
+        color: #666;
+        text-align: center;
+        font-family: "PingFang SC", sans-serif;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 150%;
+        cursor: pointer;
+      }
+
+      /* UI Helper Classes */
+      .preview-wrapper {
+        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+        background-size: 20px 20px;
+        overflow: hidden; /* 禁止滚动，完全依赖缩放 */
+      }
+
+      /* Stage Transition */
+      #presentation-stage {
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transform-origin: center center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 40px;
+      }
+
+      /* Sidebar Transition */
+      #config-sidebar {
+        transition: width 0.3s ease, transform 0.3s ease;
+      }
+
+      .toggle-btn {
+        position: absolute;
+        left: -24px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 48px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+        z-index: 50;
+      }
+
+      .sidebar-collapsed {
+        width: 0 !important;
+        border: none;
+      }
+
+      .sidebar-collapsed .sidebar-content {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body class="bg-base-200 h-screen flex w-full">
+    <!-- 1. 左侧预览区域 (Flex-1) -->
+    <main
+      class="flex-1 h-full flex flex-col bg-slate-100 relative overflow-hidden order-1"
+    >
+      <!-- 顶部工具栏 -->
+      <div
+        class="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 backdrop-blur p-1.5 rounded-full shadow-lg border border-white/50 flex gap-1"
+      >
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-compare"
+          onclick="switchView('compare')"
+          data-active="true"
+        >
+          <i class="fa-solid fa-table-columns"></i> 对比
+        </button>
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-phone"
+          onclick="switchView('phone')"
+          data-active="false"
+        >
+          <i class="fa-solid fa-mobile-screen"></i> 手机
+        </button>
+        <button
+          class="btn btn-sm btn-ghost rounded-full px-5 data-[active=true]:bg-gray-900 data-[active=true]:text-white transition-all"
+          id="btn-view-pad"
+          onclick="switchView('pad')"
+          data-active="false"
+        >
+          <i class="fa-solid fa-tablet-screen-button"></i> 平板
+        </button>
+      </div>
+
+      <!-- 预览画布容器 -->
+      <div
+        class="w-full h-full flex items-center justify-center preview-wrapper relative"
+        id="preview-container"
+      >
+        <!-- 舞台：包含所有设备，通过 JS 控制显隐和缩放 -->
+        <div id="presentation-stage">
+          <!-- 手机模型 -->
+          <div id="phone-mockup-wrapper" class="device-mockup phone">
+            <div class="screen-container phone-bg">
+              <div class="element">
+                <div class="pop-up">
+                  <img
+                    class="image"
+                    id="phone-image"
+                    src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png"
+                  />
+                  <div class="bottom">
+                    <div class="title-section phone-title-group">
+                      <div class="text1" id="phone-text1">
+                        孩子已完成第1节课程
+                      </div>
+                      <div class="text2" id="phone-text2">
+                        快来成长计划看看孩子的进步吧～
+                      </div>
+                    </div>
+                    <div class="btn-group-custom">
+                      <div class="main-btn">
+                        <div class="main-btn-text" id="phone-main-btn-text">
+                          去看看
+                        </div>
+                      </div>
+                      <div class="sec-btn-text" id="phone-secondary-btn-text">
+                        下次再说
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 平板模型 -->
+          <div id="pad-mockup-wrapper" class="device-mockup pad">
+            <div class="screen-container pad-bg">
+              <div class="element-pad">
+                <div class="pop-up">
+                  <img
+                    class="image"
+                    id="pad-image"
+                    src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png"
+                  />
+                  <div class="bottom">
+                    <div class="title-section pad-title-group">
+                      <div class="text1" id="pad-text1">
+                        孩子已完成第1节课程
+                      </div>
+                      <div class="text2" id="pad-text2">
+                        快来成长计划看看孩子的进步吧～
+                      </div>
+                    </div>
+                    <div class="btn-group-custom">
+                      <div class="main-btn">
+                        <div class="main-btn-text" id="pad-main-btn-text">
+                          去看看
+                        </div>
+                      </div>
+                      <div class="sec-btn-text" id="pad-secondary-btn-text">
+                        下次再说
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 缩放提示 -->
+      <div
+        class="absolute bottom-4 right-4 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded backdrop-blur"
+      >
+        Zoom: <span id="scale-val">100%</span>
+      </div>
+    </main>
+
+    <!-- 2. 右侧配置面板 (Order-2) -->
+    <aside
+      id="config-sidebar"
+      class="w-[380px] bg-base-100 h-full flex flex-col border-l border-base-300 shadow-xl z-20 relative order-2"
+    >
+      <!-- 收起/展开按钮 -->
+      <div
+        class="toggle-btn text-gray-500 hover:text-primary"
+        onclick="toggleSidebar()"
+      >
+        <i class="fa-solid fa-chevron-right" id="toggle-icon"></i>
+      </div>
+
+      <!-- 侧边栏内容容器 -->
+      <div
+        class="sidebar-content flex flex-col h-full w-[380px] transition-opacity duration-200"
+      >
+        <div class="p-5 border-b border-base-200 bg-white shrink-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-gray-800">底部弹窗配置</h1>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+          <!-- 图片上传组 -->
+          <div class="space-y-3">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="fa-regular fa-image"></i> 弹窗配图
+            </h3>
+            <div
+              class="bg-base-200 rounded-xl p-4 border border-base-300 border-dashed hover:border-primary transition-colors relative group"
+            >
+              <input
+                type="file"
+                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                accept="image/*"
+                id="resource-image"
+              />
+              <div class="text-center" id="upload-placeholder">
+                <div
+                  class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition-transform text-primary"
+                >
+                  <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                </div>
+                <p class="text-sm font-medium text-gray-600">点击上传资源图</p>
+                <p class="text-xs text-gray-400 mt-1">推荐尺寸: 750x800</p>
+              </div>
+              <div class="hidden relative z-20" id="upload-preview-container">
+                <img
+                  id="preview-resource"
+                  class="w-full h-32 object-contain rounded-lg bg-white"
+                />
+                <button
+                  onclick="clearImage(event)"
+                  class="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error text-white shadow-md"
+                >
+                  <i class="fa-solid fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 弹窗标题组 -->
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <h3
+                class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+              >
+                <i class="fa-solid fa-font"></i> 弹窗标题
+              </h3>
+              <label class="label cursor-pointer gap-2">
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary toggle-sm"
+                  id="show-text"
+                  checked
+                />
+              </label>
+            </div>
+
+            <!-- 这里的 hidden 会完全隐藏 DOM -->
+            <div
+              class="space-y-3 transition-all duration-300"
+              id="text-inputs-group"
+            >
+              <div class="form-control">
+                <label class="label pt-0">
+                  <span class="label-text font-medium">主标题</span>
+                </label>
+                <input
+                  type="text"
+                  id="title1"
+                  class="input input-bordered focus:input-primary w-full"
+                  value="孩子已完成第1节课程"
+                />
+              </div>
+
+              <div class="form-control">
+                <label class="label pt-0">
+                  <span class="label-text font-medium">副标题</span>
+                </label>
+                <input
+                  type="text"
+                  id="title2"
+                  class="input input-bordered focus:input-primary w-full"
+                  value="快来成长计划看看孩子的进步吧～"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- 按钮配置组 -->
+          <div class="space-y-4">
+            <h3
+              class="text-sm font-bold uppercase text-gray-400 tracking-wider flex items-center gap-2"
+            >
+              <i class="far fa-hand-point-down"></i> 按钮文案
+            </h3>
+
+            <div class="grid grid-cols-1 gap-3">
+              <div class="form-control">
+                <label class="label pt-0">
+                  <span class="label-text font-medium">主按钮文案</span>
+                </label>
+                <div class="relative">
+                  <input
+                    type="text"
+                    id="main-button-text"
+                    class="input input-bordered focus:input-primary w-full pl-10"
+                    value="去看看"
+                  />
+                  <div
+                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#fcda00] border border-gray-200"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="form-control">
+                <label class="label pt-0">
+                  <span class="label-text font-medium">次按钮文案</span>
+                </label>
+                <input
+                  type="text"
+                  id="secondary-button-text"
+                  class="input input-bordered focus:input-primary w-full"
+                  value="下次再说"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script>
+      // --- 1. 侧边栏收起/展开逻辑 ---
+      let isSidebarOpen = true;
+      function toggleSidebar() {
+        const sidebar = document.getElementById("config-sidebar");
+        const icon = document.getElementById("toggle-icon");
+
+        isSidebarOpen = !isSidebarOpen;
+
+        if (!isSidebarOpen) {
+          sidebar.classList.add("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-right");
+          icon.classList.add("fa-chevron-left");
+        } else {
+          sidebar.classList.remove("sidebar-collapsed");
+          icon.classList.remove("fa-chevron-left");
+          icon.classList.add("fa-chevron-right");
+        }
+
+        // 侧边栏动画结束后重新计算缩放
+        setTimeout(autoFit, 350);
+      }
+
+      // --- 2. 视图切换逻辑 ---
+      let currentMode = "compare"; // 默认模式
+
+      function switchView(type) {
+        currentMode = type;
+
+        // 更新按钮状态
+        document.getElementById("btn-view-compare").dataset.active =
+          type === "compare";
+        document.getElementById("btn-view-phone").dataset.active =
+          type === "phone";
+        document.getElementById("btn-view-pad").dataset.active = type === "pad";
+
+        const phoneWrapper = document.getElementById("phone-mockup-wrapper");
+        const padWrapper = document.getElementById("pad-mockup-wrapper");
+
+        // 根据模式显示/隐藏设备
+        if (type === "compare") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        } else if (type === "phone") {
+          phoneWrapper.style.display = "block";
+          padWrapper.style.display = "none";
+          phoneWrapper.classList.add("phone-compact"); // 手机模式添加紧凑样式
+        } else if (type === "pad") {
+          phoneWrapper.style.display = "none";
+          padWrapper.style.display = "block";
+          phoneWrapper.classList.remove("phone-compact");
+        }
+
+        // 触发自动缩放
+        autoFit();
+      }
+
+      // --- 3. 自动缩放逻辑 (核心优化) ---
+      function autoFit() {
+        const container = document.getElementById("preview-container");
+        const stage = document.getElementById("presentation-stage");
+        const toolbar = document.querySelector('.absolute.top-6.left-1\\/2');
+
+        // 重置缩放以获取真实尺寸
+        stage.style.transform = "scale(1)";
+
+        // 获取容器尺寸 (减去padding和工具栏高度)
+        const containerW = container.clientWidth - 60;
+        const toolbarHeight = toolbar ? toolbar.offsetHeight + 48 : 80; // 工具栏高度 + 间距(顶部6 + 间距)
+        const containerH = container.clientHeight - 60 - toolbarHeight;
+
+        // 计算内容尺寸
+        let contentW = 0;
+        let contentH = 0;
+
+        // 硬件尺寸常量
+        const PHONE_W = 399; // 375 + border 24
+        const PHONE_H = 836; // 812 + border 24
+        const PHONE_COMPACT_H = 744; // 720 + border 24 (紧凑模式)
+        const PAD_W = 1056; // 1024 + border 32
+        const PAD_H = 844; // 812 + border 32 (与手机高度一致)
+        const GAP = 40;
+
+        if (currentMode === "compare") {
+          contentW = PHONE_W + GAP + PAD_W;
+          contentH = Math.max(PHONE_H, PAD_H);
+        } else if (currentMode === "phone") {
+          contentW = PHONE_W;
+          contentH = PHONE_COMPACT_H; // 手机模式使用紧凑高度
+        } else {
+          contentW = PAD_W;
+          contentH = PAD_H;
+        }
+
+        // 计算缩放比例
+        const scaleX = containerW / contentW;
+        const scaleY = containerH / contentH;
+        let scale = Math.min(scaleX, scaleY);
+
+        // 限制最大缩放为1，最小缩放为0.1
+        scale = Math.min(Math.max(scale, 0.1), 1);
+
+        // 应用缩放
+        stage.style.transform = `scale(${scale})`;
+        document.getElementById("scale-val").innerText =
+          Math.round(scale * 100) + "%";
+      }
+
+      // 监听窗口大小变化和侧边栏动画
+      window.addEventListener("resize", autoFit);
+
+      // --- 4. 图片上传预览逻辑 ---
+      function setupImagePreview() {
+        const input = document.getElementById("resource-image");
+        const preview = document.getElementById("preview-resource");
+        const placeholder = document.getElementById("upload-placeholder");
+        const previewContainer = document.getElementById(
+          "upload-preview-container"
+        );
+        const phoneImg = document.getElementById("phone-image");
+        const padImg = document.getElementById("pad-image");
+
+        input.addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const result = e.target.result;
+              preview.src = result;
+              phoneImg.src = result;
+              padImg.src = result;
+
+              placeholder.classList.add("hidden");
+              previewContainer.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      function clearImage(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const input = document.getElementById("resource-image");
+        const placeholder = document.getElementById("upload-placeholder");
+        const previewContainer = document.getElementById(
+          "upload-preview-container"
+        );
+        const phoneImg = document.getElementById("phone-image");
+        const padImg = document.getElementById("pad-image");
+        const defaultSrc =
+          "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png";
+
+        input.value = "";
+        phoneImg.src = defaultSrc;
+        padImg.src = defaultSrc;
+        placeholder.classList.remove("hidden");
+        previewContainer.classList.add("hidden");
+      }
+
+      // --- 5. 文本同步逻辑 ---
+      function bindText(inputId, ...targetIds) {
+        const input = document.getElementById(inputId);
+        input.addEventListener("input", function () {
+          const val = this.value;
+          targetIds.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+          });
+        });
+      }
+
+      // --- 初始化 ---
+      document.addEventListener("DOMContentLoaded", function () {
+        setupImagePreview();
+
+        bindText("title1", "phone-text1", "pad-text1");
+        bindText("title2", "phone-text2", "pad-text2");
+        bindText(
+          "main-button-text",
+          "phone-main-btn-text",
+          "pad-main-btn-text"
+        );
+        bindText(
+          "secondary-button-text",
+          "phone-secondary-btn-text",
+          "pad-secondary-btn-text"
+        );
+
+        // 文本显隐控制 (完全隐藏)
+        document
+          .getElementById("show-text")
+          .addEventListener("change", function () {
+            const show = this.checked;
+            const phoneGroup = document.querySelector(".phone-title-group");
+            const padGroup = document.querySelector(".pad-title-group");
+            const inputs = document.getElementById("text-inputs-group");
+
+            const displayVal = show ? "flex" : "none";
+            phoneGroup.style.display = displayVal;
+            padGroup.style.display = displayVal;
+
+            // 逻辑修改：直接添加/移除 hidden class
+            if (show) {
+              inputs.classList.remove("hidden");
+            } else {
+              inputs.classList.add("hidden");
+            }
+          });
+
+        // 初始执行一次缩放
+        autoFit();
+      });
+    </script>
+  </body>
+</html>

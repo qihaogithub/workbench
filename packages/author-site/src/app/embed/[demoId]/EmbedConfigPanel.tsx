@@ -111,8 +111,11 @@ function EmbedSingleMode({
 
   const handleConfigChange = useCallback(
     (data: Record<string, unknown>) => {
-      setConfigData(data);
-      sendConfig(data);
+      setConfigData((prev) => {
+        const merged = { ...prev, ...data };
+        sendConfig(merged);
+        return merged;
+      });
     },
     [sendConfig]
   );
@@ -164,17 +167,6 @@ function EmbedGridMode({
     return map;
   });
 
-  const setPageConfig = useCallback(
-    (pageId: string, data: Record<string, unknown>) => {
-      setPageConfigs((prev) => {
-        const next = new Map(prev);
-        next.set(pageId, data);
-        return next;
-      });
-    },
-    []
-  );
-
   const registerIframe = useCallback(
     (pageId: string) => (el: HTMLIFrameElement | null) => {
       if (el) {
@@ -212,10 +204,16 @@ function EmbedGridMode({
 
   const handlePageConfigChange = useCallback(
     (data: Record<string, unknown>) => {
-      setPageConfig(activePageId, data);
-      sendConfigToPage(activePageId, data);
+      setPageConfigs((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(activePageId) ?? {};
+        const merged = { ...existing, ...data };
+        next.set(activePageId, merged);
+        sendConfigToPage(activePageId, merged);
+        return next;
+      });
     },
-    [activePageId, setPageConfig, sendConfigToPage]
+    [activePageId, sendConfigToPage]
   );
 
   const handleProjectConfigChange = useCallback(

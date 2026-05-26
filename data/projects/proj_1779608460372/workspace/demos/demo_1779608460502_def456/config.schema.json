@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 1024,
+      "height": 768
+    }
+  },
+  "title": "底部弹窗 - 平板版配置",
+  "type": "object",
+  "properties": {
+    "mainTitle": {
+      "type": "string",
+      "title": "主标题",
+      "description": "弹窗主标题文字",
+      "default": "孩子已完成第1节课程"
+    },
+    "subtitle": {
+      "type": "string",
+      "title": "副标题",
+      "description": "弹窗副标题文字",
+      "default": "快来成长计划看看孩子的进步吧～"
+    },
+    "mainButtonText": {
+      "type": "string",
+      "title": "主按钮文案",
+      "description": "主按钮文字",
+      "default": "去看看"
+    },
+    "secondaryButtonText": {
+      "type": "string",
+      "title": "次按钮文案",
+      "description": "次要按钮文字",
+      "default": "下次再说"
+    }
+  }
+}

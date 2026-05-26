@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "adImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图片",
+      "description": "两个页面共用的广告展示图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/伴读广告图.png"
+    },
+    "phoneBgImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机背景图",
+      "description": "手机版的背景图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/伴读广告背景.png"
+    },
+    "padBgImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板背景图",
+      "description": "平板版的背景图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/伴读广告背景.png"
+    }
+  }
+}

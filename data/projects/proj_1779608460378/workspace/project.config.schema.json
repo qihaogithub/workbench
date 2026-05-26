@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "广场页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "bigBannerForeground": {
+      "type": "string",
+      "format": "image",
+      "title": "大Banner前景图",
+      "description": "两个页面共用的大Banner前景图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png"
+    },
+    "contentImage": {
+      "type": "string",
+      "format": "image",
+      "title": "内容图片",
+      "description": "两个页面共用的内容区域图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/内容/内容.png"
+    },
+    "subjectNames": {
+      "type": "object",
+      "title": "科目名称",
+      "description": "顶部科目区域的名称文本",
+      "properties": {
+        "yuedu": { "type": "string", "title": "阅读", "default": "阅读" },
+        "yizhi": { "type": "string", "title": "益智", "default": "益智" },
+        "meiyu": { "type": "string", "title": "美育", "default": "美育" },
+        "xiezuo": { "type": "string", "title": "写作", "default": "写作" },
+        "yingyu": { "type": "string", "title": "英语", "default": "英语" }
+      }
+    }
+  }
+}

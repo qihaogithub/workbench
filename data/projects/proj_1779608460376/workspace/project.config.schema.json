@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "年课续费 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneResourceImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机端资源图",
+      "description": "手机弹窗组视图的资源展示图片"
+    },
+    "padResourceImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板端资源图",
+      "description": "平板弹窗组视图的资源展示图片"
+    },
+    "subject": {
+      "type": "string",
+      "title": "配色方案",
+      "description": "科目配色方案",
+      "enum": ["reading", "puzzle", "art", "writing", "english"],
+      "default": "reading"
+    }
+  }
+}

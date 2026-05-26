@@ -1,0 +1,27 @@
+{
+  "id": "proj_1779608460371",
+  "name": "伴读广告页面",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608460371\\workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460372_f5g6h7",
+      "name": "伴读广告-手机",
+      "order": 1,
+      "parentId": null,
+      "createdAt": 1779608460372,
+      "updatedAt": 1779608460372
+    },
+    {
+      "id": "demo_1779608460373_h7i8j9",
+      "name": "伴读广告-平板",
+      "order": 2,
+      "parentId": null,
+      "createdAt": 1779608460373,
+      "updatedAt": 1779608460373
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1779608460371,
+  "updatedAt": 1779608460371
+}

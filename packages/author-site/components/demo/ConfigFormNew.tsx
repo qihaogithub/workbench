@@ -907,7 +907,7 @@ export function ConfigForm({
     (key: string, value: unknown) => {
       const newData = { ...formDataRef.current, [key]: value };
       setFormData(newData);
-      onChange(newData);
+      onChange({ [key]: value });
     },
     [onChange]
   );
@@ -915,7 +915,7 @@ export function ConfigForm({
   const handleOrderChange = useCallback((newOrder: string[]) => {
     const newData = { ...formDataRef.current, __order: newOrder };
     setFormData(newData);
-    onChange(newData);
+    onChange({ __order: newOrder });
   }, [onChange]);
 
   const updateSchemaNote = useCallback(

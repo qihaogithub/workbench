@@ -1,0 +1,27 @@
+{
+  "id": "proj_1779608460372",
+  "name": "底部弹窗",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460372/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460501_abc123",
+      "name": "底部弹窗-手机",
+      "order": 1,
+      "parentId": null,
+      "createdAt": 1779608460501,
+      "updatedAt": 1779608460501
+    },
+    {
+      "id": "demo_1779608460502_def456",
+      "name": "底部弹窗-平板",
+      "order": 2,
+      "parentId": null,
+      "createdAt": 1779608460502,
+      "updatedAt": 1779608460502
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1779608460372,
+  "updatedAt": 1779608460372
+}

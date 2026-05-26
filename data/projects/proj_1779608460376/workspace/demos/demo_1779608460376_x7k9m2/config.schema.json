@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "title": "年课续费 - 手机版配置",
+  "type": "object",
+  "properties": {
+    "buttonImage": {
+      "type": "string",
+      "format": "image",
+      "title": "按钮图片",
+      "description": "弹窗底部按钮图片"
+    },
+    "tabbarImage": {
+      "type": "string",
+      "format": "image",
+      "title": "底部标签栏图片",
+      "description": "手机底部标签栏图片"
+    }
+  }
+}
