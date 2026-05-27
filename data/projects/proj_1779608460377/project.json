@@ -9,7 +9,7 @@
       "order": 1,
       "parentId": null,
       "createdAt": 1779608460377,
-      "updatedAt": 1779865154168
+      "updatedAt": 1779867016505
     },
     {
       "id": "demo_1779608460377_f8g6t2",
@@ -17,7 +17,7 @@
       "order": 2,
       "parentId": null,
       "createdAt": 1779608460378,
-      "updatedAt": 1779864993946
+      "updatedAt": 1779866845907
     }
   ],
   "demoFolders": [],
@@ -125,8 +125,33 @@
       "sessionId": "session-1779865029130-spnjtz7uj",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v13",
       "fileCount": 5
+    },
+    {
+      "versionId": "v14",
+      "savedAt": 1779866570619,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779865156799-mwsnp4ifr",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v14",
+      "fileCount": 5
+    },
+    {
+      "versionId": "v15",
+      "savedAt": 1779866848324,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779866577300-12xsjywtp",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v15",
+      "fileCount": 5
+    },
+    {
+      "versionId": "v16",
+      "savedAt": 1779867024058,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1779866863679-qhbvlrfoz",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v16",
+      "fileCount": 5
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1779865154252
+  "updatedAt": 1779867024065,
+  "thumbnail": "/thumbnails/proj_1779608460377_cover.webp"
 }

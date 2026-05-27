@@ -1,5 +1,7 @@
 interface DemoProps {
-  // 页面级配置项：无（所有弹窗属性由项目级共享配置注入）
+  imageWidth?: number;
+  imageMinHeight?: number;
+  imageMaxHeight?: number;
 }
 
 export default function PhonePopup(props: DemoProps) {
@@ -43,7 +45,11 @@ export default function PhonePopup(props: DemoProps) {
               />
             </svg>
           </div>
-          <img src={modalImage as string} alt="popup" className="w-full h-auto block rounded-lg" />
+          <img
+            src={modalImage as string}
+            alt="popup"
+            className="w-full h-auto block rounded-lg"
+          />
         </div>
       </div>
     </div>

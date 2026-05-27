@@ -1,5 +1,7 @@
 interface DemoProps {
-  // 页面级配置项：无（所有弹窗属性由项目级共享配置注入）
+  imageWidth?: number;
+  imageMinHeight?: number;
+  imageMaxHeight?: number;
 }
 
 export default function PadPopup(props: DemoProps) {
@@ -16,7 +18,7 @@ export default function PadPopup(props: DemoProps) {
       <div
         className="relative flex flex-col items-center justify-center w-screen h-screen"
         style={{
-          backgroundImage: `url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E5%B9%BF%E5%9C%BA%E9%A1%B5pad.png)`,
+          backgroundImage: `url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E9%A6%96%E9%A1%B5-pad.webp)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -50,7 +52,11 @@ export default function PadPopup(props: DemoProps) {
               </svg>
             </div>
 
-            <img src={modalImage as string} alt="popup" className="w-full h-auto block" />
+            <img
+              src={modalImage as string}
+              alt="popup"
+              className="w-full h-auto block"
+            />
           </div>
         </div>
       </div>
