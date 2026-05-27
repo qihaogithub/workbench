@@ -1,6 +1,7 @@
 import { BaseAgent } from './agent';
-import { AgentConfig, AgentResult, SendMessageOptions, AgentEvent } from './types';
+import { AgentConfig, AgentResult, SendMessageOptions } from './types';
 import { IBackendAdapter } from '../backends/base';
+import { logger } from '../utils/logger';
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
@@ -57,6 +58,10 @@ export class BackendAgent extends BaseAgent {
       this.setStatus('ready');
 
       const files = this.backend.getFiles?.() || [];
+      logger.info(
+        { filesCount: files.length },
+        '[SSE-DIAG] getFiles() called after sendMessage resolved',
+      );
 
       return {
         success: true,

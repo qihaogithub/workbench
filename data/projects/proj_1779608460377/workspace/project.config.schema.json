@@ -3,24 +3,12 @@
   "title": "通用弹窗 - 项目级共享配置",
   "type": "object",
   "properties": {
-    "popupImage": {
+    "modalImage": {
       "type": "string",
+      "title": "弹窗图片",
+      "description": "上传弹窗展示的图片",
       "format": "image",
-      "title": "弹窗配图",
-      "description": "弹窗展示的默认图片"
-    },
-    "svgaFile": {
-      "type": "string",
-      "format": "file",
-      "title": "SVGA动画",
-      "description": "SVGA格式动画文件，开启后覆盖弹窗配图"
-    },
-    "contentType": {
-      "type": "string",
-      "title": "内容类型",
-      "description": "弹窗展示图片还是SVGA动画",
-      "enum": ["image", "svga"],
-      "default": "image"
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png"
     }
   }
 }

@@ -39,7 +39,7 @@ export interface SessionMeta {
   userId?: string;
   createdAt: number;
   expiresAt: number;
-  status?: 'editing' | 'saved' | 'discarded' | 'archived';
+  status?: "editing" | "saved" | "discarded" | "archived";
   basedOnVersion?: string;
   opencodeSessionId?: string | null;
   workspaceId?: string;
@@ -120,3 +120,4 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
 };
 
 export * from "./workspace";
+export * from "./validator";

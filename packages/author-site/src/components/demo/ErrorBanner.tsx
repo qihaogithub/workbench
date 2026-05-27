@@ -6,7 +6,7 @@ import { mapToUserFriendly } from "../../../lib/error-mapper";
 import type { UserFriendlyError } from "../../../lib/error-mapper";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronDown, Wrench, ShieldCheck } from "lucide-react";
 
 export interface ErrorContext {
   summary: string;
@@ -17,9 +17,17 @@ interface ErrorBannerProps {
   errors: ValidationError[];
   disabled?: boolean;
   onSendToAI: (context: ErrorContext) => void;
+  onCheckCode?: () => void;
+  isChecking?: boolean;
 }
 
-export function ErrorBanner({ errors, disabled, onSendToAI }: ErrorBannerProps) {
+export function ErrorBanner({
+  errors,
+  disabled,
+  onSendToAI,
+  onCheckCode,
+  isChecking,
+}: ErrorBannerProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const userFriendly = useMemo<UserFriendlyError>(
@@ -44,6 +52,19 @@ export function ErrorBanner({ errors, disabled, onSendToAI }: ErrorBannerProps) 
           {userFriendly.summary}
         </span>
 
+        {onCheckCode && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5 shrink-0"
+            onClick={onCheckCode}
+            disabled={isChecking}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {isChecking ? "检查中..." : "检查代码"}
+          </Button>
+        )}
+
         <Button
           size="sm"
           className="h-7 text-xs gap-1.5 shrink-0"
@@ -62,7 +83,10 @@ export function ErrorBanner({ errors, disabled, onSendToAI }: ErrorBannerProps) 
         >
           <span className="text-xs">详情</span>
           <ChevronDown
-            className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")}
+            className={cn(
+              "h-3.5 w-3.5 transition-transform",
+              showDetails && "rotate-180",
+            )}
           />
         </Button>
       </div>

@@ -1,56 +1,49 @@
 interface DemoProps {
-  closeButtonColor?: string;
+  // 页面级配置项：无（所有弹窗属性由项目级共享配置注入）
 }
 
-export default function PhonePopup({ closeButtonColor = 'white', ...restProps }: DemoProps) {
-  const { popupImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png', contentType = 'image' } = restProps as Record<string, unknown>;
-  const showImage = contentType === 'image';
+export default function PhonePopup(props: DemoProps) {
+  const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props as Record<string, unknown>;
 
   return (
     <div
-      className="w-[375px] h-full flex flex-col justify-end items-center overflow-hidden"
+      className="fixed inset-0 z-50 flex flex-col"
       style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundImage: `url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E5%B9%BF%E5%9C%BA%E9%A1%B5phone.png)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div className="flex flex-col items-center justify-center w-full h-full bg-black/70">
-        <div
-          className="flex flex-col justify-center items-end"
-          style={{ width: '20.9375em', padding: '0.5em 0' }}
-        >
-          <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
-            <rect width="42" height="42" fill="black" fillOpacity="0.01" />
-            <circle
-              cx="21"
-              cy="21.0002"
-              r="18.0955"
-              stroke={closeButtonColor}
-              strokeWidth="1.26847"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              fillRule="evenodd"
-              clipRule="evenodd"
-              d="M26.6199 17.5782C27.126 16.9651 27.0923 16.0559 26.5186 15.4822C25.9091 14.8727 24.9208 14.8727 24.3113 15.4822L21.0002 18.7933L17.6892 15.4822L17.5778 15.381C16.9647 14.8748 16.0555 14.9086 15.4819 15.4822C14.8723 16.0918 14.8723 17.08 15.4819 17.6896L18.7929 21.0006L15.482 24.3115L15.3808 24.4229C14.8746 25.036 14.9083 25.9452 15.482 26.5188C16.0916 27.1284 17.0798 27.1284 17.6893 26.5188L21.0002 23.2079L24.3111 26.5188L24.4225 26.6201C25.0356 27.1263 25.9448 27.0925 26.5185 26.5188C27.128 25.9093 27.128 24.9211 26.5185 24.3115L23.2076 21.0006L26.5186 17.6896L26.6199 17.5782Z"
-              fill={closeButtonColor}
-            />
-          </svg>
-        </div>
-        <div
-          style={{ width: '20.9375em', maxHeight: '27.8125em', minHeight: '20.9375em' }}
-        >
-          {showImage ? (
-            <img src={popupImage as string} alt="popup" className="w-full h-auto" />
-          ) : (
-            <div
-              className="bg-gray-200 flex items-center justify-center text-gray-400 text-sm"
-              style={{ width: '20.9375em', height: '27.8125em' }}
-            >
-              SVGA动画区域
-            </div>
-          )}
+      {/* 半透明遮罩 — 让背景图隐约可见 */}
+      <div className="absolute inset-0 bg-black/70" />
+
+      {/* 内容区域 — 垂直居中显示 */}
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4">
+        <div className="relative inline-block max-w-xs w-full">
+          {/* 关闭按钮 — 在弹窗右上角上方10px处，不重叠 */}
+          <div className="absolute z-20 cursor-pointer" style={{ top: '-46px', right: 0 }}>
+            <svg width="36" height="36" viewBox="0 0 42 42" fill="none">
+              <rect width="42" height="42" fill="black" fillOpacity="0.01" />
+              <circle
+                cx="21"
+                cy="21.0002"
+                r="18.0955"
+                stroke="white"
+                strokeWidth="1.26847"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M26.6199 17.5782C27.126 16.9651 27.0923 16.0559 26.5186 15.4822C25.9091 14.8727 24.9208 14.8727 24.3113 15.4822L21.0002 18.7933L17.6892 15.4822L17.5778 15.381C16.9647 14.8748 16.0555 14.9086 15.4819 15.4822C14.8723 16.0918 14.8723 17.08 15.4819 17.6896L18.7929 21.0006L15.482 24.3115L15.3808 24.4229C14.8746 25.036 14.9083 25.9452 15.482 26.5188C16.0916 27.1284 17.0798 27.1284 17.6893 26.5188L21.0002 23.2079L24.3111 26.5188L24.4225 26.6201C25.0356 27.1263 25.9448 27.0925 26.5185 26.5188C27.128 25.9093 27.128 24.9211 26.5185 24.3115L23.2076 21.0006L26.5186 17.6896L26.6199 17.5782Z"
+                fill="white"
+              />
+            </svg>
+          </div>
+          <img src={modalImage as string} alt="popup" className="w-full h-auto block rounded-lg" />
         </div>
       </div>
     </div>

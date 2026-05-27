@@ -101,18 +101,20 @@ function computePreviewScale(
   };
 }
 
-function resolveImageUrls(data: Record<string, unknown>): Record<string, unknown> {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+function resolveImageUrls(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   if (!origin) return data;
 
   function walk(value: unknown): unknown {
-    if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
+    if (typeof value === "string" && value.startsWith("/api/sessions/")) {
       return origin + value;
     }
     if (Array.isArray(value)) {
       return value.map(walk);
     }
-    if (value !== null && typeof value === 'object') {
+    if (value !== null && typeof value === "object") {
       const result: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value)) {
         result[k] = walk(v);
@@ -170,6 +172,7 @@ export function PreviewPanel({
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
+  compileVersion,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,8 +183,10 @@ export function PreviewPanel({
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [iframeReady, setIframeReady] = useState(false);
   const iframeReadyRef = useRef(false);
-  const [pendingCompileResult, setPendingCompileResult] = useState<CompileResult | null>(null);
-  const [lastSuccessfulResult, setLastSuccessfulResult] = useState<CompileResult | null>(null);
+  const [pendingCompileResult, setPendingCompileResult] =
+    useState<CompileResult | null>(null);
+  const [lastSuccessfulResult, setLastSuccessfulResult] =
+    useState<CompileResult | null>(null);
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
 
   const validCode = code ? isValidCode(code) : true;
@@ -195,16 +200,18 @@ export function PreviewPanel({
     (result: CompileResult, config: Record<string, unknown> = {}) => {
       const iframe = iframeRef.current;
       if (!iframe || !iframe.contentWindow) {
-        console.log('[PreviewPanel] sendUpdateCode: iframe 或 contentWindow 不存在');
+        console.log(
+          "[PreviewPanel] sendUpdateCode: iframe 或 contentWindow 不存在",
+        );
         return;
       }
 
       const resolvedConfig = resolveImageUrls(config);
 
-      console.log('[PreviewPanel] 发送 UPDATE_CODE 消息', {
+      console.log("[PreviewPanel] 发送 UPDATE_CODE 消息", {
         codeLength: result.compiledCode?.length,
         configData: resolvedConfig,
-        cssImports: result.cssImports
+        cssImports: result.cssImports,
       });
 
       iframe.contentWindow.postMessage(
@@ -214,38 +221,47 @@ export function PreviewPanel({
           configData: resolvedConfig,
           cssImports: result.cssImports,
         },
-        "*"
+        "*",
       );
     },
-    []
+    [],
   );
 
   // 发送配置更新到 iframe
-  const sendUpdateConfig = useCallback(
-    (config: Record<string, unknown>) => {
-      const iframe = iframeRef.current;
-      if (!iframe || !iframe.contentWindow) {
-        console.log('[PreviewPanel] sendUpdateConfig: iframe 或 contentWindow 不存在');
-        return;
-      }
-
-      const resolvedConfig = resolveImageUrls(config);
-
-      console.log('[PreviewPanel] 发送 UPDATE_CONFIG 消息', { configData: resolvedConfig });
-
-      iframe.contentWindow.postMessage(
-        {
-          type: "UPDATE_CONFIG",
-          configData: resolvedConfig,
-        },
-        "*"
+  const sendUpdateConfig = useCallback((config: Record<string, unknown>) => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) {
+      console.log(
+        "[PreviewPanel] sendUpdateConfig: iframe 或 contentWindow 不存在",
       );
-    },
-    []
-  );
+      return;
+    }
+
+    const resolvedConfig = resolveImageUrls(config);
+
+    console.log("[PreviewPanel] 发送 UPDATE_CONFIG 消息", {
+      configData: resolvedConfig,
+    });
+
+    iframe.contentWindow.postMessage(
+      {
+        type: "UPDATE_CONFIG",
+        configData: resolvedConfig,
+      },
+      "*",
+    );
+  }, []);
 
   // 编译代码 effect
   useEffect(() => {
+    console.log(
+      "[PreviewPanel] 编译 effect 触发, code长度:",
+      code?.length ?? 0,
+      "sessionId:",
+      sessionId,
+      "validCode:",
+      validCode,
+    );
     // 如果有 sessionId，通过 session 读取代码编译
     // 如果有 code，直接编译代码
     // 如果都没有，不编译
@@ -286,19 +302,19 @@ export function PreviewPanel({
         }
 
         const compileResult: CompileResult = result.data;
-        console.log('[PreviewPanel] 编译成功', {
+        console.log("[PreviewPanel] 编译成功", {
           codeLength: compileResult.compiledCode?.length,
           dependencies: compileResult.dependencies?.length,
-          cssImports: compileResult.cssImports?.length
+          cssImports: compileResult.cssImports?.length,
         });
         setLastSuccessfulResult(compileResult);
 
         const currentConfig = configDataRef.current || {};
         if (iframeReadyRef.current) {
-          console.log('[PreviewPanel] iframe 已就绪，立即发送代码');
+          console.log("[PreviewPanel] iframe 已就绪，立即发送代码");
           sendUpdateCode(compileResult, currentConfig);
         } else {
-          console.log('[PreviewPanel] iframe 未就绪，缓存编译结果');
+          console.log("[PreviewPanel] iframe 未就绪，缓存编译结果");
           setPendingCompileResult(compileResult);
         }
 
@@ -315,7 +331,7 @@ export function PreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [code, sessionId, validCode, sendUpdateCode]);
+  }, [code, sessionId, validCode, sendUpdateCode, compileVersion]);
 
   // configData 变化时发送 UPDATE_CONFIG
   useEffect(() => {
@@ -327,7 +343,13 @@ export function PreviewPanel({
     }
 
     sendUpdateConfig(configData || {});
-  }, [configData, iframeReady, lastSuccessfulResult, runtimeError, sendUpdateConfig]);
+  }, [
+    configData,
+    iframeReady,
+    lastSuccessfulResult,
+    runtimeError,
+    sendUpdateConfig,
+  ]);
 
   // 监听 iframe 消息
   useEffect(() => {
@@ -337,30 +359,30 @@ export function PreviewPanel({
 
       const { type, error, stack } = event.data;
 
-      console.log('[PreviewPanel] 收到 iframe 消息', { type, error });
+      console.log("[PreviewPanel] 收到 iframe 消息", { type, error });
 
       switch (type) {
         case "READY":
-          console.log('[PreviewPanel] iframe 已就绪');
+          console.log("[PreviewPanel] iframe 已就绪");
           iframeReadyRef.current = true;
           setIframeReady(true);
           if (pendingCompileResult) {
-            console.log('[PreviewPanel] 发送待处理的编译结果');
+            console.log("[PreviewPanel] 发送待处理的编译结果");
             sendUpdateCode(pendingCompileResult, configData || {});
             setPendingCompileResult(null);
           } else if (lastSuccessfulResult) {
-            console.log('[PreviewPanel] 重新发送上一版成功结果');
+            console.log("[PreviewPanel] 重新发送上一版成功结果");
             sendUpdateCode(lastSuccessfulResult, configData || {});
           }
           break;
 
         case "LOADED":
-          console.log('[PreviewPanel] 组件已加载');
+          console.log("[PreviewPanel] 组件已加载");
           setRuntimeError(null);
           break;
 
         case "RUNTIME_ERROR":
-          console.log('[PreviewPanel] 运行时错误', { error, stack });
+          console.log("[PreviewPanel] 运行时错误", { error, stack });
           setRuntimeError(error || "组件运行时发生错误");
           onError?.(new Error(error || "组件运行时发生错误"));
           break;
@@ -405,19 +427,23 @@ export function PreviewPanel({
     return () => iframe.removeEventListener("load", handleLoad);
   }, [iframeSrcUrl]);
 
-  const { wrapperStyle, iframeStyle } = computePreviewScale(previewSize, containerWidth, containerHeight);
+  const { wrapperStyle, iframeStyle } = computePreviewScale(
+    previewSize,
+    containerWidth,
+    containerHeight,
+  );
 
   // 使用 Blob URL 替代 srcdoc，避免 CORS 问题
   useEffect(() => {
-    console.log('[PreviewPanel] 创建 iframe Blob URL');
+    console.log("[PreviewPanel] 创建 iframe Blob URL");
     const html = generateIframeHtml();
-    const blob = new Blob([html], { type: 'text/html' });
+    const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
-    console.log('[PreviewPanel] iframe Blob URL 已创建', { url });
+    console.log("[PreviewPanel] iframe Blob URL 已创建", { url });
     setIframeSrcUrl(url);
 
     return () => {
-      console.log('[PreviewPanel] 清理 iframe Blob URL');
+      console.log("[PreviewPanel] 清理 iframe Blob URL");
       URL.revokeObjectURL(url);
     };
   }, []);

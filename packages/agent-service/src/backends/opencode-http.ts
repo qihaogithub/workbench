@@ -225,6 +225,11 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
       this.closeSSE();
     }
 
+    // Reset diagnostic tracking for new SSE session
+    this.sseEventLog = [];
+    this.sessionDiffReceived = false;
+    this.sessionIdleReceived = false;
+
     this.eventSource = new EventSource(`${OPENCODE_SERVER_URL}/event?sessionId=${this.sessionId}`);
 
     this.eventSource.onmessage = (event) => {
@@ -256,6 +261,13 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
   private handleSSEEvent(data: OpenCodeSSEEvent): void {
     const props = data.properties;
+
+    // Diagnostic: log every SSE event type with timestamp for ordering analysis
+    this.sseEventLog.push({ type: data.type, ts: Date.now() });
+    logger.debug(
+      { eventType: data.type, sessionId: this.sessionId, seq: this.sseEventLog.length },
+      '[SSE-DIAG] Event received',
+    );
 
     switch (data.type) {
       // Streaming text delta (incremental chunk)
@@ -320,6 +332,17 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
       // Session became idle = AI finished responding
       case 'session.idle': {
+        this.sessionIdleReceived = true;
+        const diffBeforeIdle = this.sessionDiffReceived;
+        logger.info(
+          {
+            sessionId: this.sessionId,
+            diffReceivedBeforeIdle: diffBeforeIdle,
+            filesCount: this.files.length,
+            eventSequence: this.sseEventLog.map(e => e.type).join(' → '),
+          },
+          '[SSE-DIAG] session.idle received — closing SSE',
+        );
         this.eventCallback?.({
           type: 'stream',
           sessionId: this.config.sessionId,
@@ -350,8 +373,38 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
       // Session diff (file changes) — emit file_operation events and populate files
       case 'session.diff': {
+        const idleBeforeDiff = this.sessionIdleReceived;
+        const diffCount = Array.isArray(props.diff) ? props.diff.length : 0;
+        this.sessionDiffReceived = true;
+
+        if (idleBeforeDiff) {
+          logger.warn(
+            {
+              sessionId: this.sessionId,
+              diffCount,
+              eventSequence: this.sseEventLog.map(e => e.type).join(' → '),
+            },
+            '[SSE-DIAG] ⚠️ session.diff arrived AFTER session.idle — SSE may already be closed!',
+          );
+        }
+
+        if (diffCount === 0) {
+          logger.warn(
+            { sessionId: this.sessionId },
+            '[SSE-DIAG] ⚠️ session.diff received with EMPTY diff[] — check OpenCode Server snapshot config',
+          );
+        }
+
         if (props.diff && Array.isArray(props.diff) && props.diff.length > 0) {
-          logger.info({ diffCount: props.diff.length, sessionId: this.sessionId }, 'Session diff received');
+          logger.info(
+            {
+              diffCount: props.diff.length,
+              sessionId: this.sessionId,
+              idleBeforeDiff,
+              files: props.diff.map((d: { file?: string }) => d.file),
+            },
+            '[SSE-DIAG] session.diff received — processing file diffs',
+          );
 
           for (const fileDiff of props.diff) {
             if (fileDiff.file && fileDiff.after !== undefined) {
@@ -415,6 +468,11 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
   }
 
   private reasoningParts = new Set<string>();
+
+  // ── Diagnostic tracking for SSE event ordering ──
+  private sseEventLog: Array<{ type: string; ts: number }> = [];
+  private sessionDiffReceived = false;
+  private sessionIdleReceived = false;
 
   private closeSSE(): void {
     if (this.eventSource) {

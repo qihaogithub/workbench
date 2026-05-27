@@ -2,7 +2,13 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, invalidateCompileCache, ConfigScopeWrapper } from "../../../../../components/demo";
+import {
+  PreviewPanel,
+  ConfigForm,
+  PreviewGrid,
+  invalidateCompileCache,
+  ConfigScopeWrapper,
+} from "../../../../../components/demo";
 import type { PreviewMode } from "../../../../../components/demo";
 import {
   parseFigmaText,
@@ -25,10 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AIChat } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-} from "@/components/ui/resizable";
+import { ResizablePanelGroup, ResizablePanel } from "@/components/ui/resizable";
 import {
   Bot,
   Layers,
@@ -43,6 +46,7 @@ import {
   FileText,
   ZoomIn,
   ZoomOut,
+  ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -79,7 +83,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [schema, setSchema] = useState("");
   const [editorContent, setEditorContent] = useState("");
 
-  const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
+  const [configDataMap, setConfigDataMap] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -89,6 +95,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [agentSessionId, setAgentSessionId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   const [sessionId, setSessionId] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
@@ -100,7 +107,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
-  const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(undefined);
+  const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
+    undefined,
+  );
 
   // 多页面状态
   const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
@@ -108,10 +117,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const activeDemoIdRef = useRef(activeDemoId);
   activeDemoIdRef.current = activeDemoId;
-  const [projectConfigSchema, setProjectConfigSchema] = useState<string | undefined>(undefined);
+  const [projectConfigSchema, setProjectConfigSchema] = useState<
+    string | undefined
+  >(undefined);
 
   // 预览模式状态
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('single');
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
   const [gridScale, setGridScale] = useState(1.0);
 
@@ -139,15 +150,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
-  const [repairFailureCount, setRepairFailureCount] = useState(0);
-  const isRepairAttemptRef = useRef(false);
+  const [compileVersion, setCompileVersion] = useState(0);
 
-  const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const codeRef = useRef(code);
-  codeRef.current = code;
-  const schemaRef = useRef(schema);
-  schemaRef.current = schema;
-  const prevIsStreamingRef = useRef(false);
+  const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const configData = configDataMap[activeDemoId] ?? {};
 
@@ -156,24 +163,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   };
 
   useEffect(() => {
-    const hasErrors = !validationResult.isValid && validationResult.errors.length > 0;
+    const hasErrors =
+      !validationResult.isValid && validationResult.errors.length > 0;
     setErrorBannerVisible(hasErrors);
-    if (!hasErrors) {
-      setRepairFailureCount(0);
-    }
   }, [validationResult]);
 
-  useEffect(() => {
-    prevIsStreamingRef.current = aiIsStreaming;
-    if (!aiIsStreaming) {
-      const result = validateAll(codeRef.current, schemaRef.current);
-      setValidationResult(result);
-    }
-  }, [aiIsStreaming]);
-
-  const handleSendErrorToAI = useCallback((context: { summary: string; details: string }) => {
-    const demoId = activeDemoIdRef.current;
-    const aiPrompt = `【问题摘要】
+  const handleSendErrorToAI = useCallback(
+    (context: { summary: string; details: string }) => {
+      const demoId = activeDemoIdRef.current;
+      const aiPrompt = `【问题摘要】
 ${context.summary}
 
 【技术详情】
@@ -185,10 +183,21 @@ ${context.details}
 
 请使用 read 工具读取上述文件，分析并修复问题，保持组件原有功能不变。`;
 
-    isRepairAttemptRef.current = true;
-    setTabValue("ai");
-    setTriggerAutoSend(aiPrompt);
-  }, []);
+      setTabValue("ai");
+      setTriggerAutoSend(aiPrompt);
+    },
+    [],
+  );
+
+  const handleManualCheck = useCallback(() => {
+    setIsChecking(true);
+    try {
+      const result = validateAll(code, schema);
+      setValidationResult(result);
+    } finally {
+      setIsChecking(false);
+    }
+  }, [code, schema]);
 
   const handleNameClick = () => {
     setNameDraft(demoName);
@@ -246,7 +255,8 @@ ${context.details}
         const demosData = await demosRes.json();
         if (demosData.success) {
           const demo = demosData.data.find(
-            (d: { id: string; name: string; thumbnail?: string }) => d.id === demoId,
+            (d: { id: string; name: string; thumbnail?: string }) =>
+              d.id === demoId,
           );
           if (demo) {
             setDemoName(demo.name);
@@ -273,7 +283,10 @@ ${context.details}
           throw new Error(sessionData.error?.message || "创建 Session 失败");
         }
 
-        console.log("[loadDemo] Session 创建成功, sessionId:", sessionData.data.sessionId);
+        console.log(
+          "[loadDemo] Session 创建成功, sessionId:",
+          sessionData.data.sessionId,
+        );
         setSessionId(sessionData.data.sessionId);
         setWorkspaceId(sessionData.data.workspaceId || "");
         setTempWorkspace(sessionData.data.tempWorkspace || "");
@@ -294,12 +307,21 @@ ${context.details}
         // 多页面格式适配
         const multi = filesData.data;
         const rawPages = multi.demoPages || [];
-        const pagesWithSize = rawPages.map((page: { id: string; name: string; order: number; parentId: string | null; createdAt: number; updatedAt: number }) => ({
-          ...page,
-          previewSize: multi.demos?.[page.id]?.schema
-            ? getPreviewSize(multi.demos[page.id].schema)
-            : undefined,
-        }));
+        const pagesWithSize = rawPages.map(
+          (page: {
+            id: string;
+            name: string;
+            order: number;
+            parentId: string | null;
+            createdAt: number;
+            updatedAt: number;
+          }) => ({
+            ...page,
+            previewSize: multi.demos?.[page.id]?.schema
+              ? getPreviewSize(multi.demos[page.id].schema)
+              : undefined,
+          }),
+        );
         setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
@@ -311,13 +333,14 @@ ${context.details}
         if (multi.demos && Object.keys(multi.demos).length > 0) {
           const sortedPageIds = rawPages.map((p: { id: string }) => p.id);
           const demoIds = Object.keys(multi.demos);
-          const targetDemoId = sortedPageIds.length > 0
-            ? (sortedPageIds.includes(demoId as string)
-              ? demoId as string
-              : sortedPageIds[0])
-            : (demoIds.includes(demoId as string)
-              ? demoId as string
-              : demoIds[0]);
+          const targetDemoId =
+            sortedPageIds.length > 0
+              ? sortedPageIds.includes(demoId as string)
+                ? (demoId as string)
+                : sortedPageIds[0]
+              : demoIds.includes(demoId as string)
+                ? (demoId as string)
+                : demoIds[0];
           const currentDemo = multi.demos[targetDemoId];
           loadedCode = currentDemo.code;
           loadedSchema = currentDemo.schema;
@@ -335,16 +358,16 @@ ${context.details}
 
         const allDefaults: Record<string, Record<string, unknown>> = {};
         if (multi.demos) {
-          for (const [pageId, demo] of Object.entries(multi.demos) as [string, { schema: string }][]) {
+          for (const [pageId, demo] of Object.entries(multi.demos) as [
+            string,
+            { schema: string },
+          ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
         }
         setConfigDataMap(allDefaults);
-
-        const result = validateAll(loadedCode, loadedSchema);
-        setValidationResult(result);
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -404,13 +427,13 @@ ${context.details}
     setCode(parsed.code);
     setSchema(parsed.schema);
 
-    const result = validateAll(parsed.code, parsed.schema);
-    setValidationResult(result);
-
     const defaults = getSafeMergedDefaults(parsed.schema);
     setConfigDataMap((prev) => ({
       ...prev,
-      [activeDemoIdRef.current]: { ...defaults, ...(prev[activeDemoIdRef.current] ?? {}) },
+      [activeDemoIdRef.current]: {
+        ...defaults,
+        ...(prev[activeDemoIdRef.current] ?? {}),
+      },
     }));
 
     const size = getPreviewSize(parsed.schema);
@@ -420,17 +443,23 @@ ${context.details}
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
     setConfigDataMap((prev) => ({
       ...prev,
-      [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...data },
+      [activeDemoIdRef.current]: {
+        ...(prev[activeDemoIdRef.current] ?? {}),
+        ...data,
+      },
     }));
   }, []);
 
-  const handleSchemaChange = useCallback((newSchema: string) => {
-    setSchema(newSchema);
-    setEditorContent((prev) => {
-      const currentCode = extractCodeFromFigma(prev) || code;
-      return buildFigmaText(currentCode, newSchema);
-    });
-  }, [code]);
+  const handleSchemaChange = useCallback(
+    (newSchema: string) => {
+      setSchema(newSchema);
+      setEditorContent((prev) => {
+        const currentCode = extractCodeFromFigma(prev) || code;
+        return buildFigmaText(currentCode, newSchema);
+      });
+    },
+    [code],
+  );
 
   const handleProjectSchemaChange = useCallback((newSchema: string) => {
     setProjectConfigSchema(newSchema);
@@ -459,7 +488,7 @@ ${context.details}
     console.log(`[handleSave] 开始保存, sessionId: "${sessionId}"`);
 
     if (!sessionId) {
-      console.error('[handleSave] sessionId 为空!');
+      console.error("[handleSave] sessionId 为空!");
       toast({
         title: "保存失败",
         description: "Session 未创建，请刷新页面重试",
@@ -469,7 +498,7 @@ ${context.details}
     }
 
     if (!activeDemoId) {
-      console.error('[handleSave] activeDemoId 为空!');
+      console.error("[handleSave] activeDemoId 为空!");
       toast({
         title: "保存失败",
         description: "未选中页面，请先选择要保存的页面",
@@ -479,8 +508,12 @@ ${context.details}
     }
 
     if (!validationResult.isValid) {
-      const errors = validationResult.errors.filter(e => e.severity === "error");
-      const warnings = validationResult.errors.filter(e => e.severity === "warning");
+      const errors = validationResult.errors.filter(
+        (e) => e.severity === "error",
+      );
+      const warnings = validationResult.errors.filter(
+        (e) => e.severity === "warning",
+      );
 
       if (errors.length > 0) {
         toast({
@@ -499,12 +532,17 @@ ${context.details}
     try {
       setIsSaving(true);
 
-      console.log(`[handleSave] 发送 PUT 请求到 /api/sessions/${sessionId}/files`);
-      const saveRes = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, schema }),
-      });
+      console.log(
+        `[handleSave] 发送 PUT 请求到 /api/sessions/${sessionId}/files`,
+      );
+      const saveRes = await fetch(
+        `/api/sessions/${sessionId}/files/${activeDemoId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, schema }),
+        },
+      );
 
       if (!saveRes.ok) {
         throw new Error("保存文件失败");
@@ -578,7 +616,21 @@ ${context.details}
         "[DemoEditPage] Current schema before update:",
         schema ? "exists" : "missing",
       );
-      setCode(newCode);
+      setCode((prev) => {
+        const same = prev === newCode;
+        console.log(
+          "[DemoEditPage] setCode: prev长度:",
+          prev.length,
+          "new长度:",
+          newCode.length,
+          "相同:",
+          same,
+          "前50字符相同:",
+          prev.slice(0, 50) === newCode.slice(0, 50),
+        );
+        return same ? prev : newCode;
+      });
+      setCompileVersion((v) => v + 1);
       if (sessionId && activeDemoId) {
         invalidateCompileCache(sessionId, activeDemoId);
       }
@@ -593,25 +645,11 @@ ${context.details}
         );
         return updatedContent;
       });
-      // 同时触发验证
-      if (schema) {
-        const result = validateAll(newCode, schema);
-        console.log("[DemoEditPage] Validation result:", result);
-        setValidationResult(result);
-
-        if (isRepairAttemptRef.current) {
-          isRepairAttemptRef.current = false;
-          if (!result.isValid) {
-            setRepairFailureCount((prev) => prev + 1);
-          }
-        }
-
-        // 代码变更时重置 configData 为空，让组件默认值生效
-        setConfigDataMap((prev) => ({
-          ...prev,
-          [activeDemoIdRef.current]: {},
-        }));
-      }
+      // 代码变更时重置 configData 为空，让组件默认值生效
+      setConfigDataMap((prev) => ({
+        ...prev,
+        [activeDemoIdRef.current]: {},
+      }));
 
       // 防抖触发 Schema 自动重新生成
       // 如果 AI 在 1.5 秒内也更新了 Schema，则取消自动生成（避免覆盖 AI 的 Schema）
@@ -667,14 +705,11 @@ ${context.details}
             const newDefaults = getSafeMergedDefaults(data.data.schema);
             setConfigDataMap((prev) => ({
               ...prev,
-              [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...newDefaults },
+              [activeDemoIdRef.current]: {
+                ...(prev[activeDemoIdRef.current] ?? {}),
+                ...newDefaults,
+              },
             }));
-
-            const currentCode = codeRef.current;
-            if (currentCode) {
-              const result = validateAll(currentCode, newSchemaStr);
-              setValidationResult(result);
-            }
           }
         } catch (err) {
           console.warn("[DemoEditPage] Schema 自动生成失败:", err);
@@ -730,19 +765,6 @@ ${context.details}
         e,
       );
     }
-
-    const currentCode = codeRef.current;
-    if (currentCode) {
-      const result = validateAll(currentCode, newSchema);
-      setValidationResult(result);
-
-      if (isRepairAttemptRef.current) {
-        isRepairAttemptRef.current = false;
-        if (!result.isValid) {
-          setRepairFailureCount((prev) => prev + 1);
-        }
-      }
-    }
   }, []);
 
   if (isLoading) {
@@ -784,6 +806,18 @@ ${context.details}
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={handleManualCheck}
+            disabled={isChecking}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            <span className="text-xs">
+              {isChecking ? "检查中..." : "检查代码"}
+            </span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
             onClick={() => setCoverDialogOpen(true)}
           >
             <ImageIcon className="h-4 w-4" />
@@ -794,10 +828,7 @@ ${context.details}
           <Button variant="outline" onClick={handleCancel}>
             取消
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-          >
+          <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -832,7 +863,10 @@ ${context.details}
                   <Layers className="h-4 w-4" />
                   页面
                   {demoPages.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1">
+                    <Badge
+                      variant="secondary"
+                      className="ml-1 text-[10px] h-4 px-1"
+                    >
                       {demoPages.length}
                     </Badge>
                   )}
@@ -842,7 +876,7 @@ ${context.details}
               <TabsContent
                 value="ai"
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
->
+              >
                 <AIChat
                   sessionId={sessionId}
                   agentSessionId={agentSessionId}
@@ -863,7 +897,10 @@ ${context.details}
                   currentSessionId={sessionId}
                   onNewSession={async (existingWorkspaceId) => {
                     try {
-                      const body: Record<string, unknown> = { demoId, forceNew: true };
+                      const body: Record<string, unknown> = {
+                        demoId,
+                        forceNew: true,
+                      };
                       if (existingWorkspaceId) {
                         body.workspaceId = existingWorkspaceId;
                       }
@@ -874,7 +911,10 @@ ${context.details}
                       });
                       const data = await res.json();
                       if (!data.success) {
-                        toast({ title: "新建对话失败", variant: "destructive" });
+                        toast({
+                          title: "新建对话失败",
+                          variant: "destructive",
+                        });
                         return;
                       }
                       setSessionId(data.data.sessionId);
@@ -882,20 +922,29 @@ ${context.details}
                       setTempWorkspace(data.data.tempWorkspace || "");
                       setAgentSessionId(`demo-${demoId}-${Date.now()}`);
                       setAiMessages([]);
-                      setAiCurrentMessage({ role: "assistant", content: "", parts: [] });
+                      setAiCurrentMessage({
+                        role: "assistant",
+                        content: "",
+                        parts: [],
+                      });
                       setAiIsStreaming(false);
                       setAiStreamContent("");
                       if (!existingWorkspaceId) {
                         setCode(data.data.code || "");
                         setSchema(data.data.schema || "");
-                        setEditorContent(buildFigmaText(data.data.code || "", data.data.schema || ""));
-                        const defaults = getSafeMergedDefaults(data.data.schema || "");
+                        setEditorContent(
+                          buildFigmaText(
+                            data.data.code || "",
+                            data.data.schema || "",
+                          ),
+                        );
+                        const defaults = getSafeMergedDefaults(
+                          data.data.schema || "",
+                        );
                         setConfigDataMap((prev) => ({
                           ...prev,
                           [activeDemoIdRef.current]: defaults,
                         }));
-                        const result = validateAll(data.data.code || "", data.data.schema || "");
-                        setValidationResult(result);
                         const size = getPreviewSize(data.data.schema || "");
                         setPreviewSize(size);
                       }
@@ -903,7 +952,8 @@ ${context.details}
                     } catch (error) {
                       toast({
                         title: "新建对话失败",
-                        description: error instanceof Error ? error.message : "未知错误",
+                        description:
+                          error instanceof Error ? error.message : "未知错误",
                         variant: "destructive",
                       });
                     }
@@ -924,7 +974,9 @@ ${context.details}
                         body: JSON.stringify({ status: "editing" }),
                       });
 
-                      const sessionRes = await fetch(`/api/sessions/${newSessionId}`);
+                      const sessionRes = await fetch(
+                        `/api/sessions/${newSessionId}`,
+                      );
                       if (!sessionRes.ok) {
                         toast({ title: "会话不存在", variant: "destructive" });
                         return;
@@ -935,13 +987,22 @@ ${context.details}
                         return;
                       }
 
-                      const messagesRes = await fetch(`/api/sessions/${newSessionId}/messages`);
+                      const messagesRes = await fetch(
+                        `/api/sessions/${newSessionId}/messages`,
+                      );
                       const messagesData = await messagesRes.json();
-                      setAiMessages(messagesData.success ? (messagesData.data || []) : []);
-                      setAiCurrentMessage({ role: "assistant", content: "", parts: [] });
+                      setAiMessages(
+                        messagesData.success ? messagesData.data || [] : [],
+                      );
+                      setAiCurrentMessage({
+                        role: "assistant",
+                        content: "",
+                        parts: [],
+                      });
                       setAiIsStreaming(false);
                       setAiStreamContent("");
-                      const { getAgentClient } = await import("@/lib/agent-client");
+                      const { getAgentClient } =
+                        await import("@/lib/agent-client");
                       const agentClient = getAgentClient();
                       try {
                         await agentClient.getSession(newSessionId);
@@ -954,7 +1015,8 @@ ${context.details}
                     } catch (error) {
                       toast({
                         title: "切换失败",
-                        description: error instanceof Error ? error.message : "未知错误",
+                        description:
+                          error instanceof Error ? error.message : "未知错误",
                         variant: "destructive",
                       });
                     }
@@ -967,6 +1029,8 @@ ${context.details}
                         errors={validationResult.errors}
                         disabled={aiIsStreaming}
                         onSendToAI={handleSendErrorToAI}
+                        onCheckCode={handleManualCheck}
+                        isChecking={isChecking}
                       />
                     ) : null
                   }
@@ -990,19 +1054,23 @@ ${context.details}
                     setActiveDemoId(pageId);
                     if (sessionId) {
                       try {
-                        const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
+                        const res = await fetch(
+                          `/api/sessions/${sessionId}/files/${pageId}`,
+                        );
                         const data = await res.json();
                         if (data.success) {
                           setCode(data.data.code);
                           setSchema(data.data.schema);
-                          setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                          setEditorContent(
+                            buildFigmaText(data.data.code, data.data.schema),
+                          );
                           setConfigDataMap((prev) => {
                             if (prev[pageId]) return prev;
-                            const defaults = getSafeMergedDefaults(data.data.schema);
+                            const defaults = getSafeMergedDefaults(
+                              data.data.schema,
+                            );
                             return { ...prev, [pageId]: defaults };
                           });
-                          const result = validateAll(data.data.code, data.data.schema);
-                          setValidationResult(result);
                           const size = getPreviewSize(data.data.schema);
                           setPreviewSize(size);
                         }
@@ -1014,19 +1082,28 @@ ${context.details}
                   onPageRename={async (pageId, name) => {
                     if (!sessionId) return;
                     try {
-                      const res = await fetch(`/api/projects/${demoId}/demos/${pageId}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ sessionId, name }),
-                      });
+                      const res = await fetch(
+                        `/api/projects/${demoId}/demos/${pageId}`,
+                        {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ sessionId, name }),
+                        },
+                      );
                       const data = await res.json();
                       if (data.success) {
                         setDemoPages((prev) =>
-                          prev.map((p) => (p.id === pageId ? { ...p, name } : p))
+                          prev.map((p) =>
+                            p.id === pageId ? { ...p, name } : p,
+                          ),
                         );
                         toast({ title: "名称已更新" });
                       } else {
-                        toast({ title: "更新失败", description: data.error?.message, variant: "destructive" });
+                        toast({
+                          title: "更新失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
                       }
                     } catch {
                       toast({ title: "更新失败", variant: "destructive" });
@@ -1034,23 +1111,38 @@ ${context.details}
                   }}
                   onPageCopy={async (pageId) => {
                     if (!sessionId) {
-                      toast({ title: "未创建 Session", variant: "destructive" });
+                      toast({
+                        title: "未创建 Session",
+                        variant: "destructive",
+                      });
                       return;
                     }
-                    const page = demoPages.find(p => p.id === pageId);
+                    const page = demoPages.find((p) => p.id === pageId);
                     if (!page) return;
                     try {
                       const res = await fetch(`/api/projects/${demoId}/demos`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ sessionId, name: `${page.name} - 副本`, sourcePageId: pageId }),
+                        body: JSON.stringify({
+                          sessionId,
+                          name: `${page.name} - 副本`,
+                          sourcePageId: pageId,
+                        }),
                       });
                       const data = await res.json();
                       if (data.success) {
-                        setDemoPages((prev) => [...prev, data.data].sort((a, b) => a.order - b.order));
+                        setDemoPages((prev) =>
+                          [...prev, data.data].sort(
+                            (a, b) => a.order - b.order,
+                          ),
+                        );
                         toast({ title: "页面复制成功" });
                       } else {
-                        toast({ title: "复制失败", description: data.error?.message, variant: "destructive" });
+                        toast({
+                          title: "复制失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
                       }
                     } catch {
                       toast({ title: "复制失败", variant: "destructive" });
@@ -1058,45 +1150,64 @@ ${context.details}
                   }}
                   onPageDelete={async (pageId) => {
                     if (!sessionId) {
-                      toast({ title: "未创建 Session", variant: "destructive" });
+                      toast({
+                        title: "未创建 Session",
+                        variant: "destructive",
+                      });
                       return;
                     }
                     if (demoPages.length <= 1) {
-                      toast({ title: "无法删除", description: "至少需要保留一个页面", variant: "destructive" });
+                      toast({
+                        title: "无法删除",
+                        description: "至少需要保留一个页面",
+                        variant: "destructive",
+                      });
                       return;
                     }
-                    const page = demoPages.find(p => p.id === pageId);
-                    if (!page || !confirm(`确定要删除页面「${page.name}」吗？`)) return;
+                    const page = demoPages.find((p) => p.id === pageId);
+                    if (!page || !confirm(`确定要删除页面「${page.name}」吗？`))
+                      return;
                     try {
                       const res = await fetch(
                         `/api/projects/${demoId}/demos/${pageId}?sessionId=${encodeURIComponent(sessionId)}`,
-                        { method: "DELETE" }
+                        { method: "DELETE" },
                       );
                       const data = await res.json();
                       if (data.success) {
-                        setDemoPages((prev) => prev.filter((p) => p.id !== pageId));
+                        setDemoPages((prev) =>
+                          prev.filter((p) => p.id !== pageId),
+                        );
                         if (activeDemoId === pageId) {
-                          const remaining = demoPages.filter((p) => p.id !== pageId);
+                          const remaining = demoPages.filter(
+                            (p) => p.id !== pageId,
+                          );
                           const nextPage = remaining[0];
                           if (nextPage) {
                             setActiveDemoId(nextPage.id);
-                            const fileRes = await fetch(`/api/sessions/${sessionId}/files/${nextPage.id}`);
-                              const fileData = await fileRes.json();
-                              if (fileData.success) {
-                                setCode(fileData.data.code);
-                                setSchema(fileData.data.schema);
-                                setEditorContent(buildFigmaText(fileData.data.code, fileData.data.schema));
-                                setConfigDataMap((prev) => {
-                                  const rest = { ...prev };
-                                  delete rest[pageId];
-                                  if (!rest[nextPage.id]) {
-                                    const defaults = getSafeMergedDefaults(fileData.data.schema);
-                                    rest[nextPage.id] = defaults;
-                                  }
-                                  return rest;
-                                });
-                              const result = validateAll(fileData.data.code, fileData.data.schema);
-                              setValidationResult(result);
+                            const fileRes = await fetch(
+                              `/api/sessions/${sessionId}/files/${nextPage.id}`,
+                            );
+                            const fileData = await fileRes.json();
+                            if (fileData.success) {
+                              setCode(fileData.data.code);
+                              setSchema(fileData.data.schema);
+                              setEditorContent(
+                                buildFigmaText(
+                                  fileData.data.code,
+                                  fileData.data.schema,
+                                ),
+                              );
+                              setConfigDataMap((prev) => {
+                                const rest = { ...prev };
+                                delete rest[pageId];
+                                if (!rest[nextPage.id]) {
+                                  const defaults = getSafeMergedDefaults(
+                                    fileData.data.schema,
+                                  );
+                                  rest[nextPage.id] = defaults;
+                                }
+                                return rest;
+                              });
                               const size = getPreviewSize(fileData.data.schema);
                               setPreviewSize(size);
                             }
@@ -1104,7 +1215,11 @@ ${context.details}
                         }
                         toast({ title: "页面已删除" });
                       } else {
-                        toast({ title: "删除失败", description: data.error?.message, variant: "destructive" });
+                        toast({
+                          title: "删除失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
                       }
                     } catch {
                       toast({ title: "删除失败", variant: "destructive" });
@@ -1112,23 +1227,27 @@ ${context.details}
                   }}
                   onViewCode={async (pageId) => {
                     if (!sessionId) return;
-                    const page = demoPages.find(p => p.id === pageId);
+                    const page = demoPages.find((p) => p.id === pageId);
                     if (!page) return;
                     try {
-                      const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
+                      const res = await fetch(
+                        `/api/sessions/${sessionId}/files/${pageId}`,
+                      );
                       const data = await res.json();
                       if (data.success) {
                         setActiveDemoId(pageId);
                         setCode(data.data.code);
                         setSchema(data.data.schema);
-                        setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                        setEditorContent(
+                          buildFigmaText(data.data.code, data.data.schema),
+                        );
                         setConfigDataMap((prev) => {
                           if (prev[pageId]) return prev;
-                          const defaults = getSafeMergedDefaults(data.data.schema);
+                          const defaults = getSafeMergedDefaults(
+                            data.data.schema,
+                          );
                           return { ...prev, [pageId]: defaults };
                         });
-                        const result = validateAll(data.data.code, data.data.schema);
-                        setValidationResult(result);
                         const size = getPreviewSize(data.data.schema);
                         setPreviewSize(size);
                         setViewCodeData({
@@ -1151,50 +1270,57 @@ ${context.details}
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
               <Button
-                variant={previewMode === 'single' ? 'default' : 'ghost'}
+                variant={previewMode === "single" ? "default" : "ghost"}
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => setPreviewMode('single')}
+                onClick={() => setPreviewMode("single")}
               >
                 <FileText className="h-3.5 w-3.5" />
                 单页
               </Button>
               <Button
-                variant={previewMode === 'grid' ? 'default' : 'ghost'}
+                variant={previewMode === "grid" ? "default" : "ghost"}
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => setPreviewMode('grid')}
+                onClick={() => setPreviewMode("grid")}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 宫格
               </Button>
               <div className="flex-1" />
-              {previewMode === 'single' && demoPages.length > 1 && (
-                <Select value={activeDemoId} onValueChange={async (pageId) => {
-                  setActiveDemoId(pageId);
-                  if (sessionId) {
-                    try {
-                      const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
-                      const data = await res.json();
-                      if (data.success) {
-                        setCode(data.data.code);
-                        setSchema(data.data.schema);
-                        setEditorContent(buildFigmaText(data.data.code, data.data.schema));
-                        setConfigDataMap((prev) => {
-                          if (prev[pageId]) return prev;
-                          const defaults = getSafeMergedDefaults(data.data.schema);
-                          return { ...prev, [pageId]: defaults };
-                        });
-                        const result = validateAll(data.data.code, data.data.schema);
-                        setValidationResult(result);
-                        const size = getPreviewSize(data.data.schema);
-                        setPreviewSize(size);
+              {previewMode === "single" && demoPages.length > 1 && (
+                <Select
+                  value={activeDemoId}
+                  onValueChange={async (pageId) => {
+                    setActiveDemoId(pageId);
+                    if (sessionId) {
+                      try {
+                        const res = await fetch(
+                          `/api/sessions/${sessionId}/files/${pageId}`,
+                        );
+                        const data = await res.json();
+                        if (data.success) {
+                          setCode(data.data.code);
+                          setSchema(data.data.schema);
+                          setEditorContent(
+                            buildFigmaText(data.data.code, data.data.schema),
+                          );
+                          setConfigDataMap((prev) => {
+                            if (prev[pageId]) return prev;
+                            const defaults = getSafeMergedDefaults(
+                              data.data.schema,
+                            );
+                            return { ...prev, [pageId]: defaults };
+                          });
+                          const size = getPreviewSize(data.data.schema);
+                          setPreviewSize(size);
+                        }
+                      } catch (err) {
+                        console.error("加载页面失败:", err);
                       }
-                    } catch (err) {
-                      console.error("加载页面失败:", err);
                     }
-                  }
-                }}>
+                  }}
+                >
                   <SelectTrigger className="h-7 w-32 text-xs">
                     <SelectValue placeholder="选择页面" />
                   </SelectTrigger>
@@ -1207,10 +1333,15 @@ ${context.details}
                   </SelectContent>
                 </Select>
               )}
-              {previewMode === 'grid' && (
+              {previewMode === "grid" && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">每行</span>
-                  <Select value={String(gridColumns)} onValueChange={(v) => setGridColumns(Number(v) as 2 | 3 | 4)}>
+                  <Select
+                    value={String(gridColumns)}
+                    onValueChange={(v) =>
+                      setGridColumns(Number(v) as 2 | 3 | 4)
+                    }
+                  >
                     <SelectTrigger className="h-7 w-16 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -1222,14 +1353,14 @@ ${context.details}
                   </Select>
                 </div>
               )}
-              {previewMode === 'grid' && (
+              {previewMode === "grid" && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">缩放</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0"
-                    onClick={() => setGridScale(s => Math.max(0.5, s - 0.1))}
+                    onClick={() => setGridScale((s) => Math.max(0.5, s - 0.1))}
                   >
                     <ZoomOut className="h-3.5 w-3.5" />
                   </Button>
@@ -1240,7 +1371,7 @@ ${context.details}
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0"
-                    onClick={() => setGridScale(s => Math.min(2.0, s + 0.1))}
+                    onClick={() => setGridScale((s) => Math.min(2.0, s + 0.1))}
                   >
                     <ZoomIn className="h-3.5 w-3.5" />
                   </Button>
@@ -1249,7 +1380,7 @@ ${context.details}
             </div>
 
             <div className="flex-1 overflow-hidden">
-              {previewMode === 'single' ? (
+              {previewMode === "single" ? (
                 <div
                   className="p-4 h-full overflow-y-auto preview-single-scroll"
                   style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -1265,6 +1396,7 @@ ${context.details}
                     demoId={activeDemoId}
                     configData={configData}
                     previewSize={previewSize}
+                    compileVersion={compileVersion}
                   />
                 </div>
               ) : (
@@ -1279,7 +1411,13 @@ ${context.details}
                   onCardClick={(pageId) => {
                     if (pageId === activeDemoId) return;
                     setActiveDemoId(pageId);
-                    const clickedPage = demoPages.find(p => p.id === pageId) as (DemoPageMeta & { previewSize?: import("../../../../../components/demo/types").PreviewSize }) | undefined;
+                    const clickedPage = demoPages.find(
+                      (p) => p.id === pageId,
+                    ) as
+                      | (DemoPageMeta & {
+                          previewSize?: import("../../../../../components/demo/types").PreviewSize;
+                        })
+                      | undefined;
                     if (clickedPage?.previewSize) {
                       setPreviewSize(clickedPage.previewSize);
                     }
@@ -1290,14 +1428,16 @@ ${context.details}
                           if (data.success) {
                             setCode(data.data.code);
                             setSchema(data.data.schema);
-                            setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+                            setEditorContent(
+                              buildFigmaText(data.data.code, data.data.schema),
+                            );
                             setConfigDataMap((prev) => {
                               if (prev[pageId]) return prev;
-                              const defaults = getSafeMergedDefaults(data.data.schema);
+                              const defaults = getSafeMergedDefaults(
+                                data.data.schema,
+                              );
                               return { ...prev, [pageId]: defaults };
                             });
-                            const result = validateAll(data.data.code, data.data.schema);
-                            setValidationResult(result);
                             const size = getPreviewSize(data.data.schema);
                             setPreviewSize(size);
                           }
@@ -1322,7 +1462,10 @@ ${context.details}
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
                 {projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project" hideHeader={!projectConfigSchema}>
+                  <ConfigScopeWrapper
+                    scope="project"
+                    hideHeader={!projectConfigSchema}
+                  >
                     <ConfigForm
                       key={`project-${projectConfigSchema}`}
                       schema={projectConfigSchema}
@@ -1351,7 +1494,11 @@ ${context.details}
                   <div className="h-[2px] bg-border my-3" />
                 )}
 
-                <ConfigScopeWrapper scope="page" pageName={demoPages.find(p => p.id === activeDemoId)?.name} hideHeader={!projectConfigSchema}>
+                <ConfigScopeWrapper
+                  scope="page"
+                  pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
+                  hideHeader={!projectConfigSchema}
+                >
                   <ConfigForm
                     key={schema}
                     schema={schema}
@@ -1372,7 +1519,9 @@ ${context.details}
         onOpenChange={setCoverDialogOpen}
         projectId={demoId}
         currentThumbnail={currentThumbnail}
-        onThumbnailChange={(thumbnail) => setCurrentThumbnail(thumbnail ?? undefined)}
+        onThumbnailChange={(thumbnail) =>
+          setCurrentThumbnail(thumbnail ?? undefined)
+        }
       />
 
       <CodeViewDialog
@@ -1385,12 +1534,16 @@ ${context.details}
         demoId={viewCodeData.pageId}
         onSave={async (type, content) => {
           if (!sessionId) return;
-          const body = type === "code" ? { code: content } : { schema: content };
-          const res = await fetch(`/api/sessions/${sessionId}/files/${viewCodeData.pageId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
+          const body =
+            type === "code" ? { code: content } : { schema: content };
+          const res = await fetch(
+            `/api/sessions/${sessionId}/files/${viewCodeData.pageId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
           const data = await res.json();
           if (!data.success) {
             throw new Error(data.error?.message || "保存失败");
@@ -1398,23 +1551,22 @@ ${context.details}
           if (type === "code") {
             setCode(content);
             setEditorContent(buildFigmaText(content, schema));
-            const result = validateAll(content, schema);
-            setValidationResult(result);
           } else {
             setSchema(content);
             setEditorContent(buildFigmaText(code, content));
             const defaults = getSafeMergedDefaults(content);
             setConfigDataMap((prev) => ({
               ...prev,
-              [activeDemoIdRef.current]: { ...(prev[activeDemoIdRef.current] ?? {}), ...defaults },
+              [activeDemoIdRef.current]: {
+                ...(prev[activeDemoIdRef.current] ?? {}),
+                ...defaults,
+              },
             }));
-            const result = validateAll(code, content);
-            setValidationResult(result);
             const size = getPreviewSize(content);
             setPreviewSize(size);
-                    }
-                  }}
-                />
+          }
+        }}
+      />
     </div>
   );
 }

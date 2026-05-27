@@ -48,28 +48,59 @@ export async function fetchSessionFiles(
   demoId?: string,
 ): Promise<{ code?: string; schema?: string } | null> {
   try {
-    const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+    const url = `/api/sessions/${sessionId}/files`;
+    console.log("[fetchSessionFiles] 请求:", url, "demoId:", demoId);
+    const filesRes = await fetch(url);
+    console.log("[fetchSessionFiles] 响应状态:", filesRes.status);
     if (filesRes.ok) {
       const filesData = await filesRes.json();
+      console.log(
+        "[fetchSessionFiles] 响应数据 keys:",
+        filesData.data ? Object.keys(filesData.data) : "null",
+        "success:",
+        filesData.success,
+      );
       if (filesData.success && filesData.data) {
         const data = filesData.data;
         if (data.demos && typeof data.demos === "object") {
           const demoIds = Object.keys(data.demos);
           const targetId = demoId || demoIds[0];
+          console.log(
+            "[fetchSessionFiles] MultiDemo 格式, demoIds:",
+            demoIds,
+            "targetId:",
+            targetId,
+          );
           if (targetId && data.demos[targetId]) {
-            return {
+            const result = {
               code: data.demos[targetId].code,
               schema: data.demos[targetId].schema,
             };
+            console.log(
+              "[fetchSessionFiles] 返回: code=",
+              result.code?.length ?? 0,
+              "chars, schema=",
+              result.schema?.length ?? 0,
+              "chars",
+            );
+            return result;
           }
         }
         if (data.code || data.schema) {
+          console.log(
+            "[fetchSessionFiles] 返回: code=",
+            data.code?.length ?? 0,
+            "chars, schema=",
+            data.schema?.length ?? 0,
+            "chars",
+          );
           return { code: data.code, schema: data.schema };
         }
+        console.log("[fetchSessionFiles] ⚠️ 响应数据中无 code/schema");
       }
     }
   } catch (error) {
-    console.error("[MessageService] Error fetching files via HTTP:", error);
+    console.error("[fetchSessionFiles] Error fetching files via HTTP:", error);
   }
   return null;
 }

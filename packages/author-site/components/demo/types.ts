@@ -24,13 +24,14 @@ export interface DemoSchema extends Record<string, unknown> {
 }
 
 export interface PreviewPanelProps {
-  code?: string;                        // 编译前的原始代码（兼容旧模式）
-  sessionId?: string;                   // 优先：从 session 读取草稿代码
-  demoId?: string;                      // 多页面模式下指定要编译的页面
+  code?: string; // 编译前的原始代码（兼容旧模式）
+  sessionId?: string; // 优先：从 session 读取草稿代码
+  demoId?: string; // 多页面模式下指定要编译的页面
   configData?: Record<string, unknown>;
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
+  compileVersion?: number; // 递增以强制重新编译
 }
 
 export interface ConfigFormProps {
@@ -43,41 +44,41 @@ export interface ConfigFormProps {
   sessionId?: string;
 }
 
-export type PreviewMode = 'single' | 'grid'
+export type PreviewMode = "single" | "grid";
 
 export interface PreviewState {
-  mode: PreviewMode
-  activePageId: string
-  gridColumns: 2 | 3 | 4
+  mode: PreviewMode;
+  activePageId: string;
+  gridColumns: 2 | 3 | 4;
 }
 
 export interface GridPageItem {
-  id: string
-  name: string
-  order: number
-  previewSize?: PreviewSize
-  code?: string
+  id: string;
+  name: string;
+  order: number;
+  previewSize?: PreviewSize;
+  code?: string;
 }
 
 export interface GridIframeProps {
-  sessionId?: string
-  page: GridPageItem
-  visible: boolean
-  hasChanges: boolean
-  configData?: Record<string, unknown>
-  previewSize?: PreviewSize
+  sessionId?: string;
+  page: GridPageItem;
+  visible: boolean;
+  hasChanges: boolean;
+  configData?: Record<string, unknown>;
+  previewSize?: PreviewSize;
 }
 
 export interface PreviewGridProps {
-  sessionId?: string
-  demoPages: GridPageItem[]
-  activePageId: string
-  gridColumns: 2 | 3 | 4
-  gridScale?: number
-  onGridScaleChange?: (scale: number) => void
-  onGridColumnsChange: (columns: 2 | 3 | 4) => void
-  onCardClick: (pageId: string) => void
-  changedPageIds?: Set<string>
-  configDataMap?: Record<string, Record<string, unknown>>
-  previewSize?: PreviewSize
+  sessionId?: string;
+  demoPages: GridPageItem[];
+  activePageId: string;
+  gridColumns: 2 | 3 | 4;
+  gridScale?: number;
+  onGridScaleChange?: (scale: number) => void;
+  onGridColumnsChange: (columns: 2 | 3 | 4) => void;
+  onCardClick: (pageId: string) => void;
+  changedPageIds?: Set<string>;
+  configDataMap?: Record<string, Record<string, unknown>>;
+  previewSize?: PreviewSize;
 }

@@ -8,12 +8,5 @@
   },
   "title": "通用弹窗 - 平板版配置",
   "type": "object",
-  "properties": {
-    "closeButtonColor": {
-      "type": "string",
-      "title": "关闭按钮颜色",
-      "description": "关闭按钮X的颜色",
-      "default": "white"
-    }
-  }
+  "properties": {}
 }
