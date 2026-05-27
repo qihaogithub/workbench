@@ -151,12 +151,75 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [tabValue, setTabValue] = useState("ai");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
   const [compileVersion, setCompileVersion] = useState(0);
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
+
+  /**
+   * Unified snapshot application entry.
+   * Atomically updates code, schema, editorContent, previewSize, configData, and snapshotVersion.
+   */
+  const applyDemoSnapshot = useCallback(
+    (params: {
+      code?: string;
+      schema?: string;
+      source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch";
+    }) => {
+      const { code: newCode, schema: newSchema, source } = params;
+
+      if (newCode !== undefined) {
+        setCode((prev) => (prev === newCode ? prev : newCode));
+        if (sessionId && activeDemoId) {
+          invalidateCompileCache(sessionId, activeDemoId);
+        }
+      }
+
+      if (newSchema !== undefined) {
+        setSchema(newSchema);
+        setPreviewSize(getPreviewSize(newSchema));
+
+        // Merge config defaults using the new schema
+        try {
+          const defaults = getSafeMergedDefaults(newSchema);
+          setConfigDataMap((prev) => {
+            const current = prev[activeDemoIdRef.current] ?? {};
+            const merged = { ...current, ...defaults };
+            if (defaults.__order) {
+              merged.__order = defaults.__order;
+            }
+            return { ...prev, [activeDemoIdRef.current]: merged };
+          });
+        } catch (e) {
+          console.warn("[DemoEditPage] Failed to merge schema defaults:", e);
+        }
+      }
+
+      // Update editorContent from the latest code+schema
+      setEditorContent((prev) => {
+        const currentCode = newCode ?? extractCodeFromFigma(prev) ?? code;
+        const currentSchema =
+          newSchema ?? extractSchemaFromFigma(prev) ?? schema;
+        return buildFigmaText(currentCode, currentSchema);
+      });
+
+      // Increment snapshot version to drive PreviewPanel and ConfigForm updates
+      setSnapshotVersion((v) => v + 1);
+      setCompileVersion((v) => v + 1); // keep compileVersion in sync for backward compat
+
+      if (source === "ai-realtime" || source === "ai-finish") {
+        // Cancel any pending schema auto-regeneration
+        if (schemaRegenerateTimerRef.current) {
+          clearTimeout(schemaRegenerateTimerRef.current);
+          schemaRegenerateTimerRef.current = null;
+        }
+      }
+    },
+    [code, schema, sessionId],
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -248,8 +311,6 @@ ${context.details}
       try {
         setIsLoading(true);
 
-        console.log(`[loadDemo] 开始加载 demo: ${demoId}`);
-
         // 并行获取项目名称
         const demosRes = await fetch("/api/demos");
         const demosData = await demosRes.json();
@@ -270,23 +331,16 @@ ${context.details}
           body: JSON.stringify({ demoId }),
         });
 
-        console.log(`[loadDemo] Session API 响应状态: ${sessionRes.status}`);
-
         if (!sessionRes.ok) {
           throw new Error("创建 Session 失败");
         }
 
         const sessionData = await sessionRes.json();
-        console.log(`[loadDemo] Session API JSON:`, sessionData);
 
         if (!sessionData.success) {
           throw new Error(sessionData.error?.message || "创建 Session 失败");
         }
 
-        console.log(
-          "[loadDemo] Session 创建成功, sessionId:",
-          sessionData.data.sessionId,
-        );
         setSessionId(sessionData.data.sessionId);
         setWorkspaceId(sessionData.data.workspaceId || "");
         setTempWorkspace(sessionData.data.tempWorkspace || "");
@@ -294,7 +348,6 @@ ${context.details}
         const filesRes = await fetch(
           `/api/sessions/${sessionData.data.sessionId}/files`,
         );
-        console.log(`[loadDemo] Files API 响应状态: ${filesRes.status}`);
         if (!filesRes.ok) {
           throw new Error("加载文件失败");
         }
@@ -485,8 +538,6 @@ ${context.details}
   );
 
   const handleSave = async () => {
-    console.log(`[handleSave] 开始保存, sessionId: "${sessionId}"`);
-
     if (!sessionId) {
       console.error("[handleSave] sessionId 为空!");
       toast({
@@ -532,9 +583,6 @@ ${context.details}
     try {
       setIsSaving(true);
 
-      console.log(
-        `[handleSave] 发送 PUT 请求到 /api/sessions/${sessionId}/files`,
-      );
       const saveRes = await fetch(
         `/api/sessions/${sessionId}/files/${activeDemoId}`,
         {
@@ -605,167 +653,21 @@ ${context.details}
     }
   };
 
-  // 处理 AI 代码更新
+  // 处理 AI 代码更新 — 通过 applyDemoSnapshot 统一应用
   const handleCodeUpdate = useCallback(
     (newCode: string) => {
-      console.log(
-        "[DemoEditPage] handleCodeUpdate called, newCode length:",
-        newCode.length,
-      );
-      console.log(
-        "[DemoEditPage] Current schema before update:",
-        schema ? "exists" : "missing",
-      );
-      setCode((prev) => {
-        const same = prev === newCode;
-        console.log(
-          "[DemoEditPage] setCode: prev长度:",
-          prev.length,
-          "new长度:",
-          newCode.length,
-          "相同:",
-          same,
-          "前50字符相同:",
-          prev.slice(0, 50) === newCode.slice(0, 50),
-        );
-        return same ? prev : newCode;
-      });
-      setCompileVersion((v) => v + 1);
-      if (sessionId && activeDemoId) {
-        invalidateCompileCache(sessionId, activeDemoId);
-      }
-      setEditorContent((prev) => {
-        const updatedContent = buildFigmaText(
-          newCode,
-          extractSchemaFromFigma(prev) || schema,
-        );
-        console.log(
-          "[DemoEditPage] editorContent updated, new length:",
-          updatedContent.length,
-        );
-        return updatedContent;
-      });
-      // 代码变更时重置 configData 为空，让组件默认值生效
-      setConfigDataMap((prev) => ({
-        ...prev,
-        [activeDemoIdRef.current]: {},
-      }));
-
-      // 防抖触发 Schema 自动重新生成
-      // 如果 AI 在 1.5 秒内也更新了 Schema，则取消自动生成（避免覆盖 AI 的 Schema）
-      if (schemaRegenerateTimerRef.current) {
-        clearTimeout(schemaRegenerateTimerRef.current);
-      }
-      schemaRegenerateTimerRef.current = setTimeout(async () => {
-        schemaRegenerateTimerRef.current = null;
-        if (!sessionId) return;
-
-        try {
-          console.log("[DemoEditPage] 自动重新生成 Schema...");
-          const res = await fetch("/api/generate-schema", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, demoId: activeDemoId }),
-          });
-          const data = await res.json();
-
-          if (data.success && data.data?.schema) {
-            const newSchemaStr = JSON.stringify(data.data.schema, null, 2);
-            console.log("[DemoEditPage] Schema 自动生成成功");
-
-            setSchema((prevSchema) => {
-              try {
-                const prevObj = JSON.parse(prevSchema);
-                const newObj = data.data.schema;
-                const prevKeys = Object.keys(prevObj.properties || {});
-                const newKeys = Object.keys(newObj.properties || {});
-                const keysChanged =
-                  prevKeys.length !== newKeys.length ||
-                  prevKeys.some((k) => !newKeys.includes(k));
-
-                if (!keysChanged) {
-                  console.log("[DemoEditPage] Schema 字段未变化，跳过更新");
-                  return prevSchema;
-                }
-
-                console.log("[DemoEditPage] Schema 字段有变化，更新配置面板");
-                return newSchemaStr;
-              } catch {
-                return newSchemaStr;
-              }
-            });
-
-            setEditorContent((prev) => {
-              const currentCode = extractCodeFromFigma(prev) || newCode;
-              return buildFigmaText(currentCode, newSchemaStr);
-            });
-
-            setPreviewSize(getPreviewSize(newSchemaStr));
-
-            const newDefaults = getSafeMergedDefaults(data.data.schema);
-            setConfigDataMap((prev) => ({
-              ...prev,
-              [activeDemoIdRef.current]: {
-                ...(prev[activeDemoIdRef.current] ?? {}),
-                ...newDefaults,
-              },
-            }));
-          }
-        } catch (err) {
-          console.warn("[DemoEditPage] Schema 自动生成失败:", err);
-        }
-      }, 1500);
+      applyDemoSnapshot({ code: newCode, source: "ai-realtime" });
     },
-    [schema, sessionId],
+    [applyDemoSnapshot],
   );
 
-  // 处理 AI Schema 更新
-  const handleSchemaUpdate = useCallback((newSchema: string) => {
-    console.log(
-      "[DemoEditPage] handleSchemaUpdate called, newSchema length:",
-      newSchema.length,
-    );
-
-    // AI 主动更新了 Schema，取消自动重新生成的防抖定时器
-    if (schemaRegenerateTimerRef.current) {
-      clearTimeout(schemaRegenerateTimerRef.current);
-      schemaRegenerateTimerRef.current = null;
-      console.log("[DemoEditPage] 已取消 Schema 自动重新生成定时器");
-    }
-
-    setSchema(newSchema);
-    setEditorContent((prev) => {
-      const updatedContent = buildFigmaText(
-        extractCodeFromFigma(prev) || code,
-        newSchema,
-      );
-      console.log(
-        "[DemoEditPage] editorContent updated after schema change, new length:",
-        updatedContent.length,
-      );
-      return updatedContent;
-    });
-    const size = getPreviewSize(newSchema);
-    console.log("[DemoEditPage] Preview size calculated:", size);
-    setPreviewSize(size);
-    // 更新 configData 为新的默认值
-    try {
-      const newConfigData = getSafeMergedDefaults(newSchema);
-      setConfigDataMap((prev) => {
-        const current = prev[activeDemoIdRef.current] ?? {};
-        const merged = { ...current, ...newConfigData };
-        if (newConfigData.__order) {
-          merged.__order = newConfigData.__order;
-        }
-        return { ...prev, [activeDemoIdRef.current]: merged };
-      });
-    } catch (e) {
-      console.error(
-        "[DemoEditPage] Failed to parse schema for default values:",
-        e,
-      );
-    }
-  }, []);
+  // 处理 AI Schema 更新 — 通过 applyDemoSnapshot 统一应用
+  const handleSchemaUpdate = useCallback(
+    (newSchema: string) => {
+      applyDemoSnapshot({ schema: newSchema, source: "ai-realtime" });
+    },
+    [applyDemoSnapshot],
+  );
 
   if (isLoading) {
     return (
@@ -886,6 +788,11 @@ ${context.details}
                   workspaceId={workspaceId || undefined}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
+                  onSnapshotReady={() => {
+                    // AI finish snapshot applied — bump version to trigger PreviewPanel recompile & ConfigForm rebuild
+                    setSnapshotVersion((v) => v + 1);
+                    setCompileVersion((v) => v + 1);
+                  }}
                   externalMessages={aiMessages}
                   externalIsStreaming={aiIsStreaming}
                   externalStreamContent={aiStreamContent}
@@ -1396,7 +1303,7 @@ ${context.details}
                     demoId={activeDemoId}
                     configData={configData}
                     previewSize={previewSize}
-                    compileVersion={compileVersion}
+                    snapshotVersion={snapshotVersion}
                   />
                 </div>
               ) : (
@@ -1500,7 +1407,7 @@ ${context.details}
                   hideHeader={!projectConfigSchema}
                 >
                   <ConfigForm
-                    key={schema}
+                    key={`${activeDemoId}-${snapshotVersion}`}
                     schema={schema}
                     onChange={handleConfigChange}
                     onSchemaChange={handleSchemaChange}

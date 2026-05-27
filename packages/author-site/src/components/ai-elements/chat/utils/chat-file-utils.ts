@@ -43,11 +43,6 @@ export function extractCodeAndSchemaUpdates(
   let codeUpdated = false;
   let schemaUpdated = false;
 
-  console.log(
-    "[extractCodeAndSchemaUpdates] 检查文件列表:",
-    files.map((f) => f.path),
-  );
-
   for (const file of files) {
     const normalizedPath = normalizePath(file.path);
     const isCode = isCodeFile(normalizedPath);
@@ -57,35 +52,19 @@ export function extractCodeAndSchemaUpdates(
       typeof file.content === "string" &&
       (file.content?.length ?? 0) > 0;
 
-    console.log(
-      `[extractCodeAndSchemaUpdates] 文件: ${file.path}, isCode: ${isCode}, isSchema: ${isSchema}, hasContent: ${hasContent}, contentLength: ${file.content?.length ?? 0}`,
-    );
-
     if (isCode) {
       if (hasContent) {
         codeUpdated = true;
-        console.log(
-          "[extractCodeAndSchemaUpdates] ✅ 匹配代码文件, 触发 onCodeUpdate",
-        );
         callbacks.onCodeUpdate?.(file.content!);
       }
     } else if (isSchema) {
       if ("content" in file && typeof file.content === "string") {
         schemaUpdated = true;
-        console.log(
-          "[extractCodeAndSchemaUpdates] ✅ 匹配 schema 文件, 触发 onSchemaUpdate",
-        );
         callbacks.onSchemaUpdate?.(file.content);
       }
     }
   }
 
-  console.log(
-    "[extractCodeAndSchemaUpdates] 结果: codeUpdated=",
-    codeUpdated,
-    "schemaUpdated=",
-    schemaUpdated,
-  );
   return { codeUpdated, schemaUpdated };
 }
 

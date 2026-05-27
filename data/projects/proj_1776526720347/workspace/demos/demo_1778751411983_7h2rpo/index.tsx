@@ -96,6 +96,14 @@ const ConfigLayoutPage: React.FC<Props> = (props) => {
         }
       `}</style>
 
+      {/* ===== 🏷️ 顶部大标题 ===== */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 800, color: textColor, margin: '0', letterSpacing: '2px' }}>
+          配置项示例
+        </h1>
+        <div style={{ width: '60px', height: '4px', borderRadius: '2px', background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)`, margin: '10px auto 0' }} />
+      </div>
+
       {/* ===== 🌐 全局配置区域（来自 project.config.schema.json，影响所有页面） ===== */}
       <div style={{
         borderRadius: '12px', border: `2px solid ${primaryColor}44`,

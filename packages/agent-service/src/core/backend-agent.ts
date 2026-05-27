@@ -1,14 +1,28 @@
-import { BaseAgent } from './agent';
-import { AgentConfig, AgentResult, SendMessageOptions } from './types';
-import { IBackendAdapter } from '../backends/base';
-import { logger } from '../utils/logger';
+import { BaseAgent } from "./agent";
+import { AgentConfig, AgentResult, SendMessageOptions } from "./types";
+import { IBackendAdapter } from "../backends/base";
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
-  getModelInfo?: () => { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
+  getModelInfo?: () =>
+    | {
+        currentModelId: string | null;
+        availableModels: Array<{ id: string; label: string }>;
+        canSwitch: boolean;
+      }
+    | null
+    | Promise<{
+        currentModelId: string | null;
+        availableModels: Array<{ id: string; label: string }>;
+        canSwitch: boolean;
+      } | null>;
   getCurrentSessionId?: () => string | null;
   start?: (options?: { resumeSessionId?: string }) => Promise<void>;
-  getFiles?: () => Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+  getFiles?: () => Array<{
+    path: string;
+    action: "created" | "modified" | "deleted";
+    content?: string;
+  }>;
   cancelPrompt?: () => void;
 }
 
@@ -35,13 +49,16 @@ export class BackendAgent extends BaseAgent {
       }
       this.initialized = true;
     }
-    this.setStatus('ready');
+    this.setStatus("ready");
   }
 
-  async sendMessage(content: string, options?: SendMessageOptions): Promise<AgentResult> {
+  async sendMessage(
+    content: string,
+    options?: SendMessageOptions,
+  ): Promise<AgentResult> {
     this.busy = true;
     this.messageCount++;
-    this.setStatus('processing');
+    this.setStatus("processing");
 
     try {
       if (!this.initialized) {
@@ -53,15 +70,13 @@ export class BackendAgent extends BaseAgent {
         this.initialized = true;
       }
 
-      const resultContent = await this.backend.sendMessage(content, { stream: options?.stream });
+      const resultContent = await this.backend.sendMessage(content, {
+        stream: options?.stream,
+      });
       this.busy = false;
-      this.setStatus('ready');
+      this.setStatus("ready");
 
       const files = this.backend.getFiles?.() || [];
-      logger.info(
-        { filesCount: files.length },
-        '[SSE-DIAG] getFiles() called after sendMessage resolved',
-      );
 
       return {
         success: true,
@@ -70,12 +85,12 @@ export class BackendAgent extends BaseAgent {
       };
     } catch (error) {
       this.busy = false;
-      this.setStatus('error');
+      this.setStatus("error");
       return {
         success: false,
         error: {
-          code: 'MESSAGE_SEND_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
+          code: "MESSAGE_SEND_ERROR",
+          message: error instanceof Error ? error.message : "Unknown error",
           retryable: true,
         },
       };
@@ -85,14 +100,14 @@ export class BackendAgent extends BaseAgent {
   cancel(): void {
     this.backend.cancelPrompt?.();
     this.busy = false;
-    this.setStatus('ready');
+    this.setStatus("ready");
   }
 
   async kill(): Promise<void> {
     await this.backend.destroy();
     this.busy = false;
     this.initialized = false;
-    this.setStatus('destroyed');
+    this.setStatus("destroyed");
   }
 
   isBusy(): boolean {
@@ -103,11 +118,15 @@ export class BackendAgent extends BaseAgent {
     if (this.backend.setModel) {
       await this.backend.setModel(modelId);
     } else {
-      throw new Error('Model switching not supported by this backend');
+      throw new Error("Model switching not supported by this backend");
     }
   }
 
-  async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
+  async getModelInfo(): Promise<{
+    currentModelId: string | null;
+    availableModels: Array<{ id: string; label: string }>;
+    canSwitch: boolean;
+  } | null> {
     if (this.backend.getModelInfo) {
       return await this.backend.getModelInfo();
     }

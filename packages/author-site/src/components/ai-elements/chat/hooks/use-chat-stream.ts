@@ -3,7 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
 import type { StreamEvent } from "@opencode-workbench/agent-client";
-import { StreamService, type PermissionRequest } from "../services/stream-service";
+import {
+  StreamService,
+  type PermissionRequest,
+} from "../services/stream-service";
 import {
   updateTextPart,
   addThoughtPart,
@@ -40,14 +43,13 @@ interface UseChatStreamOptions {
       action: "created" | "modified" | "deleted";
     }>,
   ) => void;
+  onSnapshotReady?: () => void;
   messagesRef: React.MutableRefObject<ChatMessage[]>;
   setMessages: (
     updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
   ) => void;
   setIsStreaming: (value: boolean) => void;
-  setStreamContent: (
-    updater: string | ((prev: string) => string),
-  ) => void;
+  setStreamContent: (updater: string | ((prev: string) => string)) => void;
   currentMessageRef: React.MutableRefObject<ChatMessage>;
   setCurrentMessage: (
     updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
@@ -65,6 +67,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
+    onSnapshotReady,
     messagesRef,
     setMessages,
     setIsStreaming,
@@ -144,7 +147,13 @@ export function useChatStream(options: UseChatStreamOptions) {
         parts: [],
       });
     }
-  }, [sessionId, setIsStreaming, setStreamContent, setCurrentMessage, stopSilenceTracking]);
+  }, [
+    sessionId,
+    setIsStreaming,
+    setStreamContent,
+    setCurrentMessage,
+    stopSilenceTracking,
+  ]);
 
   const handleSend = useCallback(
     async (userMessage: string) => {
@@ -209,7 +218,11 @@ export function useChatStream(options: UseChatStreamOptions) {
             setCurrentMessage((prev) => ({
               ...prev,
               content: accumulatedContent,
-              parts: updateTextPart(prev.parts || [], content, accumulatedContent),
+              parts: updateTextPart(
+                prev.parts || [],
+                content,
+                accumulatedContent,
+              ),
             }));
           },
 
@@ -252,14 +265,6 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onFileOperation: (operation) => {
             markActivity();
-            console.log(
-              "[useChatStream] onFileOperation: method=",
-              operation.method,
-              "path=",
-              operation.path,
-              "hasContent:",
-              typeof operation.content === "string" ? `yes (${operation.content.length} chars)` : "no",
-            );
             if (operation.method === "fs/write_text_file" && operation.path) {
               realtimeFilesRef.set(operation.path, {
                 action: "modified",
@@ -308,39 +313,30 @@ export function useChatStream(options: UseChatStreamOptions) {
               messagesRef.current.length === 0,
             );
 
+            // Flush any pending realtime files first
             if (fileUpdateTimer) {
               clearTimeout(fileUpdateTimer);
               fileUpdateTimer = null;
               processRealtimeFiles();
             }
 
+            // Build final file list: prefer result.files (backend drain guarantees completeness)
             const finalFiles: FileChangeEntry[] =
               result.files && result.files.length > 0
                 ? result.files
                 : Array.from(realtimeFilesRef.entries()).map(
                     ([path, info]) => ({
                       path,
-                      action: info.action as
-                        | "created"
-                        | "modified"
-                        | "deleted",
+                      action: info.action as "created" | "modified" | "deleted",
                       content: info.content,
                     }),
                   );
-
-            console.log(
-              "[useChatStream] onFinish: finalFiles count:",
-              finalFiles.length,
-              "result.files:",
-              result.files?.length ?? 0,
-              "realtimeFilesRef:",
-              realtimeFilesRef.size,
-            );
 
             if (finalFiles.length > 0) {
               onFilesChange?.(finalFiles);
             }
 
+            // Apply code/schema updates from final files
             const { codeUpdated, schemaUpdated } =
               finalFiles.length > 0
                 ? extractCodeAndSchemaUpdates(finalFiles, {
@@ -349,27 +345,9 @@ export function useChatStream(options: UseChatStreamOptions) {
                   })
                 : { codeUpdated: false, schemaUpdated: false };
 
-            console.log(
-              "[useChatStream] onFinish: codeUpdated:",
-              codeUpdated,
-              "schemaUpdated:",
-              schemaUpdated,
-            );
-
+            // HTTP fallback: always fetch if code or schema was not updated
             if (!codeUpdated || !schemaUpdated) {
-              console.log(
-                "[useChatStream] HTTP fallback: fetching files for sessionId:",
-                sessionId,
-                "demoId:",
-                demoId,
-              );
               const filesData = await fetchSessionFiles(sessionId, demoId);
-              console.log(
-                "[useChatStream] HTTP fallback: fetchSessionFiles returned:",
-                filesData
-                  ? `code=${filesData.code ? filesData.code.length + "chars" : "undefined"}, schema=${filesData.schema ? filesData.schema.length + "chars" : "undefined"}`
-                  : "null",
-              );
               if (filesData) {
                 const { code, schema } = filesData;
                 if (code && !codeUpdated) onCodeUpdate?.(code);
@@ -392,6 +370,9 @@ export function useChatStream(options: UseChatStreamOptions) {
               }
             }
 
+            // Signal that the AI edit snapshot is fully applied
+            onSnapshotReady?.();
+
             realtimeFilesRef.clear();
           },
 
@@ -402,7 +383,8 @@ export function useChatStream(options: UseChatStreamOptions) {
             const errorMessage: ChatMessage = {
               id: `error-${Date.now()}`,
               role: "assistant",
-              content: "WebSocket 连接失败，请检查 Agent Service 是否运行（http://localhost:3201）",
+              content:
+                "WebSocket 连接失败，请检查 Agent Service 是否运行（http://localhost:3201）",
             };
             setMessages((prev) => [...prev, errorMessage]);
           },
@@ -475,11 +457,13 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           if (result.data?.files && result.data.files.length > 0) {
             onFilesChange?.(result.data.files);
-            const { codeUpdated, schemaUpdated } =
-              extractCodeAndSchemaUpdates(result.data.files, {
+            const { codeUpdated, schemaUpdated } = extractCodeAndSchemaUpdates(
+              result.data.files,
+              {
                 onCodeUpdate,
                 onSchemaUpdate,
-              });
+              },
+            );
 
             if (!codeUpdated || !schemaUpdated) {
               const filesData = await fetchSessionFiles(sessionId, demoId);
@@ -519,6 +503,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       onCodeUpdate,
       onSchemaUpdate,
       onFilesChange,
+      onSnapshotReady,
       setMessages,
       setIsStreaming,
       setStreamContent,
@@ -576,7 +561,13 @@ export function useChatStream(options: UseChatStreamOptions) {
         parts: [],
       });
     },
-    [setIsStreaming, setMessages, setStreamContent, setCurrentMessage, stopSilenceTracking],
+    [
+      setIsStreaming,
+      setMessages,
+      setStreamContent,
+      setCurrentMessage,
+      stopSilenceTracking,
+    ],
   );
 
   return {

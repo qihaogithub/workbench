@@ -112,6 +112,14 @@ const ConfigDataPage: React.FC<DemoProps> = (props) => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bgColor, padding: '32px', fontFamily: 'system-ui, sans-serif' }}>
+      {/* ===== 🏷️ 顶部大标题 ===== */}
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: 800, color: textColor, margin: '0', letterSpacing: '2px' }}>
+          配置项示例
+        </h1>
+        <div style={{ width: '60px', height: '4px', borderRadius: '2px', background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)`, margin: '12px auto 0' }} />
+      </div>
+
       {/* ===== 🌐 全局配置区域（来自 project.config.schema.json，影响所有页面） ===== */}
       <div style={{
         maxWidth: '1100px', margin: '0 auto 36px',
