@@ -69,6 +69,7 @@ export interface GridIframeProps {
   hasChanges: boolean;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
+  snapshotVersion?: number;
 }
 
 export interface PreviewGridProps {
@@ -83,4 +84,5 @@ export interface PreviewGridProps {
   changedPageIds?: Set<string>;
   configDataMap?: Record<string, Record<string, unknown>>;
   previewSize?: PreviewSize;
+  snapshotVersion?: number;
 }

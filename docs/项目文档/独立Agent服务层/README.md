@@ -13,13 +13,14 @@
 
 ## 文档列表
 
-| 文档 | 说明 | 阅读顺序 |
-|:-----|:-----|:---------|
-| [01-架构设计.md](./01-架构设计.md) | 整体架构设计、分层职责、设计原则 | 1 |
-| [02-接口规范.md](./02-接口规范.md) | REST API、WebSocket 协议、类型定义 | 2 |
-| [03-核心模块设计.md](./03-核心模块设计.md) | Agent、Factory、Manager、Backend 等核心模块 | 3 |
-| [04-开发计划.md](./04-开发计划.md) | 分阶段开发计划、任务清单、验收标准 | 4 |
-| [05-部署方案.md](./05-部署方案.md) | Docker/Kubernetes 部署、监控、运维 | 5 |
+| 文档                                         | 说明                                               | 阅读顺序 |
+| :------------------------------------------- | :------------------------------------------------- | :------- |
+| [01-架构设计.md](./01-架构设计.md)           | 整体架构设计、分层职责、设计原则                   | 1        |
+| [02-接口规范.md](./02-接口规范.md)           | REST API、WebSocket 协议、类型定义                 | 2        |
+| [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        |
+| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        |
+| [04-开发计划.md](./04-开发计划.md)           | 分阶段开发计划、任务清单、验收标准                 | 5        |
+| [05-部署方案.md](./05-部署方案.md)           | Docker/Kubernetes 部署、监控、运维                 | 6        |
 
 ---
 
@@ -69,12 +70,12 @@
 
 ### 1. 技术栈选型
 
-| 组件 | 选型 | 理由 |
-|:-----|:-----|:-----|
-| 运行时 | Node.js 20+ | AI 编程友好，与 opencode 兼容 |
-| 框架 | Fastify | 高性能，原生支持 WebSocket |
-| HTTP 客户端 | undici | 比 node-fetch 更快，原生支持流式响应 |
-| 日志 | pino | Fastify 默认日志库，高性能 |
+| 组件        | 选型        | 理由                                 |
+| :---------- | :---------- | :----------------------------------- |
+| 运行时      | Node.js 20+ | AI 编程友好，与 opencode 兼容        |
+| 框架        | Fastify     | 高性能，原生支持 WebSocket           |
+| HTTP 客户端 | undici      | 比 node-fetch 更快，原生支持流式响应 |
+| 日志        | pino        | Fastify 默认日志库，高性能           |
 
 ### 2. 架构模式
 
@@ -128,14 +129,14 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 
 ### 核心参考对照
 
-| 本项目模块 | AionUi 参考文件 | 参考程度 | 说明 |
-|:-----------|:----------------|:---------|:-----|
-| `AgentFactory` | `src/process/task/AgentFactory.ts` | **95%** | 工厂模式几乎完全一致 |
-| `IAgentManager` | `src/process/task/IAgentManager.ts` | **90%** | 接口定义参考 |
-| `BaseAgent` | `src/process/agent/acp/index.ts` | **70%** | 核心结构参考，通信层需重写 |
-| 事件回调机制 | `AcpAgent.onStreamEvent` | **85%** | 回调解耦模式 |
-| 会话恢复 | `createOrResumeSession()` | **80%** | 恢复策略参考 |
-| 权限缓存 | `ApprovalStore.ts` | **60%** | 可选功能，后期实现 |
+| 本项目模块      | AionUi 参考文件                     | 参考程度 | 说明                       |
+| :-------------- | :---------------------------------- | :------- | :------------------------- |
+| `AgentFactory`  | `src/process/task/AgentFactory.ts`  | **95%**  | 工厂模式几乎完全一致       |
+| `IAgentManager` | `src/process/task/IAgentManager.ts` | **90%**  | 接口定义参考               |
+| `BaseAgent`     | `src/process/agent/acp/index.ts`    | **70%**  | 核心结构参考，通信层需重写 |
+| 事件回调机制    | `AcpAgent.onStreamEvent`            | **85%**  | 回调解耦模式               |
+| 会话恢复        | `createOrResumeSession()`           | **80%**  | 恢复策略参考               |
+| 权限缓存        | `ApprovalStore.ts`                  | **60%**  | 可选功能，后期实现         |
 
 ### 需要适配的关键差异
 
@@ -158,19 +159,19 @@ Electron 生命周期           →      Fastify 生命周期
 
 ### AionUi 核心文件路径
 
-| 文件 | 路径 | 核心内容 |
-|:-----|:-----|:---------|
-| Agent 工厂 | `AionUi/src/process/task/AgentFactory.ts` | 极简工厂实现 |
-| Agent 接口 | `AionUi/src/process/task/IAgentManager.ts` | 生命周期接口 |
-| ACP Agent | `AionUi/src/process/agent/acp/index.ts` | 完整 Agent 实现 |
-| 连接管理 | `AionUi/src/process/agent/acp/AcpConnection.ts` | 连接生命周期 |
-| 权限缓存 | `AionUi/src/process/agent/acp/ApprovalStore.ts` | "always allow" 缓存 |
+| 文件       | 路径                                            | 核心内容            |
+| :--------- | :---------------------------------------------- | :------------------ |
+| Agent 工厂 | `AionUi/src/process/task/AgentFactory.ts`       | 极简工厂实现        |
+| Agent 接口 | `AionUi/src/process/task/IAgentManager.ts`      | 生命周期接口        |
+| ACP Agent  | `AionUi/src/process/agent/acp/index.ts`         | 完整 Agent 实现     |
+| 连接管理   | `AionUi/src/process/agent/acp/AcpConnection.ts` | 连接生命周期        |
+| 权限缓存   | `AionUi/src/process/agent/acp/ApprovalStore.ts` | "always allow" 缓存 |
 
 ---
 
 ## 更新日志
 
-| 日期 | 版本 | 更新内容 |
-|:-----|:-----|:---------|
+| 日期       | 版本 | 更新内容               |
+| :--------- | :--- | :--------------------- |
 | 2026-04-05 | v1.0 | 初始版本，完成全部文档 |
-| 2026-04-05 | v1.1 | 添加 AionUi 参考指南 |
+| 2026-04-05 | v1.1 | 添加 AionUi 参考指南   |

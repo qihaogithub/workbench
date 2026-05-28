@@ -1354,6 +1354,7 @@ ${context.details}
                   }}
                   configDataMap={configDataMap}
                   previewSize={previewSize}
+                  snapshotVersion={snapshotVersion}
                 />
               )}
             </div>

@@ -30,6 +30,30 @@
       "title": "商场图片2",
       "description": "叫叫商场第二张图片",
       "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA2.png"
+    },
+    "inviteColor1": {
+      "type": "string",
+      "format": "color",
+      "title": "邀请活动色值1",
+      "default": "#FF6B35"
+    },
+    "inviteColor2": {
+      "type": "string",
+      "format": "color",
+      "title": "邀请活动色值2",
+      "default": "#F7C59F"
+    },
+    "mallColor1": {
+      "type": "string",
+      "format": "color",
+      "title": "商场色值1",
+      "default": "#004E89"
+    },
+    "mallColor2": {
+      "type": "string",
+      "format": "color",
+      "title": "商场色值2",
+      "default": "#1A659E"
     }
   }
 }
