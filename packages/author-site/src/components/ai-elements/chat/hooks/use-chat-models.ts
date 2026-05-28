@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AgentStream, type StreamEvent } from "@opencode-workbench/agent-client";
 import {
-  applyModelConfigs,
+  AgentStream,
+  type StreamEvent,
+} from "@opencode-workbench/agent-client";
+import {
+  applyModelConfigsAsync,
   buildFullModelId,
   resolveCurrentModel,
   UNCONFIGURED_DEFAULT,
@@ -59,12 +62,18 @@ export function useChatModels(options: UseChatModelsOptions) {
         }
       });
 
-      stream.on("models", (event: StreamEvent) => {
-        const models = event.models ? applyModelConfigs(event.models) : [];
-        const resolved = resolveCurrentModel(event.currentModelId || "", models);
+      stream.on("models", async (event: StreamEvent) => {
+        const models = event.models
+          ? await applyModelConfigsAsync(event.models)
+          : [];
+        const resolved = resolveCurrentModel(
+          event.currentModelId || "",
+          models,
+        );
 
         setModelState((prev) => ({
-          currentModelId: resolved?.baseModelId || models[0]?.id || prev.currentModelId,
+          currentModelId:
+            resolved?.baseModelId || models[0]?.id || prev.currentModelId,
           currentDepth: resolved?.depth ?? prev.currentDepth,
           models: models.length > 0 ? models : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
@@ -130,7 +139,9 @@ export function useChatModels(options: UseChatModelsOptions) {
 
   const handleDepthChange = useCallback(
     (depth: ThinkingDepth) => {
-      const model = modelState.models.find((m) => m.id === modelState.currentModelId);
+      const model = modelState.models.find(
+        (m) => m.id === modelState.currentModelId,
+      );
       if (!model || !model.supportsThinkingDepth) return;
 
       const fullModelId = model.depthVariantIds[depth];
@@ -147,12 +158,15 @@ export function useChatModels(options: UseChatModelsOptions) {
     [modelState.currentModelId, modelState.models, sendSetModel],
   );
 
-  const handleModelsEvent = useCallback((event: StreamEvent) => {
-    const models = event.models ? applyModelConfigs(event.models) : [];
+  const handleModelsEvent = useCallback(async (event: StreamEvent) => {
+    const models = event.models
+      ? await applyModelConfigsAsync(event.models)
+      : [];
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
 
     setModelState((prev) => ({
-      currentModelId: resolved?.baseModelId || models[0]?.id || prev.currentModelId,
+      currentModelId:
+        resolved?.baseModelId || models[0]?.id || prev.currentModelId,
       currentDepth: resolved?.depth ?? prev.currentDepth,
       models: models.length > 0 ? models : prev.models,
       canSwitch: event.canSwitch ?? prev.canSwitch,
@@ -168,7 +182,9 @@ export function useChatModels(options: UseChatModelsOptions) {
     setModelState(INITIAL_MODEL_STATE);
   }, []);
 
-  const currentModel = modelState.models.find((m) => m.id === modelState.currentModelId);
+  const currentModel = modelState.models.find(
+    (m) => m.id === modelState.currentModelId,
+  );
   const currentSupportsImages =
     currentModel?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages;
   const currentAvailableDepths = currentModel?.supportsThinkingDepth

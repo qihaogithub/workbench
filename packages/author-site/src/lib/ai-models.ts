@@ -6,7 +6,12 @@
  * - 标记多模态:在条目中加 `supportsImages: true`
  * - 标记思考深度:在条目中加 `supportsThinkingDepth: true`,前端会自动检测 -low/-medium/-high 变体并分组
  * - 自定义展示名:在条目中加 `alias`(否则去掉前缀后使用后端 label)
- * - 末尾的 catch-all `{ matcher: /.*\/, enabled: false }` 禁用所有未列入白名单的模型
+ * - 末尾的 catch-all `{ matcher: /.*\//, enabled: false }` 禁用所有未列入白名单的模型
+ *
+ * 配置读取:
+ * - 优先使用数据库配置 (通过管理后台动态配置)
+ * - Fallback 到环境变量 (保持向后兼容)
+ * - 使用 model-config.ts 中的 getModelConfig() 函数
  */
 
 export type ModelMatcher = RegExp | string;
@@ -58,10 +63,23 @@ export type ResolvedModel = {
 };
 
 /**
+ * 从配置数据解析动态白名单前缀
+ *
+ * 格式: 前缀数组,如 ["deepseek/", "qwen/", "custom/"]
+ * 未设置时默认为空(不额外放行任何分组)
+ */
+function parseDynamicPrefixesFromConfig(prefixes: string[]): ModelConfig[] {
+  if (!prefixes || prefixes.length === 0) return [];
+  return prefixes.map((prefix) => ({ matcher: prefix }));
+}
+
+/**
  * 从环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 解析动态白名单前缀
  *
  * 格式: 逗号分隔的前缀列表,如 "deepseek/,qwen/,custom/"
  * 未设置时默认为空(不额外放行任何分组)
+ *
+ * @deprecated 使用 parseDynamicPrefixesFromConfig 替代
  */
 function parseDynamicPrefixes(): ModelConfig[] {
   const raw = process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "";
@@ -74,10 +92,23 @@ function parseDynamicPrefixes(): ModelConfig[] {
 }
 
 /**
+ * 从配置数据解析黑名单模型 ID 集合
+ *
+ * 格式: 完整模型 ID 数组,如 ["xjjj/old-model", "xjjj/test-model"]
+ * 黑名单中的模型会在白名单过滤之后被排除
+ */
+function parseBlacklistFromConfig(blacklist: string[]): Set<string> {
+  if (!blacklist || blacklist.length === 0) return new Set();
+  return new Set(blacklist);
+}
+
+/**
  * 从环境变量 NEXT_PUBLIC_MODEL_BLACKLIST 解析黑名单模型 ID 集合
  *
  * 格式: 逗号分隔的完整模型 ID,如 "xjjj/old-model,xjjj/test-model"
  * 黑名单中的模型会在白名单过滤之后被排除
+ *
+ * @deprecated 使用 parseBlacklistFromConfig 替代
  */
 function parseBlacklist(): Set<string> {
   const raw = process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "";
@@ -91,11 +122,39 @@ function parseBlacklist(): Set<string> {
 }
 
 /**
+ * 从配置数据解析分组名称过滤器
+ *
+ * 格式: "分组:关键词" 数组,如 ["opencode:Free", "othergroup:Pro"]
+ * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
+ * 大小写不敏感;未配置的分组不受限制
+ */
+function parseNameFiltersFromConfig(
+  filters: string[],
+): Array<{ group: string; keyword: string }> {
+  if (!filters || filters.length === 0) return [];
+  return filters
+    .map((entry) => {
+      const idx = entry.indexOf(":");
+      if (idx < 0) return { group: entry, keyword: "" };
+      return {
+        group: entry.slice(0, idx).trim(),
+        keyword: entry
+          .slice(idx + 1)
+          .trim()
+          .toLowerCase(),
+      };
+    })
+    .filter((f) => f.keyword.length > 0);
+}
+
+/**
  * 从环境变量 NEXT_PUBLIC_MODEL_NAME_FILTERS 解析分组名称过滤器
  *
  * 格式: 逗号分隔的 "分组:关键词" 条目,如 "opencode:Free,othergroup:Pro"
  * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
  * 大小写不敏感;未配置的分组不受限制
+ *
+ * @deprecated 使用 parseNameFiltersFromConfig 替代
  */
 function parseNameFilters(): Array<{ group: string; keyword: string }> {
   const raw = process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "";
@@ -109,7 +168,10 @@ function parseNameFilters(): Array<{ group: string; keyword: string }> {
       if (idx < 0) return { group: entry, keyword: "" };
       return {
         group: entry.slice(0, idx).trim(),
-        keyword: entry.slice(idx + 1).trim().toLowerCase(),
+        keyword: entry
+          .slice(idx + 1)
+          .trim()
+          .toLowerCase(),
       };
     })
     .filter((f) => f.keyword.length > 0);
@@ -204,8 +266,11 @@ export function resolveModelConfig(rawId: string): {
     config,
     enabled: config?.enabled ?? UNCONFIGURED_DEFAULT.enabled,
     alias: config?.alias,
-    supportsImages: config?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages,
-    supportsThinkingDepth: config?.supportsThinkingDepth ?? UNCONFIGURED_DEFAULT.supportsThinkingDepth,
+    supportsImages:
+      config?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages,
+    supportsThinkingDepth:
+      config?.supportsThinkingDepth ??
+      UNCONFIGURED_DEFAULT.supportsThinkingDepth,
   };
 }
 
@@ -218,16 +283,271 @@ function stripPrefix(label: string): string {
   return label.replace(/^[^/]+\//, "");
 }
 
-function parseDepthSuffix(id: string): { baseId: string; depth?: ThinkingDepth } {
+function parseDepthSuffix(id: string): {
+  baseId: string;
+  depth?: ThinkingDepth;
+} {
   const match = id.match(DEPTH_PATTERN);
   if (match) {
-    return { baseId: id.slice(0, -match[0].length), depth: match[1] as ThinkingDepth };
+    return {
+      baseId: id.slice(0, -match[0].length),
+      depth: match[1] as ThinkingDepth,
+    };
   }
   return { baseId: id };
 }
 
 export function applyModelConfigs(
   raw: Array<{ id: string; label: string }>,
+): ResolvedModel[] {
+  return applyModelConfigsWithData(raw, {
+    blacklist: [],
+    nameFilters: [],
+  });
+}
+
+/**
+ * 异步版本: 通过 API 从数据库读取完整配置并应用
+ *
+ * 包含白名单前缀、黑名单、名称过滤器等全部配置
+ * 通过 HTTP API 读取,避免客户端直接依赖 Node.js 模块
+ * Fallback 到环境变量配置
+ *
+ * @param raw 原始模型列表
+ */
+export async function applyModelConfigsAsync(
+  raw: Array<{ id: string; label: string }>,
+): Promise<ResolvedModel[]> {
+  let configData: {
+    allowedPrefixes: string[];
+    blacklist: string[];
+    nameFilters: string[];
+    multimodalModels: string[];
+  };
+
+  try {
+    const res = await fetch("/api/models/config");
+    if (res.ok) {
+      const { data } = await res.json();
+      configData = {
+        allowedPrefixes: data.frontend?.allowedPrefixes ?? [],
+        blacklist: data.frontend?.blacklist ?? [],
+        nameFilters: data.frontend?.nameFilters ?? [],
+        multimodalModels: data.multimodalModels ?? [],
+      };
+    } else {
+      configData = getEnvFallbackConfig();
+    }
+  } catch {
+    // API 不可用时 fallback 到环境变量
+    configData = getEnvFallbackConfig();
+  }
+
+  // 从配置构建完整的模型配置表(含动态白名单前缀)
+  const configs = buildModelConfigsFromData(configData.allowedPrefixes);
+  const blacklist = parseBlacklistFromConfig(configData.blacklist);
+  const nameFilters = parseNameFiltersFromConfig(configData.nameFilters);
+  const multimodalSet = new Set(configData.multimodalModels);
+
+  return applyModelConfigsWithFullData(raw, {
+    configs,
+    blacklist,
+    nameFilters,
+    multimodalSet,
+  });
+}
+
+/**
+ * 环境变量 fallback 配置 (当 API 不可用时使用)
+ */
+function getEnvFallbackConfig() {
+  return {
+    allowedPrefixes: (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    blacklist: (process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    nameFilters: (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    multimodalModels: [] as string[],
+  };
+}
+
+/**
+ * 从配置数据构建模型配置表(含动态白名单前缀)
+ */
+function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
+  return [
+    // 内置分组:始终放行
+    { matcher: "opencode/" },
+    { matcher: "jojo/" },
+    // 动态分组:从数据库或环境变量注入
+    ...parseDynamicPrefixesFromConfig(prefixes),
+    // 其他分组全部禁用
+    { matcher: /.*/, enabled: false },
+  ];
+}
+
+/**
+ * 使用完整配置数据应用模型过滤
+ *
+ * @param raw 原始模型列表
+ * @param data 完整的配置数据(含 configs、blacklist、nameFilters、multimodalSet)
+ */
+export function applyModelConfigsWithFullData(
+  raw: Array<{ id: string; label: string }>,
+  data: {
+    configs: ModelConfig[];
+    blacklist: Set<string>;
+    nameFilters: Array<{ group: string; keyword: string }>;
+    multimodalSet?: Set<string>;
+  },
+): ResolvedModel[] {
+  const { configs, blacklist, nameFilters, multimodalSet } = data;
+
+  const parsed: Array<{
+    rawId: string;
+    rawLabel: string;
+    baseId: string;
+    depth?: ThinkingDepth;
+    group: string;
+    alias: string | undefined;
+    supportsImages: boolean;
+    supportsThinkingDepth: boolean;
+  }> = [];
+
+  for (const m of raw) {
+    // 使用传入的 configs 而非静态 MODEL_CONFIGS
+    const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
+    const enabled = config?.enabled ?? UNCONFIGURED_DEFAULT.enabled;
+    if (!enabled) continue;
+
+    const group = extractGroup(m.id);
+    let baseId = m.id;
+    let depth: ThinkingDepth | undefined;
+    const supportsImages =
+      config?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages;
+    const supportsThinkingDepth =
+      config?.supportsThinkingDepth ??
+      UNCONFIGURED_DEFAULT.supportsThinkingDepth;
+
+    if (supportsThinkingDepth) {
+      const parsed2 = parseDepthSuffix(m.id);
+      baseId = parsed2.baseId;
+      depth = parsed2.depth;
+    }
+
+    parsed.push({
+      rawId: m.id,
+      rawLabel: m.label,
+      baseId,
+      depth,
+      group,
+      alias: config?.alias,
+      supportsImages,
+      supportsThinkingDepth,
+    });
+  }
+
+  const baseMap = new Map<string, typeof parsed>();
+  for (const p of parsed) {
+    const key = p.supportsThinkingDepth ? p.baseId : p.rawId;
+    if (!baseMap.has(key)) baseMap.set(key, []);
+    baseMap.get(key)!.push(p);
+  }
+
+  const result: ResolvedModel[] = [];
+
+  for (const [, entries] of baseMap) {
+    const first = entries[0];
+    const label = first.alias || stripPrefix(first.rawLabel);
+
+    if (first.supportsThinkingDepth) {
+      const availableDepths: ThinkingDepth[] = [];
+      const depthVariantIds: Record<string, string> = {};
+
+      for (const entry of entries) {
+        if (entry.depth) {
+          availableDepths.push(entry.depth);
+          depthVariantIds[entry.depth] = entry.rawId;
+        }
+      }
+
+      availableDepths.sort(
+        (a, b) => THINKING_DEPTHS.indexOf(a) - THINKING_DEPTHS.indexOf(b),
+      );
+
+      result.push({
+        id: first.baseId,
+        label,
+        group: first.group,
+        supportsImages: first.supportsImages,
+        supportsThinkingDepth: availableDepths.length >= 2,
+        availableDepths,
+        depthVariantIds,
+      });
+    } else {
+      result.push({
+        id: first.rawId,
+        label,
+        group: first.group,
+        supportsImages: first.supportsImages,
+        supportsThinkingDepth: false,
+        availableDepths: [],
+        depthVariantIds: {},
+      });
+    }
+  }
+
+  // 标记多模态模型
+  if (multimodalSet && multimodalSet.size > 0) {
+    for (const model of result) {
+      if (multimodalSet.has(model.id)) {
+        model.supportsImages = true;
+      }
+    }
+  }
+
+  return result.filter((model) => {
+    if (blacklist.has(model.id)) return false;
+    for (const variantId of Object.values(model.depthVariantIds)) {
+      if (blacklist.has(variantId)) return false;
+    }
+
+    for (const filter of nameFilters) {
+      if (model.group === filter.group) {
+        const nameLower = model.id.toLowerCase();
+        const labelLower = model.label.toLowerCase();
+        if (
+          !nameLower.includes(filter.keyword) &&
+          !labelLower.includes(filter.keyword)
+        ) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * 应用模型配置 (支持数据库配置)
+ *
+ * @param raw 原始模型列表
+ * @param configData 配置数据 (从数据库或环境变量)
+ */
+export function applyModelConfigsWithData(
+  raw: Array<{ id: string; label: string }>,
+  configData: {
+    blacklist?: string[];
+    nameFilters?: string[];
+  } = {},
 ): ResolvedModel[] {
   const parsed: Array<{
     rawId: string;
@@ -317,8 +637,13 @@ export function applyModelConfigs(
     }
   }
 
-  const blacklist = parseBlacklist();
-  const nameFilters = parseNameFilters();
+  // 优先使用传入的配置,否则从环境变量读取
+  const blacklist = configData.blacklist
+    ? parseBlacklistFromConfig(configData.blacklist)
+    : parseBlacklist();
+  const nameFilters = configData.nameFilters
+    ? parseNameFiltersFromConfig(configData.nameFilters)
+    : parseNameFilters();
 
   return result.filter((model) => {
     if (blacklist.has(model.id)) return false;
@@ -330,7 +655,10 @@ export function applyModelConfigs(
       if (model.group === filter.group) {
         const nameLower = model.id.toLowerCase();
         const labelLower = model.label.toLowerCase();
-        if (!nameLower.includes(filter.keyword) && !labelLower.includes(filter.keyword)) {
+        if (
+          !nameLower.includes(filter.keyword) &&
+          !labelLower.includes(filter.keyword)
+        ) {
           return false;
         }
       }

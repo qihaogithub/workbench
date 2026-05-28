@@ -452,8 +452,7 @@ export function PreviewGrid({
     (row: GridPageItem[]) => {
       const gapTotal = (row.length - 1) * 16;
       const totalWidth = row.reduce((sum, p) => {
-        const size =
-          p.id === activePageId ? previewSize : (p.previewSize ?? previewSize);
+        const size = p.previewSize ?? previewSize;
         return sum + actualRowHeight * getAspectRatioValue(size);
       }, 0);
       const containerWidth = containerRef.current?.clientWidth ?? 0;
@@ -463,7 +462,7 @@ export function PreviewGrid({
       }
       return actualRowHeight;
     },
-    [actualRowHeight, activePageId, previewSize],
+    [actualRowHeight, previewSize],
   );
 
   const handleCardClick = useCallback(
@@ -546,9 +545,7 @@ export function PreviewGrid({
                       ref={activePageId === page.id ? scrollRef : undefined}
                       className={cn(
                         "relative rounded-lg overflow-hidden cursor-pointer transition-all",
-                        activePageId === page.id
-                          ? "border-2 border-primary ring-2 ring-primary/20 scale-[1.02]"
-                          : "border border-border hover:border-primary/50",
+                        "border border-border hover:border-primary/50",
                       )}
                       style={{
                         height: "100%",

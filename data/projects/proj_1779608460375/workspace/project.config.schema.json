@@ -47,13 +47,13 @@
       "type": "string",
       "format": "color",
       "title": "商场色值1",
-      "default": "#004E89"
+      "default": "#FEF7E5"
     },
     "mallColor2": {
       "type": "string",
       "format": "color",
       "title": "商场色值2",
-      "default": "#1A659E"
+      "default": "#FEF7E5"
     }
   }
 }

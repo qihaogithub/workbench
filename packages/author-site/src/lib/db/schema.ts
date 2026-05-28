@@ -1,4 +1,4 @@
-import { getDb } from './index';
+import { getDb } from "./index";
 
 export function initializeDatabase(): void {
   const db = getDb();
@@ -12,7 +12,17 @@ export function initializeDatabase(): void {
     )
   `);
 
-  console.log('[Database] Users table initialized');
+  // 系统配置表 (用于管理后台动态配置)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_configs (
+      id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      updated_by TEXT
+    )
+  `);
+
+  console.log("[Database] Database initialized (users + system_configs)");
 }
 
 /**
@@ -20,6 +30,8 @@ export function initializeDatabase(): void {
  */
 export function getUserCount(): number {
   const db = getDb();
-  const row = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+  const row = db.prepare("SELECT COUNT(*) as count FROM users").get() as {
+    count: number;
+  };
   return row.count;
 }

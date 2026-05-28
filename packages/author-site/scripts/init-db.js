@@ -4,13 +4,15 @@ const Database = require("better-sqlite3");
 function findProjectRoot(startDir) {
   let dir = startDir;
   while (dir !== path.dirname(dir)) {
-    if (require("fs").existsSync(path.join(dir, "pnpm-workspace.yaml"))) return dir;
+    if (require("fs").existsSync(path.join(dir, "pnpm-workspace.yaml")))
+      return dir;
     dir = path.dirname(dir);
   }
   return startDir;
 }
 
-const DATA_DIR = process.env.DATA_DIR || path.join(findProjectRoot(__dirname), "data");
+const DATA_DIR =
+  process.env.DATA_DIR || path.join(findProjectRoot(__dirname), "data");
 const DB_PATH = path.join(DATA_DIR, "users.db");
 
 console.log("[Init] Initializing database...");
@@ -26,6 +28,16 @@ try {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       created_at INTEGER NOT NULL
+    )
+  `);
+
+  // 系统配置表 (用于管理后台动态配置)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_configs (
+      id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      updated_by TEXT
     )
   `);
 

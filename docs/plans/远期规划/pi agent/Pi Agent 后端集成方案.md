@@ -41,14 +41,23 @@ agent-service (Fastify)
 │   └── ...
 │
 ├── 新增 Pi Agent 后端
-│   └── pi-agent.ts (实现 IBackendAdapter)
-│       ├── 导入 @earendil-works/pi-agent-core
-│       ├── 导入 @earendil-works/pi-ai
-│       ├── 定义 Workbench 专用工具集
-│       └── 对接现有事件系统
+│   ├── pi-agent.ts (实现 IBackendAdapter)
+│   │   ├── 导入 @earendil-works/pi-agent-core
+│   │   ├── 导入 @earendil-works/pi-ai
+│   │   ├── 定义 Workbench 专用工具集
+│   │   └── 对接现有事件系统
+│   │
+│   └── pi-tools/ (工具集目录)
+│       ├── file-tools.ts  (文件操作)
+│       ├── bash-tool.ts   (Shell 执行)
+│       ├── schema-tool.ts (Schema 校验)
+│       └── index.ts       (工具注册)
+│
+├── BackendAgent (桥接层)
+│   └── 包装 IBackendAdapter，桥接 AgentEvent 与上层系统
 │
 └── AgentFactory
-    └── factory.register('pi-agent', createPiAgent)
+    └── factory.register('pi-agent', (config) => new BackendAgent(config, new PiAgentBackend(config)))
 ```
 
 ### 2.2 数据流对比
@@ -94,6 +103,90 @@ Pi Agent 事件 → 现有 AgentEvent 映射：
 | `tool_execution_end` | → | `tool_call_update` |
 | `agent_end` | → | `finish` |
 
+### 2.5 AgentEvent 类型定义
+
+所有后端向上传递事件的联合类型（定义在 `src/core/types.ts`）：
+
+```typescript
+export type EventType =
+  | "stream"          // 流式文本
+  | "thought"         // 思考过程
+  | "tool_call"       // 工具调用开始
+  | "tool_call_update"// 工具调用状态更新
+  | "plan"            // 执行计划
+  | "error"           // 错误
+  | "finish"          // 完成
+  | "status";         // 状态变化
+
+export type AgentEvent =
+  | StreamEvent          // { type: "stream", sessionId, content, done }
+  | ThoughtEvent         // { type: "thought", sessionId, content, done }
+  | ToolCallEvent        // { type: "tool_call", sessionId, toolCallId, status, title, kind }
+  | ToolCallUpdateEvent  // { type: "tool_call_update", sessionId, toolCallId, status }
+  | PlanEvent            // { type: "plan", sessionId, content }
+  | ErrorEvent           // { type: "error", sessionId, error: AgentError }
+  | FinishEvent          // { type: "finish", sessionId, result: AgentResult }
+  | StatusEvent          // { type: "status", sessionId, status: AgentStatus }
+  | FileOperationEvent;  // { type: "file_operation", sessionId, fileOperation: { method, path, content } }
+```
+
+### 2.6 IBackendAdapter 接口（完整定义）
+
+定义在 `src/backends/base.ts`，每个后端必须实现：
+
+```typescript
+export type BackendStatus = 'idle' | 'initializing' | 'ready' | 'busy' | 'error';
+
+export interface IBackendAdapter {
+  readonly name: string;                                              // 后端名称
+  initialize(): Promise<void>;                                        // 初始化（创建连接/会话）
+  sendMessage(content: string, options?: { stream?: boolean }): Promise<string>;  // 发送消息
+  onStream(callback: (event: AgentEvent) => void): void;             // 注册流式回调
+  getStatus(): Promise<BackendStatus>;                                // 获取状态
+  destroy(): Promise<void>;                                          // 销毁
+  checkHealth(): Promise<boolean>;                                    // 健康检查
+  // --- 以下为可选方法 ---
+  start?(options?: { resumeSessionId?: string }): Promise<void>;     // 启动/恢复会话
+  setModel?(modelId: string): Promise<void>;                         // 切换模型
+  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ ... } | null>;
+  getCurrentSessionId?(): string | null;                             // 获取当前会话 ID
+  getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;  // 获取修改的文件
+  setPromptTimeout?(seconds: number): void;                          // 设置超时
+  cancelPrompt?(): void;                                             // 取消当前提示
+  getWorkingDir?(): string | null;                                   // 获取工作目录
+}
+```
+
+### 2.7 pi-agent-core API 假设
+
+以下为假设的 pi-agent-core API，需在实现前验证：
+
+```typescript
+// 假设 pi-agent-core 提供以下 API
+interface PiAgentConfig {
+  tools: PiAgentTool[];
+  systemPrompt: string;
+  model?: string;
+  provider?: 'anthropic' | 'openai' | 'google';
+}
+
+interface PiAgent {
+  prompt(message: string, options?: { timeout?: number }): Promise<string>;
+  subscribe(callback: (event: PiAgentEvent) => void): void;
+  setModel(modelId: string): Promise<void>;
+  getModelInfo(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
+  abort(): void;
+  destroy(): void;
+}
+
+// 假设的事件类型
+type PiAgentEvent =
+  | { type: 'message_update'; delta: string; kind: 'text' | 'thinking' }
+  | { type: 'tool_execution_start'; toolCallId: string; toolName: string; params: Record<string, unknown> }
+  | { type: 'tool_execution_end'; toolCallId: string; result: unknown; success: boolean }
+  | { type: 'agent_end'; result: string };
+```
+
 ---
 
 ## 三、实现任务分解
@@ -112,34 +205,174 @@ pnpm add @earendil-works/pi-agent-core @earendil-works/pi-ai
 
 **文件**：`packages/agent-service/src/backends/pi-agent.ts`（新建）
 
-实现 `IBackendAdapter` 接口，核心结构：
+实现 `IBackendAdapter` 接口，完整结构：
 
 ```typescript
+import { IBackendAdapter, BackendStatus } from './base';
+import { AgentConfig, AgentEvent, FileChange } from '../core/types';
+import { PiAgent, PiAgentEvent } from '@earendil-works/pi-agent-core';
+import { createWorkbenchTools } from './pi-tools';
+
 export class PiAgentBackend implements IBackendAdapter {
   readonly name = "pi-agent";
-  private agent: Agent | null = null;
+  
+  private agent: PiAgent | null = null;
   private config: AgentConfig;
   private status: BackendStatus = "idle";
   private eventCallback?: (event: AgentEvent) => void;
   private files: FileChange[] = [];
+  private timeout?: number;
+  private sessionId: string | null = null;
 
   constructor(config: AgentConfig) {
     this.config = config;
   }
 
   async initialize(): Promise<void> {
-    // 创建 Pi Agent 实例，注入工具集
+    this.status = "initializing";
+    const tools = createWorkbenchTools(this.config);
+    this.agent = new PiAgent({
+      tools,
+      systemPrompt: this.buildSystemPrompt(),
+    });
+    this.status = "ready";
   }
 
   async sendMessage(content: string, options?: { stream?: boolean }): Promise<string> {
-    // 调用 agent.prompt()，订阅事件转发
+    if (!this.agent) throw new Error("Agent not initialized");
+    this.status = "busy";
+    
+    this.setupEventMapping();
+    const result = await this.agent.prompt(content, { timeout: this.timeout });
+    
+    this.status = "ready";
+    return result;
   }
 
   onStream(callback: (event: AgentEvent) => void): void {
     this.eventCallback = callback;
   }
 
-  // ... 其他接口方法
+  async getStatus(): Promise<BackendStatus> {
+    return this.status;
+  }
+
+  async destroy(): Promise<void> {
+    this.agent?.abort();
+    this.agent = null;
+    this.status = "idle";
+  }
+
+  async checkHealth(): Promise<boolean> {
+    return this.agent !== null;
+  }
+
+  async start(options?: { resumeSessionId?: string }): Promise<void> {
+    this.sessionId = options?.resumeSessionId ?? null;
+  }
+
+  async setModel(modelId: string): Promise<void> {
+    await this.agent?.setModel(modelId);
+  }
+
+  getModelInfo() {
+    return this.agent?.getModelInfo() ?? null;
+  }
+
+  getCurrentSessionId(): string | null {
+    return this.sessionId;
+  }
+
+  getFiles(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }> {
+    return this.files;
+  }
+
+  setPromptTimeout(seconds: number): void {
+    this.timeout = seconds * 1000;
+  }
+
+  cancelPrompt(): void {
+    this.agent?.abort();
+  }
+
+  getWorkingDir(): string | null {
+    return this.config.workingDir ?? null;
+  }
+
+  private setupEventMapping(): void {
+    this.agent!.subscribe((event: PiAgentEvent) => {
+      if (!this.eventCallback) return;
+      
+      switch (event.type) {
+        case 'message_update':
+          if (event.kind === 'text') {
+            this.eventCallback({
+              type: 'stream',
+              sessionId: this.sessionId ?? '',
+              content: event.delta,
+              done: false,
+            });
+          } else if (event.kind === 'thinking') {
+            this.eventCallback({
+              type: 'thought',
+              sessionId: this.sessionId ?? '',
+              content: event.delta,
+              done: false,
+            });
+          }
+          break;
+        case 'tool_execution_start':
+          this.eventCallback({
+            type: 'tool_call',
+            sessionId: this.sessionId ?? '',
+            toolCallId: event.toolCallId,
+            status: 'running',
+            title: event.toolName,
+            kind: event.toolName,
+          });
+          break;
+        case 'tool_execution_end':
+          this.eventCallback({
+            type: 'tool_call_update',
+            sessionId: this.sessionId ?? '',
+            toolCallId: event.toolCallId,
+            status: event.success ? 'completed' : 'failed',
+          });
+          break;
+        case 'agent_end':
+          this.eventCallback({
+            type: 'finish',
+            sessionId: this.sessionId ?? '',
+            result: {
+              content: event.result,
+              files: this.files,
+            },
+          });
+          break;
+      }
+    });
+  }
+
+  private buildSystemPrompt(): string {
+    return [
+      '你是 Workbench 的 AI 编码助手，负责生成和修改 React 组件代码。',
+      '',
+      '## 工作空间规则',
+      `- 工作目录: ${this.config.workingDir}`,
+      `- 只能读写工作目录内的文件`,
+      `- 修改 config.schema.json 后需校验格式`,
+      '',
+      '## 可用依赖',
+      '- react, react-dom, tailwindcss',
+      '- clsx, tailwind-merge, class-variance-authority',
+      '- lucide-react, framer-motion',
+      '',
+      '## 代码规范',
+      '- TypeScript + Tailwind CSS',
+      '- 默认导出 React 组件',
+      '- 使用 clsx + tailwind-merge 处理动态类名',
+    ].join('\n');
+  }
 }
 ```
 
@@ -151,7 +384,9 @@ export class PiAgentBackend implements IBackendAdapter {
 import { PiAgentBackend } from './backends/pi-agent';
 
 // 在现有注册代码后添加
-factory.register('pi-agent', (agentConfig) => new PiAgentBackend(agentConfig));
+// 注意：必须使用 BackendAgent 包装，它是 BaseAgent 的实现，
+// 负责桥接 IBackendAdapter 与上层 Agent 系统（AgentManager、EventBus 等）
+factory.register('pi-agent', (agentConfig) => new BackendAgent(agentConfig, new PiAgentBackend(agentConfig)));
 ```
 
 #### 任务 1.4：添加类型定义
@@ -372,13 +607,86 @@ cancelPrompt(): void {
 
 **文件**：`packages/agent-service/tests/unit/pi-agent.test.ts`（新建）
 
+```typescript
+import { PiAgentBackend } from '../../src/backends/pi-agent';
+import { AgentConfig } from '../../src/core/types';
+
+describe('PiAgentBackend', () => {
+  const mockConfig: AgentConfig = {
+    workingDir: '/tmp/test-workspace',
+    backend: 'pi-agent',
+    piAgent: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+    },
+  };
+
+  it('should initialize agent instance', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    await backend.initialize();
+    expect(await backend.getStatus()).toBe('ready');
+  });
+
+  it('should send message and receive stream events', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    const events: AgentEvent[] = [];
+    backend.onStream((event) => events.push(event));
+    
+    await backend.initialize();
+    await backend.sendMessage('hello');
+    
+    expect(events.some(e => e.type === 'stream')).toBe(true);
+  });
+
+  it('should collect file changes from writeFile tool', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    await backend.initialize();
+    await backend.sendMessage('create a hello world component');
+    
+    const files = backend.getFiles();
+    expect(files.some(f => f.path.includes('HelloWorld'))).toBe(true);
+  });
+
+  it('should validate file path whitelist', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    await backend.initialize();
+    
+    // 尝试读取工作目录外的文件应被拒绝
+    await expect(
+      backend.sendMessage('read /etc/passwd')
+    ).rejects.toThrow();
+  });
+
+  it('should cancel prompt', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    await backend.initialize();
+    
+    const promise = backend.sendMessage('long running task');
+    backend.cancelPrompt();
+    
+    await expect(promise).rejects.toThrow();
+  });
+
+  it('should destroy agent instance', async () => {
+    const backend = new PiAgentBackend(mockConfig);
+    await backend.initialize();
+    await backend.destroy();
+    
+    expect(await backend.getStatus()).toBe('idle');
+  });
+});
+```
+
+**测试用例说明**：
+
 | 测试用例 | 说明 |
 |:---------|:-----|
-| `should initialize agent` | 验证 Agent 实例创建 |
-| `should send message and receive stream` | 验证消息发送和流式响应 |
+| `should initialize agent` | 验证 Agent 实例创建和状态转换 |
+| `should send message and receive stream events` | 验证消息发送和流式响应事件转发 |
 | `should collect file changes` | 验证文件变更收集 |
-| `should validate file path whitelist` | 验证文件路径白名单 |
+| `should validate file path whitelist` | 验证文件路径白名单安全机制 |
 | `should cancel prompt` | 验证取消操作 |
+| `should destroy agent instance` | 验证资源清理 |
 
 ### 5.2 集成测试
 
@@ -399,6 +707,32 @@ curl -X POST http://localhost:3201/api/agent/test-session/message \
 - Token 消耗
 - 响应时间
 - 文件变更准确性
+
+### 5.4 错误处理策略
+
+Pi Agent 后端需要处理以下错误场景：
+
+| 错误类型 | 处理方式 | AgentEvent |
+|:---------|:---------|:-----------|
+| **初始化失败** | 抛出异常，状态设为 `error` | `error` 事件 |
+| **消息发送超时** | 取消当前操作，返回超时错误 | `error` 事件 |
+| **工具执行失败** | 记录错误，继续执行 | `tool_call_update` (status: failed) |
+| **文件路径越权** | 拒绝操作，返回权限错误 | `error` 事件 |
+| **API 密钥无效** | 初始化时检测，抛出配置错误 | 不触发事件 |
+| **网络连接异常** | 重试或超时后报错 | `error` 事件 |
+
+错误事件格式：
+```typescript
+{
+  type: 'error',
+  sessionId: string,
+  error: {
+    code: string;      // 错误码
+    message: string;   // 错误信息
+    details?: unknown; // 额外详情
+  }
+}
+```
 
 ---
 
