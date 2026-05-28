@@ -9,6 +9,10 @@ export default function FigmaComponent(props: Props) {
     inviteColor2 = '#F7C59F',
     mallColor1 = '#004E89',
     mallColor2 = '#1A659E',
+    inviteImage1URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A801.png',
+    inviteImage2URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A802.png',
+    mallImage1URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA1.png',
+    mallImage2URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA2.png',
   } = props as Record<string, unknown>;
   return (
 <>
@@ -34,8 +38,12 @@ export default function FigmaComponent(props: Props) {
             </div>
           </div>
           <div className="self-stretch shrink-0 inline-flex justify-start items-center gap-2" data-figma-id="152:6412">
-            <div data-slot-type="color" id="色值1" data-figma-id="152:114807" style={{ width: 163.50, height: 64 }}></div>
-            <div data-slot-type="color" id="色值2" data-figma-id="152:114804" style={{ width: 163.50, height: 62 }}></div>
+            <div className="flex items-center justify-center overflow-hidden rounded-md" data-slot-type="color" style={{ width: 163.50, height: 64, backgroundColor: inviteColor1, borderRadius: 16 }}>
+              <img src={inviteImage1URL} alt="邀请活动图片1" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex items-center justify-center overflow-hidden rounded-md" data-slot-type="color" style={{ width: 163.50, height: 62, backgroundColor: inviteColor2, borderRadius: 16 }}>
+              <img src={inviteImage2URL} alt="邀请活动图片2" className="w-full h-full object-cover" />
+            </div>
           </div>
         </div>
         <div className="self-stretch shrink-0 pb-3.5 flex flex-col justify-start items-start gap-2" data-figma-id="152:6415">
@@ -52,8 +60,12 @@ export default function FigmaComponent(props: Props) {
             </div>
           </div>
           <div className="w-[335px] shrink-0 inline-flex justify-start items-center gap-2" data-figma-id="152:114823">
-            <div data-slot-type="color" id="色值3" data-figma-id="152:114824" style={{ width: 163.50, height: 64 }}></div>
-            <div data-slot-type="color" id="色值4" data-figma-id="152:114827" style={{ width: 163.50, height: 62 }}></div>
+            <div className="flex items-center justify-center overflow-hidden rounded-md" data-slot-type="color" style={{ width: 163.50, height: 64, backgroundColor: mallColor1, borderRadius: 16 }}>
+              <img src={mallImage1URL} alt="商场图片1" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex items-center justify-center overflow-hidden rounded-md" data-slot-type="color" style={{ width: 163.50, height: 62, backgroundColor: mallColor2, borderRadius: 16 }}>
+              <img src={mallImage2URL} alt="商场图片2" className="w-full h-full object-cover" />
+            </div>
           </div>
         </div>
       </div>

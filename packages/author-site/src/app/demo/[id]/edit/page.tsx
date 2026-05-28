@@ -22,7 +22,11 @@ import {
   getDefaultValues,
   getPreviewSize,
 } from "../../../../../lib/validator";
-import { mergeConfigToProps, SchemaConflictError } from "@/lib/runtime-props";
+import {
+  mergeConfigToProps,
+  mergeConfigWithUserValues,
+  SchemaConflictError,
+} from "@/lib/runtime-props";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -152,7 +156,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
-  const [compileVersion, setCompileVersion] = useState(0);
   const [snapshotVersion, setSnapshotVersion] = useState(0);
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -184,15 +187,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setSchema(newSchema);
         setPreviewSize(getPreviewSize(newSchema));
 
-        // Merge config defaults using the new schema
+        // Merge config defaults using the new schema with smart merge strategy
         try {
-          const defaults = getSafeMergedDefaults(newSchema);
           setConfigDataMap((prev) => {
             const current = prev[activeDemoIdRef.current] ?? {};
-            const merged = { ...current, ...defaults };
-            if (defaults.__order) {
-              merged.__order = defaults.__order;
-            }
+            const merged = mergeConfigWithUserValues(
+              current,
+              newSchema,
+              schema, // Pass old schema to detect user modifications
+            );
             return { ...prev, [activeDemoIdRef.current]: merged };
           });
         } catch (e) {
@@ -210,7 +213,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
       // Increment snapshot version to drive PreviewPanel and ConfigForm updates
       setSnapshotVersion((v) => v + 1);
-      setCompileVersion((v) => v + 1); // keep compileVersion in sync for backward compat
 
       if (source === "ai-realtime" || source === "ai-finish") {
         // Cancel any pending schema auto-regeneration
@@ -797,7 +799,6 @@ ${context.details}
                   onSnapshotReady={() => {
                     // AI finish snapshot applied — bump version to trigger PreviewPanel recompile & ConfigForm rebuild
                     setSnapshotVersion((v) => v + 1);
-                    setCompileVersion((v) => v + 1);
                   }}
                   externalMessages={aiMessages}
                   externalIsStreaming={aiIsStreaming}

@@ -32,8 +32,6 @@ export interface PreviewPanelProps {
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
   snapshotVersion?: number; // 快照版本号，递增以强制重新编译和配置重建
-  /** @deprecated Use snapshotVersion instead */
-  compileVersion?: number;
 }
 
 export interface ConfigFormProps {

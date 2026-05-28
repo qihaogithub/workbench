@@ -1,8 +1,9 @@
 # 多 Agent 后端支持方案
 
-> **文档状态**：方案设计  
+> **文档状态**：方案设计 + 实施中  
 > **创建日期**：2026-04-08  
-> **适用范围**：packages/web、packages/agent-service
+> **更新日期**：2026-05-28  
+> **适用范围**：packages/author-site、packages/agent-service、packages/agent-client
 
 ---
 
@@ -10,7 +11,7 @@
 
 ### 1.1 现状
 
-当前 Web 工作台在与 Agent Service 通信时，**硬编码使用 `opencode` 作为默认 Agent 后端**。用户无法选择或切换不同的 AI Agent（如 Claude、Codex、Gemini、Qwen 等）。
+当前 Web 工作台在与 Agent Service 通信时，**未支持用户选择或切换不同的 AI Agent 后端**。backend 参数在 API 层和组件层均未透传，实际使用 agent-service 的 `DEFAULT_BACKEND` 环境变量（默认值 `opencode`）。
 
 ### 1.2 目标
 
@@ -19,13 +20,14 @@
 - 通过环境变量配置默认 Agent
 - API 路由支持在请求中指定 Agent 类型
 - 前端组件可传递 Agent 类型参数
-- 保持向后兼容（默认仍使用 `opencode`）
+- 保持向后兼容（默认使用 `opencode-http`）
 
 ### 1.3 支持的 Agent 后端列表
 
 | Backend | CLI 命令 | ACP 参数 | 状态 |
 |---------|----------|----------|------|
-| `opencode` | `opencode` | `['acp']` | ✅ 默认 |
+| `opencode-http` | HTTP 直连 | N/A | ✅ **推荐默认** |
+| `opencode` | `opencode` | `['acp']` | ⚠️ 已注册（@deprecated） |
 | `claude` | `claude` | `['--experimental-acp']` | ✅ 已注册 |
 | `codex` | `codex` | `[]` | ✅ 已注册 |
 | `gemini` | `gemini` | `['--experimental-acp']` | ✅ 已注册 |
@@ -38,7 +40,10 @@
 | `vibe` | `vibe` | `['--acp']` | ✅ 已注册 |
 | `custom` | 自定义 | 自定义 | ✅ 已注册 |
 
-> **注意**：实际可用的 Agent 取决于系统中是否已安装对应的 CLI 工具。
+> **注意**：
+> 1. 实际可用的 Agent 取决于系统中是否已安装对应的 CLI 工具
+> 2. `opencode` (ACP stdio) 已标记为 `@deprecated`，推荐使用 `opencode-http` (HTTP 直连)
+> 3. 完整注册代码见 `packages/agent-service/src/server.ts:65-80`
 
 ---
 
@@ -48,7 +53,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Web 前端层                            │
+│                      author-site 前端层                      │
 │  ┌──────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ AIChat   │  │ DemoEditPage │  │ 其他使用 Agent 的组件 │  │
 │  │ Component│  │   Component  │  │                      │  │
@@ -65,6 +70,11 @@
 │                  ┌────────▼────────┐                        │
 │                  │  Agent Client   │                        │
 │                  │  (SDK 封装)     │                        │
+│                  └────────┬────────┘                        │
+│                           │                                 │
+│                  ┌────────▼────────┐                        │
+│                  │  agent-client   │                        │
+│                  │  npm package    │                        │
 │                  └────────┬────────┘                        │
 └───────────────────────────┼─────────────────────────────────┘
                             │ HTTP / WebSocket
@@ -89,7 +99,7 @@
 │          ▼                ▼                ▼               │
 │   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │
 │   │ OpenCode    │ │  Claude     │ │   Codex     │  ...   │
-│   │ Backend     │ │  Backend    │ │  Backend    │        │
+│   │ Http/Acp    │ │  Backend    │ │  Backend    │        │
 │   └─────────────┘ └─────────────┘ └─────────────┘        │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -99,20 +109,20 @@
 ```
 用户配置/请求
     │
-    ├─ 环境变量 AGENT_BACKEND（全局默认）
+    ├─ 环境变量 DEFAULT_BACKEND（agent-service 全局默认，默认值 opencode）
     │
-    ├─ API 请求体 backend 字段（单次请求）
+    ├─ API 请求体 backend 字段（单次请求，当前未实现）
     │
-    └─ 前端组件 props backend（组件级）
+    └─ 前端组件 props backend（组件级，当前未实现）
          │
          ▼
-    Web API Route
+    author-site API Route（当前未透传 backend）
          │
          ▼
-    AgentClient.sendMessage(options.backend)
+    agent-client.sendMessage(options.backend)（支持，但调用方未传）
          │
          ▼
-    Agent Service POST /api/agent/:sessionId/message
+    Agent Service POST /api/agent/:sessionId/message（支持 backend 参数）
          │
          ▼
     AgentConfig.backend → AgentFactory → 具体 Backend 实现
@@ -129,64 +139,179 @@
 
 ---
 
-## 3. 已完成的改动
+## 3. 当前代码实现状态
 
 ### 3.1 环境变量配置
 
-**文件**：`packages/web/.env.example`
-
-```env
-# Agent 后端类型（可选）
-# 支持的值：opencode（默认）, claude, codex, gemini, qwen, goose, auggie, kimi, copilot, qoder, vibe
-# 注意：此配置仅在首次创建 session 时生效，后续消息会复用已创建的 agent
-AGENT_BACKEND=opencode
-```
-
-### 3.2 Agent Client 封装增强
-
-**文件**：`packages/web/src/lib/agent-client.ts`
-
-新增功能：
+**文件**：`packages/agent-service/src/routes/agent.ts` (第 18 行)
 
 ```typescript
-// 1. 读取默认 Agent 后端配置
-const AGENT_BACKEND = (process.env.AGENT_BACKEND || 'opencode') as AgentType;
+const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || 'opencode';
+```
 
-// 2. 获取默认 Agent 后端的辅助函数
-export function getDefaultAgentBackend(): AgentType {
-  return AGENT_BACKEND;
-}
+**当前状态**：
+- ✅ agent-service 已支持 `DEFAULT_BACKEND` 环境变量
+- ❌ author-site 未配置或读取此环境变量
+- ❌ 环境变量名是 `DEFAULT_BACKEND`，不是文档原描述的 `AGENT_BACKEND`
 
-// 3. 封装的发送消息方法（自动使用默认/指定的 backend）
-export async function sendAgentMessage(
+### 3.2 Agent Client SDK 支持 backend 参数
+
+**文件**：`packages/agent-client/src/client.ts`
+
+已实现功能：
+
+```typescript
+// AgentClient.sendMessage 已支持 backend 参数（第 54-76 行）
+async sendMessage(
   sessionId: string,
-  message: string,
+  content: string,
   options?: {
     demoId?: string;
+    backend?: AgentType;  // ✅ 已支持
     workingDir?: string;
-    backend?: AgentType;  // 可选：覆盖默认
-    timeout?: number;
-    stream?: boolean;
-  }
-): Promise<AgentResult> {
-  const client = getAgentClient();
-  return client.sendMessage(sessionId, message, {
-    demoId: options?.demoId,
-    workingDir: options?.workingDir,
-    backend: options?.backend || AGENT_BACKEND,  // 使用默认或指定的 backend
-    options: {
-      timeout: options?.timeout || 120000,
-      stream: options?.stream || false,
-    },
-  });
+    customWorkspace?: boolean;
+    options?: SendMessageOptions;
+  },
+): Promise<ApiResponse<AgentResult>>
+```
+
+**当前状态**：SDK 层已支持，但 author-site 调用方未传递此参数。
+
+> **注意**：文档原描述的 `sendAgentMessage()`、`getDefaultAgentBackend()` 等辅助函数在 `packages/author-site/src/lib/agent-client.ts` 中**并不存在**。当前仅导出基础的 `AgentClient` 类。
+
+### 3.3 API 路由 backend 参数支持状态
+
+**文件**：`packages/author-site/src/app/api/ai/chat/route.ts`
+
+**当前实现**（第 8-31 行）：
+
+```typescript
+// ❌ 当前未读取 backend 参数
+const { message, sessionId: localSessionId, demoId } = body as {
+  message: string;
+  sessionId?: string;
+  demoId?: string;
+  // backend?: AgentType;  ← 缺失
+};
+
+// ❌ 未传递 backend 给 agent-client
+const result = await agentClient.sendMessage(agentSessionId, message, {
+  demoId,
+  workingDir: localSessionId ? getSessionPath(localSessionId) : undefined,
+  // backend: agentBackend,  ← 缺失
+  options: { timeout: 120000, stream: false },
+});
+```
+
+**需要修改**：参考文档第 5 节的实施方案。
+
+### 3.4 前端组件 backend Props 支持状态
+
+**文件**：`packages/author-site/src/components/ai-elements/ai-chat.tsx`
+
+**当前实现**（第 20-48 行）：
+
+```typescript
+interface AIChatProps {
+  sessionId: string;
+  agentSessionId: string;
+  workingDir?: string;
+  projectId?: string;
+  demoId?: string;
+  workspaceId?: string;
+  // backend?: AgentType  ← ❌ 缺失
+  onCodeUpdate?: (code: string) => void;
+  // ...
 }
 ```
 
-### 3.3 API 路由支持 backend 参数
+**当前状态**：AIChat 组件**未支持** backend prop，需后续添加。
 
-**文件**：`packages/web/src/app/api/ai/chat/route.ts`
+> **注意**：AIChat 组件实际使用 `useChatStream` hook → `StreamService` → `AgentClient.stream()` 进行 WebSocket 通信，而非直接调用 `sendMessage()`。
 
-改动要点：
+---
+
+## 4. Agent Service 侧的实现（已就绪）
+
+### 4.1 AgentFactory 注册机制
+
+**文件**：`packages/agent-service/src/server.ts` (第 65-80 行)
+
+```typescript
+const factory = getAgentFactory();
+
+// @deprecated ACP 后端仅保留兼容，推荐使用 opencode-http
+factory.register('opencode', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeAcpBackend(agentConfig)));
+factory.register('opencode-http', (agentConfig) => new BackendAgent(agentConfig, new OpenCodeHttpBackend(agentConfig)));
+factory.register('claude', (agentConfig) => new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)));
+factory.register('codex', (agentConfig) => new BackendAgent(agentConfig, new CodexBackend(agentConfig)));
+factory.register('gemini', (agentConfig) => new BackendAgent(agentConfig, new GeminiBackend(agentConfig)));
+factory.register('qwen', (agentConfig) => new BackendAgent(agentConfig, new QwenBackend(agentConfig)));
+factory.register('goose', (agentConfig) => new BackendAgent(agentConfig, new GooseBackend(agentConfig)));
+factory.register('auggie', (agentConfig) => new BackendAgent(agentConfig, new AuggieBackend(agentConfig)));
+factory.register('kimi', (agentConfig) => new BackendAgent(agentConfig, new KimiBackend(agentConfig)));
+factory.register('copilot', (agentConfig) => new BackendAgent(agentConfig, new CopilotBackend(agentConfig)));
+factory.register('qoder', (agentConfig) => new BackendAgent(agentConfig, new QoderBackend(agentConfig)));
+factory.register('vibe', (agentConfig) => new BackendAgent(agentConfig, new VibeBackend(agentConfig)));
+factory.register('custom', (agentConfig) => new BackendAgent(agentConfig, new CustomBackend(agentConfig)));
+```
+
+### 4.2 路由接收 backend 参数
+
+**文件**：`packages/agent-service/src/routes/agent.ts` (第 25-36 行)
+
+```typescript
+interface SendMessageBody {
+  content: string;
+  demoId?: string;
+  backend?: AgentType;  // ✅ 支持
+  workingDir?: string;
+  customWorkspace?: boolean;
+  model?: string;
+  options?: {
+    timeout?: number;
+    stream?: boolean;
+  };
+}
+```
+
+**使用**（第 90 行）：
+
+```typescript
+const config: AgentConfig = {
+  sessionId,
+  backend: backend || DEFAULT_BACKEND,  // ✅ 使用请求参数或默认值
+  demoId,
+  workingDir: workspaceInfo?.path || workingDir,
+};
+
+const agent = manager.getOrCreate(sessionId, config);
+```
+
+### 4.3 WebSocket 流式通信的 backend 处理
+
+**文件**：`packages/agent-service/src/routes/websocket.ts`
+
+**当前实现**：WebSocket 消息不支持传递 `backend` 参数，使用默认值：
+
+```typescript
+const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || "opencode";
+
+// 多处使用（第 160, 183, 341, 458 行）
+backend: DEFAULT_BACKEND,
+```
+
+**影响**：通过 WebSocket 流式发送的消息**无法指定 backend**，只能使用 agent-service 的默认配置。
+
+---
+
+## 5. 待实施方案
+
+### 5.1 优先级 P0（核心功能）
+
+#### 5.1.1 author-site API 路由支持 backend 参数
+
+**需要修改**：`packages/author-site/src/app/api/ai/chat/route.ts`
 
 ```typescript
 // 1. 从请求体中读取 backend 参数
@@ -194,198 +319,43 @@ const { message, sessionId: localSessionId, demoId, backend } = body as {
   message: string;
   sessionId?: string;
   demoId?: string;
-  backend?: AgentType;
+  backend?: AgentType;  // ← 新增
 };
 
-// 2. 使用请求中的 backend 或默认值
-const agentBackend = backend || getDefaultAgentBackend();
-
-// 3. 传递给 agent-client
+// 2. 传递给 agent-client
 const result = await agentClient.sendMessage(agentSessionId, message, {
   demoId,
-  backend: agentBackend,  // ← 新增
+  backend,  // ← 新增（可选，agent-service 会使用 DEFAULT_BACKEND 作为兜底）
   workingDir: localSessionId ? getSessionPath(localSessionId) : undefined,
   options: { timeout: 120000, stream: false },
 });
 ```
 
-### 3.4 前端组件支持 backend Props
+**工作量**：约 30 分钟
 
-**文件**：`packages/web/src/components/ai-elements/ai-chat.tsx`
-
-改动要点：
-
-```typescript
-// 1. 新增 backend prop
-interface AIChatProps {
-  sessionId: string
-  agentSessionId: string
-  workingDir?: string
-  backend?: AgentType  // ← 新增
-  onCodeUpdate?: (code: string) => void
-  onSchemaUpdate?: (schema: string) => void
-  onFilesChange?: (files: Array<...>) => void
-}
-
-// 2. 在降级到非流式 HTTP 时使用 backend 参数
-const result = await agentClient.sendMessage(agentSessionId, userMessage, {
-  workingDir,
-  backend: backend || getDefaultAgentBackend(),  // ← 新增
-  options: { timeout: 120000, stream: false },
-})
-```
-
----
-
-## 4. 使用方式
-
-### 4.1 方式一：环境变量（全局默认）
-
-在 `packages/web/.env.local` 中配置：
-
-```env
-# 使用 Claude 作为默认 Agent
-AGENT_BACKEND=claude
-
-# 或使用 Qwen
-AGENT_BACKEND=qwen
-```
-
-**适用场景**：开发/部署时固定使用某个 Agent
-
-### 4.2 方式二：API 请求时指定（单次覆盖）
-
-调用 `/api/ai/chat` 时传递 `backend` 参数：
-
-```typescript
-const response = await fetch('/api/ai/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: '请帮我写一个轮播图组件',
-    sessionId: 'session-123',
-    demoId: 'my-demo',
-    backend: 'claude',  // ← 本次请求使用 Claude
-  }),
-});
-```
-
-**适用场景**：需要根据用户选择动态切换 Agent
-
-### 4.3 方式三：组件 Props 传递（组件级）
-
-在使用 `AIChat` 组件时传递 `backend`：
-
-```tsx
-import { AIChat } from '@/components/ai-elements/ai-chat';
-
-<AIChat
-  sessionId={sessionId}
-  agentSessionId={agentSessionId}
-  workingDir={workspacePath}
-  backend="gemini"  // ← 该组件使用 Gemini
-  onCodeUpdate={handleCodeUpdate}
-  onSchemaUpdate={handleSchemaUpdate}
-/>
-```
-
-**适用场景**：不同页面/组件使用不同的 Agent
-
-### 4.4 方式四：使用封装的辅助函数
-
-```typescript
-import { sendAgentMessage, getDefaultAgentBackend } from '@/lib/agent-client';
-
-// 使用默认 backend
-const result = await sendAgentMessage('session-123', '你好');
-
-// 覆盖默认 backend
-const result = await sendAgentMessage('session-123', '你好', {
-  backend: 'qwen',
-  workingDir: '/path/to/workspace',
-});
-```
-
----
-
-## 5. 后续待完善的功能
-
-### 5.1 优先级 P0（核心功能）
-
-#### 5.1.1 Session 创建时传递 backend
-
-**当前问题**：`createEditSession()` 在 `session-manager.ts` 中创建本地 session 时，**没有将 backend 信息传递给 agent-service**。
+#### 5.1.2 AIChat 组件支持 backend Props
 
 **需要修改**：
 
-```typescript
-// packages/web/src/lib/session-manager.ts
-export async function createEditSession(
-  projectId: string,
-  options?: { backend?: AgentType }  // ← 新增
-): Promise<CreateSessionResult> {
-  // ... 现有逻辑 ...
+1. **AIChat 组件** (`packages/author-site/src/components/ai-elements/ai-chat.tsx`)
 
-  // 首次调用 agent-service 时传递 backend
-  // 需要在某个地方触发 agent-service 的 session 初始化
-  // 并传入 backend 参数
+```typescript
+interface AIChatProps {
+  // ... 现有 props
+  backend?: AgentType;  // ← 新增
 }
 ```
 
+2. **useChatStream hook** - 需要将 backend 传递给 StreamService
+
+3. **StreamService** (`packages/author-site/src/components/ai-elements/chat/services/stream-service.ts`)
+
+**挑战**：当前 `StreamService.sendMessage()` 通过 WebSocket 发送消息，而 WebSocket 协议不支持传递 backend 参数（见 4.3 节）。
+
 **解决方案选项**：
 
-**选项 A**：在 `createEditSession` 中主动调用 agent-service 初始化 session
-```typescript
-// 优点：session 创建时就初始化好 agent
-// 缺点：增加创建时间，可能失败
-```
+**方案 A（推荐）**：首次消息使用 HTTP 初始化 session（携带 backend），后续使用 WebSocket
 
-**选项 B**：保持当前隐式创建模式，在首次发送消息时传递 backend
-```typescript
-// 优点：简单，不改变现有流程
-// 缺点：需要确保首次消息一定携带 backend
-// 推荐：✅ 采用此方案
-```
-
-#### 5.1.2 AIChat 组件首次消息传递 backend
-
-**当前问题**：AIChat 组件使用 WebSocket 流式通信，但 `stream.send()` **不支持传递 backend 参数**。
-
-**分析**：
-- WebSocket 流只是建立连接，真正的 session 初始化发生在首次 HTTP 请求
-- 如果 session 已经通过 HTTP 初始化过，WebSocket 只是复用
-- 如果 session 未初始化，首次使用 WebSocket 发送消息时，agent-service 会使用默认 backend
-
-**解决方案**：
-
-**方案 A**：在使用 WebSocket 前，先发送一个空的 HTTP 请求初始化 session
-```typescript
-// 初始化 session
-await fetch('/api/ai/chat', {
-  method: 'POST',
-  body: JSON.stringify({
-    message: '',  // 空消息
-    sessionId: agentSessionId,
-    backend: backend || getDefaultAgentBackend(),
-  }),
-});
-
-// 然后再建立 WebSocket 连接
-const stream = agentClient.stream(agentSessionId);
-stream.send(userMessage, ...);
-```
-**优点**：确保 backend 正确  
-**缺点**：多一次 HTTP 请求，用户体验可能有延迟
-
-**方案 B**：在 agent-service 侧支持 WebSocket 握手时传递 backend
-```typescript
-// 修改 agent-client 的 stream 方法
-stream(agentSessionId, { backend?: AgentType })
-```
-**优点**：优雅，一次连接  
-**缺点**：需要修改 agent-service 的 WebSocket 路由
-
-**方案 C（推荐）**：首次消息使用 HTTP，后续使用 WebSocket
 ```typescript
 let sessionInitialized = false;
 
@@ -393,7 +363,7 @@ const handleSend = async () => {
   if (!sessionInitialized) {
     // 首次使用 HTTP，传递 backend
     const result = await agentClient.sendMessage(agentSessionId, userMessage, {
-      backend: backend || getDefaultAgentBackend(),
+      backend: backend || 'opencode-http',
       workingDir,
     });
     sessionInitialized = true;
@@ -405,8 +375,12 @@ const handleSend = async () => {
   }
 };
 ```
-**优点**：简单，不需要修改 agent-service  
-**缺点**：首次和后续消息的通信方式不一致
+
+**方案 B**：修改 agent-service WebSocket 路由支持 backend 参数
+
+需要修改 `packages/agent-service/src/routes/websocket.ts`，在 WebSocket 消息中支持 backend 字段。
+
+**工作量**：方案 A 约 2 小时，方案 B 约 4 小时
 
 ### 5.2 优先级 P1（体验优化）
 
@@ -421,19 +395,22 @@ const handleSend = async () => {
 export async function GET() {
   const agentClient = getAgentClient();
   
-  // 调用 agent-service 的健康检查或专门的检测接口
-  const available = await agentClient.getAvailableBackends();
+  // 调用 agent-service 的 /backends 接口
+  const response = await fetch(`${AGENT_SERVICE_URL}/backends`);
+  const backends = await response.json();
   
-  return NextResponse.json({ success: true, data: available });
+  return NextResponse.json({ success: true, data: backends });
 }
 ```
+
+> **注意**：agent-service 已提供 `/backends` 接口（`server.ts:97-99`），返回已注册的后端类型列表。
 
 **UI 展示**：
 
 ```tsx
 // Agent 选择器组件
 <AgentSelector
-  available={['opencode', 'claude', 'gemini']}
+  available={['opencode-http', 'claude', 'gemini']}
   selected={currentBackend}
   onChange={setBackend}
 />
@@ -496,7 +473,7 @@ export interface AgentInfo {
 **需求**：当首选 Agent 不可用时，自动降级到备选 Agent。
 
 ```typescript
-const BACKEND_PRIORITY = ['claude', 'gemini', 'opencode'];
+const BACKEND_PRIORITY = ['opencode-http', 'claude', 'gemini'];
 
 async function sendMessageWithFallback(message: string) {
   for (const backend of BACKEND_PRIORITY) {
@@ -514,50 +491,7 @@ async function sendMessageWithFallback(message: string) {
 
 ## 6. 技术细节
 
-### 6.1 Agent Service 侧的实现（已就绪）
-
-Agent Service 已完整支持多 Agent 后端，关键代码：
-
-#### 6.1.1 AgentFactory 注册机制
-
-```typescript
-// packages/agent-service/src/server.ts
-const factory = getAgentFactory();
-
-factory.register('opencode', (config) => 
-  new BackendAgent(config, new OpenCodeAcpBackend(config)));
-factory.register('claude', (config) => 
-  new BackendAgent(config, new ClaudeBackend(config)));
-factory.register('codex', (config) => 
-  new BackendAgent(config, new CodexBackend(config)));
-// ... 其他后端
-```
-
-#### 6.1.2 路由接收 backend 参数
-
-```typescript
-// packages/agent-service/src/routes/agent.ts
-interface SendMessageBody {
-  content: string;
-  demoId?: string;
-  backend?: AgentType;  // ← 支持
-  workingDir?: string;
-  customWorkspace?: boolean;
-  options?: { timeout?: number; stream?: boolean; };
-}
-
-// 使用
-const config: AgentConfig = {
-  sessionId,
-  backend: backend || "opencode",  // ← 默认为 opencode
-  demoId,
-  workingDir: workspaceInfo?.path || workingDir,
-};
-
-const agent = manager.getOrCreate(sessionId, config);
-```
-
-### 6.2 WebSocket 流式通信的限制
+### 6.1 WebSocket 流式通信的限制
 
 **问题**：`AgentClient.stream().send()` 不支持传递 `backend` 参数。
 
@@ -566,31 +500,30 @@ const agent = manager.getOrCreate(sessionId, config);
 - 真正的 session 初始化在 agent-service 侧完成
 - 流式消息只是向已初始化的 session 发送消息
 
-**验证方法**：
+**代码验证**：`packages/agent-client/src/client.ts` 第 189-192 行
 
 ```typescript
-// 查看 agent-client/src/client.ts 的 stream 方法
 stream(sessionId: string): AgentStream {
-  const ws = new WebSocket(`${this.baseUrl}/ws/agent/${sessionId}`);
-  // ...
+  const wsUrl = this.baseUrl.replace(/^http/, "ws");
+  return new AgentStream(`${wsUrl}/api/agent/${sessionId}/stream`);
   // 没有传递 backend 的地方
 }
 ```
 
-### 6.3 Session 生命周期
+### 6.2 Session 生命周期
 
 ```
 创建流程：
 1. 前端调用 POST /api/sessions（创建本地 session 文件）
 2. 前端调用 POST /api/ai/chat（首次消息）
-3. Web API 调用 Agent Service POST /api/agent/:sessionId/message
+3. author-site API 调用 Agent Service POST /api/agent/:sessionId/message
 4. Agent Service 检测到新 session，调用 workspaceManager.create()
 5. 使用 config.backend 创建 Agent 实例
 6. 后续消息复用该实例
 
 销毁流程：
 1. 前端调用 DELETE /api/sessions/:sessionId
-2. Web API 调用 Agent Service DELETE /api/agent/:sessionId
+2. author-site API 调用 Agent Service DELETE /api/agent/:sessionId
 3. Agent Service 销毁 Agent 实例和工作区
 ```
 
@@ -602,17 +535,11 @@ stream(sessionId: string): AgentStream {
 
 ```typescript
 describe('agent-client', () => {
-  it('应使用默认的 AGENT_BACKEND', async () => {
-    process.env.AGENT_BACKEND = 'claude';
-    const backend = getDefaultAgentBackend();
-    expect(backend).toBe('claude');
-  });
-
-  it('应在 sendAgentMessage 中使用指定的 backend', async () => {
+  it('应在 sendMessage 中使用指定的 backend', async () => {
     const mockSendMessage = jest.fn();
     // ... mock 实现
     
-    await sendAgentMessage('session-1', 'test', { backend: 'gemini' });
+    await agentClient.sendMessage('session-1', 'test', { backend: 'gemini' });
     
     expect(mockSendMessage).toHaveBeenCalledWith(
       'session-1',
@@ -627,7 +554,7 @@ describe('agent-client', () => {
 
 ```typescript
 describe('AI Chat API', () => {
-  it('应在请求中使用指定的 backend', async () => {
+  it('应在请求中透传 backend 参数', async () => {
     const response = await request(app)
       .post('/api/ai/chat')
       .send({
@@ -685,32 +612,32 @@ ACP_SMOKE_REAL=1 pnpm --filter @opencode-workbench/agent-service test:smoke
   code: "INTERNAL_ERROR"
 }
 
-// 应在 Web 侧捕获并展示友好提示
+// 应在 author-site 侧捕获并展示友好提示
 ```
 
 ### 8.4 环境变量作用域
 
-- `.env.local` 仅对 `web` 包生效
-- `agent-service` 有独立的环境变量配置
+- `DEFAULT_BACKEND` 环境变量在 agent-service 侧生效
+- author-site 有独立的环境变量配置
 - 如果需要全局配置，需在两个包中同步设置
 
 ---
 
 ## 9. 实施路线图
 
-### Phase 1：基础支持（当前进度：✅ 已完成 70%）
+### Phase 1：基础支持（当前进度：⚠️ 30%）
 
-- [x] 环境变量 AGENT_BACKEND 配置
-- [x] agent-client.ts 封装增强
-- [x] API 路由支持 backend 参数
-- [x] AIChat 组件支持 backend prop
-- [ ] AIChat 首次消息传递 backend（P0，待实现）
+- [x] agent-service 支持 backend 参数（已完成）
+- [x] agent-client SDK 支持 backend 参数（已完成）
+- [ ] author-site API 路由透传 backend（P0，待实施）
+- [ ] AIChat 组件支持 backend prop（P0，待实施）
+- [ ] 首次消息使用 HTTP 初始化 session 传递 backend（P0，待实施）
 
-**预计剩余工作量**：1-2 小时
+**预计剩余工作量**：3-4 小时
 
 ### Phase 2：体验优化（P1）
 
-- [ ] Agent 可用性检测 API
+- [ ] Agent 可用性检测 API（利用现有 /backends 接口）
 - [ ] Agent 选择器 UI 组件
 - [ ] Session 列表展示 backend 信息
 - [ ] 切换 Agent 时的用户提示
@@ -736,11 +663,11 @@ ACP_SMOKE_REAL=1 pnpm --filter @opencode-workbench/agent-service test:smoke
 
 ### Q2：如何知道当前系统安装了哪些 Agent CLI？
 
-**A**：可以调用 agent-service 的健康检查接口（待实现），或在终端中直接运行对应的 CLI 命令检查。
+**A**：可以调用 agent-service 的 `/backends` 接口获取已注册的后端类型列表。但实际可用性取决于系统中是否已安装对应的 CLI 工具。
 
 ### Q3：默认使用 opencode 会影响性能吗？
 
-**A**：不会。opencode 是默认的 ACP 兼容客户端，性能与其他 Agent 取决于各自的实现和网络状况。
+**A**：`opencode` (ACP stdio) 已标记为 `@deprecated`，推荐使用 `opencode-http` (HTTP 直连)。性能差异取决于各自的实现和网络状况。
 
 ### Q4：可以同时使用多个 Agent 吗？
 
@@ -748,17 +675,29 @@ ACP_SMOKE_REAL=1 pnpm --filter @opencode-workbench/agent-service test:smoke
 
 ### Q5：WebSocket 流式通信为什么不支持传递 backend？
 
-**A**：WebSocket 连接建立时只传递 sessionId，真正的 session 初始化发生在首次 HTTP 消息或 WebSocket 首次发送消息时。当前设计中，backend 参数只在 HTTP 请求中有效。
+**A**：WebSocket 连接建立时只传递 sessionId，真正的 session 初始化发生在首次 HTTP 消息或 WebSocket 首次发送消息时。当前设计中，backend 参数只在 HTTP 请求中有效。需要通过方案 A（首次 HTTP 初始化）或方案 B（修改 WebSocket 协议）解决。
 
 ---
 
 ## 11. 参考资料
 
-- [Agent Service AGENTS.md](../../packages/agent-service/AGENTS.md)
-- [Agent Client SDK 文档](../../packages/agent-client/README.md)
+- [Agent Service AGENTS.md](packages/agent-service/AGENTS.md)
+- [Agent Client SDK](packages/agent-client/)
 - [ACP 协议规范](https://github.com/zed-industries/zed/acp)
-- [支持的 Agent 后端列表](../../packages/agent-service/src/backends/)
+- [支持的 Agent 后端列表](packages/agent-service/src/backends/)
+- [agent-service server.ts](packages/agent-service/src/server.ts)
+- [author-site ai-chat.tsx](packages/author-site/src/components/ai-elements/ai-chat.tsx)
+- [author-site chat route.ts](packages/author-site/src/app/api/ai/chat/route.ts)
 
 ---
 
 **文档维护**：请在实施过程中持续更新此文档，记录设计决策、遇到的问题和解决方案。
+
+**更新日志**：
+- 2026-05-28：根据代码现状修正文档错误
+  - 修正包名：`packages/web` → `packages/author-site`
+  - 修正默认后端：`opencode` → `opencode-http`（推荐）
+  - 修正环境变量名：`AGENT_BACKEND` → `DEFAULT_BACKEND`
+  - 修正实现状态：标记未完成的功能
+  - 删除不存在的辅助函数描述
+  - 补充 WebSocket backend 限制说明

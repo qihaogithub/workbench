@@ -73,3 +73,80 @@ export function mergeConfigToProps(
 
   return { ...projectDefaults, ...pageDefaults };
 }
+
+/**
+ * 检测值是否被用户修改过
+ *
+ * @param currentValue 当前配置值
+ * @param oldValue 旧 Schema 的默认值
+ * @param newValue 新 Schema 的默认值
+ * @returns 如果用户修改过返回 true
+ */
+function isUserModified(
+  currentValue: unknown,
+  oldValue: unknown,
+  newValue: unknown,
+): boolean {
+  // 如果当前值与新默认值相同，说明没有修改
+  if (JSON.stringify(currentValue) === JSON.stringify(newValue)) {
+    return false;
+  }
+  // 如果没有旧 schema，无法准确判断是否用户修改过
+  // 在这种情况下，我们无法区分"用户修改过"和"schema 变化但用户未修改"
+  // 为了安全起见，我们认为用户未修改（使用新默认值）
+  if (oldValue === undefined) {
+    return false;
+  }
+  // 如果当前值与旧默认值相同，说明用户未修改（只是 schema 变了）
+  if (JSON.stringify(currentValue) === JSON.stringify(oldValue)) {
+    return false;
+  }
+  // 如果当前值与旧默认值不同，说明用户修改过
+  return true;
+}
+
+/**
+ * 合并配置：删除不存在的字段，保留用户修改过的值
+ *
+ * @param currentConfig 当前配置数据
+ * @param newSchema 新 Schema 字符串
+ * @param oldSchema 旧 Schema 字符串（可选，用于检测用户修改）
+ * @returns 合并后的配置数据
+ */
+export function mergeConfigWithUserValues(
+  currentConfig: Record<string, unknown>,
+  newSchema: string,
+  oldSchema?: string,
+): Record<string, unknown> {
+  const newSchemaObj = parseSchemaString(newSchema);
+  const oldSchemaObj = oldSchema ? parseSchemaString(oldSchema) : null;
+
+  const newDefaults = extractDefaultsFromSchema(newSchemaObj);
+  const oldDefaults = extractDefaultsFromSchema(oldSchemaObj);
+
+  const result: Record<string, unknown> = {};
+
+  // 遍历新 schema 中的字段
+  for (const [key, newValue] of Object.entries(newDefaults)) {
+    const currentValue = currentConfig[key];
+    const oldValue = oldDefaults[key];
+
+    if (
+      currentValue !== undefined &&
+      isUserModified(currentValue, oldValue, newValue)
+    ) {
+      // 用户修改过，保留用户值
+      result[key] = currentValue;
+    } else {
+      // 使用新默认值
+      result[key] = newValue;
+    }
+  }
+
+  // 处理 __order 元数据
+  if (currentConfig.__order) {
+    result.__order = currentConfig.__order;
+  }
+
+  return result;
+}

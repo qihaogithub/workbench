@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
@@ -52,9 +52,28 @@ interface AssistantMessageProps {
 function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
   if (!toolName) return "other";
   const name = toolName.toLowerCase();
-  if (name.includes("read") || name.includes("get") || name.includes("search") || name.includes("glob") || name.includes("grep")) return "read";
-  if (name.includes("edit") || name.includes("write") || name.includes("create") || name.includes("delete")) return "edit";
-  if (name.includes("bash") || name.includes("exec") || name.includes("run") || name.includes("command")) return "execute";
+  if (
+    name.includes("read") ||
+    name.includes("get") ||
+    name.includes("search") ||
+    name.includes("glob") ||
+    name.includes("grep")
+  )
+    return "read";
+  if (
+    name.includes("edit") ||
+    name.includes("write") ||
+    name.includes("create") ||
+    name.includes("delete")
+  )
+    return "edit";
+  if (
+    name.includes("bash") ||
+    name.includes("exec") ||
+    name.includes("run") ||
+    name.includes("command")
+  )
+    return "execute";
   return "other";
 }
 
@@ -67,7 +86,8 @@ type RenderBlock =
   | { type: "tool-group"; parts: ToolPart[]; toolKind: string }
   | { type: "tool-single"; part: ToolPart }
   | { type: "image"; url: string; alt?: string }
-  | { type: "file"; name: string; url: string; size?: number };
+  | { type: "file"; name: string; url: string; size?: number }
+  | { type: "execution-phase"; parts: MessagePart[] };
 
 function getToolIcon(toolKind: string) {
   if (toolKind === "read") return Eye;
@@ -85,14 +105,31 @@ function getToolGroupLabel(toolKind: string): string {
 
 function getToolActionText(part: ToolPart): string {
   const name = (part.toolName || "").toLowerCase();
-  const path = (part.parameters?.path || part.parameters?.file_path) as string | undefined;
-  if (name.includes("read") || name.includes("search") || name.includes("glob") || name.includes("grep")) {
+  const path = (part.parameters?.path || part.parameters?.file_path) as
+    | string
+    | undefined;
+  if (
+    name.includes("read") ||
+    name.includes("search") ||
+    name.includes("glob") ||
+    name.includes("grep")
+  ) {
     return path || "读取文件";
   }
-  if (name.includes("edit") || name.includes("write") || name.includes("create") || name.includes("delete")) {
+  if (
+    name.includes("edit") ||
+    name.includes("write") ||
+    name.includes("create") ||
+    name.includes("delete")
+  ) {
     return path || "修改文件";
   }
-  if (name.includes("bash") || name.includes("exec") || name.includes("run") || name.includes("command")) {
+  if (
+    name.includes("bash") ||
+    name.includes("exec") ||
+    name.includes("run") ||
+    name.includes("command")
+  ) {
     return "执行命令";
   }
   return part.toolName || "未知操作";
@@ -156,12 +193,23 @@ export function AssistantMessage({
 
   const renderBlocks: RenderBlock[] = useMemo(() => {
     const blocks: RenderBlock[] = [];
+    let currentExecution: MessagePart[] = [];
     let currentReasonings: ReasoningPart[] = [];
     let currentToolGroup: { parts: ToolPart[]; toolKind: string } | null = null;
 
+    const flushExecution = () => {
+      if (currentExecution.length > 0) {
+        blocks.push({ type: "execution-phase", parts: [...currentExecution] });
+        currentExecution = [];
+      }
+    };
+
     const flushReasonings = () => {
       if (currentReasonings.length > 0) {
-        blocks.push({ type: "reasoning-group", reasonings: currentReasonings });
+        blocks.push({
+          type: "reasoning-group",
+          reasonings: [...currentReasonings],
+        });
         currentReasonings = [];
       }
     };
@@ -171,7 +219,7 @@ export function AssistantMessage({
       if (currentToolGroup.parts.length >= 2) {
         blocks.push({
           type: "tool-group",
-          parts: currentToolGroup.parts,
+          parts: [...currentToolGroup.parts],
           toolKind: currentToolGroup.toolKind,
         });
       } else {
@@ -182,34 +230,54 @@ export function AssistantMessage({
 
     normalizedParts.forEach((part) => {
       if (part.type === "reasoning") {
-        flushTools();
-        currentReasonings.push(part);
+        // 如果有暂存的纯工具，纳入执行阶段
+        if (currentToolGroup && currentToolGroup.parts.length > 0) {
+          currentToolGroup.parts.forEach((t) => currentExecution.push(t));
+          currentToolGroup = null;
+        }
+        flushReasonings();
+        currentExecution.push(part);
       } else if (part.type === "tool") {
         flushReasonings();
-        const toolKind = getToolKind(part.toolName);
-        if (currentToolGroup && currentToolGroup.toolKind === toolKind) {
-          currentToolGroup.parts.push(part);
+        if (currentExecution.length > 0) {
+          // 已在执行阶段中，直接加入
+          currentExecution.push(part);
         } else {
-          flushTools();
-          currentToolGroup = { parts: [part], toolKind };
+          // 纯工具聚合逻辑
+          const toolKind = getToolKind(part.toolName);
+          if (currentToolGroup && currentToolGroup.toolKind === toolKind) {
+            currentToolGroup.parts.push(part);
+          } else {
+            flushTools();
+            currentToolGroup = { parts: [part], toolKind };
+          }
         }
       } else if (part.type === "text") {
+        flushExecution();
         flushReasonings();
         flushTools();
         if (part.content?.trim()) {
           blocks.push({ type: "text", content: part.content });
         }
       } else if (part.type === "image") {
+        flushExecution();
         flushReasonings();
         flushTools();
         blocks.push({ type: "image", url: part.url, alt: part.alt });
       } else if (part.type === "file") {
+        flushExecution();
         flushReasonings();
         flushTools();
-        blocks.push({ type: "file", name: part.name, url: part.url, size: part.size });
+        blocks.push({
+          type: "file",
+          name: part.name,
+          url: part.url,
+          size: part.size,
+        });
       }
     });
 
+    flushExecution();
     flushReasonings();
     flushTools();
     return blocks;
@@ -250,7 +318,8 @@ export function AssistantMessage({
 
       {renderBlocks.map((block, index) => {
         if (block.type === "reasoning-group") {
-          const lastDuration = block.reasonings[block.reasonings.length - 1]?.duration;
+          const lastDuration =
+            block.reasonings[block.reasonings.length - 1]?.duration;
           return (
             <Reasoning
               key={`reasoning-group-${index}`}
@@ -285,6 +354,18 @@ export function AssistantMessage({
                 </div>
               ))}
             </Reasoning>
+          );
+        }
+
+        if (block.type === "execution-phase") {
+          const isLast = index === renderBlocks.length - 1;
+          return (
+            <ExecutionPhase
+              key={`execution-phase-${index}`}
+              parts={block.parts}
+              isStreaming={isStreaming}
+              isComplete={isStreaming && !isLast}
+            />
           );
         }
 
@@ -369,6 +450,13 @@ export function AssistantMessage({
         return null;
       })}
 
+      {isStreaming && renderBlocks.length > 0 && (
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 py-0.5">
+          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+          <span>AI 工作中...</span>
+        </div>
+      )}
+
       {allTextContent && (
         <div className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-10 bg-background/80 backdrop-blur rounded p-1 shadow-sm">
           <button
@@ -433,6 +521,117 @@ function ToolCallGroup({
               )}
             </div>
           ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function ExecutionPhase({
+  parts,
+  isStreaming,
+  isComplete,
+}: {
+  parts: MessagePart[];
+  isStreaming: boolean;
+  isComplete: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const wasStreamingRef = useRef(false);
+
+  // 当执行阶段从"正在构建"变为"已完成"时，延迟 800ms 自动折叠
+  useEffect(() => {
+    if (isStreaming && !isComplete) {
+      wasStreamingRef.current = true;
+      setOpen(true);
+    } else if (wasStreamingRef.current && isComplete) {
+      const timer = setTimeout(() => {
+        setOpen(false);
+        wasStreamingRef.current = false;
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, isComplete]);
+
+  // 统计信息
+  const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
+  const toolCount = parts.filter((p) => p.type === "tool").length;
+
+  const summaryParts: string[] = [];
+  if (reasoningCount > 0) summaryParts.push(`${reasoningCount} 次思考`);
+  if (toolCount > 0) summaryParts.push(`${toolCount} 次工具调用`);
+
+  const hasRunning = parts.some(
+    (p) => p.type === "tool" && p.status === "running",
+  );
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-0.5 text-[11px] transition-colors select-none min-w-0 group/phase">
+        <Wrench className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+        <span className="text-muted-foreground/60 truncate">
+          执行过程（{summaryParts.join("、")}）
+        </span>
+        {hasRunning && (
+          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/50" />
+        )}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/phase:text-muted-foreground/50",
+            open && "rotate-180",
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5">
+          {parts.map((part, i) => {
+            if (part.type === "reasoning") {
+              return (
+                <div
+                  key={`exec-r-${i}`}
+                  className="flex items-start gap-1.5 text-[11px] text-muted-foreground/70 py-0.5"
+                >
+                  <Sparkles className="h-3 w-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 leading-relaxed">
+                    <Streamdown
+                      plugins={{ code, cjk }}
+                      controls={{ table: false, code: true }}
+                    >
+                      {part.content}
+                    </Streamdown>
+                  </div>
+                </div>
+              );
+            }
+
+            if (part.type === "tool") {
+              const toolKind = getToolKind(part.toolName);
+              const Icon = getToolIcon(toolKind);
+              const actionText = getToolActionText(part);
+              return (
+                <div
+                  key={`exec-t-${i}`}
+                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
+                >
+                  <Icon className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{actionText}</span>
+                  {part.status === "running" && (
+                    <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                  )}
+                  {part.status === "error" && (
+                    <span className="text-red-400 text-[10px]">失败</span>
+                  )}
+                  {part.status === "awaiting-approval" && (
+                    <span className="text-yellow-400 text-[10px]">
+                      等待确认
+                    </span>
+                  )}
+                </div>
+              );
+            }
+
+            return null;
+          })}
         </div>
       </CollapsibleContent>
     </Collapsible>

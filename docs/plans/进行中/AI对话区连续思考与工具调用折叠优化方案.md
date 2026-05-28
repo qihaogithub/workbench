@@ -1,17 +1,15 @@
 # AI对话区连续思考与工具调用折叠优化方案
 
-> 版本：v1.0  
+> 版本：v1.1  
 > 创建日期：2026-05-28  
 > 关联问题：AI对话区连续的思考过程、工具调用显得冗长，需要进一步折叠  
-> 状态：方案设计阶段
+> 状态：待实施
 
 ---
 
 ## 一、问题描述
 
 ### 1.1 当前现象
-
-从用户截图可以看到，AI对话区存在以下问题：
 
 1. **连续思考过程分散**：多个"思考过程"折叠块依次排列，用户需要逐个点击展开
 2. **工具调用未聚合**：相同类型的工具调用（如多次"读取文件"）虽然有聚合，但与思考过程交替出现，视觉噪音大
@@ -31,22 +29,13 @@
 
 **核心文件**：`packages/author-site/src/components/ai-elements/assistant-message.tsx`
 
-当前实现已经做了部分聚合：
-
-```typescript
-// 第 157-216 行：renderBlocks 生成逻辑
-- 连续的 reasoning parts → 合并为 reasoning-group
-- 连续的相同类型 tool parts → 合并为 tool-group
-- 不同类型之间会被 text 或其他类型打断
-```
-
-**聚合规则**：
+当前实现已做部分聚合（第 157-216 行 `renderBlocks` 生成逻辑）：
 
 | 内容类型      | 聚合条件                             | 当前行为            |
 | ------------- | ------------------------------------ | ------------------- |
 | 思考过程      | 连续的 reasoning parts               | ✅ 合并为一个折叠块 |
 | 工具调用      | 连续的相同 kind（read/edit/execute） | ✅ 合并为一个折叠块 |
-| 思考+工具交替 | reasoning → tool → reasoning         | 不合并，分别渲染    |
+| 思考+工具交替 | reasoning → tool → reasoning         | ❌ 不合并，分别渲染 |
 
 ### 2.2 问题根源
 
@@ -66,57 +55,102 @@ normalizedParts.forEach((part) => {
 
 **关键问题**：`flushReasonings()` 和 `flushTools()` 在类型切换时立即调用，导致连续的 reasoning-group 和 tool-group 交替出现，无法进一步合并。
 
+### 2.3 相关类型定义
+
+**文件**：`packages/author-site/src/components/ai-elements/message.tsx`
+
+```typescript
+export type MessagePart =
+  | { type: "text"; content: string }
+  | {
+      type: "reasoning";
+      content: string;
+      duration?: number;
+      timestamp?: number;
+    }
+  | {
+      type: "tool";
+      toolCallId: string;
+      toolName: string;
+      status: "running" | "completed" | "error" | "awaiting-approval";
+      parameters?: Record<string, unknown>;
+      result?: unknown;
+      duration?: number;
+    }
+  | { type: "image"; url: string; alt?: string }
+  | { type: "file"; name: string; url: string; size?: number };
+```
+
+**文件**：`assistant-message.tsx` 第 64-70 行
+
+```typescript
+type RenderBlock =
+  | { type: "text"; content: string }
+  | { type: "reasoning-group"; reasonings: ReasoningPart[] }
+  | { type: "tool-group"; parts: ToolPart[]; toolKind: string }
+  | { type: "tool-single"; part: ToolPart }
+  | { type: "image"; url: string; alt?: string }
+  | { type: "file"; name: string; url: string; size?: number };
+```
+
 ---
 
-## 三、优化方案
+## 三、优化方案：阶段级折叠
 
-### 3.1 方案概述
+### 3.1 核心思路
 
-**核心思路**：将连续的"思考过程 + 工具调用"视为一个**执行阶段（Execution Phase）**，统一折叠。
+将连续的"思考过程 + 工具调用"视为一个**执行阶段（Execution Phase）**，统一折叠。
 
 ```
 当前：
 ┌─ 思考过程 ─┐
-───────────┘
+└────────────┘
 ┌─ 读取文件 (2个) ─┐
-─────────────────┘
+└──────────────────┘
 ┌─ 思考过程 ─┐
-└───────────┘
+└────────────┘
 ┌─ 读取文件 (6个) ─┐
-└─────────────────┘
+└──────────────────┘
 
 优化后：
-┌─ 执行过程（思考 + 工具）▼ ─┐
-│  ├─ 思考过程               │
-│  ├─ 读取文件 (2个)         │
-│  ├─ 思考过程               │
-│  └─ 读取文件 (6个)         │
-──────────────────────────┘
+┌─ 执行过程（2次思考、8次工具调用）▼ ─┐
+│  ├─ 思考过程                         │
+│  ├─ 读取文件 (2个)                   │
+│  ├─ 思考过程                         │
+│  └─ 读取文件 (6个)                   │
+└─────────────────────────────────────┘
 ```
 
-### 3.2 方案 A：阶段级折叠（推荐）
+### 3.2 聚合规则
 
-#### 3.2.1 核心逻辑
+将 AI 响应划分为三种内容阶段：
 
-将 AI 响应划分为三种阶段：
+1. **纯思考阶段**：仅有 reasoning parts（无工具调用跟随）
+2. **执行阶段**：reasoning 和 tool 交替出现，统一聚合
+3. **输出阶段**：text / image / file 类型（最终回复），打断执行阶段
 
-1. **思考阶段**：纯 reasoning parts（无工具调用）
-2. **执行阶段**：reasoning 和 tool 交替出现
-3. **输出阶段**：text 类型（最终回复）
-
-**聚合规则**：
+**聚合示例**：
 
 ```
 Parts 序列：[R, R, T, R, T, T, R, Text, R, T, Text]
            ↓
-Blocks:    [{思考阶段}, {执行阶段}, {输出阶段}, {执行阶段}, {输出阶段}]
+Blocks:    [{reasoning-group(R,R)}, {execution-phase(T,R,T,T,R)}, {text}, {execution-phase(R,T)}, {text}]
 ```
 
-#### 3.2.2 实现改动
+**边界规则**：
 
-**文件**：`assistant-message.tsx`
+- 连续的纯 reasoning 且后面不跟 tool → 保持 `reasoning-group`
+- 单独的 tool 且前后无 reasoning → 保持 `tool-single` / `tool-group`
+- reasoning 后紧跟 tool（或 tool 后紧跟 reasoning）→ 进入 `execution-phase`
+- text / image / file → 始终打断执行阶段
 
-**修改 1**：扩展 `RenderBlock` 类型（第 64-70 行）
+---
+
+## 四、实现改动
+
+### 4.1 修改 1：扩展 `RenderBlock` 类型
+
+**文件**：`assistant-message.tsx` 第 64-70 行
 
 ```typescript
 type RenderBlock =
@@ -126,107 +160,277 @@ type RenderBlock =
   | { type: "tool-single"; part: ToolPart }
   | { type: "image"; url: string; alt?: string }
   | { type: "file"; name: string; url: string; size?: number }
-  // 新增
-  | { type: "execution-phase"; parts: MessagePart[] }; // 执行阶段
+  // 新增：执行阶段（reasoning + tool 交替聚合）
+  | { type: "execution-phase"; parts: MessagePart[] };
 ```
 
-**修改 2**：重写 `renderBlocks` 生成逻辑（第 157-216 行）
+### 4.2 修改 2：重写 `renderBlocks` 生成逻辑
+
+**文件**：`assistant-message.tsx` 第 157-216 行
+
+替换整个 `renderBlocks` 的 `useMemo` 逻辑：
 
 ```typescript
 const renderBlocks: RenderBlock[] = useMemo(() => {
   const blocks: RenderBlock[] = [];
-  let currentExecution: MessagePart[] = []; // 当前执行阶段
-  let currentReasonings: ReasoningPart[] = []; // 纯思考阶段
+  let currentExecution: MessagePart[] = []; // 当前执行阶段（reasoning + tool 混合）
+  let currentReasonings: ReasoningPart[] = []; // 纯思考阶段暂存
+  let currentToolGroup: { parts: ToolPart[]; toolKind: string } | null = null; // 纯工具阶段暂存
 
   const flushExecution = () => {
     if (currentExecution.length > 0) {
-      blocks.push({ type: "execution-phase", parts: currentExecution });
+      blocks.push({ type: "execution-phase", parts: [...currentExecution] });
       currentExecution = [];
     }
   };
 
   const flushReasonings = () => {
     if (currentReasonings.length > 0) {
-      blocks.push({ type: "reasoning-group", reasonings: currentReasonings });
+      blocks.push({
+        type: "reasoning-group",
+        reasonings: [...currentReasonings],
+      });
       currentReasonings = [];
     }
   };
 
+  const flushTools = () => {
+    if (!currentToolGroup || currentToolGroup.parts.length === 0) return;
+    if (currentToolGroup.parts.length >= 2) {
+      blocks.push({
+        type: "tool-group",
+        parts: [...currentToolGroup.parts],
+        toolKind: currentToolGroup.toolKind,
+      });
+    } else {
+      blocks.push({ type: "tool-single", part: currentToolGroup.parts[0] });
+    }
+    currentToolGroup = null;
+  };
+
   normalizedParts.forEach((part) => {
     if (part.type === "reasoning") {
-      flushReasonings();
+      // 如果有纯工具暂存，说明之前没有 reasoning，先 flush 掉
+      // 然后将它们都纳入执行阶段
+      if (currentToolGroup && currentToolGroup.parts.length > 0) {
+        currentToolGroup.parts.forEach((t) => currentExecution.push(t));
+        currentToolGroup = null;
+      }
+      flushReasonings(); // flush 掉之前未跟 tool 的纯 reasoning
       currentExecution.push(part);
     } else if (part.type === "tool") {
-      flushReasonings();
-      currentExecution.push(part);
+      flushReasonings(); // flush 掉之前未跟 tool 的纯 reasoning
+      // 如果已经有执行阶段，直接加入
+      if (currentExecution.length > 0) {
+        currentExecution.push(part);
+      } else {
+        // 没有执行阶段，走原有的纯工具聚合逻辑
+        const toolKind = getToolKind(part.toolName);
+        if (currentToolGroup && currentToolGroup.toolKind === toolKind) {
+          currentToolGroup.parts.push(part);
+        } else {
+          flushTools();
+          currentToolGroup = { parts: [part], toolKind };
+        }
+      }
     } else if (part.type === "text") {
+      // text 打断执行阶段和纯聚合
       flushExecution();
+      flushReasonings();
+      flushTools();
       if (part.content?.trim()) {
         blocks.push({ type: "text", content: part.content });
       }
-    } else if (part.type === "image" || part.type === "file") {
+    } else if (part.type === "image") {
       flushExecution();
-      blocks.push({ type: part.type, ...part });
+      flushReasonings();
+      flushTools();
+      blocks.push({ type: "image", url: part.url, alt: part.alt });
+    } else if (part.type === "file") {
+      flushExecution();
+      flushReasonings();
+      flushTools();
+      blocks.push({
+        type: "file",
+        name: part.name,
+        url: part.url,
+        size: part.size,
+      });
     }
   });
 
   flushExecution();
   flushReasonings();
+  flushTools();
   return blocks;
 }, [normalizedParts]);
 ```
 
-**修改 3**：新增 `ExecutionPhase` 渲染组件
+### 4.3 修改 3：新增 `ExecutionPhase` 渲染组件
+
+**文件**：`assistant-message.tsx`（在 `ToolCallGroup` 组件附近新增）
 
 ```typescript
-function ExecutionPhase({ parts }: { parts: MessagePart[] }) {
+function ExecutionPhase({
+  parts,
+  isStreaming,
+}: {
+  parts: MessagePart[];
+  isStreaming: boolean;
+}) {
   const [open, setOpen] = useState(false);
-  const hasReasoning = parts.some(p => p.type === "reasoning");
-  const hasTools = parts.some(p => p.type === "tool");
+
+  // 流式输出时自动展开，结束后延迟 800ms 折叠（与 Reasoning 组件行为一致）
+  useEffect(() => {
+    if (isStreaming) {
+      setOpen(true);
+    } else {
+      const timer = setTimeout(() => setOpen(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming]);
+
+  // 对内部 parts 进行二次聚合：连续同类工具合并显示
+  const innerBlocks = useMemo(() => {
+    type InnerBlock =
+      | { type: "reasoning"; content: string; duration?: number }
+      | { type: "tool-group"; parts: ToolPart[]; toolKind: string }
+      | { type: "tool-single"; part: ToolPart };
+
+    const result: InnerBlock[] = [];
+    let toolGroup: { parts: ToolPart[]; toolKind: string } | null = null;
+
+    const flushToolGroup = () => {
+      if (!toolGroup || toolGroup.parts.length === 0) return;
+      if (toolGroup.parts.length >= 2) {
+        result.push({ type: "tool-group", parts: toolGroup.parts, toolKind: toolGroup.toolKind });
+      } else {
+        result.push({ type: "tool-single", part: toolGroup.parts[0] });
+      }
+      toolGroup = null;
+    };
+
+    parts.forEach((p) => {
+      if (p.type === "reasoning") {
+        flushToolGroup();
+        result.push({ type: "reasoning", content: p.content, duration: p.duration });
+      } else if (p.type === "tool") {
+        const toolKind = getToolKind(p.toolName);
+        if (toolGroup && toolGroup.toolKind === toolKind) {
+          toolGroup.parts.push(p);
+        } else {
+          flushToolGroup();
+          toolGroup = { parts: [p], toolKind };
+        }
+      }
+    });
+    flushToolGroup();
+    return result;
+  }, [parts]);
 
   // 统计信息
-  const reasoningCount = parts.filter(p => p.type === "reasoning").length;
-  const toolCount = parts.filter(p => p.type === "tool").length;
+  const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
+  const toolCount = parts.filter((p) => p.type === "tool").length;
 
-  const summary = [];
-  if (reasoningCount > 0) summary.push(`${reasoningCount} 次思考`);
-  if (toolCount > 0) summary.push(`${toolCount} 次工具调用`);
+  const summaryParts: string[] = [];
+  if (reasoningCount > 0) summaryParts.push(`${reasoningCount} 次思考`);
+  if (toolCount > 0) summaryParts.push(`${toolCount} 次工具调用`);
+
+  const hasRunning = parts.some(
+    (p) => p.type === "tool" && p.status === "running"
+  );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 py-1 text-[11px] transition-colors select-none min-w-0 group/phase">
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-0.5 text-[11px] transition-colors select-none min-w-0 group/phase">
         <Wrench className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
-        <span className="text-muted-foreground/60">
-          执行过程（{summary.join('、')}）
+        <span className="text-muted-foreground/60 truncate">
+          执行过程（{summaryParts.join("、")}）
         </span>
+        {hasRunning && (
+          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/50" />
+        )}
         <ChevronDown
           className={cn(
-            "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0",
-            open && "rotate-180"
+            "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/phase:text-muted-foreground/50",
+            open && "rotate-180",
           )}
         />
       </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="pl-4 border-l border-border/20 ml-[5px] mt-1 space-y-1">
-          {parts.map((part, i) => {
-            if (part.type === "reasoning") {
+      <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5">
+          {innerBlocks.map((block, i) => {
+            if (block.type === "reasoning") {
               return (
-                <div key={i} className="text-[11px] text-muted-foreground/70">
-                  <Streamdown plugins={{ code, cjk }}>
-                    {part.content}
-                  </Streamdown>
+                <div
+                  key={`exec-reasoning-${i}`}
+                  className="flex items-start gap-1.5 text-[11px] text-muted-foreground/70 py-0.5"
+                >
+                  <Sparkles className="h-3 w-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 leading-relaxed">
+                    <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+                      {block.content}
+                    </Streamdown>
+                  </div>
                 </div>
               );
             }
-            if (part.type === "tool") {
+
+            if (block.type === "tool-single") {
+              const part = block.part;
               const Icon = getToolIcon(getToolKind(part.toolName));
               return (
-                <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                <div
+                  key={`exec-tool-${i}`}
+                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
+                >
                   <Icon className="h-3 w-3 flex-shrink-0" />
-                  <span>{getToolActionText(part)}</span>
+                  <span className="truncate">{getToolActionText(part)}</span>
+                  {part.status === "running" && (
+                    <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                  )}
+                  {part.status === "error" && (
+                    <span className="text-red-400 text-[10px]">失败</span>
+                  )}
+                  {part.status === "awaiting-approval" && (
+                    <span className="text-yellow-400 text-[10px]">等待确认</span>
+                  )}
                 </div>
               );
             }
+
+            if (block.type === "tool-group") {
+              const Icon = getToolIcon(block.toolKind);
+              const label = getToolGroupLabel(block.toolKind);
+              return (
+                <div
+                  key={`exec-tool-group-${i}`}
+                  className="text-[11px] text-muted-foreground/60 py-0.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="h-3 w-3 flex-shrink-0" />
+                    <span>{label}（{block.parts.length} 个）</span>
+                  </div>
+                  <div className="pl-4 mt-0.5 space-y-0.5">
+                    {block.parts.map((p, j) => (
+                      <div
+                        key={j}
+                        className="flex items-center gap-1.5 text-muted-foreground/50"
+                      >
+                        <span className="truncate">{getToolActionText(p)}</span>
+                        {p.status === "running" && (
+                          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                        )}
+                        {p.status === "error" && (
+                          <span className="text-red-400 text-[10px]">失败</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
             return null;
           })}
         </div>
@@ -236,198 +440,66 @@ function ExecutionPhase({ parts }: { parts: MessagePart[] }) {
 }
 ```
 
-#### 3.2.3 优势
+> **注意**：需要在文件顶部的 import 中确认 `useEffect` 已导入（当前第 4 行仅导入了 `useState, useMemo`）。
 
-- ✅ 大幅减少垂直空间占用（N 个折叠块 → 1 个）
-- ✅ 保留完整的执行链上下文
-- ✅ 用户可一键展开查看完整过程
-- ✅ 向后兼容（text 输出部分不受影响）
+### 4.4 修改 4：更新渲染逻辑
 
-#### 3.2.4 风险
-
-- ️ 执行阶段过长时，展开后内容较多（可通过默认折叠缓解）
-- ️ 用户可能错过某些工具调用的细节（可提供悬停提示）
-
----
-
-### 3.3 方案 B：时间窗口聚合（备选）
-
-#### 3.3.1 核心逻辑
-
-基于时间戳将相邻的思考/工具调用聚合（如 30 秒内的操作视为一个阶段）。
-
-**适用场景**：当 `MessagePart` 包含 `timestamp` 字段时。
-
-#### 3.3.2 实现思路
+**文件**：`assistant-message.tsx` 第 251-370 行的 `renderBlocks.map` 中，新增 `execution-phase` 分支：
 
 ```typescript
-const TIME_WINDOW = 30000; // 30秒
+// 在 renderBlocks.map((block, index) => { ... }) 中，添加：
 
-const renderBlocks = useMemo(() => {
-  const blocks: RenderBlock[] = [];
-  let currentPhase: MessagePart[] = [];
-  let lastTimestamp: number | null = null;
-
-  normalizedParts.forEach((part) => {
-    const ts = part.timestamp ?? Date.now();
-
-    if (lastTimestamp && ts - lastTimestamp > TIME_WINDOW) {
-      // 时间间隔超过窗口，创建新阶段
-      if (currentPhase.length > 0) {
-        blocks.push({ type: "execution-phase", parts: currentPhase });
-      }
-      currentPhase = [];
-    }
-
-    currentPhase.push(part);
-    lastTimestamp = ts;
-  });
-
-  // flush 最后一个阶段
-  if (currentPhase.length > 0) {
-    blocks.push({ type: "execution-phase", parts: currentPhase });
-  }
-
-  return blocks;
-}, [normalizedParts]);
-```
-
-#### 3.3.3 优势
-
-- ✅ 更精确地反映 AI 的执行节奏
-- ✅ 自动识别"停顿"（如等待用户输入）
-
-#### 3.3.4 劣势
-
-- ❌ 需要 `timestamp` 字段支持（当前部分 parts 缺失）
-- ❌ 时间窗口阈值需要调优
-- ❌ 可能将本应分离的操作错误聚合
-
----
-
-### 3.4 方案 C：混合折叠（渐进式）
-
-#### 3.4.1 核心逻辑
-
-结合方案 A 和现有聚合逻辑：
-
-1. **第一层**：执行阶段折叠（方案 A）
-2. **第二层**：执行阶段内部，相同类型工具继续聚合（现有逻辑）
-
-```
-┌─ 执行过程（3次思考、8次工具调用）▼ ┐
-│  ├─ 思考过程（2次）                  │
-│  ├─ 读取文件（4个）                  │
-│  ├─ 思考过程（1次）                  │
-│  └─ 编辑文件（4个）                  │
-└────────────────────────────────────┘
-```
-
-#### 3.4.2 实现改动
-
-在 `ExecutionPhase` 组件内部，对 `parts` 进行二次聚合：
-
-```typescript
-function ExecutionPhase({ parts }: { parts: MessagePart[] }) {
-  // 二次聚合逻辑
-  const innerBlocks = useMemo(() => {
-    const blocks: InnerBlock[] = [];
-    let currentReasonings: ReasoningPart[] = [];
-    let currentToolGroup: { parts: ToolPart[]; toolKind: string } | null = null;
-
-    parts.forEach((part) => {
-      if (part.type === "reasoning") {
-        // flush tool group
-        currentReasonings.push(part);
-      } else if (part.type === "tool") {
-        // 同类型工具聚合
-        const toolKind = getToolKind(part.toolName);
-        if (currentToolGroup?.toolKind === toolKind) {
-          currentToolGroup.parts.push(part);
-        } else {
-          // flush
-          currentToolGroup = { parts: [part], toolKind };
-        }
-      }
-    });
-
-    return blocks;
-  }, [parts]);
-
-  // 渲染逻辑...
+if (block.type === "execution-phase") {
+  return (
+    <ExecutionPhase
+      key={`execution-phase-${index}`}
+      parts={block.parts}
+      isStreaming={isStreaming && index === renderBlocks.length - 1}
+    />
+  );
 }
 ```
 
-#### 3.4.3 优势
+此分支应放在 `reasoning-group` 分支之后、`text` 分支之前。
 
-- ✅ 兼顾简洁性和可读性
-- ✅ 执行阶段内部仍有结构
-- ✅ 用户可逐层展开
+### 4.5 修改 5：补充 import
 
-#### 3.4.4 劣势
+**文件**：`assistant-message.tsx` 第 4 行
 
-- ⚠️ 实现复杂度较高
-- ️ 嵌套折叠可能增加交互认知负担
-
----
-
-## 四、方案对比
-
-| 维度           | 方案 A：阶段级折叠 | 方案 B：时间窗口 | 方案 C：混合折叠 |
-| -------------- | ------------------ | ---------------- | ---------------- |
-| **空间节省**   | ⭐⭐⭐⭐           | ⭐⭐⭐⭐         | ⭐⭐⭐⭐         |
-| **实现复杂度** | ⭐⭐               | ⭐⭐⭐           | ⭐⭐⭐⭐         |
-| **可读性**     | ⭐⭐⭐⭐           | ⭐⭐⭐           | ⭐⭐⭐⭐⭐       |
-| **依赖条件**   | 无                 | 需要 timestamp   | 无               |
-| **向后兼容**   | ✅                 | ✅               | ✅               |
-| **推荐度**     | **首选**           | 备选             | 长期优化         |
+```typescript
+// 修改前
+import { useState, useMemo } from "react";
+// 修改后
+import { useState, useMemo, useEffect } from "react";
+```
 
 ---
 
 ## 五、实施计划
 
-### 5.1 阶段 1：方案 A 实现（P0）
+### 5.1 实施步骤
 
 **工作量**：2-3 小时
 
 **任务清单**：
 
-- [ ] 扩展 `RenderBlock` 类型定义
-- [ ] 重写 `renderBlocks` 生成逻辑
-- [ ] 实现 `ExecutionPhase` 组件
-- [ ] 更新 `assistant-message.tsx` 渲染逻辑
-- [ ] 添加单元测试（聚合规则验证）
-- [ ] 手动测试（截图场景验证）
+- [ ] 补充 `useEffect` import
+- [ ] 扩展 `RenderBlock` 类型定义（添加 `execution-phase`）
+- [ ] 重写 `renderBlocks` 生成逻辑（聚合 reasoning + tool 为执行阶段）
+- [ ] 实现 `ExecutionPhase` 组件（含内部二次聚合、状态处理）
+- [ ] 在 `renderBlocks.map` 中添加 `execution-phase` 渲染分支
+- [ ] 手动测试（多种 parts 序列组合验证）
 
-**验证标准**：
+### 5.2 验证标准
 
-- ✅ 截图中的 4 个思考块 + 3 个工具组 → 折叠为 1-2 个执行阶段
-- ✅ 点击展开后，内部结构清晰
-- ✅ 最终 text 输出不受影响
-- ✅ 流式输出时，执行阶段动态扩展
-
-### 5.2 阶段 2：方案 C 优化（P1，可选）
-
-**工作量**：3-4 小时
-
-**前置条件**：方案 A 已上线并验证
-
-**任务清单**：
-
-- [ ] 实现 `ExecutionPhase` 内部二次聚合
-- [ ] 优化嵌套折叠的视觉层次
-- [ ] 添加阶段摘要统计（思考次数、工具调用次数）
-- [ ] A/B 测试（用户反馈收集）
-
-### 5.3 阶段 3：数据埋点（P2）
-
-**工作量**：1-2 小时
-
-**任务清单**：
-
-- [ ] 记录执行阶段的平均长度（parts 数量）
-- [ ] 记录用户展开率（多少用户会点击查看细节）
-- [ ] 记录滚动深度变化（优化后是否减少滚动）
+- [ ] 截图中 4 个思考块 + 3 个工具组 → 折叠为 1-2 个执行阶段
+- [ ] 纯 reasoning（无 tool 跟随）仍渲染为 `reasoning-group`
+- [ ] 纯 tool（无 reasoning 跟随）仍渲染为 `tool-single` / `tool-group`
+- [ ] text / image / file 正确打断执行阶段
+- [ ] 点击展开后，内部结构清晰（思考用 Sparkles 图标，工具用对应图标）
+- [ ] 最终 text 输出不受影响
+- [ ] 流式输出时，执行阶段自动展开；结束后延迟 800ms 自动折叠
+- [ ] tool status 为 `running` / `error` / `awaiting-approval` 时正确显示
 
 ---
 
@@ -438,116 +510,77 @@ function ExecutionPhase({ parts }: { parts: MessagePart[] }) {
 **执行阶段标题**：
 
 ```
-执行过程（2 次思考、5 次工具调用）▼
+🔧 执行过程（2 次思考、5 次工具调用）▼
 ```
 
-- 字体：11px muted-foreground
-- 图标：Wrench（工具）或 Sparkles（思考）
-- 高度：28px（与现有折叠块一致）
+- 字体：11px `text-muted-foreground/60`（与现有折叠块一致）
+- 图标：`Wrench`（lucide-react）
+- 高度：与现有 `ToolCallGroup` 一致（`py-0.5`）
 
-**执行阶段内容**：
+**执行阶段展开内容**：
 
-```
-─ 思考过程（15 秒）
-├─ 读取文件（3 个）
-├─ 思考过程（8 秒）
-└─ 编辑文件（2 个）
-```
-
-- 缩进：16px
-- 左侧边框：border-l border-border/20
-- 子项间距：4px
+- 思考项：`Sparkles` 图标 + Streamdown 渲染内容
+- 工具项：对应图标（`Eye`/`Edit3`/`Terminal`/`Wrench`）+ 操作文本
+- 同类工具 ≥2 个时，内部仍聚合为子组显示
+- 缩进：`pl-4`，左侧边框 `border-l border-border/20`
 
 ### 6.2 交互规范
 
-| 操作       | 行为                                 |
-| ---------- | ------------------------------------ |
-| 点击标题   | 展开/折叠执行阶段                    |
-| 流式输出中 | 自动展开（isStreaming=true）         |
-| 流式结束   | 延迟 800ms 后自动折叠                |
-| 鼠标悬停   | 标题高亮（text-muted-foreground/80） |
+| 操作       | 行为                                               |
+| ---------- | -------------------------------------------------- |
+| 点击标题   | 展开/折叠执行阶段                                  |
+| 流式输出中 | 自动展开（`isStreaming=true`）                     |
+| 流式结束   | 延迟 800ms 后自动折叠（与 `Reasoning` 组件一致）   |
+| 鼠标悬停   | 标题区域 `group-hover/phase` 高亮 ChevronDown 图标 |
 
 ### 6.3 边界情况
 
-| 场景                      | 处理方式                      |
-| ------------------------- | ----------------------------- |
-| 纯思考（无工具）          | 保持现有 reasoning-group 渲染 |
-| 纯工具（无思考）          | 保持现有 tool-group 渲染      |
-| 单个 part                 | 不聚合，直接渲染              |
-| 超长执行阶段（>20 parts） | 添加"显示更多"按钮            |
-| 流式输出中断              | 保留已生成的执行阶段          |
+| 场景                       | 处理方式                                                           |
+| -------------------------- | ------------------------------------------------------------------ |
+| 纯思考（无后续工具）       | 保持 `reasoning-group` 渲染，不进入执行阶段                        |
+| 纯工具（无关联思考）       | 保持 `tool-single` / `tool-group` 渲染                             |
+| 单个 reasoning + 单个 tool | 合并为一个执行阶段（最小聚合单元）                                 |
+| 超长执行阶段（>20 parts）  | 内部二次聚合减少视觉噪音，暂不做虚拟滚动                           |
+| 流式输出中断               | `renderBlocks` 基于 `normalizedParts` 重算，已生成内容保留         |
+| tool status 异常           | `error` 显示红色"失败"标签，`awaiting-approval` 显示黄色"等待确认" |
 
 ---
 
 ## 七、测试计划
 
-### 7.1 单元测试
+### 7.1 聚合逻辑验证（手动）
 
-**文件**：`packages/author-site/src/components/ai-elements/__tests__/assistant-message.test.tsx`
+在浏览器中验证以下 parts 序列的渲染结果：
 
-**测试用例**：
+| 输入 Parts 序列          | 预期 Blocks                                            |
+| ------------------------ | ------------------------------------------------------ |
+| `[R, R, T, R, T, Text]`  | `[execution-phase(R,R,T,R,T), text]`                   |
+| `[R, R]`（无 tool）      | `[reasoning-group(R,R)]`                               |
+| `[T, T]`（无 reasoning） | `[tool-group(T,T)]`                                    |
+| `[R, Text, T]`           | `[reasoning-group(R), text, tool-single(T)]`           |
+| `[R, T, R, T, R, T]`     | `[execution-phase(R,T,R,T,R,T)]`                       |
+| `[T, R, T, Text, R, T]`  | `[execution-phase(T,R,T), text, execution-phase(R,T)]` |
+| `[R, T, Image, R, T]`    | `[execution-phase(R,T), image, execution-phase(R,T)]`  |
 
-```typescript
-describe("renderBlocks 聚合逻辑", () => {
-  test("连续的 reasoning 和 tool 应合并为 execution-phase", () => {
-    const parts: MessagePart[] = [
-      { type: "reasoning", content: "思考 1" },
-      { type: "tool", toolName: "read", status: "completed" },
-      { type: "reasoning", content: "思考 2" },
-      { type: "tool", toolName: "edit", status: "completed" },
-      { type: "text", content: "最终回复" },
-    ];
+> 注：R = reasoning, T = tool, Text = text, Image = image
 
-    const blocks = renderBlocks(parts);
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0].type).toBe("execution-phase");
-    expect(blocks[1].type).toBe("text");
-  });
-
-  test("纯 reasoning 应保持 reasoning-group", () => {
-    const parts: MessagePart[] = [
-      { type: "reasoning", content: "思考 1" },
-      { type: "reasoning", content: "思考 2" },
-    ];
-
-    const blocks = renderBlocks(parts);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0].type).toBe("reasoning-group");
-  });
-
-  test("text 应打断执行阶段", () => {
-    const parts: MessagePart[] = [
-      { type: "reasoning", content: "思考" },
-      { type: "text", content: "中间输出" },
-      { type: "tool", toolName: "read", status: "completed" },
-    ];
-
-    const blocks = renderBlocks(parts);
-    expect(blocks).toHaveLength(3);
-  });
-});
-```
-
-### 7.2 集成测试
-
-**测试场景**：
+### 7.2 集成测试场景
 
 1. **截图场景**：4 个思考块 + 3 个工具组 → 1-2 个执行阶段
 2. **流式输出**：执行阶段动态扩展，不影响已渲染内容
-3. **权限请求**：`awaiting-approval` 状态的工具正确显示
-4. **错误处理**：tool status = 'error' 时，执行阶段不崩溃
+3. **权限请求**：`awaiting-approval` 状态的工具正确显示"等待确认"
+4. **错误处理**：tool `status = 'error'` 时，执行阶段不崩溃，显示"失败"标签
 
-### 7.3 手动测试
-
-**测试步骤**：
+### 7.3 手动测试步骤
 
 1. 启动 `pnpm dev`
 2. 进入创作端编辑页面
 3. 发送复杂指令（如"分析当前项目结构并优化配置"）
 4. 观察 AI 响应：
    - [ ] 执行阶段折叠正确
-   - [ ] 展开后内容完整
-   - [ ] 流式输出流畅
+   - [ ] 展开后内容完整（思考 + 工具交替可见）
+   - [ ] 流式输出流畅，执行阶段自动展开
+   - [ ] 流式结束后自动折叠
    - [ ] 最终回复清晰可见
 
 ---
@@ -556,19 +589,19 @@ describe("renderBlocks 聚合逻辑", () => {
 
 ### 8.1 技术风险
 
-| 风险                 | 影响             | 缓解措施                              |
-| -------------------- | ---------------- | ------------------------------------- |
-| `parts` 数据结构变更 | 聚合逻辑失效     | 添加类型守卫，兼容旧格式              |
-| 流式输出时序问题     | 执行阶段错误分割 | 使用 `useMemo` 依赖 `normalizedParts` |
-| 性能问题（长消息）   | 渲染卡顿         | 虚拟滚动（长期优化）                  |
+| 风险                 | 影响             | 缓解措施                                           |
+| -------------------- | ---------------- | -------------------------------------------------- |
+| `parts` 数据结构变更 | 聚合逻辑失效     | 添加类型守卫，`normalizedParts` 层做兼容处理       |
+| 流式输出时序问题     | 执行阶段错误分割 | `useMemo` 依赖 `normalizedParts`，每次重算保证一致 |
+| `useEffect` 副作用   | 折叠状态竞争     | `isStreaming` 变化时才触发，手动操作不受影响       |
 
 ### 8.2 用户体验风险
 
-| 风险                   | 影响     | 缓解措施                    |
-| ---------------------- | -------- | --------------------------- |
-| 用户找不到工具调用细节 | 调试困难 | 提供悬停提示、一键展开全部  |
-| 折叠过于激进           | 信息丢失 | 保留纯思考/纯工具的独立渲染 |
-| 视觉层级混乱           | 认知负担 | 严格遵循设计稿，A/B 测试    |
+| 风险                   | 影响           | 缓解措施                                  |
+| ---------------------- | -------------- | ----------------------------------------- |
+| 用户找不到工具调用细节 | 调试困难       | 执行阶段内部保留完整工具列表，含状态标签  |
+| 折叠过于激进           | 信息丢失       | 纯思考/纯工具保持独立渲染，仅混合时才聚合 |
+| 执行阶段过长           | 展开后阅读困难 | 内部二次聚合（同类工具合并）减少视觉噪音  |
 
 ---
 
@@ -576,33 +609,27 @@ describe("renderBlocks 聚合逻辑", () => {
 
 ### 9.1 智能摘要
 
-**思路**：为执行阶段自动生成摘要（如"分析了 3 个文件，修改了 2 个配置"）。
-
-**实现**：调用 LLM 生成摘要，或基于 tool parameters 提取关键信息。
+为执行阶段自动生成摘要（如"分析了 3 个文件，修改了 2 个配置"），基于 tool parameters 提取关键信息。
 
 ### 9.2 执行链可视化
 
-**思路**：用时间线或流程图展示 AI 的执行链。
-
-**参考**：VSCode Copilot Chat 的执行步骤可视化。
+用时间线或流程图展示 AI 的执行链（参考 VSCode Copilot Chat 的执行步骤可视化）。
 
 ### 9.3 用户偏好记忆
 
-**思路**：记住用户对执行阶段的展开/折叠偏好，自动应用。
-
-**实现**：localStorage 存储 `executionPhaseDefaultOpen` 配置。
+记住用户对执行阶段的展开/折叠偏好，通过 `localStorage` 存储 `executionPhaseDefaultOpen` 配置。
 
 ---
 
 ## 十、相关文档
 
-- [01\_对话组件设计.md](./技术/01_对话组件设计.md)
 - [assistant-message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/assistant-message.tsx)
 - [reasoning.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/reasoning.tsx)
 - [message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/message.tsx)
+- [tool.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/tool.tsx)
 
 ---
 
 **文档维护者**：AI 辅助生成  
 **最后更新**：2026-05-28  
-**文档状态**：方案设计阶段，待评审
+**文档状态**：待实施

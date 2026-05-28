@@ -173,10 +173,7 @@ export function PreviewPanel({
   onError,
   previewSize,
   snapshotVersion,
-  compileVersion,
 }: PreviewPanelProps) {
-  // snapshotVersion takes precedence over deprecated compileVersion
-  const effectiveVersion = snapshotVersion ?? compileVersion;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -303,7 +300,7 @@ export function PreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [code, sessionId, validCode, sendUpdateCode, effectiveVersion]);
+  }, [code, sessionId, validCode, sendUpdateCode, snapshotVersion]);
 
   // configData 变化时发送 UPDATE_CONFIG
   useEffect(() => {

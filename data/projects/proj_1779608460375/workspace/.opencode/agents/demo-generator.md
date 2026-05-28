@@ -30,8 +30,8 @@ workspace/
 项目级共享配置：✅ 已设置（project.config.schema.json）
 包含 2 个页面：
 
-  📄 "我的页面-手机" → demos/demo_1779608460375_a1b2c7/ (index.tsx + config.schema.json)
-  📄 "我的页面-平板" → demos/demo_1779608460375_d4e5f8/ (index.tsx + config.schema.json)
+  📄 "我的页面-手机" → demos/demo_1779934698596_dvvk55/ (index.tsx + config.schema.json)
+  📄 "我的页面-平板" → demos/demo_1779935678404_lxsasc/ (index.tsx + config.schema.json)
 
 用户会通过自然语言告诉你操作哪个页面或项目配置。
 如果需要操作某个页面，请在 `demos/{id}/` 目录下编辑 `index.tsx` 或 `config.schema.json`。
