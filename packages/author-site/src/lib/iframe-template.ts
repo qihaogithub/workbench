@@ -5,24 +5,26 @@ export interface IframeTemplateOptions {
   cdnBaseUrl?: string;
 }
 
-import { getCdnBaseUrl } from './cdn-config';
+import { getCdnBaseUrl } from "./cdn-config";
 
 function generateCssLinks(cssImports: string[], cdnBase: string): string {
-  if (!cssImports.length) return '';
+  if (!cssImports.length) return "";
   return cssImports
     .map((url) => {
-      const href = url.startsWith('http') ? url : `${cdnBase}/${url}`;
+      const href = url.startsWith("http") ? url : `${cdnBase}/${url}`;
       return `    <link rel="stylesheet" href="${href}" data-dynamic-css="true">`;
     })
-    .join('\n');
+    .join("\n");
 }
 
-export function generateIframeHtml(options: IframeTemplateOptions = {}): string {
+export function generateIframeHtml(
+  options: IframeTemplateOptions = {},
+): string {
   const { cssImports = [], compiledCode, configData, cdnBaseUrl } = options;
   const cdnBase = cdnBaseUrl || getCdnBaseUrl();
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
-  const initialCode = compiledCode ? JSON.stringify(compiledCode) : 'null';
+  const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
   const initialConfig = JSON.stringify(configData || {});
 
   return `<!DOCTYPE html>
@@ -34,7 +36,7 @@ export function generateIframeHtml(options: IframeTemplateOptions = {}): string 
   <link rel="dns-prefetch" href="${cdnBase}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
     #root { min-height: 100vh; }
   </style>
 ${cssLinks}
