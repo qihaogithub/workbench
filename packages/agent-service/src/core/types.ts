@@ -68,6 +68,7 @@ export interface PiAgentConfig {
   apiKey?: string;
   model?: string;
   provider?: string;  // "anthropic" | "openai" | "google"
+  baseUrl?: string;   // 自定义 API 基础地址（OpenAI 兼容格式）
   timeout?: number;
 }
 

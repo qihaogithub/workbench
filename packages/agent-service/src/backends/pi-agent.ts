@@ -79,9 +79,28 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private getModel() {
-    const provider = (this.config.piAgent?.provider || serviceConfig.piAgent.provider) as any;
+    const provider = this.config.piAgent?.provider || serviceConfig.piAgent.provider;
     const modelId = this.config.piAgent?.model || this.config.model || serviceConfig.piAgent.model;
-    return getModel(provider, modelId);
+    const baseUrl = this.config.piAgent?.baseUrl || serviceConfig.piAgent.baseUrl;
+    
+    // 如果有自定义 baseUrl，创建自定义模型
+    if (baseUrl) {
+      return {
+        id: modelId,
+        name: modelId,
+        api: 'openai-completions' as const,
+        provider: provider,
+        baseUrl: baseUrl,
+        reasoning: false,
+        input: ['text'] as const,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 4096,
+      };
+    }
+    
+    // 否则使用预定义模型
+    return getModel(provider as any, modelId);
   }
 
   private isPathAllowed(filePath: string): boolean {

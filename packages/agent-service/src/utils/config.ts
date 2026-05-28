@@ -10,6 +10,7 @@ export interface ServiceConfig {
     provider: string;
     apiKey: string;
     model: string;
+    baseUrl: string;
     timeout: number;
   };
   rateLimit: {
@@ -27,12 +28,13 @@ export function loadConfig(): ServiceConfig {
       serverUrl: process.env.OPENCODE_SERVER_URL || 'http://localhost:4096',
       timeout: parseInt(process.env.OPENCODE_TIMEOUT || '120000', 10),
     },
-    piAgent: {
-      provider: process.env.PI_AGENT_PROVIDER || 'anthropic',
-      apiKey: process.env.PI_AGENT_API_KEY || '',
-      model: process.env.PI_AGENT_MODEL || 'claude-sonnet-4-20250514',
-      timeout: parseInt(process.env.PI_AGENT_TIMEOUT || '120000', 10),
-    },
+  piAgent: {
+    provider: process.env.PI_AGENT_PROVIDER || 'anthropic',
+    apiKey: process.env.PI_AGENT_API_KEY || '',
+    model: process.env.PI_AGENT_MODEL || 'claude-sonnet-4-20250514',
+    baseUrl: process.env.PI_AGENT_BASE_URL || '',
+    timeout: parseInt(process.env.PI_AGENT_TIMEOUT || '120000', 10),
+  },
     rateLimit: {
       max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
