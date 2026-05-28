@@ -28,7 +28,6 @@ import {
   Pencil,
   Trash2,
   FolderPlus,
-  Eye,
   Copy,
   MoveRight,
 } from "lucide-react";
@@ -47,7 +46,6 @@ interface DemoPageTreeItemProps {
   onPageRename: (pageId: string, name: string) => void;
   onPageCopy: (pageId: string) => void;
   onPageDelete: (pageId: string) => void;
-  onViewCode: (pageId: string) => void;
   onRenameFolder: (folderId: string, name: string) => void;
   onDeleteFolder: (folderId: string, deleteContents: boolean) => void;
   onCreateSubFolder: (parentId: string) => void;
@@ -67,7 +65,6 @@ export function DemoPageTreeItem({
   onPageRename,
   onPageCopy,
   onPageDelete,
-  onViewCode,
   onRenameFolder,
   onDeleteFolder,
   onCreateSubFolder,
@@ -141,17 +138,24 @@ export function DemoPageTreeItem({
       >
         {isFolder && hasChildren && (
           <span className="shrink-0 text-muted-foreground">
-            {isExpanded
-              ? <ChevronDown className="h-3.5 w-3.5" />
-              : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
           </span>
         )}
         {isFolder && !hasChildren && <span className="w-3.5 shrink-0" />}
 
-        {isFolder
-          ? (isExpanded ? <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" /> : <Folder className="h-4 w-4 shrink-0 text-amber-500" />)
-          : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-        }
+        {isFolder ? (
+          isExpanded ? (
+            <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" />
+          ) : (
+            <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+          )
+        ) : (
+          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
 
         {editingId === item.id ? (
           <Input
@@ -161,7 +165,10 @@ export function DemoPageTreeItem({
             onBlur={finishEditing}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
-              else if (e.key === "Escape") { setEditingId(null); setEditingName(""); }
+              else if (e.key === "Escape") {
+                setEditingId(null);
+                setEditingName("");
+              }
             }}
             onClick={(e) => e.stopPropagation()}
             className="h-7 text-sm px-2 py-0 flex-1 min-w-0"
@@ -173,7 +180,9 @@ export function DemoPageTreeItem({
 
       <div className="flex items-center gap-0.5 shrink-0">
         {isActive && (
-          <Badge variant="secondary" className="text-[10px] h-5">当前</Badge>
+          <Badge variant="secondary" className="text-[10px] h-5">
+            当前
+          </Badge>
         )}
 
         {isFolder ? (
@@ -182,7 +191,9 @@ export function DemoPageTreeItem({
             folderName={item.name}
             onRename={() => startEditing(item.id, item.name)}
             onCreateSubFolder={() => onCreateSubFolder(item.id)}
-            onDelete={(deleteContents) => onDeleteFolder(item.id, deleteContents)}
+            onDelete={(deleteContents) =>
+              onDeleteFolder(item.id, deleteContents)
+            }
           />
         ) : (
           <PageContextMenu
@@ -190,7 +201,6 @@ export function DemoPageTreeItem({
             pageName={item.name}
             pageParentId={(item as DemoPageMeta).parentId ?? null}
             folders={folders}
-            onViewCode={() => onViewCode(item.id)}
             onRename={() => startEditing(item.id, item.name)}
             onCopy={() => onPageCopy(item.id)}
             onDelete={() => onPageDelete(item.id)}
@@ -219,13 +229,16 @@ export function StaticTreeItem({
       className="flex items-center gap-1.5 py-1.5 px-2 rounded-md text-sm bg-popover border shadow-md select-none"
       style={{ paddingLeft: `${depth * 20 + 8}px` }}
     >
-      {isFolder
-        ? <Folder className="h-4 w-4 shrink-0 text-amber-500" />
-        : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-      }
+      {isFolder ? (
+        <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+      ) : (
+        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+      )}
       <span className="truncate flex-1 min-w-0">{item.name}</span>
       {isActive && (
-        <Badge variant="secondary" className="text-[10px] h-5">当前</Badge>
+        <Badge variant="secondary" className="text-[10px] h-5">
+          当前
+        </Badge>
       )}
     </div>
   );
@@ -275,7 +288,11 @@ function FolderContextMenu({
         <DropdownMenuItem
           className="text-destructive"
           onClick={() => {
-            if (confirm(`确定要删除文件夹「${folderName}」及其所有内容吗？此操作不可撤销。`)) {
+            if (
+              confirm(
+                `确定要删除文件夹「${folderName}」及其所有内容吗？此操作不可撤销。`,
+              )
+            ) {
               onDelete(true);
             }
           }}
@@ -293,7 +310,6 @@ function PageContextMenu({
   pageName,
   pageParentId,
   folders,
-  onViewCode,
   onRename,
   onCopy,
   onDelete,
@@ -303,13 +319,12 @@ function PageContextMenu({
   pageName: string;
   pageParentId: string | null;
   folders: DemoFolderMeta[];
-  onViewCode: () => void;
   onRename: () => void;
   onCopy: () => void;
   onDelete: () => void;
   onMoveTo: (pageId: string, targetParentId: string | null) => void;
 }) {
-  const moveTargets = folders.filter(f => f.id !== pageParentId);
+  const moveTargets = folders.filter((f) => f.id !== pageParentId);
 
   return (
     <DropdownMenu>
@@ -323,10 +338,6 @@ function PageContextMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onViewCode}>
-          <Eye className="mr-2 h-4 w-4" />
-          查看代码
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={onRename}>
           <Pencil className="mr-2 h-4 w-4" />
           重命名
@@ -343,8 +354,11 @@ function PageContextMenu({
                   📄 根级
                 </DropdownMenuItem>
               )}
-              {moveTargets.map(f => (
-                <DropdownMenuItem key={f.id} onClick={() => onMoveTo(pageId, f.id)}>
+              {moveTargets.map((f) => (
+                <DropdownMenuItem
+                  key={f.id}
+                  onClick={() => onMoveTo(pageId, f.id)}
+                >
                   📁 {f.name}
                 </DropdownMenuItem>
               ))}

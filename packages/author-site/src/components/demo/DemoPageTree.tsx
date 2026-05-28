@@ -20,7 +20,11 @@ import {
 } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { useToast } from "@/components/ui/toast-provider";
 import { DemoPageTreeItem, StaticTreeItem } from "./DemoPageTreeItem";
 import { NewFolderDialog } from "./NewFolderDialog";
@@ -46,7 +50,6 @@ interface DemoPageTreeProps {
   onPageRename: (pageId: string, name: string) => void;
   onPageCopy: (pageId: string) => void;
   onPageDelete: (pageId: string) => void;
-  onViewCode: (pageId: string) => void;
 }
 
 export function DemoPageTree({
@@ -61,11 +64,14 @@ export function DemoPageTree({
   onPageRename,
   onPageCopy,
   onPageDelete,
-  onViewCode,
 }: DemoPageTreeProps) {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(),
+  );
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
-  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(
+    null,
+  );
   const [importFigmaDialogOpen, setImportFigmaDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -76,17 +82,17 @@ export function DemoPageTree({
     [pages, folders, expandedFolders],
   );
 
-  const activeItem = activeId
-    ? findItemById(activeId, pages, folders)
-    : null;
+  const activeItem = activeId ? findItemById(activeId, pages, folders) : null;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const toggleFolder = useCallback((folderId: string) => {
-    setExpandedFolders(prev => {
+    setExpandedFolders((prev) => {
       const next = new Set(prev);
       next.has(folderId) ? next.delete(folderId) : next.add(folderId);
       return next;
@@ -119,23 +125,49 @@ export function DemoPageTree({
       const overParent = overItem.parentId ?? null;
 
       if (activeParent === overParent) {
-        const pageUpdates: Array<{ id: string; order: number; parentId: string | null }> = [];
-        const folderUpdates: Array<{ id: string; order: number; parentId: string | null }> = [];
+        const pageUpdates: Array<{
+          id: string;
+          order: number;
+          parentId: string | null;
+        }> = [];
+        const folderUpdates: Array<{
+          id: string;
+          order: number;
+          parentId: string | null;
+        }> = [];
 
         if (activeIsFolder) {
-          const updated = reorderSiblings(folders, activeParent, activeItem.id, overItem.id);
+          const updated = reorderSiblings(
+            folders,
+            activeParent,
+            activeItem.id,
+            overItem.id,
+          );
           onFoldersChange(updated);
           for (const f of updated) {
             if ((f.parentId ?? null) === activeParent) {
-              folderUpdates.push({ id: f.id, order: f.order, parentId: f.parentId ?? null });
+              folderUpdates.push({
+                id: f.id,
+                order: f.order,
+                parentId: f.parentId ?? null,
+              });
             }
           }
         } else {
-          const updated = reorderSiblings(pages, activeParent, activeItem.id, overItem.id);
+          const updated = reorderSiblings(
+            pages,
+            activeParent,
+            activeItem.id,
+            overItem.id,
+          );
           onPagesChange(updated);
           for (const p of updated) {
             if ((p.parentId ?? null) === activeParent) {
-              pageUpdates.push({ id: p.id, order: p.order, parentId: p.parentId ?? null });
+              pageUpdates.push({
+                id: p.id,
+                order: p.order,
+                parentId: p.parentId ?? null,
+              });
             }
           }
         }
@@ -152,7 +184,15 @@ export function DemoPageTree({
         }
       }
     },
-    [sessionId, pages, folders, projectId, onPagesChange, onFoldersChange, toast],
+    [
+      sessionId,
+      pages,
+      folders,
+      projectId,
+      onPagesChange,
+      onFoldersChange,
+      toast,
+    ],
   );
 
   const handleDragCancel = useCallback(() => {
@@ -163,10 +203,15 @@ export function DemoPageTree({
     async (name: string, parentId: string | null) => {
       if (!sessionId) return;
       try {
-        const folder = await projectApiClient.createFolder(projectId, name, sessionId, parentId);
+        const folder = await projectApiClient.createFolder(
+          projectId,
+          name,
+          sessionId,
+          parentId,
+        );
         onFoldersChange([...folders, folder].sort((a, b) => a.order - b.order));
         if (parentId) {
-          setExpandedFolders(prev => new Set([...prev, parentId]));
+          setExpandedFolders((prev) => new Set([...prev, parentId]));
         }
         toast({ title: "文件夹创建成功" });
       } catch (err) {
@@ -184,8 +229,13 @@ export function DemoPageTree({
     async (folderId: string, name: string) => {
       if (!sessionId) return;
       try {
-        const updated = await projectApiClient.patchFolder(projectId, folderId, sessionId, { name });
-        onFoldersChange(folders.map(f => (f.id === folderId ? updated : f)));
+        const updated = await projectApiClient.patchFolder(
+          projectId,
+          folderId,
+          sessionId,
+          { name },
+        );
+        onFoldersChange(folders.map((f) => (f.id === folderId ? updated : f)));
         toast({ title: "文件夹已重命名" });
       } catch {
         toast({ title: "重命名失败", variant: "destructive" });
@@ -204,30 +254,50 @@ export function DemoPageTree({
           sessionId,
           deleteContents,
         );
-        onFoldersChange(folders.filter(f => f.id !== folderId));
+        onFoldersChange(folders.filter((f) => f.id !== folderId));
         if (deleteContents && deletedPageIds.length > 0) {
-          onPagesChange(pages.filter(p => !deletedPageIds.includes(p.id)));
+          onPagesChange(pages.filter((p) => !deletedPageIds.includes(p.id)));
           if (activeDemoId && deletedPageIds.includes(activeDemoId)) {
-            const remaining = pages.filter(p => !deletedPageIds.includes(p.id));
+            const remaining = pages.filter(
+              (p) => !deletedPageIds.includes(p.id),
+            );
             if (remaining.length > 0) {
               onPageSelect(remaining[0].id);
             }
           }
         } else {
           onPagesChange(
-            pages.map(p =>
+            pages.map((p) =>
               p.parentId === folderId
-                ? { ...p, parentId: folders.find(f => f.id === folderId)?.parentId ?? null }
+                ? {
+                    ...p,
+                    parentId:
+                      folders.find((f) => f.id === folderId)?.parentId ?? null,
+                  }
                 : p,
             ),
           );
         }
-        toast({ title: deleteContents ? "文件夹及内容已删除" : "文件夹已删除，页面已移至上级" });
+        toast({
+          title: deleteContents
+            ? "文件夹及内容已删除"
+            : "文件夹已删除，页面已移至上级",
+        });
       } catch {
         toast({ title: "删除文件夹失败", variant: "destructive" });
       }
     },
-    [sessionId, projectId, folders, pages, activeDemoId, onFoldersChange, onPagesChange, onPageSelect, toast],
+    [
+      sessionId,
+      projectId,
+      folders,
+      pages,
+      activeDemoId,
+      onFoldersChange,
+      onPagesChange,
+      onPageSelect,
+      toast,
+    ],
   );
 
   const handleAddPage = useCallback(async () => {
@@ -248,24 +318,37 @@ export function DemoPageTree({
     }
   }, [sessionId, projectId, pages, onPagesChange, toast]);
 
-  const handleImportFigmaCreated = useCallback((page: DemoPageMeta) => {
-    onPagesChange([...pages, page].sort((a, b) => a.order - b.order));
-    onPageSelect(page.id);
-  }, [pages, onPagesChange, onPageSelect]);
+  const handleImportFigmaCreated = useCallback(
+    (page: DemoPageMeta) => {
+      onPagesChange([...pages, page].sort((a, b) => a.order - b.order));
+      onPageSelect(page.id);
+    },
+    [pages, onPagesChange, onPageSelect],
+  );
 
   const handleMovePageToFolder = useCallback(
     async (pageId: string, targetParentId: string | null) => {
       if (!sessionId) return;
       try {
-        const sameParent = pages.filter(p => (p.parentId ?? null) === targetParentId);
-        const nextOrder = sameParent.length > 0 ? Math.max(...sameParent.map(p => p.order)) + 1 : 0;
-        const updated = await projectApiClient.patchDemoPageMeta(projectId, pageId, sessionId, {
-          parentId: targetParentId,
-          order: nextOrder,
-        });
-        onPagesChange(pages.map(p => (p.id === pageId ? updated : p)));
+        const sameParent = pages.filter(
+          (p) => (p.parentId ?? null) === targetParentId,
+        );
+        const nextOrder =
+          sameParent.length > 0
+            ? Math.max(...sameParent.map((p) => p.order)) + 1
+            : 0;
+        const updated = await projectApiClient.patchDemoPageMeta(
+          projectId,
+          pageId,
+          sessionId,
+          {
+            parentId: targetParentId,
+            order: nextOrder,
+          },
+        );
+        onPagesChange(pages.map((p) => (p.id === pageId ? updated : p)));
         if (targetParentId) {
-          setExpandedFolders(prev => new Set([...prev, targetParentId]));
+          setExpandedFolders((prev) => new Set([...prev, targetParentId]));
         }
       } catch {
         toast({ title: "移动页面失败", variant: "destructive" });
@@ -281,11 +364,7 @@ export function DemoPageTree({
         <div className="flex items-center gap-1">
           <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-              >
+              <Button variant="outline" size="sm" className="h-7 text-xs">
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 添加
               </Button>
@@ -319,8 +398,7 @@ export function DemoPageTree({
                   setImportFigmaDialogOpen(true);
                 }}
               >
-                <Upload className="h-4 w-4" />
-                从 Figma 导入
+                <Upload className="h-4 w-4" />从 Figma 导入
               </button>
             </PopoverContent>
           </Popover>
@@ -342,11 +420,11 @@ export function DemoPageTree({
               onDragCancel={handleDragCancel}
             >
               <SortableContext
-                items={flatItems.map(f => f.item.id)}
+                items={flatItems.map((f) => f.item.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-0.5">
-                  {flatItems.map(flat => (
+                  {flatItems.map((flat) => (
                     <DemoPageTreeItem
                       key={flat.item.id}
                       flatItem={flat}
@@ -361,7 +439,6 @@ export function DemoPageTree({
                       onPageRename={onPageRename}
                       onPageCopy={onPageCopy}
                       onPageDelete={onPageDelete}
-                      onViewCode={onViewCode}
                       onRenameFolder={handleRenameFolder}
                       onDeleteFolder={handleDeleteFolder}
                       onCreateSubFolder={(parentId) => {
@@ -378,7 +455,8 @@ export function DemoPageTree({
                   <StaticTreeItem
                     item={activeItem}
                     depth={
-                      flatItems.find(f => f.item.id === activeItem.id)?.depth ?? 0
+                      flatItems.find((f) => f.item.id === activeItem.id)
+                        ?.depth ?? 0
                     }
                     activeDemoId={activeDemoId}
                   />

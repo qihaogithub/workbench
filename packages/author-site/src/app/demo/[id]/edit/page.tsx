@@ -35,6 +35,7 @@ import { ResizablePanelGroup, ResizablePanel } from "@/components/ui/resizable";
 import {
   Bot,
   Layers,
+  FileCode2,
   Loader2,
   ImageIcon,
   Pencil,
@@ -61,10 +62,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CodeViewDialog } from "@/components/demo/code-view-dialog";
 import { ErrorBanner } from "@/components/demo/ErrorBanner";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
+import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
+import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
 
 interface DemoEditPageProps {
@@ -130,13 +132,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState("");
 
-  const [viewCodeDialogOpen, setViewCodeDialogOpen] = useState(false);
-  const [viewCodeData, setViewCodeData] = useState<{
-    code: string;
-    schema: string;
-    pageName: string;
-    pageId: string;
-  }>({ code: "", schema: "", pageName: "", pageId: "" });
+  // 工作空间代码 Tab 弹窗状态
+  const [wsCodeDialogOpen, setWsCodeDialogOpen] = useState(false);
+  const [wsCodeDialogData, setWsCodeDialogData] = useState<{
+    filePath: string;
+    content: string;
+    editable: boolean;
+  }>({ filePath: "", content: "", editable: false });
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -773,6 +775,10 @@ ${context.details}
                     </Badge>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="code" className="gap-2">
+                  <FileCode2 className="h-4 w-4" />
+                  代码
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent
@@ -941,6 +947,42 @@ ${context.details}
                       />
                     ) : null
                   }
+                />
+              </TabsContent>
+
+              <TabsContent
+                value="code"
+                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
+              >
+                <WorkspaceFileTree
+                  sessionId={sessionId}
+                  onFileSelect={async (filePath, editable) => {
+                    try {
+                      const res = await fetch(
+                        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+                      );
+                      const data = await res.json();
+                      if (data.success) {
+                        setWsCodeDialogData({
+                          filePath: data.data.path,
+                          content: data.data.content,
+                          editable: data.data.editable,
+                        });
+                        setWsCodeDialogOpen(true);
+                      } else {
+                        toast({
+                          title: "加载文件失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
+                      }
+                    } catch {
+                      toast({
+                        title: "加载文件失败",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
                 />
               </TabsContent>
 
@@ -1130,43 +1172,6 @@ ${context.details}
                       }
                     } catch {
                       toast({ title: "删除失败", variant: "destructive" });
-                    }
-                  }}
-                  onViewCode={async (pageId) => {
-                    if (!sessionId) return;
-                    const page = demoPages.find((p) => p.id === pageId);
-                    if (!page) return;
-                    try {
-                      const res = await fetch(
-                        `/api/sessions/${sessionId}/files/${pageId}`,
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        setActiveDemoId(pageId);
-                        setCode(data.data.code);
-                        setSchema(data.data.schema);
-                        setEditorContent(
-                          buildFigmaText(data.data.code, data.data.schema),
-                        );
-                        setConfigDataMap((prev) => {
-                          if (prev[pageId]) return prev;
-                          const defaults = getSafeMergedDefaults(
-                            data.data.schema,
-                          );
-                          return { ...prev, [pageId]: defaults };
-                        });
-                        const size = getPreviewSize(data.data.schema);
-                        setPreviewSize(size);
-                        setViewCodeData({
-                          code: data.data.code,
-                          schema: data.data.schema,
-                          pageName: page.name,
-                          pageId: page.id,
-                        });
-                        setViewCodeDialogOpen(true);
-                      }
-                    } catch {
-                      toast({ title: "加载代码失败", variant: "destructive" });
                     }
                   }}
                 />
@@ -1432,46 +1437,25 @@ ${context.details}
         }
       />
 
-      <CodeViewDialog
-        open={viewCodeDialogOpen}
-        onOpenChange={setViewCodeDialogOpen}
-        code={viewCodeData.code}
-        schema={viewCodeData.schema}
-        pageName={viewCodeData.pageName}
-        sessionId={sessionId}
-        demoId={viewCodeData.pageId}
-        onSave={async (type, content) => {
+      <WorkspaceCodeDialog
+        open={wsCodeDialogOpen}
+        onOpenChange={setWsCodeDialogOpen}
+        filePath={wsCodeDialogData.filePath}
+        content={wsCodeDialogData.content}
+        editable={wsCodeDialogData.editable}
+        onSave={async (content) => {
           if (!sessionId) return;
-          const body =
-            type === "code" ? { code: content } : { schema: content };
           const res = await fetch(
-            `/api/sessions/${sessionId}/files/${viewCodeData.pageId}`,
+            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(wsCodeDialogData.filePath)}`,
             {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
+              body: JSON.stringify({ content }),
             },
           );
           const data = await res.json();
           if (!data.success) {
             throw new Error(data.error?.message || "保存失败");
-          }
-          if (type === "code") {
-            setCode(content);
-            setEditorContent(buildFigmaText(content, schema));
-          } else {
-            setSchema(content);
-            setEditorContent(buildFigmaText(code, content));
-            const defaults = getSafeMergedDefaults(content);
-            setConfigDataMap((prev) => ({
-              ...prev,
-              [activeDemoIdRef.current]: {
-                ...(prev[activeDemoIdRef.current] ?? {}),
-                ...defaults,
-              },
-            }));
-            const size = getPreviewSize(content);
-            setPreviewSize(size);
           }
         }}
       />

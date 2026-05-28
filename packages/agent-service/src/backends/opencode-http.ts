@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { IBackendAdapter, BackendStatus } from "./base";
 import { AgentConfig, AgentEvent } from "../core/types";
 import { logger } from "../utils/logger";
@@ -259,7 +261,17 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
         reject(new Error("SSE stream timeout"));
       }, this.config.timeout || 120000);
 
-      this.streamDone = { resolve, reject, timeout };
+      this.streamDone = { 
+        resolve: async (value: string) => {
+          // If no files were collected from session.diff, read workspace files directly
+          if (this.files.length === 0 && this.config.workingDir && this.config.demoId) {
+            await this.readWorkspaceFiles();
+          }
+          resolve(value);
+        }, 
+        reject, 
+        timeout 
+      };
     });
   }
 
@@ -546,6 +558,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
   /**
    * Resolve the stream promise and clean up SSE connection.
    * Called when both idle and diff (or drain timeout) are complete.
+   * File reading is handled in sendMessageStream's resolve callback.
    */
   private resolveStream(): void {
     if (!this.streamDone) return;
@@ -560,6 +573,51 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     clearTimeout(this.streamDone.timeout);
     this.streamDone.resolve(this.fullContent);
     this.streamDone = null;
+  }
+
+  /**
+   * Read workspace files directly when session.diff is missing or empty.
+   * This ensures we always have the latest file state after AI modifications.
+   */
+  private async readWorkspaceFiles(): Promise<void> {
+    if (!this.config.workingDir || !this.config.demoId) {
+      return;
+    }
+
+    const demoDir = path.join(this.config.workingDir, "demos", this.config.demoId);
+    const filesToRead = ["index.tsx", "config.schema.json"];
+
+    for (const fileName of filesToRead) {
+      const filePath = path.join(demoDir, fileName);
+      try {
+        const content = await fs.promises.readFile(filePath, "utf-8");
+        
+        // Check if file already exists in this.files
+        const existingIndex = this.files.findIndex(f => f.path === filePath);
+        if (existingIndex >= 0) {
+          // Update existing file content
+          this.files[existingIndex].content = content;
+        } else {
+          // Add new file
+          this.files.push({
+            path: filePath,
+            action: "modified",
+            content,
+          });
+        }
+        
+        logger.debug(
+          { filePath, sessionId: this.sessionId },
+          "Read workspace file directly",
+        );
+      } catch (error) {
+        // File might not exist, which is okay
+        logger.debug(
+          { filePath, error, sessionId: this.sessionId },
+          "Could not read workspace file (may not exist)",
+        );
+      }
+    }
   }
 
   private closeSSE(): void {
