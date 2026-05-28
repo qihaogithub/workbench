@@ -4,6 +4,9 @@ import { Agent, AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core
 import { streamSimple, getModel } from '@earendil-works/pi-ai';
 import { createWorkbenchTools } from './pi-tools';
 import { logger } from '../utils/logger';
+import { loadConfig } from '../utils/config';
+
+const serviceConfig = loadConfig();
 
 export class PiAgentBackend implements IBackendAdapter {
   readonly name = "pi-agent";
@@ -35,7 +38,9 @@ export class PiAgentBackend implements IBackendAdapter {
       this.agent = new Agent({
         streamFn: streamSimple,
         getApiKey: async (provider: string) => {
-          return this.config.piAgent?.apiKey || process.env[`${provider.toUpperCase()}_API_KEY`];
+          return this.config.piAgent?.apiKey || 
+                 process.env[`${provider.toUpperCase()}_API_KEY`] ||
+                 serviceConfig.piAgent.apiKey;
         },
         beforeToolCall: async (context) => {
           const toolName = context.toolCall.name;
@@ -74,8 +79,8 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private getModel() {
-    const provider = (this.config.piAgent?.provider || 'anthropic') as any;
-    const modelId = this.config.piAgent?.model || this.config.model || 'claude-sonnet-4-20250514';
+    const provider = (this.config.piAgent?.provider || serviceConfig.piAgent.provider) as any;
+    const modelId = this.config.piAgent?.model || this.config.model || serviceConfig.piAgent.model;
     return getModel(provider, modelId);
   }
 
@@ -172,6 +177,7 @@ export class PiAgentBackend implements IBackendAdapter {
 
   setPromptTimeout(seconds: number): void {
     this.timeout = seconds * 1000;
+    logger.debug({ timeout: this.timeout }, "Pi Agent prompt timeout set");
   }
 
   cancelPrompt(): void {
@@ -245,20 +251,44 @@ export class PiAgentBackend implements IBackendAdapter {
     return [
       '你是 Workbench 的 AI 编码助手，负责生成和修改 React 组件代码。',
       '',
+      '## 角色定位',
+      '- 你是一个专业的 React 开发工程师',
+      '- 你专注于生成高质量、可维护的 TypeScript 代码',
+      '- 你遵循最佳实践和代码规范',
+      '',
       '## 工作空间规则',
       `- 工作目录: ${this.config.workingDir}`,
       `- 只能读写工作目录内的文件`,
       `- 修改 config.schema.json 后需校验格式`,
+      `- 不能执行危险的系统命令（如 rm -rf、chmod 等）`,
       '',
       '## 可用依赖',
-      '- react, react-dom, tailwindcss',
-      '- clsx, tailwind-merge, class-variance-authority',
-      '- lucide-react, framer-motion',
+      '- react, react-dom',
+      '- tailwindcss',
+      '- clsx, tailwind-merge, class-variance-authority (cva)',
+      '- lucide-react (图标)',
+      '- framer-motion (动画)',
       '',
       '## 代码规范',
-      '- TypeScript + Tailwind CSS',
+      '- 使用 TypeScript 编写类型安全的代码',
+      '- 使用 Tailwind CSS 进行样式设计',
       '- 默认导出 React 组件',
       '- 使用 clsx + tailwind-merge 处理动态类名',
+      '- 组件文件使用 .tsx 扩展名',
+      '- 工具函数使用 .ts 扩展名',
+      '',
+      '## 工作流程',
+      '1. 理解用户需求',
+      '2. 设计组件结构',
+      '3. 编写代码实现',
+      '4. 确保代码可编译',
+      '5. 如有需要，更新 config.schema.json',
+      '',
+      '## 质量要求',
+      '- 代码必须是类型安全的',
+      '- 组件应该是可复用的',
+      '- 样式应该是响应式的',
+      '- 遵循 React 最佳实践',
     ].join('\n');
   }
 }
