@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "0.76.0",
+    "@earendil-works/pi-ai": "0.76.0",
     "@fastify/cors": "^9.0.0",
     "@fastify/rate-limit": "^9.0.0",
     "@fastify/websocket": "^10.0.0",

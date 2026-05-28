@@ -14,3 +14,4 @@ export { CopilotBackend } from './copilot';
 export { QoderBackend } from './qoder';
 export { VibeBackend } from './vibe';
 export { CustomBackend } from './custom';
+export { PiAgentBackend } from './pi-agent';

@@ -27,6 +27,7 @@ import {
 } from './backends';
 import { OpenCodeAcpBackend } from './backends/opencode-acp';
 import { OpenCodeHttpBackend } from './backends/opencode-http';
+import { PiAgentBackend } from './backends/pi-agent';
 import { BackendAgent } from './core/backend-agent';
 import { registerRoutes } from './routes';
 import { destroySessionStore } from './session/session-store';
@@ -78,6 +79,7 @@ async function start() {
   factory.register('qoder', (agentConfig) => new BackendAgent(agentConfig, new QoderBackend(agentConfig)));
   factory.register('vibe', (agentConfig) => new BackendAgent(agentConfig, new VibeBackend(agentConfig)));
   factory.register('custom', (agentConfig) => new BackendAgent(agentConfig, new CustomBackend(agentConfig)));
+  factory.register('pi-agent', (agentConfig) => new BackendAgent(agentConfig, new PiAgentBackend(agentConfig)));
 
   await registerRoutes(fastify);
 

@@ -2,7 +2,7 @@
 // 基础类型
 // ============================================================
 
-export type AgentType = "opencode" | "opencode-http" | "claude" | "codex" | "gemini" | string;
+export type AgentType = "opencode" | "opencode-http" | "claude" | "codex" | "gemini" | "pi-agent" | string;
 
 export type AgentStatus =
   | "initializing"
@@ -38,6 +38,7 @@ export interface AgentConfig {
   claude?: ClaudeConfig;
   codex?: CodexConfig;
   gemini?: GeminiConfig;
+  piAgent?: PiAgentConfig;
 }
 
 export interface OpenCodeConfig {
@@ -60,6 +61,13 @@ export interface CodexConfig {
 export interface GeminiConfig {
   apiKey?: string;
   model?: string;
+  timeout?: number;
+}
+
+export interface PiAgentConfig {
+  apiKey?: string;
+  model?: string;
+  provider?: string;  // "anthropic" | "openai" | "google"
   timeout?: number;
 }
 
