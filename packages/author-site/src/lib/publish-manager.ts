@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { execFile } from 'child_process';
 import { compileCode } from '@/lib/compiler';
 import {
   readProjectMeta,
@@ -57,6 +58,12 @@ export interface PublishResult {
   publishedAt: number;
   demoCount: number;
   duration: number;
+  cloudflareSync?: CloudflareSyncResult;
+}
+
+export interface CloudflareSyncResult {
+  success: boolean;
+  message: string;
 }
 
 export function getPublishedDir(): string {
@@ -170,12 +177,18 @@ export async function publishProject(projectId: string): Promise<PublishResult> 
 
   regenerateProjectsIndex();
 
+  let cloudflareSync: CloudflareSyncResult | undefined;
+  if (process.env.CLOUDFLARE_SYNC_ENABLED === 'true') {
+    cloudflareSync = await syncToCloudflare();
+  }
+
   return {
     projectId,
     publishedVersion: currentVersion,
     publishedAt: project.publishedAt,
     demoCount: publishedDemoPages.length,
     duration: Date.now() - startTime,
+    cloudflareSync,
   };
 }
 
@@ -248,4 +261,44 @@ export function getPublishStatus(projectId: string): {
     hasUnpublishedChanges: status === 'unpublished_changes',
     status,
   };
+}
+
+export async function syncToCloudflare(): Promise<CloudflareSyncResult> {
+  const scriptPath = path.resolve(
+    process.cwd(),
+    'scripts',
+    'sync-to-cloudflare.sh',
+  );
+
+  if (!fs.existsSync(scriptPath)) {
+    return { success: false, message: '同步脚本不存在' };
+  }
+
+  return new Promise((resolve) => {
+    execFile(
+      'bash',
+      [scriptPath],
+      {
+        timeout: 120_000,
+        env: {
+          ...process.env,
+          CLOUDFLARE_PROJECT_NAME:
+            process.env.CLOUDFLARE_PROJECT_NAME || 'opencode-viewer',
+        },
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          resolve({
+            success: false,
+            message: `Cloudflare 同步失败: ${error.message}`,
+          });
+          return;
+        }
+        resolve({
+          success: true,
+          message: 'Cloudflare Pages 同步完成',
+        });
+      },
+    );
+  });
 }

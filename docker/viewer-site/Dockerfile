@@ -15,18 +15,11 @@ COPY packages/viewer-site/ ./packages/viewer-site/
 
 RUN pnpm --filter @opencode-workbench/viewer-site build
 
-FROM node:20-bookworm-slim
+FROM nginx:alpine
 
-WORKDIR /app
+COPY --from=builder /app/packages/viewer-site/out /usr/share/nginx/html
+COPY docker/viewer-site/nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV NODE_ENV=production
+EXPOSE 80
 
-COPY --from=builder /app/packages/viewer-site/.next/standalone ./
-COPY --from=builder /app/packages/viewer-site/.next/static ./packages/viewer-site/.next/static
-
-EXPOSE 3300
-
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3300').then(r=>process.exit(0)).catch(()=>process.exit(1))"
-
-CMD ["node", "packages/viewer-site/server.js"]
+CMD ["nginx", "-g", "daemon off;"]

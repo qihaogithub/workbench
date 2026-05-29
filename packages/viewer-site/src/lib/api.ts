@@ -1,53 +1,84 @@
-import type {
-  ProjectListResponse,
-  ProjectDetailResponse,
-  VersionHistoryResponse,
-  ApiResponse,
-} from "@opencode-workbench/shared";
+import type { DemoFolderMeta } from "@opencode-workbench/shared";
 
-const AGENT_SERVICE_URL =
-  process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
-const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3200";
+export interface PreviewSize {
+  width?: string | number;
+  height?: string | number;
+  minHeight?: string | number;
+  maxHeight?: string | number;
+  scale?: number;
+}
 
-async function fetchApi<T>(baseUrl: string, path: string): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`);
+export interface PublishedDemoPage {
+  id: string;
+  name: string;
+  order: number;
+  parentId: string | null;
+  compiledJsPath: string;
+  schemaPath?: string;
+  previewSize?: PreviewSize;
+}
+
+export interface PublishedProject {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail?: string;
+  publishedVersion: string;
+  publishedAt: number;
+  demoPages: PublishedDemoPage[];
+  demoFolders: DemoFolderMeta[];
+  projectConfigSchema?: string;
+}
+
+export interface ProjectsIndex {
+  projects: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    thumbnail?: string;
+    publishedAt: number;
+    publishedVersion: string;
+    demoCount: number;
+  }>;
+  generatedAt: number;
+}
+
+const DATA_BASE = process.env.NEXT_PUBLIC_DATA_BASE || "";
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${DATA_BASE}${path}`);
   if (!res.ok) {
-    throw new Error(`API 请求失败: ${res.status} ${res.statusText}`);
+    throw new Error(`数据加载失败: ${res.status} ${res.statusText}`);
   }
-  const json: ApiResponse<T> = await res.json();
-  if (!json.success) {
-    throw new Error(json.error?.message || "未知错误");
-  }
-  return json.data as T;
+  return res.json();
 }
 
-export async function getProjects(): Promise<ProjectListResponse> {
-  return fetchApi<ProjectListResponse>(AGENT_SERVICE_URL, "/api/projects");
+export async function getProjects(): Promise<ProjectsIndex> {
+  return fetchJson<ProjectsIndex>("/data/projects.json");
 }
 
-export async function getProject(
+export async function getProjectData(
   projectId: string,
-): Promise<ProjectDetailResponse> {
-  return fetchApi<ProjectDetailResponse>(
-    AGENT_SERVICE_URL,
-    `/api/projects/${projectId}`,
+): Promise<PublishedProject> {
+  return fetchJson<PublishedProject>(`/data/${projectId}/project.json`);
+}
+
+export async function getDemoSchema(
+  projectId: string,
+  schemaPath: string,
+): Promise<Record<string, unknown>> {
+  return fetchJson<Record<string, unknown>>(
+    `/data/${projectId}/${schemaPath}`,
   );
 }
 
-export async function getProjectVersions(
+export function getThumbnailUrl(projectId: string): string {
+  return `${DATA_BASE}/data/${projectId}/thumbnail.png`;
+}
+
+export function getCompiledJsUrl(
   projectId: string,
-): Promise<VersionHistoryResponse> {
-  return fetchApi<VersionHistoryResponse>(
-    AGENT_SERVICE_URL,
-    `/api/projects/${projectId}/versions`,
-  );
-}
-
-export function getWebUrl(): string {
-  return WEB_URL;
-}
-
-export function getThumbnailUrl(thumbnail?: string): string | undefined {
-  if (!thumbnail) return undefined;
-  return `${WEB_URL}${thumbnail}`;
+  compiledJsPath: string,
+): string {
+  return `${DATA_BASE}/data/${projectId}/${compiledJsPath}`;
 }

@@ -70,14 +70,9 @@ services:
       context: .
       dockerfile: docker/viewer-site/Dockerfile
     ports:
-      - "3300:3300"
-    environment:
-      - PORT=3300
-      - HOSTNAME=0.0.0.0
-      - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
-      - NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}
-    depends_on:
-      - agent-service
+      - "3300:80"
+    volumes:
+      - app-data:/app/data:ro
     profiles:
       - viewer
     restart: unless-stopped
