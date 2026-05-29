@@ -309,7 +309,7 @@ export function applyModelConfigs(
 /**
  * 异步版本: 通过 API 从数据库读取完整配置并应用
  *
- * 包含白名单前缀、黑名单、名称过滤器等全部配置
+ * 包含白名单前缀、黑名单、名称过滤器、启用列表等全部配置
  * 通过 HTTP API 读取,避免客户端直接依赖 Node.js 模块
  * Fallback 到环境变量配置
  *
@@ -319,6 +319,8 @@ export async function applyModelConfigsAsync(
   raw: Array<{ id: string; label: string }>,
 ): Promise<ResolvedModel[]> {
   let configData: {
+    enabledModels?: string[];
+    autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
     allowedPrefixes: string[];
     blacklist: string[];
     nameFilters: string[];
@@ -330,6 +332,8 @@ export async function applyModelConfigsAsync(
     if (res.ok) {
       const { data } = await res.json();
       configData = {
+        enabledModels: data.frontend?.enabledModels,
+        autoEnableRules: data.frontend?.autoEnableRules,
         allowedPrefixes: data.frontend?.allowedPrefixes ?? [],
         blacklist: data.frontend?.blacklist ?? [],
         nameFilters: data.frontend?.nameFilters ?? [],
@@ -354,6 +358,8 @@ export async function applyModelConfigsAsync(
     blacklist,
     nameFilters,
     multimodalSet,
+    enabledModels: configData.enabledModels,
+    autoEnableRules: configData.autoEnableRules,
   });
 }
 
@@ -361,19 +367,30 @@ export async function applyModelConfigsAsync(
  * 环境变量 fallback 配置 (当 API 不可用时使用)
  */
 function getEnvFallbackConfig() {
+  const allowedPrefixes = (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const nameFilters = (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const defaultModelIds = (process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   return {
-    allowedPrefixes: (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    enabledModels: defaultModelIds,
+    autoEnableRules: [
+      ...allowedPrefixes.map((v) => ({ type: "prefix" as const, value: v })),
+      ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
+    ],
+    allowedPrefixes,
     blacklist: (process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    nameFilters: (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    nameFilters,
     multimodalModels: [] as string[],
   };
 }
@@ -396,8 +413,15 @@ function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
 /**
  * 使用完整配置数据应用模型过滤
  *
+ * 支持两种模式:
+ * 1. 启用列表模式 (enabledModels 存在时):
+ *    - 仅放行 enabledModels 中的模型,按列表顺序返回
+ *    - 未在列表中的模型若匹配 autoEnableRules,则自动放行(追加在末尾)
+ * 2. 前缀模式 (向后兼容):
+ *    - 使用 configs 白名单 + blacklist + nameFilters 过滤
+ *
  * @param raw 原始模型列表
- * @param data 完整的配置数据(含 configs、blacklist、nameFilters、multimodalSet)
+ * @param data 完整的配置数据
  */
 export function applyModelConfigsWithFullData(
   raw: Array<{ id: string; label: string }>,
@@ -406,9 +430,22 @@ export function applyModelConfigsWithFullData(
     blacklist: Set<string>;
     nameFilters: Array<{ group: string; keyword: string }>;
     multimodalSet?: Set<string>;
+    enabledModels?: string[];
+    autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
   },
 ): ResolvedModel[] {
-  const { configs, blacklist, nameFilters, multimodalSet } = data;
+  const {
+    configs,
+    blacklist,
+    nameFilters,
+    multimodalSet,
+    enabledModels,
+    autoEnableRules,
+  } = data;
+
+  const useEnabledList =
+    Array.isArray(enabledModels) && enabledModels.length > 0;
+  const enabledSet = useEnabledList ? new Set(enabledModels) : null;
 
   const parsed: Array<{
     rawId: string;
@@ -422,10 +459,36 @@ export function applyModelConfigsWithFullData(
   }> = [];
 
   for (const m of raw) {
-    // 使用传入的 configs 而非静态 MODEL_CONFIGS
+    // 启用列表模式下: 先放行启用列表中的 + 匹配自动启用规则的
+    if (useEnabledList) {
+      const inEnabledList = enabledSet!.has(m.id);
+      const matchedAuto =
+        !inEnabledList &&
+        autoEnableRules &&
+        autoEnableRules.some((rule) => {
+          if (rule.type === "prefix") return m.id.startsWith(rule.value);
+          // nameFilter 格式 "分组:关键词"
+          const idx = rule.value.indexOf(":");
+          if (idx < 0) return false;
+          const g = rule.value.slice(0, idx).trim();
+          const k = rule.value
+            .slice(idx + 1)
+            .trim()
+            .toLowerCase();
+          if (!k) return false;
+          if (extractGroup(m.id) !== g) return false;
+          return m.id.toLowerCase().includes(k);
+        });
+      if (!inEnabledList && !matchedAuto) continue;
+    } else {
+      // 前缀模式 (向后兼容)
+      const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
+      const enabled = config?.enabled ?? UNCONFIGURED_DEFAULT.enabled;
+      if (!enabled) continue;
+    }
+
+    // 获取 config 用于解析多模态/思考深度 (即使在启用列表模式下也需要)
     const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
-    const enabled = config?.enabled ?? UNCONFIGURED_DEFAULT.enabled;
-    if (!enabled) continue;
 
     const group = extractGroup(m.id);
     let baseId = m.id;
@@ -461,7 +524,8 @@ export function applyModelConfigsWithFullData(
     baseMap.get(key)!.push(p);
   }
 
-  const result: ResolvedModel[] = [];
+  // 保留原始顺序的 result (用于后续按 enabledModels 重排)
+  const unorderedResult: ResolvedModel[] = [];
 
   for (const [, entries] of baseMap) {
     const first = entries[0];
@@ -482,7 +546,7 @@ export function applyModelConfigsWithFullData(
         (a, b) => THINKING_DEPTHS.indexOf(a) - THINKING_DEPTHS.indexOf(b),
       );
 
-      result.push({
+      unorderedResult.push({
         id: first.baseId,
         label,
         group: first.group,
@@ -492,7 +556,7 @@ export function applyModelConfigsWithFullData(
         depthVariantIds,
       });
     } else {
-      result.push({
+      unorderedResult.push({
         id: first.rawId,
         label,
         group: first.group,
@@ -506,34 +570,63 @@ export function applyModelConfigsWithFullData(
 
   // 标记多模态模型
   if (multimodalSet && multimodalSet.size > 0) {
-    for (const model of result) {
+    for (const model of unorderedResult) {
       if (multimodalSet.has(model.id)) {
         model.supportsImages = true;
       }
     }
   }
 
-  return result.filter((model) => {
+  // 过滤黑名单 + 名称过滤器
+  const filtered = unorderedResult.filter((model) => {
     if (blacklist.has(model.id)) return false;
     for (const variantId of Object.values(model.depthVariantIds)) {
       if (blacklist.has(variantId)) return false;
     }
 
-    for (const filter of nameFilters) {
-      if (model.group === filter.group) {
-        const nameLower = model.id.toLowerCase();
-        const labelLower = model.label.toLowerCase();
-        if (
-          !nameLower.includes(filter.keyword) &&
-          !labelLower.includes(filter.keyword)
-        ) {
-          return false;
+    // 启用列表模式下,跳过 nameFilters(因为启用列表本身已精确指定)
+    if (!useEnabledList) {
+      for (const filter of nameFilters) {
+        if (model.group === filter.group) {
+          const nameLower = model.id.toLowerCase();
+          const labelLower = model.label.toLowerCase();
+          if (
+            !nameLower.includes(filter.keyword) &&
+            !labelLower.includes(filter.keyword)
+          ) {
+            return false;
+          }
         }
       }
     }
 
     return true;
   });
+
+  // 启用列表模式: 按 enabledModels 顺序排序,自动启用的模型追加在末尾
+  if (useEnabledList && enabledModels) {
+    const orderMap = new Map<string, number>();
+    enabledModels.forEach((id, idx) => orderMap.set(id, idx));
+
+    const ordered: ResolvedModel[] = [];
+    const autoEnabled: ResolvedModel[] = [];
+
+    for (const model of filtered) {
+      if (orderMap.has(model.id)) {
+        ordered.push(model);
+      } else {
+        autoEnabled.push(model);
+      }
+    }
+
+    ordered.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    return [...ordered, ...autoEnabled];
+  }
+
+  return filtered;
 }
 
 /**

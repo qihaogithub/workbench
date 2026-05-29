@@ -35,11 +35,19 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
 
 /**
  * 设置认证 Cookie（httpOnly，7 天）
+ * 
+ * Secure 标志说明：
+ * - 生产环境默认启用 secure（需要 HTTPS）
+ * - 可通过 USE_SECURE_COOKIE=false 禁用（适用于 HTTP 内网部署）
+ * - 示例：USE_SECURE_COOKIE=false docker-compose up -d
  */
 export function setAuthCookie(token: string): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  const useSecureCookie = isProduction && process.env.USE_SECURE_COOKIE !== "false";
+
   cookies().set("auth_token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecureCookie,
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60,
     path: "/",
