@@ -57,6 +57,7 @@ services:
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
       - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-true}
       - DATA_DIR=/app/data
     volumes:
       - app-data:/app/data

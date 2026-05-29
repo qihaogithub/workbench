@@ -88,7 +88,6 @@ export default function FigmaComponent(props: Props) {
           </div>
         </div>
         <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_5af15f6d.png" alt="static layer" className="left-0 top-0 absolute object-cover" data-figma-id="152:6422" style={{ width: 375, height: 44 }} />
-        <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_eba70025.png" alt="static layer" className="left-0 top-[722px] absolute object-cover" data-figma-id="152:6423" style={{ width: 375, height: 90 }} />
         <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_f781f1fa.png" alt="static layer" className="left-[20px] top-[44px] absolute object-cover" data-figma-id="152:88506" style={{ width: 335, height: 455 }} />
       </div>
       {/* 顶部导航栏 - 固定在顶部 */}

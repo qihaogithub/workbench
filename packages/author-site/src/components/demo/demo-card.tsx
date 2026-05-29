@@ -1,30 +1,33 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { MoreVertical, Trash2 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import Link from "next/link";
+import { MoreVertical, Trash2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import type { DemoMeta } from '@opencode-workbench/shared'
+} from "@/components/ui/dropdown-menu";
+import type { DemoMeta } from "@opencode-workbench/shared";
 
 interface DemoCardProps {
-  demo: DemoMeta
-  onDelete: (id: string) => void
+  demo: DemoMeta;
+  onDelete: (id: string) => void;
 }
 
+/**
+ * 格式化日期为 ISO 格式字符串（locale-independent）
+ * 避免 toLocaleDateString 在 Node.js 与浏览器间产生不同输出导致 Hydration 不匹配
+ */
 function formatDate(timestamp: number): string {
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const date = new Date(timestamp);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}/${m}/${d} ${h}:${min}`;
 }
 
 export function DemoCard({ demo, onDelete }: DemoCardProps) {
@@ -62,7 +65,9 @@ export function DemoCard({ demo, onDelete }: DemoCardProps) {
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-base truncate text-foreground">{demo.name}</h3>
+              <h3 className="font-medium text-base truncate text-foreground">
+                {demo.name}
+              </h3>
               <p className="text-xs text-muted-foreground mt-1.5">
                 更新于 {formatDate(demo.updatedAt)}
               </p>
@@ -80,8 +85,8 @@ export function DemoCard({ demo, onDelete }: DemoCardProps) {
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive text-xs"
                   onClick={(e) => {
-                    e.preventDefault()
-                    onDelete(demo.id)
+                    e.preventDefault();
+                    onDelete(demo.id);
                   }}
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-2" />
@@ -93,5 +98,5 @@ export function DemoCard({ demo, onDelete }: DemoCardProps) {
         </CardContent>
       </Card>
     </Link>
-  )
+  );
 }

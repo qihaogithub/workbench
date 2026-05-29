@@ -71,7 +71,9 @@ export async function middleware(request: NextRequest) {
       const cookieValue = await hashSecret(getAdminSecret());
       response.cookies.set("admin_token", cookieValue, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure:
+          process.env.NODE_ENV === "production" &&
+          process.env.USE_SECURE_COOKIE !== "false",
         sameSite: "lax",
         maxAge: 2 * 60 * 60, // 2 小时
         path: "/",
