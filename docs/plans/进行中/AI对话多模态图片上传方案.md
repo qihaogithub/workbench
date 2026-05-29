@@ -1,7 +1,8 @@
 # AI 对话多模态 — 图片上传方案
 
-> 版本：v1.0
+> 版本：v1.1
 > 创建日期：2026-05-27
+> 根因确认：2026-05-29（代码审查验证 10 处断裂点）
 > 关联需求：[AI对话\_需求文档.md](../../项目文档/创作端/05-AI对话/AI对话_需求文档.md)
 > 关联架构：[02_AIChat分层架构.md](../../项目文档/创作端/05-AI对话/技术/02_AIChat分层架构.md)
 
@@ -20,27 +21,37 @@
 | 模型元数据 | `ResolvedModel.supportsImages`           | ✅ 模型列表已携带图片支持标记                         |
 | 消息类型   | `PromptInputMessage.files`               | ✅ onSubmit 回调已携带 `PromptInputFile[]`            |
 
-### 1.2 断裂点
+### 1.2 根因分析（代码验证）
 
-| 位置                                      | 问题                                          | 影响                          |
-| :---------------------------------------- | :-------------------------------------------- | :---------------------------- |
-| `ChatInput.handleSubmit`                  | 仅传递 `message.text`，丢弃 `message.files`   | 图片数据在 UI → Hook 边界丢失 |
-| `useChatStream.handleSend`                | 签名为 `(userMessage: string)`，不接受附件    | 无法将图片传入流式通信层      |
-| `StreamService.sendMessage`               | 仅发送 `{ type, id, content, workingDir }`    | WebSocket 消息体无图片字段    |
-| `AgentStream.send` (agent-client)         | 签名为 `(content, id?, options?)`             | 客户端 SDK 不支持多模态       |
-| `BaseBackend.sendMessage` (agent-service) | 签名为 `(content: string)`                    | 后端无法接收和转发图片        |
-| 各 LLM Backend                            | Claude/Gemini 等 API 适配层未构建多模态消息体 | 图片无法送达模型              |
+> 以下断裂点已通过代码审查逐一验证，标注了具体文件与行号。
+
+| # | 位置 | 代码位置 | 问题 | 影响 |
+| :-- | :--- | :--- | :--- | :--- |
+| ① | `ChatInput.handleSubmit` | `chat-input.tsx:91` | `onSubmit(message.text \|\| "处理附件文件")` — 只传 text，`message.files` 被丢弃 | **根因起点**：图片数据在 UI 组件层被截断 |
+| ② | `ChatInput.onSubmit` 类型 | `chat-input.tsx:52` | `onSubmit: (message: string) => void` — 回调签名不含 files 参数 | 类型层面不支持传递附件 |
+| ③ | `useChatStream.handleSend` | `use-chat-stream.ts:159` | `async (userMessage: string)` — 仅接受文本参数 | Hook 层无法接收图片 |
+| ④ | `useChatStream` 调用 StreamService | `use-chat-stream.ts:416` | `streamService.sendMessage(userMessage, workingDir)` — 无 images 参数 | 图片未传入通信层 |
+| ⑤ | `StreamService.sendMessage` | `stream-service.ts:113-121` | `sendMessage(message: string, workingDir?: string)` — 仅发 text + workingDir | WebSocket 消息无图片字段 |
+| ⑥ | `AgentStream.send` | `client.ts:315-323` | JSON 体只有 `type, id, content, workingDir, options` — 无 `images` | 客户端 SDK 不支持多模态 |
+| ⑦ | `SendMessageOptions` 类型 | `types.ts:78-86` | 无 `images` 字段定义 | 类型层面不支持 |
+| ⑧ | WebSocket 消息解析 | `websocket.ts:31-44` | `ClientMessage` 接口无 `images` 字段 | 服务端不解析图片 |
+| ⑨ | `agent.sendMessage` 调用 | `websocket.ts:235-237` | `agent.sendMessage(message.content, message.options)` — 不传 images | Agent 层不接收图片 |
+| ⑩ | `IBackendAdapter.sendMessage` | `base.ts:8` | `(content: string, options?: { stream?: boolean })` — 无 images 参数 | 后端适配器不支持多模态 |
+
+**根因结论**：图片数据在 **ChatInput.handleSubmit**（第①处）被丢弃，后续全链路均无 images 参数传递。这是一处**设计遗漏** — UI 层已完整实现附件管理，但 `onSubmit` 回调签名仅为 `string`，导致图片从未进入数据流。
 
 ### 1.3 数据流断裂示意
 
 ```
 用户选图 → PromptInputAddImage → attachments.files（✅ 已有）
-    → ChatInput.handleSubmit → 只取 text（❌ files 丢弃）
-        → useChatStream.handleSend(text)（❌ 无图片参数）
-            → StreamService.sendMessage(text)（❌ 无图片字段）
-                → AgentStream.send(text)（❌ 无图片字段）
-                    → agent-service WebSocket handler（❌ 不解析图片）
-                        → Backend.sendMessage(text)（❌ 不支持多模态）
+    → ChatInput.handleSubmit（chat-input.tsx:82-94）
+        → 只取 message.text（chat-input.tsx:91）（❌ files 丢弃 — 根因起点）
+            → useChatStream.handleSend(text)（use-chat-stream.ts:159）（❌ 无图片参数）
+                → StreamService.sendMessage(text, workingDir)（stream-service.ts:113）（❌ 无图片字段）
+                    → AgentStream.send(text, id, { stream, workingDir })（client.ts:315）（❌ 无 images 字段）
+                        → WebSocket JSON（websocket.ts:31-44）（❌ ClientMessage 无 images）
+                            → agent.sendMessage(content, options)（websocket.ts:235）（❌ 不传 images）
+                                → Backend.sendMessage(content, { stream })（base.ts:8）（❌ 不支持多模态）
 ```
 
 ---

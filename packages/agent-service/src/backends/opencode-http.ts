@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { IBackendAdapter, BackendStatus } from "./base";
-import { AgentConfig, AgentEvent } from "../core/types";
+import { AgentConfig, AgentEvent, ImageAttachment } from "../core/types";
 import { logger } from "../utils/logger";
 import { EventSource } from "eventsource";
 
@@ -145,7 +145,7 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
   async sendMessage(
     content: string,
-    options?: { stream?: boolean },
+    options?: { stream?: boolean; images?: ImageAttachment[] },
   ): Promise<string> {
     if (!this.sessionId) {
       await this.initialize();
@@ -167,9 +167,9 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
 
     try {
       if (options?.stream) {
-        return await this.sendMessageStream(content);
+        return await this.sendMessageStream(content, options?.images);
       } else {
-        return await this.sendMessageSync(content);
+        return await this.sendMessageSync(content, options?.images);
       }
     } catch (error) {
       this.status = "error";
@@ -181,10 +181,20 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     }
   }
 
-  private async sendMessageSync(content: string): Promise<string> {
-    const body: Record<string, unknown> = {
-      parts: [{ type: "text", text: content }],
-    };
+  private async sendMessageSync(content: string, images?: ImageAttachment[]): Promise<string> {
+    const parts: Array<Record<string, unknown>> = [];
+    if (images?.length) {
+      for (const img of images) {
+        parts.push({
+          type: "image",
+          image: img.data,
+          mimeType: img.mimeType,
+        });
+      }
+    }
+    parts.push({ type: "text", text: content });
+
+    const body: Record<string, unknown> = { parts };
     if (this.config.model) {
       body.model = this.config.model;
     }
@@ -229,13 +239,23 @@ export class OpenCodeHttpBackend implements IBackendAdapter {
     return this.fullContent;
   }
 
-  private async sendMessageStream(content: string): Promise<string> {
+  private async sendMessageStream(content: string, images?: ImageAttachment[]): Promise<string> {
     // Connect SSE first to avoid missing early events
     this.connectSSE();
 
-    const body: Record<string, unknown> = {
-      parts: [{ type: "text", text: content }],
-    };
+    const parts: Array<Record<string, unknown>> = [];
+    if (images?.length) {
+      for (const img of images) {
+        parts.push({
+          type: "image",
+          image: img.data,
+          mimeType: img.mimeType,
+        });
+      }
+    }
+    parts.push({ type: "text", text: content });
+
+    const body: Record<string, unknown> = { parts };
     if (this.config.model) {
       body.model = this.config.model;
     }

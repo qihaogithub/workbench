@@ -121,3 +121,13 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
 
 export * from "./workspace";
 export * from "./validator";
+
+/** 图片附件，Base64 编码 */
+export interface ImageAttachment {
+  /** Base64 数据（不含 data URI 前缀） */
+  data: string;
+  /** MIME 类型，如 image/png */
+  mimeType: string;
+  /** 原始文件名 */
+  name: string;
+}

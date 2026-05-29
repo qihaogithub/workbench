@@ -4,6 +4,7 @@ import { getAgentManager } from "../core/agent-manager";
 import {
   AgentConfig,
   AgentResult,
+  ImageAttachment,
 } from "../core/types";
 import { logger } from "../utils/logger";
 import {
@@ -35,6 +36,7 @@ interface ClientMessage {
   sessionId?: string;
   modelId?: string;
   workingDir?: string;
+  images?: ImageAttachment[];
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -234,7 +236,10 @@ export async function registerWebSocketRoutes(
               try {
                 const sendPromise = agent.sendMessage(
                   message.content,
-                  message.options,
+                  {
+                    ...message.options,
+                    images: message.images,
+                  },
                 );
                 const timeoutPromise = new Promise<AgentResult>((resolve) => {
                   timeoutHandle = setTimeout(() => {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
-import type { StreamEvent } from "@opencode-workbench/agent-client";
+import type { StreamEvent, ImageAttachment } from "@opencode-workbench/agent-client";
 import {
   StreamService,
   type PermissionRequest,
@@ -156,7 +156,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   ]);
 
   const handleSend = useCallback(
-    async (userMessage: string) => {
+    async (userMessage: string, images?: ImageAttachment[]) => {
       if (!userMessage.trim() || !agentSessionId) return;
 
       setMessages((prev) => [
@@ -165,6 +165,10 @@ export function useChatStream(options: UseChatStreamOptions) {
           id: `user-${Date.now()}`,
           role: "user",
           content: userMessage.trim(),
+          parts: images?.map((img) => ({
+            type: "image" as const,
+            url: `data:${img.mimeType};base64,${img.data}`,
+          })) || [],
         },
       ]);
 
@@ -413,7 +417,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         await streamService.waitForConnection(stream);
 
-        streamService.sendMessage(userMessage, workingDir);
+        streamService.sendMessage(userMessage, workingDir, images);
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
@@ -428,6 +432,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             userMessage,
             {
               workingDir,
+              images,
               options: {
                 stream: false,
               },

@@ -79,7 +79,14 @@ export interface PiAgentConfig {
 export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
+  images?: ImageAttachment[];
   context?: MessageContext;
+}
+
+export interface ImageAttachment {
+  data: string;
+  mimeType: string;
+  name: string;
 }
 
 export interface MessageContext {

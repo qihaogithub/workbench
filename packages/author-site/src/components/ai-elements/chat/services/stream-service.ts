@@ -1,6 +1,7 @@
 import {
   AgentStream,
   type StreamEvent,
+  type ImageAttachment,
 } from "@opencode-workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
@@ -110,13 +111,14 @@ export class StreamService {
     });
   }
 
-  sendMessage(message: string, workingDir?: string): void {
+  sendMessage(message: string, workingDir?: string, images?: ImageAttachment[]): void {
     if (!this.stream) {
       throw new Error("Stream not connected");
     }
     this.stream.send(message, `msg-${Date.now()}`, {
       stream: true,
       workingDir,
+      images,
     });
   }
 

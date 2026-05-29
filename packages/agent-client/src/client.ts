@@ -60,6 +60,7 @@ export class AgentClient {
       workingDir?: string;
       customWorkspace?: boolean;
       options?: SendMessageOptions;
+      images?: import("./types").ImageAttachment[];
     },
   ): Promise<ApiResponse<AgentResult>> {
     return this.request<AgentResult>(`/api/agent/${sessionId}/message`, {
@@ -70,6 +71,7 @@ export class AgentClient {
         backend: options?.backend,
         workingDir: options?.workingDir,
         customWorkspace: options?.customWorkspace,
+        images: options?.images,
         options: options?.options,
       }),
     });
@@ -318,6 +320,7 @@ export class AgentStream {
         id: id || `msg-${Date.now()}`,
         content,
         workingDir: options?.workingDir,
+        images: options?.images,
         options,
       }),
     );

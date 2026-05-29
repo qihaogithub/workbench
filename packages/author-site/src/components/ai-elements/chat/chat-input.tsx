@@ -24,6 +24,19 @@ import { ModelSelectWithGuard } from "./model-select-with-guard";
 import { History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResolvedModel, ThinkingDepth } from "@/lib/ai-models";
+import type { ImageAttachment } from "@opencode-workbench/agent-client";
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const PromptInputAttachmentsDisplay = () => {
   const attachments = usePromptInputAttachments();
@@ -49,7 +62,7 @@ const PromptInputAttachmentsDisplay = () => {
 };
 
 interface ChatInputProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, images?: ImageAttachment[]) => void;
   onCancel: () => void;
   isStreaming: boolean;
   currentSupportsImages: boolean;
@@ -80,7 +93,7 @@ export function ChatInput({
   isModelLoading,
 }: ChatInputProps) {
   const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
+    async (message: PromptInputMessage) => {
       const hasText = Boolean(message.text);
       const hasAttachments = Boolean(message.files?.length);
 
@@ -88,7 +101,17 @@ export function ChatInput({
         return;
       }
 
-      onSubmit(message.text || "处理附件文件");
+      const images: ImageAttachment[] = [];
+      if (message.files?.length) {
+        for (const file of message.files) {
+          if (file.file && file.type.startsWith("image/")) {
+            const base64 = await fileToBase64(file.file);
+            images.push({ data: base64, mimeType: file.type, name: file.name });
+          }
+        }
+      }
+
+      onSubmit(message.text || "处理附件图片", images.length > 0 ? images : undefined);
     },
     [onSubmit],
   );

@@ -79,10 +79,21 @@ export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
   workingDir?: string;
+  images?: ImageAttachment[];
   context?: {
     files?: string[];
     presetRules?: string;
   };
+}
+
+/** 图片附件，Base64 编码 */
+export interface ImageAttachment {
+  /** Base64 数据（不含 data URI 前缀） */
+  data: string;
+  /** MIME 类型，如 image/png */
+  mimeType: string;
+  /** 原始文件名 */
+  name: string;
 }
 
 export interface AgentInfo {

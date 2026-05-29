@@ -1,4 +1,11 @@
-interface DemoProps {}
+interface DemoProps {
+  bigBannerMaxWidth?: number;
+  bigBannerMaxHeight?: number;
+  miniBannerMaxWidth?: number;
+  miniBannerMaxHeight?: number;
+  imageMaxWidth?: number;
+  imageMaxHeight?: number;
+}
 
 const subjects = [
   { key: 'yuedu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/阅读.png', bgClass: 'bg-[#fff2ea]' },
@@ -20,7 +27,23 @@ export default function PadSquare(props: DemoProps) {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
     bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
     firstMiniBanner = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png',
-  } = props as Record<string, unknown>;
+
+    // 尺寸限制参数（来自配置）
+    bigBannerMaxWidth = 688,
+    bigBannerMaxHeight = 320,
+    miniBannerMaxWidth = 300,
+    miniBannerMaxHeight = 137,
+    imageMaxWidth = 0,
+    imageMaxHeight = 0,
+  } = {
+    ...props,
+    ...(props as Record<string, unknown>),
+  };
+
+  // 全局图片尺寸限制
+  const globalImgStyle: React.CSSProperties = {};
+  if (imageMaxWidth > 0) globalImgStyle.maxWidth = imageMaxWidth;
+  if (imageMaxHeight > 0) globalImgStyle.maxHeight = imageMaxHeight;
 
   return (
     <div
@@ -41,17 +64,24 @@ export default function PadSquare(props: DemoProps) {
         }
       `}</style>
       <div className="w-full flex-shrink-0">
-        <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png" alt="status" className="w-full h-auto" />
+        <img
+          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png"
+          alt="status"
+          className="w-full h-auto"
+          style={globalImgStyle}
+        />
         <div className="flex items-center justify-between h-11 px-5">
           <img
             className="w-[154px] h-[30px]"
             src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/叫叫%20Logo%20-%20基础.png"
             alt="Logo"
+            style={globalImgStyle}
           />
           <img
             className="h-[30px]"
             src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/扫一扫.png"
             alt="扫一扫"
+            style={globalImgStyle}
           />
         </div>
       </div>
@@ -63,33 +93,81 @@ export default function PadSquare(props: DemoProps) {
               key={s.key}
               className={`${s.bgClass} flex items-center justify-center w-[58.2px] rounded-[12px_12px_24px_12px] py-1.5`}
             >
-              <img src={s.icon} alt={s.key} className="w-8 h-8" />
+              <img
+                src={s.icon}
+                alt={s.key}
+                className="w-8 h-8"
+                style={globalImgStyle}
+              />
             </div>
           ))}
         </div>
 
-        {/* 大Banner - Pad端 */}
+        {/* 大Banner - Pad端，带尺寸限制 */}
         <div className="w-full px-10 mt-4">
-          <div className="relative w-full overflow-hidden rounded-2xl" style={{ height: 320 }}>
+          <div
+            className="relative w-full overflow-hidden rounded-2xl"
+            style={{
+              height: bigBannerMaxHeight,
+              maxWidth: bigBannerMaxWidth,
+            }}
+          >
             <img
               className="absolute w-full h-[89.583%] bottom-0 left-1/2 -translate-x-1/2 object-cover"
               src={bigBannerBackground}
               alt="banner-bg"
+              style={{
+                maxWidth: bigBannerMaxWidth,
+                maxHeight: bigBannerMaxHeight,
+                ...globalImgStyle,
+              }}
             />
             <img
               className="absolute w-full h-full bottom-0 left-1/2 -translate-x-1/2 object-cover"
               src={bigBannerForeground}
               alt="banner-fg"
+              style={{
+                maxWidth: bigBannerMaxWidth,
+                maxHeight: bigBannerMaxHeight,
+                ...globalImgStyle,
+              }}
             />
           </div>
         </div>
 
-        {/* 小Banner滚动区 */}
-        <div className="w-full pl-10 h-[137px] mt-5 overflow-x-auto hide-scrollbar" style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* 小Banner滚动区 - 带尺寸限制 */}
+        <div
+          className="w-full pl-10 mt-5 overflow-x-auto hide-scrollbar"
+          style={{
+            scrollSnapType: 'x mandatory',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            height: miniBannerMaxHeight,
+          }}
+        >
           <div className="flex gap-2 h-full">
-            <img src={firstMiniBanner} alt="mini-banner-1" className="h-full w-auto flex-shrink-0" />
+            <img
+              src={firstMiniBanner}
+              alt="mini-banner-1"
+              className="h-full w-auto flex-shrink-0"
+              style={{
+                maxWidth: miniBannerMaxWidth,
+                maxHeight: miniBannerMaxHeight,
+                ...globalImgStyle,
+              }}
+            />
             {miniBannerList.map((url, i) => (
-              <img key={i} src={url} alt={`mini-banner-${i + 2}`} className="h-full w-auto flex-shrink-0" />
+              <img
+                key={i}
+                src={url}
+                alt={`mini-banner-${i + 2}`}
+                className="h-full w-auto flex-shrink-0"
+                style={{
+                  maxWidth: miniBannerMaxWidth,
+                  maxHeight: miniBannerMaxHeight,
+                  ...globalImgStyle,
+                }}
+              />
             ))}
           </div>
         </div>
@@ -100,6 +178,7 @@ export default function PadSquare(props: DemoProps) {
           src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏_pad.png"
           alt="tabBar"
           className="w-full h-auto"
+          style={globalImgStyle}
         />
       </div>
     </div>

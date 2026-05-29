@@ -153,6 +153,7 @@ export default function Demo({
 - properties 与该页面特有的字段一一对应（**严禁**包含项目配置中已有的字段）
 - 每个属性有合理的 default 值
 - 充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`（详见 `references/config-system.md`）
+- **图片尺寸校验**：当图片有明确的尺寸要求时，必须在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
 
 # 参考文件
 
