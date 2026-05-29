@@ -15,7 +15,7 @@ function resolveDefaultModelId(): string {
   return first || "";
 }
 
-const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || 'opencode';
+function getDefaultBackend(): string { return process.env.DEFAULT_BACKEND || 'opencode'; }
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
@@ -87,7 +87,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         
         if (workingDir) {
           workspaceInfo = await workspaceManager.create({
-            backend: backend || DEFAULT_BACKEND,
+            backend: backend || getDefaultBackend(),
             workspace: workingDir,
             customWorkspace,
           });
@@ -95,14 +95,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           const existingSession = sessionStore.get(sessionId);
           if (!existingSession) {
             workspaceInfo = await workspaceManager.create({
-              backend: backend || DEFAULT_BACKEND,
+              backend: backend || getDefaultBackend(),
             });
           }
         }
 
         const config: AgentConfig = {
           sessionId,
-          backend: backend || DEFAULT_BACKEND,
+          backend: backend || getDefaultBackend(),
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: request.body.model || resolveDefaultModelId(),

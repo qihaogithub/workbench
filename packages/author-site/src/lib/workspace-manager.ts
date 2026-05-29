@@ -24,13 +24,41 @@ export interface CreateWorkspaceResult {
   demos: MultiDemoFiles;
 }
 
-function injectOpencodeAgentConfig(workspacePath: string, projectId: string): void {
+function injectReferences(workspacePath: string): void {
+  const refsDir = path.join(workspacePath, "references");
+  if (!fs.existsSync(refsDir)) {
+    fs.mkdirSync(refsDir, { recursive: true });
+  }
+
+  const sourceDir = path.join(
+    process.cwd(),
+    "src",
+    "lib",
+    "agent-prompts",
+    "references",
+  );
+
+  if (!fs.existsSync(sourceDir)) return;
+
+  for (const file of fs.readdirSync(sourceDir)) {
+    if (!file.endsWith(".md")) continue;
+    fs.copyFileSync(path.join(sourceDir, file), path.join(refsDir, file));
+  }
+}
+
+function injectOpencodeAgentConfig(
+  workspacePath: string,
+  projectId: string,
+): void {
   const opencodeDir = path.join(workspacePath, ".opencode");
   const agentsDir = path.join(opencodeDir, "agents");
 
   if (!fs.existsSync(agentsDir)) {
     fs.mkdirSync(agentsDir, { recursive: true });
   }
+
+  // 注入参考文件（references/）
+  injectReferences(workspacePath);
 
   const opencodeJson = {
     $schema: "https://opencode.ai/config.json",
@@ -168,8 +196,12 @@ export function getWorkspace(workspaceId: string) {
     projectConfigSchema,
     workspacePath: wsPath,
     // 兼容旧格式前端
-    code: hasLegacyFiles ? fs.readFileSync(codePath, "utf-8") : (Object.values(demos)[0]?.code ?? ""),
-    schema: hasLegacyFiles ? fs.readFileSync(schemaPath, "utf-8") : (Object.values(demos)[0]?.schema ?? ""),
+    code: hasLegacyFiles
+      ? fs.readFileSync(codePath, "utf-8")
+      : (Object.values(demos)[0]?.code ?? ""),
+    schema: hasLegacyFiles
+      ? fs.readFileSync(schemaPath, "utf-8")
+      : (Object.values(demos)[0]?.schema ?? ""),
   };
 }
 
@@ -181,7 +213,10 @@ export function deleteWorkspace(workspaceId: string): boolean {
   return true;
 }
 
-export function listWorkspaces(userId: string, projectId: string): WorkspaceMeta[] {
+export function listWorkspaces(
+  userId: string,
+  projectId: string,
+): WorkspaceMeta[] {
   const workspaceDir = getWorkspaceDir(userId, projectId);
   if (!fs.existsSync(workspaceDir)) return [];
 
@@ -195,7 +230,9 @@ export function listWorkspaces(userId: string, projectId: string): WorkspaceMeta
     if (!fs.existsSync(metaPath)) continue;
 
     try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMeta;
+      const meta = JSON.parse(
+        fs.readFileSync(metaPath, "utf-8"),
+      ) as WorkspaceMeta;
       workspaces.push(meta);
     } catch {
       continue;
@@ -205,7 +242,10 @@ export function listWorkspaces(userId: string, projectId: string): WorkspaceMeta
   return workspaces.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function findActiveWorkspace(userId: string, projectId: string): string | null {
+export function findActiveWorkspace(
+  userId: string,
+  projectId: string,
+): string | null {
   const workspaces = listWorkspaces(userId, projectId);
   return workspaces.length > 0 ? workspaces[0].workspaceId : null;
 }
@@ -229,20 +269,23 @@ function collectActiveWorkspaceIds(): Set<string> {
   const userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
   for (const userDir of userDirs) {
     if (!userDir.isDirectory()) continue;
-    const projectDirs = fs.readdirSync(
-      path.join(sessionsDir, userDir.name),
-      { withFileTypes: true }
-    );
+    const projectDirs = fs.readdirSync(path.join(sessionsDir, userDir.name), {
+      withFileTypes: true,
+    });
     for (const projectDir of projectDirs) {
       if (!projectDir.isDirectory()) continue;
       const sessionDirs = fs.readdirSync(
         path.join(sessionsDir, userDir.name, projectDir.name),
-        { withFileTypes: true }
+        { withFileTypes: true },
       );
       for (const sessionDir of sessionDirs) {
         if (!sessionDir.isDirectory()) continue;
         const metaPath = path.join(
-          sessionsDir, userDir.name, projectDir.name, sessionDir.name, ".session.json"
+          sessionsDir,
+          userDir.name,
+          projectDir.name,
+          sessionDir.name,
+          ".session.json",
         );
         if (fs.existsSync(metaPath)) {
           try {
@@ -250,7 +293,9 @@ function collectActiveWorkspaceIds(): Set<string> {
             if (meta.workspaceId && Date.now() <= meta.expiresAt) {
               ids.add(meta.workspaceId);
             }
-          } catch { /* 忽略损坏的 session 元数据 */ }
+          } catch {
+            /* 忽略损坏的 session 元数据 */
+          }
         }
       }
     }
@@ -263,7 +308,9 @@ function collectActiveWorkspaceIds(): Set<string> {
  * 清理孤儿 workspace：没有任何活跃 session 引用的过期 workspace
  * @param ttlMs TTL 时间，默认 24 小时
  */
-export function cleanupOrphanWorkspaces(ttlMs: number = 24 * 60 * 60 * 1000): string[] {
+export function cleanupOrphanWorkspaces(
+  ttlMs: number = 24 * 60 * 60 * 1000,
+): string[] {
   const cleaned: string[] = [];
   const workspacesDir = getWorkspacesDir();
   if (!fs.existsSync(workspacesDir)) return cleaned;

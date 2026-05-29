@@ -62,22 +62,22 @@ describe('PiAgentBackend', () => {
   });
 
   describe('模型信息', () => {
-    it('应返回当前模型信息', () => {
+    it('应返回当前模型信息', async () => {
       const backend = new PiAgentBackend(mockConfig);
-      const modelInfo = backend.getModelInfo();
+      const modelInfo = await backend.getModelInfo();
       
       expect(modelInfo).toBeDefined();
       expect(modelInfo?.currentModelId).toBe('anthropic/claude-sonnet-4-20250514');
       expect(modelInfo?.canSwitch).toBe(true);
     });
 
-    it('当未配置模型时应使用默认值', () => {
+    it('当未配置模型时应使用默认值', async () => {
       const configWithoutModel: AgentConfig = {
         sessionId: 'test-session',
         workingDir: '/tmp/test-workspace',
       };
       const backend = new PiAgentBackend(configWithoutModel);
-      const modelInfo = backend.getModelInfo();
+      const modelInfo = await backend.getModelInfo();
       
       expect(modelInfo?.currentModelId).toBe('anthropic/claude-sonnet-4-20250514');
     });

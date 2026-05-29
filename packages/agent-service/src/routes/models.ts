@@ -1,8 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { getAgentManager } from "../core/agent-manager";
+import { AgentConfig } from "../core/types";
 import { logger } from "../utils/logger";
 
-const OPENCODE_SERVER_URL =
-  process.env.OPENCODE_SERVER_URL || "http://localhost:4096";
+function getDefaultBackend(): string {
+  return process.env.DEFAULT_BACKEND || "opencode";
+}
 
 /**
  * /config/providers 返回的模型能力结构（仅取需要的字段）
@@ -45,86 +48,71 @@ interface ConfigProvidersResponse {
 /**
  * 注册模型列表 HTTP 端点
  *
- * 供管理后台使用，通过 OpenCode Server 的 /config/providers 端点
- * 查询所有供应商和模型，包含多模态、思考深度等能力信息。
+ * 供管理后台使用，根据 DEFAULT_BACKEND 环境变量获取对应后端的模型列表。
  */
 export async function registerModelsRoutes(
   fastify: FastifyInstance,
 ): Promise<void> {
+  const manager = getAgentManager();
+
   /**
    * GET /models
    *
-   * 从 OpenCode Server /config/providers 获取完整的模型列表及能力信息。
-   * 返回字段：id, label, group, supportsImages, supportsThinkingDepth
+   * 根据 DEFAULT_BACKEND 创建临时 agent 获取模型列表。
+   * - opencode-http 后端：从 OpenCode Server 获取完整模型信息
+   * - 其他后端：从 agent 的 getModelInfo() 获取
    */
   fastify.get(
     "/models",
     async (_request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const response = await fetch(
-          `${OPENCODE_SERVER_URL}/config/providers`,
-          {
-            method: "GET",
-            signal: AbortSignal.timeout(10000),
-          },
-        );
+      const tempSessionId = `__models_probe_${Date.now()}`;
 
-        if (!response.ok) {
-          return reply.code(502).send({
-            success: false,
-            error: {
-              code: "BACKEND_UNAVAILABLE",
-              message: `OpenCode Server responded ${response.status}`,
+      try {
+        const config: AgentConfig = {
+          sessionId: tempSessionId,
+          backend: getDefaultBackend(),
+        };
+
+        const agent = manager.getOrCreate(tempSessionId, config);
+
+        if (agent.status !== "ready") {
+          await agent.start();
+        }
+
+        const modelInfo = await agent.getModelInfo?.();
+
+        await manager.destroy(tempSessionId);
+
+        if (!modelInfo) {
+          return reply.send({
+            success: true,
+            data: {
+              models: [],
+              currentModelId: null,
+              canSwitch: false,
             },
           });
         }
 
-        const data = (await response.json()) as ConfigProvidersResponse;
-
-        const models: Array<{
-          id: string;
-          label: string;
-          group: string;
-          supportsImages: boolean;
-          supportsThinkingDepth: boolean;
-        }> = [];
-
-        for (const provider of data.providers || []) {
-          const providerModels = provider.models || {};
-          for (const [, modelInfo] of Object.entries(providerModels)) {
-            const fullId = `${provider.id}/${modelInfo.id}`;
-            const caps = modelInfo.capabilities;
-            const variants = modelInfo.variants || {};
-
-            // 判断是否支持思考深度：有 low/medium/high 等变体
-            const hasThinkingVariants = Object.keys(variants).some(
-              (k) =>
-                k === "low" || k === "medium" || k === "high" || k === "max",
-            );
-
-            models.push({
-              id: fullId,
-              label: modelInfo.name || modelInfo.id,
-              group: provider.id,
-              supportsImages: !!caps?.input?.image,
-              supportsThinkingDepth: hasThinkingVariants || !!caps?.reasoning,
-            });
-          }
-        }
-
-        // 从 default 映射中推断当前默认模型
-        const currentModelId = data.default
-          ? Object.entries(data.default)
-              .map(([p, m]) => `${p}/${m}`)
-              .find((id) => models.some((m) => m.id === id)) || null
-          : null;
+        // 转换为统一格式，补充 group 字段
+        const models = modelInfo.availableModels.map((m) => {
+          const slashIdx = m.id.indexOf("/");
+          const group = slashIdx >= 0 ? m.id.slice(0, slashIdx) : "";
+          return {
+            id: m.id,
+            label: m.label,
+            group,
+            supportsImages: false,
+            supportsThinkingDepth: false,
+          };
+        });
 
         return reply.send({
           success: true,
           data: {
             models,
-            currentModelId,
-            canSwitch: models.length > 1,
+            currentModelId: modelInfo.currentModelId,
+            canSwitch: modelInfo.canSwitch,
           },
         });
       } catch (error) {
@@ -139,21 +127,21 @@ export async function registerModelsRoutes(
 
         if (isConnectionError) {
           logger.warn(
-            { serverUrl: OPENCODE_SERVER_URL },
-            "OpenCode Server is not reachable for /models",
+            { backend: getDefaultBackend() },
+            "Backend not reachable for /models",
           );
           return reply.code(503).send({
             success: false,
             error: {
               code: "SERVER_UNREACHABLE",
-              message: `无法连接 OpenCode Server (${OPENCODE_SERVER_URL})，请确认服务已启动后点击「拉取模型」重试`,
+              message: `无法连接后端服务 (${getDefaultBackend()})，请确认服务已启动后点击「拉取模型」重试`,
             },
           });
         }
 
         logger.error(
-          { error },
-          "Failed to fetch models from /config/providers",
+          { error, backend: getDefaultBackend() },
+          "Failed to get models from backend",
         );
         return reply.code(500).send({
           success: false,
@@ -166,5 +154,5 @@ export async function registerModelsRoutes(
     },
   );
 
-  logger.info("模型列表路由已注册: GET /models");
+  logger.info(`模型列表路由已注册: GET /models (backend: ${getDefaultBackend()})`);
 }

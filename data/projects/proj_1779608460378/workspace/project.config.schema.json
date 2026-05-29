@@ -7,27 +7,22 @@
       "type": "string",
       "format": "image",
       "title": "大Banner前景图",
-      "description": "两个页面共用的大Banner前景图片",
+      "description": "手机和平板共用的大Banner前景图片",
       "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png"
     },
-    "contentImage": {
+    "bigBannerBackground": {
       "type": "string",
       "format": "image",
-      "title": "内容图片",
-      "description": "两个页面共用的内容区域图片",
-      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/内容/内容.png"
+      "title": "大Banner背景图",
+      "description": "手机和平板共用的大Banner背景图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png"
     },
-    "subjectNames": {
-      "type": "object",
-      "title": "科目名称",
-      "description": "顶部科目区域的名称文本",
-      "properties": {
-        "yuedu": { "type": "string", "title": "阅读", "default": "阅读" },
-        "yizhi": { "type": "string", "title": "益智", "default": "益智" },
-        "meiyu": { "type": "string", "title": "美育", "default": "美育" },
-        "xiezuo": { "type": "string", "title": "写作", "default": "写作" },
-        "yingyu": { "type": "string", "title": "英语", "default": "英语" }
-      }
+    "firstMiniBanner": {
+      "type": "string",
+      "format": "image",
+      "title": "第1个小Banner图片",
+      "description": "手机和平板共用的第一个小Banner图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png"
     }
   }
 }

@@ -79,7 +79,7 @@ describe('Pi Agent 集成测试', () => {
       expect(backend.getCurrentSessionId()).toBeNull();
       expect(backend.getFiles()).toHaveLength(0);
       
-      const modelInfo = backend.getModelInfo();
+      const modelInfo = await backend.getModelInfo();
       expect(modelInfo).toBeDefined();
       expect(modelInfo?.currentModelId).toBe('anthropic/claude-sonnet-4-20250514');
       expect(modelInfo?.canSwitch).toBe(true);
@@ -133,7 +133,7 @@ describe('Pi Agent 集成测试', () => {
 
       backend = new PiAgentBackend(config);
       
-      const modelInfo = backend.getModelInfo();
+      const modelInfo = await backend.getModelInfo();
       expect(modelInfo?.currentModelId).toBe('anthropic/claude-sonnet-4-20250514');
     });
   });

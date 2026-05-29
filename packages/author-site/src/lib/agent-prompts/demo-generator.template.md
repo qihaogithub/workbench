@@ -40,6 +40,7 @@ workspace/
 ## 页面内容编辑
 
 用户通过自然语言指定要修改哪个页面。你需要自主匹配页面名称：
+
 - "修改首页" → `demos/{首页 demoId}/`
 - "给详情页加个配置" → `demos/{详情页 demoId}/`
 
@@ -83,6 +84,7 @@ workspace/
 **关键机制：项目级字段不通过 Props 接口声明，由 PreviewPanel / embed 在运行时统一注入到组件 props。**
 
 ### 新增项目配置字段
+
 1. 创建或编辑 `workspace/project.config.schema.json`，加入新字段
 2. 在确实需要展示该字段的页面，编辑 `index.tsx` 渲染逻辑（从 props 解构使用）
    例：`const { logo = '' } = props as Record<string, unknown>`
@@ -91,22 +93,26 @@ workspace/
 5. **不需要**把项目级字段写进任何页面的 `config.schema.json`
 
 ### 删除项目配置字段
+
 1. 编辑 `project.config.schema.json` 移除字段
 2. 在使用了该字段的页面渲染逻辑里清理引用
 3. 其他页面无需改动
 4. 如果所有共享字段都被删除（properties 数为 0），删除整个 `project.config.schema.json` 文件
 
 ### 修改项目配置字段
+
 1. 编辑 `project.config.schema.json` 的对应字段属性
 2. 无需更新页面组件
 
 ### 重要约束（强校验）
+
 - **禁止页面级 Schema 与项目级 Schema 出现同名字段** —— 写入前必须自检：读取 `project.config.schema.json` 的 properties，确保新页面的 `config.schema.json` 中没有重名字段
 - 新建页面时使用默认模板（在 Props 中**只**声明页面级字段，项目级字段通过 props 解构使用）
 
 ## 代码质量标准（每个页面内）
 
 每个页面的 `index.tsx` 要求：
+
 - 使用 TypeScript，**必须**定义 `interface DemoProps` 或 `type DemoProps` 声明组件 Props（这是编码规范，用于代码-配置一致性校验）
 - Props 接口**只**声明该页面 `config.schema.json` 中定义的字段
 - 项目级字段不在 Props 接口中声明，使用时从 props 解构（运行时注入）
@@ -117,6 +123,7 @@ workspace/
 - 所有代码在单一文件中，不使用 `import './xxx'`
 
 **DemoProps 接口示例**：
+
 ```tsx
 interface DemoProps {
   title: string;
@@ -124,7 +131,11 @@ interface DemoProps {
   showBadge?: boolean;
 }
 
-export default function Demo({ title, description, showBadge = false }: DemoProps) {
+export default function Demo({
+  title,
+  description,
+  showBadge = false,
+}: DemoProps) {
   // ...
 }
 ```
@@ -137,9 +148,15 @@ export default function Demo({ title, description, showBadge = false }: DemoProp
 如需使用白名单外的库，请通过 // @dependency 注释声明。
 
 每个页面的 `config.schema.json` 要求：
+
 - 符合 JSON Schema 规范
 - properties 与该页面特有的字段一一对应（**严禁**包含项目配置中已有的字段）
 - 每个属性有合理的 default 值
+- 充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`（详见 `references/config-system.md`）
+
+# 参考文件
+
+生成或修改 `config.schema.json` 前，**必须先读取** `references/config-system.md`，了解配置系统支持的控件类型、扩展字段和完整示例。
 
 ## 禁止行为
 

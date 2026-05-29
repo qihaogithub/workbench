@@ -22,7 +22,7 @@ function resolveDefaultModelId(): string {
 }
 
 const DEFAULT_MODEL_ID = resolveDefaultModelId();
-const DEFAULT_BACKEND = process.env.DEFAULT_BACKEND || "opencode";
+function getDefaultBackend(): string { return process.env.DEFAULT_BACKEND || "opencode"; }
 
 interface StreamParams {
   sessionId: string;
@@ -157,7 +157,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId,
-                backend: DEFAULT_BACKEND,
+                backend: getDefaultBackend(),
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -180,7 +180,7 @@ export async function registerWebSocketRoutes(
                   let workspaceInfo: { path: string; customWorkspace: boolean; type: "user" | "temp" } | undefined;
                   if (message.workingDir) {
                     workspaceInfo = await workspaceManager.create({
-                      backend: DEFAULT_BACKEND,
+                      backend: getDefaultBackend(),
                       workspace: message.workingDir,
                     });
                   }
@@ -338,7 +338,7 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
-                backend: DEFAULT_BACKEND,
+                backend: getDefaultBackend(),
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -455,7 +455,7 @@ export async function registerWebSocketRoutes(
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
-                  backend: DEFAULT_BACKEND,
+                  backend: getDefaultBackend(),
                   workingDir: message.workingDir || process.cwd(),
                   model: DEFAULT_MODEL_ID,
                 };

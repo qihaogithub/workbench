@@ -10,6 +10,7 @@ const serviceConfig = loadConfig();
 let Agent: any;
 let streamSimple: any;
 let getModel: any;
+let getModels: any;
 
 async function loadPiAgentDeps() {
   if (!Agent) {
@@ -18,6 +19,7 @@ async function loadPiAgentDeps() {
     Agent = piAgentCore.Agent;
     streamSimple = piAi.streamSimple;
     getModel = piAi.getModel;
+    getModels = piAi.getModels;
   }
 }
 
@@ -218,12 +220,56 @@ export class PiAgentBackend implements IBackendAdapter {
     logger.info({ modelId }, "Model set for Pi Agent backend");
   }
 
-  getModelInfo(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null {
-    const provider = this.config.piAgent?.provider || 'anthropic';
-    const modelId = this.config.piAgent?.model || this.config.model || 'claude-sonnet-4-20250514';
+  async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
+    const provider = this.config.piAgent?.provider || serviceConfig.piAgent.provider;
+    const modelId = this.config.piAgent?.model || serviceConfig.piAgent.model;
+
+    // getModels(provider) returns Array<{ id, name, provider, ... }>
+    const availableModels: Array<{ id: string; label: string }> = [];
+    try {
+      if (getModels) {
+        const models = getModels(provider);
+        for (const m of models) {
+          availableModels.push({
+            id: `${provider}/${m.id}`,
+            label: m.name || m.id,
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn({ error, provider }, "Failed to get available models from pi-ai");
+    }
+
+    // Fallback: for custom providers not known by pi-ai, fetch from OpenCode Server
+    if (availableModels.length === 0) {
+      try {
+        const opencodeUrl = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
+        const response = await fetch(`${opencodeUrl}/provider`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000),
+        });
+        if (response.ok) {
+          const data = await response.json() as {
+            all?: Array<{ id: string; models?: Record<string, { id: string; name?: string }> }>;
+          };
+          const providerInfo = data.all?.find((p) => p.id === provider);
+          if (providerInfo?.models) {
+            for (const [modelKey, modelInfo] of Object.entries(providerInfo.models)) {
+              availableModels.push({
+                id: `${provider}/${modelInfo.id || modelKey}`,
+                label: modelInfo.name || modelInfo.id || modelKey,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn({ error, provider }, "Failed to fetch models from OpenCode Server");
+      }
+    }
+
     return {
       currentModelId: `${provider}/${modelId}`,
-      availableModels: [],
+      availableModels,
       canSwitch: true,
     };
   }

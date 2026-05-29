@@ -1,7 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v1.0
+> 版本：v2.0
 > 创建日期：2026-04-05
+> 更新日期：2026-05-29
 
 ---
 
@@ -13,14 +14,12 @@
 
 ## 文档列表
 
-| 文档                                         | 说明                                               | 阅读顺序 |
-| :------------------------------------------- | :------------------------------------------------- | :------- |
-| [01-架构设计.md](./01-架构设计.md)           | 整体架构设计、分层职责、设计原则                   | 1        |
-| [02-接口规范.md](./02-接口规范.md)           | REST API、WebSocket 协议、类型定义                 | 2        |
-| [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        |
-| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        |
-| [04-开发计划.md](./04-开发计划.md)           | 分阶段开发计划、任务清单、验收标准                 | 5        |
-| [05-部署方案.md](./05-部署方案.md)           | Docker/Kubernetes 部署、监控、运维                 | 6        |
+| 文档                                         | 说明                                               | 阅读顺序 | 状态     |
+| :------------------------------------------- | :------------------------------------------------- | :------- | :------- |
+| [01-架构设计.md](./01-架构设计.md)           | 整体架构设计、分层职责、设计原则                   | 1        | 已更新   |
+| [02-接口规范.md](./02-接口规范.md)           | REST API、WebSocket 协议、类型定义                 | 2        | 已更新   |
+| [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        | 已更新   |
+| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        | 已完成   |
 
 ---
 
@@ -72,17 +71,19 @@
 
 | 组件        | 选型        | 理由                                 |
 | :---------- | :---------- | :----------------------------------- |
-| 运行时      | Node.js 20+ | AI 编程友好，与 opencode 兼容        |
+| 运行时      | Node.js 18+ | Monorepo 要求，与 opencode 兼容      |
 | 框架        | Fastify     | 高性能，原生支持 WebSocket           |
 | HTTP 客户端 | undici      | 比 node-fetch 更快，原生支持流式响应 |
 | 日志        | pino        | Fastify 默认日志库，高性能           |
+| 测试        | vitest      | agent-service 专用测试框架           |
 
 ### 2. 架构模式
 
-- **工厂模式**：支持多种 AI 后端
+- **工厂模式**：支持多种 AI 后端（14+ 后端）
 - **观察者模式**：事件驱动，解耦 Agent 和 UI
-- **单例模式**：全局 AgentManager
+- **单例模式**：全局 AgentManager + AgentFactory
 - **策略模式**：不同后端使用不同通信策略
+- **适配器模式**：BackendAgent 统一封装后端接口
 
 ### 3. 核心原则
 
@@ -115,9 +116,11 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 
 ### 现有代码
 
-- `packages/web/src/lib/opencode-client.ts` - OpenCode 客户端
-- `packages/web/src/lib/session-manager.ts` - Session 管理器
-- `packages/web/src/app/api/ai/chat/route.ts` - AI Chat API
+- `packages/agent-service/src/server.ts` - 服务入口
+- `packages/agent-service/src/core/` - 核心模块（Agent、Factory、Manager）
+- `packages/agent-service/src/backends/` - 后端适配器（14+ 后端）
+- `packages/agent-service/src/routes/` - API 路由
+- `packages/shared/src/` - 共享类型
 
 ---
 
@@ -171,7 +174,8 @@ Electron 生命周期           →      Fastify 生命周期
 
 ## 更新日志
 
-| 日期       | 版本 | 更新内容               |
-| :--------- | :--- | :--------------------- |
-| 2026-04-05 | v1.0 | 初始版本，完成全部文档 |
-| 2026-04-05 | v1.1 | 添加 AionUi 参考指南   |
+| 日期       | 版本 | 更新内容                           |
+| :--------- | :--- | :--------------------------------- |
+| 2026-04-05 | v1.0 | 初始版本，完成全部文档             |
+| 2026-04-05 | v1.1 | 添加 AionUi 参考指南               |
+| 2026-05-29 | v2.0 | 根据代码实现全面更新文档，对齐现状 |

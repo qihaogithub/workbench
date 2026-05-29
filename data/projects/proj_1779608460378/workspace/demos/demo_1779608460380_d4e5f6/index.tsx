@@ -8,24 +8,19 @@ const subjects = [
   { key: 'yingyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/英语.png', bgClass: 'bg-[#fff0f3]' },
 ];
 
-const miniBanners = [
-  'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png',
+const miniBannerList = [
   'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png',
   'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png',
   'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png',
   'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png',
 ];
 
-const defaultSubjectNames = {
-  yuedu: '阅读', yizhi: '益智', meiyu: '美育', xiezuo: '写作', yingyu: '英语',
-};
-
 export default function PadSquare(props: DemoProps) {
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
-    contentImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/内容/pad内容占位.png',
-    subjectNames = defaultSubjectNames,
-  } = props as Record<string, unknown> & { subjectNames?: Record<string, string> };
+    bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
+    firstMiniBanner = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png',
+  } = props as Record<string, unknown>;
 
   return (
     <div
@@ -36,6 +31,15 @@ export default function PadSquare(props: DemoProps) {
         margin: '0 auto',
       }}
     >
+      <style>{`
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="w-full flex-shrink-0">
         <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png" alt="status" className="w-full h-auto" />
         <div className="flex items-center justify-between h-11 px-5">
@@ -57,21 +61,19 @@ export default function PadSquare(props: DemoProps) {
           {subjects.map((s) => (
             <div
               key={s.key}
-              className={`${s.bgClass} flex flex-col items-center justify-center gap-0.5 w-[58.2px] rounded-[12px_12px_24px_12px] py-0.5`}
+              className={`${s.bgClass} flex items-center justify-center w-[58.2px] rounded-[12px_12px_24px_12px] py-1.5`}
             >
               <img src={s.icon} alt={s.key} className="w-8 h-8" />
-              <span className="text-xs font-normal leading-[18px]">
-                {subjectNames?.[s.key as keyof typeof defaultSubjectNames] || defaultSubjectNames[s.key as keyof typeof defaultSubjectNames]}
-              </span>
             </div>
           ))}
         </div>
 
-        <div className="w-[1052px] mt-4">
-          <div className="relative w-full overflow-hidden" style={{ height: 'auto' }}>
+        {/* 大Banner - Pad端 */}
+        <div className="w-full px-10 mt-4">
+          <div className="relative w-full overflow-hidden rounded-2xl" style={{ height: 320 }}>
             <img
-              className="absolute w-full h-[89.583%] bottom-0 left-1/2 -translate-x-1/2 rounded-2xl object-cover"
-              src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png"
+              className="absolute w-full h-[89.583%] bottom-0 left-1/2 -translate-x-1/2 object-cover"
+              src={bigBannerBackground}
               alt="banner-bg"
             />
             <img
@@ -82,15 +84,15 @@ export default function PadSquare(props: DemoProps) {
           </div>
         </div>
 
-        <div className="w-full pl-10 h-[137px] mt-5 overflow-x-auto scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
+        {/* 小Banner滚动区 */}
+        <div className="w-full pl-10 h-[137px] mt-5 overflow-x-auto hide-scrollbar" style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div className="flex gap-2 h-full">
-            {miniBanners.map((url, i) => (
-              <img key={i} src={url} alt={`mini-banner-${i + 1}`} className="h-full w-auto flex-shrink-0" />
+            <img src={firstMiniBanner} alt="mini-banner-1" className="h-full w-auto flex-shrink-0" />
+            {miniBannerList.map((url, i) => (
+              <img key={i} src={url} alt={`mini-banner-${i + 2}`} className="h-full w-auto flex-shrink-0" />
             ))}
           </div>
         </div>
-
-        <img className="w-[1052px] my-4" src={contentImage} alt="content" />
       </div>
 
       <div className="w-full flex-shrink-0">
