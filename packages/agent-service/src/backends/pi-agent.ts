@@ -51,7 +51,14 @@ export class PiAgentBackend implements IBackendAdapter {
       const tools = createWorkbenchTools(this.config);
       const model = this.getModel();
       
+      logger.info({ modelId: model.id, provider: model.provider, baseUrl: model.baseUrl }, "Pi Agent model configured");
+      
       this.agent = new Agent({
+        initialState: {
+          model: model,
+          systemPrompt: this.buildSystemPrompt(),
+          tools: tools,
+        },
         streamFn: streamSimple,
         getApiKey: async (provider: string) => {
           return this.config.piAgent?.apiKey || 
@@ -81,9 +88,6 @@ export class PiAgentBackend implements IBackendAdapter {
         },
       });
 
-      this.agent.state.tools = tools;
-      this.agent.state.systemPrompt = this.buildSystemPrompt();
-      
       this.setupEventMapping();
       this.status = "ready";
       logger.info("Pi Agent backend initialized");
@@ -130,9 +134,13 @@ export class PiAgentBackend implements IBackendAdapter {
     this.status = "busy";
     this.files = [];
     
+    logger.info({ content: content.substring(0, 100) }, "Pi Agent sending message");
+    
     try {
       await this.agent.prompt(content);
+      logger.info("Pi Agent prompt sent, waiting for idle");
       await this.agent.waitForIdle();
+      logger.info("Pi Agent idle, extracting response");
       this.status = "ready";
       
       const lastAssistantMessage = this.agent.state.messages
@@ -140,12 +148,15 @@ export class PiAgentBackend implements IBackendAdapter {
         .pop();
       
       if (lastAssistantMessage && 'content' in lastAssistantMessage) {
-        return lastAssistantMessage.content
+        const result = lastAssistantMessage.content
           .filter((c: any) => c.type === 'text')
           .map((c: any) => c.text)
           .join('');
+        logger.info({ resultLength: result.length }, "Pi Agent response extracted");
+        return result;
       }
       
+      logger.warn("No assistant message found");
       return '';
     } catch (error) {
       this.status = "error";
