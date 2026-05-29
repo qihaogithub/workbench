@@ -955,15 +955,15 @@ curl http://localhost:3200/api/health
 
 ### 11.4 最终状态
 
-| 项目           | 状态     | 备注                                                        |
-| -------------- | -------- | ----------------------------------------------------------- |
-| 根因定位       | ✓ 已完成 | Secure Cookie + 部署脚本漏传 + Hydration 三重根因           |
-| Cookie 修复    | ✓ 已完成 | jwt.ts, middleware.ts, docker-compose, .env.docker           |
-| 部署脚本修复   | ✓ 已完成 | deploy.sh 增加 USE_SECURE_COOKIE 读取和写入，默认 false      |
-| Hydration 修复 | ✓ 已完成 | demo-card.tsx, projects/page.tsx                            |
-| 文档编写       | ✓ 已完成 | 综合报告                                                    |
-| 部署验证       | ✓ 已完成 | HTTP 内网环境登录跳转正常                                   |
-| 生产部署       | ✓ 已完成 | 已通过 deploy.sh 部署验证                                    |
+| 项目           | 状态     | 备注                                                    |
+| -------------- | -------- | ------------------------------------------------------- |
+| 根因定位       | ✓ 已完成 | Secure Cookie + 部署脚本漏传 + Hydration 三重根因       |
+| Cookie 修复    | ✓ 已完成 | jwt.ts, middleware.ts, docker-compose, .env.docker      |
+| 部署脚本修复   | ✓ 已完成 | deploy.sh 增加 USE_SECURE_COOKIE 读取和写入，默认 false |
+| Hydration 修复 | ✓ 已完成 | demo-card.tsx, projects/page.tsx                        |
+| 文档编写       | ✓ 已完成 | 综合报告                                                |
+| 部署验证       | ✓ 已完成 | HTTP 内网环境登录跳转正常                               |
+| 生产部署       | ✓ 已完成 | 已通过 deploy.sh 部署验证                               |
 
 ---
 
