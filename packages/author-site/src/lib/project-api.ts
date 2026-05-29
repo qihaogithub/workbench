@@ -490,6 +490,55 @@ export class ProjectApiClient {
     }
   }
 
+  // ============ 发布管理 ============
+
+  async publishProject(projectId: string): Promise<{
+    projectId: string;
+    publishedVersion: string;
+    publishedAt: number;
+    demoCount: number;
+    duration: number;
+  }> {
+    const response = await this.localRequest<{
+      projectId: string;
+      publishedVersion: string;
+      publishedAt: number;
+      demoCount: number;
+      duration: number;
+    }>(
+      `/api/projects/${projectId}/publish`,
+      { method: 'POST' }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '发布失败');
+    }
+    return response.data;
+  }
+
+  async getPublishStatus(projectId: string): Promise<{
+    projectId: string;
+    publishedVersion: string | null;
+    publishedAt: number | null;
+    currentVersion: string | null;
+    hasUnpublishedChanges: boolean;
+    status: 'never_published' | 'published' | 'unpublished_changes';
+  }> {
+    const response = await this.localRequest<{
+      projectId: string;
+      publishedVersion: string | null;
+      publishedAt: number | null;
+      currentVersion: string | null;
+      hasUnpublishedChanges: boolean;
+      status: 'never_published' | 'published' | 'unpublished_changes';
+    }>(
+      `/api/projects/${projectId}/publish-status`
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '获取发布状态失败');
+    }
+    return response.data;
+  }
+
   // ============ Session 文件（多页面） ============
 
   /**

@@ -1,0 +1,21 @@
+{
+  "projects": [
+    {
+      "id": "proj_1779608458649",
+      "name": "学习页-课后",
+      "thumbnail": "/data/proj_1779608458649/thumbnail.png",
+      "publishedAt": 1780063578252,
+      "publishedVersion": "v10",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1776526720347",
+      "name": "配置项示例",
+      "thumbnail": "/data/proj_1776526720347/thumbnail.png",
+      "publishedAt": 1780063481520,
+      "publishedVersion": "v50",
+      "demoCount": 2
+    }
+  ],
+  "generatedAt": 1780063578253
+}

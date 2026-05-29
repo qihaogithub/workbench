@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "layoutStyle": {
+      "type": "string",
+      "title": "布局样式",
+      "enum": ["grid", "list", "card"],
+      "enumNames": ["网格布局", "列表布局", "卡片布局"],
+      "default": "grid",
+      "description": "内容的排列布局方式"
+    },
+    "animationEnabled": {
+      "type": "boolean",
+      "title": "启用动画",
+      "default": true,
+      "description": "是否启用卡片入场和悬停动画效果"
+    },
+    "animationDuration": {
+      "type": "number",
+      "title": "动画时长(ms)",
+      "default": 400,
+      "minimum": 100,
+      "maximum": 1500,
+      "description": "动画持续时长，单位毫秒（滑块控制）"
+    },
+    "columns": {
+      "type": "number",
+      "title": "网格列数",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 3,
+      "description": "网格布局下的列数"
+    },
+    "roundedLevel": {
+      "type": "string",
+      "title": "圆角程度",
+      "enum": ["none", "sm", "md", "lg", "xl", "full"],
+      "enumNames": ["无圆角", "小圆角", "中圆角", "大圆角", "超大圆角", "全圆角"],
+      "default": "lg",
+      "description": "卡片的圆角大小（下拉选择）"
+    },
+    "showBorder": {
+      "type": "boolean",
+      "title": "显示边框",
+      "default": true,
+      "description": "是否为卡片添加边框"
+    },
+    "borderStyle": {
+      "type": "string",
+      "title": "边框样式",
+      "enum": ["solid", "dashed", "dotted"],
+      "enumNames": ["实线", "虚线", "点线"],
+      "default": "solid",
+      "description": "边框的线条样式"
+    },
+    "contentDensity": {
+      "type": "string",
+      "title": "内容密度",
+      "enum": ["compact", "comfortable", "spacious"],
+      "enumNames": ["紧凑", "舒适", "宽松"],
+      "default": "comfortable",
+      "description": "卡片内边距和间距的紧凑程度"
+    }
+  }
+}

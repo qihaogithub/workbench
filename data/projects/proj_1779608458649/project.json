@@ -104,5 +104,7 @@
     }
   ],
   "createdAt": 1779608458652,
-  "updatedAt": 1779785298719
+  "updatedAt": 1779785298719,
+  "publishedVersion": "v10",
+  "publishedAt": 1780063578252
 }

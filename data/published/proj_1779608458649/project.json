@@ -1,0 +1,35 @@
+{
+  "id": "proj_1779608458649",
+  "name": "学习页-课后",
+  "thumbnail": "/data/proj_1779608458649/thumbnail.png",
+  "publishedVersion": "v10",
+  "publishedAt": 1780063578252,
+  "demoPages": [
+    {
+      "id": "demo_1779608460500_a1b2c3",
+      "name": "课后服务-手机",
+      "order": 1,
+      "parentId": null,
+      "compiledJsPath": "demos/demo_1779608460500_a1b2c3/compiled.js",
+      "schemaPath": "demos/demo_1779608460500_a1b2c3/schema.json",
+      "previewSize": {
+        "width": 375,
+        "height": 812
+      }
+    },
+    {
+      "id": "demo_1779608461000_d4e5f6",
+      "name": "课后服务-平板",
+      "order": 2,
+      "parentId": null,
+      "compiledJsPath": "demos/demo_1779608461000_d4e5f6/compiled.js",
+      "schemaPath": "demos/demo_1779608461000_d4e5f6/schema.json",
+      "previewSize": {
+        "width": 1024,
+        "height": 768
+      }
+    }
+  ],
+  "demoFolders": [],
+  "projectConfigSchema": "{\r\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\r\n  \"title\": \"课后服务 - 项目级共享配置\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"bannerImage\": {\r\n      \"type\": \"string\",\r\n      \"format\": \"image\",\r\n      \"title\": \"Banner图片\",\r\n      \"description\": \"两个页面共用的Banner展示图片\",\r\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png\"\r\n    }\r\n  }\r\n}"
+}

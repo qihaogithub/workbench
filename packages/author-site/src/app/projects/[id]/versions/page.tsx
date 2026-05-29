@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectApiClient } from '@/lib/project-api';
 import type { VersionHistoryResponse, VersionInfo } from '@opencode-workbench/shared';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UsernameDisplay } from '@/components/username-selector';
 import { getCurrentUsername } from '@/components/username-selector';
+import { useToast } from '@/components/ui/toast-provider';
 import {
   ArrowLeft,
   History,
@@ -20,22 +21,29 @@ import {
   FileText,
   Clock,
   User,
+  Upload,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
+type PublishStatusType = 'never_published' | 'published' | 'unpublished_changes';
+
 export default function VersionHistoryPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [publishStatus, setPublishStatus] = useState<PublishStatusType | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
   const username = getCurrentUsername();
 
-  // 加载版本历史
-  const loadVersionHistory = async () => {
+  const loadVersionHistory = useCallback(async () => {
     try {
       const data = await projectApiClient.getVersionHistory(params.id);
       setVersionHistory(data);
@@ -45,14 +53,50 @@ export default function VersionHistoryPage({ params }: { params: { id: string } 
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  const loadPublishStatus = useCallback(async () => {
+    try {
+      const result = await projectApiClient.getPublishStatus(params.id);
+      setPublishStatus(result.status);
+      setPublishedVersion(result.publishedVersion);
+    } catch {
+      setPublishStatus(null);
+    }
+  }, [params.id]);
 
   useEffect(() => {
     loadVersionHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+    loadPublishStatus();
+  }, [loadVersionHistory, loadPublishStatus]);
 
-  // 恢复版本
+  const handlePublish = async () => {
+    setPublishing(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const result = await projectApiClient.publishProject(params.id);
+      setPublishStatus('published');
+      setPublishedVersion(result.publishedVersion);
+      setSuccess(`已成功发布版本 ${result.publishedVersion}，共 ${result.demoCount} 个页面`);
+      toast({
+        title: '发布成功',
+        description: `版本 ${result.publishedVersion} 已发布到预览端，共 ${result.demoCount} 个页面`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '发布失败';
+      setError(message);
+      toast({
+        title: '发布失败',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleRestoreVersion = async (version: VersionInfo) => {
     if (!username) {
       setError('请先设置用户名');
@@ -75,8 +119,8 @@ export default function VersionHistoryPage({ params }: { params: { id: string } 
 
       setSuccess(`已成功恢复到新版本 ${result.newVersionId}`);
 
-      // 重新加载版本历史
       await loadVersionHistory();
+      await loadPublishStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : '恢复版本失败');
     } finally {
@@ -140,19 +184,74 @@ export default function VersionHistoryPage({ params }: { params: { id: string } 
         </Alert>
       )}
 
-      {/* 当前版本信息 */}
+      {/* 当前版本信息 + 发布按钮 */}
       {versionHistory && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>当前版本</CardTitle>
-            <CardDescription>
-              项目最新版本号
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>当前版本</CardTitle>
+                <CardDescription>
+                  项目最新版本号
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                {publishStatus && (
+                  <Badge
+                    variant={
+                      publishStatus === 'published' ? 'secondary' :
+                      publishStatus === 'unpublished_changes' ? 'default' :
+                      'outline'
+                    }
+                  >
+                    {publishStatus === 'published' && '已发布'}
+                    {publishStatus === 'unpublished_changes' && '有未发布变更'}
+                    {publishStatus === 'never_published' && '未发布'}
+                  </Badge>
+                )}
+                <Button
+                  onClick={handlePublish}
+                  disabled={
+                    publishing ||
+                    publishStatus === 'published' ||
+                    publishStatus === null
+                  }
+                  variant={publishStatus === 'unpublished_changes' ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-2"
+                >
+                  {publishing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      发布中...
+                    </>
+                  ) : publishStatus === 'published' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      已发布
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      发布到预览端
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <Badge variant="default" className="text-lg">
-              {versionHistory.currentVersion}
-            </Badge>
+            <div className="flex items-center gap-4">
+              <Badge variant="default" className="text-lg">
+                {versionHistory.currentVersion}
+              </Badge>
+              {publishedVersion && publishStatus === 'published' && (
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  已发布版本：{publishedVersion}
+                </span>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

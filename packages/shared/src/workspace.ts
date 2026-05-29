@@ -109,6 +109,8 @@ export interface Project {
   updatedAt: number;           // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
   thumbnail?: string;          // 缩略图路径
+  publishedVersion?: string;   // 已发布的版本ID，如 "v3"；undefined 表示从未发布
+  publishedAt?: number;        // 最后发布时间戳
 }
 
 /**

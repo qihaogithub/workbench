@@ -113,7 +113,23 @@ export default function ProjectEditPage({ params }: { params: { id: string } }) 
 
       setSuccess(`已成功保存为新版本 ${result.version}`);
 
-      // 延迟跳转到项目列表
+      const shouldPublish = confirm('保存成功！当前有未发布变更，是否立即发布到预览端？');
+      if (shouldPublish) {
+        try {
+          const publishResult = await projectApiClient.publishProject(params.id);
+          toast({
+            title: '发布成功',
+            description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
+          });
+        } catch (publishErr) {
+          toast({
+            title: '发布失败',
+            description: publishErr instanceof Error ? publishErr.message : '发布失败',
+            variant: 'destructive',
+          });
+        }
+      }
+
       setTimeout(() => {
         router.push(`/projects/${params.id}/versions`);
       }, 1500);

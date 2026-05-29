@@ -87,6 +87,8 @@ export const ErrorCode = {
   FOLDER_NOT_FOUND: "FOLDER_NOT_FOUND",
   FOLDER_DEPTH_EXCEEDED: "FOLDER_DEPTH_EXCEEDED",
   CIRCULAR_REFERENCE: "CIRCULAR_REFERENCE",
+  NO_CONTENT_TO_PUBLISH: "NO_CONTENT_TO_PUBLISH",
+  PUBLISH_FAILED: "PUBLISH_FAILED",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -117,6 +119,8 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   FOLDER_NOT_FOUND: "文件夹不存在",
   FOLDER_DEPTH_EXCEEDED: "文件夹嵌套不能超过 3 层",
   CIRCULAR_REFERENCE: "不能将文件夹移动到自身或其子文件夹中",
+  NO_CONTENT_TO_PUBLISH: "项目没有可发布的Demo页面",
+  PUBLISH_FAILED: "发布失败",
 };
 
 export * from "./workspace";
