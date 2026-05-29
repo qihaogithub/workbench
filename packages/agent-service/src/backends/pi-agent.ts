@@ -61,9 +61,11 @@ export class PiAgentBackend implements IBackendAdapter {
         },
         streamFn: streamSimple,
         getApiKey: async (provider: string) => {
-          return this.config.piAgent?.apiKey || 
+          const apiKey = this.config.piAgent?.apiKey || 
                  process.env[`${provider.toUpperCase()}_API_KEY`] ||
                  serviceConfig.piAgent.apiKey;
+          logger.info({ provider, apiKeyLength: apiKey?.length }, "Pi Agent getApiKey called");
+          return apiKey;
         },
         beforeToolCall: async (context: any) => {
           const toolName = context.toolCall.name;
@@ -100,8 +102,11 @@ export class PiAgentBackend implements IBackendAdapter {
 
   private getModel() {
     const provider = this.config.piAgent?.provider || serviceConfig.piAgent.provider;
-    const modelId = this.config.piAgent?.model || this.config.model || serviceConfig.piAgent.model;
+    // 优先使用 piAgent 配置的 model，不要使用 OpenCode 的 config.model
+    const modelId = this.config.piAgent?.model || serviceConfig.piAgent.model;
     const baseUrl = this.config.piAgent?.baseUrl || serviceConfig.piAgent.baseUrl;
+    
+    logger.info({ modelId, provider, baseUrl }, "Pi Agent getModel");
     
     // 如果有自定义 baseUrl，创建自定义模型
     if (baseUrl) {
@@ -143,11 +148,21 @@ export class PiAgentBackend implements IBackendAdapter {
       logger.info("Pi Agent idle, extracting response");
       this.status = "ready";
       
+      // 检查错误消息
+      if (this.agent.state.errorMessage) {
+        logger.error({ errorMessage: this.agent.state.errorMessage }, "Pi Agent error message");
+      }
+      
       const lastAssistantMessage = this.agent.state.messages
         .filter((m: any) => m.role === 'assistant')
         .pop();
       
       if (lastAssistantMessage && 'content' in lastAssistantMessage) {
+        // 检查消息是否有错误
+        if ('errorMessage' in lastAssistantMessage && lastAssistantMessage.errorMessage) {
+          logger.error({ errorMessage: lastAssistantMessage.errorMessage }, "Pi Agent assistant message error");
+        }
+        
         const result = lastAssistantMessage.content
           .filter((c: any) => c.type === 'text')
           .map((c: any) => c.text)
