@@ -1,6 +1,14 @@
 {
   "projects": [
     {
+      "id": "proj_1779608460378",
+      "name": "广场页面",
+      "thumbnail": "/data/proj_1779608460378/thumbnail.png",
+      "publishedAt": 1780072530331,
+      "publishedVersion": "v7",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1779608458649",
       "name": "学习页-课后",
       "thumbnail": "/data/proj_1779608458649/thumbnail.png",
@@ -17,5 +25,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1780063578253
+  "generatedAt": 1780072530332
 }

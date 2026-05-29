@@ -9,7 +9,7 @@
       "order": 1,
       "parentId": null,
       "createdAt": 1779608460379,
-      "updatedAt": 1780048416926
+      "updatedAt": 1780072537486
     },
     {
       "id": "demo_1779608460380_d4e5f6",
@@ -61,8 +61,34 @@
       "sessionId": "session-1780048325878-d7jrpe745",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v5",
       "fileCount": 6
+    },
+    {
+      "versionId": "v6",
+      "savedAt": 1780071552703,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780070423042-uysfxuds5",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v6",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v7",
+      "savedAt": 1780071637954,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780071636398-t6x1ie5id",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v7",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v8",
+      "savedAt": 1780072538130,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780072052941-69d7yx13q",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v8",
+      "fileCount": 6
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780048416962
+  "updatedAt": 1780072538131,
+  "publishedVersion": "v7",
+  "publishedAt": 1780072530331
 }

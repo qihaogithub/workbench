@@ -52,6 +52,13 @@ import {
   ZoomIn,
   ZoomOut,
   ShieldCheck,
+  Upload,
+  CheckCircle,
+  History,
+  RotateCcw,
+  Clock,
+  User,
+  RefreshCw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -71,7 +78,10 @@ import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
-import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
+import type { DemoPageMeta, DemoFolderMeta, VersionHistoryResponse, VersionInfo } from "@opencode-workbench/shared";
+import { projectApiClient } from "@/lib/project-api";
+import { format } from "date-fns";
+import { zhCN } from "date-fns/locale";
 
 interface DemoEditPageProps {
   params: {
@@ -157,6 +167,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [tabValue, setTabValue] = useState("ai");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
   const [snapshotVersion, setSnapshotVersion] = useState(0);
+
+  const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
+  const [publishing, setPublishing] = useState(false);
+
+  const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -541,6 +558,79 @@ ${context.details}
     [projectConfigSchema],
   );
 
+  useEffect(() => {
+    projectApiClient.getPublishStatus(demoId).then((result) => {
+      setPublishStatus(result.status);
+      setPublishedVersion(result.publishedVersion);
+    }).catch(() => {
+      setPublishStatus(null);
+    });
+  }, [demoId]);
+
+  const loadVersionHistory = useCallback(async () => {
+    try {
+      const data = await projectApiClient.getVersionHistory(demoId);
+      setVersionHistory(data);
+    } catch {
+      setVersionHistory(null);
+    }
+  }, [demoId]);
+
+  useEffect(() => {
+    loadVersionHistory();
+  }, [loadVersionHistory]);
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const publishResult = await projectApiClient.publishProject(demoId);
+      setPublishStatus('published');
+      setPublishedVersion(publishResult.publishedVersion);
+      toast({
+        title: '发布成功',
+        description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
+      });
+    } catch (publishErr) {
+      toast({
+        title: '发布失败',
+        description: publishErr instanceof Error ? publishErr.message : '发布失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleRestoreVersion = async (version: VersionInfo) => {
+    if (!confirm(`确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`)) {
+      return;
+    }
+
+    setRestoring(version.versionId);
+    try {
+      const result = await projectApiClient.restoreVersion(demoId, {
+        versionId: version.versionId,
+        username: 'user',
+      });
+      toast({
+        title: '恢复成功',
+        description: `已恢复到新版本 ${result.newVersionId}`,
+      });
+      await loadVersionHistory();
+      const statusResult = await projectApiClient.getPublishStatus(demoId);
+      setPublishStatus(statusResult.status);
+      setPublishedVersion(statusResult.publishedVersion);
+    } catch (err) {
+      toast({
+        title: '恢复失败',
+        description: err instanceof Error ? err.message : '恢复版本失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!sessionId) {
       console.error("[handleSave] sessionId 为空!");
@@ -614,6 +704,10 @@ ${context.details}
         title: "保存成功",
         description: "Demo 已更新",
       });
+
+      setPublishStatus('unpublished_changes');
+
+      loadVersionHistory();
 
       router.push("/");
     } catch (error) {
@@ -744,6 +838,33 @@ ${context.details}
               "保存"
             )}
           </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={
+              publishing ||
+              publishStatus === 'published' ||
+              publishStatus === null
+            }
+            variant={publishStatus === 'unpublished_changes' ? 'default' : 'outline'}
+            className="gap-2"
+          >
+            {publishing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                发布中...
+              </>
+            ) : publishStatus === 'published' ? (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                已发布
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                发布
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -780,6 +901,10 @@ ${context.details}
                 <TabsTrigger value="code" className="gap-2">
                   <FileCode2 className="h-4 w-4" />
                   代码
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2">
+                  <History className="h-4 w-4" />
+                  版本
                 </TabsTrigger>
               </TabsList>
 
@@ -1177,6 +1302,106 @@ ${context.details}
                   }}
                 />
               </TabsContent>
+
+              <TabsContent
+                value="history"
+                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-auto"
+              >
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">当前版本</span>
+                      {versionHistory && (
+                        <Badge variant="default">{versionHistory.currentVersion}</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {publishStatus && (
+                        <Badge
+                          variant={
+                            publishStatus === 'published' ? 'secondary' :
+                            publishStatus === 'unpublished_changes' ? 'default' :
+                            'outline'
+                          }
+                        >
+                          {publishStatus === 'published' && '已发布'}
+                          {publishStatus === 'unpublished_changes' && '有未发布变更'}
+                          {publishStatus === 'never_published' && '未发布'}
+                        </Badge>
+                      )}
+                      {publishedVersion && publishStatus === 'published' && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <RefreshCw className="h-3 w-3" />
+                          {publishedVersion}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {!versionHistory || versionHistory.versions.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>暂无版本历史</p>
+                      <p className="text-xs mt-1">保存编辑后会创建版本记录</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {versionHistory.versions.map((version, index) => {
+                        const isLatest = index === 0;
+                        return (
+                          <div
+                            key={version.versionId}
+                            className={`p-3 rounded-lg border ${isLatest ? 'border-primary/30 bg-primary/5' : 'border-border'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{version.versionId}</span>
+                                {isLatest && <Badge variant="default" className="text-[10px] h-4 px-1">最新</Badge>}
+                                {version.sessionId === 'restore' && <Badge variant="secondary" className="text-[10px] h-4 px-1">恢复</Badge>}
+                              </div>
+                              <Button
+                                variant={isLatest ? 'ghost' : 'ghost'}
+                                size="sm"
+                                onClick={() => handleRestoreVersion(version)}
+                                disabled={restoring === version.versionId || isLatest}
+                                className="h-7 gap-1 text-xs"
+                              >
+                                {restoring === version.versionId ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="h-3 w-3" />
+                                )}
+                                {isLatest ? '当前' : '恢复'}
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {format(version.savedAt, 'MM-dd HH:mm', { locale: zhCN })}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {version.savedBy}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <FileText className="h-3 w-3" />
+                                {version.fileCount} 文件
+                              </span>
+                            </div>
+                            {version.note && (
+                              <p className="mt-1 text-xs text-muted-foreground truncate">{version.note}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <p className="text-center text-xs text-muted-foreground pt-2">
+                        共 {versionHistory.totalVersions} 个版本
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
             </Tabs>
           </ResizablePanel>
 
