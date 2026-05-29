@@ -8,42 +8,5 @@
   },
   "title": "广场页面 - 平板版配置",
   "type": "object",
-  "properties": {
-    "bigBannerMaxWidth": {
-      "type": "number",
-      "title": "大Banner最大宽度(px)",
-      "description": "大Banner图片容器的最大宽度限制",
-      "default": 688
-    },
-    "bigBannerMaxHeight": {
-      "type": "number",
-      "title": "大Banner最大高度(px)",
-      "description": "大Banner图片容器的最大高度限制",
-      "default": 320
-    },
-    "miniBannerMaxWidth": {
-      "type": "number",
-      "title": "小Banner最大宽度(px)",
-      "description": "每个小Banner图片的最大宽度限制",
-      "default": 300
-    },
-    "miniBannerMaxHeight": {
-      "type": "number",
-      "title": "小Banner最大高度(px)",
-      "description": "小Banner滚动区域的最大高度限制",
-      "default": 137
-    },
-    "imageMaxWidth": {
-      "type": "number",
-      "title": "图片全局最大宽度(px)",
-      "description": "所有图片的最大宽度限制，0表示不限制",
-      "default": 0
-    },
-    "imageMaxHeight": {
-      "type": "number",
-      "title": "图片全局最大高度(px)",
-      "description": "所有图片的最大高度限制，0表示不限制",
-      "default": 0
-    }
-  }
+  "properties": {}
 }

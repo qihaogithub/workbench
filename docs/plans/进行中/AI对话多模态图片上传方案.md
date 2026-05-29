@@ -1,8 +1,9 @@
 # AI 对话多模态 — 图片上传方案
 
-> 版本：v1.1
+> 版本：v1.2
 > 创建日期：2026-05-27
 > 根因确认：2026-05-29（代码审查验证 10 处断裂点）
+> 第一轮修复：2026-05-29（全链路 images 参数贯通）
 > 关联需求：[AI对话\_需求文档.md](../../项目文档/创作端/05-AI对话/AI对话_需求文档.md)
 > 关联架构：[02_AIChat分层架构.md](../../项目文档/创作端/05-AI对话/技术/02_AIChat分层架构.md)
 
@@ -40,18 +41,54 @@
 
 **根因结论**：图片数据在 **ChatInput.handleSubmit**（第①处）被丢弃，后续全链路均无 images 参数传递。这是一处**设计遗漏** — UI 层已完整实现附件管理，但 `onSubmit` 回调签名仅为 `string`，导致图片从未进入数据流。
 
-### 1.3 数据流断裂示意
+### 1.2.1 第一轮修复记录（2026-05-29）
+
+已完成的修复 — 全链路 images 参数贯通：
+
+| # | 文件 | 改动 |
+| :-- | :--- | :--- |
+| 1 | `packages/shared/src/index.ts` | 新增 `ImageAttachment` 共享类型 |
+| 2 | `packages/agent-client/src/types.ts` | `SendMessageOptions` 添加 `images` 字段 |
+| 3 | `packages/agent-client/src/client.ts` | `AgentStream.send` 和 `AgentClient.sendMessage` 支持 images |
+| 4 | `packages/author-site/.../chat-input.tsx` | `handleSubmit` 提取图片转 Base64，`onSubmit` 签名扩展 |
+| 5 | `packages/author-site/.../use-chat-stream.ts` | `handleSend` 接受 images 参数并透传 |
+| 6 | `packages/author-site/.../stream-service.ts` | `sendMessage` 支持 images |
+| 7 | `packages/agent-service/.../types.ts` | `SendMessageOptions` 添加 `images` 字段 |
+| 8 | `packages/agent-service/.../websocket.ts` | 解析 images 并传递给 agent |
+| 9 | `packages/agent-service/.../base.ts` | `sendMessage` 接口添加 images |
+| 10 | `packages/agent-service/.../opencode-http.ts` | `sendMessage` 构建多模态 parts 数组 |
+
+### 1.2.2 剩余问题（待排查）
+
+> 第一轮修复后测试：发送图片，AI 依然看不到图片。需要排查以下环节。
+
+| # | 排查方向 | 可能原因 | 排查方法 |
+| :-- | :--- | :--- | :--- |
+| **A** | OpenCode Server API 兼容性 | `/session/:id/message` 和 `/session/:id/prompt_async` 的 `parts` 数组是否支持 `type: "image"` 格式？ | 查阅 OpenCode Server API 文档或源码，确认 `parts` 支持的类型 |
+| **B** | 图片 parts 格式 | 当前实现使用 `{ type: "image", image: data, mimeType }` — 字段名 `image` 和 `mimeType` 是否正确？OpenCode Server 可能期望 `data`/`mediaType` 或其他字段名 | 对比 OpenCode Server 的 `UserMessagePart` 类型定义 |
+| **C** | 图片数据编码 | 前端 `fileToBase64` 去掉了 `data:...;base64,` 前缀，但 OpenCode Server 可能期望完整 Data URL 或纯 base64 字符串 | 测试发送不同格式的 base64 数据 |
+| **D** | WebSocket 消息大小 | 大图片可能导致 WebSocket 帧超限，消息被静默丢弃 | 检查 agent-service 日志，确认消息是否到达后端 |
+| **E** | 非 opencode-http 后端 | 如果使用的是 ACP 后端（claude/gemini 等），它们通过 stdio 子进程通信，images 参数未被传递到 ACP 协议层 | 检查当前使用的 backend 类型，确认是否为 opencode-http |
+| **F** | 浏览器端图片转换 | `PromptInputFile.file` 可能为 undefined（File 对象在某些情况下会丢失） | 在 `handleSubmit` 中添加 `console.log(message.files)` 调试 |
+
+### 1.3 数据流（修复后 + 待验证断裂点）
 
 ```
 用户选图 → PromptInputAddImage → attachments.files（✅ 已有）
     → ChatInput.handleSubmit（chat-input.tsx:82-94）
-        → 只取 message.text（chat-input.tsx:91）（❌ files 丢弃 — 根因起点）
-            → useChatStream.handleSend(text)（use-chat-stream.ts:159）（❌ 无图片参数）
-                → StreamService.sendMessage(text, workingDir)（stream-service.ts:113）（❌ 无图片字段）
-                    → AgentStream.send(text, id, { stream, workingDir })（client.ts:315）（❌ 无 images 字段）
-                        → WebSocket JSON（websocket.ts:31-44）（❌ ClientMessage 无 images）
-                            → agent.sendMessage(content, options)（websocket.ts:235）（❌ 不传 images）
-                                → Backend.sendMessage(content, { stream })（base.ts:8）（❌ 不支持多模态）
+        → fileToBase64() → ImageAttachment[]（✅ 已修复）
+            → onSubmit(text, images)（✅ 已修复）
+                → useChatStream.handleSend(text, images)（✅ 已修复）
+                    → StreamService.sendMessage(text, workingDir, images)（✅ 已修复）
+                        → AgentStream.send(text, id, { images })（✅ 已修复）
+                            → WebSocket JSON: { type, content, images }（✅ 已修复）
+                                → agent-service: ClientMessage.images（✅ 已修复）
+                                    → agent.sendMessage(content, { images })（✅ 已修复）
+                                        → OpenCodeHttpBackend.sendMessage（✅ 已修复）
+                                            → parts = [...imageParts, {type:"text"}]（✅ 已修复）
+                                                → POST /session/:id/message（⚠️ 待验证）
+                                                    → OpenCode Server 处理（❓ 未知）
+                                                        → LLM API（❓ 未知）
 ```
 
 ---
@@ -400,15 +437,16 @@ export interface ImageAttachment {
 
 ## 七、实施优先级
 
-| 阶段 | 任务                             | 说明                               |
-| :--- | :------------------------------- | :--------------------------------- |
-| P0   | Task 1-5 + Task 9                | 前端全链路 + agent-client 类型扩展 |
-| P0   | Task 6                           | agent-service WS 解析              |
-| P0   | Task 7 + Task 8（opencode-http） | 默认后端适配                       |
-| P1   | Task 8（claude, gemini）         | 主流多模态后端适配                 |
-| P2   | Task 8（ACP 后端）               | ACP 协议层扩展                     |
-| P2   | 消息历史图片回显优化             | 持久化体积优化                     |
-| P3   | 分片发送方案                     | 大图/多图场景优化                  |
+| 阶段 | 任务 | 说明 | 状态 |
+| :--- | :--- | :--- | :--- |
+| P0 | Task 1-5 + Task 9 | 前端全链路 + agent-client 类型扩展 | ✅ 已完成 |
+| P0 | Task 6 | agent-service WS 解析 | ✅ 已完成 |
+| P0 | Task 7 + Task 8（opencode-http） | 默认后端适配 | ✅ 已完成 |
+| **P0** | **OpenCode Server API 兼容性验证** | **确认 API 支持 image parts** | ⏳ 待排查 |
+| P1 | Task 8（claude, gemini） | 主流多模态后端适配 | ⏳ 待实施 |
+| P2 | Task 8（ACP 后端） | ACP 协议层扩展 | ⏳ 待实施 |
+| P2 | 消息历史图片回显优化 | 持久化体积优化 | ⏳ 待实施 |
+| P3 | 分片发送方案 | 大图/多图场景优化 | ⏳ 待实施 |
 
 ---
 
@@ -432,3 +470,69 @@ export interface ImageAttachment {
 - [01\_对话组件设计.md](../../项目文档/创作端/05-AI对话/技术/01_对话组件设计.md)
 - [02_AIChat分层架构.md](../../项目文档/创作端/05-AI对话/技术/02_AIChat分层架构.md)
 - [AI对话模型选择功能方案](../已完成/AI对话/AI对话模型选择功能方案.md)（图片守卫的初始实现）
+
+---
+
+## 十、调试指南（下次修复用）
+
+### 10.1 快速验证图片是否到达 OpenCode Server
+
+在 `packages/agent-service/src/backends/opencode-http.ts` 的 `sendMessageSync` 方法开头添加日志：
+
+```typescript
+private async sendMessageSync(content: string, images?: ImageAttachment[]): Promise<string> {
+  logger.info({ 
+    contentLength: content.length, 
+    imagesCount: images?.length,
+    imageDetails: images?.map(img => ({ mimeType: img.mimeType, dataLength: img.data.length }))
+  }, "OpenCodeHttpBackend.sendMessageSync called");
+  // ... 原有逻辑
+}
+```
+
+### 10.2 检查 OpenCode Server API 是否支持图片
+
+测试命令（手动验证）：
+
+```bash
+# 1. 创建 session
+curl -X POST http://localhost:4096/session \
+  -H "Content-Type: application/json" \
+  -d '{"title":"test-image"}'
+
+# 返回 {"id":"<session-id>"}
+
+# 2. 发送带图片的消息（用一个小的 1x1 像素 PNG base64）
+curl -X POST http://localhost:4096/session/<session-id>/message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parts": [
+      {"type":"image","image":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==","mimeType":"image/png"},
+      {"type":"text","text":"这是什么图片？"}
+    ]
+  }'
+```
+
+如果返回错误，说明 OpenCode Server 不支持 image parts，需要查阅其 API 文档确认正确的格式。
+
+### 10.3 前端调试
+
+在 `packages/author-site/src/components/ai-elements/chat/chat-input.tsx` 的 `handleSubmit` 中添加日志：
+
+```typescript
+const handleSubmit = useCallback(
+  async (message: PromptInputMessage) => {
+    console.log("[ChatInput] handleSubmit called", {
+      text: message.text,
+      filesCount: message.files?.length,
+      files: message.files?.map(f => ({ name: f.name, type: f.type, hasFile: !!f.file }))
+    });
+    // ... 原有逻辑
+  },
+  [onSubmit],
+);
+```
+
+### 10.4 WebSocket 消息调试
+
+在浏览器开发者工具的 Network → WS 标签中，找到 `/api/agent/:sessionId/stream` 连接，查看发送的消息是否包含 `images` 字段。

@@ -65,6 +65,60 @@
 | `placeholder` | 文本/文件上传 | 占位提示文案                              |
 | `maxItems`    | 多图列表      | 最大图片数量，默认 20                     |
 
+### 图片尺寸校验（ui:options）
+
+当图片配置项需要特定尺寸时，可在 `ui:options` 中声明尺寸约束。系统会在上传时自动校验，尺寸不符会弹出警告对话框，用户可选择「取消上传」或「继续上传」。
+
+| 选项        | 类型     | 说明           | 示例   |
+| :---------- | :------- | :------------- | :----- |
+| `minWidth`  | `number` | 最小宽度（px） | `100`  |
+| `minHeight` | `number` | 最小高度（px） | `100`  |
+| `maxWidth`  | `number` | 最大宽度（px） | `2048` |
+| `maxHeight` | `number` | 最大高度（px） | `2048` |
+
+**使用原则**：
+
+- 仅在**业务确实需要特定尺寸**时才添加尺寸校验，不要滥用
+- 常见的需要尺寸校验场景：Banner 图、头像、商品主图、背景图等
+- 建议同时设置 `minWidth` + `minHeight`（保证最小清晰度）或 `maxWidth` + `maxHeight`（控制文件大小）
+- 尺寸校验是**警告模式**，不强制阻止上传
+
+**单图示例**（Banner 图，要求宽度至少 750px）：
+
+```json
+{
+  "bannerImage": {
+    "type": "string",
+    "format": "image",
+    "title": "Banner 图",
+    "ui:options": {
+      "accept": "image/*",
+      "maxSize": 5242880,
+      "minWidth": 750,
+      "maxWidth": 2048,
+      "maxHeight": 1024
+    }
+  }
+}
+```
+
+**多图示例**（商品图片，要求正方形且至少 200x200px）：
+
+```json
+{
+  "productImages": {
+    "type": "array",
+    "title": "商品图片",
+    "ui:widget": "imageList",
+    "ui:options": {
+      "maxItems": 10,
+      "minWidth": 200,
+      "minHeight": 200
+    }
+  }
+}
+```
+
 ## 扩展字段（$demo）
 
 ### $demo.previewSize — 预览尺寸
@@ -156,7 +210,10 @@
       "default": "https://picsum.photos/750/400",
       "ui:options": {
         "accept": "image/*",
-        "maxSize": 5242880
+        "maxSize": 5242880,
+        "minWidth": 750,
+        "maxWidth": 2048,
+        "maxHeight": 1024
       }
     },
     "layout": {
