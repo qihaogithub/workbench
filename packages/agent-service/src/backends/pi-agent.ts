@@ -1,17 +1,30 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange } from '../core/types';
-import { Agent, AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core';
-import { streamSimple, getModel } from '@earendil-works/pi-ai';
 import { createWorkbenchTools } from './pi-tools';
 import { logger } from '../utils/logger';
 import { loadConfig } from '../utils/config';
 
 const serviceConfig = loadConfig();
 
+// 动态导入 ESM-only 依赖
+let Agent: any;
+let streamSimple: any;
+let getModel: any;
+
+async function loadPiAgentDeps() {
+  if (!Agent) {
+    const piAgentCore = await import('@earendil-works/pi-agent-core');
+    const piAi = await import('@earendil-works/pi-ai');
+    Agent = piAgentCore.Agent;
+    streamSimple = piAi.streamSimple;
+    getModel = piAi.getModel;
+  }
+}
+
 export class PiAgentBackend implements IBackendAdapter {
   readonly name = "pi-agent";
   
-  private agent: Agent | null = null;
+  private agent: any = null;
   private config: AgentConfig;
   private status: BackendStatus = "idle";
   private eventCallback?: (event: AgentEvent) => void;
@@ -32,6 +45,9 @@ export class PiAgentBackend implements IBackendAdapter {
     logger.info("Initializing Pi Agent backend");
 
     try {
+      // 动态加载 ESM 依赖
+      await loadPiAgentDeps();
+      
       const tools = createWorkbenchTools(this.config);
       const model = this.getModel();
       
@@ -42,7 +58,7 @@ export class PiAgentBackend implements IBackendAdapter {
                  process.env[`${provider.toUpperCase()}_API_KEY`] ||
                  serviceConfig.piAgent.apiKey;
         },
-        beforeToolCall: async (context) => {
+        beforeToolCall: async (context: any) => {
           const toolName = context.toolCall.name;
           if (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'listFiles') {
             const args = context.args as { path?: string };
@@ -52,7 +68,7 @@ export class PiAgentBackend implements IBackendAdapter {
           }
           return undefined;
         },
-        afterToolCall: async (context) => {
+        afterToolCall: async (context: any) => {
           if (context.toolCall.name === 'writeFile' && !context.isError) {
             const args = context.args as { path: string; content: string };
             this.files.push({
@@ -100,7 +116,7 @@ export class PiAgentBackend implements IBackendAdapter {
     }
     
     // 否则使用预定义模型
-    return getModel(provider as any, modelId);
+    return getModel(provider, modelId);
   }
 
   private isPathAllowed(filePath: string): boolean {
@@ -120,13 +136,13 @@ export class PiAgentBackend implements IBackendAdapter {
       this.status = "ready";
       
       const lastAssistantMessage = this.agent.state.messages
-        .filter(m => m.role === 'assistant')
+        .filter((m: any) => m.role === 'assistant')
         .pop();
       
       if (lastAssistantMessage && 'content' in lastAssistantMessage) {
         return lastAssistantMessage.content
-          .filter(c => c.type === 'text')
-          .map(c => c.text)
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text)
           .join('');
       }
       
@@ -208,7 +224,7 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private setupEventMapping(): void {
-    this.agent!.subscribe((event: PiAgentEvent) => {
+    this.agent!.subscribe((event: any) => {
       if (!this.eventCallback) return;
       
       const sessionId = this.sessionId ?? this.config.sessionId;
