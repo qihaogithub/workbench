@@ -25,7 +25,10 @@ export default function LoginPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message || "登录失败");
 
-      toast({ title: "登录成功", description: `欢迎回来，${data.data.user.username}` });
+      toast({
+        title: "登录成功",
+        description: `欢迎回来，${data.data.user.username}`,
+      });
       router.push(redirect);
       router.refresh();
     } catch (error) {
@@ -42,12 +45,20 @@ export default function LoginPage() {
   return (
     <div className="space-y-4">
       <LoginForm onSubmit={handleLogin} loading={loading} />
-      <p className="text-center text-sm text-muted-foreground">
-        还没有账号？{" "}
-        <Link href="/register" className="text-primary hover:underline">
-          立即注册
+      <div className="flex items-center justify-between text-sm">
+        <p className="text-muted-foreground">
+          还没有账号？{" "}
+          <Link href="/register" className="text-primary hover:underline">
+            立即注册
+          </Link>
+        </p>
+        <Link
+          href="/forgot-password"
+          className="text-muted-foreground hover:text-primary hover:underline"
+        >
+          忘记密码？
         </Link>
-      </p>
+      </div>
     </div>
   );
 }

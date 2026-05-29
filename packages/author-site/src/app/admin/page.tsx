@@ -3,7 +3,7 @@
  */
 
 import Link from "next/link";
-import { ArrowRight, ListFilter } from "lucide-react";
+import { ArrowRight, ListFilter, Users } from "lucide-react";
 
 export default function AdminDashboard() {
   return (
@@ -33,6 +33,27 @@ export default function AdminDashboard() {
           <div className="mt-4 flex items-center gap-2 text-sm text-primary">
             <ListFilter className="h-4 w-4" />
             <span>进入配置</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/users"
+          className="block p-6 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                用户管理
+              </h3>
+              <p className="text-sm text-gray-600">
+                查看用户列表、重置用户密码
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-400" />
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm text-primary">
+            <Users className="h-4 w-4" />
+            <span>进入管理</span>
           </div>
         </Link>
       </div>

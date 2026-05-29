@@ -22,7 +22,27 @@ export function initializeDatabase(): void {
     )
   `);
 
-  console.log("[Database] Database initialized (users + system_configs)");
+  // 密码重置日志表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      reset_by TEXT NOT NULL,
+      reset_method TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reset_logs_user ON password_reset_logs(user_id)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reset_logs_created ON password_reset_logs(created_at)
+  `);
+
+  console.log(
+    "[Database] Database initialized (users + system_configs + password_reset_logs)",
+  );
 }
 
 /**

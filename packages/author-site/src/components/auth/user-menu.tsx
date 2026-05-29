@@ -18,10 +18,15 @@ export function UserMenu({ username }: { username: string }) {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    // 清除 Cookie（纯 JWT 方案无需调用后端）
-    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    // 通过服务端 API 清除 httpOnly Cookie
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // 即使请求失败也继续跳转
+    }
     toast({ title: "已登出" });
     router.push("/login");
+    router.refresh();
   };
 
   return (
@@ -38,7 +43,10 @@ export function UserMenu({ username }: { username: string }) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+        <DropdownMenuItem
+          onClick={handleLogout}
+          className="text-red-600 cursor-pointer"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>登出</span>
         </DropdownMenuItem>

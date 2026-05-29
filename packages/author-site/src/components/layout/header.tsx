@@ -1,28 +1,27 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { SettingsButton } from "@/components/settings/settings-button";
 
 interface BreadcrumbItem {
-  label: string
-  href?: string
+  label: string;
+  href?: string;
 }
 
 interface HeaderProps {
-  breadcrumbs?: BreadcrumbItem[]
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 export function Header({ breadcrumbs = [] }: HeaderProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
-  const defaultBreadcrumbs: BreadcrumbItem[] = [
-    { label: '首页', href: '/' },
-  ]
+  const defaultBreadcrumbs: BreadcrumbItem[] = [{ label: "首页", href: "/" }];
 
   const allBreadcrumbs =
-    breadcrumbs.length > 0 ? breadcrumbs : defaultBreadcrumbs
+    breadcrumbs.length > 0 ? breadcrumbs : defaultBreadcrumbs;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -44,8 +43,9 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
                 <Link
                   href={item.href}
                   className={cn(
-                    'hover:text-foreground transition-colors duration-200',
-                    index === allBreadcrumbs.length - 1 && 'text-foreground font-medium'
+                    "hover:text-foreground transition-colors duration-200",
+                    index === allBreadcrumbs.length - 1 &&
+                      "text-foreground font-medium",
                   )}
                 >
                   {item.label}
@@ -53,7 +53,8 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
               ) : (
                 <span
                   className={cn(
-                    index === allBreadcrumbs.length - 1 && 'text-foreground font-medium'
+                    index === allBreadcrumbs.length - 1 &&
+                      "text-foreground font-medium",
                   )}
                 >
                   {item.label}
@@ -63,7 +64,8 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
           ))}
         </nav>
 
+        <SettingsButton />
       </div>
     </header>
-  )
+  );
 }
