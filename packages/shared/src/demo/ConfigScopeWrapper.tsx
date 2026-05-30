@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Settings, FileText } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 
 type ConfigScope = "project" | "page";
 

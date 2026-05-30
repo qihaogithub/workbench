@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ConfigForm } from '../ConfigFormNew';
+import { ConfigForm } from '@opencode-workbench/shared/demo';
 
 const mockSchema = JSON.stringify({
   type: 'object',

@@ -3,7 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { getProjectPath, projectExists, readProjectMeta } from '@/lib/fs-utils';
 import { compileCode } from '@/lib/compiler';
-import { generateIframeHtml } from '@/lib/iframe-template';
+import { generateIframeHtml } from '@opencode-workbench/shared/demo/iframe-template';
+import { getCdnBaseUrl } from '@/lib/cdn-config';
 
 export async function GET(
   _request: Request,
@@ -59,6 +60,7 @@ export async function GET(
       compiledCode: compileResult.compiledCode,
       cssImports: compileResult.cssImports,
       configData,
+      cdnBaseUrl: getCdnBaseUrl(),
     });
 
     return new NextResponse(html, {

@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
-import { Upload, X, Loader2, ImageIcon, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Upload, X, Loader2, AlertTriangle } from 'lucide-react';
+import { cn } from './utils';
 import {
   Dialog,
   DialogContent,

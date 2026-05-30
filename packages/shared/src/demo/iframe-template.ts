@@ -99,6 +99,7 @@ export function generateIframeHtml(
             if (thisVersion !== updateVersion) return;
             currentComponent = module.default || null;
             renderComponent();
+            URL.revokeObjectURL(moduleUrl);
             if (module.default) {
               window.parent.postMessage({ type: 'LOADED' }, '*');
             } else {
@@ -269,6 +270,7 @@ ${cssLinks}
         .then((module) => {
           currentComponent = module.default;
           renderComponent();
+          URL.revokeObjectURL(moduleUrl);
         })
         .catch((err) => {
           window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');

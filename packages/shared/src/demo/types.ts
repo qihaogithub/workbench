@@ -83,4 +83,5 @@ export interface PreviewGridProps {
   configDataMap?: Record<string, Record<string, unknown>>;
   previewSize?: PreviewSize;
   snapshotVersion?: number;
+  flashCardId?: string;
 }

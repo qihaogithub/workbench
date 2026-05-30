@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { PreviewPanel } from "../PreviewPanel";
+import { PreviewPanel } from "@opencode-workbench/shared/demo";
 
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;

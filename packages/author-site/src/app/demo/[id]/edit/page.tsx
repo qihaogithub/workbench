@@ -117,7 +117,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspaceId, setWorkspaceId] = useState("");
   const [tempWorkspace, setTempWorkspace] = useState("");
   const [previewSize, setPreviewSize] =
-    useState<import("../../../../../components/demo/types").PreviewSize>();
+    useState<import("@opencode-workbench/shared/demo").PreviewSize>();
 
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -141,6 +141,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
   const [gridScale, setGridScale] = useState(1.0);
+  const [flashGridCardId, setFlashGridCardId] = useState<string | null>(null);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -1127,6 +1128,10 @@ ${context.details}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
                     setActiveDemoId(pageId);
+                    if (previewMode === "grid") {
+                      setFlashGridCardId(pageId);
+                      setTimeout(() => setFlashGridCardId(null), 1600);
+                    }
                     if (sessionId) {
                       try {
                         const res = await fetch(
@@ -1553,7 +1558,7 @@ ${context.details}
                       (p) => p.id === pageId,
                     ) as
                       | (DemoPageMeta & {
-                          previewSize?: import("../../../../../components/demo/types").PreviewSize;
+                          previewSize?: import("@opencode-workbench/shared/demo").PreviewSize;
                         })
                       | undefined;
                     if (clickedPage?.previewSize) {
@@ -1586,6 +1591,7 @@ ${context.details}
                   configDataMap={configDataMap}
                   previewSize={previewSize}
                   snapshotVersion={snapshotVersion}
+                  flashCardId={flashGridCardId ?? undefined}
                 />
               )}
             </div>

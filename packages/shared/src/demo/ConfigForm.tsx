@@ -8,7 +8,7 @@ import {
   Sparkles,
   GripVertical,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -36,9 +36,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import type { ConfigFormProps } from "./types";
-import { ImageListWidget, ImageItem } from "./ImageListWidget";
 import { FileUploadWidget } from "./widgets";
-import { getOrderable } from "@/lib/validator";
+import { ImageListWidget, type ImageItem } from "./ImageListWidget";
+import { NoteButton } from "./NoteButton";
+import { NotePreview, stripHtml } from "./NotePreview";
+import { NoteDialog } from "./NoteDialog";
+import { getOrderable } from "./validator";
 import { Button } from "@/components/ui/button";
 import {
   DndContext,
@@ -57,9 +60,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { NoteButton } from "./NoteButton";
-import { NotePreview, stripHtml } from "./NotePreview";
-import { NoteDialog } from "./NoteDialog";
 
 interface FieldConfig {
   key: string;

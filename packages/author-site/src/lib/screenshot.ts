@@ -3,7 +3,8 @@ import path from 'path';
 import type { Browser } from 'playwright';
 import { getProjectPath, readProjectMeta, writeProjectMeta } from './fs-utils';
 import { compileCode } from './compiler';
-import { generateIframeHtml } from './iframe-template';
+import { generateIframeHtml } from '@opencode-workbench/shared/demo/iframe-template';
+import { getCdnBaseUrl } from './cdn-config';
 
 const THUMBNAILS_DIR = path.join(process.cwd(), 'public', 'thumbnails');
 
@@ -63,6 +64,7 @@ export async function generateThumbnail(projectId: string): Promise<string | nul
       compiledCode: compileResult.compiledCode,
       cssImports: compileResult.cssImports,
       configData,
+      cdnBaseUrl: getCdnBaseUrl(),
     });
 
     // 启动浏览器

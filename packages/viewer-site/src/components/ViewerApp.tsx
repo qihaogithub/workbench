@@ -26,12 +26,10 @@ import type {
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
-import { PreviewPanel } from "@/components/demo/PreviewPanel";
-import { PreviewGrid } from "@/components/demo/PreviewGrid";
-import { ConfigForm } from "@/components/demo/ConfigForm";
-import { ConfigScopeWrapper } from "@/components/demo/ConfigScopeWrapper";
+import { PreviewPanel, PreviewGrid } from "@/components/demo";
+import { ConfigForm, ConfigScopeWrapper } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
-import type { PreviewSize, PreviewMode } from "@/components/demo/types";
+import type { PreviewSize, PreviewMode } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -539,9 +537,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const activePageSchema = activePage ? pageSchemaMap[activePage.id] : "";
   const hasSchema = !!activePageSchema || !!project.projectConfigSchema;
 
-  const gridPages = project.demoPages.map((p) => ({
+  const gridPages = project.demoPages.map((p, index) => ({
     id: p.id,
     name: p.name,
+    order: index,
     compiledJsUrl: getCompiledJsUrl(projectId, p.compiledJsPath),
     previewSize: pageSchemaMap[p.id]
       ? getPreviewSize(pageSchemaMap[p.id])
@@ -611,7 +610,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             </div>
           ) : (
             <PreviewGrid
-              pages={gridPages}
+              demoPages={gridPages}
               activePageId={activePageId}
               gridColumns={gridColumns}
               gridScale={gridScale}

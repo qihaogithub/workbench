@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
-import { generateIframeHtml } from "@/lib/iframe-template";
+import { generateIframeHtml } from "./iframe-template";
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   width: 375,

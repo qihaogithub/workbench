@@ -10,7 +10,8 @@ import {
   listDemoPages,
 } from "@/lib/fs-utils";
 import { compileCode } from "@/lib/compiler";
-import { generateIframeHtml } from "@/lib/iframe-template";
+import { generateIframeHtml } from '@opencode-workbench/shared/demo/iframe-template';
+import { getCdnBaseUrl } from '@/lib/cdn-config';
 import {
   mergeConfigToProps,
   SchemaConflictError,
@@ -69,6 +70,7 @@ export async function GET(
         compiledCode: compileResult.compiledCode,
         cssImports: compileResult.cssImports,
         configData,
+        cdnBaseUrl: getCdnBaseUrl(),
       });
 
       return new NextResponse(html, {
@@ -116,6 +118,7 @@ export async function GET(
       compiledCode: compileResult.compiledCode,
       cssImports: compileResult.cssImports,
       configData: mergedProps,
+      cdnBaseUrl: getCdnBaseUrl(),
     });
 
     return new NextResponse(html, {

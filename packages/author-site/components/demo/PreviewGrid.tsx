@@ -8,106 +8,25 @@ import React, {
   type RefObject,
 } from "react";
 import { cn } from "@/lib/utils";
-import { generateIframeHtml } from "@/lib/iframe-template";
 import {
+  generateIframeHtml,
   getCachedCompile,
   setCachedCompile,
   invalidateCompileCache,
-} from "./compile-cache";
+  getEffectivePreviewSize,
+  parseSizeValue,
+  getAspectRatioValue,
+  getBaseRowHeight,
+  useVisiblePages,
+  resolveImageUrls,
+  FLASH_ANIMATION_CSS,
+} from "@opencode-workbench/shared/demo";
 import type {
   PreviewSize,
   GridPageItem,
   GridIframeProps,
   PreviewGridProps,
-} from "./types";
-
-const DEFAULT_PREVIEW_SIZE: PreviewSize = {
-  width: 375,
-  height: 812,
-};
-
-function getEffectivePreviewSize(size?: PreviewSize): PreviewSize {
-  return size ?? DEFAULT_PREVIEW_SIZE;
-}
-
-function parseSizeValue(value: string | number | undefined): number | null {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    const num = parseFloat(value.replace(/px$/, ""));
-    return isNaN(num) ? null : num;
-  }
-  return null;
-}
-
-function getPreviewAspectRatio(size?: PreviewSize): string {
-  const effective = getEffectivePreviewSize(size);
-  const w = parseSizeValue(effective.width);
-  const h = parseSizeValue(effective.height);
-
-  if (w && h) {
-    return `${w}/${h}`;
-  }
-
-  return "375/812";
-}
-
-function getAspectRatioValue(size?: PreviewSize): number {
-  const ratio = getPreviewAspectRatio(size);
-  const [w, h] = ratio.split("/").map(Number);
-  return w / h;
-}
-
-function getBaseRowHeight(columns: number): number {
-  const map: Record<number, number> = { 2: 500, 3: 380, 4: 300 };
-  return map[columns] ?? 380;
-}
-
-function useVisiblePages(
-  containerRef: RefObject<HTMLElement | null>,
-  pages: GridPageItem[],
-  bufferCount: number = 1,
-): Set<string> {
-  const [visiblePages, setVisiblePages] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setVisiblePages((prev) => {
-          const next = new Set(prev);
-          for (const entry of entries) {
-            const pageId = entry.target.getAttribute("data-page-id");
-            if (!pageId) continue;
-            if (entry.isIntersecting) {
-              next.add(pageId);
-              const idx = pages.findIndex((p) => p.id === pageId);
-              for (
-                let i = Math.max(0, idx - bufferCount);
-                i <= Math.min(pages.length - 1, idx + bufferCount);
-                i++
-              ) {
-                next.add(pages[i].id);
-              }
-            } else {
-              next.delete(pageId);
-            }
-          }
-          return next;
-        });
-      },
-      { root: container, rootMargin: "100% 0px" },
-    );
-
-    const cards = container.querySelectorAll("[data-page-id]");
-    cards.forEach((card) => observer.observe(card));
-
-    return () => observer.disconnect();
-  }, [containerRef, pages, bufferCount]);
-
-  return visiblePages;
-}
+} from "@opencode-workbench/shared/demo";
 
 type AlignmentMode = "center" | "top";
 
@@ -145,32 +64,6 @@ function useAlignmentMode(
   }, [containerRef, gridRef]);
 
   return mode;
-}
-
-function resolveImageUrls(
-  data: Record<string, unknown>,
-): Record<string, unknown> {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  if (!origin) return data;
-
-  function walk(value: unknown): unknown {
-    if (typeof value === "string" && value.startsWith("/api/sessions/")) {
-      return origin + value;
-    }
-    if (Array.isArray(value)) {
-      return value.map(walk);
-    }
-    if (value !== null && typeof value === "object") {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value)) {
-        result[k] = walk(v);
-      }
-      return result;
-    }
-    return value;
-  }
-
-  return walk(data) as Record<string, unknown>;
 }
 
 function disableIframeScrollbar(iframe: HTMLIFrameElement) {
@@ -434,11 +327,13 @@ export function PreviewGrid({
   configDataMap,
   previewSize,
   snapshotVersion,
+  flashCardId,
 }: PreviewGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridMeasureRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const visiblePages = useVisiblePages(containerRef, demoPages);
+  const pageIds = demoPages.map((p) => p.id);
+  const visiblePages = useVisiblePages(containerRef, pageIds);
   const alignmentMode = useAlignmentMode(containerRef, gridMeasureRef);
 
   const rows: GridPageItem[][] = [];
@@ -504,6 +399,7 @@ export function PreviewGrid({
         .preview-grid-scroll::-webkit-scrollbar {
           display: none;
         }
+        ${FLASH_ANIMATION_CSS}
       `}</style>
       <div
         className="min-h-full px-4 pb-4 flex flex-col items-center"
@@ -532,10 +428,7 @@ export function PreviewGrid({
                 }}
               >
                 {row.map((page) => {
-                  const effectiveSize =
-                    page.id === activePageId
-                      ? previewSize
-                      : (page.previewSize ?? previewSize);
+                  const effectiveSize = page.previewSize ?? previewSize;
                   const aspectRatio = getAspectRatioValue(effectiveSize);
                   const cardWidth = rowHeight * aspectRatio;
                   return (
@@ -546,6 +439,8 @@ export function PreviewGrid({
                       className={cn(
                         "relative rounded-lg overflow-hidden cursor-pointer transition-all",
                         "border border-border hover:border-primary/50",
+                        page.id === activePageId && "border-primary shadow-md ring-1 ring-primary/20",
+                        flashCardId === page.id && "animate-grid-card-flash",
                       )}
                       style={{
                         height: "100%",

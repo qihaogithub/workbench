@@ -1,11 +1,4 @@
-export { PreviewPanel } from './PreviewPanel';
 export { PreviewGrid } from './PreviewGrid';
-export { ConfigForm } from './ConfigForm';
-export type { PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, PreviewSize, GridPageItem, GridIframeProps, PreviewGridProps } from './types';
-export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
-export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';
-export { ImageListWidget, type ImageItem, type ImageListWidgetProps } from './ImageListWidget';
-export { NoteButton } from './NoteButton';
-export { NoteDialog } from './NoteDialog';
-export { NotePreview, stripHtml } from './NotePreview';
-export { ConfigScopeWrapper } from './ConfigScopeWrapper';
+export type { PreviewMode, PreviewState, PreviewSize, GridPageItem, GridIframeProps, PreviewGridProps } from '@opencode-workbench/shared/demo';
+export { PreviewPanel, ConfigForm, ConfigScopeWrapper, NoteButton, NoteDialog, NotePreview, stripHtml, RichTextEditor, sanitizeNoteHtml, customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget, ImageListWidget, getCachedCompile, setCachedCompile, invalidateCompileCache, getOrderable, getDefaultValues, getPreviewSize, generateIframeHtml, buildIframeHtml } from '@opencode-workbench/shared/demo';
+export type { PreviewPanelProps, ConfigFormProps, ImageItem, ImageListWidgetProps, FileUploadWidgetOptions, FileUploadWidgetProps, DemoMeta, DemoSchema } from '@opencode-workbench/shared/demo';

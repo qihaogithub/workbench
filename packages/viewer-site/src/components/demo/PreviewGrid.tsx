@@ -5,408 +5,376 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo,
 } from "react";
-import type { PreviewSize } from "./types";
-import { generateIframeHtml } from "@/lib/iframe-template";
-
-const DEFAULT_ASPECT_RATIO = 375 / 812;
-
-function getBaseRowHeight(columns: number): number {
-  const map: Record<number, number> = { 2: 500, 3: 380, 4: 300 };
-  return map[columns] ?? 380;
-}
-
-function getAspectRatioValue(size?: PreviewSize): number {
-  const w =
-    typeof size?.width === "number"
-      ? size.width
-      : typeof size?.width === "string"
-        ? parseFloat(size.width)
-        : 375;
-  const h =
-    typeof size?.height === "number"
-      ? size.height
-      : typeof size?.height === "string"
-        ? parseFloat(size.height)
-        : 812;
-  return isNaN(w) || isNaN(h) || h === 0 ? DEFAULT_ASPECT_RATIO : w / h;
-}
-
-function useVisiblePages(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  pageIds: string[],
-  bufferCount = 1,
-): Set<string> {
-  const [visiblePages, setVisiblePages] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const pageIdsRef = useRef(pageIds);
-  pageIdsRef.current = pageIds;
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        setVisiblePages((prev) => {
-          const next = new Set(prev);
-          for (const entry of entries) {
-            const pageId = entry.target.getAttribute("data-page-id");
-            if (!pageId) continue;
-            const idx = pageIdsRef.current.indexOf(pageId);
-            if (idx === -1) continue;
-
-            if (entry.isIntersecting) {
-              next.add(pageId);
-              for (
-                let i = Math.max(0, idx - bufferCount);
-                i <=
-                Math.min(pageIdsRef.current.length - 1, idx + bufferCount);
-                i++
-              ) {
-                next.add(pageIdsRef.current[i]);
-              }
-            } else {
-              next.delete(pageId);
-            }
-          }
-          return next;
-        });
-      },
-      {
-        root: container,
-        rootMargin: "100% 0px",
-      },
-    );
-
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, [containerRef, bufferCount]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    const observer = observerRef.current;
-    if (!container || !observer) return;
-
-    const cards = container.querySelectorAll("[data-page-id]");
-    cards.forEach((card) => observer.observe(card));
-
-    return () => {
-      cards.forEach((card) => observer.unobserve(card));
-    };
-  });
-
-  return visiblePages;
-}
-
-interface ViewerGridPageItem {
-  id: string;
-  name: string;
-  compiledJsUrl: string;
-  previewSize?: PreviewSize;
-}
-
-interface ViewerGridIframeProps {
-  page: ViewerGridPageItem;
-  visible: boolean;
-  rowHeight: number;
-  cardWidth: number;
-  configData?: Record<string, unknown>;
-  isActive: boolean;
-  flash: boolean;
-  onClick: () => void;
-}
+import {
+  generateIframeHtml,
+  getEffectivePreviewSize,
+  parseSizeValue,
+  getAspectRatioValue,
+  getBaseRowHeight,
+  useVisiblePages,
+  resolveImageUrls,
+  FLASH_ANIMATION_CSS,
+} from "@opencode-workbench/shared/demo";
+import type {
+  PreviewSize,
+  GridPageItem,
+  PreviewGridProps,
+} from "@opencode-workbench/shared/demo";
+import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
+import { LayoutGrid, Columns2, Columns3, Columns4 } from "lucide-react";
 
 function ViewerGridIframe({
-  page,
-  visible,
-  rowHeight,
-  cardWidth,
+  compiledJsUrl,
+  cssImports,
   configData,
-  isActive,
-  flash,
-  onClick,
-}: ViewerGridIframeProps) {
+  previewSize,
+  rowHeight,
+  visible,
+  pageName,
+}: {
+  compiledJsUrl?: string;
+  cssImports?: string[];
+  configData?: Record<string, unknown>;
+  previewSize?: PreviewSize;
+  rowHeight?: number;
+  visible: boolean;
+  pageName: string;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
-  const [iframeReady, setIframeReady] = useState(false);
-  const iframeReadyRef = useRef(false);
+  const blobUrlRef = useRef<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cardWidth, setCardWidth] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
-
-  const effectiveSize = page.previewSize ?? {
-    width: 375,
-    height: 812,
-  };
-  const iframeWidth =
-    typeof effectiveSize.width === "number"
-      ? effectiveSize.width
-      : parseFloat(String(effectiveSize.width)) || 375;
-  const iframeHeight =
-    typeof effectiveSize.height === "number"
-      ? effectiveSize.height
-      : parseFloat(String(effectiveSize.height)) || 812;
-
-  const scale =
-    rowHeight > 0 ? rowHeight / iframeHeight : cardWidth > 0 ? cardWidth / iframeWidth : 0.3;
+  const iframeReadyRef = useRef(false);
 
   useEffect(() => {
-    if (!visible) return;
-    const html = generateIframeHtml({ supportUrlMode: true });
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    setIframeSrcUrl(url);
-    return () => {
-      URL.revokeObjectURL(url);
-      setIframeSrcUrl(null);
-      setIframeReady(false);
-      iframeReadyRef.current = false;
-    };
-  }, [visible]);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const iframe = iframeRef.current;
-      if (!iframe || event.source !== iframe.contentWindow) return;
-      const { type } = event.data;
-      if (type === "READY") {
-        iframeReadyRef.current = true;
-        setIframeReady(true);
-      }
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  useEffect(() => {
-    if (!iframeReady || !iframeRef.current || !page.compiledJsUrl) return;
-    const iframe = iframeRef.current;
-    if (!iframe.contentWindow) return;
-    iframe.contentWindow.postMessage(
-      {
-        type: "UPDATE_CODE",
-        code: page.compiledJsUrl,
-        isUrl: true,
-        configData: configDataRef.current || {},
-        cssImports: [],
-      },
-      "*",
-    );
-  }, [iframeReady, page.compiledJsUrl]);
-
-  useEffect(() => {
-    if (!iframeReadyRef.current || !iframeRef.current) return;
-    const iframe = iframeRef.current;
-    if (!iframe.contentWindow) return;
-    iframe.contentWindow.postMessage(
-      {
-        type: "UPDATE_CONFIG",
-        configData: configData || {},
-      },
-      "*",
-    );
-  }, [configData, iframeReady]);
-
-  if (!visible) {
-    return (
-      <div
-        className="flex items-center justify-center bg-secondary/30 rounded-lg border border-border"
-        style={{ width: cardWidth, height: rowHeight }}
-        onClick={onClick}
-      >
-        <span className="text-xs text-muted-foreground truncate px-2">
-          {page.name}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`relative rounded-lg border overflow-hidden cursor-pointer transition-shadow ${
-        isActive
-          ? "border-primary shadow-md ring-1 ring-primary/20"
-          : "border-border hover:shadow-sm"
-      } ${flash ? "animate-grid-card-flash" : ""}`}
-      style={{ width: cardWidth, height: rowHeight }}
-      onClick={onClick}
-    >
-      {iframeSrcUrl && (
-        <iframe
-          ref={iframeRef}
-          sandbox="allow-scripts allow-same-origin"
-          src={iframeSrcUrl}
-          style={{
-            width: iframeWidth,
-            height: iframeHeight,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-            border: "none",
-            position: "absolute",
-            top: 0,
-            left: 0,
-            pointerEvents: "none",
-          }}
-          title={page.name}
-        />
-      )}
-      <div
-        className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/60 to-transparent"
-        style={{ pointerEvents: "none" }}
-      >
-        <span className="text-xs text-white truncate block">{page.name}</span>
-      </div>
-    </div>
-  );
-}
-
-interface PreviewGridProps {
-  pages: ViewerGridPageItem[];
-  activePageId: string;
-  gridColumns: 2 | 3 | 4;
-  gridScale: number;
-  onGridScaleChange: (scale: number) => void;
-  onGridColumnsChange: (columns: 2 | 3 | 4) => void;
-  onCardClick: (pageId: string) => void;
-  configDataMap?: Record<string, Record<string, unknown>>;
-  previewSize?: PreviewSize;
-  flashCardId?: string;
-}
-
-export function PreviewGrid({
-  pages,
-  activePageId,
-  gridColumns,
-  gridScale,
-  onGridScaleChange,
-  onGridColumnsChange,
-  onCardClick,
-  configDataMap,
-  previewSize,
-  flashCardId,
-}: PreviewGridProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  const pageIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const visiblePages = useVisiblePages(containerRef, pageIds);
-
-  useEffect(() => {
-    const el = containerRef.current;
+    const el = wrapperRef.current;
     if (!el) return;
+
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        setCardWidth(entry.contentRect.width);
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const rows = useMemo(() => {
-    const result: ViewerGridPageItem[][] = [];
-    for (let i = 0; i < pages.length; i += gridColumns) {
-      result.push(pages.slice(i, i + gridColumns));
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const iframe = iframeRef.current;
+      if (!iframe || event.source !== iframe.contentWindow) return;
+      if (event.data?.type === "READY") {
+        iframeReadyRef.current = true;
+        if (compiledJsUrl) {
+          const resolvedConfig = configDataRef.current
+            ? resolveImageUrls(configDataRef.current)
+            : {};
+          iframe.contentWindow?.postMessage(
+            {
+              type: "UPDATE_CODE",
+              code: compiledJsUrl,
+              isUrl: true,
+              configData: resolvedConfig,
+              cssImports: cssImports || [],
+            },
+            "*",
+          );
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [compiledJsUrl, cssImports]);
+
+  useEffect(() => {
+    if (!visible) {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      iframeReadyRef.current = false;
+      return;
     }
-    return result;
-  }, [pages, gridColumns]);
+
+    const html = generateIframeHtml({ supportUrlMode: true });
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+    }
+    blobUrlRef.current = url;
+    setIsLoading(true);
+    iframeReadyRef.current = false;
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!iframeReadyRef.current || !blobUrlRef.current) return;
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    const resolvedConfig = configData ? resolveImageUrls(configData) : {};
+    iframe.contentWindow.postMessage(
+      { type: "UPDATE_CONFIG", configData: resolvedConfig },
+      "*",
+    );
+  }, [configData]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  if (!visible) {
+    return (
+      <div
+        ref={wrapperRef}
+        className="w-full h-full bg-muted/50 flex items-center justify-center"
+      >
+        <span className="text-xs text-muted-foreground">{pageName}</span>
+      </div>
+    );
+  }
+
+  if (isLoading && !blobUrlRef.current) {
+    return (
+      <div
+        ref={wrapperRef}
+        className="w-full h-full bg-muted/30 flex items-center justify-center"
+      >
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!blobUrlRef.current) {
+    return (
+      <div
+        ref={wrapperRef}
+        className="w-full h-full bg-muted/50 flex items-center justify-center"
+      >
+        <span className="text-xs text-muted-foreground">加载失败</span>
+      </div>
+    );
+  }
+
+  const effective = getEffectivePreviewSize(previewSize);
+  const iframeWidth = parseSizeValue(effective.width) ?? 375;
+  const iframeHeight = parseSizeValue(effective.height) ?? 812;
+  const scale =
+    rowHeight != null && rowHeight > 0
+      ? rowHeight / iframeHeight
+      : cardWidth > 0
+        ? cardWidth / iframeWidth
+        : 0.3;
+
+  return (
+    <div ref={wrapperRef} className="relative w-full h-full overflow-hidden">
+      <iframe
+        ref={iframeRef}
+        src={blobUrlRef.current}
+        sandbox="allow-scripts allow-same-origin"
+        onLoad={() => setIsLoading(false)}
+        style={{
+          width: iframeWidth,
+          height: iframeHeight,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+          border: "none",
+          pointerEvents: "none",
+        }}
+        title={pageName}
+      />
+    </div>
+  );
+}
+
+export function PreviewGrid({
+  sessionId,
+  demoPages,
+  activePageId,
+  gridColumns,
+  gridScale = 1.0,
+  onGridScaleChange,
+  onGridColumnsChange,
+  onCardClick,
+  configDataMap,
+  previewSize,
+  snapshotVersion,
+}: PreviewGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pageIds = demoPages.map((p) => p.id);
+  const visiblePages = useVisiblePages(containerRef, pageIds);
+
+  const rows: GridPageItem[][] = [];
+  for (let i = 0; i < demoPages.length; i += gridColumns) {
+    rows.push(demoPages.slice(i, i + gridColumns));
+  }
 
   const actualRowHeight = getBaseRowHeight(gridColumns) * gridScale;
 
   const getRowHeight = useCallback(
-    (row: ViewerGridPageItem[]) => {
+    (row: GridPageItem[]) => {
       const gapTotal = (row.length - 1) * 16;
       const totalWidth = row.reduce((sum, p) => {
-        return sum + actualRowHeight * getAspectRatioValue(p.previewSize ?? previewSize);
+        const size = p.previewSize ?? previewSize;
+        return sum + actualRowHeight * getAspectRatioValue(size);
       }, 0);
+      const containerWidth = containerRef.current?.clientWidth ?? 0;
       const availableWidth = containerWidth - 32;
       if (totalWidth + gapTotal > availableWidth && availableWidth > 0) {
         return actualRowHeight * ((availableWidth - gapTotal) / totalWidth);
       }
       return actualRowHeight;
     },
-    [actualRowHeight, previewSize, containerWidth],
+    [actualRowHeight, previewSize],
   );
 
+  const handleCardClick = useCallback(
+    (pageId: string) => {
+      onCardClick(pageId);
+    },
+    [onCardClick],
+  );
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [activePageId]);
+
   return (
-    <div className="flex flex-col h-full">
-      <style>{`
-        @keyframes grid-card-flash {
-          0%, 100% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0); }
-          50% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.6); }
-        }
-        .animate-grid-card-flash {
-          animation: grid-card-flash 0.4s ease-in-out 2;
-        }
-      `}</style>
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
-        <span className="text-xs text-muted-foreground">每行</span>
-        {([2, 3, 4] as const).map((n) => (
-          <button
-            key={n}
-            onClick={() => onGridColumnsChange(n)}
-            className={`rounded px-2 py-0.5 text-xs transition-colors ${
-              gridColumns === n
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">
-          {Math.round(gridScale * 100)}%
-        </span>
-        <button
-          onClick={() => onGridScaleChange(Math.max(0.5, gridScale - 0.1))}
-          className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-        >
-          −
-        </button>
-        <button
-          onClick={() => onGridScaleChange(Math.min(2, gridScale + 0.1))}
-          className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-        >
-          +
-        </button>
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 py-2 border-b">
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">宫格视图</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
+            {([2, 3, 4] as const).map((col) => {
+              const Icon = col === 2 ? Columns2 : col === 3 ? Columns3 : Columns4;
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  onClick={() => onGridColumnsChange(col)}
+                  className={cn(
+                    "h-7 w-7 p-0 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",
+                    gridColumns === col && "bg-muted text-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">缩放</span>
+            <Slider
+              value={[gridScale * 100]}
+              onValueChange={([v]) => onGridScaleChange?.(v / 100)}
+              min={30}
+              max={150}
+              step={5}
+              className="w-24"
+            />
+            <span className="text-xs text-muted-foreground w-8">
+              {Math.round(gridScale * 100)}%
+            </span>
+          </div>
+        </div>
       </div>
+
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4"
+        className="flex-1 overflow-y-auto preview-grid-scroll"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        <div className="flex flex-col gap-4 items-center">
-          {rows.map((row, rowIdx) => {
-            const rowHeight = getRowHeight(row);
-            return (
-              <div key={rowIdx} className="flex gap-4">
-                {row.map((page) => {
-                  const aspectRatio = getAspectRatioValue(
-                    page.previewSize ?? previewSize,
-                  );
-                  const cardWidth = rowHeight * aspectRatio;
-                  return (
-                    <div key={page.id} data-page-id={page.id}>
-                      <ViewerGridIframe
-                        page={page}
-                        visible={visiblePages.has(page.id)}
-                        rowHeight={rowHeight}
-                        cardWidth={cardWidth}
-                        configData={configDataMap?.[page.id]}
-                        isActive={page.id === activePageId}
-                        flash={page.id === flashCardId}
-                        onClick={() => onCardClick(page.id)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+        <style>{`
+          .preview-grid-scroll::-webkit-scrollbar {
+            display: none;
+          }
+          ${FLASH_ANIMATION_CSS}
+        `}</style>
+        <div className="min-h-full px-4 pb-4 flex flex-col items-center justify-start">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              alignItems: "flex-start",
+            }}
+          >
+            {rows.map((row) => {
+              const rowHeight = getRowHeight(row);
+              return (
+                <div
+                  key={row.map((p) => p.id).join("-")}
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    height: `${rowHeight}px`,
+                  }}
+                >
+                  {row.map((page) => {
+                    const effectiveSize = page.previewSize ?? previewSize;
+                    const aspectRatio = getAspectRatioValue(effectiveSize);
+                    const cardWidth = rowHeight * aspectRatio;
+                    return (
+                      <div
+                        key={page.id}
+                        data-page-id={page.id}
+                        ref={activePageId === page.id ? scrollRef : undefined}
+                        className={`relative rounded-lg overflow-hidden cursor-pointer transition-all border ${
+                          page.id === activePageId
+                            ? "border-primary shadow-md ring-1 ring-primary/20"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        style={{
+                          height: "100%",
+                          width: `${cardWidth}px`,
+                          flexShrink: 0,
+                        }}
+                        onClick={() => handleCardClick(page.id)}
+                      >
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 z-10 pointer-events-none">
+                          <span className="text-xs text-white font-medium truncate block">
+                            {page.name}
+                          </span>
+                        </div>
+                        <ViewerGridIframe
+                          compiledJsUrl={page.code}
+                          cssImports={[]}
+                          configData={configDataMap?.[page.id] ?? {}}
+                          previewSize={effectiveSize}
+                          rowHeight={rowHeight}
+                          visible={visiblePages.has(page.id)}
+                          pageName={page.name}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
