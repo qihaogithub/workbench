@@ -1,38 +1,136 @@
-const CDN_BASE = "https://esm.sh";
+export interface IframeTemplateOptions {
+  cssImports?: string[];
+  compiledCode?: string;
+  configData?: Record<string, unknown>;
+  cdnBaseUrl?: string;
+  supportUrlMode?: boolean;
+}
 
-function generateCssLinks(cssImports: string[]): string {
+const DEFAULT_CDN_BASE = "https://esm.sh";
+
+function generateCssLinks(cssImports: string[], cdnBase: string): string {
   if (!cssImports.length) return "";
   return cssImports
     .map((url) => {
-      const href = url.startsWith("http") ? url : `${CDN_BASE}/${url}`;
+      const href = url.startsWith("http") ? url : `${cdnBase}/${url}`;
       return `    <link rel="stylesheet" href="${href}" data-dynamic-css="true">`;
     })
     .join("\n");
 }
 
-export function generateIframeHtml(): string {
-  const cssLinksPlaceholder = "__CSS_LINKS_PLACEHOLDER__";
+export function generateIframeHtml(
+  options: IframeTemplateOptions = {},
+): string {
+  const {
+    cssImports = [],
+    compiledCode,
+    configData,
+    cdnBaseUrl,
+    supportUrlMode = true,
+  } = options;
+  const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
+
+  const cssLinks = generateCssLinks(cssImports, cdnBase);
+  const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
+  const initialConfig = JSON.stringify(configData || {});
+
+  const loadModuleFn = `
+    function loadModuleFromCode(code, thisVersion) {
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const moduleUrl = URL.createObjectURL(blob);
+      import(moduleUrl)
+        .then((module) => {
+          if (thisVersion !== updateVersion) return;
+          currentComponent = module.default || null;
+          renderComponent();
+          URL.revokeObjectURL(moduleUrl);
+          if (module.default) {
+            window.parent.postMessage({ type: 'LOADED' }, '*');
+          } else {
+            window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
+          }
+        })
+        .catch((err) => {
+          if (thisVersion !== updateVersion) return;
+          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
+        });
+    }`;
+
+  const updateCodeHandler = supportUrlMode
+    ? `
+      if (type === 'UPDATE_CODE') {
+        currentConfig = newConfigData || {};
+        window.__DEMO_PROPS__ = currentConfig;
+        updateCssLinks(newCssImports || []);
+
+        const thisVersion = ++updateVersion;
+
+        if (isUrl) {
+          fetch(code)
+            .then(res => {
+              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
+              return res.text();
+            })
+            .then(jsCode => {
+              if (thisVersion !== updateVersion) return;
+              loadModuleFromCode(jsCode, thisVersion);
+            })
+            .catch((err) => {
+              if (thisVersion !== updateVersion) return;
+              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+            });
+        } else {
+          loadModuleFromCode(code, thisVersion);
+        }
+      }`
+    : `
+      if (type === 'UPDATE_CODE') {
+        currentConfig = newConfigData || {};
+        window.__DEMO_PROPS__ = currentConfig;
+        updateCssLinks(newCssImports || []);
+
+        const thisVersion = ++updateVersion;
+
+        const blob = new Blob([code], { type: 'application/javascript' });
+        const moduleUrl = URL.createObjectURL(blob);
+
+        import(moduleUrl)
+          .then((module) => {
+            if (thisVersion !== updateVersion) return;
+            currentComponent = module.default || null;
+            renderComponent();
+            if (module.default) {
+              window.parent.postMessage({ type: 'LOADED' }, '*');
+            } else {
+              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
+            }
+          })
+          .catch((err) => {
+            if (thisVersion !== updateVersion) return;
+            window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
+          });
+      }`;
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="preconnect" href="${CDN_BASE}" crossorigin>
-  <link rel="dns-prefetch" href="${CDN_BASE}">
+  <link rel="preconnect" href="${cdnBase}" crossorigin>
+  <link rel="dns-prefetch" href="${cdnBase}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
     #root { min-height: 100vh; }
   </style>
-  ${cssLinksPlaceholder}
+${cssLinks}
   <script type="importmap">
   {
     "imports": {
-      "react": "${CDN_BASE}/react@18.3.1",
-      "react-dom": "${CDN_BASE}/react-dom@18.3.1/client",
-      "react/jsx-runtime": "${CDN_BASE}/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "${CDN_BASE}/react@18.3.1/jsx-dev-runtime"
+      "react": "${cdnBase}/react@18.3.1",
+      "react-dom": "${cdnBase}/react-dom@18.3.1/client",
+      "react/jsx-runtime": "${cdnBase}/react@18.3.1/jsx-runtime",
+      "react/jsx-dev-runtime": "${cdnBase}/react@18.3.1/jsx-dev-runtime"
     }
   }
   </script>
@@ -42,11 +140,11 @@ export function generateIframeHtml(): string {
   <div id="root"></div>
 
   <script type="module">
-    import React from '${CDN_BASE}/react@18.3.1';
-    import ReactDOM from '${CDN_BASE}/react-dom@18.3.1/client';
+    import React from '${cdnBase}/react@18.3.1';
+    import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
 
     let currentRoot = null;
-    let currentConfig = {};
+    let currentConfig = ${initialConfig};
     let currentComponent = null;
     let updateVersion = 0;
 
@@ -112,63 +210,20 @@ export function generateIframeHtml(): string {
       cssUrls.forEach(url => {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = url.startsWith('http') ? url : '${CDN_BASE}/' + url;
+        link.href = url.startsWith('http') ? url : '${cdnBase}/' + url;
         link.setAttribute('data-dynamic-css', 'true');
         document.head.appendChild(link);
       });
     }
 
-    function loadModuleFromCode(code, thisVersion) {
-      const blob = new Blob([code], { type: 'application/javascript' });
-      const moduleUrl = URL.createObjectURL(blob);
-      import(moduleUrl)
-        .then((module) => {
-          if (thisVersion !== updateVersion) return;
-          currentComponent = module.default || null;
-          renderComponent();
-          URL.revokeObjectURL(moduleUrl);
-          if (module.default) {
-            window.parent.postMessage({ type: 'LOADED' }, '*');
-          } else {
-            window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
-          }
-        })
-        .catch((err) => {
-          if (thisVersion !== updateVersion) return;
-          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
-        });
-    }
+    ${loadModuleFn}
 
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, configData: newConfigData, cssImports: newCssImports, isUrl } = event.data;
+      const { type, code, configData: newConfigData, cssImports: newCssImports${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
-      if (type === 'UPDATE_CODE') {
-        currentConfig = newConfigData || {};
-        window.__DEMO_PROPS__ = currentConfig;
-        updateCssLinks(newCssImports || []);
-
-        const thisVersion = ++updateVersion;
-
-        if (isUrl) {
-          fetch(code)
-            .then(res => {
-              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-              return res.text();
-            })
-            .then(jsCode => {
-              if (thisVersion !== updateVersion) return;
-              loadModuleFromCode(jsCode, thisVersion);
-            })
-            .catch((err) => {
-              if (thisVersion !== updateVersion) return;
-              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
-            });
-        } else {
-          loadModuleFromCode(code, thisVersion);
-        }
-      }
+      ${updateCodeHandler}
 
       if (type === 'UPDATE_CONFIG') {
         currentConfig = newConfigData || {};
@@ -204,15 +259,26 @@ export function generateIframeHtml(): string {
     });
 
     window.parent.postMessage({ type: 'READY' }, '*');
+
+    const initialCode = ${initialCode};
+    if (initialCode) {
+      window.__DEMO_PROPS__ = currentConfig;
+      const blob = new Blob([initialCode], { type: 'application/javascript' });
+      const moduleUrl = URL.createObjectURL(blob);
+      import(moduleUrl)
+        .then((module) => {
+          currentComponent = module.default;
+          renderComponent();
+        })
+        .catch((err) => {
+          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+        });
+    }
   </script>
 </body>
 </html>`;
 }
 
 export function buildIframeHtml(cssImports?: string[]): string {
-  const html = generateIframeHtml();
-  if (!cssImports || cssImports.length === 0) {
-    return html.replace("__CSS_LINKS_PLACEHOLDER__", "");
-  }
-  return html.replace("__CSS_LINKS_PLACEHOLDER__", generateCssLinks(cssImports));
+  return generateIframeHtml({ cssImports });
 }

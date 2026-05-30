@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "通用弹窗 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "modalImage": {
+      "type": "string",
+      "title": "弹窗图片",
+      "description": "上传弹窗展示的图片",
+      "format": "image",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png"
+    }
+  }
+}

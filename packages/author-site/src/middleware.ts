@@ -88,7 +88,8 @@ export async function middleware(request: NextRequest) {
   const isApiOrEmbedRoute =
     pathname.startsWith("/api/") ||
     pathname.startsWith("/embed/") ||
-    pathname.startsWith("/viewer/");
+    pathname.startsWith("/viewer/") ||
+    pathname.startsWith("/data/");
   if (origin && isApiOrEmbedRoute && VIEWER_ORIGINS.includes(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set(

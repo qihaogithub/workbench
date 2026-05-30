@@ -1,6 +1,14 @@
 {
   "projects": [
     {
+      "id": "proj_1779608460377",
+      "name": "通用弹窗",
+      "thumbnail": "/data/proj_1779608460377/thumbnail.png",
+      "publishedAt": 1780109444551,
+      "publishedVersion": "v16",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1779608460378",
       "name": "广场页面",
       "thumbnail": "/data/proj_1779608460378/thumbnail.png",
@@ -25,5 +33,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1780072530332
+  "generatedAt": 1780109444557
 }
