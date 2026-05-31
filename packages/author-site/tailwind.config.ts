@@ -7,7 +7,7 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
-    // 扫描 streamdown 内部的 className，确保 list-disc、flex 等运行时 class 进入最终 CSS
+    './node_modules/@opencode-workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/streamdown/dist/**/*.js',
     './node_modules/@streamdown/code/dist/**/*.js',
     './node_modules/@streamdown/mermaid/dist/**/*.js',
