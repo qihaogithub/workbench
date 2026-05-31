@@ -50,6 +50,15 @@ async function fetchJson<T>(path: string): Promise<T> {
   if (!res.ok) {
     throw new Error(`数据加载失败: ${res.status} ${res.statusText}`);
   }
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `数据加载失败: 期望 JSON 响应但收到 ${contentType || "未知类型"}。` +
+        (DATA_BASE
+          ? `请确认数据源 (${DATA_BASE}) 可访问且已发布数据。`
+          : `NEXT_PUBLIC_DATA_BASE 未配置，请求可能被前端路由拦截。本地开发请设置 NEXT_PUBLIC_DATA_BASE=http://localhost:3200`),
+    );
+  }
   return res.json();
 }
 
