@@ -234,6 +234,7 @@ function FieldRenderer({
           required={field.required}
           sessionId={sessionId}
           options={field.uiOptions as any}
+          defaultValue={typeof field.default === "string" ? field.default : undefined}
         />
       );
     }
@@ -285,6 +286,7 @@ function FieldRenderer({
           required={field.required}
           sessionId={sessionId}
           options={field.uiOptions as any}
+          defaultValue={typeof field.default === "string" ? field.default : undefined}
         />
       );
     }

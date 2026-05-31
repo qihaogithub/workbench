@@ -81,8 +81,8 @@ export async function getDemoSchema(
   );
 }
 
-export function getThumbnailUrl(projectId: string): string {
-  return `${DATA_BASE}/data/${projectId}/thumbnail.png`;
+export function getThumbnailUrl(thumbnail: string): string {
+  return `${DATA_BASE}${thumbnail}`;
 }
 
 export function getCompiledJsUrl(

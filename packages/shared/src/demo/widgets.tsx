@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
-import { Upload, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Upload, Repeat, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from './utils';
 import {
   Dialog,
@@ -115,6 +115,7 @@ export interface FileUploadWidgetProps {
   disabled?: boolean;
   sessionId?: string;
   options?: FileUploadWidgetOptions;
+  defaultValue?: string;
 }
 
 export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
@@ -129,6 +130,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const sessionId = (props as any).sessionId ?? (props as any).formContext?.sessionId;
   const rawOptions = ((props as any).options || {}) as FileUploadWidgetOptions;
+  const defaultValue = (props as any).defaultValue as string | undefined;
 
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
@@ -248,9 +250,9 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     if (sessionId && typeof value === 'string' && value.startsWith('/api/sessions/')) {
       await deleteServerFile(sessionId, value);
     }
-    onChange('');
+    onChange(defaultValue || '');
     setError('');
-  }, [sessionId, value, onChange]);
+  }, [sessionId, value, onChange, defaultValue]);
 
   const isValueFromUpload = useMemo(() => {
     return typeof value === 'string' && value.startsWith('/api/sessions/');
@@ -284,9 +286,9 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isUploading}
                 className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                aria-label="重新上传"
+                aria-label="替换图片"
               >
-                <Upload className="w-4 h-4" />
+                <Repeat className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -295,7 +297,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
                 aria-label="删除图片"
               >
-                <X className="w-4 h-4" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>

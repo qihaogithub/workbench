@@ -229,7 +229,7 @@ function ProjectListPage() {
           >
             {filteredProjects.map((project) => {
               const thumbnailUrl = project.thumbnail
-                ? getThumbnailUrl(project.id)
+                ? getThumbnailUrl(project.thumbnail)
                 : undefined;
               return (
                 <button

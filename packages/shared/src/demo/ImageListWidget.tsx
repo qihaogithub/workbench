@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { X, Plus, Loader2, AlertTriangle, ZoomIn } from 'lucide-react';
+import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -266,7 +266,7 @@ export function ImageListWidget({
                 className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
                 aria-label="删除图片"
               >
-                <X className="w-4 h-4" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>

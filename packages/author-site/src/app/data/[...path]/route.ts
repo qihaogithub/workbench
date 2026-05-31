@@ -16,7 +16,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { path: string[] } },
 ) {
   const filePath = params.path.join("/");
@@ -68,6 +68,14 @@ export async function GET(
         ? "public, immutable, max-age=2592000"
         : "public, must-revalidate, max-age=3600",
   };
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
+    headers["Access-Control-Allow-Headers"] = "Content-Type";
+    headers["Access-Control-Allow-Credentials"] = "true";
+  }
 
   return new NextResponse(fileBuffer, { headers });
 }

@@ -1,7 +1,6 @@
 {
   "id": "proj_1776526720347",
   "name": "配置项示例",
-  "thumbnail": "/data/proj_1776526720347/thumbnail.png",
   "publishedVersion": "v50",
   "publishedAt": 1780063481520,
   "demoPages": [
@@ -31,5 +30,6 @@
     }
   ],
   "demoFolders": [],
-  "projectConfigSchema": "{\r\n  \"type\": \"object\",\r\n  \"title\": \"项目级共享配置\",\r\n  \"description\": \"所有页面共享的配置项，运行时自动注入到每个页面的 props 中\",\r\n  \"properties\": {\r\n    \"brandName\": {\r\n      \"type\": \"string\",\r\n      \"title\": \"品牌名称\",\r\n      \"default\": \"OpenCode Workbench\",\r\n      \"description\": \"全局品牌名称，显示在所有页面顶部\"\r\n    },\r\n    \"primaryColor\": {\r\n      \"type\": \"string\",\r\n      \"format\": \"color\",\r\n      \"title\": \"主题色\",\r\n      \"default\": \"#6366f1\",\r\n      \"description\": \"主色调，影响按钮、链接、高亮等元素的颜色\"\r\n    },\r\n    \"darkMode\": {\r\n      \"type\": \"boolean\",\r\n      \"title\": \"深色模式\",\r\n      \"default\": false,\r\n      \"description\": \"全局深色/浅色主题切换\"\r\n    },\r\n    \"companySlogan\": {\r\n      \"type\": \"string\",\r\n      \"title\": \"公司标语\",\r\n      \"default\": \"用配置驱动一切\",\r\n      \"description\": \"显示在页面底部的品牌标语\"\r\n    }\r\n  }\r\n}\r\n"
+  "projectConfigSchema": "{\r\n  \"type\": \"object\",\r\n  \"title\": \"项目级共享配置\",\r\n  \"description\": \"所有页面共享的配置项，运行时自动注入到每个页面的 props 中\",\r\n  \"properties\": {\r\n    \"brandName\": {\r\n      \"type\": \"string\",\r\n      \"title\": \"品牌名称\",\r\n      \"default\": \"OpenCode Workbench\",\r\n      \"description\": \"全局品牌名称，显示在所有页面顶部\"\r\n    },\r\n    \"primaryColor\": {\r\n      \"type\": \"string\",\r\n      \"format\": \"color\",\r\n      \"title\": \"主题色\",\r\n      \"default\": \"#6366f1\",\r\n      \"description\": \"主色调，影响按钮、链接、高亮等元素的颜色\"\r\n    },\r\n    \"darkMode\": {\r\n      \"type\": \"boolean\",\r\n      \"title\": \"深色模式\",\r\n      \"default\": false,\r\n      \"description\": \"全局深色/浅色主题切换\"\r\n    },\r\n    \"companySlogan\": {\r\n      \"type\": \"string\",\r\n      \"title\": \"公司标语\",\r\n      \"default\": \"用配置驱动一切\",\r\n      \"description\": \"显示在页面底部的品牌标语\"\r\n    }\r\n  }\r\n}\r\n",
+  "thumbnail": "/data/proj_1776526720347/thumbnail.png"
 }

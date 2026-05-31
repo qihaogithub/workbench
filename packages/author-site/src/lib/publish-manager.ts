@@ -143,10 +143,14 @@ export async function publishProject(projectId: string): Promise<PublishResult> 
     );
   }
 
+  let thumbnailCopied = false;
+  let thumbnailExt = '';
   if (project.thumbnail) {
-    const thumbnailSrc = path.join(getProjectPath(projectId), project.thumbnail);
+    const thumbnailSrc = path.join(process.cwd(), 'public', project.thumbnail);
     if (fs.existsSync(thumbnailSrc)) {
-      fs.copyFileSync(thumbnailSrc, path.join(publishedProjectDir, 'thumbnail.png'));
+      thumbnailExt = path.extname(project.thumbnail);
+      fs.copyFileSync(thumbnailSrc, path.join(publishedProjectDir, `thumbnail${thumbnailExt}`));
+      thumbnailCopied = true;
     }
   }
 
@@ -158,7 +162,7 @@ export async function publishProject(projectId: string): Promise<PublishResult> 
     id: project.id,
     name: project.name,
     description: project.description,
-    thumbnail: `/data/${projectId}/thumbnail.png`,
+    thumbnail: thumbnailCopied ? `/data/${projectId}/thumbnail${thumbnailExt}` : undefined,
     publishedVersion: currentVersion,
     publishedAt: Date.now(),
     demoPages: publishedDemoPages,
