@@ -9,7 +9,7 @@
       "order": 1,
       "parentId": null,
       "createdAt": 1779608460377,
-      "updatedAt": 1779867016505
+      "updatedAt": 1780280696484
     },
     {
       "id": "demo_1779608460377_f8g6t2",
@@ -17,7 +17,7 @@
       "order": 2,
       "parentId": null,
       "createdAt": 1779608460378,
-      "updatedAt": 1779866845907
+      "updatedAt": 1780280852769
     }
   ],
   "demoFolders": [],
@@ -149,11 +149,53 @@
       "sessionId": "session-1779866863679-qhbvlrfoz",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v16",
       "fileCount": 5
+    },
+    {
+      "versionId": "v17",
+      "savedAt": 1780280315575,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780280185275-binc2t6km",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v17",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v18",
+      "savedAt": 1780280696536,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780280326900-bvg2yj4pu",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v18",
+      "fileCount": 6
+    },
+    {
+      "versionId": "v19",
+      "savedAt": 1780280834354,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v19_backup",
+      "fileCount": 13,
+      "note": "从 v16 恢复"
+    },
+    {
+      "versionId": "v20",
+      "savedAt": 1780280850279,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v20_backup",
+      "fileCount": 13,
+      "note": "从 v17 恢复"
+    },
+    {
+      "versionId": "v21",
+      "savedAt": 1780280853573,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780280817225-akw0bpx6a",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v21",
+      "fileCount": 6
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1779867024065,
+  "updatedAt": 1780280853574,
   "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
-  "publishedVersion": "v16",
-  "publishedAt": 1780109444552
+  "publishedVersion": "v18",
+  "publishedAt": 1780280705601
 }

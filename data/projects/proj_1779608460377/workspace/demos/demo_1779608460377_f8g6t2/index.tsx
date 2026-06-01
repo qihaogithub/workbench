@@ -1,11 +1,36 @@
+import { useState, useCallback } from 'react';
+
 interface DemoProps {
-  imageWidth?: number;
-  imageMinHeight?: number;
-  imageMaxHeight?: number;
+  modalImage?: string;
 }
 
+const IMAGE_CONSTRAINTS = {
+  width: 670,
+  minHeight: 670,
+  maxHeight: 890,
+} as const;
+
 export default function PadPopup(props: DemoProps) {
-  const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props as Record<string, unknown>;
+  const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props;
+  const [sizeWarning, setSizeWarning] = useState<string | null>(null);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const { naturalWidth: w, naturalHeight: h } = img;
+
+    const violations: string[] = [];
+    if (w !== IMAGE_CONSTRAINTS.width) {
+      violations.push(`宽度应为 ${IMAGE_CONSTRAINTS.width}px，当前为 ${w}px`);
+    }
+    if (h < IMAGE_CONSTRAINTS.minHeight) {
+      violations.push(`高度至少 ${IMAGE_CONSTRAINTS.minHeight}px，当前为 ${h}px`);
+    }
+    if (h > IMAGE_CONSTRAINTS.maxHeight) {
+      violations.push(`高度最多 ${IMAGE_CONSTRAINTS.maxHeight}px，当前为 ${h}px`);
+    }
+
+    setSizeWarning(violations.length > 0 ? violations.join('；') : null);
+  }, []);
 
   return (
     <div
@@ -53,10 +78,21 @@ export default function PadPopup(props: DemoProps) {
             </div>
 
             <img
-              src={modalImage as string}
+              src={modalImage}
               alt="popup"
               className="w-full h-auto block"
+              onLoad={handleImageLoad}
             />
+
+            {/* 尺寸校验警告 */}
+            {sizeWarning && (
+              <div
+                className="absolute bottom-0 left-0 right-0 text-center text-xs py-1 px-2 rounded-b"
+                style={{ backgroundColor: 'rgba(255, 200, 0, 0.9)', color: '#333' }}
+              >
+                ⚠ {sizeWarning}
+              </div>
+            )}
           </div>
         </div>
       </div>

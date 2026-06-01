@@ -8,24 +8,5 @@
   },
   "title": "通用弹窗 - 平板版配置",
   "type": "object",
-  "properties": {
-    "imageWidth": {
-      "type": "number",
-      "title": "图片宽度(px)",
-      "default": 670,
-      "description": "弹窗图片宽度（固定值）"
-    },
-    "imageMinHeight": {
-      "type": "number",
-      "title": "图片最小高度(px)",
-      "default": 670,
-      "description": "弹窗图片允许的最小高度"
-    },
-    "imageMaxHeight": {
-      "type": "number",
-      "title": "图片最大高度(px)",
-      "default": 890,
-      "description": "弹窗图片允许的最大高度"
-    }
-  }
+  "properties": {}
 }

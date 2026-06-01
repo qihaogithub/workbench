@@ -1,11 +1,36 @@
-import {jsx as _jsx, jsxs as _jsxs} from 'https://esm.sh/react@18.3.1/jsx-runtime';
+import {jsx as _jsx, jsxs as _jsxs} from 'https://esm.sh/react@18.3.1/jsx-runtime';import { useState, useCallback } from 'https://esm.sh/react@18.3.1';
 
 
 
 
+
+const IMAGE_CONSTRAINTS = {
+  width: 670,
+  minHeight: 670,
+  maxHeight: 890,
+} ;
 
 export default function PadPopup(props) {
-  const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props ;
+  const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props;
+  const [sizeWarning, setSizeWarning] = useState(null);
+
+  const handleImageLoad = useCallback((e) => {
+    const img = e.currentTarget;
+    const { naturalWidth: w, naturalHeight: h } = img;
+
+    const violations = [];
+    if (w !== IMAGE_CONSTRAINTS.width) {
+      violations.push(`宽度应为 ${IMAGE_CONSTRAINTS.width}px，当前为 ${w}px`);
+    }
+    if (h < IMAGE_CONSTRAINTS.minHeight) {
+      violations.push(`高度至少 ${IMAGE_CONSTRAINTS.minHeight}px，当前为 ${h}px`);
+    }
+    if (h > IMAGE_CONSTRAINTS.maxHeight) {
+      violations.push(`高度最多 ${IMAGE_CONSTRAINTS.maxHeight}px，当前为 ${h}px`);
+    }
+
+    setSizeWarning(violations.length > 0 ? violations.join('；') : null);
+  }, []);
 
   return (
     _jsx('div', {
@@ -53,9 +78,20 @@ export default function PadPopup(props) {
             })
 
             , _jsx('img', {
-              src: modalImage ,
+              src: modalImage,
               alt: "popup",
-              className: "w-full h-auto block"  ,}
+              className: "w-full h-auto block"  ,
+              onLoad: handleImageLoad,}
+            )
+
+            /* 尺寸校验警告 */
+            , sizeWarning && (
+              _jsxs('div', {
+                className: "absolute bottom-0 left-0 right-0 text-center text-xs py-1 px-2 rounded-b"        ,
+                style: { backgroundColor: 'rgba(255, 200, 0, 0.9)', color: '#333' },
+ children: ["⚠ "
+                 , sizeWarning
+              ]})
             )
           ]})
         })

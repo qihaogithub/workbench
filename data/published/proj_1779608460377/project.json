@@ -1,8 +1,9 @@
 {
   "id": "proj_1779608460377",
   "name": "通用弹窗",
-  "publishedVersion": "v16",
-  "publishedAt": 1780109444551,
+  "thumbnail": "/data/proj_1779608460377/thumbnail.webp",
+  "publishedVersion": "v18",
+  "publishedAt": 1780280705601,
   "demoPages": [
     {
       "id": "demo_1779608460377_w4j5h1",
@@ -12,8 +13,8 @@
       "compiledJsPath": "demos/demo_1779608460377_w4j5h1/compiled.js",
       "schemaPath": "demos/demo_1779608460377_w4j5h1/schema.json",
       "previewSize": {
-        "width": 375,
-        "height": 812
+        "width": 1024,
+        "height": 768
       }
     },
     {
@@ -30,6 +31,5 @@
     }
   ],
   "demoFolders": [],
-  "projectConfigSchema": "{\r\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\r\n  \"title\": \"通用弹窗 - 项目级共享配置\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"modalImage\": {\r\n      \"type\": \"string\",\r\n      \"title\": \"弹窗图片\",\r\n      \"description\": \"上传弹窗展示的图片\",\r\n      \"format\": \"image\",\r\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png\"\r\n    }\r\n  }\r\n}\r\n",
-  "thumbnail": "/data/proj_1779608460377/thumbnail.webp"
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"通用弹窗 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"modalImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗图片\",\n      \"description\": \"上传弹窗展示的图片（宽度670px，高度670~890px）\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 670,\n        \"minHeight\": 670,\n        \"maxWidth\": 670,\n        \"maxHeight\": 890\n      }\n    }\n  },\n  \"required\": [\"modalImage\"]\n}"
 }

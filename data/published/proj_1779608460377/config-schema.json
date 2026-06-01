@@ -5,10 +5,19 @@
   "properties": {
     "modalImage": {
       "type": "string",
-      "title": "弹窗图片",
-      "description": "上传弹窗展示的图片",
       "format": "image",
-      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png"
+      "title": "弹窗图片",
+      "description": "上传弹窗展示的图片（宽度670px，高度670~890px）",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 5242880,
+        "minWidth": 670,
+        "minHeight": 670,
+        "maxWidth": 670,
+        "maxHeight": 890
+      }
     }
-  }
+  },
+  "required": ["modalImage"]
 }
