@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ConfigForm, ConfigScopeWrapper } from "../../../../components/demo";
+import { ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
 import { Button } from "@/components/ui/button";
 import { Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -322,16 +322,20 @@ function ConfigPanel({
       .catch(() => {});
   }, [demoId]);
 
-  const hasBothScopes = !!projectConfigSchema;
+  const hasProjectConfig = !isSchemaEmpty(projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(schema);
+  const showProjectConfig = hasProjectConfig;
+  const showPageConfig = hasPageConfig;
+  const hasBothScopes = showProjectConfig && showPageConfig;
 
   return (
     <div className="w-72 shrink-0">
       <div className="flex flex-col">
-        {projectConfigSchema && (
+        {showProjectConfig && (
           <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
             <ConfigForm
               key={`project-${projectConfigSchema}`}
-              schema={projectConfigSchema}
+              schema={projectConfigSchema!}
               onChange={onProjectConfigChange ?? onChange}
               initialData={configData}
               sessionId={sessionId}
@@ -339,19 +343,21 @@ function ConfigPanel({
           </ConfigScopeWrapper>
         )}
 
-        {projectConfigSchema && (
+        {showProjectConfig && showPageConfig && (
           <div className="h-[2px] bg-border my-3" />
         )}
 
-        <ConfigScopeWrapper scope="page" hideHeader={!hasBothScopes}>
-          <ConfigForm
-            key={schema}
-            schema={schema}
-            onChange={onChange}
-            initialData={configData}
-            sessionId={sessionId}
-          />
-        </ConfigScopeWrapper>
+        {showPageConfig && (
+          <ConfigScopeWrapper scope="page" hideHeader={!hasBothScopes}>
+            <ConfigForm
+              key={schema}
+              schema={schema}
+              onChange={onChange}
+              initialData={configData}
+              sessionId={sessionId}
+            />
+          </ConfigScopeWrapper>
+        )}
       </div>
     </div>
   );

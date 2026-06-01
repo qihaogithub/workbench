@@ -4,6 +4,7 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
+import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 
 const ReadFileParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -11,6 +12,7 @@ const ReadFileParams = Type.Object({
 type ReadFileParams = Static<typeof ReadFileParams>;
 
 export function createReadFileTool(config: AgentConfig): AgentTool<typeof ReadFileParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   return {
     name: 'readFile',
     label: 'Read File',
@@ -18,6 +20,15 @@ export function createReadFileTool(config: AgentConfig): AgentTool<typeof ReadFi
     parameters: ReadFileParams,
     execute: async (toolCallId: string, args: ReadFileParams) => {
       const filePath = path.resolve(config.workingDir || '.', args.path);
+
+      if (!isPathAllowed(args.path, config.workingDir || '', permissions)) {
+        logger.warn({ path: args.path }, 'readFile denied by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: path "${args.path}" is not allowed by workspace permissions` }],
+          details: { path: args.path, error: 'permission denied' },
+          isError: true,
+        };
+      }
       
       try {
         const content = await fs.promises.readFile(filePath, 'utf-8');
@@ -46,6 +57,7 @@ const WriteFileParams = Type.Object({
 type WriteFileParams = Static<typeof WriteFileParams>;
 
 export function createWriteFileTool(config: AgentConfig): AgentTool<typeof WriteFileParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   return {
     name: 'writeFile',
     label: 'Write File',
@@ -54,6 +66,15 @@ export function createWriteFileTool(config: AgentConfig): AgentTool<typeof Write
     execute: async (toolCallId: string, args: WriteFileParams) => {
       const filePath = path.resolve(config.workingDir || '.', args.path);
       const dir = path.dirname(filePath);
+
+      if (!isPathAllowed(args.path, config.workingDir || '', permissions)) {
+        logger.warn({ path: args.path }, 'writeFile denied by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: path "${args.path}" is not allowed by workspace permissions` }],
+          details: { path: args.path, error: 'permission denied' },
+          isError: true,
+        };
+      }
       
       try {
         await fs.promises.mkdir(dir, { recursive: true });
@@ -82,6 +103,7 @@ const ListFilesParams = Type.Object({
 type ListFilesParams = Static<typeof ListFilesParams>;
 
 export function createListFilesTool(config: AgentConfig): AgentTool<typeof ListFilesParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   return {
     name: 'listFiles',
     label: 'List Files',
@@ -89,6 +111,15 @@ export function createListFilesTool(config: AgentConfig): AgentTool<typeof ListF
     parameters: ListFilesParams,
     execute: async (toolCallId: string, args: ListFilesParams) => {
       const dirPath = path.resolve(config.workingDir || '.', args.path || '.');
+
+      if (!isPathAllowed(args.path || '.', config.workingDir || '', permissions)) {
+        logger.warn({ path: args.path || '.' }, 'listFiles denied by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: path "${args.path || '.'}" is not allowed by workspace permissions` }],
+          details: { path: args.path || '.', error: 'permission denied' },
+          isError: true,
+        };
+      }
       
       try {
         const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });

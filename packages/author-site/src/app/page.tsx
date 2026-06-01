@@ -1,9 +1,9 @@
-import { HomePage } from '@/components/demo/home-page'
-import { listProjects } from '@/lib/fs-utils'
+import { HomePage } from "@/components/demo/home-page";
+import { listProjects } from "@/lib/fs-utils";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const initialDemos = listProjects()
-  return <HomePage initialDemos={initialDemos} />
+  const initialDemos = listProjects();
+  return <HomePage initialDemos={initialDemos} />;
 }

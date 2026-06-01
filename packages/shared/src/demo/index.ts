@@ -1,5 +1,5 @@
 export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, GridPageItem, GridIframeProps, PreviewGridProps } from './types';
-export { getOrderable, getDefaultValues, getPreviewSize } from './validator';
+export { getOrderable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
 export { ConfigForm } from './ConfigForm';
@@ -14,3 +14,5 @@ export { ImageListWidget } from './ImageListWidget';
 export type { ImageItem, ImageListWidgetProps } from './ImageListWidget';
 export { generateIframeHtml, buildIframeHtml } from './iframe-template';
 export { getEffectivePreviewSize, parseSizeValue, getAspectRatioValue, getBaseRowHeight, useVisiblePages, resolveImageUrls, FLASH_ANIMATION_CSS } from './preview-grid-utils';
+export { PreviewGrid } from './PreviewGrid';
+export { cn } from './utils';

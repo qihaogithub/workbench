@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, ConfigScopeWrapper } from "../../../../components/demo";
+import { PreviewPanel, ConfigForm, PreviewGrid, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
 import type { PreviewMode, PreviewSize } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
@@ -320,6 +320,13 @@ export default function ViewerProjectPage() {
     code: p.code,
   }));
 
+  const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(activePageSchema);
+  const showProjectConfig = hasProjectConfig;
+  const showPageConfig = hasPageConfig;
+  const hasBothScopes = showProjectConfig && showPageConfig;
+  const hasAnyConfig = showProjectConfig || showPageConfig;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex flex-1 overflow-hidden">
@@ -456,32 +463,36 @@ export default function ViewerProjectPage() {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
-                {data.projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project" hideHeader={!(data.projectConfigSchema && activePageSchema)}>
-                    <ConfigForm
-                      key={`project-${data.projectConfigSchema}`}
-                      schema={data.projectConfigSchema}
-                      onChange={handleProjectConfigChange}
-                      initialData={configData}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
-                )}
+                {hasAnyConfig && (
+                  <>
+                    {showProjectConfig && (
+                      <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
+                        <ConfigForm
+                          key={`project-${data.projectConfigSchema}`}
+                          schema={data.projectConfigSchema!}
+                          onChange={handleProjectConfigChange}
+                          initialData={configData}
+                          readonly
+                        />
+                      </ConfigScopeWrapper>
+                    )}
 
-                {data.projectConfigSchema && activePageSchema && (
-                  <div className="h-[2px] bg-border my-3" />
-                )}
+                    {showProjectConfig && showPageConfig && (
+                      <div className="h-[2px] bg-border my-3" />
+                    )}
 
-                {activePageSchema && (
-                  <ConfigScopeWrapper scope="page" pageName={activePage?.name} hideHeader={!(data.projectConfigSchema && activePageSchema)}>
-                    <ConfigForm
-                      key={`page-${activeDemoId}`}
-                      schema={activePageSchema}
-                      onChange={handleConfigChange}
-                      initialData={configData}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
+                    {showPageConfig && (
+                      <ConfigScopeWrapper scope="page" pageName={activePage?.name} hideHeader={!hasBothScopes}>
+                        <ConfigForm
+                          key={`page-${activeDemoId}`}
+                          schema={activePageSchema!}
+                          onChange={handleConfigChange}
+                          initialData={configData}
+                          readonly
+                        />
+                      </ConfigScopeWrapper>
+                    )}
+                  </>
                 )}
               </div>
             </ScrollArea>

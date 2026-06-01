@@ -4,6 +4,7 @@ import { createWorkbenchTools } from './pi-tools';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
+import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
 
 // 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
 // (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
@@ -87,8 +88,8 @@ export class PiAgentBackend implements IBackendAdapter {
           const toolName = context.toolCall.name;
           if (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'listFiles') {
             const args = context.args as { path?: string };
-            if (args.path && !this.isPathAllowed(args.path)) {
-              return { block: true, reason: `Access denied: path outside working directory` };
+            if (args.path && !isPathAllowed(args.path, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {
+              return { block: true, reason: `Access denied: path "${args.path}" is not allowed by workspace permissions` };
             }
           }
           return undefined;
@@ -153,12 +154,6 @@ export class PiAgentBackend implements IBackendAdapter {
 
     // 否则使用预定义模型
     return getModel(provider, modelId);
-  }
-
-  private isPathAllowed(filePath: string): boolean {
-    if (!this.config.workingDir) return true;
-    const resolvedPath = require('path').resolve(this.config.workingDir, filePath);
-    return resolvedPath.startsWith(this.config.workingDir);
   }
 
   async sendMessage(content: string, options?: { stream?: boolean }): Promise<string> {

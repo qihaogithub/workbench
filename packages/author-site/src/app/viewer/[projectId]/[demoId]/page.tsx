@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, ConfigScopeWrapper } from "../../../../../components/demo";
+import { PreviewPanel, ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "../../../../../components/demo";
 import type { PreviewSize } from "../../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../../lib/validator";
@@ -239,6 +239,13 @@ export default function ViewerDemoPage() {
   const currentPage = data.demoPages.find((p) => p.id === activeDemoId);
   const currentPageSchema = currentPage?.schema;
 
+  const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(currentPageSchema);
+  const showProjectConfig = hasProjectConfig;
+  const showPageConfig = hasPageConfig;
+  const hasBothScopes = showProjectConfig && showPageConfig;
+  const hasAnyConfig = showProjectConfig || showPageConfig;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex flex-1 overflow-hidden">
@@ -311,34 +318,38 @@ export default function ViewerDemoPage() {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
-                {data.projectConfigSchema && (
-                  <ConfigScopeWrapper scope="project" hideHeader={!(data.projectConfigSchema && currentPageSchema)}>
-                    <ConfigForm
-                      key={`project-${data.projectConfigSchema}`}
-                      schema={data.projectConfigSchema}
-                      onChange={handleConfigChange}
-                      initialData={configData}
-                      sessionId={sessionId}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
-                )}
+                {hasAnyConfig && (
+                  <>
+                    {showProjectConfig && (
+                      <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
+                        <ConfigForm
+                          key={`project-${data.projectConfigSchema}`}
+                          schema={data.projectConfigSchema!}
+                          onChange={handleConfigChange}
+                          initialData={configData}
+                          sessionId={sessionId}
+                          readonly
+                        />
+                      </ConfigScopeWrapper>
+                    )}
 
-                {data.projectConfigSchema && currentPageSchema && (
-                  <div className="h-[2px] bg-border my-3" />
-                )}
+                    {showProjectConfig && showPageConfig && (
+                      <div className="h-[2px] bg-border my-3" />
+                    )}
 
-                {currentPageSchema && (
-                  <ConfigScopeWrapper scope="page" pageName={currentPage?.name} hideHeader={!(data.projectConfigSchema && currentPageSchema)}>
-                    <ConfigForm
-                      key={`page-${activeDemoId}`}
-                      schema={currentPageSchema}
-                      onChange={handleConfigChange}
-                      initialData={configData}
-                      sessionId={sessionId}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
+                    {showPageConfig && (
+                      <ConfigScopeWrapper scope="page" pageName={currentPage?.name} hideHeader={!hasBothScopes}>
+                        <ConfigForm
+                          key={`page-${activeDemoId}`}
+                          schema={currentPageSchema!}
+                          onChange={handleConfigChange}
+                          initialData={configData}
+                          sessionId={sessionId}
+                          readonly
+                        />
+                      </ConfigScopeWrapper>
+                    )}
+                  </>
                 )}
               </div>
             </ScrollArea>

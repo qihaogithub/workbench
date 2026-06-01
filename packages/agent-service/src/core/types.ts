@@ -4,6 +4,11 @@
 
 export type AgentType = "pi-agent";
 
+// 权限配置类型（PI-1 已实现，路径和命令的白/黑名单）
+// 实际定义在 backends/pi-tools/permissions.ts（避免循环引用），
+// 这里以 type alias 方式复用
+export type { PermissionConfig } from "../backends/pi-tools/permissions";
+
 export type AgentStatus =
   | "initializing"
   | "ready"
@@ -32,6 +37,7 @@ export interface AgentConfig {
   demoId?: string;
   model?: string;
   timeout?: number;
+  permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
 
   piAgent?: PiAgentConfig;
 }

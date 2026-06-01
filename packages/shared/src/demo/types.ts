@@ -84,4 +84,6 @@ export interface PreviewGridProps {
   previewSize?: PreviewSize;
   snapshotVersion?: number;
   flashCardId?: string;
+  showToolbar?: boolean;
+  className?: string;
 }

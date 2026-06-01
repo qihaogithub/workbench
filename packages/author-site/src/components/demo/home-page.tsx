@@ -1,72 +1,72 @@
-'use client'
+"use client";
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { Plus, Search } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { DemoCard } from '@/components/demo/demo-card'
-import { CreateDemoDialog } from '@/components/demo/create-demo-dialog'
-import { DeleteConfirmDialog } from '@/components/demo/delete-confirm-dialog'
-import { useDemos, createDemo, deleteDemo } from '@/lib/api'
-import { useToast } from '@/components/ui/toast-provider'
-import { SettingsButton } from '@/components/settings/settings-button'
-import type { DemoMeta } from '@opencode-workbench/shared'
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { DemoCard } from "@/components/demo/demo-card";
+import { CreateDemoDialog } from "@/components/demo/create-demo-dialog";
+import { DeleteConfirmDialog } from "@/components/demo/delete-confirm-dialog";
+import { useDemos, createDemo, deleteDemo } from "@/lib/api";
+import { useToast } from "@/components/ui/toast-provider";
+import { SettingsButton } from "@/components/settings/settings-button";
+import type { DemoMeta } from "@opencode-workbench/shared";
 
 export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
-  const router = useRouter()
+  const router = useRouter();
   const { demos, error, revalidate } = useDemos({
     fallbackData: initialDemos,
-  })
-  const { toast } = useToast()
+  });
+  const { toast } = useToast();
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null);
 
   const filteredDemos = useMemo(() => {
-    if (!searchQuery) return demos
+    if (!searchQuery) return demos;
     return demos.filter((demo) =>
-      demo.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [demos, searchQuery])
+      demo.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [demos, searchQuery]);
 
   const handleCreate = async (name: string) => {
-    const response = await createDemo(name)
+    const response = await createDemo(name);
     if (response.success) {
       toast({
-        title: '创建成功',
+        title: "创建成功",
         description: `Demo「${name}」已创建`,
-      })
-      router.push(`/demo/${response.data.id}/edit`)
+      });
+      router.push(`/demo/${response.data.id}/edit`);
     } else {
       toast({
-        variant: 'destructive',
-        title: '创建失败',
+        variant: "destructive",
+        title: "创建失败",
         description: response.error.message,
-      })
+      });
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget) return;
 
-    const response = await deleteDemo(deleteTarget.id)
+    const response = await deleteDemo(deleteTarget.id);
     if (response.success) {
       toast({
-        title: '删除成功',
+        title: "删除成功",
         description: `Demo「${deleteTarget.name}」已删除`,
-      })
-      revalidate()
+      });
+      revalidate();
     } else {
       toast({
-        variant: 'destructive',
-        title: '删除失败',
+        variant: "destructive",
+        title: "删除失败",
         description: response.error.message,
-      })
+      });
     }
-    setDeleteTarget(null)
-  }
+    setDeleteTarget(null);
+  };
 
   if (error) {
     return (
@@ -74,14 +74,14 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         <div className="text-center">
           <p className="text-destructive text-lg">加载失败</p>
           <p className="text-muted-foreground mt-2">
-            {error instanceof Error ? error.message : '未知错误'}
+            {error instanceof Error ? error.message : "未知错误"}
           </p>
           <Button onClick={() => revalidate()} className="mt-4">
             重试
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -112,7 +112,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         {filteredDemos.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
             <div className="text-muted-foreground text-lg">
-              {searchQuery ? '没有找到匹配的 Demo' : '暂无 Demo'}
+              {searchQuery ? "没有找到匹配的 Demo" : "暂无 Demo"}
             </div>
             {!searchQuery && (
               <Button
@@ -146,9 +146,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
           open={!!deleteTarget}
           onOpenChange={(open) => !open && setDeleteTarget(null)}
           onConfirm={handleDelete}
-          demoName={deleteTarget?.name || ''}
+          demoName={deleteTarget?.name || ""}
         />
       </main>
     </div>
-  )
+  );
 }

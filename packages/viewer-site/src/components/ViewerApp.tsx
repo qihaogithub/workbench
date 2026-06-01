@@ -27,7 +27,7 @@ import type {
   PublishedDemoPage,
 } from "@/lib/api";
 import { PreviewPanel, PreviewGrid } from "@/components/demo";
-import { ConfigForm, ConfigScopeWrapper } from "@/components/demo";
+import { ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize, PreviewMode } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -535,13 +535,16 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const tree = buildTree(project.demoPages, project.demoFolders);
   const activePage = project.demoPages.find((p) => p.id === activePageId);
   const activePageSchema = activePage ? pageSchemaMap[activePage.id] : "";
-  const hasSchema = !!activePageSchema || !!project.projectConfigSchema;
+  const hasProjectConfig = !isSchemaEmpty(project.projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(activePageSchema);
+  const hasSchema = hasProjectConfig || hasPageConfig;
+  const hasBothScopes = hasProjectConfig && hasPageConfig;
 
   const gridPages = project.demoPages.map((p, index) => ({
     id: p.id,
     name: p.name,
     order: index,
-    compiledJsUrl: getCompiledJsUrl(projectId, p.compiledJsPath),
+    code: getCompiledJsUrl(projectId, p.compiledJsPath),
     previewSize: pageSchemaMap[p.id]
       ? getPreviewSize(pageSchemaMap[p.id])
       : undefined,
@@ -631,41 +634,31 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-4">
-                {project.projectConfigSchema && (
+                {hasProjectConfig && (
                   <ConfigScopeWrapper
                     scope="project"
-                    hideHeader={
-                      !(
-                        project.projectConfigSchema &&
-                        activePageSchema
-                      )
-                    }
+                    hideHeader={!hasBothScopes}
                   >
                     <ConfigForm
-                      schema={project.projectConfigSchema}
+                      schema={project.projectConfigSchema!}
                       onChange={handleProjectConfigChange}
                       initialData={configData}
                       readonly
                     />
                   </ConfigScopeWrapper>
                 )}
-                {project.projectConfigSchema && activePageSchema && (
+                {hasProjectConfig && hasPageConfig && (
                   <Separator />
                 )}
-                {activePageSchema && (
+                {hasPageConfig && (
                   <ConfigScopeWrapper
                     scope="page"
                     pageName={activePage?.name}
-                    hideHeader={
-                      !(
-                        project.projectConfigSchema &&
-                        activePageSchema
-                      )
-                    }
+                    hideHeader={!hasBothScopes}
                   >
                     <ConfigForm
                       key={`page-${activePageId}`}
-                      schema={activePageSchema}
+                      schema={activePageSchema!}
                       onChange={handleConfigChange}
                       initialData={configData}
                       readonly

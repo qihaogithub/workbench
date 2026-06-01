@@ -4,10 +4,9 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { isCommandAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 
 const execAsync = promisify(exec);
-
-const ALLOWED_COMMANDS = ['npm', 'node', 'npx', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo'];
 
 const BashParams = Type.Object({
   command: Type.String({ description: 'Shell command to execute' }),
@@ -15,6 +14,7 @@ const BashParams = Type.Object({
 type BashParams = Static<typeof BashParams>;
 
 export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   return {
     name: 'bash',
     label: 'Bash',
@@ -22,13 +22,13 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
     parameters: BashParams,
     execute: async (toolCallId: string, args: BashParams) => {
       const command = args.command.trim();
-      const baseCommand = command.split(/\s+/)[0];
-      
-      if (!ALLOWED_COMMANDS.includes(baseCommand)) {
-        logger.warn({ command: baseCommand }, 'Command not in allowed list');
+
+      if (!isCommandAllowed(command, permissions)) {
+        const baseCommand = command.split(/\s+/)[0] || '';
+        logger.warn({ command: baseCommand }, 'Command not allowed by permissions');
         return {
-          content: [{ type: 'text', text: `Error: Command "${baseCommand}" is not allowed. Allowed commands: ${ALLOWED_COMMANDS.join(', ')}` }],
-          details: { command, error: 'Command not allowed' },
+          content: [{ type: 'text', text: `Error: command "${baseCommand}" is not allowed. Allowed: ${permissions.allowedCommands.join(', ')}. Denied: ${permissions.deniedCommands.join(', ')}` }],
+          details: { command, error: 'permission denied' },
           isError: true,
         };
       }

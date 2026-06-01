@@ -1,5 +1,18 @@
 import type { PreviewSize } from "./types";
 
+export function isSchemaEmpty(schema?: string | null): boolean {
+  if (!schema) return true;
+  try {
+    const parsed = JSON.parse(schema);
+    if (!parsed.properties || typeof parsed.properties !== "object") {
+      return true;
+    }
+    return Object.keys(parsed.properties).length === 0;
+  } catch {
+    return true;
+  }
+}
+
 export function getDefaultValues(schema: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(schema);

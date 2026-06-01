@@ -8,6 +8,7 @@ import {
   PreviewGrid,
   invalidateCompileCache,
   ConfigScopeWrapper,
+  isSchemaEmpty,
 } from "../../../../../components/demo";
 import type { PreviewMode } from "../../../../../components/demo";
 import {
@@ -781,6 +782,13 @@ ${context.details}
     );
   }
 
+  const hasProjectConfig = !isSchemaEmpty(projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(schema);
+  const showProjectConfig = hasProjectConfig;
+  const showPageConfig = hasPageConfig;
+  const hasBothScopes = showProjectConfig && showPageConfig;
+  const hasAnyConfig = showProjectConfig || showPageConfig;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
@@ -1551,6 +1559,7 @@ ${context.details}
                   gridScale={gridScale}
                   onGridScaleChange={setGridScale}
                   onGridColumnsChange={setGridColumns}
+                  showToolbar={false}
                   onCardClick={(pageId) => {
                     if (pageId === activeDemoId) return;
                     setActiveDemoId(pageId);
@@ -1606,53 +1615,59 @@ ${context.details}
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col">
-                {projectConfigSchema && (
-                  <ConfigScopeWrapper
-                    scope="project"
-                    hideHeader={!projectConfigSchema}
-                  >
-                    <ConfigForm
-                      key={`project-${projectConfigSchema}`}
-                      schema={projectConfigSchema}
-                      onChange={(data) => {
-                        setConfigDataMap((prev) => {
-                          const next = { ...prev };
-                          for (const pageId of Object.keys(next)) {
-                            next[pageId] = { ...next[pageId], ...data };
-                          }
-                          for (const page of demoPages) {
-                            if (!next[page.id]) {
-                              next[page.id] = { ...data };
-                            }
-                          }
-                          return next;
-                        });
-                      }}
-                      onSchemaChange={handleProjectSchemaChange}
-                      initialData={configData}
-                      sessionId={sessionId}
-                    />
-                  </ConfigScopeWrapper>
-                )}
+                {hasAnyConfig && (
+                  <>
+                    {showProjectConfig && (
+                      <ConfigScopeWrapper
+                        scope="project"
+                        hideHeader={!hasBothScopes}
+                      >
+                        <ConfigForm
+                          key={`project-${projectConfigSchema}`}
+                          schema={projectConfigSchema!}
+                          onChange={(data) => {
+                            setConfigDataMap((prev) => {
+                              const next = { ...prev };
+                              for (const pageId of Object.keys(next)) {
+                                next[pageId] = { ...next[pageId], ...data };
+                              }
+                              for (const page of demoPages) {
+                                if (!next[page.id]) {
+                                  next[page.id] = { ...data };
+                                }
+                              }
+                              return next;
+                            });
+                          }}
+                          onSchemaChange={handleProjectSchemaChange}
+                          initialData={configData}
+                          sessionId={sessionId}
+                        />
+                      </ConfigScopeWrapper>
+                    )}
 
-                {projectConfigSchema && (
-                  <div className="h-[2px] bg-border my-3" />
-                )}
+                    {showProjectConfig && showPageConfig && (
+                      <div className="h-[2px] bg-border my-3" />
+                    )}
 
-                <ConfigScopeWrapper
-                  scope="page"
-                  pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
-                  hideHeader={!projectConfigSchema}
-                >
-                  <ConfigForm
-                    key={`${activeDemoId}-${snapshotVersion}`}
-                    schema={schema}
-                    onChange={handleConfigChange}
-                    onSchemaChange={handleSchemaChange}
-                    initialData={configData}
-                    sessionId={sessionId}
-                  />
-                </ConfigScopeWrapper>
+                    {showPageConfig && (
+                      <ConfigScopeWrapper
+                        scope="page"
+                        pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
+                        hideHeader={!hasBothScopes}
+                      >
+                        <ConfigForm
+                          key={`${activeDemoId}-${snapshotVersion}`}
+                          schema={schema}
+                          onChange={handleConfigChange}
+                          onSchemaChange={handleSchemaChange}
+                          initialData={configData}
+                          sessionId={sessionId}
+                        />
+                      </ConfigScopeWrapper>
+                    )}
+                  </>
+                )}
               </div>
             </ScrollArea>
           </ResizablePanel>
