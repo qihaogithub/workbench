@@ -36,6 +36,10 @@ cat > "$DEPLOY_DIR/_headers" << 'EOF'
   Cache-Control: public, immutable
   Access-Control-Allow-Origin: *
 
+/data/*/demos/*.html
+  Cache-Control: public, immutable
+  Access-Control-Allow-Origin: *
+
 /*.html
   Cache-Control: no-cache, must-revalidate
 

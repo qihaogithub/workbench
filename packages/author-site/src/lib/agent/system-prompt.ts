@@ -41,15 +41,15 @@ export function buildStaticSystemPrompt(): string {
  * 调用时机：每次 sendMessage 前
  * 注入方式：拼接到 user message 头部（不进入 system prompt）
  * 缓存表现：user message 前缀也支持缓存，但每次 L3 变化会失效（可接受）
+ *
+ * 返回的字符串直接作为 L3 全文（WORKSPACE_STATUS_TEMPLATE 内部已含 [系统自动注入...] 标记和 [系统上下文结束] 标记）
  */
 export function buildDynamicContextPrefix(context: SystemPromptContext): string {
-  const l3 = render(WORKSPACE_STATUS_TEMPLATE, {
+  return render(WORKSPACE_STATUS_TEMPLATE, {
     PROJECT_NAME: context.projectName,
     PROJECT_CONFIG_STATUS: context.projectConfigStatus,
     WORKSPACE_PATH: context.workspacePath,
     PAGE_COUNT: String(context.pageCount),
     PAGE_LIST: context.pageList || '（暂无页面）',
   });
-
-  return `[当前工作空间]\n${l3}\n\n---\n\n`;
 }

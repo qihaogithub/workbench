@@ -63,9 +63,14 @@ describe('buildDynamicContextPrefix', () => {
     expect(out).toContain('关于');
   });
 
-  it('返回内容以 [当前工作空间] 标记开头便于 LLM 识别', () => {
+  it('返回内容以 [系统自动注入] 标记开头便于 LLM 识别', () => {
     const out = buildDynamicContextPrefix(baseContext);
-    expect(out).toMatch(/^\[当前工作空间\]/);
+    expect(out).toMatch(/^\[系统自动注入的工作空间状态/);
+  });
+
+  it('包含"不要 listFiles"提示以避免 AI 重复查询', () => {
+    const out = buildDynamicContextPrefix(baseContext);
+    expect(out).toContain('无需 listFiles');
   });
 
   it('无页面时显示（暂无页面）', () => {

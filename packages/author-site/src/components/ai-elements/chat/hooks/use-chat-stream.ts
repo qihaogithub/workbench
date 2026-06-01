@@ -417,7 +417,9 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         await streamService.waitForConnection(stream);
 
-        streamService.sendMessage(userMessage, workingDir, images);
+        // v3.2: sendMessage 是 async，等待 L3 拼装完再发送
+        // fire-and-forget：不让发送等待阻塞 UI，但 L3 fetch 顺序保证
+        void streamService.sendMessage(userMessage, workingDir, images);
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
