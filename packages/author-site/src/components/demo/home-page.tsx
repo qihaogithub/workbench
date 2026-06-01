@@ -10,6 +10,7 @@ import { CreateDemoDialog } from '@/components/demo/create-demo-dialog'
 import { DeleteConfirmDialog } from '@/components/demo/delete-confirm-dialog'
 import { useDemos, createDemo, deleteDemo } from '@/lib/api'
 import { useToast } from '@/components/ui/toast-provider'
+import { SettingsButton } from '@/components/settings/settings-button'
 import type { DemoMeta } from '@opencode-workbench/shared'
 
 export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
@@ -84,65 +85,70 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-          <Input
-            placeholder="搜索 Demo..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          新建 Demo
-        </Button>
-      </div>
-
-      {filteredDemos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <div className="text-muted-foreground text-lg">
-            {searchQuery ? '没有找到匹配的 Demo' : '暂无 Demo'}
-          </div>
-          {!searchQuery && (
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="mt-4"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              创建第一个 Demo
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredDemos.map((demo) => (
-            <DemoCard
-              key={demo.id}
-              demo={demo}
-              onDelete={() => setDeleteTarget(demo)}
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="container flex h-14 items-center px-4 gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+            <Input
+              placeholder="搜索 Demo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-ring"
             />
-          ))}
+          </div>
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            新建 Demo
+          </Button>
+          <SettingsButton />
         </div>
-      )}
+      </header>
 
-      <CreateDemoDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onCreate={handleCreate}
-      />
+      <main className="container py-6 px-4 space-y-8">
+        {filteredDemos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+            <div className="text-muted-foreground text-lg">
+              {searchQuery ? '没有找到匹配的 Demo' : '暂无 Demo'}
+            </div>
+            {!searchQuery && (
+              <Button
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="mt-4"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                创建第一个 Demo
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredDemos.map((demo) => (
+              <DemoCard
+                key={demo.id}
+                demo={demo}
+                onDelete={() => setDeleteTarget(demo)}
+              />
+            ))}
+          </div>
+        )}
 
-      <DeleteConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        demoName={deleteTarget?.name || ''}
-      />
+        <CreateDemoDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          onCreate={handleCreate}
+        />
+
+        <DeleteConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => !open && setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          demoName={deleteTarget?.name || ''}
+        />
+      </main>
     </div>
   )
 }
