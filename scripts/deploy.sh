@@ -50,10 +50,6 @@ print(value)
 PY
 }
 
-OPENCODE_PROVIDER_NAME="$(read_env_value "OPENCODE_PROVIDER_NAME")"
-OPENCODE_API_KEY="$(read_env_value "OPENCODE_API_KEY")"
-OPENCODE_API_BASE="$(read_env_value "OPENCODE_API_BASE")"
-OPENCODE_MODELS="$(read_env_value "OPENCODE_MODELS")"
 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES="$(read_env_value "NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES")"
 NEXT_PUBLIC_MODEL_NAME_FILTERS="$(read_env_value "NEXT_PUBLIC_MODEL_NAME_FILTERS")"
 NEXT_PUBLIC_AGENT_SERVICE_URL="$(read_env_value "NEXT_PUBLIC_AGENT_SERVICE_URL")"
@@ -62,27 +58,8 @@ CORS_ORIGINS="$(read_env_value "CORS_ORIGINS")"
 JWT_SECRET="$(read_env_value "JWT_SECRET")"
 USE_SECURE_COOKIE="$(read_env_value "USE_SECURE_COOKIE")"
 
-if [ -z "${OPENCODE_API_KEY}" ] || [ "${OPENCODE_API_KEY}" = "sk-your-api-key-here" ]; then
-    echo -e "${RED}❌ .env.docker 中未配置 OPENCODE_API_KEY${NC}"
-    exit 1
-fi
-
-if [ -z "${OPENCODE_API_BASE}" ] || [ "${OPENCODE_API_BASE}" = "https://api.example.com/v1" ]; then
-    echo -e "${RED}❌ .env.docker 中未配置 OPENCODE_API_BASE${NC}"
-    exit 1
-fi
-
-if [ -z "${OPENCODE_MODELS}" ] || [ "${OPENCODE_MODELS}" = "your-model-name" ]; then
-    echo -e "${RED}❌ .env.docker 中未配置 OPENCODE_MODELS${NC}"
-    exit 1
-fi
-
 # 生成部署环境文件
 cat > "${DEPLOY_ENV_FILE}" <<EOF
-OPENCODE_PROVIDER_NAME=${OPENCODE_PROVIDER_NAME:-custom}
-OPENCODE_API_KEY=${OPENCODE_API_KEY}
-OPENCODE_API_BASE=${OPENCODE_API_BASE}
-OPENCODE_MODELS=${OPENCODE_MODELS}
 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
 NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
@@ -177,10 +154,10 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         --build-arg GIT_COMMIT='${GIT_COMMIT}' \
         --build-arg GIT_BRANCH='${GIT_BRANCH}' \
         --build-arg BUILD_TIME='${BUILD_TIME}' \
-        opencode-serve agent-service author-site
+        agent-service author-site
 
     docker compose --env-file .env.docker up -d --force-recreate \
-        opencode-serve agent-service author-site
+        agent-service author-site
 
     echo '✅ 核心服务已启动'
 "
@@ -220,7 +197,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     echo '⏳ 等待容器启动...'
     for i in \$(seq 1 60); do
         all_running=true
-        for name in opencode-workbench-opencode-serve-1 opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
             status=\$(docker inspect -f '{{.State.Status}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$status\" != 'running' ]; then
                 all_running=false
@@ -239,7 +216,6 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     done
 
     # 检查容器运行状态
-    check_container_running opencode-workbench-opencode-serve-1
     check_container_running opencode-workbench-agent-service-1
     check_container_running opencode-workbench-author-site-1
 
@@ -247,7 +223,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     echo '⏳ 等待健康检查...'
     for i in \$(seq 1 90); do
         all_healthy=true
-        for name in opencode-workbench-opencode-serve-1 opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
             health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$health\" != 'healthy' ]; then
                 all_healthy=false
@@ -259,7 +235,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         fi
         if [ \"\$i\" -eq 90 ]; then
             echo '❌ 健康检查超时'
-            for name in opencode-workbench-opencode-serve-1 opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+            for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
                 check_container_healthy \"\$name\"
             done
             exit 1
@@ -268,7 +244,6 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     done
 
     # 健康检查
-    check_container_healthy opencode-workbench-opencode-serve-1
     check_container_healthy opencode-workbench-agent-service-1
     check_container_healthy opencode-workbench-author-site-1
 
@@ -298,19 +273,6 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         fi
         sleep 1
     done
-
-    for i in \$(seq 1 30); do
-        if curl -fsS http://127.0.0.1:4096/global/health >/dev/null 2>&1; then
-            echo '✅ opencode-serve 健康检查通过'
-            break
-        fi
-        if [ \"\$i\" -eq 30 ]; then
-            echo '❌ opencode-serve 健康检查失败: http://127.0.0.1:4096/global/health'
-            docker logs --tail=120 opencode-workbench-opencode-serve-1 2>/dev/null || true
-            exit 1
-        fi
-        sleep 1
-    done
 "
 
 echo ""
@@ -320,7 +282,6 @@ echo ""
 echo -e "${YELLOW}📋 服务端口说明:${NC}"
 echo -e "   author-site:    http://${SERVER_IP}:3200  (前端界面)"
 echo -e "   agent-service:  http://${SERVER_IP}:3201  (Agent 服务)"
-echo -e "   opencode-serve: http://${SERVER_IP}:4096  (LLM 服务)"
 echo ""
 echo -e "${YELLOW}💡 可选: 启动预览端 viewer-site:${NC}"
 echo -e "   ssh ${SERVER_USER}@${SERVER_IP}"

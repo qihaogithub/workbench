@@ -27,6 +27,7 @@ import type {
   PreviewSize,
   GridPageItem,
   PreviewGridProps,
+  PreviewMode,
 } from "./types";
 
 type AlignmentMode = "center" | "top";
@@ -409,6 +410,8 @@ export function PreviewGrid({
   snapshotVersion,
   flashCardId,
   showToolbar = true,
+  showModeToggle = false,
+  onPreviewModeChange,
   className,
 }: PreviewGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -475,26 +478,82 @@ export function PreviewGrid({
     <div className={cn("h-full flex flex-col", className)}>
       {showToolbar && (
         <div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
-          <div className="flex items-center gap-2">
-            <svg
-              className="h-4 w-4 text-muted-foreground"
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="7" height="7" x="3" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="14" rx="1" />
-              <rect width="7" height="7" x="3" y="14" rx="1" />
-            </svg>
-            <span className="text-sm font-medium">宫格视图</span>
-          </div>
+          {showModeToggle && onPreviewModeChange ? (
+            <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+              <button
+                type="button"
+                onClick={() => onPreviewModeChange("single")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
+                  "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                单页
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
+                  "bg-accent text-accent-foreground",
+                )}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect width="7" height="7" x="3" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="14" rx="1" />
+                  <rect width="7" height="7" x="3" y="14" rx="1" />
+                </svg>
+                宫格
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 text-muted-foreground"
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="7" height="7" x="3" y="3" rx="1" />
+                <rect width="7" height="7" x="14" y="3" rx="1" />
+                <rect width="7" height="7" x="14" y="14" rx="1" />
+                <rect width="7" height="7" x="3" y="14" rx="1" />
+              </svg>
+              <span className="text-sm font-medium">宫格视图</span>
+            </div>
+          )}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
               {([2, 3, 4] as const).map((col) => {

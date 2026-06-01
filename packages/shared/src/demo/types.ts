@@ -85,5 +85,7 @@ export interface PreviewGridProps {
   snapshotVersion?: number;
   flashCardId?: string;
   showToolbar?: boolean;
+  showModeToggle?: boolean;
+  onPreviewModeChange?: (mode: PreviewMode) => void;
   className?: string;
 }

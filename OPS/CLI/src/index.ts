@@ -56,19 +56,23 @@ program
   .description("通过 HTTP API 发送消息(非流式)")
   .option("-d, --demo-id <demoId>", "Demo ID")
   .option("-w, --working-dir <dir>", "工作目录路径")
-  .option("-b, --backend <backend>", "Agent 后端类型", "opencode-http")
+  .option("-b, --backend <backend>", "Agent 后端类型", "pi-agent")
   .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .action(async (sessionId, message, options) => {
-    await testHttpMessage(program.opts().url, {
-      sessionId,
-      message,
-      demoId: options.demoId,
-      workingDir: options.workingDir,
-      backend: options.backend,
-      model: options.model,
-      timeout: parseInt(options.timeout),
-    }, getJsonMode());
+    await testHttpMessage(
+      program.opts().url,
+      {
+        sessionId,
+        message,
+        demoId: options.demoId,
+        workingDir: options.workingDir,
+        backend: options.backend,
+        model: options.model,
+        timeout: parseInt(options.timeout),
+      },
+      getJsonMode(),
+    );
   });
 
 // ============================================================
@@ -78,7 +82,7 @@ program
   .command("stream <sessionId> [message]")
   .description("通过 WebSocket 测试流式响应")
   .option("-w, --working-dir <dir>", "工作目录路径")
-  .option("-b, --backend <backend>", "Agent 后端类型", "opencode-http")
+  .option("-b, --backend <backend>", "Agent 后端类型", "pi-agent")
   .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .option("--no-wait", "发送消息后立即退出,不等待响应完成")

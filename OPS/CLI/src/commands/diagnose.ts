@@ -117,7 +117,9 @@ export async function diagnoseError(
     }
 
     showError("无法连接到 Agent Service");
-    console.error(chalk.red(`  ${error instanceof Error ? error.message : "未知错误"}`));
+    console.error(
+      chalk.red(`  ${error instanceof Error ? error.message : "未知错误"}`),
+    );
     process.exit(1);
   }
 
@@ -236,7 +238,11 @@ export async function diagnoseError(
         showSuccess("测试消息成功");
         console.log(chalk.gray(`  耗时: ${duration}ms`));
         if (messageResponse.data.content) {
-          console.log(chalk.gray(`  回复长度: ${messageResponse.data.content.length} 字符`));
+          console.log(
+            chalk.gray(
+              `  回复长度: ${messageResponse.data.content.length} 字符`,
+            ),
+          );
         }
         console.log("");
         showSuccess("诊断完成 - 服务运行正常");
@@ -255,7 +261,9 @@ export async function diagnoseError(
       }
 
       showError("测试消息异常");
-      console.error(chalk.red(`  ${error instanceof Error ? error.message : "未知错误"}`));
+      console.error(
+        chalk.red(`  ${error instanceof Error ? error.message : "未知错误"}`),
+      );
       console.log("");
       console.log(chalk.yellow("  可能是网络连接问题或服务器异常"));
     }
@@ -278,7 +286,11 @@ function analyzeError(
   error: { code?: string; message?: string } | undefined,
 ): DiagnoseResult["analysis"] {
   if (!error) {
-    return { problem: "未知错误", possibleCauses: ["无具体错误信息"], solutions: ["查看详细日志"] };
+    return {
+      problem: "未知错误",
+      possibleCauses: ["无具体错误信息"],
+      solutions: ["查看详细日志"],
+    };
   }
 
   const { code, message } = error;
@@ -289,11 +301,11 @@ function analyzeError(
       possibleCauses: [
         "ACP 连接建立但 createSession 失败",
         "Session 超时或失效",
-        "opencode CLI 未正确响应",
+        "Pi Agent 未正确响应",
       ],
       solutions: [
         "使用新的 sessionId 重试",
-        "检查 opencode CLI 是否可用",
+        "检查 agent-service 是否正常运行",
         "查看 agent-service 日志",
         '运行: ops-cli stream "new-session" "测试"',
       ],
@@ -320,41 +332,32 @@ function analyzeError(
   if (message?.includes("ECONNREFUSED")) {
     return {
       problem: "连接被拒绝",
-      possibleCauses: [
-        "CLI 子进程未启动",
-        "端口被占用",
-        "防火墙阻止",
-      ],
-      solutions: [
-        "确认相关 CLI 已安装",
-        "检查端口占用情况",
-        "检查防火墙设置",
-      ],
+      possibleCauses: ["CLI 子进程未启动", "端口被占用", "防火墙阻止"],
+      solutions: ["确认相关 CLI 已安装", "检查端口占用情况", "检查防火墙设置"],
     };
   }
 
   if (code === "SESSION_NOT_FOUND") {
     return {
       problem: "会话不存在",
-      possibleCauses: [
-        "会话已被清理或销毁",
-        "会话 ID 错误",
-      ],
-      solutions: [
-        "使用新的 sessionId",
-        "列出所有会话: ops-cli sessions",
-      ],
+      possibleCauses: ["会话已被清理或销毁", "会话 ID 错误"],
+      solutions: ["使用新的 sessionId", "列出所有会话: ops-cli sessions"],
     };
   }
 
   return {
     problem: "未知错误",
-    possibleCauses: [`错误代码: ${code || "N/A"}`, `错误信息: ${message || "N/A"}`],
+    possibleCauses: [
+      `错误代码: ${code || "N/A"}`,
+      `错误信息: ${message || "N/A"}`,
+    ],
     solutions: ["查看详细日志", "尝试重新操作", "运行 ops-cli system 检查环境"],
   };
 }
 
-function displayAnalysis(analysis: NonNullable<DiagnoseResult["analysis"]>): void {
+function displayAnalysis(
+  analysis: NonNullable<DiagnoseResult["analysis"]>,
+): void {
   console.log(chalk.yellow("错误分析:"));
   console.log(chalk.yellow(`\n  [问题] ${analysis.problem}`));
   console.log(chalk.yellow("  [可能原因]"));

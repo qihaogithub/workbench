@@ -1417,99 +1417,100 @@ ${context.details}
           </ResizablePanel>
 
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
-            <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-              <Button
-                variant={previewMode === "single" ? "default" : "ghost"}
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => setPreviewMode("single")}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                单页
-              </Button>
-              <Button
-                variant={previewMode === "grid" ? "default" : "ghost"}
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => setPreviewMode("grid")}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                宫格
-              </Button>
-              <div className="flex-1" />
-              {previewMode === "single" && demoPages.length > 1 && (
-                <Select
-                  value={activeDemoId}
-                  onValueChange={async (pageId) => {
-                    setActiveDemoId(pageId);
-                    if (sessionId) {
-                      try {
-                        const res = await fetch(
-                          `/api/sessions/${sessionId}/files/${pageId}`,
-                        );
-                        const data = await res.json();
-                        if (data.success) {
-                          setCode(data.data.code);
-                          setSchema(data.data.schema);
-                          setEditorContent(
-                            buildFigmaText(data.data.code, data.data.schema),
-                          );
-                          setConfigDataMap((prev) => {
-                            if (prev[pageId]) return prev;
-                            const defaults = getSafeMergedDefaults(
-                              data.data.schema,
-                            );
-                            return { ...prev, [pageId]: defaults };
-                          });
-                          const size = getPreviewSize(data.data.schema);
-                          setPreviewSize(size);
-                        }
-                      } catch (err) {
-                        console.error("加载页面失败:", err);
-                      }
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-7 w-32 text-xs">
-                    <SelectValue placeholder="选择页面" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {demoPages.map((page) => (
-                      <SelectItem key={page.id} value={page.id}>
-                        {page.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-            </div>
-
             <div className="flex-1 overflow-hidden">
               {previewMode === "single" ? (
-                <div
-                  className="p-4 h-full overflow-y-auto preview-single-scroll"
-                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                >
-                  <style>{`
-                    .preview-single-scroll::-webkit-scrollbar {
-                      display: none;
-                    }
-                  `}</style>
-                  <PreviewPanel
-                    code={code}
-                    sessionId={sessionId}
-                    demoId={activeDemoId}
-                    configData={configData}
-                    previewSize={previewSize}
-                    snapshotVersion={snapshotVersion}
-                  />
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        单页
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("grid")}
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
+                      >
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                        宫格
+                      </button>
+                    </div>
+                    <div className="flex-1" />
+                    {demoPages.length > 1 && (
+                      <Select
+                        value={activeDemoId}
+                        onValueChange={async (pageId) => {
+                          setActiveDemoId(pageId);
+                          if (sessionId) {
+                            try {
+                              const res = await fetch(
+                                `/api/sessions/${sessionId}/files/${pageId}`,
+                              );
+                              const data = await res.json();
+                              if (data.success) {
+                                setCode(data.data.code);
+                                setSchema(data.data.schema);
+                                setEditorContent(
+                                  buildFigmaText(data.data.code, data.data.schema),
+                                );
+                                setConfigDataMap((prev) => {
+                                  if (prev[pageId]) return prev;
+                                  const defaults = getSafeMergedDefaults(
+                                    data.data.schema,
+                                  );
+                                  return { ...prev, [pageId]: defaults };
+                                });
+                                const size = getPreviewSize(data.data.schema);
+                                setPreviewSize(size);
+                              }
+                            } catch (err) {
+                              console.error("加载页面失败:", err);
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-32 text-xs">
+                          <SelectValue placeholder="选择页面" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {demoPages.map((page) => (
+                            <SelectItem key={page.id} value={page.id}>
+                              {page.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <div
+                    className="flex-1 overflow-y-auto p-4 preview-single-scroll"
+                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  >
+                    <style>{`
+                      .preview-single-scroll::-webkit-scrollbar {
+                        display: none;
+                      }
+                    `}</style>
+                    <PreviewPanel
+                      code={code}
+                      sessionId={sessionId}
+                      demoId={activeDemoId}
+                      configData={configData}
+                      previewSize={previewSize}
+                      snapshotVersion={snapshotVersion}
+                    />
+                  </div>
                 </div>
               ) : (
                 <PreviewGrid
                   sessionId={sessionId}
                   demoPages={demoPages}
                   activePageId={activeDemoId}
+                  showModeToggle
+                  onPreviewModeChange={setPreviewMode}
                   gridColumns={gridColumns}
                   gridScale={gridScale}
                   onGridScaleChange={setGridScale}

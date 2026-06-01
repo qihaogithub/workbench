@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n opencode,author,agent,viewer -c yellow,blue,green,cyan \"opencode serve\" \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
+    "dev": "concurrently -n author,agent,viewer -c blue,green,cyan \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
     "dev:author": "pnpm --filter @opencode-workbench/author-site dev",
     "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
     "dev:viewer": "pnpm --filter @opencode-workbench/viewer-site dev",
