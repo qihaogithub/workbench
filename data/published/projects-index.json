@@ -4,8 +4,8 @@
       "id": "proj_1779608460377",
       "name": "通用弹窗",
       "thumbnail": "/data/proj_1779608460377/thumbnail.webp",
-      "publishedAt": 1780280705601,
-      "publishedVersion": "v18",
+      "publishedAt": 1780292121718,
+      "publishedVersion": "v23",
       "demoCount": 2
     },
     {
@@ -31,5 +31,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1780280705603
+  "generatedAt": 1780292121720
 }

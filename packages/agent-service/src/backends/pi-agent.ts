@@ -247,23 +247,42 @@ export class PiAgentBackend implements IBackendAdapter {
 
   async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
     const svc = getServiceConfig();
-    const provider = this.config.piAgent?.provider || svc.piAgent.provider;
-    const modelId = this.config.piAgent?.model || svc.piAgent.model;
     const providersManager = getBackendProvidersManager();
 
-    // 1) 优先尝试 pi-ai 内置 KnownProvider 的模型列表
+    // 优先级: 推送的 activeModelId > this.config.piAgent > serviceConfig 默认
+    // 注意: split 可能在末尾产生空字符串 (e.g. "anthropic/" -> ["anthropic", ""]),
+    //       此时应回退到 this.config.piAgent, 否则 modelId 变空
+    const activeFromManager = providersManager.getActiveModelId();
+    const [managerProvider, ...managerRest] = activeFromManager
+      ? activeFromManager.split("/")
+      : [];
+    const managerModel = managerRest.length ? managerRest.join("/") : "";
+    const useManager = !!(managerProvider && managerModel);
+
+    const provider = useManager
+      ? managerProvider
+      : this.config.piAgent?.provider || svc.piAgent.provider;
+    const modelId = useManager
+      ? managerModel
+      : this.config.piAgent?.model || svc.piAgent.model;
+
     const availableModels: Array<{ id: string; label: string }> = [];
-    let usedBuiltin = false;
+    const seen = new Set<string>();
+    const add = (id: string, label: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      availableModels.push({ id, label });
+    };
+
+    // 1) 当前激活 provider: 优先尝试 pi-ai 内置 KnownProvider
+    let builtinHit = false;
     try {
       if (getModels) {
         const models = getModels(provider);
         if (models.length > 0) {
-          usedBuiltin = true;
+          builtinHit = true;
           for (const m of models) {
-            availableModels.push({
-              id: `${provider}/${m.id}`,
-              label: m.name || m.id,
-            });
+            add(`${provider}/${m.id}`, m.name || m.id);
           }
         }
       }
@@ -271,26 +290,40 @@ export class PiAgentBackend implements IBackendAdapter {
       logger.warn({ error, provider }, "Failed to get available models from pi-ai");
     }
 
-    // 2) 若内置为空（自定义 provider），回退到 backendProviders 配置
-    if (!usedBuiltin) {
+    // 2) 自定义 provider (内置未命中): 回退到 backendProviders 当前 provider 的模型
+    if (!builtinHit) {
       const providerModels = providersManager.getProviderModels(provider);
       for (const m of providerModels) {
-        availableModels.push(m);
+        add(m.id, m.label);
       }
       if (providerModels.length > 0) {
         logger.info(
           { provider, modelCount: providerModels.length },
-          "Using backendProviders for model list (custom provider)",
+          "Using backendProviders for active provider model list",
         );
       }
     }
 
-    // 3) 终极 fallback：若仍为空，用当前 model 配置构造一个可用项
+    // 3) 遍历其他 backendProviders, 把每个 provider 的每个模型都加入列表
+    //    修复前: 只返回当前 provider 的模型, 用户配置的其他供应商看不到
+    const allProviders = providersManager.getConfig().providers;
+    for (const p of allProviders) {
+      if (p.id === provider) continue;
+      if (p.enabled === false) continue;
+      for (const m of p.models) {
+        add(`${p.id}/${m}`, m);
+      }
+    }
+    if (allProviders.length > 1) {
+      logger.info(
+        { totalProviders: allProviders.length, totalModels: availableModels.length },
+        "Multi-provider model list assembled",
+      );
+    }
+
+    // 4) 终极 fallback: 若仍为空 (没有 backendProviders 也没有 builtin), 用当前 model 配置构造一个
     if (availableModels.length === 0 && modelId) {
-      availableModels.push({
-        id: `${provider}/${modelId}`,
-        label: modelId,
-      });
+      add(`${provider}/${modelId}`, modelId);
       logger.info(
         { provider, modelId },
         "Using synthetic model from config (last-resort fallback)",
