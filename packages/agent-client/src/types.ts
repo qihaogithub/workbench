@@ -80,6 +80,12 @@ export interface SendMessageOptions {
   stream?: boolean;
   workingDir?: string;
   images?: ImageAttachment[];
+  /**
+   * v3.2: 静态 system prompt 注入（L2 + L4）
+   * author-site 端通过 buildStaticSystemPrompt() 生成
+   * 注：L3 动态上下文已拼到 content 字段头部
+   */
+  systemPrompt?: string;
   context?: {
     files?: string[];
     presetRules?: string;

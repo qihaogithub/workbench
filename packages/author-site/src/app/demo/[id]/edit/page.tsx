@@ -50,8 +50,6 @@ import {
   Copy,
   LayoutGrid,
   FileText,
-  ZoomIn,
-  ZoomOut,
   ShieldCheck,
   Upload,
   CheckCircle,
@@ -1484,50 +1482,7 @@ ${context.details}
                   </SelectContent>
                 </Select>
               )}
-              {previewMode === "grid" && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">每行</span>
-                  <Select
-                    value={String(gridColumns)}
-                    onValueChange={(v) =>
-                      setGridColumns(Number(v) as 2 | 3 | 4)
-                    }
-                  >
-                    <SelectTrigger className="h-7 w-16 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2">2</SelectItem>
-                      <SelectItem value="3">3</SelectItem>
-                      <SelectItem value="4">4</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {previewMode === "grid" && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">缩放</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => setGridScale((s) => Math.max(0.5, s - 0.1))}
-                  >
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-xs w-10 text-center tabular-nums">
-                    {Math.round(gridScale * 100)}%
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => setGridScale((s) => Math.min(2.0, s + 0.1))}
-                  >
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
+
             </div>
 
             <div className="flex-1 overflow-hidden">
@@ -1559,7 +1514,6 @@ ${context.details}
                   gridScale={gridScale}
                   onGridScaleChange={setGridScale}
                   onGridColumnsChange={setGridColumns}
-                  showToolbar={false}
                   onCardClick={(pageId) => {
                     if (pageId === activeDemoId) return;
                     setActiveDemoId(pageId);

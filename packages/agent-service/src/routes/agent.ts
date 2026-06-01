@@ -18,6 +18,12 @@ interface SendMessageBody {
   workingDir?: string;
   customWorkspace?: boolean;
   model?: string;
+  /**
+   * v3.2: 静态 system prompt 注入（L2 + L4）
+   * author-site 端通过 buildStaticSystemPrompt() 生成
+   * 注：L3 动态上下文已拼到 content 字段头部
+   */
+  systemPrompt?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -59,7 +65,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, demoId, workingDir, customWorkspace, options } = request.body;
+      const { content, demoId, workingDir, customWorkspace, model, systemPrompt, options } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -94,6 +100,12 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         };
 
         const agent = manager.getOrCreate(sessionId, config);
+
+        // v3.2: 注入静态 system prompt（L2 + L4）
+        // 注：实际静态部分永远不变，可省略；但保留接口以备规则更新
+        if (systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
+          await (agent as any).updateSystemPrompt(systemPrompt);
+        }
 
         if (agent.status === 'initializing') {
           await agent.start();

@@ -68,7 +68,9 @@ export class PiAgentBackend implements IBackendAdapter {
       this.agent = new Agent({
         initialState: {
           model: model,
-          systemPrompt: this.buildSystemPrompt(),
+          // v3.2: 使用占位 systemPrompt，运行时由 author-site 端通过 updateSystemPrompt 注入
+          // 这样 system prompt 100% 静态 → LLM API 缓存持续命中
+          systemPrompt: '# Workbench AI 编码助手\n\n等待 system prompt 注入...',
           tools: tools,
         },
         streamFn: streamSimple,
@@ -412,6 +414,26 @@ export class PiAgentBackend implements IBackendAdapter {
     });
   }
 
+  /**
+   * v3.2: 运行时更新 system prompt（仅接收静态部分 L2 + L4）
+   *
+   * - 不重建 Agent 实例，保留对话历史（messages 数组不变）
+   * - 依赖 Pi Agent core 的 AgentState.systemPrompt 是可写字段
+   * - 调用频率：可低频（静态部分实际上一次都不变），保留接口以备规则更新
+   */
+  async updateSystemPrompt(newPrompt: string): Promise<void> {
+    if (!this.agent) {
+      logger.warn('updateSystemPrompt called before agent initialized, ignoring');
+      return;
+    }
+    this.agent.state.systemPrompt = newPrompt;
+    logger.debug({ promptLength: newPrompt.length }, 'System prompt updated');
+  }
+
+  /**
+   * @deprecated v3.2 拆分：硬编码 system prompt 模板已迁至 author-site 端
+   * （packages/shared/src/agent-prompts/demo-generator.template.ts + author-site/src/lib/agent/system-prompt.ts）
+   */
   private buildSystemPrompt(): string {
     return [
       '你是 Workbench 的 AI 编码助手，负责生成和修改 React 组件代码。',

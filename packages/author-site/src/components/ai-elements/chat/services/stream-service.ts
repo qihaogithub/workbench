@@ -5,6 +5,30 @@ import {
 } from "@opencode-workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
+import { buildStaticSystemPrompt, buildDynamicContextPrefix } from "@/lib/agent/system-prompt";
+
+// v3.2: 静态 system prompt 缓存在 module 顶部
+const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
+
+/**
+ * 异步获取 L3 上下文前缀（通过服务端 API 避免客户端打包 fs）
+ * 失败时返回空字符串，不阻塞对话
+ */
+async function fetchDynamicContextPrefix(workingDir: string): Promise<string> {
+  try {
+    const response = await fetch(
+      `/api/agent/workspace-context?workingDir=${encodeURIComponent(workingDir)}`,
+      { method: "GET" }
+    );
+    if (!response.ok) return "";
+    const json = await response.json();
+    if (!json?.success || !json?.data) return "";
+    return buildDynamicContextPrefix(json.data);
+  } catch (error) {
+    console.warn("[StreamService] fetchDynamicContextPrefix 失败:", error);
+    return "";
+  }
+}
 
 export interface PermissionRequest {
   sessionId: string;
@@ -115,11 +139,36 @@ export class StreamService {
     if (!this.stream) {
       throw new Error("Stream not connected");
     }
-    this.stream.send(message, `msg-${Date.now()}`, {
+
+    // v3.2: 异步获取 L3 上下文（通过服务端 API）→ 拼到 user content 前面
+    // L3 走 user message 前缀（不进 system prompt），L2 + L4 走 systemPrompt 字段
+    // 注：必须 fire-and-forget 保持 sendMessage 同步签名
+    if (workingDir) {
+      void this.sendWithL3Prefix(message, workingDir, images);
+    } else {
+      this.stream.send(message, `msg-${Date.now()}`, {
+        stream: true,
+        workingDir,
+        images,
+        systemPrompt: STATIC_SYSTEM_PROMPT,
+      } as any);
+    }
+  }
+
+  private async sendWithL3Prefix(
+    message: string,
+    workingDir: string,
+    images?: ImageAttachment[],
+  ): Promise<void> {
+    if (!this.stream) return;
+    const dynamicContext = await fetchDynamicContextPrefix(workingDir);
+    const finalContent = dynamicContext ? `${dynamicContext}${message}` : message;
+    this.stream.send(finalContent, `msg-${Date.now()}`, {
       stream: true,
       workingDir,
       images,
-    });
+      systemPrompt: STATIC_SYSTEM_PROMPT,
+    } as any);
   }
 
   sendPermissionResponse(permissionId: string, optionId: string): void {

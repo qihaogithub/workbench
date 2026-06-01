@@ -18,4 +18,9 @@ export interface IBackendAdapter {
   setPromptTimeout?(seconds: number): void;
   cancelPrompt?(): void;
   getWorkingDir?(): string | null;
+  /**
+   * v3.2: 运行时更新 system prompt（仅静态部分 L2 + L4）
+   * 不重建 Agent，保留 messages 历史
+   */
+  updateSystemPrompt?(newPrompt: string): Promise<void>;
 }

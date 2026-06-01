@@ -36,6 +36,8 @@ interface ClientMessage {
   modelId?: string;
   workingDir?: string;
   images?: ImageAttachment[];
+  /** v3.2: 静态 system prompt 注入（L2 + L4） */
+  systemPrompt?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -163,6 +165,11 @@ export async function registerWebSocketRoutes(
               };
 
               const agent = manager.getOrCreate(sessionId, config);
+
+              // v3.2: 注入静态 system prompt（L2 + L4）
+              if (message.systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
+                await (agent as any).updateSystemPrompt(message.systemPrompt);
+              }
 
               eventRouter.bindAgent(agent);
 

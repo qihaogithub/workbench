@@ -70,6 +70,7 @@ export class AgentClient {
         workingDir: options?.workingDir,
         customWorkspace: options?.customWorkspace,
         images: options?.images,
+        systemPrompt: options?.options?.systemPrompt,
         options: options?.options,
       }),
     });
@@ -319,6 +320,7 @@ export class AgentStream {
         content,
         workingDir: options?.workingDir,
         images: options?.images,
+        systemPrompt: options?.systemPrompt,
         options,
       }),
     );
