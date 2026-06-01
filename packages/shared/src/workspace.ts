@@ -6,7 +6,6 @@ export interface WorkspaceInfo {
 }
 
 export interface CreateWorkspaceOptions {
-  backend: string;
   workspace?: string;
   customWorkspace?: boolean;
 }

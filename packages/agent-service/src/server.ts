@@ -12,27 +12,17 @@ import { loadConfig } from "./utils/config";
 import { getLogger } from "./utils/logger";
 import { getAgentManager } from "./core/agent-manager";
 import { getAgentFactory } from "./core/agent-factory";
-import {
-  ClaudeBackend,
-  CodexBackend,
-  GeminiBackend,
-  QwenBackend,
-  GooseBackend,
-  AuggieBackend,
-  KimiBackend,
-  CopilotBackend,
-  QoderBackend,
-  VibeBackend,
-  CustomBackend,
-} from "./backends";
-import { OpenCodeAcpBackend } from "./backends/opencode-acp";
-import { OpenCodeHttpBackend } from "./backends/opencode-http";
+import { PiAgentBackend } from "./backends";
 import { BackendAgent } from "./core/backend-agent";
 import { registerRoutes } from "./routes";
 import { destroySessionStore } from "./session/session-store";
+import { getBackendProvidersManager } from "./config/backend-providers";
 
 const config = loadConfig();
 const logger = getLogger();
+
+// 启动时初始化 backendProviders（从 .env PI_AGENT_PROVIDERS 加载）
+getBackendProvidersManager().initialize();
 
 async function start() {
   const fastify = Fastify({
@@ -69,76 +59,8 @@ async function start() {
 
   const factory = getAgentFactory();
 
-  // @deprecated ACP 后端仅保留兼容，推荐使用 opencode-http
-  factory.register(
-    "opencode",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new OpenCodeAcpBackend(agentConfig)),
-  );
-  factory.register(
-    "opencode-http",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new OpenCodeHttpBackend(agentConfig)),
-  );
-  factory.register(
-    "claude",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new ClaudeBackend(agentConfig)),
-  );
-  factory.register(
-    "codex",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new CodexBackend(agentConfig)),
-  );
-  factory.register(
-    "gemini",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new GeminiBackend(agentConfig)),
-  );
-  factory.register(
-    "qwen",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new QwenBackend(agentConfig)),
-  );
-  factory.register(
-    "goose",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new GooseBackend(agentConfig)),
-  );
-  factory.register(
-    "auggie",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new AuggieBackend(agentConfig)),
-  );
-  factory.register(
-    "kimi",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new KimiBackend(agentConfig)),
-  );
-  factory.register(
-    "copilot",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new CopilotBackend(agentConfig)),
-  );
-  factory.register(
-    "qoder",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new QoderBackend(agentConfig)),
-  );
-  factory.register(
-    "vibe",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new VibeBackend(agentConfig)),
-  );
-  factory.register(
-    "custom",
-    (agentConfig) =>
-      new BackendAgent(agentConfig, new CustomBackend(agentConfig)),
-  );
-
   // PiAgentBackend: 动态导入 (ESM-only 依赖 @earendil-works/pi-agent-core)
   try {
-    const { PiAgentBackend } = await import("./backends/pi-agent.js");
     factory.register(
       "pi-agent",
       (agentConfig) =>
@@ -154,7 +76,6 @@ async function start() {
   await registerRoutes(fastify);
 
   fastify.get("/health", async () => {
-    const backends = factory.getRegisteredTypes();
     const manager = getAgentManager();
 
     return {
@@ -162,12 +83,7 @@ async function start() {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       agents: manager.count(),
-      backends,
     };
-  });
-
-  fastify.get("/backends", async () => {
-    return factory.getRegisteredTypes();
   });
 
   process.on("SIGTERM", async () => {

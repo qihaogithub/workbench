@@ -2,9 +2,18 @@ import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange } from '../core/types';
 import { createWorkbenchTools } from './pi-tools';
 import { logger } from '../utils/logger';
-import { loadConfig } from '../utils/config';
+import { loadConfig, type ServiceConfig } from '../utils/config';
+import { getBackendProvidersManager } from '../config/backend-providers';
 
-const serviceConfig = loadConfig();
+// 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
+// (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
+let _serviceConfig: ServiceConfig | null = null;
+function getServiceConfig(): ServiceConfig {
+  if (!_serviceConfig) {
+    _serviceConfig = loadConfig();
+  }
+  return _serviceConfig;
+}
 
 // 动态导入 ESM-only 依赖
 let Agent: any;
@@ -63,9 +72,14 @@ export class PiAgentBackend implements IBackendAdapter {
         },
         streamFn: streamSimple,
         getApiKey: async (provider: string) => {
-          const apiKey = this.config.piAgent?.apiKey || 
-                 process.env[`${provider.toUpperCase()}_API_KEY`] ||
-                 serviceConfig.piAgent.apiKey;
+          // 优先级：backendProviders.apiKey > model.apiKey > piAgent.apiKey > env var > service config
+          const providerConfig = getBackendProvidersManager().getProvider(provider);
+          const apiKey =
+            providerConfig?.apiKey ||
+            (model as any).apiKey ||
+            this.config.piAgent?.apiKey ||
+            process.env[`${provider.toUpperCase()}_API_KEY`] ||
+            getServiceConfig().piAgent.apiKey;
           logger.info({ provider, apiKeyLength: apiKey?.length }, "Pi Agent getApiKey called");
           return apiKey;
         },
@@ -103,13 +117,22 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private getModel() {
-    const provider = this.config.piAgent?.provider || serviceConfig.piAgent.provider;
+    const svc = getServiceConfig();
+    const provider = this.config.piAgent?.provider || svc.piAgent.provider;
     // 优先使用 piAgent 配置的 model，不要使用 OpenCode 的 config.model
-    const modelId = this.config.piAgent?.model || serviceConfig.piAgent.model;
-    const baseUrl = this.config.piAgent?.baseUrl || serviceConfig.piAgent.baseUrl;
-    
-    logger.info({ modelId, provider, baseUrl }, "Pi Agent getModel");
-    
+    const modelId = this.config.piAgent?.model || svc.piAgent.model;
+    const providersManager = getBackendProvidersManager();
+
+    // 1) 优先从 backendProviders 拿 baseURL/apiKey（运行时动态配置）
+    const providerConfig = providersManager.getProvider(provider);
+    const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
+    const apiKeyFromProvider = providerConfig?.apiKey;
+
+    logger.info(
+      { modelId, provider, baseUrl, hasProviderConfig: !!providerConfig },
+      "Pi Agent getModel",
+    );
+
     // 如果有自定义 baseUrl，创建自定义模型
     if (baseUrl) {
       return {
@@ -118,6 +141,8 @@ export class PiAgentBackend implements IBackendAdapter {
         api: 'openai-completions' as const,
         provider: provider,
         baseUrl: baseUrl,
+        // 若 backendProviders 配置了 apiKey,附加到 model 对象上(供 Agent.getApiKey 使用)
+        ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
         reasoning: false,
         input: ['text'] as const,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -125,7 +150,7 @@ export class PiAgentBackend implements IBackendAdapter {
         maxTokens: 4096,
       };
     }
-    
+
     // 否则使用预定义模型
     return getModel(provider, modelId);
   }
@@ -221,50 +246,55 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
-    const provider = this.config.piAgent?.provider || serviceConfig.piAgent.provider;
-    const modelId = this.config.piAgent?.model || serviceConfig.piAgent.model;
+    const svc = getServiceConfig();
+    const provider = this.config.piAgent?.provider || svc.piAgent.provider;
+    const modelId = this.config.piAgent?.model || svc.piAgent.model;
+    const providersManager = getBackendProvidersManager();
 
-    // getModels(provider) returns Array<{ id, name, provider, ... }>
+    // 1) 优先尝试 pi-ai 内置 KnownProvider 的模型列表
     const availableModels: Array<{ id: string; label: string }> = [];
+    let usedBuiltin = false;
     try {
       if (getModels) {
         const models = getModels(provider);
-        for (const m of models) {
-          availableModels.push({
-            id: `${provider}/${m.id}`,
-            label: m.name || m.id,
-          });
+        if (models.length > 0) {
+          usedBuiltin = true;
+          for (const m of models) {
+            availableModels.push({
+              id: `${provider}/${m.id}`,
+              label: m.name || m.id,
+            });
+          }
         }
       }
     } catch (error) {
       logger.warn({ error, provider }, "Failed to get available models from pi-ai");
     }
 
-    // Fallback: for custom providers not known by pi-ai, fetch from OpenCode Server
-    if (availableModels.length === 0) {
-      try {
-        const opencodeUrl = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
-        const response = await fetch(`${opencodeUrl}/provider`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000),
-        });
-        if (response.ok) {
-          const data = await response.json() as {
-            all?: Array<{ id: string; models?: Record<string, { id: string; name?: string }> }>;
-          };
-          const providerInfo = data.all?.find((p) => p.id === provider);
-          if (providerInfo?.models) {
-            for (const [modelKey, modelInfo] of Object.entries(providerInfo.models)) {
-              availableModels.push({
-                id: `${provider}/${modelInfo.id || modelKey}`,
-                label: modelInfo.name || modelInfo.id || modelKey,
-              });
-            }
-          }
-        }
-      } catch (error) {
-        logger.warn({ error, provider }, "Failed to fetch models from OpenCode Server");
+    // 2) 若内置为空（自定义 provider），回退到 backendProviders 配置
+    if (!usedBuiltin) {
+      const providerModels = providersManager.getProviderModels(provider);
+      for (const m of providerModels) {
+        availableModels.push(m);
       }
+      if (providerModels.length > 0) {
+        logger.info(
+          { provider, modelCount: providerModels.length },
+          "Using backendProviders for model list (custom provider)",
+        );
+      }
+    }
+
+    // 3) 终极 fallback：若仍为空，用当前 model 配置构造一个可用项
+    if (availableModels.length === 0 && modelId) {
+      availableModels.push({
+        id: `${provider}/${modelId}`,
+        label: modelId,
+      });
+      logger.info(
+        { provider, modelId },
+        "Using synthetic model from config (last-resort fallback)",
+      );
     }
 
     return {

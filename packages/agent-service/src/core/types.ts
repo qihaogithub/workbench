@@ -2,7 +2,7 @@
 // 基础类型
 // ============================================================
 
-export type AgentType = "opencode" | "opencode-http" | "claude" | "codex" | "gemini" | "pi-agent" | string;
+export type AgentType = "pi-agent";
 
 export type AgentStatus =
   | "initializing"
@@ -28,40 +28,12 @@ export type ErrorCode =
 
 export interface AgentConfig {
   sessionId: string;
-  backend?: AgentType;
   workingDir?: string;
   demoId?: string;
   model?: string;
   timeout?: number;
 
-  opencode?: OpenCodeConfig;
-  claude?: ClaudeConfig;
-  codex?: CodexConfig;
-  gemini?: GeminiConfig;
   piAgent?: PiAgentConfig;
-}
-
-export interface OpenCodeConfig {
-  serverUrl?: string;
-  timeout?: number;
-}
-
-export interface ClaudeConfig {
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-}
-
-export interface CodexConfig {
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-}
-
-export interface GeminiConfig {
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
 }
 
 export interface PiAgentConfig {

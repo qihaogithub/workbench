@@ -1,4 +1,4 @@
-export type AgentType = 'opencode' | 'claude' | 'codex' | 'gemini' | string;
+export type AgentType = 'pi-agent';
 
 export type AgentStatus =
   | 'initializing'
@@ -99,7 +99,7 @@ export interface ImageAttachment {
 export interface AgentInfo {
   sessionId: string;
   status: AgentStatus;
-  backend: AgentType;
+  backend: "pi-agent";
   createdAt: string;
   lastActivityAt: string;
   messageCount: number;

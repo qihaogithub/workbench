@@ -11,7 +11,7 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 export interface SessionMeta {
   sessionId: string;
   demoId?: string;
-  backend: string;
+  backend: "pi-agent";
   workingDir: string;
   customWorkspace: boolean;
   workspaceType: 'user' | 'temp';
@@ -21,7 +21,6 @@ export interface SessionMeta {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
-  opencodeSessionId?: string;
 }
 
 export interface CreateSessionOptions extends AgentConfig {
@@ -39,7 +38,6 @@ export interface ISessionStore {
 export interface SessionFilter {
   status?: AgentStatus;
   demoId?: string;
-  backend?: string;
 }
 
 export class MemorySessionStore implements ISessionStore {
@@ -51,7 +49,7 @@ export class MemorySessionStore implements ISessionStore {
     const meta: SessionMeta = {
       sessionId,
       demoId: config.demoId,
-      backend: config.backend || 'opencode-http',
+      backend: "pi-agent",
       workingDir: workspaceMeta?.workingDir || config.workingDir || '',
       customWorkspace: workspaceMeta?.customWorkspace ?? false,
       workspaceType: workspaceMeta?.workspaceType || 'temp',
@@ -94,9 +92,6 @@ export class MemorySessionStore implements ISessionStore {
       }
       if (filter.demoId) {
         result = result.filter((s) => s.demoId === filter.demoId);
-      }
-      if (filter.backend) {
-        result = result.filter((s) => s.backend === filter.backend);
       }
     }
 

@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Settings, ListFilter, Database, Users } from "lucide-react";
+import { Settings, ListFilter, Database, Users, Server } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -45,6 +45,13 @@ export default function AdminLayout({
               >
                 <ListFilter className="h-5 w-5" />
                 模型配置
+              </Link>
+              <Link
+                href="/admin/backend-providers"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100"
+              >
+                <Server className="h-5 w-5" />
+                AI 后端供应商
               </Link>
               <Link
                 href="/admin/users"

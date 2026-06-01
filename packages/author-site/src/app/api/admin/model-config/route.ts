@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
+import { pushBackendProvidersToAgent } from "@/lib/agent-providers";
 
 const CONFIG_ID = "model_config";
 
@@ -202,38 +203,67 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // 验证配置结构
-    if (!body.frontend || typeof body.frontend !== "object") {
+    // 支持部分更新: frontend 和 backendProviders 都不是必填
+    // 单独更新任一字段时,保留 DB 中其他字段不变
+    if (body.frontend !== undefined && (typeof body.frontend !== "object" || body.frontend === null)) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "INVALID_CONFIG",
-            message: "配置结构无效: 缺少 frontend 字段",
+            message: "frontend 字段必须是对象",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    if (body.backendProviders !== undefined && (typeof body.backendProviders !== "object" || body.backendProviders === null)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_CONFIG",
+            message: "backendProviders 字段必须是对象",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    if (body.frontend === undefined && body.backendProviders === undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_CONFIG",
+            message: "请求体至少需要包含 frontend 或 backendProviders 字段之一",
           },
         },
         { status: 400 },
       );
     }
 
-    // 规范化提交的前端配置,自动同步新旧结构
-    const normalizedFrontend = normalizeSubmittedFrontend(body.frontend);
-
     // 合并配置 (保留已有配置的其他字段)
     const existingConfig = readDbConfig(CONFIG_ID) || {};
-    const updatedConfig = {
+    const updatedConfig: Record<string, any> = {
       ...existingConfig,
       ...body,
-      frontend: {
+      lastSyncedToEnv: Date.now(),
+    };
+
+    // 单独处理 frontend:提交时规范化新旧结构,缺失时不覆盖
+    if (body.frontend !== undefined) {
+      const normalizedFrontend = normalizeSubmittedFrontend(body.frontend);
+      updatedConfig.frontend = {
         ...(existingConfig.frontend || {}),
         ...body.frontend,
         ...normalizedFrontend,
-      },
-      multimodalModels: Array.isArray(body.multimodalModels)
-        ? body.multimodalModels
-        : existingConfig.multimodalModels || [],
-      lastSyncedToEnv: Date.now(),
-    };
+      };
+    }
+
+    // 单独处理 multimodalModels
+    if (Array.isArray(body.multimodalModels)) {
+      updatedConfig.multimodalModels = body.multimodalModels;
+    }
 
     // 写入数据库
     writeDbConfig(CONFIG_ID, updatedConfig, "admin");
@@ -241,10 +271,19 @@ export async function PUT(request: NextRequest) {
     // 清除缓存,使配置立即生效
     invalidateConfigCache();
 
+    // 如果包含 backendProviders 字段,推送到 agent-service
+    let pushResult: { ok: boolean; message: string } | null = null;
+    if (updatedConfig.backendProviders !== undefined) {
+      pushResult = await pushBackendProvidersToAgent(
+        updatedConfig.backendProviders,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: "配置已保存",
       data: updatedConfig,
+      agentPushResult: pushResult,
     });
   } catch (error) {
     console.error("[API] Failed to update model config:", error);

@@ -1,10 +1,11 @@
 # 全面迁移至 Pi Agent 并移除多后端支持方案
 
-> 版本：v1.1
+> 版本：v1.3
 > 创建日期：2026-06-01
 > 更新日期：2026-06-01
-> 状态：待评审
+> 状态：✅ 已完成
 > 分类：架构简化方案
+> 实施日期：2026-06-01
 
 ---
 
@@ -330,22 +331,27 @@
 
 ## 六、验证清单
 
-- [ ] `pnpm typecheck` 通过（全 monorepo）
-- [ ] `pnpm --filter @opencode-workbench/agent-service test` 通过
-- [ ] `pnpm --filter @opencode-workbench/agent-service dev` 启动正常
-- [ ] `pnpm dev` 全服务启动正常
-- [ ] 创作端 AI 对话功能正常（Pi Agent 后端）
-- [ ] 模型切换功能正常
-- [ ] 文件变更拦截正常（beforeToolCall/afterToolCall）
-- [ ] Docker 部署正常（移除 opencode-serve 后）
-- [ ] 全局搜索确认无残留引用：`grep -r "opencode-http\|getDefaultBackend\|AgentType.*claude\|AgentType.*codex" packages/`
+- [x] `pnpm typecheck` 通过（全 monorepo）— agent-service、author-site、agent-client 全部通过
+- [x] `pnpm --filter @opencode-workbench/agent-service test` 通过 — 51/51 测试通过
+- [x] `pnpm --filter @opencode-workbench/agent-service dev` 启动正常 — `/health` 返回 200 OK
+- [x] `pnpm --filter @opencode-workbench/agent-service build` 通过 — `tsc` 无错误
+- [x] `pnpm --filter @opencode-workbench/agent-client build` 通过 — `tsc` 无错误
+- [x] `/backends` 端点已移除 — 验证返回 HTTP 404
+- [x] Lint 错误从 17 → 5（删除文件连带清理，未引入新错误）
+- [x] 全局搜索确认无残留引用 — `grep -r "opencode-serve\|opencode-http\|getDefaultBackend\|base-acp\|DEFAULT_BACKEND" packages/ AGENTS.md` 无匹配
+- [ ] `pnpm dev` 全服务启动正常（未执行，依赖 LLM API key）
+- [ ] 创作端 AI 对话功能正常（需配合前端联调验证）
+- [ ] 模型切换功能正常（需配合前端联调验证）
+- [ ] 文件变更拦截正常（beforeToolCall/afterToolCall）— 单元测试覆盖
+- [ ] Docker 部署正常（移除 opencode-serve 后）— 需在生产环境验证
 
 ---
 
 ## 七、附录
 
-### 7.1 删除文件完整清单
+### 7.1 删除文件完整清单（实际 28 个）
 
+**后端适配器（14 个）**：
 ```
 packages/agent-service/src/backends/opencode-http.ts
 packages/agent-service/src/backends/opencode-acp.ts
@@ -361,43 +367,104 @@ packages/agent-service/src/backends/copilot.ts
 packages/agent-service/src/backends/qoder.ts
 packages/agent-service/src/backends/vibe.ts
 packages/agent-service/src/backends/custom.ts
+```
+
+**ACP 协议层（5 个）**：
+```
 packages/agent-service/src/acp/connection.ts
 packages/agent-service/src/acp/types.ts
 packages/agent-service/src/acp/index.ts
 packages/agent-service/src/acp/approval-store.ts          # 原方案漏掉
 packages/agent-service/src/acp/model-info.ts              # 原方案漏掉
+```
+
+**测试文件（6 个，方案漏 2 个）**：
+```
 packages/agent-service/tests/unit/default-backend.test.ts
 packages/agent-service/tests/unit/acp-types.test.ts
 packages/agent-service/tests/unit/opencode-http.test.ts
 packages/agent-service/tests/integration/acp-smoke.test.ts # 原方案漏掉
+packages/agent-service/tests/unit/approval-store.test.ts   # 原方案漏掉
+packages/agent-service/tests/unit/model-info.test.ts       # 原方案漏掉
+```
+
+**Docker 镜像文件（2 个，方案未列出）**：
+```
+docker/opencode-serve/Dockerfile
+docker/opencode-serve/entrypoint.sh
+```
+
+**测试 fixtures（1 个目录 + 1 文件）**：
+```
 packages/agent-service/tests/fixtures/fake-acp-cli/index.js
 packages/agent-service/tests/fixtures/fake-acp-cli/        # 整个目录
 ```
 
-### 7.2 修改文件完整清单
-
+**空目录清理（1 个）**：
 ```
-packages/agent-service/src/core/types.ts
-packages/agent-service/src/core/agent-factory.ts
-packages/agent-service/src/core/backend-agent.ts
-packages/agent-service/src/backends/index.ts
-packages/agent-service/src/backends/base.ts
-packages/agent-service/src/server.ts
-packages/agent-service/src/routes/agent.ts
-packages/agent-service/src/routes/websocket.ts
-packages/agent-service/src/routes/models.ts
-packages/agent-service/src/session/session-store.ts
-packages/agent-service/src/workspace/workspace-manager.ts
-packages/agent-service/src/workspace/utils.ts
-packages/agent-service/src/utils/config.ts
-packages/agent-client/src/types.ts
-packages/agent-client/src/client.ts
-packages/shared/src/workspace.ts
-AGENTS.md
-packages/agent-service/AGENTS.md
-.env
-.env.docker
-docker-compose.yml
+packages/agent-service/tests/fixtures/                    # 子目录删除后空目录清理
+```
+
+### 7.2 修改文件完整清单（实际 24 个）
+
+**核心类型与配置**：
+```
+packages/agent-service/src/core/types.ts                  # AgentType 简化，删除 4 个配置接口
+packages/agent-service/src/core/agent-factory.ts          # create() 硬编码 pi-agent
+packages/agent-service/src/core/agent.ts                  # getInfo() backend 硬编码
+packages/agent-service/src/utils/config.ts                # 移除 opencode 配置块
+```
+
+**后端层**：
+```
+packages/agent-service/src/backends/index.ts              # 仅导出 pi-agent
+packages/agent-service/src/backends/pi-agent.ts           # 移除 OpenCode fallback
+```
+
+**服务器与路由**：
+```
+packages/agent-service/src/server.ts                      # 移除 13 个 factory.register + /backends
+packages/agent-service/src/routes/agent.ts                # 移除 backend 参数 + /api/llm/models 死端点
+packages/agent-service/src/routes/websocket.ts            # 移除 getDefaultBackend() + opencode-http 特殊处理
+packages/agent-service/src/routes/models.ts               # 整文件重写（删除未用接口）
+```
+
+**会话与工作空间**：
+```
+packages/agent-service/src/session/session-store.ts       # backend 硬编码为字面量，移除 filter
+packages/agent-service/src/workspace/workspace-manager.ts # 移除 backend 参数
+packages/agent-service/src/workspace/utils.ts             # generateTempWorkspaceName 改无参，前缀 workbench
+```
+
+**Agent Client SDK**：
+```
+packages/agent-client/src/types.ts                        # AgentType → "pi-agent"，AgentInfo.backend 字面量
+packages/agent-client/src/client.ts                       # 移除 sendMessage 的 backend 参数
+```
+
+**共享类型**：
+```
+packages/shared/src/workspace.ts                          # CreateWorkspaceOptions.backend 移除
+```
+
+**配置文件**：
+```
+.env                                                     # 移除 DEFAULT_BACKEND
+.env.docker                                              # 移除 OPENCODE_* 变量
+docker-compose.yml                                        # 移除 opencode-serve 服务
+packages/agent-service/package.json                       # 移除 eventsource 依赖
+```
+
+**文档**：
+```
+AGENTS.md                                                # 更新后端描述
+packages/agent-service/AGENTS.md                         # 整文件重写（专注 Pi Agent）
+```
+
+**测试**：
+```
+packages/agent-service/tests/unit/workspace-manager.test.ts  # 适配 workbench 前缀
+packages/agent-service/tests/unit/workspace-utils.test.ts    # 适配 workbench 前缀
 ```
 
 ### 7.3 版本历史
@@ -407,3 +474,117 @@ docker-compose.yml
 | v1.0 | 2026-06-01 | 初始版本 |
 | v1.1 | 2026-06-01 | 合并选型分析报告精华：新增决策背景章节（选型结论、项目适用场景、劣势场景化评估、代码验证发现） |
 | v1.2 | 2026-06-01 | **事实校验校正**：补全 ACP 协议层 2 个漏数文件（`approval-store.ts`/`model-info.ts`）；补全集成测试漏数（`acp-smoke.test.ts`）；更新删除文件总数 20→24；更新代码量统计 3350→~3656 行；补全 `routes/*.ts` 中 `getDefaultBackend()` fallback 实际值为 `'opencode'`（非 `pi-agent`）；校正 OpenCode Drain 行数估算（80→100-150）；补全 Docker 部署中 `agent-service` 仍用 `opencode-http` 的现状；补充行号定位、字段使用位置等实施细节 |
+| v1.3 | 2026-06-01 | **实施完成记录**：状态改为"✅ 已完成"；勾选验证清单中已验证项；新增"第八节 实施记录"（8.1 实施结果总览、8.2 阶段执行情况、8.3 方案外发现的 3 个问题及处理、8.4 实施差异点、8.5 关键决策记录、8.6 后续建议）；附录 7.1 删除文件清单实际为 28 个（方案列 24 个 + 漏列 4 个：2 个 docker 镜像文件 + 2 个漏数测试文件） |
+
+## 八、实施记录
+
+### 8.1 实施结果总览
+
+| 维度 | 方案预估 | 实际结果 | 偏差说明 |
+|:-----|:---------|:---------|:---------|
+| 删除文件数 | 24 | **28** | +4：方案漏列 `docker/opencode-serve/`（2 文件）+ `tests/unit/approval-store.test.ts` + `tests/unit/model-info.test.ts` |
+| 修改文件数 | ~24 | **24** | 匹配 |
+| 代码净变化 | -~3656 行 | **-6126 行** (+146/-6272) | 实际多减 2470 行，主要因 `opencode-http.ts`（808 行）+ `acp/connection.ts`（902 行）单文件比方案估算更大 |
+| 残留 lint 错误 | 未明确 | 5（预先存在） | 删文件连带清理 12 个错误；剩余 5 个为 `pi-agent.ts`/`schema-tool.ts`/`snapshot-service.ts` 中预先存在 |
+| 测试通过率 | 未明确 | 51/51 | 全部测试通过 |
+
+### 8.2 实施阶段执行情况
+
+| 阶段 | 目标 | 实际执行 | 备注 |
+|:-----|:-----|:---------|:-----|
+| 一：类型简化 | `AgentType` → `"pi-agent"`，删除 4 个配置接口 | ✅ 按计划完成 | typecheck 暴露 33 处预期错误 |
+| 二：删除后端 + ACP | 14 后端 + 5 ACP 文件 | ✅ 按计划完成（外加 1 个空 `fixtures` 目录清理） | typecheck 暴露剩余错误 |
+| 三：server + 路由 | 移除 13 个 `factory.register` + `/backends` + 3 处 `getDefaultBackend()` | ✅ 按计划完成 | 含 `/api/llm/models` 死端点删除（方案外） |
+| 四：核心模块 | agent-factory/session-store/workspace 简化 | ✅ 按计划完成 | `generateTempWorkspaceName` 前缀 `opencode` → `workbench`（更通用） |
+| 五：配置和部署 | .env/docker/config.ts/agent-client/shared | ✅ 按计划完成 | docker-compose 4→3 服务 |
+| 六：测试和文档 | 删除过时测试 + 更新文档 | ✅ 按计划完成 | 外加 2 个测试文件（approval-store/model-info）一并删除 |
+| 额外-1 | 移除 `pi-agent.ts` 的 OpenCode Server fallback | ✅ 完成 | 用户决策：彻底移除 |
+| 额外-2 | 删除 `routes/agent.ts` 末尾的 `/api/llm/models` 死端点 | ✅ 完成 | 用户决策：直接删除 |
+
+### 8.3 方案外发现的问题与决策
+
+实施过程中发现 3 个方案未列出的问题（与用户确认后处理）+ 1 个技术决策选择：
+
+> 实施日期：2026-06-01
+
+#### 问题 1：`pi-agent.ts` 间接依赖 OpenCode Server（已彻底移除）
+
+**位置**：`packages/agent-service/src/backends/pi-agent.ts:244-268`（原行号）
+
+**现象**：`getModelInfo()` 在 `pi-ai.getModels(provider)` 返回空数组时（如自定义 provider `jojo`），会 fallback 到 `http://localhost:4096/provider`（OpenCode Server）获取模型列表。
+
+**冲突**：方案假设"完全移除 OpenCode"，但 Pi Agent 仍保留这条 fallback 路径。
+
+**用户决策**：彻底移除 OpenCode fallback，保留 `pi-ai.getModels(provider)` 单一来源。
+
+**影响**：使用非标准 provider（如 `jojo`）时，模型列表获取依赖 `pi-ai` 包中预定义的 provider；不识别时返回空列表（`availableModels: []`），但 Pi Agent 仍可正常工作（已配置的具体 model 可用）。
+
+#### 问题 2：`/api/llm/models` 死端点（已直接删除）
+
+**位置**：`packages/agent-service/src/routes/agent.ts:487-560`（原行号）
+
+**现象**：`routes/agent.ts` 末尾嵌入了一个 `/api/llm/models` 端点，直接调用 OpenCode Server `/provider` 接口返回模型列表。`grep` 全项目无其他文件引用，纯死代码。
+
+**用户决策**：直接删除该端点。
+
+**影响**：无（端点未被任何代码引用）。
+
+#### 问题 3：测试文件漏数（已一并删除）
+
+**位置**：`tests/unit/approval-store.test.ts` + `tests/unit/model-info.test.ts`
+
+**现象**：方案仅列出 4 个测试文件，实际 `tests/unit/` 目录还有这 2 个测试，依赖已删除的 `acp/approval-store.ts` 和 `acp/model-info.ts`。
+
+**处理**：一并删除（阶段六）。
+
+#### 问题 4：临时目录前缀选择（采用 `workbench`）
+
+**位置**：`packages/agent-service/src/workspace/utils.ts:54-57`
+
+**原方案**：`generateTempWorkspaceName(backend: string)` → 改为不带参数，简化前缀。
+
+**实际选择**：固定使用 `workbench` 前缀（与项目名一致），而非保留 `pi-agent` 或 `opencode`。
+- 影响：临时目录名从 `opencode-temp-{timestamp}` → `workbench-temp-{timestamp}`
+- 工作空间显示名从 `opencode` → `workbench`
+- 同步更新了 `workspace-manager.test.ts` 和 `workspace-utils.test.ts` 中的 8 处期望
+
+**理由**：
+- `pi-agent` 暴露给用户无意义（用户不关心后端类型）
+- `opencode` 含义错误（已不再依赖 OpenCode）
+- `workbench` 与项目名一致，长期稳定
+
+### 8.4 实施差异点
+
+| 项 | 方案描述 | 实际选择 | 原因 |
+|:---|:---------|:---------|:-----|
+| 临时工作空间前缀 | 移除 backend 前缀（未指定具体值） | `workbench` | 与项目名一致，显示友好 |
+| session-store.backend 字段 | "保留字段以便未来扩展但值固定" | 硬编码为字面量 `"pi-agent"` | 移除 `string` 联合类型，更严格的类型检查 |
+| agent-factory | "保留工厂但只注册 pi-agent" | 保留 + 硬编码 `type: AgentType = "pi-agent"` | 与方案一致，但通过字面量类型防止误用 |
+| routes/models.ts 注释 | 清理第 62 行 opencode-http 注释 | 整文件重写（删除 `ConfigProvidersResponse` 等未使用的接口） | 简化代码 + 通过 lint 检查 |
+| 方案漏数的 ACP 文件 | 已记录 | 实际删除时已包含 | 验证步骤发现 |
+| 方案漏数的 2 个测试文件 | 未列出 | 一并删除 | 验证步骤发现 |
+| `docker/opencode-serve/` 镜像 | 未列出 | 一并删除目录 | 不再使用 |
+| `package.json` `eventsource` 依赖 | "移除 eventsource" | 已在 `package.json` 删除 | 阶段五 |
+
+### 8.5 关键决策记录
+
+| 决策点 | 方案预设 | 实际决策 | 用户/技术理由 |
+|:-------|:---------|:---------|:--------------|
+| 工作目录方式 | 未明确 | 在 main 上直接工作（不创建 worktree） | 用户决策：避免分支切换复杂度，工作树干净可逆 |
+| pi-agent.ts OpenCode fallback | 未列出问题 | 彻底移除 | 用户决策：完全契合"移除多后端"目标 |
+| `/api/llm/models` 死端点 | 未列出 | 直接删除 | 用户决策：grep 无引用，纯死代码 |
+| 临时目录前缀 | "可简化为不依赖 backend" | `workbench` | 与项目名一致 |
+
+### 8.6 后续建议
+
+1. **commit 拆分**：本次 52 文件变更建议拆分为 3-4 个 commit：
+   - commit 1: 类型简化（types.ts、agent-client/types.ts）
+   - commit 2: 删除后端 + ACP（22 个文件删除）
+   - commit 3: 简化路由/核心（server.ts、routes/*、core/*、session/*、workspace/*）
+   - commit 4: 配置清理 + 文档（.env、docker-compose.yml、AGENTS.md）
+2. **集成测试**：建议补充端到端测试（创建会话 → 发送消息 → 收到 Pi Agent 流式响应 → 文件变更）
+3. **性能监控**：迁移后关注 Pi Agent 后端的 `waitForIdle()` 性能（之前未使用，因 opencode-http 是基于 SSE 流式）
+4. **pi-agent 依赖升级**：`@earendil-works/pi-agent-core` 当前 0.76.0，关注未来版本 API 变化
+
+---
+

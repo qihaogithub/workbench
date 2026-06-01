@@ -1,20 +1,4 @@
 services:
-  opencode-serve:
-    build:
-      context: .
-      dockerfile: docker/opencode-serve/Dockerfile
-    ports:
-      - "4096:4096"
-    environment:
-      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
-      - OPENCODE_JOJO_API_KEY=${OPENCODE_JOJO_API_KEY:-}
-      - OPENCODE_API_BASE=${OPENCODE_API_BASE}
-      - OPENCODE_MODELS=${OPENCODE_MODELS}
-      - OPENCODE_PROVIDER_NAME=${OPENCODE_PROVIDER_NAME:-custom}
-      - OPENCODE_PROVIDERS=${OPENCODE_PROVIDERS:-}
-      - OPENCODE_DEFAULT_MODEL=${OPENCODE_DEFAULT_MODEL:-}
-    restart: unless-stopped
-
   agent-service:
     build:
       context: .
@@ -24,16 +8,16 @@ services:
     environment:
       - PORT=3201
       - HOST=0.0.0.0
-      - DEFAULT_BACKEND=opencode-http
-      - OPENCODE_SERVER_URL=http://opencode-serve:4096
+      - PI_AGENT_PROVIDER=${PI_AGENT_PROVIDER:-anthropic}
+      - PI_AGENT_API_KEY=${PI_AGENT_API_KEY:-}
+      - PI_AGENT_MODEL=${PI_AGENT_MODEL:-claude-sonnet-4-20250514}
+      - PI_AGENT_BASE_URL=${PI_AGENT_BASE_URL:-}
+      - PI_AGENT_TIMEOUT=${PI_AGENT_TIMEOUT:-120000}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
     volumes:
       - app-data:/app/data
-    depends_on:
-      opencode-serve:
-        condition: service_healthy
     restart: unless-stopped
 
   author-site:

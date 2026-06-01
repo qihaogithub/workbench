@@ -83,7 +83,7 @@ export abstract class BaseAgent extends EventEmitter {
     return {
       sessionId: this.sessionId,
       status: this._status,
-      backend: this.config.backend || "opencode",
+      backend: "pi-agent",
       createdAt: this.createdAt.toISOString(),
       lastActivityAt: this.lastActivityAt.toISOString(),
       messageCount: this.messageCount,

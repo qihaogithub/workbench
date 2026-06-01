@@ -30,7 +30,7 @@ describe('Workspace Utils', () => {
 
   describe('isTemporaryWorkspace', () => {
     it('应识别临时工作空间', () => {
-      const tempPath = path.join(tempBaseDir, 'opencode-temp-123456');
+      const tempPath = path.join(tempBaseDir, 'workbench-temp-123456');
       expect(isTemporaryWorkspace(tempPath, tempBaseDir)).toBe(true);
     });
 
@@ -42,8 +42,8 @@ describe('Workspace Utils', () => {
 
   describe('getWorkspaceDisplayName', () => {
     it('应从临时目录名提取显示名称', () => {
-      const tempPath = path.join(tempBaseDir, 'opencode-temp-123456');
-      expect(getWorkspaceDisplayName(tempPath)).toBe('opencode');
+      const tempPath = path.join(tempBaseDir, 'workbench-temp-123456');
+      expect(getWorkspaceDisplayName(tempPath)).toBe('workbench');
     });
 
     it('应返回普通目录的最后一级名称', () => {
@@ -77,9 +77,9 @@ describe('Workspace Utils', () => {
   });
 
   describe('generateTempWorkspaceName', () => {
-    it('应生成包含后端名称的临时目录名', () => {
-      const name = generateTempWorkspaceName('opencode');
-      expect(name).toContain('opencode');
+    it('应生成包含 workbench 前缀的临时目录名', () => {
+      const name = generateTempWorkspaceName();
+      expect(name).toContain('workbench');
       expect(name).toContain('-temp-');
     });
   });

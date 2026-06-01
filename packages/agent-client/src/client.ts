@@ -56,7 +56,6 @@ export class AgentClient {
     content: string,
     options?: {
       demoId?: string;
-      backend?: AgentType;
       workingDir?: string;
       customWorkspace?: boolean;
       options?: SendMessageOptions;
@@ -68,7 +67,6 @@ export class AgentClient {
       body: JSON.stringify({
         content,
         demoId: options?.demoId,
-        backend: options?.backend,
         workingDir: options?.workingDir,
         customWorkspace: options?.customWorkspace,
         images: options?.images,

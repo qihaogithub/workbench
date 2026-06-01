@@ -51,9 +51,9 @@ export function getSystemTempDir(): string {
   return path.join(os.tmpdir(), 'opencode-workspaces');
 }
 
-export function generateTempWorkspaceName(backend: string): string {
+export function generateTempWorkspaceName(): string {
   const timestamp = Date.now();
-  return `${backend}${TEMP_WORKSPACE_PREFIX}${timestamp}`;
+  return `workbench${TEMP_WORKSPACE_PREFIX}${timestamp}`;
 }
 
 export function isPathInsideWorkspace(targetPath: string, workspacePath: string): boolean {

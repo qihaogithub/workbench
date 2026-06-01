@@ -23,7 +23,6 @@ function resolveDefaultModelId(): string {
 }
 
 const DEFAULT_MODEL_ID = resolveDefaultModelId();
-function getDefaultBackend(): string { return process.env.DEFAULT_BACKEND || "opencode"; }
 
 interface StreamParams {
   sessionId: string;
@@ -159,7 +158,6 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId,
-                backend: getDefaultBackend(),
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -182,7 +180,6 @@ export async function registerWebSocketRoutes(
                   let workspaceInfo: { path: string; customWorkspace: boolean; type: "user" | "temp" } | undefined;
                   if (message.workingDir) {
                     workspaceInfo = await workspaceManager.create({
-                      backend: getDefaultBackend(),
                       workspace: message.workingDir,
                     });
                   }
@@ -204,14 +201,6 @@ export async function registerWebSocketRoutes(
                         }
                       : undefined,
                   });
-
-                  // 同步 opencodeSessionId（HTTP 后端）
-                  if (config.backend === "opencode-http") {
-                    const ocSessionId = agent.getCurrentSessionId?.();
-                    if (ocSessionId) {
-                      sessionStore.update(sessionId, { opencodeSessionId: ocSessionId });
-                    }
-                  }
                 }
               }
 
@@ -343,7 +332,6 @@ export async function registerWebSocketRoutes(
 
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
-                backend: getDefaultBackend(),
                 workingDir: message.workingDir,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
@@ -460,7 +448,6 @@ export async function registerWebSocketRoutes(
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
-                  backend: getDefaultBackend(),
                   workingDir: message.workingDir || process.cwd(),
                   model: DEFAULT_MODEL_ID,
                 };

@@ -26,7 +26,7 @@ export class WorkspaceManager {
   }
 
   async create(options: CreateWorkspaceOptions): Promise<WorkspaceInfo> {
-    const { backend, workspace, customWorkspace: providedCustomWorkspace } = options;
+    const { workspace, customWorkspace: providedCustomWorkspace } = options;
 
     const customWorkspace = providedCustomWorkspace !== undefined
       ? providedCustomWorkspace
@@ -35,7 +35,7 @@ export class WorkspaceManager {
     let workspacePath: string;
 
     if (!workspace) {
-      workspacePath = await this.createTempWorkspace(backend);
+      workspacePath = await this.createTempWorkspace();
     } else {
       workspacePath = await this.createOrValidateUserWorkspace(workspace);
     }
@@ -47,23 +47,23 @@ export class WorkspaceManager {
       createdAt: Date.now(),
     };
 
-    logger.info({ workspacePath, customWorkspace, backend }, 'Workspace created');
+    logger.info({ workspacePath, customWorkspace }, 'Workspace created');
     return info;
   }
 
-  private async createTempWorkspace(backend: string): Promise<string> {
+  private async createTempWorkspace(): Promise<string> {
     const tempDir = this.tempBaseDir;
-    
+
     if (!fs.existsSync(tempDir)) {
       await fs.promises.mkdir(tempDir, { recursive: true });
     }
 
-    const workspaceName = generateTempWorkspaceName(backend);
+    const workspaceName = generateTempWorkspaceName();
     const workspacePath = path.join(tempDir, workspaceName);
 
     await fs.promises.mkdir(workspacePath, { recursive: true });
-    
-    logger.debug({ workspacePath, backend }, 'Temporary workspace created');
+
+    logger.debug({ workspacePath }, 'Temporary workspace created');
     return workspacePath;
   }
 

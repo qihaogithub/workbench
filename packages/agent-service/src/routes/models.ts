@@ -3,52 +3,10 @@ import { getAgentManager } from "../core/agent-manager";
 import { AgentConfig } from "../core/types";
 import { logger } from "../utils/logger";
 
-function getDefaultBackend(): string {
-  return process.env.DEFAULT_BACKEND || "opencode";
-}
-
-/**
- * /config/providers 返回的模型能力结构（仅取需要的字段）
- */
-interface ProviderModelCapabilities {
-  input?: { text?: boolean; image?: boolean; audio?: boolean; video?: boolean };
-  output?: { text?: boolean; image?: boolean };
-  reasoning?: boolean;
-  toolcall?: boolean;
-}
-
-interface ProviderModelVariant {
-  reasoningEffort?: string;
-  [key: string]: unknown;
-}
-
-interface ProviderModel {
-  id: string;
-  providerID: string;
-  name?: string;
-  family?: string;
-  capabilities?: ProviderModelCapabilities;
-  variants?: Record<string, ProviderModelVariant>;
-  cost?: { input?: number; output?: number };
-  limit?: { context?: number; output?: number };
-  status?: string;
-}
-
-interface Provider {
-  id: string;
-  name?: string;
-  models?: Record<string, ProviderModel>;
-}
-
-interface ConfigProvidersResponse {
-  providers: Provider[];
-  default?: Record<string, string>;
-}
-
 /**
  * 注册模型列表 HTTP 端点
  *
- * 供管理后台使用，根据 DEFAULT_BACKEND 环境变量获取对应后端的模型列表。
+ * 创建临时 Pi Agent agent 获取模型列表。
  */
 export async function registerModelsRoutes(
   fastify: FastifyInstance,
@@ -58,9 +16,7 @@ export async function registerModelsRoutes(
   /**
    * GET /models
    *
-   * 根据 DEFAULT_BACKEND 创建临时 agent 获取模型列表。
-   * - opencode-http 后端：从 OpenCode Server 获取完整模型信息
-   * - 其他后端：从 agent 的 getModelInfo() 获取
+   * 从 Pi Agent 的 getModelInfo() 获取可用模型列表。
    */
   fastify.get(
     "/models",
@@ -70,7 +26,6 @@ export async function registerModelsRoutes(
       try {
         const config: AgentConfig = {
           sessionId: tempSessionId,
-          backend: getDefaultBackend(),
         };
 
         const agent = manager.getOrCreate(tempSessionId, config);
@@ -126,23 +81,17 @@ export async function registerModelsRoutes(
           errMsg.includes("aborted");
 
         if (isConnectionError) {
-          logger.warn(
-            { backend: getDefaultBackend() },
-            "Backend not reachable for /models",
-          );
+          logger.warn("Pi Agent backend not reachable for /models");
           return reply.code(503).send({
             success: false,
             error: {
               code: "SERVER_UNREACHABLE",
-              message: `无法连接后端服务 (${getDefaultBackend()})，请确认服务已启动后点击「拉取模型」重试`,
+              message: "无法连接 Pi Agent 后端，请确认服务已启动后点击「拉取模型」重试",
             },
           });
         }
 
-        logger.error(
-          { error, backend: getDefaultBackend() },
-          "Failed to get models from backend",
-        );
+        logger.error({ error }, "Failed to get models from Pi Agent backend");
         return reply.code(500).send({
           success: false,
           error: {
@@ -154,5 +103,5 @@ export async function registerModelsRoutes(
     },
   );
 
-  logger.info(`模型列表路由已注册: GET /models (backend: ${getDefaultBackend()})`);
+  logger.info("模型列表路由已注册: GET /models (backend: pi-agent)");
 }

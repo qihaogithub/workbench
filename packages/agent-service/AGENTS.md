@@ -4,52 +4,22 @@
 
 ## 包概览
 
-`@opencode-workbench/agent-service` 是一个独立的 Agent 服务包，实现了 **ACP (Agent Client Protocol)** 协议，用于与各种 AI Agent CLI 进行标准化通信。
+`@opencode-workbench/agent-service` 是一个独立的 Agent 服务包，基于 **Pi Agent**（`@earendil-works/pi-agent-core`）进程内嵌入实现，与单个 LLM 通信。
 
-## ACP 协议说明
-
-### 什么是 ACP？
-
-**ACP (Agent Client Protocol，智能体客户端协议)** 是由 **Zed Industries** 主导发起的**行业开放标准**，于 2025 年 9 月正式发布。它定义了编辑器/IDE（Client）与 AI 编程 Agent（Server）之间的标准通信规范。
-
-**官方资源：**
-- 🌐 官网：[https://www.jetbrains.com/acp/](https://www.jetbrains.com/acp/)
-- 📦 NPM 包：[@zed-industries/agent-client-protocol](https://www.npmjs.com/package/@zed-industries/agent-client-protocol)
-- 📖 Zed 文档：[External Agents](https://github.com/zed-industries/zed/blob/main/docs/src/ai/external-agents.md)
-
-### 本包的角色
-
-本包是 **ACP 协议的客户端实现**，负责：
-1. 启动 Agent CLI 子进程
-2. 通过 stdio 进行 JSON-RPC 通信
-3. 管理会话生命周期
-4. 处理流式响应和权限请求
+> **历史**：本包早期基于 ACP (Agent Client Protocol) 协议支持 14 种后端（OpenCode、Claude、Codex、Gemini、Qwen、Goose、Auggie、Kimi、Copilot、Qoder、Vibe、自定义等）。经评估后于 2026-06 全面迁移至 Pi Agent，移除了多后端支持（见 `docs/plans/进行中/全面迁移至Pi-Agent并移除多后端支持方案.md`）。
 
 ## 目录结构
 
 ```
 src/
-├── acp/                    # ACP 协议实现
-│   ├── types.ts            # ACP 类型定义（JSON-RPC 消息、会话更新等）
-│   ├── connection.ts       # ACP 连接管理（进程通信、消息处理）
-│   ├── approval-store.ts   # 权限审批存储（管理 allow_always 决策）
-│   ├── model-info.ts       # 模型信息处理（构建和汇总模型信息）
-│   └── index.ts            # 模块导出
 ├── backends/               # Agent 后端适配器
-│   ├── base.ts             # 后端适配器基类接口
-│   ├── base-acp.ts         # ACP 后端基类
-│   ├── claude.ts           # Claude Code 后端
-│   ├── codex.ts            # Codex 后端
-│   ├── gemini.ts           # Gemini 后端
-│   ├── qwen.ts             # Qwen Code 后端
-│   ├── goose.ts            # Goose 后端
-│   ├── auggie.ts           # Augment Code 后端
-│   ├── kimi.ts             # Kimi CLI 后端
-│   ├── copilot.ts          # GitHub Copilot 后端
-│   ├── qoder.ts            # Qoder CLI 后端
-│   ├── vibe.ts             # Mistral Vibe 后端
-│   ├── opencode-acp.ts     # OpenCode ACP 后端
-│   ├── custom.ts           # 自定义 Agent 后端
+│   ├── base.ts             # 后端适配器接口（IBackendAdapter）
+│   ├── pi-agent.ts         # Pi Agent 后端实现
+│   ├── pi-tools/           # Pi Agent 工具集
+│   │   ├── index.ts        # 工具导出（readFile/writeFile/listFiles/bash/schemaValidate）
+│   │   ├── file-tools.ts   # 文件操作工具
+│   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
+│   │   └── schema-tool.ts  # config.schema.json 校验
 │   └── index.ts            # 模块导出
 ├── core/                   # 核心逻辑
 │   ├── agent.ts            # Agent 基类
@@ -72,222 +42,57 @@ src/
 └── server.ts               # Fastify 服务器入口
 
 tests/
-├── fixtures/
-│   └── fake-acp-cli/
-│       └── index.js        # 模拟 ACP CLI（用于测试）
-├── unit/
-│   ├── approval-store.test.ts  # 权限存储单元测试
-│   ├── model-info.test.ts      # 模型信息单元测试
-│   └── acp-types.test.ts       # 类型定义单元测试
-└── integration/
-    └── acp-smoke.test.ts       # ACP 协议冒烟测试
+├── unit/                   # 单元测试
+└── integration/            # 集成测试
 ```
 
-## ACP 通信架构
+## Pi Agent 通信架构
 
 ```
 ┌─────────────────────┐                    ┌─────────────────────┐
-│                     │   stdin (JSON)     │                     │
-│   agent-service     │ ──────────────────►│   Agent CLI         │
-│   (ACP Client)      │                    │   (ACP Server)      │
-│                     │ ◄────────────────── │                     │
-└─────────────────────┘   stdout (JSON)    └─────────────────────┘
+│   agent-service     │    函数调用        │  @earendil-works/   │
+│   (Fastify)         │ ────────────────► │  pi-agent-core      │
+│                     │    (进程内嵌入)    │                     │
+└─────────────────────┘                    └─────────────────────┘
 ```
 
 **关键点：**
-- **stdio 通信**：通过子进程的标准输入/输出进行通信
-- **JSON-RPC 格式**：每行一个 JSON 消息，以换行符分隔
-- **双向通信**：客户端发送请求，Agent 返回响应或通知
+- **进程内嵌入**：Pi Agent 核心以 npm 依赖方式嵌入，无需独立进程或端口
+- **动态导入**：`pi-agent.ts` 通过 `await import('@earendil-works/pi-agent-core')` 动态加载，避免 ESM/CJS 兼容问题
+- **流式响应**：`Agent.subscribe(event)` 推送 `message_update`、`tool_execution_start/end`、`agent_end` 事件
+- **工具拦截**：`beforeToolCall`（路径校验）+ `afterToolCall`（文件变更捕获）
 
-## 支持的后端
+## Pi Agent 工具集
 
-从 `src/acp/types.ts` 中定义的后端配置：
+`src/backends/pi-tools/` 暴露 5 个工具：
 
-| Backend | CLI 命令 | ACP 参数 | 需要认证 |
-|---------|----------|----------|----------|
-| `opencode` | `opencode` | `['acp']` | 否 |
-| `claude` | `claude` | `['--experimental-acp']` | 是 |
-| `codex` | `codex` 或 `npx @zed-industries/codex-acp@0.9.5` | `[]` | 是 |
-| `gemini` | `gemini` | `['--experimental-acp']` | 是 |
-| `qwen` | `qwen` 或 `npx @qwen-code/qwen-code` | `['--acp']` | 是 |
-| `goose` | `goose` | `['acp']` | 否 |
-| `auggie` | `auggie` | `['--acp']` | 否 |
-| `kimi` | `kimi` | `['acp']` | 否 |
-| `copilot` | `copilot` | `['--acp', '--stdio']` | 否 |
-| `qoder` | `qodercli` | `['--acp']` | 否 |
-| `vibe` | `vibe-acp` | `[]` | 否 |
-| `custom` | 自定义 | `[]` | 否 |
+| 工具 | 用途 |
+|:-----|:-----|
+| `readFile` | 读取工作空间内文件 |
+| `writeFile` | 写入工作空间内文件（变更会被捕获） |
+| `listFiles` | 列出目录文件 |
+| `bash` | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo） |
+| `schemaValidate` | 校验 config.schema.json 格式 |
 
-## 核心 API
+### Shell 白名单
 
-### AcpConnection 类
+`pi-tools/bash-tool.ts:10` 定义 11 个允许的命令：`['npm', 'node', 'npx', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo']`。
+注：`npm install` / `npx` 可写文件系统；`echo` 可重定向。但未含 `rm` / `mv` 等高危命令。
 
-```typescript
-import { AcpConnection } from './acp/connection';
+## 配置（环境变量）
 
-// 创建连接
-const connection = new AcpConnection('claude', '/path/to/workspace');
+```bash
+# 必填
+PI_AGENT_API_KEY=sk-...
 
-// 连接到 Agent
-await connection.connect();
-
-// 创建会话
-const session = await connection.createSession({ model: 'claude-sonnet-4' });
-
-// 加载已有会话
-const loadedSession = await connection.loadSession('existing-session-id');
-
-// 创建或恢复会话
-const sessionId = await connection.createOrResumeSession('existing-session-id', { model: 'claude-sonnet-4' });
-
-// 发送消息
-const result = await connection.sendPrompt('你好，请帮我写一个函数', {
-  onSessionUpdate: (update) => {
-    // 处理流式更新
-  },
-  onPermissionRequest: async (request) => {
-    // 处理权限请求
-    return 'allow_once';
-  },
-});
-
-// 设置模型
-await connection.setModel('claude-sonnet-4');
-
-// 设置配置选项
-await connection.setConfigOption('optionId', 'value');
-
-// 设置会话模式
-await connection.setSessionMode('modeId');
-
-// 获取模型信息
-const modelInfo = connection.getModelInfo();
-
-// 获取配置选项
-const configOptions = connection.getConfigOptions();
-
-// 获取审批存储
-const approvalStore = connection.getApprovalStore();
-
-// 断开连接
-await connection.disconnect();
+# 选填（有默认值）
+PI_AGENT_PROVIDER=jojo                # anthropic / openai / google / 自定义 provider
+PI_AGENT_MODEL=deepseek-v4-flash      # 模型 ID
+PI_AGENT_BASE_URL=https://token.xjjj.co/v1  # 自定义 API 基础地址（OpenAI 兼容格式）
+PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 ```
 
-### JSON-RPC 消息类型
-
-```typescript
-// 请求 - 需要响应
-interface AcpRequest {
-  jsonrpc: "2.0";
-  id: number;
-  method: string;
-  params?: Record<string, unknown> | unknown[];
-}
-
-// 响应 - 对请求的回复
-interface AcpResponse {
-  jsonrpc: "2.0";
-  id: number;
-  result?: unknown;
-  error?: { code: number; message: string; data?: unknown };
-}
-
-// 通知 - 单向消息
-interface AcpNotification {
-  jsonrpc: "2.0";
-  method: string;
-  params?: Record<string, unknown> | unknown[];
-}
-```
-
-### ACP 方法
-
-```typescript
-export const ACP_METHODS = {
-  INITIALIZE: 'initialize',              // 初始化协议
-  AUTHENTICATE: 'authenticate',          // 认证
-  SESSION_NEW: 'session/new',            // 创建会话
-  SESSION_LOAD: 'session/load',          // 加载会话
-  SESSION_PROMPT: 'session/prompt',      // 发送消息
-  SESSION_CANCEL: 'session/cancel',      // 取消消息
-  SESSION_UPDATE: 'session/update',      // 会话更新通知
-  REQUEST_PERMISSION: 'session/request_permission',  // 权限请求
-  SET_CONFIG_OPTION: 'session/set_config_option',   // 设置配置
-  SET_MODEL: 'session/set_model',        // 设置模型
-  SET_MODE: 'session/set_mode',          // 设置模式
-  READ_TEXT_FILE: 'fs/read_text_file',   // 读取文件
-  WRITE_TEXT_FILE: 'fs/write_text_file', // 写入文件
-} as const;
-```
-
-### Session Update 类型
-
-```typescript
-type SessionUpdateType =
-  | 'agent_message_chunk'      // Agent 回复的文本片段
-  | 'agent_thought_chunk'      // Agent 的思考过程
-  | 'tool_call'                // 工具调用开始
-  | 'tool_call_update'         // 工具调用状态更新
-  | 'plan'                     // 执行计划更新
-  | 'available_commands_update' // 可用命令更新
-  | 'user_message_chunk'       // 用户消息片段
-  | 'config_option_update'     // 配置选项更新
-  | 'usage_update';            // Token 使用量更新
-```
-
-### IBackendAdapter 接口
-
-```typescript
-export interface IBackendAdapter {
-  readonly name: string;
-  initialize(): Promise<void>;
-  sendMessage(content: string, options?: { stream?: boolean }): Promise<string>;
-  onStream(callback: (event: AgentEvent) => void): void;
-  getStatus(): Promise<BackendStatus>;
-  destroy(): Promise<void>;
-  checkHealth(): Promise<boolean>;
-  start?(options?: { resumeSessionId?: string }): Promise<void>;
-  setModel?(modelId: string): Promise<void>;
-  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null;
-  getCurrentSessionId?(): string | null;
-  getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
-  setPromptTimeout?(seconds: number): void;
-}
-```
-
-### AcpApprovalStore 类
-
-用于管理权限审批决策，支持 `allow_always` 自动审批：
-
-```typescript
-import { AcpApprovalStore, createAcpApprovalKey } from './acp/approval-store';
-
-const store = new AcpApprovalStore();
-
-// 存储审批决策
-store.put(toolCallKey, 'allow_always');
-
-// 检查是否已审批
-const isApproved = store.isApprovedForSession(toolCallKey);
-
-// 清空存储
-store.clear();
-```
-
-### AcpModelInfo 类型
-
-用于处理模型信息：
-
-```typescript
-export interface AcpModelInfo {
-  currentModelId: string | null;
-  currentModelLabel: string | null;
-  availableModels: Array<{ id: string; label: string }>;
-  canSwitch: boolean;
-  source: 'configOption' | 'models';
-  configOptionId?: string;
-}
-```
+完整配置加载逻辑见 `src/utils/config.ts`。
 
 ## HTTP API 路由
 
@@ -299,8 +104,9 @@ export interface AcpModelInfo {
 {
   content: string;
   demoId?: string;
-  backend?: AgentType;
   workingDir?: string;
+  customWorkspace?: boolean;
+  model?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -328,11 +134,33 @@ export interface AcpModelInfo {
 ### POST /api/agent/:sessionId/rollback
 回滚文件修改。
 
-### GET /health
-健康检查端点。
+### GET /models
+获取可用模型列表（创建临时 Pi Agent 实例调用 `getModelInfo()`）。
 
-### GET /backends
-获取已注册的后端列表。
+### GET /health
+健康检查端点（返回 status/timestamp/uptime/agents）。
+
+## IBackendAdapter 接口
+
+```typescript
+export interface IBackendAdapter {
+  readonly name: string;
+  initialize(): Promise<void>;
+  sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string>;
+  onStream(callback: (event: AgentEvent) => void): void;
+  getStatus(): Promise<BackendStatus>;
+  destroy(): Promise<void>;
+  checkHealth(): Promise<boolean>;
+  start?(options?: { resumeSessionId?: string }): Promise<void>;
+  setModel?(modelId: string): Promise<void>;
+  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
+  getCurrentSessionId?(): string | null;
+  getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+  setPromptTimeout?(seconds: number): void;
+  cancelPrompt?(): void;
+  getWorkingDir?(): string | null;
+}
+```
 
 ## 构建 / 测试 / 开发命令
 
@@ -346,7 +174,7 @@ pnpm build
 # 生产模式运行
 pnpm start
 
-# 运行所有测试（使用 fake-acp-cli，快速可靠）
+# 运行所有测试
 pnpm test
 
 # 测试监听模式
@@ -354,9 +182,6 @@ pnpm test:watch
 
 # 测试覆盖率报告
 pnpm test:coverage
-
-# 真实后端冒烟测试（需要安装对应 CLI 并设置环境变量）
-ACP_SMOKE_REAL=1 pnpm test:smoke
 
 # ESLint 检查
 pnpm lint
@@ -367,28 +192,10 @@ pnpm typecheck
 
 ## 测试策略
 
-### 分层测试架构
-
 | 测试类型 | 描述 | 文件位置 |
 |:---------|:-----|:---------|
 | **单元测试** | 纯逻辑测试，无需外部依赖 | `tests/unit/*.test.ts` |
-| **集成测试** | 使用 fake-acp-cli 模拟真实 CLI | `tests/integration/*.test.ts` |
-| **真实后端测试** | 可选，测试真实 CLI（需设置环境变量） | `ACP_SMOKE_REAL=1` |
-
-### fake-acp-cli
-
-`tests/fixtures/fake-acp-cli/index.js` 是一个模拟 ACP 协议的 CLI，用于测试：
-
-- 支持 `initialize`、`session/new`、`session/prompt` 等方法
-- 模拟流式响应（`agent_message_chunk`、`agent_thought_chunk`）
-- 模拟工具调用（`tool_call`、`tool_call_update`）
-- 返回模型信息和配置选项
-
-### Agent 友好的测试方式
-
-1. **fake-acp-cli** - 模拟真实 ACP 协议，无需真实后端
-2. **纯单元测试** - 测试核心逻辑，无需进程启动
-3. **可选真实测试** - 通过环境变量控制，不影响 CI
+| **集成测试** | 测试 Pi Agent 后端初始化/事件/配置 | `tests/integration/*.test.ts` |
 
 ## 代码风格与约定
 
@@ -398,9 +205,9 @@ pnpm typecheck
 - **模块系统**：NodeNext
 
 ### 命名约定
-- **类/接口**：PascalCase（`AcpConnection`, `AgentConfig`）
+- **类/接口**：PascalCase（`PiAgentBackend`, `AgentConfig`）
 - **函数/变量**：camelCase（`sendPrompt`, `createSession`）
-- **常量**：UPPER_SNAKE_CASE（`ACP_METHODS`, `JSONRPC_VERSION`）
+- **常量**：UPPER_SNAKE_CASE（`SESSION_EXPIRY_MS`）
 - **类型别名**：PascalCase（`AgentType`, `ErrorCode`）
 
 ### 导入顺序
@@ -418,24 +225,14 @@ pnpm typecheck
 - 通过 `src/utils/logger.ts` 统一导出
 - 日志级别：`debug`, `info`, `warn`, `error`
 
-```typescript
-import { logger } from './utils/logger';
-
-logger.info({ backend: 'claude' }, 'ACP connection established');
-logger.error({ error: err }, 'Failed to connect');
-```
-
 ## 注意事项
 
-- **进程隔离**：每个 Agent 运行在独立子进程中
-- **超时处理**：`session/prompt` 默认超时 5 分钟，其他方法 1 分钟；可通过 `setPromptTimeout()` 调整
-- **权限控制**：敏感操作需要通过 `onPermissionRequest` 回调确认；支持 `allow_always` 自动审批
-- **流式响应**：通过 `session/update` 通知实现实时更新
-- **会话恢复**：支持通过 `loadSession` 或 `createOrResumeSession` 恢复已有会话
-- **模型切换**：支持运行时切换模型（`setModel`）
-- **文件操作**：支持通过 `fs/read_text_file` 和 `fs/write_text_file` 通知进行文件操作
+- **单后端架构**：仅支持 Pi Agent，无外部服务依赖
+- **进程内嵌入**：`@earendil-works/pi-agent-core` 以动态导入方式加载
+- **超时处理**：`MESSAGE_TIMEOUT_MS = 300000`（5 分钟）— `src/routes/websocket.ts:59`
+- **文件操作**：`afterToolCall` 钩子捕获 `writeFile` 变更存入 `this.files`
+- **路径安全**：`beforeToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
 
 ## 相关文档
 
-- [ACP 协议详解](../../docs/AionUI/ACP协议.md)
-- [Zed External Agents 文档](https://github.com/zed-industries/zed/blob/main/docs/src/ai/external-agents.md)
+- [迁移方案](../../docs/plans/进行中/全面迁移至Pi-Agent并移除多后端支持方案.md)

@@ -1,21 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
-import { BackendAgent } from '../core/backend-agent';
 import { getSessionStore } from '../session/session-store';
-import { getChangedFiles, validatePath } from '../session/session-guard';
+import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
 import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
-import { AgentConfig, AgentType } from '../core/types';
-import { logger } from '../utils/logger';
-
-function resolveDefaultModelId(): string {
-  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
-  const first = raw.split(",")[0]?.trim();
-  return first || "";
-}
-
-function getDefaultBackend(): string { return process.env.DEFAULT_BACKEND || 'opencode'; }
+import { AgentConfig } from '../core/types';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
@@ -25,7 +15,6 @@ interface SessionParams {
 interface SendMessageBody {
   content: string;
   demoId?: string;
-  backend?: AgentType;
   workingDir?: string;
   customWorkspace?: boolean;
   model?: string;
@@ -70,7 +59,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, demoId, backend, workingDir, customWorkspace, options } = request.body;
+      const { content, demoId, workingDir, customWorkspace, options } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -84,35 +73,31 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
       try {
         let workspaceInfo: WorkspaceInfo | undefined;
-        
+
         if (workingDir) {
           workspaceInfo = await workspaceManager.create({
-            backend: backend || getDefaultBackend(),
             workspace: workingDir,
             customWorkspace,
           });
         } else {
           const existingSession = sessionStore.get(sessionId);
           if (!existingSession) {
-            workspaceInfo = await workspaceManager.create({
-              backend: backend || getDefaultBackend(),
-            });
+            workspaceInfo = await workspaceManager.create({});
           }
         }
 
         const config: AgentConfig = {
           sessionId,
-          backend: backend || getDefaultBackend(),
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
-          model: request.body.model || resolveDefaultModelId(),
+          model: request.body.model,
         };
 
         const agent = manager.getOrCreate(sessionId, config);
 
         if (agent.status === 'initializing') {
           await agent.start();
-          
+
           if (workspaceInfo) {
             const snapshotInfo = await snapshotService.init(workspaceInfo.path);
             sessionStore.create(sessionId, {
@@ -125,14 +110,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
                 snapshotBranch: snapshotInfo.branch,
               },
             });
-          }
-
-          // 同步 opencodeSessionId 到 SessionMeta（HTTP 后端）
-          if (config.backend === 'opencode-http') {
-            const ocSessionId = agent.getCurrentSessionId?.();
-            if (ocSessionId) {
-              sessionStore.update(sessionId, { opencodeSessionId: ocSessionId });
-            }
           }
         }
 
@@ -362,7 +339,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       }
 
       const workspaceInfo = await workspaceManager.create({
-        backend: session.backend,
         workspace: workingDir,
         customWorkspace,
       });
@@ -481,81 +457,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           discarded: discardedFiles,
         },
       });
-    }
-  );
-
-  fastify.get(
-    '/api/llm/models',
-    async (_request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const serverUrl = process.env.OPENCODE_SERVER_URL || 'http://localhost:4096';
-
-        // Get models from /provider endpoint (OpenCode Server actual API)
-        const response = await fetch(`${serverUrl}/provider`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000),
-        });
-
-        if (!response.ok) {
-          return reply.code(502).send({
-            success: false,
-            error: {
-              code: 'BACKEND_UNAVAILABLE',
-              message: '无法从 OpenCode Server 获取模型列表',
-            },
-          });
-        }
-
-        const data = await response.json() as {
-          all?: Array<{
-            id: string;
-            name?: string;
-            models?: Record<string, { id: string; name?: string }>;
-          }>;
-        };
-
-        const models: Array<{ id: string; label: string }> = [];
-        for (const provider of data.all || []) {
-          for (const [, modelInfo] of Object.entries(provider.models || {})) {
-            models.push({
-              id: `${provider.id}/${modelInfo.id}`,
-              label: modelInfo.name || modelInfo.id,
-            });
-          }
-        }
-
-        // Get current model from config
-        let currentModelId: string | undefined;
-        try {
-          const configResp = await fetch(`${serverUrl}/config`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(3000),
-          });
-          if (configResp.ok) {
-            const configData = await configResp.json() as { model?: string };
-            currentModelId = configData.model;
-          }
-        } catch {
-          // Ignore config fetch errors
-        }
-
-        return reply.send({
-          success: true,
-          data: {
-            models,
-            currentModelId,
-          },
-        });
-      } catch (error) {
-        logger.error({ error }, 'Failed to fetch models from OpenCode Server');
-        return reply.code(500).send({
-          success: false,
-          error: {
-            code: 'INTERNAL_ERROR',
-            message: error instanceof Error ? error.message : '获取模型列表失败',
-          },
-        });
-      }
     }
   );
 }

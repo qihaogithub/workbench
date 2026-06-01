@@ -12,7 +12,7 @@ describe('WorkspaceManager', () => {
   beforeEach(() => {
     manager = new WorkspaceManager();
     (manager as unknown as { tempBaseDir: string }).tempBaseDir = testTempDir;
-    
+
     if (!fs.existsSync(testTempDir)) {
       fs.mkdirSync(testTempDir, { recursive: true });
     }
@@ -32,22 +32,21 @@ describe('WorkspaceManager', () => {
 
   describe('create', () => {
     it('应创建临时工作空间', async () => {
-      const info = await manager.create({ backend: 'opencode' });
-      
+      const info = await manager.create({});
+
       expect(info.type).toBe('temp');
       expect(info.customWorkspace).toBe(false);
-      expect(info.path).toContain('opencode-temp-');
+      expect(info.path).toContain('workbench-temp-');
       expect(fs.existsSync(info.path)).toBe(true);
     });
 
     it('应创建用户指定工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'my-project');
       const info = await manager.create({
-        backend: 'opencode',
         workspace: userPath,
         customWorkspace: true,
       });
-      
+
       expect(info.type).toBe('user');
       expect(info.customWorkspace).toBe(true);
       expect(info.path).toBe(path.resolve(userPath));
@@ -57,19 +56,18 @@ describe('WorkspaceManager', () => {
     it('应自动推断 customWorkspace', async () => {
       const userPath = path.join(userWorkspaceDir, 'auto-project');
       const info = await manager.create({
-        backend: 'opencode',
         workspace: userPath,
       });
-      
+
       expect(info.customWorkspace).toBe(true);
     });
   });
 
   describe('cleanup', () => {
     it('应清理临时工作空间', async () => {
-      const info = await manager.create({ backend: 'opencode' });
+      const info = await manager.create({});
       expect(fs.existsSync(info.path)).toBe(true);
-      
+
       await manager.cleanup(info.path);
       expect(fs.existsSync(info.path)).toBe(false);
     });
@@ -77,11 +75,10 @@ describe('WorkspaceManager', () => {
     it('不应清理用户工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'user-project');
       const info = await manager.create({
-        backend: 'opencode',
         workspace: userPath,
         customWorkspace: true,
       });
-      
+
       await manager.cleanup(info.path);
       expect(fs.existsSync(info.path)).toBe(true);
     });
@@ -89,14 +86,13 @@ describe('WorkspaceManager', () => {
 
   describe('isTemporary', () => {
     it('应正确识别临时工作空间', async () => {
-      const info = await manager.create({ backend: 'opencode' });
+      const info = await manager.create({});
       expect(manager.isTemporary(info.path)).toBe(true);
     });
 
     it('应正确识别用户工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'check-project');
       const info = await manager.create({
-        backend: 'opencode',
         workspace: userPath,
         customWorkspace: true,
       });
@@ -106,8 +102,8 @@ describe('WorkspaceManager', () => {
 
   describe('getDisplayName', () => {
     it('应返回工作空间显示名称', async () => {
-      const info = await manager.create({ backend: 'opencode' });
-      expect(manager.getDisplayName(info.path)).toBe('opencode');
+      const info = await manager.create({});
+      expect(manager.getDisplayName(info.path)).toBe('workbench');
     });
   });
 });

@@ -8,6 +8,7 @@
  */
 
 import { readDbConfig } from "./db-config";
+import type { BackendProvidersConfig } from "@opencode-workbench/shared";
 
 const CONFIG_ID = "model_config";
 const CACHE_TTL = 60 * 1000; // 1 分钟缓存
@@ -43,6 +44,11 @@ export interface ModelConfigData {
     nameFilters: string[];
   };
   multimodalModels: string[];
+  /**
+   * AI 后端供应商配置(用于 agent-service 的 LLM 后端)
+   * 字段缺失时视为空(agent-service 走 .env PI_AGENT_PROVIDERS fallback)
+   */
+  backendProviders?: BackendProvidersConfig;
 }
 
 let cachedConfig: CachedConfig | null = null;
