@@ -630,6 +630,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 />
               )}
             </div>
+            </div>
           ) : (
             <PreviewGrid
               demoPages={gridPages}
