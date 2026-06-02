@@ -1,8 +1,8 @@
 {
   "id": "proj_1779608460378",
   "name": "广场页面",
-  "publishedVersion": "v7",
-  "publishedAt": 1780072530331,
+  "publishedVersion": "v12",
+  "publishedAt": 1780392718136,
   "demoPages": [
     {
       "id": "demo_1779608460379_a1b2c3",
@@ -14,7 +14,9 @@
       "previewSize": {
         "width": 375,
         "height": 812
-      }
+      },
+      "iframeHtmlPath": "demos/demo_1779608460379_a1b2c3/iframe.html",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     },
     {
       "id": "demo_1779608460380_d4e5f6",
@@ -26,9 +28,11 @@
       "previewSize": {
         "width": 768,
         "height": 1024
-      }
+      },
+      "iframeHtmlPath": "demos/demo_1779608460380_d4e5f6/iframe.html",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     }
   ],
   "demoFolders": [],
-  "projectConfigSchema": "{\r\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\r\n  \"title\": \"广场页面 - 项目级共享配置\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"bigBannerForeground\": {\r\n      \"type\": \"string\",\r\n      \"format\": \"image\",\r\n      \"title\": \"大Banner前景图\",\r\n      \"description\": \"手机和平板共用的大Banner前景图片，推荐尺寸 1248×384\",\r\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png\",\r\n      \"ui:options\": {\r\n        \"accept\": \"image/*\",\r\n        \"maxSize\": 5242880,\r\n        \"minWidth\": 1248,\r\n        \"maxWidth\": 1248,\r\n        \"minHeight\": 384,\r\n        \"maxHeight\": 384\r\n      }\r\n    },\r\n    \"bigBannerBackground\": {\r\n      \"type\": \"string\",\r\n      \"format\": \"image\",\r\n      \"title\": \"大Banner背景图\",\r\n      \"description\": \"手机和平板共用的大Banner背景图片，推荐尺寸 1248×344\",\r\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png\",\r\n      \"ui:options\": {\r\n        \"accept\": \"image/*\",\r\n        \"maxSize\": 5242880,\r\n        \"minWidth\": 1248,\r\n        \"maxWidth\": 1248,\r\n        \"minHeight\": 344,\r\n        \"maxHeight\": 344\r\n      }\r\n    },\r\n    \"miniBanners\": {\r\n      \"type\": \"array\",\r\n      \"title\": \"小Banner图片列表\",\r\n      \"description\": \"小Banner滚动区域的图片列表，每张推荐尺寸 480×270\",\r\n      \"ui:widget\": \"imageList\",\r\n      \"ui:options\": {\r\n        \"maxItems\": 10,\r\n        \"minWidth\": 480,\r\n        \"maxWidth\": 480,\r\n        \"minHeight\": 270,\r\n        \"maxHeight\": 270\r\n      },\r\n      \"items\": {\r\n        \"type\": \"string\",\r\n        \"format\": \"image\"\r\n      },\r\n      \"default\": [\r\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png\",\r\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png\",\r\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png\",\r\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png\",\r\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png\"\r\n      ]\r\n    }\r\n  }\r\n}"
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"广场页面 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"bigBannerForeground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner前景图\",\n      \"description\": \"手机和平板共用的大Banner前景图片，推荐尺寸 1248×384\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 384,\n        \"maxHeight\": 384\n      }\n    },\n    \"bigBannerBackground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner背景图\",\n      \"description\": \"手机和平板共用的大Banner背景图片，推荐尺寸 1248×344\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 344,\n        \"maxHeight\": 344\n      }\n    },\n    \"miniBanners\": {\n      \"type\": \"array\",\n      \"title\": \"小Banner图片列表\",\n      \"description\": \"小Banner滚动区域的图片列表，每张推荐尺寸 480×270\",\n      \"ui:widget\": \"imageList\",\n      \"ui:options\": {\n        \"maxItems\": 10,\n        \"minWidth\": 480,\n        \"maxWidth\": 480,\n        \"minHeight\": 270,\n        \"maxHeight\": 270\n      },\n      \"items\": {\n        \"type\": \"string\",\n        \"format\": \"image\"\n      },\n      \"default\": [\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png\"\n      ]\n    }\n  }\n}"
 }

@@ -101,12 +101,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
         const agent = manager.getOrCreate(sessionId, config);
 
-        // v3.2: 注入静态 system prompt（L2 + L4）
-        // 注：实际静态部分永远不变，可省略；但保留接口以备规则更新
-        if (systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
-          await (agent as any).updateSystemPrompt(systemPrompt);
-        }
-
         if (agent.status === 'initializing') {
           await agent.start();
 
@@ -123,6 +117,11 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
               },
             });
           }
+        }
+
+        // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
+        if (systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
+          await (agent as any).updateSystemPrompt(systemPrompt);
         }
 
         sessionStore.update(sessionId, {

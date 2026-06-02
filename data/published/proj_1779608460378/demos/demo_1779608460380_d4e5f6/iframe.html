@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="dns-prefetch" href="https://esm.sh">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
+    #root { min-height: 100vh; }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom": "https://esm.sh/react-dom@18.3.1/client",
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+      "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime"
+    }
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import React from 'https://esm.sh/react@18.3.1';
+    import ReactDOM from 'https://esm.sh/react-dom@18.3.1/client';
+
+    let currentRoot = null;
+    let currentConfig = {"bigBannerForeground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png","bigBannerBackground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png","miniBanners":["https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png"]};
+    let currentComponent = null;
+    let updateVersion = 0;
+
+    window.__DEMO_PROPS__ = currentConfig;
+
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        window.parent.postMessage({ type: 'RUNTIME_ERROR', error: error.message, stack: error.stack }, '*');
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return React.createElement('div', {
+            style: {
+              padding: '16px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              fontFamily: 'system-ui, sans-serif'
+            }
+          },
+            React.createElement('p', { style: { color: '#991b1b', fontWeight: 500, margin: '0 0 4px 0' } }, '渲染出错'),
+            React.createElement('pre', {
+              style: {
+                color: '#dc2626',
+                fontSize: '13px',
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }
+            }, this.state.error?.message || '组件运行时发生错误')
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    function renderComponent() {
+      if (!currentComponent) return;
+      const container = document.getElementById('root');
+      if (!container) return;
+      if (!currentRoot) {
+        currentRoot = ReactDOM.createRoot(container);
+      }
+      currentRoot.render(
+        React.createElement(ErrorBoundary, null,
+          React.createElement(currentComponent, currentConfig)
+        )
+      );
+    }
+
+    function updateCssLinks(cssUrls) {
+      document.querySelectorAll('link[data-dynamic-css]').forEach(el => el.remove());
+      cssUrls.forEach(url => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = url.startsWith('http') ? url : 'https://esm.sh/' + url;
+        link.setAttribute('data-dynamic-css', 'true');
+        document.head.appendChild(link);
+      });
+    }
+
+    
+    function loadModuleFromCode(code, thisVersion) {
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const moduleUrl = URL.createObjectURL(blob);
+      import(moduleUrl)
+        .then((module) => {
+          if (thisVersion !== updateVersion) return;
+          currentComponent = module.default || null;
+          renderComponent();
+          URL.revokeObjectURL(moduleUrl);
+          if (module.default) {
+            window.parent.postMessage({ type: 'LOADED' }, '*');
+          } else {
+            window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
+          }
+        })
+        .catch((err) => {
+          if (thisVersion !== updateVersion) return;
+          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
+        });
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== window.parent) return;
+
+      const { type, code, configData: newConfigData, cssImports: newCssImports, isUrl } = event.data;
+
+      
+      if (type === 'UPDATE_CODE') {
+        currentConfig = newConfigData || {};
+        window.__DEMO_PROPS__ = currentConfig;
+        updateCssLinks(newCssImports || []);
+
+        const thisVersion = ++updateVersion;
+
+        if (isUrl) {
+          fetch(code)
+            .then(res => {
+              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
+              return res.text();
+            })
+            .then(jsCode => {
+              if (thisVersion !== updateVersion) return;
+              loadModuleFromCode(jsCode, thisVersion);
+            })
+            .catch((err) => {
+              if (thisVersion !== updateVersion) return;
+              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+            });
+        } else {
+          loadModuleFromCode(code, thisVersion);
+        }
+      }
+
+      if (type === 'UPDATE_CONFIG') {
+        currentConfig = newConfigData || {};
+        window.__DEMO_PROPS__ = currentConfig;
+        if (currentComponent) {
+          renderComponent();
+        }
+      }
+    });
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        window.parent.postMessage({ type: 'RESIZE', height }, '*');
+      }
+    });
+    resizeObserver.observe(document.body);
+
+    window.addEventListener('error', (event) => {
+      window.parent.postMessage({
+        type: 'RUNTIME_ERROR',
+        error: event.message,
+        source: event.filename,
+        line: event.lineno
+      }, '*');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      window.parent.postMessage({
+        type: 'RUNTIME_ERROR',
+        error: event.reason?.message || String(event.reason)
+      }, '*');
+    });
+
+    window.parent.postMessage({ type: 'READY' }, '*');
+
+    const initialCode = "import {jsxs as _jsxs, jsx as _jsx} from 'https://esm.sh/react@18.3.1/jsx-runtime';\n\n\n\n\n\nconst subjects = [\n  { key: 'yuedu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/阅读.png', bgClass: 'bg-[#fff2ea]' },\n  { key: 'yizhi', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/益智.png', bgClass: 'bg-[#eaf9ff]' },\n  { key: 'meiyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/美育.png', bgClass: 'bg-[#f9f5ff]' },\n  { key: 'xiezuo', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/写作.png', bgClass: 'bg-[#eefceb]' },\n  { key: 'yingyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/英语.png', bgClass: 'bg-[#fff0f3]' },\n];\n\nexport default function PadSquare(props) {\n  const {\n    bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',\n    bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',\n    miniBanners = [\n      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png',\n      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png',\n      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png',\n      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png',\n      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png',\n    ],\n  } = props;\n\n  return (\n    _jsxs('div', {\n      className: \"w-full min-h-screen bg-white flex flex-col overflow-hidden\"     ,\n      style: {\n        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n        maxWidth: 768,\n        margin: '0 auto',\n      },\n children: [\n      _jsx('style', { children: `\n        .hide-scrollbar {\n          -ms-overflow-style: none;\n          scrollbar-width: none;\n        }\n        .hide-scrollbar::-webkit-scrollbar {\n          display: none;\n        }\n      `})\n\n      /* 顶部状态栏和 Logo */\n      , _jsxs('div', { className: \"w-full flex-shrink-0\" , children: [\n        _jsx('img', {\n          src: \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png\",\n          alt: \"status\",\n          className: \"w-full h-auto\" ,}\n        )\n        , _jsxs('div', { className: \"flex items-center justify-between h-11 px-5\"    , children: [\n          _jsx('img', {\n            className: \"w-[154px] h-[30px]\" ,\n            src: \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/叫叫%20Logo%20-%20基础.png\",\n            alt: \"Logo\",}\n          )\n          , _jsx('img', {\n            className: \"h-[30px]\",\n            src: \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/扫一扫.png\",\n            alt: \"扫一扫\",}\n          )\n        ]})\n      ]})\n\n      /* 内容区 */\n      , _jsxs('div', { className: \"flex-1 flex flex-col items-center overflow-y-auto\"    , children: [\n        /* 科目图标 */\n        _jsx('div', { className: \"flex items-center justify-between px-10 gap-[11px] mt-4 w-full\"      , children: \n          subjects.map((s) => (\n            _jsx('div', {\n\n              className: `${s.bgClass} flex items-center justify-center w-[58.2px] rounded-[12px_12px_24px_12px] py-1.5`,\n children: \n              _jsx('img', { src: s.icon, alt: s.key, className: \"w-8 h-8\" ,} )\n            }, s.key)\n          ))\n        })\n\n        /* 大Banner - 使用配置的图片原始尺寸 */\n        , _jsx('div', { className: \"w-full px-10 mt-4\"  , children: \n          _jsxs('div', { className: \"relative w-full overflow-hidden rounded-2xl\"   , children: [\n            /* 背景图 - 根据前景图比例自动适应 */\n            _jsx('img', {\n              className: \"absolute w-full bottom-0 left-1/2 -translate-x-1/2 object-cover\"     ,\n              src: bigBannerBackground,\n              alt: \"banner-bg\",\n              style: { height: '89.583%' },}\n            )\n            /* 前景图 */\n            , _jsx('img', {\n              className: \"relative w-full h-auto object-cover\"   ,\n              src: bigBannerForeground,\n              alt: \"banner-fg\",}\n            )\n          ]})\n        })\n\n        /* 小Banner滚动区 */\n        , _jsx('div', { className: \"w-full pl-10 mt-5 overflow-x-auto hide-scrollbar\"    , children: \n          _jsx('div', { className: \"flex gap-2\" , children: \n            miniBanners.map((url, i) => (\n              _jsx('img', {\n\n                src: url,\n                alt: `mini-banner-${i + 1}`,\n                className: \"h-[137px] w-auto flex-shrink-0\"  ,}, i\n              )\n            ))\n          })\n        })\n      ]})\n\n      /* 底部标签栏 */\n      , _jsx('div', { className: \"w-full flex-shrink-0\" , children: \n        _jsx('img', {\n          src: \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏_pad.png\",\n          alt: \"tabBar\",\n          className: \"w-full h-auto\" ,}\n        )\n      })\n    ]})\n  );\n}";
+    if (initialCode) {
+      window.__DEMO_PROPS__ = currentConfig;
+      const blob = new Blob([initialCode], { type: 'application/javascript' });
+      const moduleUrl = URL.createObjectURL(blob);
+      import(moduleUrl)
+        .then((module) => {
+          currentComponent = module.default;
+          renderComponent();
+          URL.revokeObjectURL(moduleUrl);
+        })
+        .catch((err) => {
+          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+        });
+    }
+  </script>
+</body>
+</html>

@@ -101,3 +101,23 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
     workspacePath: workingDir,
   };
 }
+
+/**
+ * 读取工作区根目录的 memory.md 内容
+ * 容错：文件不存在或读取失败时返回 null
+ */
+export function readMemoryContent(workingDir: string): string | null {
+  const memoryPath = path.join(workingDir, 'memory.md');
+  try {
+    if (!fs.existsSync(memoryPath)) {
+      return null;
+    }
+    const content = fs.readFileSync(memoryPath, 'utf-8').trim();
+    if (!content) {
+      return null;
+    }
+    return content;
+  } catch {
+    return null;
+  }
+}

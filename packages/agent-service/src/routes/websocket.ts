@@ -166,11 +166,6 @@ export async function registerWebSocketRoutes(
 
               const agent = manager.getOrCreate(sessionId, config);
 
-              // v3.2: 注入静态 system prompt（L2 + L4）
-              if (message.systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
-                await (agent as any).updateSystemPrompt(message.systemPrompt);
-              }
-
               eventRouter.bindAgent(agent);
 
               if (agent.status === "initializing") {
@@ -209,6 +204,14 @@ export async function registerWebSocketRoutes(
                       : undefined,
                   });
                 }
+              }
+
+              // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
+              if (message.systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
+                logger.info({ sessionId, promptLength: message.systemPrompt.length }, 'WebSocket: calling updateSystemPrompt');
+                await (agent as any).updateSystemPrompt(message.systemPrompt);
+              } else {
+                logger.warn({ sessionId, hasPrompt: !!message.systemPrompt, hasMethod: 'updateSystemPrompt' in agent }, 'WebSocket: updateSystemPrompt NOT called');
               }
 
               sendMessage({

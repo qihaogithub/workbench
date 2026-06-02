@@ -427,7 +427,7 @@ export class PiAgentBackend implements IBackendAdapter {
       return;
     }
     this.agent.state.systemPrompt = newPrompt;
-    logger.debug({ promptLength: newPrompt.length }, 'System prompt updated');
+    logger.info({ promptLength: newPrompt.length }, 'System prompt updated via updateSystemPrompt');
   }
 
   /**

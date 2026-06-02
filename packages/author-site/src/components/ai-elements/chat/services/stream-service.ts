@@ -5,16 +5,17 @@ import {
 } from "@opencode-workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
-import { buildStaticSystemPrompt, buildDynamicContextPrefix } from "@/lib/agent/system-prompt";
+import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix } from "@/lib/agent/system-prompt";
 
 // v3.2: 静态 system prompt 缓存在 module 顶部
 const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
+console.log('[StreamService] STATIC_SYSTEM_PROMPT length:', STATIC_SYSTEM_PROMPT.length, 'contains memory.md:', STATIC_SYSTEM_PROMPT.includes('memory.md'));
 
 /**
- * 异步获取 L3 上下文前缀（通过服务端 API 避免客户端打包 fs）
- * 失败时返回空字符串（仍会发，但会让 AI 不知道页面列表）
+ * 异步获取 L3 上下文前缀和 L4 记忆内容（通过服务端 API 避免客户端打包 fs）
+ * 失败时返回空字符串（仍会发，但会让 AI 不知道页面列表/记忆）
  */
-async function fetchDynamicContextPrefix(workingDir: string): Promise<string> {
+async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; memory: string | null }> {
   try {
     const response = await fetch(
       `/api/agent/workspace-context?workingDir=${encodeURIComponent(workingDir)}`,
@@ -26,24 +27,27 @@ async function fetchDynamicContextPrefix(workingDir: string): Promise<string> {
         response.status,
         response.statusText
       );
-      return "";
+      return { l3: "", memory: null };
     }
     const json = await response.json();
     if (!json?.success || !json?.data) {
       console.warn("[StreamService] workspace-context 返回失败:", json);
-      return "";
+      return { l3: "", memory: null };
     }
     const l3 = buildDynamicContextPrefix(json.data);
+    const memory = json.data.memoryContent ? buildMemoryPrefix(json.data.memoryContent) : null;
     console.log(
       "[StreamService] L3 prefix fetched, length:",
       l3.length,
       "pageCount:",
-      json.data.pageCount
+      json.data.pageCount,
+      "memoryContent:",
+      memory ? "present" : "absent"
     );
-    return l3;
+    return { l3, memory };
   } catch (error) {
-    console.warn("[StreamService] fetchDynamicContextPrefix 失败:", error);
-    return "";
+    console.warn("[StreamService] fetchContextPrefix 失败:", error);
+    return { l3: "", memory: null };
   }
 }
 
@@ -95,6 +99,7 @@ export class StreamService {
   private handlers: StreamEventHandlers = {};
   private connectionEstablished = false;
   private keepaliveTimer: NodeJS.Timeout | null = null;
+  private hasInjectedMemory = false;
   private static readonly KEEPALIVE_INTERVAL_MS = 25000; // 每25秒发送一次ping
 
   get isActive(): boolean {
@@ -161,18 +166,23 @@ export class StreamService {
       throw new Error("Stream not connected");
     }
 
-    // v3.2: 异步获取 L3 上下文（通过服务端 API）→ 拼到 user content 前面
-    // L3 走 user message 前缀（不进 system prompt），L2 + L4 走 systemPrompt 字段
+    // v3.2: 异步获取 L3 上下文 + L4 记忆（通过服务端 API）→ 拼到 user content 前面
+    // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
+    // L4 记忆仅在首条消息注入
     let finalContent = message;
     if (workingDir) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
-      let l3 = await fetchDynamicContextPrefix(workingDir);
-      if (!l3) {
+      let ctx = await fetchContextPrefix(workingDir);
+      if (!ctx.l3 && !ctx.memory) {
         await new Promise((r) => setTimeout(r, 200));
-        l3 = await fetchDynamicContextPrefix(workingDir);
+        ctx = await fetchContextPrefix(workingDir);
       }
-      if (l3) {
-        finalContent = `${l3}${message}`;
+      if (ctx.l3) {
+        const memoryPrefix = (!this.hasInjectedMemory && ctx.memory) ? ctx.memory : '';
+        if (memoryPrefix) {
+          this.hasInjectedMemory = true;
+        }
+        finalContent = `${ctx.l3}${memoryPrefix}${message}`;
       } else {
         console.warn(
           "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态"
@@ -222,6 +232,7 @@ export class StreamService {
       this.stream = null;
       this.currentSessionId = "";
       this.connectionEstablished = false;
+      this.hasInjectedMemory = false;
     }
   }
 
