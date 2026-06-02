@@ -18,6 +18,14 @@
       "parentId": null,
       "createdAt": 1779608460380,
       "updatedAt": 1780045436071
+    },
+    {
+      "id": "demo_1780376271257_t4yvgo",
+      "name": "从Figma导入的页面",
+      "order": 3,
+      "parentId": null,
+      "createdAt": 1780376271257,
+      "updatedAt": 1780377219600
     }
   ],
   "demoFolders": [],
@@ -85,10 +93,26 @@
       "sessionId": "session-1780072052941-69d7yx13q",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v8",
       "fileCount": 6
+    },
+    {
+      "versionId": "v9",
+      "savedAt": 1780376775516,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780376184185-3a2055yuy",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v9",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v10",
+      "savedAt": 1780377219639,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780376784848-53arzf98h",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v10",
+      "fileCount": 8
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780072538131,
+  "updatedAt": 1780377219640,
   "publishedVersion": "v7",
   "publishedAt": 1780072530331
 }
