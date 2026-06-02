@@ -345,7 +345,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activePageId, setActivePageId] = useState<string>("");
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
   const [gridScale, setGridScale] = useState(1);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -559,8 +559,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       <Header
         name={project.name}
         onBack={() => router.push("/")}
-        previewMode={previewMode}
-        onPreviewModeChange={setPreviewMode}
       />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project.demoPages.length > 1 && (
@@ -596,13 +594,34 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
         <div className="flex-1 min-w-0 overflow-hidden">
           {previewMode === "single" ? (
-            <div
-              className="h-full overflow-y-auto"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              <style>{`
-                .preview-single-scroll::-webkit-scrollbar { display: none; }
-              `}</style>
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    单页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("grid")}
+                    className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    宫格
+                  </button>
+                </div>
+                <div className="flex-1" />
+              </div>
+              <div
+                className="flex-1 overflow-y-auto"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                <style>{`
+                  .preview-single-scroll::-webkit-scrollbar { display: none; }
+                `}</style>
               {activePage && (
                 <PreviewPanel
                   compiledJsUrl={compiledUrl}
@@ -615,6 +634,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             <PreviewGrid
               demoPages={gridPages}
               activePageId={activePageId}
+              showModeToggle
+              onPreviewModeChange={setPreviewMode}
               gridColumns={gridColumns}
               gridScale={gridScale}
               onGridScaleChange={setGridScale}
@@ -747,17 +768,7 @@ function TreeList({
   );
 }
 
-function Header({
-  name,
-  onBack,
-  previewMode,
-  onPreviewModeChange,
-}: {
-  name: string;
-  onBack: () => void;
-  previewMode?: PreviewMode;
-  onPreviewModeChange?: (mode: PreviewMode) => void;
-}) {
+function Header({ name, onBack }: { name: string; onBack: () => void }) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
       <button
@@ -768,32 +779,6 @@ function Header({
         <span className="text-sm">返回</span>
       </button>
       {name && <h1 className="text-sm font-semibold">{name}</h1>}
-      {previewMode && onPreviewModeChange && (
-        <div className="ml-auto flex items-center gap-1 rounded-md border border-border p-0.5">
-          <button
-            onClick={() => onPreviewModeChange("single")}
-            className={`inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs transition-colors ${
-              previewMode === "single"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            单页
-          </button>
-          <button
-            onClick={() => onPreviewModeChange("grid")}
-            className={`inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs transition-colors ${
-              previewMode === "grid"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            宫格
-          </button>
-        </div>
-      )}
     </header>
   );
 }

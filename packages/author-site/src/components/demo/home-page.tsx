@@ -86,41 +86,65 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="container flex h-14 items-center px-4 gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center px-4">
+          {/* 左侧品牌标识 */}
+          <div className="flex items-center gap-2 mr-8">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-sm">
+              <span className="text-sm font-bold text-primary-foreground">
+                UI
+              </span>
+            </div>
+            <span className="text-lg font-semibold tracking-tight">
+              Demo Studio
+            </span>
+          </div>
+
+          {/* 搜索框 - 居中 */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="搜索 Demo..."
+              placeholder="搜索项目..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-ring"
+              className="pl-9 pr-4 h-10 bg-muted/50 border-0 rounded-lg focus-visible:ring-2 focus-visible:ring-ring transition-all"
             />
           </div>
-          <Button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            新建 Demo
-          </Button>
-          <SettingsButton />
+
+          {/* 右侧操作区 */}
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              size="sm"
+              className="gap-2 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              添加项目
+            </Button>
+            <SettingsButton />
+          </div>
         </div>
       </header>
 
-      <main className="container py-6 px-4 space-y-8">
+      <main className="container py-8 px-4 space-y-8">
         {filteredDemos.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Plus className="h-8 w-8 text-muted-foreground" />
+            </div>
             <div className="text-muted-foreground text-lg">
-              {searchQuery ? "没有找到匹配的 Demo" : "暂无 Demo"}
+              {searchQuery ? "没有找到匹配的项目" : "暂无项目"}
+            </div>
+            <div className="text-muted-foreground/70 text-sm mt-1">
+              {searchQuery ? "尝试其他关键词" : "点击「添加项目」开始创建"}
             </div>
             {!searchQuery && (
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
-                className="mt-4"
+                className="mt-6 gap-2"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                创建第一个 Demo
+                <Plus className="h-4 w-4" />
+                创建第一个项目
               </Button>
             )}
           </div>

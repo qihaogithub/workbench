@@ -12,7 +12,7 @@ const subjects = [
   { key: 'yingyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/英语.png', bgClass: 'bg-[#fff0f3]' },
 ];
 
-export default function PadSquare(props: DemoProps) {
+export default function PhoneSquare(props: DemoProps) {
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
     bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
@@ -30,7 +30,7 @@ export default function PadSquare(props: DemoProps) {
       className="w-full min-h-screen bg-white flex flex-col overflow-hidden"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        maxWidth: 768,
+        maxWidth: 375,
         margin: '0 auto',
       }}
     >
@@ -47,10 +47,9 @@ export default function PadSquare(props: DemoProps) {
       {/* 顶部状态栏和 Logo */}
       <div className="w-full flex-shrink-0">
         <img
-          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png"
+          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏.png"
           alt="status"
-          className="w-full object-cover"
-          style={{ height: 88 }}
+          className="w-full h-auto"
         />
         <div className="flex items-center justify-between h-11 px-5">
           <img
@@ -69,7 +68,7 @@ export default function PadSquare(props: DemoProps) {
       {/* 内容区 */}
       <div className="flex-1 flex flex-col items-center overflow-y-auto">
         {/* 科目图标 */}
-        <div className="flex items-center justify-between px-10 gap-[11px] mt-4 w-full">
+        <div className="flex items-center justify-between px-5 gap-[11px] mt-4 w-full">
           {subjects.map((s) => (
             <div
               key={s.key}
@@ -80,18 +79,19 @@ export default function PadSquare(props: DemoProps) {
           ))}
         </div>
 
-        {/* 大Banner - 居中裁剪 */}
-        <div className="w-full px-10 mt-4">
-          <div className="relative w-full overflow-hidden rounded-2xl aspect-[335/192]">
-            {/* 背景图 - 居中裁剪 */}
+        {/* 大Banner - 使用配置的图片原始尺寸 */}
+        <div className="w-[335px] mt-4">
+          <div className="relative w-full overflow-hidden">
+            {/* 背景图 - 根据前景图比例自动适应 */}
             <img
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="absolute w-full bottom-0 left-1/2 -translate-x-1/2 rounded-2xl object-cover"
               src={bigBannerBackground}
               alt="banner-bg"
+              style={{ height: '89.583%' }}
             />
-            {/* 前景图 - 居中裁剪 */}
+            {/* 前景图 */}
             <img
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="relative w-full h-auto object-cover"
               src={bigBannerForeground}
               alt="banner-fg"
             />
@@ -99,14 +99,14 @@ export default function PadSquare(props: DemoProps) {
         </div>
 
         {/* 小Banner滚动区 */}
-        <div className="w-full pl-10 mt-5 overflow-x-auto hide-scrollbar">
+        <div className="w-full pl-4 mt-4 overflow-x-auto hide-scrollbar">
           <div className="flex gap-2">
             {miniBanners.map((url, i) => (
               <img
                 key={i}
                 src={url}
                 alt={`mini-banner-${i + 1}`}
-                className="h-[137px] w-auto flex-shrink-0"
+                className="h-[91px] w-auto flex-shrink-0"
               />
             ))}
           </div>
@@ -116,10 +116,9 @@ export default function PadSquare(props: DemoProps) {
       {/* 底部标签栏 */}
       <div className="w-full flex-shrink-0">
         <img
-          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏_pad.png"
+          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏.png"
           alt="tabBar"
-          className="w-full object-cover"
-          style={{ height: 90 }}
+          className="w-full h-auto"
         />
       </div>
     </div>

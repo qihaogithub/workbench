@@ -49,8 +49,7 @@ export default function PadSquare(props: DemoProps) {
         <img
           src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png"
           alt="status"
-          className="w-full object-cover"
-          style={{ height: 88 }}
+          className="w-full h-auto"
         />
         <div className="flex items-center justify-between h-11 px-5">
           <img
@@ -80,18 +79,19 @@ export default function PadSquare(props: DemoProps) {
           ))}
         </div>
 
-        {/* 大Banner - 居中裁剪 */}
+        {/* 大Banner - 使用配置的图片原始尺寸 */}
         <div className="w-full px-10 mt-4">
-          <div className="relative w-full overflow-hidden rounded-2xl aspect-[335/192]">
-            {/* 背景图 - 居中裁剪 */}
+          <div className="relative w-full overflow-hidden rounded-2xl">
+            {/* 背景图 - 根据前景图比例自动适应 */}
             <img
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="absolute w-full bottom-0 left-1/2 -translate-x-1/2 object-cover"
               src={bigBannerBackground}
               alt="banner-bg"
+              style={{ height: '89.583%' }}
             />
-            {/* 前景图 - 居中裁剪 */}
+            {/* 前景图 */}
             <img
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="relative w-full h-auto object-cover"
               src={bigBannerForeground}
               alt="banner-fg"
             />
@@ -118,8 +118,7 @@ export default function PadSquare(props: DemoProps) {
         <img
           src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏_pad.png"
           alt="tabBar"
-          className="w-full object-cover"
-          style={{ height: 90 }}
+          className="w-full h-auto"
         />
       </div>
     </div>
