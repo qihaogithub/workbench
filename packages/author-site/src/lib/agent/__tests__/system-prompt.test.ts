@@ -50,27 +50,21 @@ describe('buildDynamicContextPrefix', () => {
     projectConfigStatus: '已设置',
     workspacePath: '/tmp/workspace',
     pageCount: 2,
-    pageList: '1. **首页** (`demos/home/`)\n2. **关于** (`demos/about/`)',
+    pageList: '- 首页 — `demos/home/`\n- 关于 — `demos/about/`',
   };
 
-  it('渲染所有 5 个占位符', () => {
+  it('仅渲染页面列表，不包含冗余的项目元信息', () => {
     const out = buildDynamicContextPrefix(baseContext);
-    expect(out).toContain('MyProject');
-    expect(out).toContain('已设置');
-    expect(out).toContain('/tmp/workspace');
-    expect(out).toContain('2');
     expect(out).toContain('首页');
     expect(out).toContain('关于');
-  });
-
-  it('返回内容以 [系统自动注入] 标记开头便于 LLM 识别', () => {
-    const out = buildDynamicContextPrefix(baseContext);
-    expect(out).toMatch(/^\[系统自动注入的工作空间状态/);
-  });
-
-  it('包含"不要 listFiles"提示以避免 AI 重复查询', () => {
-    const out = buildDynamicContextPrefix(baseContext);
-    expect(out).toContain('无需 listFiles');
+    expect(out).toContain('demos/home/');
+    expect(out).toContain('demos/about/');
+    // 不应包含项目名/工作空间路径/项目配置/页面数量（避免冗余干扰 AI）
+    expect(out).not.toContain('MyProject');
+    expect(out).not.toContain('/tmp/workspace');
+    expect(out).not.toContain('已设置');
+    expect(out).not.toContain('项目配置');
+    expect(out).not.toContain('页面数量');
   });
 
   it('无页面时显示（暂无页面）', () => {
@@ -78,8 +72,8 @@ describe('buildDynamicContextPrefix', () => {
     expect(out).toContain('暂无页面');
   });
 
-  it('未设置项目配置时正确渲染', () => {
-    const out = buildDynamicContextPrefix({ ...baseContext, projectConfigStatus: '未设置' });
-    expect(out).toContain('未设置');
+  it('L3 前缀以"当前工作空间中的页面"开头便于 LLM 识别', () => {
+    const out = buildDynamicContextPrefix(baseContext);
+    expect(out).toMatch(/^当前工作空间中的页面/);
   });
 });

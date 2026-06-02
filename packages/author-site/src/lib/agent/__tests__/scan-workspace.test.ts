@@ -64,14 +64,64 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.pageList).toBe('（暂无页面）');
   });
 
-  it('页面列表按顺序编号', () => {
+  it('页面列表展示每个页面的 index.tsx 和 config.schema.json 路径', () => {
     const demosDir = path.join(tmpDir, 'demos');
     fs.mkdirSync(path.join(demosDir, 'a'), { recursive: true });
     fs.mkdirSync(path.join(demosDir, 'b'), { recursive: true });
-    fs.mkdirSync(path.join(demosDir, 'c'), { recursive: true });
     const ctx = scanWorkspaceContext(tmpDir);
-    expect(ctx.pageList).toMatch(/^1\./);
-    expect(ctx.pageList).toMatch(/2\./);
-    expect(ctx.pageList).toMatch(/3\./);
+    expect(ctx.pageList).toMatch(/^- a$/m);
+    expect(ctx.pageList).toMatch(/demos\/a\/index\.tsx/);
+    expect(ctx.pageList).toMatch(/demos\/a\/config\.schema\.json/);
+    expect(ctx.pageList).toMatch(/^- b$/m);
+    expect(ctx.pageList).toMatch(/demos\/b\/index\.tsx/);
+  });
+
+  it('每个页面列出 index.tsx 和 config.schema.json 精确路径', () => {
+    const pageDir = path.join(tmpDir, 'demos', 'home');
+    fs.mkdirSync(pageDir, { recursive: true });
+    fs.writeFileSync(path.join(pageDir, 'index.tsx'), '// code');
+    fs.writeFileSync(path.join(pageDir, 'config.schema.json'), '{}');
+    const ctx = scanWorkspaceContext(tmpDir);
+    expect(ctx.pageList).toContain('demos/home/index.tsx');
+    expect(ctx.pageList).toContain('demos/home/config.schema.json');
+  });
+
+  it('页面数 ≤ 2 时，pageList 包含 index.tsx 和 config.schema.json 的文件内容', () => {
+    const demosDir = path.join(tmpDir, 'demos');
+    const aDir = path.join(demosDir, 'a');
+    fs.mkdirSync(aDir, { recursive: true });
+    fs.writeFileSync(path.join(aDir, 'index.tsx'), 'export default function A() { return <div>A</div>; }');
+    fs.writeFileSync(path.join(aDir, 'config.schema.json'), '{"type":"object"}');
+    const ctx = scanWorkspaceContext(tmpDir);
+    expect(ctx.pageList).toContain('export default function A()');
+    expect(ctx.pageList).toContain('"type":"object"');
+  });
+
+  it('页面数 > 2 时，pageList 不包含文件内容（避免 L3 过大）', () => {
+    const demosDir = path.join(tmpDir, 'demos');
+    for (const id of ['a', 'b', 'c']) {
+      const dir = path.join(demosDir, id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'index.tsx'), `// code for ${id}`);
+      fs.writeFileSync(path.join(dir, 'config.schema.json'), `{"id":"${id}"}`);
+    }
+    const ctx = scanWorkspaceContext(tmpDir);
+    expect(ctx.pageList).not.toContain('// code for a');
+    expect(ctx.pageList).not.toContain('// code for b');
+    expect(ctx.pageList).not.toContain('// code for c');
+    expect(ctx.pageList).toContain('demos/a/index.tsx');
+    expect(ctx.pageList).toContain('demos/c/config.schema.json');
+  });
+
+  it('页面数恰好为 2 时仍嵌入文件内容', () => {
+    const demosDir = path.join(tmpDir, 'demos');
+    for (const id of ['x', 'y']) {
+      const dir = path.join(demosDir, id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'index.tsx'), `// ${id}-code`);
+    }
+    const ctx = scanWorkspaceContext(tmpDir);
+    expect(ctx.pageList).toContain('// x-code');
+    expect(ctx.pageList).toContain('// y-code');
   });
 });
