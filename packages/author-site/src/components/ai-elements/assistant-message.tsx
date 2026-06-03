@@ -18,6 +18,8 @@ import {
   Wrench,
   ChevronDown,
   Sparkles,
+  RotateCcw,
+  Undo2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -25,6 +27,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
+import { CodeBlockFolder } from "./collapsible-code-block";
 import { type MessagePart } from "./message";
 
 interface AssistantMessageProps {
@@ -47,6 +50,10 @@ interface AssistantMessageProps {
   parts?: MessagePart[];
   isStreaming?: boolean;
   className?: string;
+  messageId?: string;
+  hasFileChanges?: boolean;
+  onRegenerate?: (targetAssistantId: string) => void;
+  onRollback?: (targetAssistantId: string) => void;
 }
 
 function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
@@ -142,6 +149,10 @@ export function AssistantMessage({
   parts,
   isStreaming = false,
   className,
+  messageId,
+  hasFileChanges = false,
+  onRegenerate,
+  onRollback,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
 
@@ -335,7 +346,7 @@ export function AssistantMessage({
                         streaming && "animate-pulse",
                       )}
                     />
-                    <span className="text-[11px] text-muted-foreground/60 truncate">
+                    <span className="text-xs text-muted-foreground/60 truncate">
                       {streaming
                         ? "思考中..."
                         : duration
@@ -370,20 +381,23 @@ export function AssistantMessage({
         }
 
         if (block.type === "text") {
+          const isLastText = index === renderBlocks.length - 1;
           return (
-            <div
+            <CodeBlockFolder
               key={`text-${index}`}
-              className="prose prose-sm dark:prose-invert max-w-none min-w-0 text-[14px]"
+              isStreaming={isStreaming && isLastText}
             >
-              <Streamdown
-                plugins={{ code, mermaid, math, cjk }}
-                isAnimating={isStreaming && index === renderBlocks.length - 1}
-                caret="block"
-                controls={{ table: false, code: true, mermaid: true }}
-              >
-                {block.content}
-              </Streamdown>
-            </div>
+              <div className="prose prose-sm dark:prose-invert max-w-none min-w-0 text-[14px]">
+                <Streamdown
+                  plugins={{ code, mermaid, math, cjk }}
+                  isAnimating={isStreaming && isLastText}
+                  caret="block"
+                  controls={{ table: false, code: true, mermaid: true }}
+                >
+                  {block.content}
+                </Streamdown>
+              </div>
+            </CodeBlockFolder>
           );
         }
 
@@ -451,25 +465,48 @@ export function AssistantMessage({
       })}
 
       {isStreaming && renderBlocks.length > 0 && (
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 py-0.5">
-          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-          <span>AI 工作中...</span>
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5">
+          <span className="inline-flex items-center gap-0.5">
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+          </span>
+          <span>AI 工作中</span>
         </div>
       )}
 
       {allTextContent && (
-        <div className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-10 bg-background/80 backdrop-blur rounded p-1 shadow-sm">
+        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded transition-colors"
+            disabled={isStreaming}
+            className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
+            title="复制"
           >
             {copied ? (
-              <Check className="h-3 w-3 text-green-500" />
+              <Check className="h-3.5 w-3.5 text-green-500" />
             ) : (
-              <Copy className="h-3 w-3" />
+              <Copy className="h-3.5 w-3.5" />
             )}
-            {copied ? "已复制" : "复制"}
           </button>
+          {!isStreaming && onRegenerate && messageId && (
+            <button
+              onClick={() => onRegenerate(messageId)}
+              className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
+              title="重新生成"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {!isStreaming && hasFileChanges && onRollback && messageId && (
+            <button
+              onClick={() => onRollback(messageId)}
+              className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
+              title="回撤"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -493,7 +530,7 @@ function ToolCallGroup({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1 py-0.5 text-[11px] transition-colors select-none min-w-0 group/tool">
+      <CollapsibleTrigger className="flex w-full items-center gap-1 py-1.5 text-xs transition-colors select-none min-w-0 group/tool">
         <Icon className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
         <span className="text-muted-foreground/60 truncate">
           {label} ({count} 个)
@@ -567,7 +604,7 @@ function ExecutionPhase({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-0.5 text-[11px] transition-colors select-none min-w-0 group/phase">
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-1.5 text-xs transition-colors select-none min-w-0 group/phase">
         <Wrench className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
         <span className="text-muted-foreground/60 truncate">
           执行过程（{summaryParts.join("、")}）
@@ -583,7 +620,7 @@ function ExecutionPhase({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5">
+        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto">
           {parts.map((part, i) => {
             if (part.type === "reasoning") {
               return (

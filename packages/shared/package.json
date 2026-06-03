@@ -7,8 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./demo": "./src/demo/index.ts",
-    "./demo/iframe-template": "./src/demo/iframe-template.ts",
-    "./agent-prompts": "./src/agent-prompts/index.ts"
+    "./demo/iframe-template": "./src/demo/iframe-template.ts"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

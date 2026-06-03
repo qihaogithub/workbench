@@ -1,7 +1,6 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { ScrollArea as ScrollAreaPrimitive } from '@/components/ui/scroll-area'
 import * as React from 'react'
 
 const Conversation = React.forwardRef<
@@ -17,17 +16,15 @@ const Conversation = React.forwardRef<
 Conversation.displayName = 'Conversation'
 
 const ConversationContent = React.forwardRef<
-  React.ComponentRef<typeof ScrollAreaPrimitive>,
-  React.ComponentProps<typeof ScrollAreaPrimitive>
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className, children, ...props }, ref) => (
-  <div className="flex-1 min-h-0 overflow-hidden">
-    <ScrollAreaPrimitive
-      ref={ref}
-      className={cn('h-full', className)}
-      {...props}
-    >
-      <div className="flex flex-col gap-4 p-4 max-w-full min-w-0">{children}</div>
-    </ScrollAreaPrimitive>
+  <div
+    ref={ref}
+    className={cn('flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin', className)}
+    {...props}
+  >
+    <div className="flex flex-col gap-4 p-4 max-w-full min-w-0">{children}</div>
   </div>
 ))
 ConversationContent.displayName = 'ConversationContent'

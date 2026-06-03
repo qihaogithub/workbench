@@ -17,7 +17,7 @@ import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
 import type { PermissionRequest } from "./chat/services/stream-service";
-import { X, FileText } from "lucide-react";
+import { X, FileText, ArrowDown } from "lucide-react";
 
 interface AIChatProps {
   sessionId: string;
@@ -121,6 +121,9 @@ export function AIChat({
     memoryFilePathsRef,
     handleSend,
     handleCancel,
+    handleRegenerate,
+    handleRollback,
+    handleEditResend,
     handlePermissionResponse,
     handlePermissionCancel,
   } = useChatStream({
@@ -152,15 +155,35 @@ export function AIChat({
     }
   }, [isStreaming, memoryFilePathsRef]);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
   const handleSendRef = useRef(handleSend);
   handleSendRef.current = handleSend;
   const onTriggerAutoSendHandledRef = useRef(onTriggerAutoSendHandled);
   onTriggerAutoSendHandledRef.current = onTriggerAutoSendHandled;
 
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const threshold = 100;
+    const isNearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    setIsUserScrolling(!isNearBottom);
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamContent]);
+    if (isUserScrolling) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, streamContent, isUserScrolling]);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setIsUserScrolling(false);
+  }, []);
 
   const handleCancelStream = useCallback(() => {
     handleCancel(streamContent, currentMessage);
@@ -184,12 +207,19 @@ export function AIChat({
   return (
     <div className="flex flex-col h-full">
       <Conversation className="flex-1 min-h-0">
-        <ConversationContent>
+        <ConversationContent ref={scrollContainerRef} onScroll={handleScroll}>
           <ChatMessages
             messages={messages}
             currentMessage={currentMessage}
             isStreaming={isStreaming}
-            messagesEndRef={messagesEndRef}
+            isUserScrolling={isUserScrolling}
+            onScrollToBottom={scrollToBottom}
+            onRegenerate={handleRegenerate}
+            onRollback={handleRollback}
+            onEditResend={handleEditResend}
+            messagesRef={messagesRef}
+            setMessages={setMessages}
+            handleSend={handleSend}
           />
         </ConversationContent>
       </Conversation>

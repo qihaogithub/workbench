@@ -1,26 +1,58 @@
 "use client";
 
-import { type RefObject, useEffect, useRef } from "react";
+import { useRef } from "react";
 import {
   Message,
   AssistantMessage,
   type ChatMessage,
 } from "@/components/ai-elements";
-import { Bot } from "lucide-react";
+import { Bot, ArrowDown } from "lucide-react";
+
+function hasFileChanges(msg: ChatMessage): boolean {
+  if (msg.files && msg.files.length > 0) return true;
+  const parts = msg.parts;
+  if (!parts || parts.length === 0) return false;
+  return parts.some(
+    (p) =>
+      p.type === "tool" &&
+      (p.toolName?.toLowerCase().includes("write") ||
+        p.toolName?.toLowerCase().includes("edit") ||
+        p.toolName?.toLowerCase().includes("create") ||
+        p.toolName?.toLowerCase().includes("delete") ||
+        p.toolName?.toLowerCase().includes("bash") ||
+        p.toolName?.toLowerCase().includes("exec")),
+  );
+}
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
   currentMessage: ChatMessage;
   isStreaming: boolean;
-  messagesEndRef: RefObject<HTMLDivElement>;
+  isUserScrolling: boolean;
+  onScrollToBottom: () => void;
+  onRegenerate: (targetAssistantId: string) => void;
+  onRollback: (targetAssistantId: string) => void;
+  onEditResend: (targetMessageId: string, newContent: string) => void;
+  messagesRef: React.MutableRefObject<ChatMessage[]>;
+  setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+  handleSend: (content: string) => void;
 }
 
 export function ChatMessages({
   messages,
   currentMessage,
   isStreaming,
-  messagesEndRef,
+  isUserScrolling,
+  onScrollToBottom,
+  onRegenerate,
+  onRollback,
+  onEditResend,
+  messagesRef,
+  setMessages,
+  handleSend,
 }: ChatMessagesProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   if (messages.length === 0 && !isStreaming) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
@@ -55,7 +87,17 @@ export function ChatMessages({
     <>
       {messages.map((msg) => {
         if (msg.role === "user") {
-          return <Message key={msg.id} message={msg} />;
+          return (
+            <Message
+              key={msg.id}
+              message={msg}
+              isStreaming={isStreaming}
+              onEditResend={onEditResend}
+              allMessages={messages}
+              setMessages={setMessages}
+              handleSend={handleSend}
+            />
+          );
         }
         return (
           <AssistantMessage
@@ -64,6 +106,11 @@ export function ChatMessages({
             reasonings={msg.reasonings}
             tools={msg.tools}
             parts={msg.parts}
+            messageId={msg.id}
+            hasFileChanges={hasFileChanges(msg)}
+            isStreaming={isStreaming}
+            onRegenerate={onRegenerate}
+            onRollback={onRollback}
           />
         );
       })}
@@ -76,6 +123,18 @@ export function ChatMessages({
           parts={currentMessage.parts}
           isStreaming={true}
         />
+      )}
+
+      {isUserScrolling && isStreaming && (
+        <div className="sticky bottom-0 flex justify-center pb-2">
+          <button
+            onClick={onScrollToBottom}
+            className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full shadow-lg text-sm flex items-center gap-1.5 z-10 hover:bg-primary/90 transition-colors"
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+            回到底部
+          </button>
+        </div>
       )}
 
       <div ref={messagesEndRef} />

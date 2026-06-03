@@ -7,6 +7,7 @@ import { snapshotService } from '../session/snapshot-service';
 import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig } from '../core/types';
+import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
 
 interface SessionParams {
@@ -281,14 +282,97 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       const { sessionId } = request.params;
       const { files } = request.body || {};
 
-      return reply.send({
-        success: true,
-        data: {
-          sessionId,
-          rolledBack: files || [],
-        },
-      });
-    }
+      try {
+        const session = sessionStore.get(sessionId);
+        if (!session) {
+          return reply.code(404).send({
+            success: false,
+            error: {
+              code: 'SESSION_NOT_FOUND',
+              message: `Session ${sessionId} 不存在`,
+            },
+          });
+        }
+
+        if (!session.workingDir) {
+          return reply.code(400).send({
+            success: false,
+            error: {
+              code: 'INVALID_PARAMS',
+              message: 'Session 没有绑定工作空间',
+            },
+          });
+        }
+
+        const workingDir = session.workingDir;
+
+        if (files && files.length > 0) {
+          // 指定文件回撤
+          const rolledBack: string[] = [];
+          const failed: string[] = [];
+          for (const file of files) {
+            try {
+              const result = await snapshotService.compare(workingDir);
+              const fileChange = [...result.staged, ...result.unstaged].find(
+                (f) => f.path === file,
+              );
+              if (fileChange) {
+                await snapshotService.discardFile(
+                  workingDir,
+                  file,
+                  fileChange.operation,
+                );
+                rolledBack.push(file);
+              }
+            } catch {
+              failed.push(file);
+            }
+          }
+          return reply.send({
+            success: true,
+            data: { sessionId, rolledBack, failed },
+          });
+        }
+
+        // 全量回撤：恢复所有修改过的文件
+        const result = await snapshotService.compare(workingDir);
+        const allChanged = [...result.staged, ...result.unstaged];
+        const rolledBack: string[] = [];
+        const failed: string[] = [];
+
+        for (const fileChange of allChanged) {
+          try {
+            await snapshotService.discardFile(
+              workingDir,
+              fileChange.path,
+              fileChange.operation,
+            );
+            rolledBack.push(fileChange.path);
+          } catch (error) {
+            logger.error({ error, filePath: fileChange.path }, 'Rollback discard failed');
+            failed.push(fileChange.path);
+          }
+        }
+
+        // 回撤后重新初始化快照
+        snapshotService.clearSnapshot(workingDir);
+        await snapshotService.init(workingDir);
+
+        return reply.send({
+          success: true,
+          data: { sessionId, rolledBack, failed },
+        });
+      } catch (error) {
+        logger.error({ error, sessionId }, 'Rollback failed');
+        return reply.code(500).send({
+          success: false,
+          error: {
+            code: 'ROLLBACK_ERROR',
+            message: error instanceof Error ? error.message : '回撤失败',
+          },
+        });
+      }
+    },
   );
 
   fastify.get<{ Params: SessionParams }>(

@@ -10,8 +10,10 @@ import {
   RotateCcw,
   ThumbsUp,
   ThumbsDown,
+  Pencil,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Streamdown } from "streamdown";
 import { Tool } from "./tool";
@@ -98,15 +100,38 @@ interface MessageProps {
   message: ChatMessage;
   className?: string;
   isStreaming?: boolean;
+  onEditResend?: (targetMessageId: string, newContent: string) => void;
+  allMessages?: ChatMessage[];
+  setMessages?: (
+    updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+  ) => void;
+  handleSend?: (content: string) => void;
 }
 
 export function Message({
   message,
   className,
   isStreaming = false,
+  onEditResend,
+  allMessages,
+  setMessages,
+  handleSend,
 }: MessageProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(
+        textareaRef.current.value.length,
+        textareaRef.current.value.length,
+      );
+    }
+  }, [editing]);
 
   const handleCopy = async () => {
     if (message.content) {
@@ -118,13 +143,96 @@ export function Message({
 
   // 用户消息使用气泡样式
   if (isUser) {
+    if (editing) {
+      return (
+        <div
+          className={cn(
+            "flex flex-col gap-2 items-end min-w-0",
+            className,
+          )}
+        >
+          <div className="w-full max-w-[80%] rounded-2xl rounded-tr-sm border border-border bg-muted">
+            <textarea
+              ref={textareaRef}
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="w-full rounded-2xl rounded-tr-sm bg-transparent px-4 py-2.5 text-sm text-foreground resize-none outline-none min-h-[60px]"
+              rows={3}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setEditing(false);
+                  setEditContent(message.content);
+                }
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  if (
+                    onEditResend &&
+                    message.id &&
+                    editContent.trim() &&
+                    editContent !== message.content
+                  ) {
+                    onEditResend(message.id, editContent);
+                    setEditing(false);
+                  } else {
+                    setEditing(false);
+                  }
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-t border-border/50">
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setEditContent(message.content);
+                }}
+                className="px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground rounded transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (
+                    onEditResend &&
+                    message.id &&
+                    editContent.trim() &&
+                    editContent !== message.content
+                  ) {
+                    onEditResend(message.id, editContent);
+                  }
+                  setEditing(false);
+                }}
+                disabled={
+                  !editContent.trim() || editContent === message.content
+                }
+                className="px-2.5 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                发送
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className={cn("flex flex-col gap-3 group items-end min-w-0", className)}>
+      <div className={cn("flex flex-col gap-2 group items-end min-w-0", className)}>
         {message.content && (
-          <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50">
+          <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
             <div className="whitespace-pre-wrap break-words">
               {message.content}
             </div>
+            {!isStreaming && onEditResend && message.id && (
+              <button
+                onClick={() => {
+                  setEditContent(message.content);
+                  setEditing(true);
+                }}
+                className="absolute -top-2 -left-2 p-1 rounded-full bg-background border border-border opacity-0 group-hover/user-msg:opacity-100 transition-opacity hover:bg-muted"
+                title="编辑"
+              >
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -594,6 +594,80 @@ export function useChatStream(options: UseChatStreamOptions) {
     ],
   );
 
+  const handleRegenerate = useCallback(
+    (targetAssistantId: string) => {
+      const msgs = messagesRef.current;
+      const targetIndex = msgs.findIndex((m) => m.id === targetAssistantId);
+      if (targetIndex < 1) return;
+
+      const userMsg = msgs
+        .slice(0, targetIndex)
+        .reverse()
+        .find((m) => m.role === "user");
+      if (!userMsg) return;
+
+      const truncated = msgs.slice(0, targetIndex);
+      setMessages(truncated);
+      persistMessages(sessionId, truncated);
+
+      const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
+      const images: ImageAttachment[] | undefined = imageParts.length > 0
+        ? imageParts.map((p) => {
+            if (p.type !== "image") return undefined;
+            const match = p.url.match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+              return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
+            }
+            return undefined;
+          }).filter((img): img is ImageAttachment => img !== undefined)
+        : undefined;
+
+      handleSend(userMsg.content, images);
+    },
+    [messagesRef, setMessages, sessionId, handleSend],
+  );
+
+  const handleRollback = useCallback(
+    async (targetAssistantId: string) => {
+      const msgs = messagesRef.current;
+      const targetIndex = msgs.findIndex((m) => m.id === targetAssistantId);
+      if (targetIndex < 1) return;
+
+      try {
+        await fetch(`/api/agent/${agentSessionId}/rollback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assistantMessageId: targetAssistantId }),
+        });
+        onSnapshotReady?.();
+      } catch (e) {
+        console.warn("[Rollback] File rollback failed:", e);
+      }
+
+      const truncated = msgs.slice(0, targetIndex);
+      setMessages(truncated);
+      await persistMessages(sessionId, truncated);
+    },
+    [messagesRef, setMessages, sessionId, agentSessionId, onSnapshotReady],
+  );
+
+  const handleEditResend = useCallback(
+    (targetMessageId: string, newContent: string) => {
+      if (!newContent.trim()) return;
+
+      const msgs = messagesRef.current;
+      const msgIndex = msgs.findIndex((m) => m.id === targetMessageId);
+      if (msgIndex < 0) return;
+
+      const truncated = msgs.slice(0, msgIndex);
+      setMessages(truncated);
+      persistMessages(sessionId, truncated);
+
+      handleSend(newContent);
+    },
+    [messagesRef, setMessages, sessionId, handleSend],
+  );
+
   return {
     plan,
     setPlan,
@@ -602,6 +676,9 @@ export function useChatStream(options: UseChatStreamOptions) {
     memoryFilePathsRef,
     handleSend,
     handleCancel,
+    handleRegenerate,
+    handleRollback,
+    handleEditResend,
     handlePermissionResponse,
     handlePermissionCancel,
   };

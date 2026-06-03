@@ -1,126 +1,124 @@
 interface DemoProps {
   bigBannerForeground?: string;
-  bigBannerBackground?: string;
-  miniBanners?: string[];
 }
-
-const subjects = [
-  { key: 'yuedu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/阅读.png', bgClass: 'bg-[#fff2ea]' },
-  { key: 'yizhi', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/益智.png', bgClass: 'bg-[#eaf9ff]' },
-  { key: 'meiyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/美育.png', bgClass: 'bg-[#f9f5ff]' },
-  { key: 'xiezuo', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/写作.png', bgClass: 'bg-[#eefceb]' },
-  { key: 'yingyu', icon: 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/科目图标/英语.png', bgClass: 'bg-[#fff0f3]' },
-];
 
 export default function PadSquare(props: DemoProps) {
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
-    bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
-    miniBanners = [
-      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png',
-      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png',
-      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png',
-      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png',
-      'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png',
-    ],
   } = props;
 
   return (
     <div
-      className="w-full min-h-screen bg-white flex flex-col overflow-hidden"
+      className="w-[1024px] h-[768px] relative bg-white overflow-hidden"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        maxWidth: 1024,
-        margin: '0 auto',
       }}
     >
       <style>{`
-        .hide-scrollbar {
+        .figma-scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
-        .hide-scrollbar::-webkit-scrollbar {
+        .figma-scrollbar-hide::-webkit-scrollbar {
           display: none;
+          width: 0;
+          height: 0;
         }
       `}</style>
 
-      {/* 顶部状态栏和 Logo */}
-      <div className="w-full flex-shrink-0">
+      {/* 顶部状态栏 */}
+      <img
+        src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_569f7368.png"
+        alt="status bar"
+        className="left-0 top-0 absolute object-cover max-w-none"
+        style={{ width: 1023, height: 58 }}
+      />
+
+      {/* 内容区域 */}
+      <div className="w-[1023.10px] px-[36.15px] left-0 top-[57.84px] absolute inline-flex flex-col justify-start items-start gap-5">
+
+        {/* 科目选择 - 参考设计图 */}
         <img
-          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/状态栏_pad.png"
-          alt="status"
-          className="w-full h-auto"
+          src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_b2570ead.png"
+          alt="subjects"
+          className="object-cover max-w-none"
+          style={{ width: 951, height: 54 }}
         />
-        <div className="flex items-center justify-between h-11 px-5">
-          <img
-            className="w-[154px] h-[30px]"
-            src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/叫叫%20Logo%20-%20基础.png"
-            alt="Logo"
-          />
-          <img
-            className="h-[30px]"
-            src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/顶部/扫一扫.png"
-            alt="扫一扫"
-          />
-        </div>
-      </div>
 
-      {/* 内容区 */}
-      <div className="flex-1 flex flex-col items-center overflow-y-auto">
-        {/* 科目图标 */}
-        <div className="flex items-center justify-between px-10 gap-[11px] mt-4 w-full">
-          {subjects.map((s) => (
-            <div
-              key={s.key}
-              className={`${s.bgClass} flex items-center justify-center w-[58.2px] rounded-[12px_12px_24px_12px] py-1.5`}
-            >
-              <img src={s.icon} alt={s.key} className="w-8 h-8" />
-            </div>
-          ))}
-        </div>
-
-        {/* 大Banner - 使用配置的图片原始尺寸 */}
-        <div className="w-full px-10 mt-4">
-          <div className="relative w-full overflow-hidden rounded-2xl">
-            {/* 背景图 - 根据前景图比例自动适应 */}
+        {/* 大Banner - 使用项目级配置的前景图 */}
+        <div className="w-[950px] h-[291.93px] shrink-0 relative overflow-hidden">
+          <div className="w-[951.82px] h-[261.52px] left-[-1.22px] top-[30.41px] absolute bg-gradient-to-b from-[#ffd5ec] to-[#fceef6] rounded-3xl overflow-hidden">
             <img
-              className="absolute w-full bottom-0 left-1/2 -translate-x-1/2 object-cover"
-              src={bigBannerBackground}
-              alt="banner-bg"
-              style={{ height: '89.583%' }}
-            />
-            {/* 前景图 */}
-            <img
-              className="relative w-full h-auto object-cover"
-              src={bigBannerForeground}
-              alt="banner-fg"
+              className="w-[948.78px] h-[265.17px] left-[1.22px] top-[-3.65px] absolute max-w-none"
+              src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_df5192e8.png"
+              alt="banner-bg-deco"
+              style={{ width: 949, height: 265 }}
             />
           </div>
+          <img
+            className="w-[948.78px] h-[291.93px] left-[1.40px] top-[0.38px] absolute max-w-none"
+            src={bigBannerForeground}
+            alt="banner-fg"
+            style={{ width: 949, height: 292 }}
+          />
         </div>
 
-        {/* 小Banner滚动区 */}
-        <div className="w-full pl-10 mt-5 overflow-x-auto hide-scrollbar">
-          <div className="flex gap-2">
-            {miniBanners.map((url, i) => (
-              <img
-                key={i}
-                src={url}
-                alt={`mini-banner-${i + 1}`}
-                className="h-[137px] w-auto flex-shrink-0"
-              />
-            ))}
-          </div>
+        {/* 横滑领课卡片 - 6张课程卡片 */}
+        <div className="shrink-0 inline-flex justify-start items-start gap-[14.91px] overflow-x-auto figma-scrollbar-hide">
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_526b8a8b.png"
+            alt="course-card-1"
+            style={{ width: 220, height: 124 }}
+          />
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_71cc80a5.png"
+            alt="course-card-2"
+            style={{ width: 220, height: 124 }}
+          />
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_b9ff3ad5.png"
+            alt="course-card-3"
+            style={{ width: 220, height: 124 }}
+          />
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_c7fa7da1.png"
+            alt="course-card-4"
+            style={{ width: 220, height: 124 }}
+          />
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_744e2e57.png"
+            alt="course-card-5"
+            style={{ width: 220, height: 124 }}
+          />
+          <img
+            className="w-[219.62px] h-[123.54px] shrink-0 max-w-none"
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_8946e15c.png"
+            alt="course-card-6"
+            style={{ width: 220, height: 124 }}
+          />
         </div>
+
+        {/* 底部课程卡片区 */}
+        <img
+          src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_c925e908.png"
+          alt="course-section"
+          className="relative object-cover max-w-none"
+          style={{ width: 951, height: 228 }}
+        />
       </div>
 
       {/* 底部标签栏 */}
-      <div className="w-full flex-shrink-0">
-        <img
-          src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/底部/底部标签栏_pad.png"
-          alt="tabBar"
-          className="w-full h-auto"
-        />
-      </div>
+      <img
+        src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_ccadf0df.png"
+        alt="tabBar"
+        className="left-0 top-[706px] absolute object-cover max-w-none"
+        style={{ width: 1024, height: 62 }}
+      />
     </div>
   );
 }

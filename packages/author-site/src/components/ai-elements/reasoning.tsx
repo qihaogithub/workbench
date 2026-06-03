@@ -121,7 +121,7 @@ function ReasoningTrigger({
           isStreaming && "animate-pulse",
         )}
       />
-      <span className="text-[11px] text-muted-foreground/60 truncate">
+      <span className="text-xs text-muted-foreground/60 truncate">
         {isStreaming
           ? "思考中..."
           : duration
@@ -134,7 +134,7 @@ function ReasoningTrigger({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center gap-1 py-0.5 text-[11px] transition-colors select-none min-w-0 group/reasoning",
+        "flex w-full items-center gap-1 py-1.5 text-xs transition-colors select-none min-w-0 group/reasoning",
         className,
       )}
       {...props}
