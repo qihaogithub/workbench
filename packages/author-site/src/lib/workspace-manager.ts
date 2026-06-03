@@ -11,8 +11,6 @@ import {
   getWorkspaceMeta as getWorkspaceMetaFromFs,
   writeWorkspaceMeta,
   getWorkspaceMultiDemoFiles,
-  readProjectMeta,
-  listDemoPages,
   type WorkspaceMeta,
 } from "./fs-utils";
 import type { MultiDemoFiles } from "@opencode-workbench/shared";
@@ -24,108 +22,6 @@ export interface CreateWorkspaceResult {
   demos: MultiDemoFiles;
 }
 
-function injectReferences(workspacePath: string): void {
-  const refsDir = path.join(workspacePath, "references");
-  if (!fs.existsSync(refsDir)) {
-    fs.mkdirSync(refsDir, { recursive: true });
-  }
-
-  const sourceDir = path.join(
-    process.cwd(),
-    "src",
-    "lib",
-    "agent-prompts",
-    "references",
-  );
-
-  if (!fs.existsSync(sourceDir)) return;
-
-  for (const file of fs.readdirSync(sourceDir)) {
-    if (!file.endsWith(".md")) continue;
-    fs.copyFileSync(path.join(sourceDir, file), path.join(refsDir, file));
-  }
-}
-
-function injectOpencodeAgentConfig(
-  workspacePath: string,
-  projectId: string,
-): void {
-  const opencodeDir = path.join(workspacePath, ".opencode");
-  const agentsDir = path.join(opencodeDir, "agents");
-
-  if (!fs.existsSync(agentsDir)) {
-    fs.mkdirSync(agentsDir, { recursive: true });
-  }
-
-  // 注入参考文件（references/）
-  injectReferences(workspacePath);
-
-  const opencodeJson = {
-    $schema: "https://opencode.ai/config.json",
-    agent: {
-      "demo-generator": {
-        file: ".opencode/agents/demo-generator.md",
-        description: "专门用于生成 OpenCode Demo 文件的 AI 代理",
-        tools: {
-          write: true,
-          edit: true,
-          bash: false,
-          fetch: false,
-        },
-      },
-    },
-    default_agent: "demo-generator",
-    instructions: [".opencode/agents/demo-generator.md"],
-  };
-
-  fs.writeFileSync(
-    path.join(opencodeDir, "opencode.json"),
-    JSON.stringify(opencodeJson, null, 2),
-    "utf-8",
-  );
-
-  // 读取模板文件
-  const templatePath = path.join(
-    process.cwd(),
-    "src",
-    "lib",
-    "agent-prompts",
-    "demo-generator.template.md",
-  );
-  let template = "# Demo Generator Agent\n\n";
-  if (fs.existsSync(templatePath)) {
-    template = fs.readFileSync(templatePath, "utf-8");
-  }
-
-  // 构建运行时上下文
-  const project = readProjectMeta(projectId);
-  const projectName = project?.name ?? projectId;
-  const demoPages = listDemoPages(workspacePath);
-
-  const hasProjectConfig = fs.existsSync(
-    path.join(workspacePath, "project.config.schema.json"),
-  );
-  const projectConfigLine = hasProjectConfig
-    ? "项目级共享配置：✅ 已设置（project.config.schema.json）"
-    : "项目级共享配置：未设置";
-
-  const pageCount = demoPages.length;
-  const pageList = demoPages
-    .map(
-      (p) =>
-        `  📄 "${p.name}" → demos/${p.id}/ (index.tsx + config.schema.json)`,
-    )
-    .join("\n");
-
-  // 替换占位符
-  const agentMd = template
-    .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
-    .replace(/\{\{PROJECT_CONFIG_LINE\}\}/g, projectConfigLine)
-    .replace(/\{\{PAGE_COUNT\}\}/g, String(pageCount))
-    .replace(/\{\{PAGE_LIST\}\}/g, pageList || "  （暂无页面）");
-
-  fs.writeFileSync(path.join(agentsDir, "demo-generator.md"), agentMd, "utf-8");
-}
 
 export function createWorkspace(
   userId: string,
@@ -158,8 +54,6 @@ export function createWorkspace(
     JSON.stringify(meta, null, 2),
     "utf-8",
   );
-
-  injectOpencodeAgentConfig(workspacePath, projectId);
 
   const demos = getWorkspaceMultiDemoFiles(workspaceId) ?? {
     demos: {},

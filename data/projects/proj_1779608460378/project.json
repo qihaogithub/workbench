@@ -176,10 +176,18 @@
       "sessionId": "session-1780459078429-x2730k2g6",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v19",
       "fileCount": 8
+    },
+    {
+      "versionId": "v20",
+      "savedAt": 1780463608640,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780463312163-i9r0495nr",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v20",
+      "fileCount": 8
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780463079179,
+  "updatedAt": 1780463608641,
   "publishedVersion": "v18",
   "publishedAt": 1780459086310
 }

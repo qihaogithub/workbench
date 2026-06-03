@@ -34,7 +34,6 @@ export function getFileEditorType(filePath: string): FileEditorType {
 
 /** 隐藏文件/目录列表（文件树中不显示） */
 const HIDDEN_ENTRIES = new Set([
-  ".opencode",
   "node_modules",
   ".git",
   ".workspace.json",

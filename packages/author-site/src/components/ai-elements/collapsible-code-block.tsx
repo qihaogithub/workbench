@@ -1,17 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface CodeBlockFolderProps {
   children: React.ReactNode;
-  /** 是否正在流式输出，流式期间不处理折叠 */
   isStreaming?: boolean;
   className?: string;
-}
-
-interface FolderState {
-  destroy: () => void;
 }
 
 function processCodeBlocks(container: HTMLElement) {
@@ -52,7 +47,7 @@ function processCodeBlocks(container: HTMLElement) {
 
     const summary = document.createElement("div");
     summary.className =
-      "cb-summary flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors select-none";
+      "cb-summary flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer select-none bg-muted/30 hover:bg-muted/50 transition-colors";
     summary.innerHTML = `
       <svg class="cb-chevron h-3.5 w-3.5 text-muted-foreground/60 transition-transform flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       <span class="text-xs text-muted-foreground/80">展开 · ${lines} 行${language ? ` ${language}` : ""} 代码</span>
@@ -62,24 +57,29 @@ function processCodeBlocks(container: HTMLElement) {
       const isNowCollapsed = wrapper!.classList.toggle("cb-collapsed");
       const chevron = summary.querySelector(".cb-chevron");
       if (chevron) {
-        if (isNowCollapsed) {
-          chevron.setAttribute(
-            "style",
-            "transform: rotate(0deg)",
-          );
-        } else {
-          chevron.setAttribute(
-            "style",
-            "transform: rotate(90deg)",
-          );
-        }
+        (chevron as HTMLElement).style.transform = isNowCollapsed
+          ? "rotate(0deg)"
+          : "rotate(90deg)";
       }
-      summary.querySelector("span")!.textContent = isNowCollapsed
-        ? `展开 · ${lines} 行${language ? ` ${language}` : ""} 代码`
-        : `折叠 · ${lines} 行${language ? ` ${language}` : ""} 代码`;
+      const span = summary.querySelector("span");
+      if (span) {
+        span.textContent = isNowCollapsed
+          ? `展开 · ${lines} 行${language ? ` ${language}` : ""} 代码`
+          : `折叠 · ${lines} 行${language ? ` ${language}` : ""} 代码`;
+      }
     });
 
     wrapper.parentNode?.insertBefore(summary, wrapper);
+  });
+}
+
+function cleanupCodeBlocks(container: HTMLElement) {
+  container.querySelectorAll(".cb-summary").forEach((el) => el.remove());
+  container.querySelectorAll(".cb-collapsible").forEach((el) => {
+    el.classList.remove("cb-collapsible", "cb-collapsed");
+  });
+  container.querySelectorAll("[data-cb-processed]").forEach((el) => {
+    el.removeAttribute("data-cb-processed");
   });
 }
 
@@ -88,42 +88,30 @@ export function CodeBlockFolder({
   isStreaming = false,
   className,
 }: CodeBlockFolderProps) {
-  const stateRef = useRef<FolderState | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const ref = useCallback(
-    (container: HTMLDivElement | null) => {
-      if (stateRef.current) {
-        stateRef.current.destroy();
-        stateRef.current = null;
-      }
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || isStreaming) return;
 
-      if (!container || isStreaming) return;
+    // 立即处理一次
+    processCodeBlocks(container);
 
+    // MutationObserver 处理异步渲染（Shiki 主题加载等延迟渲染）
+    const observer = new MutationObserver(() => {
       processCodeBlocks(container);
+    });
 
-      stateRef.current = {
-        destroy: () => {
-          container
-            .querySelectorAll(".cb-summary")
-            .forEach((el) => el.remove());
-          container
-            .querySelectorAll(".cb-collapsible")
-            .forEach((el) => {
-              el.classList.remove("cb-collapsible", "cb-collapsed");
-            });
-          container
-            .querySelectorAll("[data-cb-processed]")
-            .forEach((el) => {
-              el.removeAttribute("data-cb-processed");
-            });
-        },
-      };
-    },
-    [isStreaming],
-  );
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      cleanupCodeBlocks(container);
+    };
+  }, [isStreaming, children]);
 
   return (
-    <div ref={ref} className={cn("cb-container", className)}>
+    <div ref={containerRef} className={cn("cb-container", className)}>
       {children}
     </div>
   );

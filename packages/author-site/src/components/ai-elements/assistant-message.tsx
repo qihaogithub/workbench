@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
@@ -20,6 +20,7 @@ import {
   Sparkles,
   RotateCcw,
   Undo2,
+  ArrowDown,
 } from "lucide-react";
 import {
   Collapsible,
@@ -575,8 +576,36 @@ function ExecutionPhase({
 }) {
   const [open, setOpen] = useState(false);
   const wasStreamingRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isUserScrollingPhase, setIsUserScrollingPhase] = useState(false);
+  const isUserScrollingPhaseRef = useRef(false);
 
-  // 当执行阶段从"正在构建"变为"已完成"时，延迟 800ms 自动折叠
+  const handlePhaseScroll = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const threshold = 30;
+    const isNearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    isUserScrollingPhaseRef.current = !isNearBottom;
+    setIsUserScrollingPhase(!isNearBottom);
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming || isComplete) return;
+    if (isUserScrollingPhaseRef.current) return;
+    const el = contentRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [parts, isStreaming, isComplete]);
+
+  const scrollPhaseToBottom = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    isUserScrollingPhaseRef.current = false;
+    setIsUserScrollingPhase(false);
+  }, []);
+
   useEffect(() => {
     if (isStreaming && !isComplete) {
       wasStreamingRef.current = true;
@@ -590,7 +619,6 @@ function ExecutionPhase({
     }
   }, [isStreaming, isComplete]);
 
-  // 统计信息
   const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
   const toolCount = parts.filter((p) => p.type === "tool").length;
 
@@ -601,6 +629,8 @@ function ExecutionPhase({
   const hasRunning = parts.some(
     (p) => p.type === "tool" && p.status === "running",
   );
+
+  const isStreamingPhase = isStreaming && !isComplete;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -620,55 +650,72 @@ function ExecutionPhase({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-        <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto">
-          {parts.map((part, i) => {
-            if (part.type === "reasoning") {
-              return (
-                <div
-                  key={`exec-r-${i}`}
-                  className="flex items-start gap-1.5 text-[11px] text-muted-foreground/70 py-0.5"
-                >
-                  <Sparkles className="h-3 w-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1 leading-relaxed">
-                    <Streamdown
-                      plugins={{ code, cjk }}
-                      controls={{ table: false, code: true }}
-                    >
-                      {part.content}
-                    </Streamdown>
+        <div className="relative">
+          <div
+            ref={contentRef}
+            onScroll={handlePhaseScroll}
+            className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto scrollbar-thin"
+          >
+            {parts.map((part, i) => {
+              if (part.type === "reasoning") {
+                return (
+                  <div
+                    key={`exec-r-${i}`}
+                    className="flex items-start gap-1.5 text-[11px] text-muted-foreground/70 py-0.5"
+                  >
+                    <Sparkles className="h-3 w-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1 leading-relaxed">
+                      <Streamdown
+                        plugins={{ code, cjk }}
+                        controls={{ table: false, code: true }}
+                      >
+                        {part.content}
+                      </Streamdown>
+                    </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            if (part.type === "tool") {
-              const toolKind = getToolKind(part.toolName);
-              const Icon = getToolIcon(toolKind);
-              const actionText = getToolActionText(part);
-              return (
-                <div
-                  key={`exec-t-${i}`}
-                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
-                >
-                  <Icon className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{actionText}</span>
-                  {part.status === "running" && (
-                    <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-                  )}
-                  {part.status === "error" && (
-                    <span className="text-red-400 text-[10px]">失败</span>
-                  )}
-                  {part.status === "awaiting-approval" && (
-                    <span className="text-yellow-400 text-[10px]">
-                      等待确认
-                    </span>
-                  )}
-                </div>
-              );
-            }
+              if (part.type === "tool") {
+                const toolKind = getToolKind(part.toolName);
+                const Icon = getToolIcon(toolKind);
+                const actionText = getToolActionText(part);
+                return (
+                  <div
+                    key={`exec-t-${i}`}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
+                  >
+                    <Icon className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{actionText}</span>
+                    {part.status === "running" && (
+                      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                    )}
+                    {part.status === "error" && (
+                      <span className="text-red-400 text-[10px]">失败</span>
+                    )}
+                    {part.status === "awaiting-approval" && (
+                      <span className="text-yellow-400 text-[10px]">
+                        等待确认
+                      </span>
+                    )}
+                  </div>
+                );
+              }
 
-            return null;
-          })}
+              return null;
+            })}
+          </div>
+          {isStreamingPhase && isUserScrollingPhase && (
+            <div className="sticky bottom-0 flex justify-center pt-1 pb-1">
+              <button
+                onClick={scrollPhaseToBottom}
+                className="bg-muted/80 text-muted-foreground px-3 py-1 rounded-full text-xs flex items-center gap-1 hover:bg-muted transition-colors"
+              >
+                <ArrowDown className="h-3 w-3" />
+                回到底部
+              </button>
+            </div>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>

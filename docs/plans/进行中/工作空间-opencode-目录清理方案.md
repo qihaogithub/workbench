@@ -36,7 +36,13 @@ function injectReferences(workspacePath: string): void {
   }
 
   // 源目录：author-site/src/lib/agent-prompts/references/*.md
-  const sourceDir = path.join(process.cwd(), "src", "lib", "agent-prompts", "references");
+  const sourceDir = path.join(
+    process.cwd(),
+    "src",
+    "lib",
+    "agent-prompts",
+    "references",
+  );
   if (!fs.existsSync(sourceDir)) return;
 
   for (const file of fs.readdirSync(sourceDir)) {
@@ -45,14 +51,17 @@ function injectReferences(workspacePath: string): void {
   }
 }
 
-function injectOpencodeAgentConfig(workspacePath: string, projectId: string): void {
+function injectOpencodeAgentConfig(
+  workspacePath: string,
+  projectId: string,
+): void {
   // 1. 创建 .opencode/agents/ 目录
   const opencodeDir = path.join(workspacePath, ".opencode");
   const agentsDir = path.join(opencodeDir, "agents");
-  
+
   // 2. 注入 references/ 目录（配置系统参考文档）
   injectReferences(workspacePath);
-  
+
   // 3. 写入 opencode.json（OpenCode 配置文件）
   // 4. 读取模板并替换占位符，写入 demo-generator.md
   // ... (代码省略)
@@ -150,11 +159,11 @@ ls data/projects/proj_1779608460378/workspace/references/
 
 #### 2.2.1 需要修改的文件
 
-| 文件                                                           | 改动类型 | 说明                                                                                           |
-| :------------------------------------------------------------- | :------- | :--------------------------------------------------------------------------------------------- |
+| 文件                                                           | 改动类型 | 说明                                                                                              |
+| :------------------------------------------------------------- | :------- | :------------------------------------------------------------------------------------------------ |
 | `packages/author-site/src/lib/workspace-manager.ts`            | 重构     | 移除 `injectOpencodeAgentConfig()` 函数及 `injectReferences()` 函数，`createWorkspace()` 不再调用 |
-| `packages/author-site/src/lib/workspace-file-utils.ts`         | 简化     | `HIDDEN_ENTRIES` 移除 `".opencode"`（不再需要隐藏）                                      |
-| `packages/shared/src/agent-prompts/demo-generator.template.ts` | 微调     | L144 禁止行为中移除 `.opencode/` 相关条目（已不存在）                                    |
+| `packages/author-site/src/lib/workspace-file-utils.ts`         | 简化     | `HIDDEN_ENTRIES` 移除 `".opencode"`（不再需要隐藏）                                               |
+| `packages/shared/src/agent-prompts/demo-generator.template.ts` | 微调     | L144 禁止行为中移除 `.opencode/` 相关条目（已不存在）                                             |
 
 #### 2.2.2 不需要修改的文件
 
@@ -171,12 +180,12 @@ ls data/projects/proj_1779608460378/workspace/references/
 
 **目标**：工作空间创建时不再注入 `.opencode/` 目录，同时清理 `injectReferences()` 函数（源目录不存在，已无实际作用）
 
-| 步骤 | 文件                            | 改动                                                                                       |
-| :--- | :------------------------------ | :----------------------------------------------------------------------------------------- |
-| 1    | `workspace-manager.ts` L27-128  | 移除 `injectReferences()` 函数（L27-47）和 `injectOpencodeAgentConfig()` 函数（L49-128）   |
-| 2    | `workspace-manager.ts` L162     | 移除 `injectOpencodeAgentConfig(workspacePath, projectId);` 调用                           |
-| 3    | 验证 `references/` 自动复制     | 确认项目模板 `data/projects/*/workspace/references/` 随 `fs.cpSync()` 自动复制到工作空间   |
-| 4    | 运行 `pnpm typecheck`           | 验证编译通过                                                                               |
+| 步骤 | 文件                           | 改动                                                                                     |
+| :--- | :----------------------------- | :--------------------------------------------------------------------------------------- |
+| 1    | `workspace-manager.ts` L27-128 | 移除 `injectReferences()` 函数（L27-47）和 `injectOpencodeAgentConfig()` 函数（L49-128） |
+| 2    | `workspace-manager.ts` L162    | 移除 `injectOpencodeAgentConfig(workspacePath, projectId);` 调用                         |
+| 3    | 验证 `references/` 自动复制    | 确认项目模板 `data/projects/*/workspace/references/` 随 `fs.cpSync()` 自动复制到工作空间 |
+| 4    | 运行 `pnpm typecheck`          | 验证编译通过                                                                             |
 
 **重构后代码**：
 
@@ -245,24 +254,24 @@ ls data/projects/proj_1779608460378/workspace/references/
 
 ## 四、预期收益
 
-| 收益             | 说明                                                                 |
-| :--------------- | :------------------------------------------------------------------- |
+| 收益             | 说明                                                                                    |
+| :--------------- | :-------------------------------------------------------------------------------------- |
 | **代码量减少**   | 删除 ~102 行无效代码（`injectReferences` L27-47 + `injectOpencodeAgentConfig` L49-128） |
-| **存储节省**     | 每个新工作空间减少 ~2KB（opencode.json + demo-generator.md）         |
-| **架构一致性**   | 工作空间目录不再包含废弃的 OpenCode 配置                             |
-| **维护简化**     | 移除模板占位符替换逻辑（projectName/pageCount/pageList 等）及无效函数 |
-| **用户认知清晰** | 工作空间目录结构与实际使用的 Pi Agent 架构一致                       |
+| **存储节省**     | 每个新工作空间减少 ~2KB（opencode.json + demo-generator.md）                            |
+| **架构一致性**   | 工作空间目录不再包含废弃的 OpenCode 配置                                                |
+| **维护简化**     | 移除模板占位符替换逻辑（projectName/pageCount/pageList 等）及无效函数                   |
+| **用户认知清晰** | 工作空间目录结构与实际使用的 Pi Agent 架构一致                                          |
 
 ---
 
 ## 五、风险与缓解
 
-| 风险                       | 概率 | 影响 | 缓解措施                                                                                   |
-| :------------------------- | :--- | :--- | :----------------------------------------------------------------------------------------- |
-| **references/ 复制遗漏**   | 极低 | 高   | 验证项目模板包含 `references/config-system.md`，`fs.cpSync()` 自动复制                     |
-| **历史工作空间异常**       | 极低 | 中   | 不主动删除，保留所有过滤/兼容逻辑                                                          |
-| **System Prompt 注入失败** | 极低 | 高   | Pi Agent 使用 `buildStaticSystemPrompt()`，与 `.opencode/` 无关，已有缓存机制保障          |
-| **E2E 测试失败**           | 低   | 中   | 阶段四运行 `pnpm test:e2e`，根据失败调整                                                   |
+| 风险                       | 概率 | 影响 | 缓解措施                                                                          |
+| :------------------------- | :--- | :--- | :-------------------------------------------------------------------------------- |
+| **references/ 复制遗漏**   | 极低 | 高   | 验证项目模板包含 `references/config-system.md`，`fs.cpSync()` 自动复制            |
+| **历史工作空间异常**       | 极低 | 中   | 不主动删除，保留所有过滤/兼容逻辑                                                 |
+| **System Prompt 注入失败** | 极低 | 高   | Pi Agent 使用 `buildStaticSystemPrompt()`，与 `.opencode/` 无关，已有缓存机制保障 |
+| **E2E 测试失败**           | 低   | 中   | 阶段四运行 `pnpm test:e2e`，根据失败调整                                          |
 
 ---
 
@@ -336,12 +345,12 @@ author-site/src/lib/workspace-manager.ts
 
 ### 7.3 术语表
 
-| 术语                          | 说明                                                            |
-| :---------------------------- | :-------------------------------------------------------------- |
-| `.opencode/`                  | OpenCode Agent 的配置目录，包含 opencode.json 和 agents/ 子目录                 |
-| `references/`                 | 工作空间参考文件目录，包含 config-system.md 等配置系统文档（已存在于项目模板） |
+| 术语                          | 说明                                                                                     |
+| :---------------------------- | :--------------------------------------------------------------------------------------- |
+| `.opencode/`                  | OpenCode Agent 的配置目录，包含 opencode.json 和 agents/ 子目录                          |
+| `references/`                 | 工作空间参考文件目录，包含 config-system.md 等配置系统文档（已存在于项目模板）           |
 | `injectReferences()`          | 原函数，从 `src/lib/agent-prompts/references` 复制参考文件（源目录不存在，已无实际作用） |
-| `injectOpencodeAgentConfig()` | 原函数，负责注入 .opencode 配置和提示词（重构后移除）                           |
-| L2/L3/L4                      | System Prompt 分层：L2=静态行为约束，L3=动态上下文，L4=记忆前缀 |
-| Pi Agent                      | `@earendil-works/pi-agent-core`，进程内嵌入的 Agent 后端        |
-| OpenCode                      | 已废弃的外部 Go 进程 Agent 后端（端口 4096）                    |
+| `injectOpencodeAgentConfig()` | 原函数，负责注入 .opencode 配置和提示词（重构后移除）                                    |
+| L2/L3/L4                      | System Prompt 分层：L2=静态行为约束，L3=动态上下文，L4=记忆前缀                          |
+| Pi Agent                      | `@earendil-works/pi-agent-core`，进程内嵌入的 Agent 后端                                 |
+| OpenCode                      | 已废弃的外部 Go 进程 Agent 后端（端口 4096）                                             |
