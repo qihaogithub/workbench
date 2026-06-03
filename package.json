@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n author,agent,viewer -c blue,green,cyan \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\"",
+    "dev": "concurrently -n author,agent,viewer,snapshot -c blue,green,cyan,magenta \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\" \"pnpm --filter @opencode-workbench/snapshot-service dev\"",
     "dev:author": "pnpm --filter @opencode-workbench/author-site dev",
     "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
     "dev:viewer": "pnpm --filter @opencode-workbench/viewer-site dev",
+    "dev:snapshot": "pnpm --filter @opencode-workbench/snapshot-service dev",
     "build": "pnpm --filter @opencode-workbench/author-site build",
     "build:viewer": "pnpm --filter @opencode-workbench/viewer-site build",
     "lint": "pnpm --filter @opencode-workbench/author-site lint",
