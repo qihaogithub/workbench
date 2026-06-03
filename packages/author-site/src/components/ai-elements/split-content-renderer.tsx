@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { Streamdown } from "streamdown";
-import { code } from "@streamdown/code";
+import { code as codePlugin } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
 import { math } from "@streamdown/math";
 import { cjk } from "@streamdown/cjk";
@@ -45,7 +45,7 @@ export function SplitContentRenderer({
             className="prose prose-sm dark:prose-invert max-w-none min-w-0 text-[14px]"
           >
             <Streamdown
-              plugins={{ code, mermaid, math, cjk }}
+              plugins={{ code: codePlugin, mermaid, math, cjk }}
               isAnimating={isStreaming}
               caret="block"
               controls={{ table: false, code: true, mermaid: true }}
@@ -145,7 +145,7 @@ function CollapsibleCodeBlock({
       {!collapsed && (
         <div>
           <Streamdown
-            plugins={{ code, cjk }}
+            plugins={{ code: codePlugin, cjk }}
             isAnimating={isStreaming}
             caret={isStreaming ? "block" : undefined}
             controls={{ table: false, code: true }}

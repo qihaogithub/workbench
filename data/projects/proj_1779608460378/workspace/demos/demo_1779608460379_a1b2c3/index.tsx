@@ -107,21 +107,15 @@ export default function PhoneSquare(props: DemoProps) {
                 alt="banner-bg-shape"
               />
             </div>
-            {/* Banner前景装饰 */}
-            <img
-              src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_57ed088e.svg"
-              className="left-[-143.98px] top-[0.25px] absolute w-[624px] h-48 max-w-none"
-              alt="banner-fg-shape"
-            />
-            {/* 可配置的大Banner前景图 */}
+            {/* 可配置的大Banner前景图 - object-cover 等比缩放，高度撑满，超出裁切 */}
             <img
               src={bigBannerForeground}
               alt="banner-fg"
-              className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full object-contain z-10"
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full object-cover z-10"
             />
           </div>
 
-          {/* 小Banner滚动区 - 添加 mt-5 与大Banner间隔20px */}
+          {/* 小Banner滚动区 */}
           <div className="shrink-0 mt-5 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide">
             {miniBanners.map((url, i) => (
               <img

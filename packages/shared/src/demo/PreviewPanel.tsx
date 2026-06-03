@@ -174,7 +174,7 @@ export function PreviewPanel({
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
-  snapshotVersion,
+  snapshotVersion: _snapshotVersion,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -344,7 +344,6 @@ export function PreviewPanel({
     validCode,
     sendUpdateCode,
     sendUpdateCodeUrl,
-    snapshotVersion,
   ]);
 
   useEffect(() => {

@@ -121,8 +121,115 @@ export function DemoPageTree({
         if (isDescendantLocal(activeItem.id, overItem.id, folders)) return;
       }
 
+      // 拖拽到文件夹上 → 移入该文件夹
+      if (overIsFolder) {
+        const targetFolderId = overItem.id;
+        if ((activeItem.parentId ?? null) === targetFolderId) return;
+
+        if (activeIsFolder) {
+          try {
+            const sameParent = folders.filter(
+              (f) => (f.parentId ?? null) === targetFolderId && f.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((f) => f.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchFolder(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: targetFolderId, order: nextOrder },
+            );
+            onFoldersChange(
+              folders.map((f) => (f.id === activeItem.id ? updated : f)),
+            );
+            setExpandedFolders((prev) => new Set([...prev, targetFolderId]));
+          } catch {
+            toast({ title: "移动文件夹失败", variant: "destructive" });
+          }
+        } else {
+          try {
+            const sameParent = pages.filter(
+              (p) => (p.parentId ?? null) === targetFolderId && p.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((p) => p.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchDemoPageMeta(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: targetFolderId, order: nextOrder },
+            );
+            onPagesChange(
+              pages.map((p) => (p.id === activeItem.id ? updated : p)),
+            );
+            setExpandedFolders((prev) => new Set([...prev, targetFolderId]));
+          } catch {
+            toast({ title: "移动页面失败", variant: "destructive" });
+          }
+        }
+        return;
+      }
+
       const activeParent = activeItem.parentId ?? null;
       const overParent = overItem.parentId ?? null;
+
+      // 跨层级移动（页面拖到不同父级的页面上方）→ 移到目标层级末尾
+      if (activeParent !== overParent) {
+        if (!activeIsFolder) {
+          try {
+            const sameParent = pages.filter(
+              (p) => (p.parentId ?? null) === overParent && p.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((p) => p.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchDemoPageMeta(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: overParent, order: nextOrder },
+            );
+            onPagesChange(
+              pages.map((p) => (p.id === activeItem.id ? updated : p)),
+            );
+            if (overParent) {
+              setExpandedFolders((prev) => new Set([...prev, overParent]));
+            }
+          } catch {
+            toast({ title: "移动页面失败", variant: "destructive" });
+          }
+        } else {
+          try {
+            const sameParent = folders.filter(
+              (f) => (f.parentId ?? null) === overParent && f.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((f) => f.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchFolder(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: overParent, order: nextOrder },
+            );
+            onFoldersChange(
+              folders.map((f) => (f.id === activeItem.id ? updated : f)),
+            );
+            if (overParent) {
+              setExpandedFolders((prev) => new Set([...prev, overParent]));
+            }
+          } catch {
+            toast({ title: "移动文件夹失败", variant: "destructive" });
+          }
+        }
+        return;
+      }
 
       if (activeParent === overParent) {
         const pageUpdates: Array<{
@@ -466,7 +573,7 @@ export function DemoPageTree({
           )}
 
           <p className="text-xs text-muted-foreground mt-4">
-            💡 拖拽可调整同级顺序，右键菜单可移动到文件夹
+            💡 拖拽可排序或移入文件夹，右键菜单可移动到文件夹
           </p>
         </div>
       </ScrollArea>

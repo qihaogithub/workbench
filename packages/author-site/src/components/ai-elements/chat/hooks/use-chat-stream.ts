@@ -35,8 +35,8 @@ interface UseChatStreamOptions {
   agentSessionId: string;
   workingDir?: string;
   demoId?: string;
-  onCodeUpdate?: (code: string) => void;
-  onSchemaUpdate?: (schema: string) => void;
+  onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
+  onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
   onFilesChange?: (
     files: Array<{
       path: string;
@@ -356,18 +356,20 @@ export function useChatStream(options: UseChatStreamOptions) {
             const { codeUpdated, schemaUpdated } =
               finalFiles.length > 0
                 ? extractCodeAndSchemaUpdates(finalFiles, {
-                    onCodeUpdate,
-                    onSchemaUpdate,
+                    onCodeUpdate: (code) => onCodeUpdate?.(code, "ai-finish"),
+                    onSchemaUpdate: (schema) =>
+                      onSchemaUpdate?.(schema, "ai-finish"),
                   })
                 : { codeUpdated: false, schemaUpdated: false };
 
-            // HTTP fallback: always fetch if code or schema was not updated
-            if (!codeUpdated || !schemaUpdated) {
+            // HTTP fallback: only fetch if NEITHER code NOR schema was updated
+            if (!codeUpdated && !schemaUpdated) {
               const filesData = await fetchSessionFiles(sessionId, demoId);
               if (filesData) {
                 const { code, schema } = filesData;
-                if (code && !codeUpdated) onCodeUpdate?.(code);
-                if (schema && !schemaUpdated) onSchemaUpdate?.(schema);
+                if (code && !codeUpdated) onCodeUpdate?.(code, "ai-finish");
+                if (schema && !schemaUpdated)
+                  onSchemaUpdate?.(schema, "ai-finish");
 
                 const fetchedFiles: FileChangeEntry[] = [];
                 if (!codeUpdated && code)

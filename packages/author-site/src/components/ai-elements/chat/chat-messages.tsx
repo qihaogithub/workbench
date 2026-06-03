@@ -108,7 +108,7 @@ export function ChatMessages({
             parts={msg.parts}
             messageId={msg.id}
             hasFileChanges={hasFileChanges(msg)}
-            isStreaming={isStreaming}
+            isStreaming={false}
             onRegenerate={onRegenerate}
             onRollback={onRollback}
           />

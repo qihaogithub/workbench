@@ -26,8 +26,8 @@ interface AIChatProps {
   projectId?: string;
   demoId?: string;
   workspaceId?: string;
-  onCodeUpdate?: (code: string) => void;
-  onSchemaUpdate?: (schema: string) => void;
+  onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
+  onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
   onFilesChange?: (
     files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
   ) => void;

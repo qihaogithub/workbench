@@ -239,7 +239,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       }
     },
-    [code, schema, sessionId],
+    [code, schema, sessionId, activeDemoId],
   );
 
   const scrollToBottom = () => {
@@ -751,18 +751,41 @@ ${context.details}
 
   // 处理 AI 代码更新 — 通过 applyDemoSnapshot 统一应用
   const handleCodeUpdate = useCallback(
-    (newCode: string) => {
-      applyDemoSnapshot({ code: newCode, source: "ai-realtime" });
+    (newCode: string, source: "ai-realtime" | "ai-finish" = "ai-realtime") => {
+      applyDemoSnapshot({ code: newCode, source });
     },
     [applyDemoSnapshot],
   );
 
   // 处理 AI Schema 更新 — 通过 applyDemoSnapshot 统一应用
   const handleSchemaUpdate = useCallback(
-    (newSchema: string) => {
-      applyDemoSnapshot({ schema: newSchema, source: "ai-realtime" });
+    (newSchema: string, source: "ai-realtime" | "ai-finish" = "ai-realtime") => {
+      applyDemoSnapshot({ schema: newSchema, source });
     },
     [applyDemoSnapshot],
+  );
+
+  // 从工作空间文件路径提取 demoId
+  function extractDemoIdFromPath(normalizedPath: string): string | null {
+    const match = normalizedPath.match(/^demos\/([^/]+)\//);
+    return match ? match[1] : null;
+  }
+
+  // 处理工作空间文件保存 → 同步预览状态
+  const handleWorkspaceFileSaved = useCallback(
+    (filePath: string, content: string) => {
+      const normalizedPath = filePath.replace(/^\/+/, "");
+      const demoId = extractDemoIdFromPath(normalizedPath);
+      const fileType = normalizedPath.endsWith("index.tsx") ? "code" : "schema";
+
+      if (demoId && demoId === activeDemoId) {
+        applyDemoSnapshot({
+          [fileType === "code" ? "code" : "schema"]: content,
+          source: "manual-load",
+        });
+      }
+    },
+    [activeDemoId, applyDemoSnapshot],
   );
 
   if (isLoading) {
@@ -1637,7 +1660,7 @@ ${context.details}
                         hideHeader={!hasBothScopes}
                       >
                         <ConfigForm
-                          key={`${activeDemoId}-${snapshotVersion}`}
+                          key={activeDemoId}
                           schema={schema}
                           onChange={handleConfigChange}
                           onSchemaChange={handleSchemaChange}
@@ -1684,6 +1707,9 @@ ${context.details}
           if (!data.success) {
             throw new Error(data.error?.message || "保存失败");
           }
+        }}
+        onSaved={({ filePath, content }) => {
+          handleWorkspaceFileSaved(filePath, content);
         }}
       />
     </div>

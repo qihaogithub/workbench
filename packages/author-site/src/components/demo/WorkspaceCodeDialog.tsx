@@ -22,6 +22,7 @@ interface WorkspaceCodeDialogProps {
   content: string;
   editable: boolean;
   onSave: (content: string) => Promise<void>;
+  onSaved?: (params: { filePath: string; content: string }) => void;
 }
 
 /**
@@ -35,6 +36,7 @@ export function WorkspaceCodeDialog({
   content,
   editable,
   onSave,
+  onSaved,
 }: WorkspaceCodeDialogProps) {
   const [editContent, setEditContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
@@ -66,6 +68,7 @@ export function WorkspaceCodeDialog({
     setIsSaving(true);
     try {
       await onSave(editContent);
+      onSaved?.({ filePath, content: editContent });
       toast({ title: "保存成功" });
       setHasChanges(false);
       onOpenChange(false);

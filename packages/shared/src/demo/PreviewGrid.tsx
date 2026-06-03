@@ -285,7 +285,7 @@ function GridIframe({
     return () => {
       cancelled = true;
     };
-  }, [visible, isAuthorMode, sessionId, page.id, page.code, snapshotVersion]);
+  }, [visible, isAuthorMode, sessionId, page.id, page.code]);
 
   useEffect(() => {
     if (!iframeReadyRef.current || !blobUrlRef.current) return;
