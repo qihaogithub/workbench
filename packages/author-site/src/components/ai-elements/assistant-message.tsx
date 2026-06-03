@@ -28,7 +28,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
-import { CodeBlockFolder } from "./collapsible-code-block";
+import { SplitContentRenderer } from "./split-content-renderer";
 import { type MessagePart } from "./message";
 
 interface AssistantMessageProps {
@@ -384,21 +384,11 @@ export function AssistantMessage({
         if (block.type === "text") {
           const isLastText = index === renderBlocks.length - 1;
           return (
-            <CodeBlockFolder
+            <SplitContentRenderer
               key={`text-${index}`}
+              content={block.content}
               isStreaming={isStreaming && isLastText}
-            >
-              <div className="prose prose-sm dark:prose-invert max-w-none min-w-0 text-[14px]">
-                <Streamdown
-                  plugins={{ code, mermaid, math, cjk }}
-                  isAnimating={isStreaming && isLastText}
-                  caret="block"
-                  controls={{ table: false, code: true, mermaid: true }}
-                >
-                  {block.content}
-                </Streamdown>
-              </div>
-            </CodeBlockFolder>
+            />
           );
         }
 

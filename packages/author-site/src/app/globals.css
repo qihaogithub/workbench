@@ -76,46 +76,6 @@
     background: transparent;
   }
 
-  /* 代码块折叠 — 统一视觉容器 */
-  .cb-visual-wrapper {
-    border: 1px solid hsl(var(--border) / 0.5);
-    border-radius: 0.5rem;
-    overflow: hidden;
-    margin: 0.25rem 0 0.5rem 0;
-  }
-
-  .cb-summary .cb-summary-inner {
-    user-select: none;
-  }
-
-  .cb-summary .cb-icon-wrap svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .cb-summary .cb-chevron-wrap {
-    transition: transform 0.2s ease;
-  }
-
-  .cb-summary .cb-chevron-wrap svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .cb-collapsible {
-    overflow: hidden;
-    transition: max-height 0.35s ease, opacity 0.3s ease;
-    max-height: 9999px;
-    opacity: 1;
-  }
-
-  .cb-collapsible.cb-collapsed {
-    max-height: 0 !important;
-    opacity: 0;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-  }
 }
 
 /* ============================================
