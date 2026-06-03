@@ -116,15 +116,20 @@ export function DemoPageTree({
 
       const activeIsFolder = activeItem.id.startsWith("folder_");
       const overIsFolder = overItem.id.startsWith("folder_");
+      const activeParent = activeItem.parentId ?? null;
+      const overParent = overItem.parentId ?? null;
 
       if (activeIsFolder && overIsFolder) {
         if (isDescendantLocal(activeItem.id, overItem.id, folders)) return;
       }
 
-      // 拖拽到文件夹上 → 移入该文件夹
-      if (overIsFolder) {
+      // 场景A：拖到文件夹上 → 移入该文件夹
+      // 例外：同级两个文件夹拖拽 → 降级为排序（场景B处理）
+      const isSameLevelFolderDrag =
+        activeIsFolder && overIsFolder && activeParent === overParent;
+
+      if (overIsFolder && activeParent !== overItem.id && !isSameLevelFolderDrag) {
         const targetFolderId = overItem.id;
-        if ((activeItem.parentId ?? null) === targetFolderId) return;
 
         if (activeIsFolder) {
           try {
@@ -174,64 +179,8 @@ export function DemoPageTree({
         return;
       }
 
-      const activeParent = activeItem.parentId ?? null;
-      const overParent = overItem.parentId ?? null;
-
-      // 跨层级移动（页面拖到不同父级的页面上方）→ 移到目标层级末尾
-      if (activeParent !== overParent) {
-        if (!activeIsFolder) {
-          try {
-            const sameParent = pages.filter(
-              (p) => (p.parentId ?? null) === overParent && p.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((p) => p.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchDemoPageMeta(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: overParent, order: nextOrder },
-            );
-            onPagesChange(
-              pages.map((p) => (p.id === activeItem.id ? updated : p)),
-            );
-            if (overParent) {
-              setExpandedFolders((prev) => new Set([...prev, overParent]));
-            }
-          } catch {
-            toast({ title: "移动页面失败", variant: "destructive" });
-          }
-        } else {
-          try {
-            const sameParent = folders.filter(
-              (f) => (f.parentId ?? null) === overParent && f.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((f) => f.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchFolder(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: overParent, order: nextOrder },
-            );
-            onFoldersChange(
-              folders.map((f) => (f.id === activeItem.id ? updated : f)),
-            );
-            if (overParent) {
-              setExpandedFolders((prev) => new Set([...prev, overParent]));
-            }
-          } catch {
-            toast({ title: "移动文件夹失败", variant: "destructive" });
-          }
-        }
-        return;
-      }
-
-      if (activeParent === overParent) {
+      // 场景B：同级同类型排序
+      if (activeParent === overParent && activeIsFolder === overIsFolder) {
         const pageUpdates: Array<{
           id: string;
           order: number;
@@ -288,6 +237,60 @@ export function DemoPageTree({
           );
         } catch {
           toast({ title: "排序保存失败", variant: "destructive" });
+        }
+        return;
+      }
+
+      // 场景C：跨层级移动（拖到不同父级的页面上方 → 移到目标层级末尾）
+      if (activeParent !== overParent) {
+        if (activeIsFolder) {
+          try {
+            const sameParent = folders.filter(
+              (f) => (f.parentId ?? null) === overParent && f.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((f) => f.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchFolder(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: overParent, order: nextOrder },
+            );
+            onFoldersChange(
+              folders.map((f) => (f.id === activeItem.id ? updated : f)),
+            );
+            if (overParent) {
+              setExpandedFolders((prev) => new Set([...prev, overParent]));
+            }
+          } catch {
+            toast({ title: "移动文件夹失败", variant: "destructive" });
+          }
+        } else {
+          try {
+            const sameParent = pages.filter(
+              (p) => (p.parentId ?? null) === overParent && p.id !== activeItem.id,
+            );
+            const nextOrder =
+              sameParent.length > 0
+                ? Math.max(...sameParent.map((p) => p.order)) + 1
+                : 0;
+            const updated = await projectApiClient.patchDemoPageMeta(
+              projectId,
+              activeItem.id,
+              sessionId,
+              { parentId: overParent, order: nextOrder },
+            );
+            onPagesChange(
+              pages.map((p) => (p.id === activeItem.id ? updated : p)),
+            );
+            if (overParent) {
+              setExpandedFolders((prev) => new Set([...prev, overParent]));
+            }
+          } catch {
+            toast({ title: "移动页面失败", variant: "destructive" });
+          }
         }
       }
     },

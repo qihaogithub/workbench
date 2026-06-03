@@ -51,9 +51,9 @@ export async function PATCH(
       );
     }
 
-    if (!pages || !Array.isArray(pages) || pages.length === 0) {
+    if (!pages || !Array.isArray(pages)) {
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "pages 参数必填且不能为空"),
+        createApiError("INVALID_REQUEST", "pages 参数必填"),
         { status: 400 },
       );
     }

@@ -208,10 +208,60 @@
       "sessionId": "session-1780469319772-y9z1p398s",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v23",
       "fileCount": 8
+    },
+    {
+      "versionId": "v24",
+      "savedAt": 1780470718688,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780469827745-um3c24qcl",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v24",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v25",
+      "savedAt": 1780470747465,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v25_backup",
+      "fileCount": 8,
+      "note": "从 v23 恢复"
+    },
+    {
+      "versionId": "v26",
+      "savedAt": 1780470749603,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470730747-tprm1ce7f",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v26",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v27",
+      "savedAt": 1780470768349,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v27_backup",
+      "fileCount": 8,
+      "note": "从 v23 恢复"
+    },
+    {
+      "versionId": "v28",
+      "savedAt": 1780470771192,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470751017-q16bcx7yt",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v28",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v29",
+      "savedAt": 1780471114510,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470828009-8nmvqyg2q",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v29",
+      "fileCount": 12
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780469675530,
+  "updatedAt": 1780471114512,
   "publishedVersion": "v21",
   "publishedAt": 1780468794271
 }

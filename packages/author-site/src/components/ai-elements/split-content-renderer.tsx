@@ -71,6 +71,7 @@ function CollapsibleCodeBlock({
   isStreaming,
 }: CollapsibleCodeBlockProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!isStreaming) {
@@ -79,80 +80,111 @@ function CollapsibleCodeBlock({
   }, [isStreaming]);
 
   const handleToggle = useCallback(() => {
-    setIsCollapsed((prev) => !prev);
-  }, []);
+    if (!isStreaming) {
+      setIsCollapsed((prev) => !prev);
+    }
+  }, [isStreaming]);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard not available
+    }
+  }, [code]);
 
   const lines = code.split("\n").filter(Boolean).length;
-  const langLabel = language || "文本";
+  const langDisplay = language || "文本";
 
   const collapsed = !isStreaming && isCollapsed;
   const fenceMarkdown = `\`\`\`${language}\n${code}\n\`\`\``;
 
   return (
-    <div className={cn("my-1 rounded-lg border border-border/50 overflow-hidden")}>
+    <div className="code-card my-2 rounded-lg border border-border/50 overflow-hidden">
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-2.5 px-3 py-2 w-full cursor-pointer select-none bg-muted/40 hover:bg-muted/70 transition-colors"
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 w-full text-left",
+          !isStreaming &&
+            "cursor-pointer select-none hover:bg-muted/50 transition-colors"
+        )}
       >
-        <div className="h-7 w-7 rounded flex items-center justify-center bg-muted-foreground/10 text-muted-foreground/80 flex-shrink-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-3.5 w-3.5"
+        <span className="text-xs font-medium text-muted-foreground">
+          {langDisplay} · {lines} 行
+        </span>
+        <div className="flex-1" />
+        {!collapsed && (
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopy();
+            }}
+            className="cursor-pointer p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            title="复制代码"
           >
-            <polyline points="16 18 22 12 16 6" />
-            <polyline points="8 6 2 12 8 18" />
-          </svg>
-        </div>
-        <div className="flex-1 min-w-0 text-left">
-          <div className="text-xs font-medium text-foreground/80">
-            已生成 {lines} 行 {langLabel} 代码
-          </div>
-          <div className="text-[10px] text-muted-foreground/60">
-            点击{collapsed ? "展开" : "折叠"}查看
-          </div>
-        </div>
-        <div
+            {copied ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+          </span>
+        )}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           className={cn(
-            "h-5 w-5 flex items-center justify-center text-muted-foreground/60 transition-transform flex-shrink-0",
-            !collapsed && "rotate-90"
+            "text-muted-foreground transition-transform flex-shrink-0",
+            collapsed ? "-rotate-90" : ""
           )}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-3.5 w-3.5"
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </div>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
       {!collapsed && (
-        <div>
-          <Streamdown
-            plugins={{ code: codePlugin, cjk }}
-            isAnimating={isStreaming}
-            caret={isStreaming ? "block" : undefined}
-            controls={{ table: false, code: true }}
-          >
-            {fenceMarkdown}
-          </Streamdown>
-        </div>
+        <Streamdown
+          plugins={{ code: codePlugin, cjk }}
+          isAnimating={isStreaming}
+          caret={isStreaming ? "block" : undefined}
+          controls={false}
+        >
+          {fenceMarkdown}
+        </Streamdown>
       )}
     </div>
   );

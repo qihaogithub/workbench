@@ -12,7 +12,9 @@
 
 **问题 1**：发布后的项目如果使用本地图片路径，在使用端环境中无法访问（工作空间路径不存在）。
 
-**问题 2**：用户通过聊天框发送的图片（Base64 内联），AI 无法保存到工作区，导致生成的代码中无法引用这些图片。
+**问题 2**：用户通过聊天框发送的图片（Base64 内联或图片 URL），AI 无法保存到工作区，导致生成的代码中无法引用这些图片。
+
+**问题 3**：用户有时提供的是图片 URL（如 `https://example.com/photo.png`）而非本地文件上传，当前方案仅支持 Base64 内联图片，缺少对 URL 来源图片的处理能力。
 
 ### 1.2 需求场景
 
@@ -21,18 +23,39 @@
 - AI 需要将用户上传的参考图片嵌入到生成的页面中
 - 项目发布后，图片资源需持久可访问
 
-### 1.3 用户上传图片的处理流程
+### 1.3 用户发送图片的处理流程
+
+#### 场景 A：用户上传图片文件（Base64）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         用户发送图片                                     │
+│                    用户发送图片（文件上传）                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  1. UI 层：用户选择图片，Base64 编码后作为附件发送                        │
 │  2. 传输层：WebSocket 消息携带 images 字段                              │
 │  3. AI 接收：LLM 看到图片内容（多模态理解）                             │
-│  4. 【待实现】保存图片到工作区                                           │
+│  4. 【待实现】saveImage 工具保存 Base64 到工作区                        │
 │  5. AI 生成代码：使用本地相对路径引用已保存的图片                        │
 │  6. 发布时：自动上传图片到 OSS，替换路径                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 场景 B：用户发送图片 URL
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    用户发送图片 URL                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│  1. 用户在聊天中提供 URL："帮我用这张图 https://example.com/photo.png"   │
+│  2. AI 接收：从消息文本中提取图片 URL                                    │
+│  3. 【待实现】saveImage 工具下载 URL 图片并保存到工作区                  │
+│  4. AI 生成代码：使用本地相对路径引用已保存的图片                        │
+│  5. 发布时：自动上传图片到 OSS，替换路径                                 │
+│                                                                         │
+│  注意：URL 图片存在以下风险需处理：                                      │
+│  - URL 可能不可访问（超时/403/域名不存在）                               │
+│  - URL 可能指向非图片资源                                                │
+│  - URL 可能包含恶意内容                                                  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,6 +75,7 @@
 1. 新增 `saveImage` 工具，支持 Base64 图片保存到工作区
 2. AI 可在生成代码时引用已保存的图片
 3. 支持用户发送图片后，AI 自动保存并引用
+4. 支持用户发送图片 URL，AI 下载并保存到工作区
 
 ### 2.2 设计原则
 
@@ -106,7 +130,7 @@
 
 | 能力               | 触发时机     | 实现位置      | 说明                     |
 | :----------------- | :----------- | :------------ | :----------------------- |
-| **saveImage 工具** | AI 对话中    | agent-service | 保存 Base64 图片到工作区 |
+| **saveImage 工具** | AI 对话中    | agent-service | 保存 Base64 图片 / 下载 URL 图片到工作区 |
 | **发布图片处理**   | 点击发布按钮 | author-site   | 批量上传本地图片到 OSS   |
 
 ### 3.3 核心模块设计
@@ -519,8 +543,11 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "../../core/types";
 
 const SaveImageParams = Type.Object({
-  base64Data: Type.String({
-    description: "Base64 编码的图片数据（不含 data:image/xxx;base64, 前缀）",
+  source: Type.Union([Type.Literal('base64'), Type.Literal('url')], {
+    description: "图片来源：base64 为内联数据，url 为远程图片地址",
+  }),
+  data: Type.String({
+    description: "图片数据：source=base64 时为 Base64 编码字符串（不含 data:image/xxx;base64, 前缀）；source=url 时为图片 URL",
   }),
   filename: Type.String({
     description: "保存的文件名，如 product.png",
@@ -540,7 +567,7 @@ export function createSaveImageTool(
   return {
     name: "saveImage",
     label: "Save Image",
-    description: "Save a Base64 encoded image to the workspace",
+    description: "Save an image to the workspace from Base64 data or a remote URL",
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
       // 实现逻辑见下节
@@ -552,14 +579,23 @@ export function createSaveImageTool(
 #### 3.9.2 工具行为
 
 1. **参数校验**：
-   - `base64Data` 必须是有效的 Base64 字符串
+   - `source` 必须为 `"base64"` 或 `"url"`
+   - `source="base64"` 时，`data` 必须是有效的 Base64 字符串
+   - `source="url"` 时，`data` 必须是合法的 HTTP/HTTPS URL
    - `filename` 必须符合文件命名规范（不含特殊字符）
-   - 文件大小限制：最大 10MB（Base64 解码后）
+   - 文件大小限制：最大 10MB（解码/下载后）
 
 2. **保存流程**：
 
+   **Base64 来源**：
    ```
    Base64 解码 → 验证图片格式 → 生成保存路径 → 写入文件 → 返回相对路径
+   ```
+
+   **URL 来源**：
+   ```
+   URL 校验（仅允许 http/https）→ 下载图片（10s 超时）→ Content-Type 校验
+   → 文件大小校验 → 生成保存路径 → 写入文件 → 返回相对路径
    ```
 
 3. **返回值**（与现有工具保持一致的格式）：
@@ -571,7 +607,8 @@ export function createSaveImageTool(
      details: {
        path: 'images/product.png',
        size: 245678,  // 文件大小（字节）
-       format: 'png'  // 图片格式
+       format: 'png', // 图片格式
+       source: 'url'  // 来源：base64 | url
      }
    }
    ```
@@ -581,13 +618,31 @@ export function createSaveImageTool(
 ```typescript
 import * as fs from "fs";
 import * as path from "path";
+import * as https from "https";
+import * as http from "http";
+import { URL } from "url";
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from "./permissions";
 
 // 支持的图片格式
 const SUPPORTED_FORMATS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 
+// URL 下载超时（毫秒）
+const URL_DOWNLOAD_TIMEOUT = 10_000;
+
+// URL 下载最大文件大小（10MB）
+const MAX_DOWNLOAD_SIZE = 10 * 1024 * 1024;
+
+// Content-Type → 扩展名映射（用于 URL 来源自动推断扩展名）
+const MIME_TO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
+
 execute: async (toolCallId: string, args: SaveImageParams) => {
-  const { base64Data, filename, directory = "images" } = args;
+  const { source, data, filename, directory = "images" } = args;
 
   // 1. 验证文件名
   if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(filename)) {
@@ -613,16 +668,31 @@ execute: async (toolCallId: string, args: SaveImageParams) => {
     };
   }
 
-  // 3. Base64 解码
+  // 3. 获取图片 Buffer
   let buffer: Buffer;
-  try {
-    buffer = Buffer.from(base64Data, "base64");
-  } catch (error) {
-    return {
-      content: [{ type: "text", text: "Error: Invalid Base64 data" }],
-      details: { error: "invalid_base64" },
-      isError: true,
-    };
+
+  if (source === "base64") {
+    // 3a. Base64 解码
+    try {
+      buffer = Buffer.from(data, "base64");
+    } catch (error) {
+      return {
+        content: [{ type: "text", text: "Error: Invalid Base64 data" }],
+        details: { error: "invalid_base64" },
+        isError: true,
+      };
+    }
+  } else {
+    // 3b. URL 下载
+    const urlResult = await downloadImageFromUrl(data);
+    if (urlResult.error) {
+      return {
+        content: [{ type: "text", text: `Error: ${urlResult.error}` }],
+        details: { error: urlResult.errorCode },
+        isError: true,
+      };
+    }
+    buffer = urlResult.buffer!;
   }
 
   // 4. 验证文件大小
@@ -672,6 +742,7 @@ execute: async (toolCallId: string, args: SaveImageParams) => {
         path: relativePath,
         size: buffer.length,
         format: ext,
+        source,
       },
     };
   } catch (error) {
@@ -682,6 +753,113 @@ execute: async (toolCallId: string, args: SaveImageParams) => {
     };
   }
 };
+
+/**
+ * 从 URL 下载图片
+ * - 仅允许 http/https 协议
+ * - 10 秒超时
+ * - 校验 Content-Type 为图片类型
+ */
+async function downloadImageFromUrl(
+  urlString: string,
+): Promise<{
+  buffer?: Buffer;
+  error?: string;
+  errorCode?: string;
+}> {
+  // 1. URL 格式校验
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(urlString);
+  } catch {
+    return { error: "Invalid URL format", errorCode: "invalid_url" };
+  }
+
+  // 2. 协议限制（仅 http/https，防止 SSRF）
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return {
+      error: "Only http:// and https:// URLs are allowed",
+      errorCode: "invalid_protocol",
+    };
+  }
+
+  // 3. 下载（带超时和大小限制）
+  return new Promise((resolve) => {
+    const client = parsedUrl.protocol === "https:" ? https : http;
+
+    const req = client.get(urlString, { timeout: URL_DOWNLOAD_TIMEOUT }, (res) => {
+      // 跟随重定向（最多 3 次）
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectResult = downloadImageFromUrl(res.headers.location);
+        redirectResult.then(resolve);
+        res.destroy();
+        return;
+      }
+
+      if (res.statusCode !== 200) {
+        res.destroy();
+        resolve({
+          error: `HTTP ${res.statusCode} when downloading image`,
+          errorCode: "download_failed",
+        });
+        return;
+      }
+
+      // Content-Type 校验
+      const contentType = res.headers["content-type"] || "";
+      if (!contentType.startsWith("image/")) {
+        res.destroy();
+        resolve({
+          error: `URL does not point to an image (Content-Type: ${contentType})`,
+          errorCode: "not_an_image",
+        });
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+
+      res.on("data", (chunk: Buffer) => {
+        totalSize += chunk.length;
+        if (totalSize > MAX_DOWNLOAD_SIZE) {
+          res.destroy();
+          resolve({
+            error: "Image exceeds 10MB size limit",
+            errorCode: "file_too_large",
+          });
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      res.on("end", () => {
+        resolve({ buffer: Buffer.concat(chunks) });
+      });
+
+      res.on("error", (err) => {
+        resolve({
+          error: `Download error: ${err.message}`,
+          errorCode: "download_failed",
+        });
+      });
+    });
+
+    req.on("timeout", () => {
+      req.destroy();
+      resolve({
+        error: `Download timed out after ${URL_DOWNLOAD_TIMEOUT / 1000}s`,
+        errorCode: "download_timeout",
+      });
+    });
+
+    req.on("error", (err) => {
+      resolve({
+        error: `Network error: ${err.message}`,
+        errorCode: "download_failed",
+      });
+    });
+  });
+}
 ```
 
 #### 3.9.4 工具注册
@@ -712,25 +890,41 @@ export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
 
 ### 保存用户上传的图片
 
-当用户在对话中发送图片（Base64 格式）时：
+当用户在对话中发送图片时，支持两种来源：
 
-1. 使用 `saveImage` 工具将图片保存到工作区
+**来源 1：文件上传（Base64）**
+
+1. 使用 `saveImage` 工具将图片保存到工作区（source="base64"）
 2. 默认保存到 `images/` 目录
 3. 在生成的代码中使用相对路径引用：`<img src="./images/xxx.png" />`
 
-示例：
-
 ```typescript
-// 用户发送了一张产品图
+// 用户通过附件上传了一张产品图
 saveImage({
-  base64Data: 'iVBORw0KGgo...',  // Base64 数据
+  source: 'base64',
+  data: 'iVBORw0KGgo...',     // Base64 数据
   filename: 'product.png',
   directory: 'images'
 });
-
-// 在代码中引用
-<img src="./images/product.png" alt="产品图" />
 ```
+
+**来源 2：图片 URL**
+
+1. 用户提供图片链接时，使用 `saveImage` 工具下载并保存（source="url"）
+2. 工具会自动下载、验证并保存到工作区
+3. 在生成的代码中使用相对路径引用
+
+```typescript
+// 用户提供了一张在线图片
+saveImage({
+  source: 'url',
+  data: 'https://example.com/photo.png',  // 图片 URL
+  filename: 'hero.png',
+  directory: 'images'
+});
+```
+
+> **安全提示**：URL 来源仅允许 http/https 协议，下载超时 10 秒，最大 10MB，且会校验 Content-Type 确保是图片资源。
 
 ### 发布时自动处理
 
@@ -881,6 +1075,11 @@ async function validateFileSize(filePath: string): Promise<boolean> {
 | 文件过大         | `FILE_TOO_LARGE`     | "文件大小超过 10MB 限制"               |
 | 上传失败（网络） | `UPLOAD_FAILED`      | "图片上传失败，请重试"                 |
 | 部分上传失败     | `PARTIAL_UPLOAD`     | "{count} 张图片上传失败"               |
+| URL 格式非法     | `INVALID_URL`        | "图片 URL 格式不正确"                  |
+| URL 协议不允许   | `INVALID_PROTOCOL`   | "仅支持 http/https 协议的图片 URL"     |
+| URL 下载失败     | `DOWNLOAD_FAILED`    | "图片下载失败，请检查 URL 是否可访问"  |
+| URL 下载超时     | `DOWNLOAD_TIMEOUT`   | "图片下载超时（10s），请稍后重试或提供其他 URL" |
+| URL 非图片资源   | `NOT_AN_IMAGE`       | "URL 指向的不是图片资源"               |
 
 ## 7. 后续扩展方向
 
@@ -924,11 +1123,15 @@ interface IStorageProvider {
 ### saveImage 工具
 
 - [ ] AI 可成功调用 `saveImage` 工具
-- [ ] Base64 图片正确保存为二进制文件
+- [ ] `source="base64"` 时 Base64 图片正确保存为二进制文件
+- [ ] `source="url"` 时可正确下载并保存图片
 - [ ] 支持 png/jpg/gif/webp/svg 格式
-- [ ] 超过 10MB 的图片被拒绝
+- [ ] 超过 10MB 的图片被拒绝（Base64 和 URL 来源均生效）
 - [ ] 非法文件名被拒绝
 - [ ] 路径遍历攻击被拦截
+- [ ] URL 来源仅允许 http/https 协议（防止 SSRF）
+- [ ] URL 下载超时（10s）时返回明确错误
+- [ ] URL 指向非图片资源时返回明确错误
 - [ ] 保存后可在代码中通过相对路径引用
 
 ### 发布图片处理
@@ -956,6 +1159,9 @@ interface IStorageProvider {
 | 大量图片上传慢 | 中   | 中   | 并发上传 + 进度展示 + 超时控制      |
 | 部分上传失败   | 中   | 低   | 记录失败列表，支持重试或降级处理    |
 | 发布中断       | 中   | 低   | 事务性操作，失败时回滚发布目录      |
+| URL 图片不可访问 | 中 | 中   | 10s 超时 + 明确错误提示，AI 可回退为占位图或提示用户重新提供 |
+| URL SSRF 攻击    | 高 | 低   | 仅允许 http/https 协议，禁止内网 IP 和 file:// 等危险协议 |
+| URL 图片非真实图片 | 中 | 低   | 校验 Content-Type 响应头，确保为 image/* |
 
 ## 10. 依赖项
 
@@ -999,9 +1205,9 @@ interface IStorageProvider {
 
 ---
 
-**文档版本**：v2.1  
+**文档版本**：v2.2  
 **创建日期**：2026-06-03  
-**最后更新**：2026-06-03（新增 saveImage 工具设计）  
+**最后更新**：2026-06-03（新增图片 URL 来源支持，saveImage 工具支持 base64/url 双来源）  
 **状态**：待评审
 
 ## 附录：方案演变记录
@@ -1011,3 +1217,4 @@ interface IStorageProvider {
 | v1.0 | 2026-06-03 | 初始方案：AI 主动上传 OSS                     |
 | v2.0 | 2026-06-03 | 重构为发布时构建上传                          |
 | v2.1 | 2026-06-03 | 新增 saveImage 工具，支持用户图片保存到工作区 |
+| v2.2 | 2026-06-03 | saveImage 工具支持 URL 来源（下载远程图片），补充 SSRF 防护和错误码 |

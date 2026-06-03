@@ -76,6 +76,18 @@
     background: transparent;
   }
 
+  /* 代码块折叠 — GitHub 风格统一卡片 */
+  .code-card [data-streamdown="code-block"] {
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .code-card [data-streamdown="code-block-header"] {
+    display: none !important;
+  }
 }
 
 /* ============================================
