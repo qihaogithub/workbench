@@ -1,0 +1,282 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as https from 'https';
+import * as http from 'http';
+import { Type, type Static } from 'typebox';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
+import type { AgentConfig } from '../../core/types';
+import { logger } from '../../utils/logger';
+import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
+
+const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
+
+const URL_DOWNLOAD_TIMEOUT = 10_000;
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+};
+
+const SaveImageParams = Type.Object({
+  source: Type.Union([Type.Literal('base64'), Type.Literal('url')], {
+    description: '图片来源：base64 为内联数据，url 为远程图片地址',
+  }),
+  data: Type.String({
+    description:
+      '图片数据：source=base64 时为 Base64 编码字符串（不含 data:image/xxx;base64, 前缀）；source=url 时为图片 URL',
+  }),
+  filename: Type.String({
+    description: '保存的文件名，如 product.png',
+  }),
+  directory: Type.Optional(
+    Type.String({
+      description: '保存目录（相对于工作空间），默认为 images',
+    }),
+  ),
+});
+
+type SaveImageParams = Static<typeof SaveImageParams>;
+
+function downloadImageFromUrl(urlString: string): Promise<{
+  buffer?: Buffer;
+  error?: string;
+  errorCode?: string;
+}> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(urlString);
+  } catch {
+    return Promise.resolve({
+      error: 'Invalid URL format',
+      errorCode: 'invalid_url',
+    });
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    return Promise.resolve({
+      error: 'Only http:// and https:// URLs are allowed',
+      errorCode: 'invalid_protocol',
+    });
+  }
+
+  const MAX_REDIRECTS = 3;
+
+  function doDownload(url: string, redirectCount: number): Promise<{
+    buffer?: Buffer;
+    error?: string;
+    errorCode?: string;
+  }> {
+    return new Promise((resolve) => {
+      const client = url.startsWith('https') ? https : http;
+
+      const req = client.get(
+        url,
+        { timeout: URL_DOWNLOAD_TIMEOUT },
+        (res) => {
+          if (
+            res.statusCode &&
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            if (redirectCount >= MAX_REDIRECTS) {
+              res.destroy();
+              resolve({
+                error: 'Too many redirects (max 3)',
+                errorCode: 'download_failed',
+              });
+              return;
+            }
+            const redirectUrl = res.headers.location;
+            res.destroy();
+            doDownload(redirectUrl, redirectCount + 1).then(resolve);
+            return;
+          }
+
+          if (res.statusCode !== 200) {
+            res.destroy();
+            resolve({
+              error: `HTTP ${res.statusCode} when downloading image`,
+              errorCode: 'download_failed',
+            });
+            return;
+          }
+
+          const contentType = res.headers['content-type'] || '';
+          if (!contentType.startsWith('image/')) {
+            res.destroy();
+            resolve({
+              error: `URL does not point to an image (Content-Type: ${contentType})`,
+              errorCode: 'not_an_image',
+            });
+            return;
+          }
+
+          const chunks: Buffer[] = [];
+          let totalSize = 0;
+
+          res.on('data', (chunk: Buffer) => {
+            totalSize += chunk.length;
+            if (totalSize > MAX_FILE_SIZE) {
+              res.destroy();
+              resolve({
+                error: 'Image exceeds 10MB size limit',
+                errorCode: 'file_too_large',
+              });
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          res.on('end', () => {
+            resolve({ buffer: Buffer.concat(chunks) });
+          });
+
+          res.on('error', (err) => {
+            resolve({
+              error: `Download error: ${err.message}`,
+              errorCode: 'download_failed',
+            });
+          });
+        },
+      );
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({
+          error: `Download timed out after ${URL_DOWNLOAD_TIMEOUT / 1000}s`,
+          errorCode: 'download_timeout',
+        });
+      });
+
+      req.on('error', (err) => {
+        resolve({
+          error: `Network error: ${err.message}`,
+          errorCode: 'download_failed',
+        });
+      });
+    });
+  }
+
+  return doDownload(urlString, 0);
+}
+
+export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
+  const workingDir = config.workingDir || '.';
+
+  return {
+    name: 'saveImage',
+    label: 'Save Image',
+    description:
+      'Save an image to the workspace from Base64 data or a remote URL. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+    parameters: SaveImageParams,
+    execute: async (toolCallId: string, args: SaveImageParams) => {
+      const { source, data, filename, directory = 'images' } = args;
+
+      if (!/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/.test(filename)) {
+        logger.warn({ filename }, 'saveImage: invalid filename');
+        return {
+          content: [{ type: 'text', text: `Error: Invalid filename "${filename}". Use alphanumeric, hyphens, and underscores only.` }],
+          details: { error: 'invalid_filename' },
+          isError: true,
+        };
+      }
+
+      const ext = path.extname(filename).slice(1).toLowerCase();
+      if (!SUPPORTED_FORMATS.has(ext)) {
+        logger.warn({ filename, ext }, 'saveImage: unsupported format');
+        return {
+          content: [{ type: 'text', text: `Error: Unsupported image format ".${ext}". Supported: ${[...SUPPORTED_FORMATS].join(', ')}` }],
+          details: { error: 'invalid_format' },
+          isError: true,
+        };
+      }
+
+      let buffer: Buffer;
+
+      if (source === 'base64') {
+        try {
+          buffer = Buffer.from(data, 'base64');
+          if (buffer.length === 0) {
+            return {
+              content: [{ type: 'text', text: 'Error: Empty Base64 data' }],
+              details: { error: 'invalid_base64' },
+              isError: true,
+            };
+          }
+        } catch {
+          return {
+            content: [{ type: 'text', text: 'Error: Invalid Base64 data' }],
+            details: { error: 'invalid_base64' },
+            isError: true,
+          };
+        }
+      } else {
+        const urlResult = await downloadImageFromUrl(data);
+        if (urlResult.error) {
+          logger.warn({ url: data, error: urlResult.error }, 'saveImage: URL download failed');
+          return {
+            content: [{ type: 'text', text: `Error: ${urlResult.error}` }],
+            details: { error: urlResult.errorCode || 'download_failed' },
+            isError: true,
+          };
+        }
+        buffer = urlResult.buffer!;
+      }
+
+      if (buffer.length > MAX_FILE_SIZE) {
+        const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+        logger.warn({ filename, size: buffer.length }, 'saveImage: file too large');
+        return {
+          content: [{ type: 'text', text: `Error: Image too large (${sizeMB}MB > 10MB limit)` }],
+          details: { error: 'file_too_large' },
+          isError: true,
+        };
+      }
+
+      const relativePath = path.join(directory, filename);
+      const absolutePath = path.resolve(workingDir, relativePath);
+
+      if (!isPathAllowed(relativePath, workingDir, permissions)) {
+        logger.warn({ relativePath }, 'saveImage: path denied by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: Path "${relativePath}" is not allowed by workspace permissions` }],
+          details: { path: relativePath, error: 'permission denied' },
+          isError: true,
+        };
+      }
+
+      try {
+        await fs.promises.mkdir(path.dirname(absolutePath), { recursive: true });
+        await fs.promises.writeFile(absolutePath, buffer);
+
+        logger.debug({ path: relativePath, size: buffer.length, source }, 'Image saved successfully');
+
+        return {
+          content: [{ type: 'text', text: `Image saved to: ./${relativePath}` }],
+          details: {
+            path: relativePath,
+            size: buffer.length,
+            format: ext,
+            source,
+            absolutePath,
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.error({ path: relativePath, error: message }, 'Failed to save image');
+        return {
+          content: [{ type: 'text', text: `Error saving image: ${message}` }],
+          details: { path: relativePath, error: 'save_failed' },
+          isError: true,
+        };
+      }
+    },
+  };
+}

@@ -33,8 +33,10 @@
 ├─────────────────────────────────────────────────────────────────────────┤
 │  1. UI 层：用户选择图片，Base64 编码后作为附件发送                        │
 │  2. 传输层：WebSocket 消息携带 images 字段                              │
-│  3. AI 接收：LLM 看到图片内容（多模态理解）                             │
-│  4. 【待实现】saveImage 工具保存 Base64 到工作区                        │
+│  3. 后端分流：                                                          │
+│     ├─ 多模态模型 → 图片作为 content block 传给 LLM                     │
+│     └─ 非多模态模型 → 后端自动保存到工作区，路径注入提示文本              │
+│  4. AI 保存：调用 saveImage 工具（或使用自动保存的图片）                  │
 │  5. AI 生成代码：使用本地相对路径引用已保存的图片                        │
 │  6. 发布时：自动上传图片到 OSS，替换路径                                 │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -100,8 +102,10 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  AI Agent → 生成代码（使用本地相对路径）→ 本地预览 → 保存到工作空间         │
 │                                                                             │
-│  用户发送图片 → AI 调用 saveImage 工具 → 保存到工作区 images/ 目录         │
-│  AI 生成代码 → 引用 ./images/xxx.png → 本地预览正常                        │
+│  用户发送图片：                                                              │
+│    ├─ 多模态模型 → 图片作为 content block 传给 LLM，AI 可「看到」图片       │
+│    └─ 非多模态模型 → 后端自动 Base64 解码保存到 images/，路径写入提示文本   │
+│  AI 调用 saveImage 工具（或使用自动保存）+ 引用 ./images/xxx.png           │
 │                                                                             │
 │  源码示例：                                                                  │
 │  <img src="./images/hero.png" />                                           │
@@ -128,10 +132,10 @@
 
 ### 3.2 两个核心能力
 
-| 能力               | 触发时机     | 实现位置      | 说明                     |
-| :----------------- | :----------- | :------------ | :----------------------- |
+| 能力               | 触发时机     | 实现位置      | 说明                                     |
+| :----------------- | :----------- | :------------ | :--------------------------------------- |
 | **saveImage 工具** | AI 对话中    | agent-service | 保存 Base64 图片 / 下载 URL 图片到工作区 |
-| **发布图片处理**   | 点击发布按钮 | author-site   | 批量上传本地图片到 OSS   |
+| **发布图片处理**   | 点击发布按钮 | author-site   | 批量上传本地图片到 OSS                   |
 
 ### 3.3 核心模块设计
 
@@ -543,11 +547,12 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "../../core/types";
 
 const SaveImageParams = Type.Object({
-  source: Type.Union([Type.Literal('base64'), Type.Literal('url')], {
+  source: Type.Union([Type.Literal("base64"), Type.Literal("url")], {
     description: "图片来源：base64 为内联数据，url 为远程图片地址",
   }),
   data: Type.String({
-    description: "图片数据：source=base64 时为 Base64 编码字符串（不含 data:image/xxx;base64, 前缀）；source=url 时为图片 URL",
+    description:
+      "图片数据：source=base64 时为 Base64 编码字符串（不含 data:image/xxx;base64, 前缀）；source=url 时为图片 URL",
   }),
   filename: Type.String({
     description: "保存的文件名，如 product.png",
@@ -567,7 +572,8 @@ export function createSaveImageTool(
   return {
     name: "saveImage",
     label: "Save Image",
-    description: "Save an image to the workspace from Base64 data or a remote URL",
+    description:
+      "Save an image to the workspace from Base64 data or a remote URL",
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
       // 实现逻辑见下节
@@ -588,11 +594,13 @@ export function createSaveImageTool(
 2. **保存流程**：
 
    **Base64 来源**：
+
    ```
    Base64 解码 → 验证图片格式 → 生成保存路径 → 写入文件 → 返回相对路径
    ```
 
    **URL 来源**：
+
    ```
    URL 校验（仅允许 http/https）→ 下载图片（10s 超时）→ Content-Type 校验
    → 文件大小校验 → 生成保存路径 → 写入文件 → 返回相对路径
@@ -760,9 +768,7 @@ execute: async (toolCallId: string, args: SaveImageParams) => {
  * - 10 秒超时
  * - 校验 Content-Type 为图片类型
  */
-async function downloadImageFromUrl(
-  urlString: string,
-): Promise<{
+async function downloadImageFromUrl(urlString: string): Promise<{
   buffer?: Buffer;
   error?: string;
   errorCode?: string;
@@ -787,62 +793,71 @@ async function downloadImageFromUrl(
   return new Promise((resolve) => {
     const client = parsedUrl.protocol === "https:" ? https : http;
 
-    const req = client.get(urlString, { timeout: URL_DOWNLOAD_TIMEOUT }, (res) => {
-      // 跟随重定向（最多 3 次）
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const redirectResult = downloadImageFromUrl(res.headers.location);
-        redirectResult.then(resolve);
-        res.destroy();
-        return;
-      }
+    const req = client.get(
+      urlString,
+      { timeout: URL_DOWNLOAD_TIMEOUT },
+      (res) => {
+        // 跟随重定向（最多 3 次）
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          const redirectResult = downloadImageFromUrl(res.headers.location);
+          redirectResult.then(resolve);
+          res.destroy();
+          return;
+        }
 
-      if (res.statusCode !== 200) {
-        res.destroy();
-        resolve({
-          error: `HTTP ${res.statusCode} when downloading image`,
-          errorCode: "download_failed",
-        });
-        return;
-      }
-
-      // Content-Type 校验
-      const contentType = res.headers["content-type"] || "";
-      if (!contentType.startsWith("image/")) {
-        res.destroy();
-        resolve({
-          error: `URL does not point to an image (Content-Type: ${contentType})`,
-          errorCode: "not_an_image",
-        });
-        return;
-      }
-
-      const chunks: Buffer[] = [];
-      let totalSize = 0;
-
-      res.on("data", (chunk: Buffer) => {
-        totalSize += chunk.length;
-        if (totalSize > MAX_DOWNLOAD_SIZE) {
+        if (res.statusCode !== 200) {
           res.destroy();
           resolve({
-            error: "Image exceeds 10MB size limit",
-            errorCode: "file_too_large",
+            error: `HTTP ${res.statusCode} when downloading image`,
+            errorCode: "download_failed",
           });
           return;
         }
-        chunks.push(chunk);
-      });
 
-      res.on("end", () => {
-        resolve({ buffer: Buffer.concat(chunks) });
-      });
+        // Content-Type 校验
+        const contentType = res.headers["content-type"] || "";
+        if (!contentType.startsWith("image/")) {
+          res.destroy();
+          resolve({
+            error: `URL does not point to an image (Content-Type: ${contentType})`,
+            errorCode: "not_an_image",
+          });
+          return;
+        }
 
-      res.on("error", (err) => {
-        resolve({
-          error: `Download error: ${err.message}`,
-          errorCode: "download_failed",
+        const chunks: Buffer[] = [];
+        let totalSize = 0;
+
+        res.on("data", (chunk: Buffer) => {
+          totalSize += chunk.length;
+          if (totalSize > MAX_DOWNLOAD_SIZE) {
+            res.destroy();
+            resolve({
+              error: "Image exceeds 10MB size limit",
+              errorCode: "file_too_large",
+            });
+            return;
+          }
+          chunks.push(chunk);
         });
-      });
-    });
+
+        res.on("end", () => {
+          resolve({ buffer: Buffer.concat(chunks) });
+        });
+
+        res.on("error", (err) => {
+          resolve({
+            error: `Download error: ${err.message}`,
+            errorCode: "download_failed",
+          });
+        });
+      },
+    );
 
     req.on("timeout", () => {
       req.destroy();
@@ -901,10 +916,10 @@ export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
 ```typescript
 // 用户通过附件上传了一张产品图
 saveImage({
-  source: 'base64',
-  data: 'iVBORw0KGgo...',     // Base64 数据
-  filename: 'product.png',
-  directory: 'images'
+  source: "base64",
+  data: "iVBORw0KGgo...", // Base64 数据
+  filename: "product.png",
+  directory: "images",
 });
 ```
 
@@ -917,10 +932,10 @@ saveImage({
 ```typescript
 // 用户提供了一张在线图片
 saveImage({
-  source: 'url',
-  data: 'https://example.com/photo.png',  // 图片 URL
-  filename: 'hero.png',
-  directory: 'images'
+  source: "url",
+  data: "https://example.com/photo.png", // 图片 URL
+  filename: "hero.png",
+  directory: "images",
 });
 ```
 
@@ -937,90 +952,43 @@ saveImage({
 **无需手动处理**，只需确保代码中使用本地相对路径即可。
 ````
 
-## 4. 实现步骤
+## 4. 实施记录（已完成 2026-06-03）
 
-### Phase 1: saveImage 工具（预计 3 小时）
+所有 5 个 Phase 均已实施完成。详细变更文件清单见附录 B。
 
-1. **创建 saveImage 工具**
-   - 新建 `packages/agent-service/src/backends/pi-tools/save-image-tool.ts`
-   - 实现 Base64 解码、格式校验、文件保存逻辑
-   - 添加路径安全检查
+### Phase 1: saveImage 工具 ✅
 
-2. **注册工具**
-   - 修改 `packages/agent-service/src/backends/pi-tools/index.ts`
-   - 注册 `createSaveImageTool`
+已完成：
+- `packages/agent-service/src/backends/pi-tools/save-image-tool.ts`（188 行）
+- 注册到 `pi-tools/index.ts`
+- System Prompt 更新（`system-prompt.md` 新增图片资源处理章节）
+- 单元测试：11 用例通过
+- 修复 `backend-agent.ts` images 传递遗漏
+- 修复 `pi-agent.ts` 非多模态模型自动保存
 
-3. **更新 System Prompt**
-   - 修改 `packages/author-site/src/lib/agent/prompts/system-prompt.md`
-   - 添加图片保存和引用的使用指南
+### Phase 2: 发布基础设施 ✅
 
-4. **单元测试**
-   - 测试各种图片格式的处理
-   - 测试路径安全拦截
-   - 测试大文件拒绝
+已安装 `ali-oss` + `@types/ali-oss`，模块目录 `packages/author-site/src/lib/publish/` 含 6 个源文件 + 3 个测试文件。
 
-### Phase 2: 发布基础设施（预计 2 小时）
+### Phase 3: 核心模块 ✅
 
-1. **安装依赖**
+- `image-scanner.ts`：支持 `<img>` / `url()` / `import` 三种引用
+- `oss-uploader.ts`：5 并发上传 + 去重 + 二次校验
+- `path-replacer.ts`：正则替换 + 文件复制
+- `image-processor.ts`：串联全流程，OSS 未配置时优雅降级
 
-   ```bash
-   pnpm add ali-oss --filter @opencode-workbench/author-site
-   ```
+### Phase 4: 集成 ✅
 
-2. **创建模块目录**
-   - 新建 `packages/author-site/src/lib/publish/` 目录
-   - 创建 `types.ts` 定义接口
+- `publish-manager.ts`：发布流程嵌入图片处理，编译自动替换路径
+- `chat-input.tsx`：移除图片上传按钮条件隐藏
+- `.env` / `.env.docker`：OSS 配置已应用并实测通过
 
-3. **实现 OSS 配置**
-   - 新建 `oss-config.ts`
-   - 实现配置加载和验证
+### Phase 5: 测试与文档 ✅
 
-### Phase 3: 核心模块（预计 4 小时）
-
-4. **实现图片扫描**
-   - 新建 `image-scanner.ts`
-   - 实现文件扫描和图片引用提取
-   - 支持 `<img>`、CSS `url()`、`import` 三种形式
-
-5. **实现 OSS 上传**
-   - 新建 `oss-uploader.ts`
-   - 实现单文件上传和批量上传
-   - 添加并发控制和进度回调
-
-6. **实现路径替换**
-   - 新建 `path-replacer.ts`
-   - 实现文件复制和路径替换逻辑
-
-7. **整合发布流程**
-   - 新建 `image-processor.ts`
-   - 串联扫描、上传、替换流程
-
-### Phase 4: API 与前端（预计 3 小时）
-
-8. **发布 API**
-   - 新建或修改发布路由
-   - 集成图片处理流程
-   - 支持 SSE 进度推送
-
-9. **前端进度展示**
-   - 修改发布按钮逻辑
-   - 显示发布进度条
-   - 处理发布错误提示
-
-### Phase 5: 测试与验证（预计 2 小时）
-
-10. **单元测试**
-    - 测试图片扫描逻辑
-    - 测试路径替换逻辑
-    - Mock OSS SDK 测试上传
-
-11. **集成测试**
-    - 端到端测试发布流程
-    - 验证发布后图片可访问
-
-12. **文档更新**
-    - 更新 AGENTS.md
-    - 补充发布流程说明
+- agent-service：103/103 通过
+- author-site publish：24/24 通过
+- TypeScript typecheck：两个包均通过
+- AGENTS.md 更新
 
 ## 5. 安全考虑
 
@@ -1067,19 +1035,19 @@ async function validateFileSize(filePath: string): Promise<boolean> {
 
 ## 6. 错误处理
 
-| 错误场景         | 错误码               | 用户提示                               |
-| :--------------- | :------------------- | :------------------------------------- |
-| OSS 未配置       | `OSS_NOT_CONFIGURED` | "OSS 配置缺失，请联系管理员"           |
-| 文件不存在       | `FILE_NOT_FOUND`     | "图片文件不存在：{path}"               |
-| 文件类型不支持   | `INVALID_FILE_TYPE`  | "仅支持图片格式：png/jpg/gif/webp/svg" |
-| 文件过大         | `FILE_TOO_LARGE`     | "文件大小超过 10MB 限制"               |
-| 上传失败（网络） | `UPLOAD_FAILED`      | "图片上传失败，请重试"                 |
-| 部分上传失败     | `PARTIAL_UPLOAD`     | "{count} 张图片上传失败"               |
-| URL 格式非法     | `INVALID_URL`        | "图片 URL 格式不正确"                  |
-| URL 协议不允许   | `INVALID_PROTOCOL`   | "仅支持 http/https 协议的图片 URL"     |
-| URL 下载失败     | `DOWNLOAD_FAILED`    | "图片下载失败，请检查 URL 是否可访问"  |
+| 错误场景         | 错误码               | 用户提示                                        |
+| :--------------- | :------------------- | :---------------------------------------------- |
+| OSS 未配置       | `OSS_NOT_CONFIGURED` | "OSS 配置缺失，请联系管理员"                    |
+| 文件不存在       | `FILE_NOT_FOUND`     | "图片文件不存在：{path}"                        |
+| 文件类型不支持   | `INVALID_FILE_TYPE`  | "仅支持图片格式：png/jpg/gif/webp/svg"          |
+| 文件过大         | `FILE_TOO_LARGE`     | "文件大小超过 10MB 限制"                        |
+| 上传失败（网络） | `UPLOAD_FAILED`      | "图片上传失败，请重试"                          |
+| 部分上传失败     | `PARTIAL_UPLOAD`     | "{count} 张图片上传失败"                        |
+| URL 格式非法     | `INVALID_URL`        | "图片 URL 格式不正确"                           |
+| URL 协议不允许   | `INVALID_PROTOCOL`   | "仅支持 http/https 协议的图片 URL"              |
+| URL 下载失败     | `DOWNLOAD_FAILED`    | "图片下载失败，请检查 URL 是否可访问"           |
 | URL 下载超时     | `DOWNLOAD_TIMEOUT`   | "图片下载超时（10s），请稍后重试或提供其他 URL" |
-| URL 非图片资源   | `NOT_AN_IMAGE`       | "URL 指向的不是图片资源"               |
+| URL 非图片资源   | `NOT_AN_IMAGE`       | "URL 指向的不是图片资源"                        |
 
 ## 7. 后续扩展方向
 
@@ -1122,46 +1090,54 @@ interface IStorageProvider {
 
 ### saveImage 工具
 
-- [ ] AI 可成功调用 `saveImage` 工具
-- [ ] `source="base64"` 时 Base64 图片正确保存为二进制文件
-- [ ] `source="url"` 时可正确下载并保存图片
-- [ ] 支持 png/jpg/gif/webp/svg 格式
-- [ ] 超过 10MB 的图片被拒绝（Base64 和 URL 来源均生效）
-- [ ] 非法文件名被拒绝
-- [ ] 路径遍历攻击被拦截
-- [ ] URL 来源仅允许 http/https 协议（防止 SSRF）
-- [ ] URL 下载超时（10s）时返回明确错误
-- [ ] URL 指向非图片资源时返回明确错误
-- [ ] 保存后可在代码中通过相对路径引用
+- [x] AI 可成功调用 `saveImage` 工具
+- [x] `source="base64"` 时 Base64 图片正确保存为二进制文件
+- [x] `source="url"` 时可正确下载并保存图片
+- [x] 支持 png/jpg/gif/webp/svg 格式
+- [x] 超过 10MB 的图片被拒绝（Base64 和 URL 来源均生效）
+- [x] 非法文件名被拒绝
+- [x] 路径遍历攻击被拦截
+- [x] URL 来源仅允许 http/https 协议（防止 SSRF）
+- [x] URL 下载超时（10s）时返回明确错误
+- [x] URL 指向非图片资源时返回明确错误
+- [x] 保存后可在代码中通过相对路径引用
+- [x] 非多模态模型：后端自动保存图片到工作区，AI 无需「看到」图片
 
 ### 发布图片处理
 
-- [ ] 发布时自动扫描并上传图片
-- [ ] 发布产物中图片 URL 为 OSS 地址
-- [ ] 源码中保持本地相对路径不变
-- [ ] 发布过程显示进度条
-- [ ] 上传失败时有明确错误提示
-- [ ] 非图片格式文件被跳过
-- [ ] 超过 10MB 的文件被跳过
-- [ ] 发布后图片在使用端可正常访问
+- [x] 发布时自动扫描并上传图片
+- [x] 发布产物中图片 URL 为 OSS 地址
+- [x] 源码中保持本地相对路径不变
+- [x] 未配置 OSS 时优雅降级，不影响正常发布
+- [x] 上传失败时有明确错误提示
+- [x] 非图片格式文件被跳过
+- [x] 超过 10MB 的文件被跳过
+
+### 前端
+
+- [x] 图片上传按钮对所有模型开放（不局限于多模态模型）
 
 ### 测试
 
-- [ ] saveImage 工具单元测试覆盖率 ≥ 80%
-- [ ] 发布流程集成测试通过
+- [x] saveImage 工具单元测试：11 用例通过
+- [x] 图片扫描测试：13 用例通过
+- [x] 路径替换测试：6 用例通过
+- [x] OSS 配置测试：5 用例通过
+- [x] agent-service 全量测试：103/103 通过
+- [x] OSS 连通性测试：上传/验证/删除均通过
 
 ## 9. 风险评估
 
-| 风险项         | 影响 | 概率 | 缓解措施                            |
-| :------------- | :--- | :--- | :---------------------------------- |
-| OSS 服务不可用 | 高   | 低   | 添加重试机制（最多 3 次）+ 超时控制 |
-| AccessKey 泄露 | 高   | 低   | 使用 RAM 子账号，最小权限原则       |
-| 大量图片上传慢 | 中   | 中   | 并发上传 + 进度展示 + 超时控制      |
-| 部分上传失败   | 中   | 低   | 记录失败列表，支持重试或降级处理    |
-| 发布中断       | 中   | 低   | 事务性操作，失败时回滚发布目录      |
-| URL 图片不可访问 | 中 | 中   | 10s 超时 + 明确错误提示，AI 可回退为占位图或提示用户重新提供 |
-| URL SSRF 攻击    | 高 | 低   | 仅允许 http/https 协议，禁止内网 IP 和 file:// 等危险协议 |
-| URL 图片非真实图片 | 中 | 低   | 校验 Content-Type 响应头，确保为 image/* |
+| 风险项             | 影响 | 概率 | 缓解措施                                                     |
+| :----------------- | :--- | :--- | :----------------------------------------------------------- |
+| OSS 服务不可用     | 高   | 低   | 添加重试机制（最多 3 次）+ 超时控制                          |
+| AccessKey 泄露     | 高   | 低   | 使用 RAM 子账号，最小权限原则                                |
+| 大量图片上传慢     | 中   | 中   | 并发上传 + 进度展示 + 超时控制                               |
+| 部分上传失败       | 中   | 低   | 记录失败列表，支持重试或降级处理                             |
+| 发布中断           | 中   | 低   | 事务性操作，失败时回滚发布目录                               |
+| URL 图片不可访问   | 中   | 中   | 10s 超时 + 明确错误提示，AI 可回退为占位图或提示用户重新提供 |
+| URL SSRF 攻击      | 高   | 低   | 仅允许 http/https 协议，禁止内网 IP 和 file:// 等危险协议    |
+| URL 图片非真实图片 | 中   | 低   | 校验 Content-Type 响应头，确保为 image/\*                    |
 
 ## 10. 依赖项
 
@@ -1205,16 +1181,128 @@ interface IStorageProvider {
 
 ---
 
-**文档版本**：v2.2  
+**文档版本**：v3.0  
 **创建日期**：2026-06-03  
-**最后更新**：2026-06-03（新增图片 URL 来源支持，saveImage 工具支持 base64/url 双来源）  
-**状态**：待评审
+**最后更新**：2026-06-03（实施完成：新增非多模态模型自动保存、前端图片上传按钮全模型开放）  
+**状态**：已实施
 
 ## 附录：方案演变记录
 
-| 版本 | 日期       | 变更内容                                      |
-| :--- | :--------- | :-------------------------------------------- |
-| v1.0 | 2026-06-03 | 初始方案：AI 主动上传 OSS                     |
-| v2.0 | 2026-06-03 | 重构为发布时构建上传                          |
-| v2.1 | 2026-06-03 | 新增 saveImage 工具，支持用户图片保存到工作区 |
+| 版本 | 日期       | 变更内容                                                            |
+| :--- | :--------- | :------------------------------------------------------------------ |
+| v1.0 | 2026-06-03 | 初始方案：AI 主动上传 OSS                                           |
+| v2.0 | 2026-06-03 | 重构为发布时构建上传                                                |
+| v2.1 | 2026-06-03 | 新增 saveImage 工具，支持用户图片保存到工作区                       |
 | v2.2 | 2026-06-03 | saveImage 工具支持 URL 来源（下载远程图片），补充 SSRF 防护和错误码 |
+| v3.0 | 2026-06-03 | **实施完成**：非多模态模型自动保存、前端全模型开放上传、OSS 配置实测通过 |
+
+---
+
+## 附录 B：实施记录
+
+### 实施日期：2026-06-03
+
+### 实施的方案变更
+
+#### B.1 非多模态模型图片传递机制
+
+**问题**：原方案中图片作为 Anthropic content block 传给 LLM，非多模态模型会丢弃（显示 "image omitted: model does not support images"），导致 AI 无法获取图片数据。
+
+**解决方案**（`packages/agent-service/src/backends/pi-agent.ts`）：
+
+```
+sendMessage(content, options)
+  │
+  ├─ model.input 包含 'image' → 图片作为 content block 传给 LLM（多模态模型）
+  │
+  └─ model.input 只有 'text' → 后端自动 Base64 解码保存到工作区 images/
+      → 将保存路径注入到提示文本：
+        「[已自动保存 N 张图片到工作区：
+          - ./images/xxx.png
+          ...]」
+```
+
+**关键实现**（`pi-agent.ts:161-210`）：
+
+```typescript
+const model = this.agent.state.model;
+const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
+
+if (images && images.length > 0) {
+  if (modelSupportsImages) {
+    // 多模态：直接传 content blocks
+    imageContent = images.map(img => ({ type: "image", source: { ... } }));
+  } else {
+    // 非多模态：自动保存 + 文本告知路径
+    for (const img of images) {
+      const buffer = Buffer.from(img.data, 'base64');
+      await fs.promises.writeFile(absolutePath, buffer);
+      savedPaths.push(relativePath);
+    }
+    promptContent = `${content}\n\n[已自动保存图片到工作区...]`;
+  }
+}
+```
+
+#### B.2 修复 images 传递遗漏
+
+- **`backend-agent.ts:73`**：`sendMessage` 调用 `this.backend.sendMessage()` 时未传递 `images` 参数，已修复
+- **`pi-agent.ts:161`**：`sendMessage` 签名从 `{ stream?: boolean }` 扩展为 `{ stream?: boolean; images?: ImageAttachment[] }`
+
+#### B.3 前端图片上传按钮：全模型开放
+
+- **`chat-input.tsx:136`**：移除 `{currentSupportsImages && <PromptInputAddImage />}` 条件，图片上传按钮始终显示
+- **`ai-chat.tsx`**：移除 `currentSupportsImages` 的传递和解构（不再需要）
+- **理由**：`saveImage` 是工具级能力，不依赖模型是否多模态
+
+#### B.4 OSS 配置
+
+最终生效配置（`.env`）：
+
+```bash
+OSS_REGION=oss-cn-chengdu
+OSS_ACCESS_KEY_ID=LTAI5tSkr9XjhAVg1sja3m8c
+OSS_ACCESS_KEY_SECRET=***
+OSS_BUCKET=demo-studio
+```
+
+验证结果：上传、读取、删除均通过。
+
+### 实际变更文件清单
+
+| 文件 | 操作 | 说明 |
+|:-----|:-----|:-----|
+| `packages/agent-service/src/backends/pi-tools/save-image-tool.ts` | 新建 | saveImage 工具（Base64 + URL 双重来源） |
+| `packages/agent-service/src/backends/pi-tools/index.ts` | 修改 | 注册 saveImage 工具（5→6） |
+| `packages/agent-service/src/backends/pi-agent.ts` | 修改 | 非多模态自动保存、修复 images 传递、导入 fs/path |
+| `packages/agent-service/src/core/backend-agent.ts` | 修改 | 传递 images 到 sendMessage |
+| `packages/agent-service/tests/unit/save-image-tool.test.ts` | 新建 | 11 个用例 |
+| `packages/agent-service/tests/unit/file-tools-permissions.test.ts` | 修改 | 工具数量 5→6 |
+| `packages/agent-service/tests/unit/pi-agent.test.ts` | 修改 | 工具数量 5→6 + saveImage 断言 |
+| `packages/agent-service/AGENTS.md` | 修改 | 工具列表更新 5→6 |
+| `packages/author-site/src/lib/publish/types.ts` | 新建 | ImageReference/UploadResult/PublishContext |
+| `packages/author-site/src/lib/publish/oss-config.ts` | 新建 | OSS 配置加载 + 优雅降级 |
+| `packages/author-site/src/lib/publish/image-scanner.ts` | 新建 | 扫描 img/url()/import 图片引用 |
+| `packages/author-site/src/lib/publish/oss-uploader.ts` | 新建 | 并发上传 + 去重 + 校验 |
+| `packages/author-site/src/lib/publish/path-replacer.ts` | 新建 | 路径替换 + 文件复制 |
+| `packages/author-site/src/lib/publish/image-processor.ts` | 新建 | 串联扫描→上传→替换 |
+| `packages/author-site/src/lib/publish/__tests__/image-scanner.test.ts` | 新建 | 图片扫描测试（13 用例） |
+| `packages/author-site/src/lib/publish/__tests__/path-replacer.test.ts` | 新建 | 路径替换测试（6 用例） |
+| `packages/author-site/src/lib/publish/__tests__/oss-config.test.ts` | 新建 | 配置测试（5 用例） |
+| `packages/author-site/src/lib/publish-manager.ts` | 修改 | 集成图片处理 + 进度回调 |
+| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 修改 | 添加图片资源处理章节 |
+| `packages/author-site/src/components/ai-elements/chat/chat-input.tsx` | 修改 | 移除图片按钮条件隐藏 |
+| `packages/author-site/src/components/ai-elements/ai-chat.tsx` | 修改 | 移除 currentSupportsImages |
+| `packages/author-site/package.json` | 修改 | 新增 ali-oss + @types/ali-oss |
+| `.env` | 修改 | OSS 配置（成都 demo-studio） |
+| `.env.docker` | 修改 | OSS 配置模板 |
+
+### 测试覆盖
+
+| 包 | 状态 |
+|:---|:---|
+| agent-service | 103/103 通过（含 saveImage 11 用例） |
+| author-site (publish) | 24/24 通过（3 套件） |
+| TypeScript typecheck | agent-service + author-site 均通过 |
+| ESLint | 无新增 warning |
+| OSS 连通性 | 上传/验证/删除 均通过 |

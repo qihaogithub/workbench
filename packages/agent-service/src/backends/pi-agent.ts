@@ -1,10 +1,12 @@
 import { IBackendAdapter, BackendStatus } from './base';
-import { AgentConfig, AgentEvent, FileChange } from '../core/types';
+import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
 import { createWorkbenchTools } from './pi-tools';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
 // (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
@@ -158,15 +160,64 @@ export class PiAgentBackend implements IBackendAdapter {
     return getModel(provider, modelId);
   }
 
-  async sendMessage(content: string, options?: { stream?: boolean }): Promise<string> {
+  async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string> {
     if (!this.agent) throw new Error("Agent not initialized");
     this.status = "busy";
     this.files = [];
     
-    logger.info({ content: content.substring(0, 100) }, "Pi Agent sending message");
+    const images = options?.images;
+    const model = this.agent.state.model;
+    const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
+
+    let promptContent = content;
+    let imageContent: Array<{ type: string; source: { type: string; media_type: string; data: string } }> | undefined;
+
+    if (images && images.length > 0) {
+      if (modelSupportsImages) {
+        // 多模态模型：直接传图片
+        imageContent = images.map((img) => ({
+          type: "image" as const,
+          source: {
+            type: "base64" as const,
+            media_type: img.mimeType,
+            data: img.data,
+          },
+        }));
+      } else {
+        // 非多模态模型：自动保存图片到工作区，把路径写入提示文本
+        const savedPaths: string[] = [];
+        const workingDir = this.config.workingDir || '.';
+
+        for (const img of images) {
+          const filename = img.name || `image-${Date.now()}-${savedPaths.length + 1}.png`;
+          const relativePath = path.join('images', filename);
+          const absolutePath = path.resolve(workingDir, relativePath);
+
+          try {
+            const buffer = Buffer.from(img.data, 'base64');
+            await fs.promises.mkdir(path.dirname(absolutePath), { recursive: true });
+            await fs.promises.writeFile(absolutePath, buffer);
+            savedPaths.push(relativePath);
+            logger.info({ path: relativePath, size: buffer.length }, "Auto-saved image to workspace");
+          } catch (error) {
+            logger.error({ path: relativePath, error }, "Failed to auto-save image");
+          }
+        }
+
+        if (savedPaths.length > 0) {
+          const pathList = savedPaths.map((p) => `- ./${p}`).join('\n');
+          promptContent = `${content}\n\n[已自动保存 ${savedPaths.length} 张图片到工作区：\n${pathList}\n如需在页面中使用这些图片，直接引用上述路径即可。也可使用 saveImage 工具重新保存。]`;
+        }
+      }
+    }
+
+    logger.info(
+      { contentLength: promptContent.length, imageCount: images?.length || 0, modelSupportsImages },
+      "Pi Agent sending message",
+    );
     
     try {
-      await this.agent.prompt(content);
+      await this.agent.prompt(promptContent, imageContent);
       logger.info("Pi Agent prompt sent, waiting for idle");
       await this.agent.waitForIdle();
       logger.info("Pi Agent idle, extracting response");

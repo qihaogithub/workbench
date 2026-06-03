@@ -3,6 +3,7 @@ import type { AgentConfig } from '../../core/types';
 import { createReadFileTool, createWriteFileTool, createListFilesTool } from './file-tools';
 import { createBashTool } from './bash-tool';
 import { createSchemaValidateTool } from './schema-tool';
+import { createSaveImageTool } from './save-image-tool';
 
 export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
   return [
@@ -11,5 +12,6 @@ export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
     createListFilesTool(config),
     createBashTool(config),
     createSchemaValidateTool(config),
+    createSaveImageTool(config),
   ];
 }

@@ -107,9 +107,9 @@ function CollapsibleCodeBlock({
         type="button"
         onClick={handleToggle}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 w-full text-left",
+          "flex items-center gap-2 px-3 py-1.5 w-full text-left bg-muted/70",
           !isStreaming &&
-            "cursor-pointer select-none hover:bg-muted/50 transition-colors"
+            "cursor-pointer select-none hover:bg-muted/80 transition-colors",
         )}
       >
         <span className="text-xs font-medium text-muted-foreground">
@@ -170,22 +170,29 @@ function CollapsibleCodeBlock({
           strokeLinejoin="round"
           className={cn(
             "text-muted-foreground transition-transform flex-shrink-0",
-            collapsed ? "-rotate-90" : ""
+            collapsed ? "-rotate-90" : "",
           )}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {!collapsed && (
-        <Streamdown
-          plugins={{ code: codePlugin, cjk }}
-          isAnimating={isStreaming}
-          caret={isStreaming ? "block" : undefined}
-          controls={false}
-        >
-          {fenceMarkdown}
-        </Streamdown>
-      )}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-out",
+          collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <Streamdown
+            plugins={{ code: codePlugin, cjk }}
+            isAnimating={isStreaming}
+            caret={isStreaming ? "block" : undefined}
+            controls={false}
+          >
+            {fenceMarkdown}
+          </Streamdown>
+        </div>
+      </div>
     </div>
   );
 }

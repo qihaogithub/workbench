@@ -1,9 +1,5 @@
-import React from 'react';
-
 interface DemoProps {
-  bigBannerForeground?: string;
-  bigBannerBackground?: string;
-  miniBanners?: string[];
+  showFreeTrial?: boolean;
 }
 
 const subjects = [
@@ -34,6 +30,8 @@ const subjects = [
 ];
 
 export default function PhoneSquare(props: DemoProps) {
+  const { showFreeTrial = true } = props;
+  // 项目级共享配置：运行时注入，不在 Props 接口中声明
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
     bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
@@ -45,7 +43,7 @@ export default function PhoneSquare(props: DemoProps) {
       'https://r2-asset-worker.qihaogo.workers.dev/figma/h_3be0b370.png',
       'https://r2-asset-worker.qihaogo.workers.dev/figma/h_f4868f75.png',
     ],
-  } = props;
+  } = props as Record<string, unknown>;
 
   return (
     <div
@@ -115,15 +113,15 @@ export default function PhoneSquare(props: DemoProps) {
             />
             {/* 可配置的大Banner前景图 */}
             <img
-              src={bigBannerForeground}
+              src={bigBannerForeground as string}
               alt="banner-fg"
               className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full object-contain z-10"
             />
           </div>
 
-          {/* 小Banner滚动区 - 添加 mt-5 与大Banner间隔20px */}
+          {/* 小Banner滚动区 */}
           <div className="shrink-0 mt-5 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide">
-            {miniBanners.map((url, i) => (
+            {(miniBanners as string[]).map((url, i) => (
               <img
                 key={i}
                 src={url}
@@ -134,32 +132,36 @@ export default function PhoneSquare(props: DemoProps) {
             ))}
           </div>
 
-          {/* 免费试一试区域 */}
-          <div className="w-[335px] shrink-0 pt-6 flex flex-col justify-end items-start">
-            <div className="self-stretch shrink-0 px-1 inline-flex justify-between items-center">
-              <div className="grow basis-0 min-w-0 justify-start text-[#3f3f3f] text-lg font-medium font-sans leading-[27px]">
-                免费试一试
-              </div>
-              <div className="h-6 shrink-0 pl-3 pr-1.5 rounded-[99px] outline outline-1 outline-offset-[-1px] outline-[#f4f3f3] flex justify-center items-center gap-0.5">
-                <div className="shrink-0 text-right justify-start text-[#b2b2b2] text-sm font-normal font-sans leading-[30px] tracking-wider whitespace-nowrap">
-                  K1学什么？
+          {/* 免费试一试区域 — 由 showFreeTrial 控制显隐 */}
+          {showFreeTrial && (
+            <>
+              <div className="w-[335px] shrink-0 pt-6 flex flex-col justify-end items-start">
+                <div className="self-stretch shrink-0 px-1 inline-flex justify-between items-center">
+                  <div className="grow basis-0 min-w-0 justify-start text-[#3f3f3f] text-lg font-medium font-sans leading-[27px]">
+                    免费试一试
+                  </div>
+                  <div className="h-6 shrink-0 pl-3 pr-1.5 rounded-[99px] outline outline-1 outline-offset-[-1px] outline-[#f4f3f3] flex justify-center items-center gap-0.5">
+                    <div className="shrink-0 text-right justify-start text-[#b2b2b2] text-sm font-normal font-sans leading-[30px] tracking-wider whitespace-nowrap">
+                      K1学什么？
+                    </div>
+                    <img
+                      src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_3a5cb93a.svg"
+                      className="relative w-[29.01px] h-4 shrink-0 origin-top-left -rotate-90 max-w-none"
+                      alt="arrow"
+                    />
+                  </div>
                 </div>
-                <img
-                  src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_3a5cb93a.svg"
-                  className="relative w-[29.01px] h-4 shrink-0 origin-top-left -rotate-90 max-w-none"
-                  alt="arrow"
-                />
               </div>
-            </div>
-          </div>
 
-          {/* 课程卡片 */}
-          <img
-            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_f9228c0.png"
-            alt="course card"
-            className="object-cover max-w-none"
-            style={{ width: 335, height: 293 }}
-          />
+              {/* 课程卡片 */}
+              <img
+                src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_f9228c0.png"
+                alt="course card"
+                className="object-cover max-w-none"
+                style={{ width: 335, height: 293 }}
+              />
+            </>
+          )}
         </div>
       </div>
 

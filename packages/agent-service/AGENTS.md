@@ -19,7 +19,8 @@ src/
 │   │   ├── index.ts        # 工具导出（readFile/writeFile/listFiles/bash/schemaValidate）
 │   │   ├── file-tools.ts   # 文件操作工具
 │   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
-│   │   └── schema-tool.ts  # config.schema.json 校验
+│   │   ├── schema-tool.ts  # config.schema.json 校验
+│   │   └── save-image-tool.ts # 图片保存工具（Base64/URL 双重来源）
 │   └── index.ts            # 模块导出
 ├── core/                   # 核心逻辑
 │   ├── agent.ts            # Agent 基类
@@ -64,7 +65,7 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 暴露 5 个工具：
+`src/backends/pi-tools/` 暴露 6 个工具：
 
 | 工具 | 用途 |
 |:-----|:-----|
@@ -73,6 +74,7 @@ tests/
 | `listFiles` | 列出目录文件 |
 | `bash` | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo） |
 | `schemaValidate` | 校验 config.schema.json 格式 |
+| `saveImage` | 保存图片到工作空间（支持 Base64 和 URL 双重来源，最大 10MB） |
 
 ### Shell 白名单
 

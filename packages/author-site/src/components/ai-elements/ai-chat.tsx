@@ -105,7 +105,6 @@ export function AIChat({
 
   const {
     modelState,
-    currentSupportsImages,
     currentAvailableDepths,
     handleModelChange,
     handleDepthChange,
@@ -276,7 +275,6 @@ export function AIChat({
         onSubmit={handleSend}
         onCancel={handleCancelStream}
         isStreaming={isStreaming}
-        currentSupportsImages={currentSupportsImages}
         onHistoryClick={handleHistoryClick}
         onModelChange={handleModelChange}
         onDepthChange={handleDepthChange}

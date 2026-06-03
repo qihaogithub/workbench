@@ -65,7 +65,6 @@ interface ChatInputProps {
   onSubmit: (message: string, images?: ImageAttachment[]) => void;
   onCancel: () => void;
   isStreaming: boolean;
-  currentSupportsImages: boolean;
   onHistoryClick: () => void;
   onModelChange: (modelId: string) => void;
   onDepthChange: (depth: ThinkingDepth) => void;
@@ -81,7 +80,6 @@ export function ChatInput({
   onSubmit,
   onCancel,
   isStreaming,
-  currentSupportsImages,
   onHistoryClick,
   onModelChange,
   onDepthChange,
@@ -133,7 +131,7 @@ export function ChatInput({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
-          {currentSupportsImages && <PromptInputAddImage />}
+          <PromptInputAddImage />
           <Button
             variant="ghost"
             size="icon"

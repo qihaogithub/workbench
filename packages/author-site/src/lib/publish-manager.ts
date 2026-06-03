@@ -20,6 +20,9 @@ import type {
 } from "@opencode-workbench/shared";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
+import { processImagesForPublish } from "@/lib/publish/image-processor";
+import { replacePathsInContent } from "@/lib/publish/path-replacer";
+import type { PublishContext } from "@/lib/publish/types";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 
@@ -102,8 +105,12 @@ function extractSchemaDefaults(schemaContent: string): Record<string, unknown> {
 
 export async function publishProject(
   projectId: string,
+  options?: {
+    onProgress?: (percent: number, message: string) => void;
+  },
 ): Promise<PublishResult> {
   const startTime = Date.now();
+  const onProgress = options?.onProgress;
 
   if (!projectExists(projectId)) {
     throw new Error("PROJECT_NOT_FOUND");
@@ -122,6 +129,32 @@ export async function publishProject(
   }
 
   const publishedProjectDir = path.join(PUBLISHED_DIR, projectId);
+
+  let urlMap = new Map<string, string>();
+  try {
+    onProgress?.(0, "正在处理图片资源...");
+    const publishContext: PublishContext = {
+      projectId,
+      workspacePath,
+      publishDir: publishedProjectDir,
+      onProgress: (percent, _total, message) => {
+        onProgress?.(percent, message);
+      },
+    };
+    const imageResult = await processImagesForPublish(publishContext);
+    urlMap = imageResult.urlMap;
+    if (imageResult.errors.length > 0) {
+      console.warn(
+        `[publish] ${imageResult.errors.length} 张图片上传失败:`,
+        imageResult.errors.map((e) => e.localPath).join(', '),
+      );
+    }
+  } catch (error) {
+    console.warn('[publish] 图片处理失败，继续发布:', error instanceof Error ? error.message : error);
+    urlMap = new Map();
+  }
+  onProgress?.(10, "正在编译页面...");
+
   fs.mkdirSync(publishedProjectDir, { recursive: true });
   fs.mkdirSync(path.join(publishedProjectDir, "demos"), { recursive: true });
 
@@ -133,8 +166,10 @@ export async function publishProject(
     : {};
 
   const viewerBaseUrl = getViewerBaseUrl();
+  const totalPages = demoPages.length;
 
-  for (const page of demoPages) {
+  for (let i = 0; i < demoPages.length; i++) {
+    const page = demoPages[i];
     const demoDir = getDemoDirPath(workspacePath, page.id);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
@@ -147,9 +182,13 @@ export async function publishProject(
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
 
+    const replacedCode = urlMap.size > 0
+      ? replacePathsInContent(compileResult.compiledCode, urlMap, codePath)
+      : compileResult.compiledCode;
+
     fs.writeFileSync(
       path.join(demoPublishDir, "compiled.js"),
-      compileResult.compiledCode,
+      replacedCode,
     );
 
     let previewSize: PreviewSize | undefined;
@@ -164,7 +203,7 @@ export async function publishProject(
     const mergedConfigData = { ...projectConfigData, ...pageConfigData };
 
     const iframeHtml = generateIframeHtml({
-      compiledCode: compileResult.compiledCode,
+      compiledCode: replacedCode,
       cssImports: compileResult.cssImports,
       configData: mergedConfigData,
       cdnBaseUrl: getCdnBaseUrl(),
@@ -190,6 +229,9 @@ export async function publishProject(
       iframeHtmlPath,
       embedCode,
     });
+
+    const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+    onProgress?.(pagePercent, `编译页面 ${i + 1}/${totalPages}...`);
   }
 
   if (publishedDemoPages.length === 0) {
@@ -249,8 +291,11 @@ export async function publishProject(
 
   let cloudflareSync: CloudflareSyncResult | undefined;
   if (process.env.CLOUDFLARE_SYNC_ENABLED === "true") {
+    onProgress?.(95, "正在同步到 Cloudflare...");
     cloudflareSync = await syncToCloudflare();
   }
+
+  onProgress?.(100, "发布完成");
 
   return {
     projectId,

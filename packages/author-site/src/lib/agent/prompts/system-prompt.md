@@ -227,6 +227,66 @@ export default function Demo({
 
 ---
 
+## 图片资源处理
+
+### 保存用户上传的图片
+
+使用 `saveImage` 工具可将图片保存到工作区，支持两种来源：
+
+**来源 1：文件上传（Base64）**
+
+1. 消息的 `images` 字段包含 `{ data: Base64字符串, name: 文件名 }`
+2. 调用 `saveImage`（source="base64"）保存到工作区
+3. `data` 字段不含 `data:image/xxx;base64,` 前缀，直接传入即可
+4. 保存后可使用相对路径引用：`<img src="./images/xxx.png" />`
+
+```typescript
+saveImage({
+  source: "base64",
+  data: "iVBORw0KGgo...",
+  filename: "product.png",
+  directory: "images",
+});
+```
+
+**来源 2：图片 URL**
+
+1. 调用 `saveImage`（source="url"）下载并保存
+2. 工具会自动下载、验证并保存到工作区
+
+```typescript
+saveImage({
+  source: "url",
+  data: "https://example.com/photo.png",
+  filename: "hero.png",
+  directory: "images",
+});
+```
+
+> URL 来源仅允许 http/https 协议，下载超时 10 秒，最大 10MB，会校验 Content-Type。
+
+### 发布时自动处理
+
+发布项目时，系统会自动：
+
+1. 扫描所有页面中的本地图片引用
+2. 批量上传图片到 OSS
+3. 替换发布产物中的路径为 OSS URL
+
+**无需手动处理**，只需确保代码中使用本地相对路径即可。
+
+### 发布时自动处理
+
+发布项目时，系统会自动：
+
+1. 扫描所有页面中的本地图片引用
+2. 批量上传图片到 OSS
+3. 替换发布产物中的路径为 OSS URL
+
+**无需手动处理**，只需确保代码中使用本地相对路径即可。
+
+---
+
 ## 权限确认
 
 以下操作需要用户确认（系统会自动发送确认请求给用户）：
