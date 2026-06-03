@@ -108,7 +108,7 @@ export function WorkspaceCodeDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-auto border rounded-md">
+        <div className="flex-1 min-h-0 flex flex-col border rounded-md overflow-hidden">
           {editorType === "markdown" ? (
             <MemoryMarkdownEditor
               key={filePath}

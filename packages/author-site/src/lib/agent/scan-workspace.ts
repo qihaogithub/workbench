@@ -9,7 +9,6 @@ interface PageInfo {
   name: string;
   indexPath: string;
   schemaPath: string;
-  demoJsonPath: string;
   indexContent?: string;
   schemaContent?: string;
 }
@@ -52,30 +51,38 @@ function formatPageList(pages: PageInfo[]): string {
 }
 
 export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
-  const demosDir = path.join(workingDir, 'demos');
   const pages: PageInfo[] = [];
 
-  if (fs.existsSync(demosDir)) {
-    for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        const pageDir = path.join(demosDir, entry.name);
-        const demoJsonPath = path.join(pageDir, '.demo.json');
-        let name = entry.name;
-        if (fs.existsSync(demoJsonPath)) {
-          try {
-            const meta = JSON.parse(fs.readFileSync(demoJsonPath, 'utf-8'));
-            name = meta.name || entry.name;
-          } catch {
-            /* 解析失败用目录名 */
-          }
-        }
+  // 优先从 workspace-tree.json 读取页面元数据
+  const treePath = path.join(workingDir, 'workspace-tree.json');
+  if (fs.existsSync(treePath)) {
+    try {
+      const tree = JSON.parse(fs.readFileSync(treePath, 'utf-8'));
+      const treePages = Array.isArray(tree?.pages) ? tree.pages : [];
+      for (const p of treePages) {
         pages.push({
-          id: entry.name,
-          name,
-          indexPath: path.join('demos', entry.name, 'index.tsx'),
-          schemaPath: path.join('demos', entry.name, 'config.schema.json'),
-          demoJsonPath: path.join('demos', entry.name, '.demo.json'),
+          id: p.id || '',
+          name: p.name || p.id || '',
+          indexPath: path.join('demos', p.id, 'index.tsx'),
+          schemaPath: path.join('demos', p.id, 'config.schema.json'),
         });
+      }
+    } catch { /* fall through to directory scan */ }
+  }
+
+  // 兜底：扫描 demos/ 目录（tree 不存在或损坏时）
+  if (pages.length === 0) {
+    const demosDir = path.join(workingDir, 'demos');
+    if (fs.existsSync(demosDir)) {
+      for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          pages.push({
+            id: entry.name,
+            name: entry.name,
+            indexPath: path.join('demos', entry.name, 'index.tsx'),
+            schemaPath: path.join('demos', entry.name, 'config.schema.json'),
+          });
+        }
       }
     }
   }

@@ -57,7 +57,7 @@ describe('createWriteFileTool - 权限感知', () => {
     (fs.promises.mkdir as any).mockResolvedValue(undefined);
     (fs.promises.writeFile as any).mockResolvedValue(undefined);
     const tool = createWriteFileTool(mockConfig);
-    const result = await tool.execute('id', { path: 'demos/home/.demo.json', content: '{}' } as any);
+    const result = await tool.execute('id', { path: 'workspace-tree.json', content: '{}' } as any);
     expect(result.isError).toBeFalsy();
   });
 

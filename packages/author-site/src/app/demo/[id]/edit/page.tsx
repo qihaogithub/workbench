@@ -387,8 +387,6 @@ ${context.details}
             name: string;
             order: number;
             parentId: string | null;
-            createdAt: number;
-            updatedAt: number;
           }) => ({
             ...page,
             previewSize: multi.demos?.[page.id]?.schema

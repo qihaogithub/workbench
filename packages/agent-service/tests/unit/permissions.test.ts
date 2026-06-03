@@ -12,7 +12,7 @@ describe('isPathAllowed', () => {
   it('允许白名单内的 demos 子目录文件', () => {
     expect(isPathAllowed('demos/home/index.tsx', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
     expect(isPathAllowed('demos/home/config.schema.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
-    expect(isPathAllowed('demos/home/.demo.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+    expect(isPathAllowed('workspace-tree.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
   });
 
   it('允许 project.config.schema.json 顶层文件', () => {
@@ -79,13 +79,13 @@ describe('isPathAllowed', () => {
   it('白名单支持 * 单层段通配', () => {
     const config = {
       ...DEFAULT_WORKSPACE_PERMISSIONS,
-      allowedPaths: ['demos/*/.demo.json'],
+      allowedPaths: ['demos/*/index.tsx'],
       deniedPatterns: [],
     };
-    expect(isPathAllowed('demos/home/.demo.json', WORKSPACE, config)).toBe(true);
-    expect(isPathAllowed('demos/about/.demo.json', WORKSPACE, config)).toBe(true);
+    expect(isPathAllowed('demos/home/index.tsx', WORKSPACE, config)).toBe(true);
+    expect(isPathAllowed('demos/about/index.tsx', WORKSPACE, config)).toBe(true);
     // * 不应跨段匹配
-    expect(isPathAllowed('demos/home/sub/.demo.json', WORKSPACE, config)).toBe(false);
+    expect(isPathAllowed('demos/home/sub/index.tsx', WORKSPACE, config)).toBe(false);
   });
 });
 

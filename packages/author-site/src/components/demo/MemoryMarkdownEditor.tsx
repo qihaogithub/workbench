@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -12,13 +12,11 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Blockquote from "@tiptap/extension-blockquote";
 import { common, createLowlight } from "lowlight";
 import {
-  defaultMarkdownParser,
   defaultMarkdownSerializer,
   MarkdownSerializer,
-  schema as defaultMdSchema,
 } from "prosemirror-markdown";
-import { DOMSerializer } from "@tiptap/pm/model";
 import type { Node } from "@tiptap/pm/model";
+import MarkdownIt from "markdown-it";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
@@ -49,6 +47,7 @@ import {
 } from "lucide-react";
 
 const lowlight = createLowlight(common);
+const md = new MarkdownIt({ html: true, linkify: false, typographer: false });
 
 interface MemoryMarkdownEditorProps {
   value: string;
@@ -93,19 +92,12 @@ function Separator() {
   return <div className="w-px h-4 bg-border mx-1" />;
 }
 
-function markdownToHtml(md: string): string {
-  if (!md || !md.trim()) return "";
-
+function markdownToHtml(mdText: string): string {
+  if (!mdText) return "";
   try {
-    const doc = defaultMarkdownParser.parse(md);
-    const serializer = DOMSerializer.fromSchema(defaultMdSchema);
-    const fragment = serializer.serializeFragment(doc.content);
-
-    const div = document.createElement("div");
-    div.appendChild(fragment);
-    return div.innerHTML;
+    return md.render(mdText);
   } catch {
-    return md
+    return mdText
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -114,28 +106,61 @@ function markdownToHtml(md: string): string {
 }
 
 function createMarkdownSerializer(): MarkdownSerializer {
-  const defaultNodes = defaultMarkdownSerializer.nodes;
-  const defaultMarks = defaultMarkdownSerializer.marks;
+  const defaultNodes = defaultMarkdownSerializer.nodes as Record<
+    string,
+    MarkdownSerializer["nodes"][string]
+  >;
+  const defaultMarks = defaultMarkdownSerializer.marks as Record<
+    string,
+    MarkdownSerializer["marks"][string]
+  >;
 
-  const nodes = { ...defaultNodes } as Record<string, any>;
+  const nodes: Record<string, MarkdownSerializer["nodes"][string]> = {};
 
-  nodes.taskList = {
-    ...defaultNodes.bulletList,
-  };
+  // TipTap v3 uses camelCase, prosemirror-markdown default uses snake_case
+  // Map default rules to camelCase names so they match TipTap's doc
+  if (defaultNodes.blockquote) nodes.blockquote = defaultNodes.blockquote;
+  if (defaultNodes.heading) nodes.heading = defaultNodes.heading;
+  if (defaultNodes.paragraph) nodes.paragraph = defaultNodes.paragraph;
+  if (defaultNodes.text) nodes.text = defaultNodes.text;
+  if (defaultNodes.image) nodes.image = defaultNodes.image;
+  if (defaultNodes.hard_break) nodes.hardBreak = defaultNodes.hard_break;
+  if (defaultNodes.code_block) nodes.codeBlock = defaultNodes.code_block;
+  if (defaultNodes.horizontal_rule)
+    nodes.horizontalRule = defaultNodes.horizontal_rule;
+  if (defaultNodes.bullet_list) nodes.bulletList = defaultNodes.bullet_list;
+  if (defaultNodes.ordered_list) nodes.orderedList = defaultNodes.ordered_list;
+  if (defaultNodes.list_item) nodes.listItem = defaultNodes.list_item;
 
-  nodes.taskItem = {
-    ...defaultNodes.listItem,
-  };
+  // taskList: same as bulletList in Markdown output, but with [ ] / [x] items
+  if (defaultNodes.bullet_list) {
+    nodes.taskList = (state, node) => {
+      // Render children; the wrapping <ul data-type="taskList"> is implicit
+      // because TipTap puts listItem directly inside taskList.
+      // We need custom rendering: each listItem becomes "- [ ] text" or "- [x] text"
+      // and lines are joined with newlines
+      state.renderContent(node);
+    };
+  }
 
-  nodes.blockquote = {
-    ...defaultNodes.blockquote,
-  };
+  if (defaultNodes.list_item) {
+    nodes.taskItem = (state, node) => {
+      const checked = node.attrs.checked === true;
+      const prefix = checked ? "[x] " : "[ ] ";
+      state.write(prefix);
+      state.renderContent(node);
+      state.closeBlock(node);
+    };
+  }
 
-  nodes.codeBlock = {
-    ...defaultNodes.codeBlock,
-  };
+  const marks: Record<string, MarkdownSerializer["marks"][string]> = {};
 
-  const marks = { ...defaultMarks };
+  // TipTap v3 uses "bold" and "italic" mark names, prosemirror-markdown default uses "strong" and "em"
+  if (defaultMarks.strong) marks.bold = defaultMarks.strong;
+  if (defaultMarks.em) marks.italic = defaultMarks.em;
+  if (defaultMarks.link) marks.link = defaultMarks.link;
+  if (defaultMarks.code) marks.code = defaultMarks.code;
+
   marks.underline = {
     open: "_",
     close: "_",
@@ -161,9 +186,8 @@ export function MemoryMarkdownEditor({
   readOnly = false,
 }: MemoryMarkdownEditorProps) {
   const [previewMode, setPreviewMode] = useState(false);
-
-  const initialHtml = useMemo(() => markdownToHtml(value), [value]);
-  const valueRef = { current: value };
+  const isInitializedRef = useRef(false);
+  const valueRef = useRef(value);
   valueRef.current = value;
 
   const editor = useEditor({
@@ -196,40 +220,55 @@ export function MemoryMarkdownEditor({
       }),
       Blockquote,
     ],
-    content: initialHtml,
+    content: "",
     editable: !readOnly && !previewMode,
+    onCreate: ({ editor }) => {
+      const html = markdownToHtml(value);
+      if (html) {
+        editor.commands.setContent(html, { emitUpdate: false });
+      }
+      isInitializedRef.current = true;
+    },
     onUpdate: ({ editor }) => {
+      if (!isInitializedRef.current) {
+        return;
+      }
       try {
         const md = editorDocToMarkdown(editor.state.doc);
         if (md !== valueRef.current) {
           onChange(md);
         }
       } catch {
-        const html = editor.getHTML();
-        onChange(html);
-      }
-    },
-    onCreate: ({ editor }) => {
-      if (value && !initialHtml) {
-        try {
-          const md = editorDocToMarkdown(editor.state.doc);
-          if (md !== value) {
-            onChange(md);
-          }
-        } catch {
-          // ignore
-        }
+        // ignore serialization errors
       }
     },
     editorProps: {
       attributes: {
         class: cn(
-          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] px-3 py-2 text-sm",
+          "markdown-editor-content focus:outline-none min-h-[200px] px-3 py-2 text-sm",
           readOnly ? "cursor-default" : "",
         ),
       },
     },
   });
+
+  // Re-sync editor content when value changes externally (e.g., reload from server)
+  useEffect(() => {
+    if (!editor || !isInitializedRef.current) return;
+    const currentHtml = editor.getHTML();
+    const targetHtml = markdownToHtml(value);
+    if (targetHtml && currentHtml !== targetHtml) {
+      isInitializedRef.current = false;
+      editor.commands.setContent(targetHtml, { emitUpdate: false });
+      isInitializedRef.current = true;
+    }
+  }, [editor, value]);
+
+  // Update editor's editable state when previewMode or readOnly changes
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(!readOnly && !previewMode);
+  }, [editor, readOnly, previewMode]);
 
   const handleAddLink = useCallback(() => {
     if (!editor) return;
@@ -253,7 +292,7 @@ export function MemoryMarkdownEditor({
   const mdCharCount = value.length;
 
   return (
-    <div className="border rounded-md overflow-hidden flex flex-col">
+    <div className="border rounded-md overflow-hidden flex flex-col h-full">
       <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30 flex-wrap">
         <ToolbarButton
           icon={Bold}
@@ -361,9 +400,7 @@ export function MemoryMarkdownEditor({
           icon={SeparatorHorizontal}
           tooltip="分隔线"
           active={false}
-          onClick={() =>
-            editor.chain().focus().setHorizontalRule().run()
-          }
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
           disabled={readOnly || previewMode}
         />
         <ToolbarButton
@@ -387,7 +424,7 @@ export function MemoryMarkdownEditor({
       </div>
 
       {previewMode ? (
-        <div className="prose prose-sm dark:prose-invert max-w-none min-h-[200px] px-3 py-2 text-sm overflow-y-auto">
+        <div className="markdown-editor-content min-h-[200px] px-3 py-2 text-sm overflow-y-auto scrollbar-thin">
           <Streamdown
             plugins={{ code, cjk }}
             controls={{ table: false, code: true }}
@@ -396,7 +433,10 @@ export function MemoryMarkdownEditor({
           </Streamdown>
         </div>
       ) : (
-        <EditorContent editor={editor} className="flex-1 min-h-0 overflow-y-auto" />
+        <EditorContent
+          editor={editor}
+          className="flex-1 min-h-0 overflow-y-auto scrollbar-thin"
+        />
       )}
 
       <div className="px-3 py-1 border-t bg-muted/20 text-xs text-muted-foreground">

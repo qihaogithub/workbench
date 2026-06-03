@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { isPathInsideWorkspace, resolveWorkspacePath } from '../workspace/utils';
 
-const ALLOWED_FILES = ['index.tsx', 'config.schema.json', 'project.config.schema.json', '.demo.json', 'AGENTS.md', '.session.json'];
+const ALLOWED_FILES = ['index.tsx', 'config.schema.json', 'project.config.schema.json', 'workspace-tree.json', 'AGENTS.md', '.session.json'];
 
 export interface FileValidationResult {
   valid: boolean;

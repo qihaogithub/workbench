@@ -13,6 +13,7 @@ import type {
   DemoPageMeta,
   DemoFolderMeta,
   MultiDemoFiles,
+  WorkspaceTree,
 } from "@opencode-workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
 
@@ -271,105 +272,190 @@ export function getDemoDirPath(workspacePath: string, demoId: string): string {
   return path.join(workspacePath, "demos", demoId);
 }
 
+// ============================================================
+// Workspace 统一清单（workspace-tree.json）— 取代 .demo.json + .folders.json
+// ============================================================
+
+const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
+
+function getWorkspaceTreePath(workspacePath: string): string {
+  return path.join(workspacePath, WORKSPACE_TREE_FILENAME);
+}
+
 /**
- * 读取页面元数据 `.demo.json`
- * 文件缺失或损坏时返回 null（容错），让上层根据目录列表兜底
+ * 从旧格式（.folders.json + demos/{id}/.demo.json）迁移到 workspace-tree.json。
+ * 仅在 workspace-tree.json 不存在时自动执行，写入后即持久化为新格式。
+ */
+function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
+  let folders: DemoFolderMeta[] = [];
+  const legacyFoldersPath = path.join(workspacePath, ".folders.json");
+  if (fs.existsSync(legacyFoldersPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(legacyFoldersPath, "utf-8"));
+      if (Array.isArray(parsed?.folders)) {
+        folders = parsed.folders.map((f: Record<string, unknown>) => ({
+          id: f.id as string,
+          name: f.name as string,
+          order: f.order as number,
+          parentId: (f.parentId ?? null) as string | null,
+        }));
+      }
+    } catch { /* ignore */ }
+  }
+
+  const pages: DemoPageMeta[] = [];
+  const demosDir = path.join(workspacePath, "demos");
+  if (fs.existsSync(demosDir)) {
+    for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const legacyMetaPath = path.join(demosDir, entry.name, ".demo.json");
+      if (fs.existsSync(legacyMetaPath)) {
+        try {
+          const m = JSON.parse(fs.readFileSync(legacyMetaPath, "utf-8"));
+          pages.push({
+            id: m.id as string || entry.name,
+            name: m.name as string || entry.name,
+            order: typeof m.order === "number" ? m.order : pages.length,
+            parentId: (m.parentId ?? null) as string | null,
+          });
+        } catch { /* ignore */ }
+      } else {
+        // 目录存在但无 .demo.json：用目录名兜底
+        const dir = path.join(demosDir, entry.name);
+        if (
+          fs.existsSync(path.join(dir, "index.tsx")) &&
+          fs.existsSync(path.join(dir, "config.schema.json"))
+        ) {
+          pages.push({
+            id: entry.name,
+            name: entry.name,
+            order: pages.length,
+            parentId: null,
+          });
+        }
+      }
+    }
+  }
+
+  const tree: WorkspaceTree = { folders, pages };
+  writeWorkspaceTree(workspacePath, tree);
+  return tree;
+}
+
+/**
+ * 读取 Workspace 统一清单（workspace-tree.json）。
+ * 文件不存在时自动从旧格式迁移。
+ */
+function readWorkspaceTree(workspacePath: string): WorkspaceTree {
+  const treePath = getWorkspaceTreePath(workspacePath);
+  if (fs.existsSync(treePath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(treePath, "utf-8"));
+      return {
+        folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
+        pages: Array.isArray(parsed?.pages) ? parsed.pages : [],
+      };
+    } catch { /* fall through to migration */ }
+  }
+  return migrateLegacyToTree(workspacePath);
+}
+
+/**
+ * 将统一清单写回 workspace-tree.json。
+ * workspacePath 目录不存在时自动创建。
+ */
+function writeWorkspaceTree(workspacePath: string, tree: WorkspaceTree): void {
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
+  }
+  fs.writeFileSync(
+    getWorkspaceTreePath(workspacePath),
+    JSON.stringify(tree, null, 2),
+    "utf-8",
+  );
+}
+
+/**
+ * 读取页面元数据（从 workspace-tree.json 的 pages 数组）。
+ * 页面不存在于清单中时返回 null。
  */
 export function readDemoPageMeta(
   workspacePath: string,
   demoId: string,
 ): DemoPageMeta | null {
-  const metaPath = path.join(getDemoDirPath(workspacePath, demoId), ".demo.json");
-  if (!fs.existsSync(metaPath)) return null;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-    if (
-      typeof parsed?.id === "string" &&
-      typeof parsed?.name === "string" &&
-      typeof parsed?.order === "number" &&
-      typeof parsed?.createdAt === "number" &&
-      typeof parsed?.updatedAt === "number"
-    ) {
-      return {
-        ...parsed,
-        parentId: parsed.parentId ?? null,
-      } as DemoPageMeta;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  const tree = readWorkspaceTree(workspacePath);
+  return tree.pages.find(p => p.id === demoId) ?? null;
 }
 
 /**
- * 写入或合并页面元数据 `.demo.json`
- * 自动维护 `updatedAt` 字段
+ * 写入或合并页面元数据到 workspace-tree.json 的 pages 数组。
+ * 不再维护 createdAt / updatedAt 字段。
  */
 export function writeDemoPageMeta(
   workspacePath: string,
   demoId: string,
   patch: Partial<DemoPageMeta>,
 ): DemoPageMeta {
-  const demoDir = getDemoDirPath(workspacePath, demoId);
-  if (!fs.existsSync(demoDir)) {
-    fs.mkdirSync(demoDir, { recursive: true });
-  }
-  const existing = readDemoPageMeta(workspacePath, demoId);
-  const now = Date.now();
+  const tree = readWorkspaceTree(workspacePath);
+  const existingIdx = tree.pages.findIndex(p => p.id === demoId);
+  const existing = existingIdx !== -1 ? tree.pages[existingIdx] : null;
   const merged: DemoPageMeta = {
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
     order: patch.order ?? existing?.order ?? 0,
     parentId: patch.parentId !== undefined ? patch.parentId : (existing?.parentId ?? null),
-    createdAt: existing?.createdAt ?? patch.createdAt ?? now,
-    updatedAt: now,
   };
-  fs.writeFileSync(
-    path.join(demoDir, ".demo.json"),
-    JSON.stringify(merged, null, 2),
-    "utf-8",
-  );
+  if (existingIdx !== -1) {
+    tree.pages[existingIdx] = merged;
+  } else {
+    tree.pages.push(merged);
+  }
+  writeWorkspaceTree(workspacePath, tree);
   return merged;
 }
 
 /**
- * 列出 workspace 内所有有效的 Demo 页面（按 order/createdAt 升序）。
- * 真值来源是文件系统 `demos/` 目录；元数据由 `.demo.json` 提供，缺失时用 id 兜底。
+ * 列出 workspace 内所有有效的 Demo 页面（按 order/id 升序）。
+ * 真值来源是文件系统 `demos/` 目录；元数据由 workspace-tree.json 提供。
  */
 export function listDemoPages(workspacePath: string): DemoPageMeta[] {
   const demosDir = path.join(workspacePath, "demos");
   if (!fs.existsSync(demosDir)) return [];
 
+  const tree = readWorkspaceTree(workspacePath);
   const result: DemoPageMeta[] = [];
+
+  for (const page of tree.pages) {
+    const dir = path.join(demosDir, page.id);
+    if (
+      fs.existsSync(path.join(dir, "index.tsx")) &&
+      fs.existsSync(path.join(dir, "config.schema.json"))
+    ) {
+      result.push(page);
+    }
+  }
+
+  // 同时发现磁盘上有但 tree 中缺失的页面（如 AI Agent 创建后未更新 tree）
   for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+    if (result.some(p => p.id === entry.name)) continue;
     const dir = path.join(demosDir, entry.name);
     if (
-      !fs.existsSync(path.join(dir, "index.tsx")) ||
-      !fs.existsSync(path.join(dir, "config.schema.json"))
+      fs.existsSync(path.join(dir, "index.tsx")) &&
+      fs.existsSync(path.join(dir, "config.schema.json"))
     ) {
-      continue;
-    }
-    const meta = readDemoPageMeta(workspacePath, entry.name);
-    if (meta) {
-      result.push(meta);
-    } else {
-      // .demo.json 缺失 / 损坏时使用目录 mtime 与 id 兜底
-      const stat = fs.statSync(dir);
       result.push({
         id: entry.name,
         name: entry.name,
         order: result.length,
         parentId: null,
-        createdAt: stat.birthtimeMs,
-        updatedAt: stat.mtimeMs,
       });
     }
   }
 
   return result.sort((a, b) => {
     if (a.order !== b.order) return a.order - b.order;
-    return a.createdAt - b.createdAt;
+    return a.id.localeCompare(b.id);
   });
 }
 
@@ -413,20 +499,14 @@ export function ensureWorkspaceFiles(workspacePath: string): {
     "utf-8",
   );
 
-  const now = Date.now();
   const meta: DemoPageMeta = {
     id: demoId,
     name: "默认页面",
     order: 0,
     parentId: null,
-    createdAt: now,
-    updatedAt: now,
   };
-  fs.writeFileSync(
-    path.join(demoDir, ".demo.json"),
-    JSON.stringify(meta, null, 2),
-    "utf-8",
-  );
+
+  writeWorkspaceTree(workspacePath, { folders: [], pages: [meta] });
 
   return { demoIds: [demoId], defaultDemoMeta: meta };
 }
@@ -453,8 +533,6 @@ export function createProject(name: string): DemoMeta {
         name: demoId,
         order: index,
         parentId: null,
-        createdAt: now,
-        updatedAt: now,
       }
     );
   });
@@ -1089,16 +1167,13 @@ export function updateWorkspaceDemoFiles(
   }
   if (meta) {
     writeDemoPageMeta(wsPath, demoId, meta);
-  } else {
-    // 即使无显式 meta，也维护一次 updatedAt
-    writeDemoPageMeta(wsPath, demoId, {});
   }
 
   return true;
 }
 
 /**
- * 创建一个新的 Demo 页面，写入默认 `index.tsx`、`config.schema.json` 与 `.demo.json` 元数据。
+ * 创建一个新的 Demo 页面，写入默认 `index.tsx`、`config.schema.json` 并注册到 workspace-tree.json。
  * `order` 取当前最大 order + 1。
  */
 export function createWorkspaceDemoPage(
@@ -1124,20 +1199,14 @@ export function createWorkspaceDemoPage(
     "utf-8",
   );
 
-  const now = Date.now();
   const meta: DemoPageMeta = {
     id: demoId,
     name: name?.trim() || "新建页面",
     order: nextOrder,
     parentId: parentId ?? null,
-    createdAt: now,
-    updatedAt: now,
   };
-  fs.writeFileSync(
-    path.join(demoDir, ".demo.json"),
-    JSON.stringify(meta, null, 2),
-    "utf-8",
-  );
+
+  writeDemoPageMeta(wsPath, demoId, meta);
   return meta;
 }
 
@@ -1165,20 +1234,14 @@ export function copyWorkspaceDemoPage(
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.cpSync(sourceDir, demoDir, { recursive: true });
 
-  const now = Date.now();
   const meta: DemoPageMeta = {
     id: demoId,
     name: name?.trim() || "复制的页面",
     order: nextOrder,
     parentId: sourceMeta?.parentId ?? null,
-    createdAt: now,
-    updatedAt: now,
   };
-  fs.writeFileSync(
-    path.join(demoDir, ".demo.json"),
-    JSON.stringify(meta, null, 2),
-    "utf-8",
-  );
+
+  writeDemoPageMeta(wsPath, demoId, meta);
   return meta;
 }
 
@@ -1298,39 +1361,22 @@ export function syncProjectDemoPagesFromWorkspace(
   if (!project) return [];
   const fresh = listDemoPages(workspacePath);
   project.demoPages = fresh;
-  project.demoFolders = readFoldersMeta(workspacePath);
+  project.demoFolders = readWorkspaceTree(workspacePath).folders;
   project.updatedAt = Date.now();
   writeProjectMeta(projectId, project);
   return fresh;
 }
 
 // ============================================================
-// 虚拟文件夹管理（.folders.json）
+// 虚拟文件夹管理（workspace-tree.json 的 folders 数组）
 // ============================================================
 
-const FOLDERS_META_FILENAME = ".folders.json";
-
-function getFoldersMetaPath(workspacePath: string): string {
-  return path.join(workspacePath, FOLDERS_META_FILENAME);
-}
-
+/**
+ * 读取虚拟文件夹元数据（从 workspace-tree.json 的 folders 数组）。
+ * 保留此函数兼容外部调用，内部委托给 readWorkspaceTree。
+ */
 export function readFoldersMeta(workspacePath: string): DemoFolderMeta[] {
-  const metaPath = getFoldersMetaPath(workspacePath);
-  if (!fs.existsSync(metaPath)) return [];
-  try {
-    const parsed = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-    if (Array.isArray(parsed?.folders)) {
-      return parsed.folders as DemoFolderMeta[];
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-function writeFoldersMeta(workspacePath: string, folders: DemoFolderMeta[]): void {
-  const metaPath = getFoldersMetaPath(workspacePath);
-  fs.writeFileSync(metaPath, JSON.stringify({ folders }, null, 2), "utf-8");
+  return readWorkspaceTree(workspacePath).folders;
 }
 
 export function generateFolderId(): string {
@@ -1361,7 +1407,8 @@ export function createDemoFolder(
   name: string,
   parentId?: string | null,
 ): DemoFolderMeta | null {
-  const folders = readFoldersMeta(workspacePath);
+  const tree = readWorkspaceTree(workspacePath);
+  const folders = tree.folders;
 
   if (parentId) {
     const parent = folders.find(f => f.id === parentId);
@@ -1373,18 +1420,15 @@ export function createDemoFolder(
   const nextOrder =
     sameParent.length > 0 ? Math.max(...sameParent.map(f => f.order)) + 1 : 0;
 
-  const now = Date.now();
   const folder: DemoFolderMeta = {
     id: generateFolderId(),
     name: name.trim() || "新建文件夹",
     parentId: parentId ?? null,
     order: nextOrder,
-    createdAt: now,
-    updatedAt: now,
   };
 
-  folders.push(folder);
-  writeFoldersMeta(workspacePath, folders);
+  tree.folders.push(folder);
+  writeWorkspaceTree(workspacePath, tree);
   return folder;
 }
 
@@ -1393,28 +1437,27 @@ export function updateDemoFolder(
   folderId: string,
   patch: { name?: string; parentId?: string | null; order?: number },
 ): DemoFolderMeta | null {
-  const folders = readFoldersMeta(workspacePath);
-  const index = folders.findIndex(f => f.id === folderId);
+  const tree = readWorkspaceTree(workspacePath);
+  const index = tree.folders.findIndex(f => f.id === folderId);
   if (index === -1) return null;
 
   if (patch.parentId !== undefined && patch.parentId !== null) {
-    const targetParent = folders.find(f => f.id === patch.parentId);
+    const targetParent = tree.folders.find(f => f.id === patch.parentId);
     if (!targetParent) return null;
-    if (isDescendant(folderId, patch.parentId, folders)) return null;
-    if (getFolderDepth(folderId, folders) + 1 > 3) return null;
+    if (isDescendant(folderId, patch.parentId, tree.folders)) return null;
+    if (getFolderDepth(folderId, tree.folders) + 1 > 3) return null;
   }
 
-  const existing = folders[index];
-  folders[index] = {
+  const existing = tree.folders[index];
+  tree.folders[index] = {
     ...existing,
     ...(patch.name !== undefined && { name: patch.name.trim() }),
     ...(patch.parentId !== undefined && { parentId: patch.parentId }),
     ...(patch.order !== undefined && { order: patch.order }),
-    updatedAt: Date.now(),
   };
 
-  writeFoldersMeta(workspacePath, folders);
-  return folders[index];
+  writeWorkspaceTree(workspacePath, tree);
+  return tree.folders[index];
 }
 
 export function deleteDemoFolder(
@@ -1422,8 +1465,8 @@ export function deleteDemoFolder(
   folderId: string,
   deleteContents: boolean = false,
 ): { success: boolean; deletedPageIds?: string[] } {
-  const folders = readFoldersMeta(workspacePath);
-  const index = folders.findIndex(f => f.id === folderId);
+  const tree = readWorkspaceTree(workspacePath);
+  const index = tree.folders.findIndex(f => f.id === folderId);
   if (index === -1) return { success: false };
 
   const deletedPageIds: string[] = [];
@@ -1431,7 +1474,7 @@ export function deleteDemoFolder(
   if (deleteContents) {
     const descendantFolderIds = new Set<string>();
     const collectDescendants = (parentId: string) => {
-      for (const f of folders) {
+      for (const f of tree.folders) {
         if (f.parentId === parentId) {
           descendantFolderIds.add(f.id);
           collectDescendants(f.id);
@@ -1441,7 +1484,7 @@ export function deleteDemoFolder(
     collectDescendants(folderId);
     descendantFolderIds.add(folderId);
 
-    const pages = listDemoPages(workspacePath);
+    const pages = tree.pages;
     for (const page of pages) {
       if (page.parentId && descendantFolderIds.has(page.parentId)) {
         const wsId = path.basename(workspacePath);
@@ -1450,27 +1493,26 @@ export function deleteDemoFolder(
       }
     }
 
-    const remaining = folders.filter(f => !descendantFolderIds.has(f.id));
-    writeFoldersMeta(workspacePath, remaining);
+    tree.folders = tree.folders.filter(f => !descendantFolderIds.has(f.id));
+    tree.pages = tree.pages.filter(p => !deletedPageIds.includes(p.id));
+    writeWorkspaceTree(workspacePath, tree);
   } else {
-    const remaining = folders.filter(f => f.id !== folderId);
-    for (const f of remaining) {
+    tree.folders = tree.folders.filter(f => f.id !== folderId);
+    for (const f of tree.folders) {
       if (f.parentId === folderId) {
-        f.parentId = folders.find(fo => fo.id === folderId)?.parentId ?? null;
+        f.parentId = tree.folders.find(fo => fo.id === folderId)?.parentId ?? null;
       }
     }
-    writeFoldersMeta(workspacePath, remaining);
 
-    const pages = listDemoPages(workspacePath);
     let changed = false;
-    for (const page of pages) {
-      if (page.parentId === folderId) {
-        writeDemoPageMeta(workspacePath, page.id, {
-          parentId: folders.find(fo => fo.id === folderId)?.parentId ?? null,
-        });
+    for (const p of tree.pages) {
+      if (p.parentId === folderId) {
+        p.parentId = tree.folders.find(fo => fo.id === folderId)?.parentId ?? null;
         changed = true;
       }
     }
+
+    writeWorkspaceTree(workspacePath, tree);
   }
 
   return { success: true, deletedPageIds };
@@ -1481,20 +1523,24 @@ export function reorderDemoPages(
   pageUpdates: Array<{ id: string; order: number; parentId: string | null }>,
   folderUpdates?: Array<{ id: string; order: number; parentId: string | null }>,
 ): boolean {
+  const tree = readWorkspaceTree(workspacePath);
+
   for (const u of pageUpdates) {
-    writeDemoPageMeta(workspacePath, u.id, { order: u.order, parentId: u.parentId });
+    const idx = tree.pages.findIndex(p => p.id === u.id);
+    if (idx !== -1) {
+      tree.pages[idx] = { ...tree.pages[idx], order: u.order, parentId: u.parentId };
+    }
   }
 
   if (folderUpdates && folderUpdates.length > 0) {
-    const folders = readFoldersMeta(workspacePath);
     for (const u of folderUpdates) {
-      const idx = folders.findIndex(f => f.id === u.id);
+      const idx = tree.folders.findIndex(f => f.id === u.id);
       if (idx !== -1) {
-        folders[idx] = { ...folders[idx], order: u.order, parentId: u.parentId, updatedAt: Date.now() };
+        tree.folders[idx] = { ...tree.folders[idx], order: u.order, parentId: u.parentId };
       }
     }
-    writeFoldersMeta(workspacePath, folders);
   }
 
+  writeWorkspaceTree(workspacePath, tree);
   return true;
 }

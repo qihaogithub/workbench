@@ -54,31 +54,36 @@ export interface VersionInfo {
 /**
  * Demo 页面元数据
  *
- * 持久化在 workspace/demos/{id}/.demo.json 中。
- * 保存项目时由后端扫描 demos/ 目录 + 读取各 .demo.json 合并到 Project.demoPages。
+ * 持久化在 workspace/workspace-tree.json 的 pages 数组中。
+ * 保存项目时由后端读取 workspace-tree.json 合并到 Project.demoPages。
  */
 export interface DemoPageMeta {
   id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
   name: string;                // 显示名称，如 "首页"、"详情页"
   order: number;               // 在页面列表中的展示顺序（小者在前）
   parentId: string | null;     // 所属文件夹 ID，null 表示根级
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
 }
 
 /**
  * 虚拟文件夹元数据
  *
  * 文件夹仅存在于元数据层，物理 demos/ 目录保持扁平结构。
- * 持久化在 workspace/.folders.json 中，保存时合并到 Project.demoFolders。
+ * 持久化在 workspace/workspace-tree.json 的 folders 数组中，保存时合并到 Project.demoFolders。
  */
 export interface DemoFolderMeta {
   id: string;                  // 唯一标识，格式 "folder_{timestamp}_{random6}"
   name: string;                // 文件夹显示名称
   parentId: string | null;     // 父文件夹 ID，null 表示根级
   order: number;               // 同级内的排序（小者在前）
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
+}
+
+/**
+ * Workspace 统一清单结构，包含文件夹和页面的完整树结构。
+ * 持久化在 workspace/workspace-tree.json 中。
+ */
+export interface WorkspaceTree {
+  folders: DemoFolderMeta[];
+  pages: DemoPageMeta[];
 }
 
 /**

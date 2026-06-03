@@ -70,7 +70,7 @@ describe("多 Demo 页面 — fs-utils", () => {
       const demoDir = path.join(ws, "demos", demoId);
       expect(fs.existsSync(path.join(demoDir, "index.tsx"))).toBe(true);
       expect(fs.existsSync(path.join(demoDir, "config.schema.json"))).toBe(true);
-      expect(fs.existsSync(path.join(demoDir, ".demo.json"))).toBe(true);
+      expect(fs.existsSync(path.join(ws, "workspace-tree.json"))).toBe(true);
     });
 
     it("已存在 demo 时不重复创建默认页面", () => {
@@ -110,7 +110,7 @@ describe("多 Demo 页面 — fs-utils", () => {
     });
     afterEach(() => cleanup(ws));
 
-    it("写入后能读出完整 meta，updatedAt 自动更新", async () => {
+    it("写入后能读出完整 meta", async () => {
       const demoId = "demo_test";
       const written = writeDemoPageMeta(ws, demoId, {
         name: "页面 A",
@@ -120,45 +120,27 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(written.id).toBe(demoId);
       expect(written.name).toBe("页面 A");
       expect(written.order).toBe(2);
-      expect(written.createdAt).toBeGreaterThan(0);
-      expect(written.updatedAt).toBeGreaterThan(0);
+      expect(written.parentId).toBeNull();
 
       const read = readDemoPageMeta(ws, demoId);
       expect(read).toEqual(written);
 
-      // 等待 1ms 后 patch order，updatedAt 应更新，createdAt 不变
-      await new Promise((r) => setTimeout(r, 2));
+      // patch order：未传 name 保留旧值
       const patched = writeDemoPageMeta(ws, demoId, { order: 5 });
-      expect(patched.name).toBe("页面 A"); // 未传 name 保留旧值
+      expect(patched.name).toBe("页面 A");
       expect(patched.order).toBe(5);
-      expect(patched.createdAt).toBe(written.createdAt);
-      expect(patched.updatedAt).toBeGreaterThan(written.updatedAt);
     });
 
     it("读取不存在的 meta 返回 null", () => {
       expect(readDemoPageMeta(ws, "non_existent")).toBeNull();
     });
 
-    it("损坏的 .demo.json 返回 null（不抛错）", () => {
-      const demoId = "demo_corrupt";
-      const dir = getDemoDirPath(ws, demoId);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, ".demo.json"), "{not-json", "utf-8");
+    it("损坏的 workspace-tree.json 时自动从旧格式迁移", () => {
+      // 写入损坏的 workspace-tree.json
+      fs.writeFileSync(path.join(ws, "workspace-tree.json"), "{corrupt-json", "utf-8");
 
-      expect(readDemoPageMeta(ws, demoId)).toBeNull();
-    });
-
-    it("字段不完整的 .demo.json 返回 null", () => {
-      const demoId = "demo_partial";
-      const dir = getDemoDirPath(ws, demoId);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(
-        path.join(dir, ".demo.json"),
-        JSON.stringify({ id: demoId, name: "缺字段" }),
-        "utf-8",
-      );
-
-      expect(readDemoPageMeta(ws, demoId)).toBeNull();
+      // readDemoPageMeta 应不抛错，尝试迁移后返回 null（因为旧格式也不存在）
+      expect(readDemoPageMeta(ws, "demo_nonexist")).toBeNull();
     });
   });
 
@@ -169,79 +151,60 @@ describe("多 Demo 页面 — fs-utils", () => {
     });
     afterEach(() => cleanup(ws));
 
-    function createDemo(id: string, opts?: { meta?: object | null; missingFile?: boolean }) {
+    function createPages(pageMetas: Array<{ id: string; name: string; order: number }>) {
+      const treePath = path.join(ws, "workspace-tree.json");
+      const pages = pageMetas.map(m => ({ ...m, parentId: null }));
+      fs.writeFileSync(treePath, JSON.stringify({ folders: [], pages }, null, 2), "utf-8");
+
+      for (const m of pageMetas) {
+        const dir = path.join(ws, "demos", m.id);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, "index.tsx"), "// code", "utf-8");
+        fs.writeFileSync(path.join(dir, "config.schema.json"), "{}", "utf-8");
+      }
+    }
+
+    function createDemoMissingFiles(id: string) {
+      const dir = path.join(ws, "demos", id);
+      fs.mkdirSync(dir, { recursive: true });
+      // 只写 schema，不写 index.tsx（缺失 index.tsx 不应被列出）
+      fs.writeFileSync(path.join(dir, "config.schema.json"), "{}", "utf-8");
+    }
+
+    function createDemoNoMeta(id: string) {
+      // 创建完整页面但不在 workspace-tree.json 中注册
       const dir = path.join(ws, "demos", id);
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, "index.tsx"), "// code", "utf-8");
-      if (!opts?.missingFile) {
-        fs.writeFileSync(path.join(dir, "config.schema.json"), "{}", "utf-8");
-      }
-      if (opts?.meta !== null) {
-        const meta = opts?.meta ?? {
-          id,
-          name: id,
-          order: 0,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        fs.writeFileSync(
-          path.join(dir, ".demo.json"),
-          JSON.stringify(meta),
-          "utf-8",
-        );
-      }
+      fs.writeFileSync(path.join(dir, "config.schema.json"), "{}", "utf-8");
     }
 
     it("demos 目录不存在时返回空数组", () => {
       expect(listDemoPages(ws)).toEqual([]);
     });
 
-    it("按 order 升序排序，order 相同时按 createdAt 升序", () => {
-      const now = Date.now();
-      createDemo("a", {
-        meta: { id: "a", name: "A", order: 2, createdAt: now, updatedAt: now },
-      });
-      createDemo("b", {
-        meta: {
-          id: "b",
-          name: "B",
-          order: 1,
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
-      createDemo("c", {
-        meta: {
-          id: "c",
-          name: "C",
-          order: 1,
-          createdAt: now - 1000,
-          updatedAt: now,
-        },
-      });
+    it("按 order 升序排序，order 相同时按 id 字典序兜底", () => {
+      createPages([
+        { id: "page_a", name: "A", order: 2 },
+        { id: "page_c", name: "C", order: 1 },
+        { id: "page_b", name: "B", order: 1 },
+      ]);
 
       const list = listDemoPages(ws);
-      expect(list.map((d) => d.id)).toEqual(["c", "b", "a"]);
+      // order=1 的两个按 id 字典序: page_b < page_c，然后 order=2 的 page_a
+      expect(list.map((d) => d.id)).toEqual(["page_b", "page_c", "page_a"]);
     });
 
     it("缺少 index.tsx 或 config.schema.json 的目录被排除", () => {
-      createDemo("ok", {
-        meta: {
-          id: "ok",
-          name: "OK",
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      });
-      createDemo("broken", { missingFile: true });
+      createPages([{ id: "ok", name: "OK", order: 0 }]);
+      createDemoMissingFiles("broken");
 
       const list = listDemoPages(ws);
       expect(list.map((d) => d.id)).toEqual(["ok"]);
     });
 
-    it(".demo.json 缺失时使用 id 名称兜底", () => {
-      createDemo("nometa", { meta: null });
+    it("workspace-tree.json 缺失但目录存在时使用 id 名称兜底", () => {
+      createDemoNoMeta("nometa");
 
       const list = listDemoPages(ws);
       expect(list).toHaveLength(1);

@@ -30,7 +30,7 @@ export default function PadSquare(props: DemoProps) {
       className="w-full min-h-screen bg-white flex flex-col overflow-hidden"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        maxWidth: 768,
+        maxWidth: 1024,
         margin: '0 auto',
       }}
     >

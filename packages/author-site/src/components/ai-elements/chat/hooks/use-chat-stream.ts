@@ -314,7 +314,6 @@ export function useChatStream(options: UseChatStreamOptions) {
               parts: [],
             });
             setStreamContent("");
-            setIsStreaming(false);
 
             await persistMessages(sessionId, updatedMessages);
             await updateSessionTitle(
@@ -350,6 +349,8 @@ export function useChatStream(options: UseChatStreamOptions) {
               }
               onFilesChange?.(finalFiles);
             }
+
+            setIsStreaming(false);
 
             // Apply code/schema updates from final files
             const { codeUpdated, schemaUpdated } =

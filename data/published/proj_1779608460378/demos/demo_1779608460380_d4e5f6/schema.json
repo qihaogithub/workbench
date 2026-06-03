@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$demo": {
     "previewSize": {
-      "width": 768,
-      "height": 1024
+      "width": 1024,
+      "height": 768
     }
   },
   "title": "广场页面 - 平板版配置",

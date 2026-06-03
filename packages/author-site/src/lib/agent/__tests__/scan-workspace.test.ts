@@ -39,21 +39,20 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.pageList).toContain('about');
   });
 
-  it('解析 .demo.json 中的 name 字段', () => {
-    const pageDir = path.join(tmpDir, 'demos', 'home');
-    fs.mkdirSync(pageDir, { recursive: true });
+  it('解析 workspace-tree.json 中的页面 name 字段', () => {
+    fs.mkdirSync(path.join(tmpDir, 'demos', 'home'), { recursive: true });
     fs.writeFileSync(
-      path.join(pageDir, '.demo.json'),
-      JSON.stringify({ name: '我的首页', id: 'home' })
+      path.join(tmpDir, 'workspace-tree.json'),
+      JSON.stringify({ folders: [], pages: [{ id: 'home', name: '我的首页', order: 0, parentId: null }] })
     );
     const ctx = scanWorkspaceContext(tmpDir);
     expect(ctx.pageList).toContain('我的首页');
   });
 
-  it('.demo.json 解析失败时回退到目录名', () => {
+  it('workspace-tree.json 损坏时回退到目录扫描', () => {
     const pageDir = path.join(tmpDir, 'demos', 'broken');
     fs.mkdirSync(pageDir, { recursive: true });
-    fs.writeFileSync(path.join(pageDir, '.demo.json'), 'invalid json{');
+    fs.writeFileSync(path.join(tmpDir, 'workspace-tree.json'), 'invalid json{');
     const ctx = scanWorkspaceContext(tmpDir);
     expect(ctx.pageList).toContain('broken');
   });
