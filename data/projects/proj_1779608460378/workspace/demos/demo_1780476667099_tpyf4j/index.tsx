@@ -5,7 +5,7 @@ interface DemoProps {
 
 export default function ImageDisplayPage(props: DemoProps) {
   const {
-    displayImage = './images/static-bg.png',
+    displayImage = './images/display-bg.png',
     backgroundColor = '#ffffff',
   } = props;
 

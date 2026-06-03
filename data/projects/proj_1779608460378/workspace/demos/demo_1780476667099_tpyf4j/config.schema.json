@@ -14,7 +14,7 @@
       "format": "image",
       "title": "展示图片",
       "description": "请上传或输入图片URL，推荐尺寸 375×812 全屏展示",
-      "default": "./images/static-bg.png",
+      "default": "./images/display-bg.png",
       "ui:options": {
         "accept": "image/*",
         "maxSize": 10485760,
