@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
 import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
+import { rewriteLocalAssetPaths } from '@/lib/rewrite-local-paths';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +56,24 @@ export async function POST(request: NextRequest) {
         createApiError('INVALID_REQUEST', 'code 或 sessionId 参数必填'),
         { status: 400 }
       );
+    }
+
+    if (result && sessionId && typeof sessionId === 'string') {
+      const effectiveDemoId = demoId || (() => {
+        try {
+          return getSessionMeta(sessionId)?.demoId;
+        } catch {
+          return undefined;
+        }
+      })();
+
+      if (effectiveDemoId) {
+        const basePath = `demos/${effectiveDemoId}/`;
+        result = {
+          ...result,
+          compiledCode: rewriteLocalAssetPaths(result.compiledCode, basePath, sessionId),
+        };
+      }
     }
 
     // 异步解析并锁定依赖版本（不阻塞响应）

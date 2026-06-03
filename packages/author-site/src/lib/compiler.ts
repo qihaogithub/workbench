@@ -6,14 +6,14 @@ import {
   findWorkspacePath,
   getWorkspaceDemoPageFiles,
 } from './fs-utils';
+import { getCdnBaseUrl } from './cdn-config';
+import { rewriteLocalAssetPaths } from './rewrite-local-paths';
 
 export interface CompileResult {
   compiledCode: string;
   dependencies: string[];
   cssImports: string[];
 }
-
-import { getCdnBaseUrl } from './cdn-config';
 
 const ESM_SH_BASE = getCdnBaseUrl();
 
@@ -319,5 +319,12 @@ export function compileSession(
     // 忽略元数据读取错误，使用默认版本
   }
 
-  return compileCode(code, lockedDependencies);
+  const result = compileCode(code, lockedDependencies);
+
+  if (demoId) {
+    const basePath = `demos/${demoId}/`;
+    result.compiledCode = rewriteLocalAssetPaths(result.compiledCode, basePath, sessionId);
+  }
+
+  return result;
 }

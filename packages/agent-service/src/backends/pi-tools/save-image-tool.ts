@@ -14,14 +14,6 @@ const URL_DOWNLOAD_TIMEOUT = 10_000;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-const MIME_TO_EXT: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/svg+xml': 'svg',
-};
-
 const SaveImageParams = Type.Object({
   source: Type.Union([Type.Literal('base64'), Type.Literal('url')], {
     description: '图片来源：base64 为内联数据，url 为远程图片地址',
@@ -169,6 +161,8 @@ function downloadImageFromUrl(urlString: string): Promise<{
 export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
   const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   const workingDir = config.workingDir || '.';
+  const demoId = config.demoId;
+  const defaultDirectory = demoId ? `demos/${demoId}/images` : 'images';
 
   return {
     name: 'saveImage',
@@ -177,9 +171,9 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       'Save an image to the workspace from Base64 data or a remote URL. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
-      const { source, data, filename, directory = 'images' } = args;
+      const { source, data, filename, directory = defaultDirectory } = args;
 
-      if (!/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/.test(filename)) {
+      if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(filename)) {
         logger.warn({ filename }, 'saveImage: invalid filename');
         return {
           content: [{ type: 'text', text: `Error: Invalid filename "${filename}". Use alphanumeric, hyphens, and underscores only.` }],
