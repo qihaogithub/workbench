@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Copy, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { CodeEditor } from "./CodeEditor";
-import { getFileLanguage } from "@/lib/workspace-file-utils";
+import { MemoryMarkdownEditor } from "./MemoryMarkdownEditor";
+import { getFileLanguage, getFileEditorType } from "@/lib/workspace-file-utils";
 
 interface WorkspaceCodeDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ export function WorkspaceCodeDialog({
   const { toast } = useToast();
 
   const language = getFileLanguage(filePath);
+  const editorType = getFileEditorType(filePath);
 
   // 打开弹窗时重置状态
   useEffect(() => {
@@ -107,13 +109,22 @@ export function WorkspaceCodeDialog({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-auto border rounded-md">
-          <CodeEditor
-            value={editContent}
-            onChange={editable ? handleChange : undefined}
-            language={language}
-            readOnly={!editable}
-            height="100%"
-          />
+          {editorType === "markdown" ? (
+            <MemoryMarkdownEditor
+              key={filePath}
+              value={editContent}
+              onChange={handleChange}
+              readOnly={!editable}
+            />
+          ) : (
+            <CodeEditor
+              value={editContent}
+              onChange={editable ? handleChange : undefined}
+              language={language}
+              readOnly={!editable}
+              height="100%"
+            />
+          )}
         </div>
 
         <DialogFooter>

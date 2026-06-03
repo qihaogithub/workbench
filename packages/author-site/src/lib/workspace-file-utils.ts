@@ -3,11 +3,15 @@
  * 提供文件编辑权限判定、语言类型推断等公共逻辑
  */
 
+/** 编辑器类型 */
+export type FileEditorType = "code" | "markdown";
+
 /** 可编辑文件的正则白名单 */
 const EDITABLE_PATTERNS: RegExp[] = [
   /^demos\/[^/]+\/index\.tsx$/,
   /^demos\/[^/]+\/config\.schema\.json$/,
   /^project\.config\.schema\.json$/,
+  /^memory\.md$/,
 ];
 
 /**
@@ -17,6 +21,15 @@ const EDITABLE_PATTERNS: RegExp[] = [
 export function isFileEditable(filePath: string): boolean {
   const normalized = filePath.replace(/^\/+/, "");
   return EDITABLE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * 根据文件扩展名返回编辑器类型
+ * 只需在此函数添加新类型，WorkspaceCodeDialog 无需改动
+ */
+export function getFileEditorType(filePath: string): FileEditorType {
+  if (filePath.endsWith(".md")) return "markdown";
+  return "code";
 }
 
 /** 隐藏文件/目录列表（文件树中不显示） */

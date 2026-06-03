@@ -6,21 +6,30 @@
     {
       "id": "demo_1779608460379_a1b2c3",
       "name": "广场页面-手机",
-      "order": 1,
-      "parentId": null,
+      "order": 0,
+      "parentId": "folder_1780455433998_zc29ug",
       "createdAt": 1779608460379,
-      "updatedAt": 1780450209708
+      "updatedAt": 1780455466566
     },
     {
       "id": "demo_1779608460380_d4e5f6",
       "name": "广场页面-平板",
-      "order": 2,
-      "parentId": null,
+      "order": 1,
+      "parentId": "folder_1780455433998_zc29ug",
       "createdAt": 1779608460380,
-      "updatedAt": 1780045436071
+      "updatedAt": 1780455462012
     }
   ],
-  "demoFolders": [],
+  "demoFolders": [
+    {
+      "id": "folder_1780455433998_zc29ug",
+      "name": "页面分类",
+      "parentId": null,
+      "order": 0,
+      "createdAt": 1780455433998,
+      "updatedAt": 1780455433998
+    }
+  ],
   "versions": [
     {
       "versionId": "v1",
@@ -125,10 +134,34 @@
       "sessionId": "session-1780449923856-n0qy67uyu",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v13",
       "fileCount": 7
+    },
+    {
+      "versionId": "v14",
+      "savedAt": 1780455019821,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780450215188-eh6ej4qj4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v14",
+      "fileCount": 7
+    },
+    {
+      "versionId": "v15",
+      "savedAt": 1780455443343,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780455025144-raz6lzzhr",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v15",
+      "fileCount": 7
+    },
+    {
+      "versionId": "v16",
+      "savedAt": 1780455466668,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780455448228-g54sefpsy",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v16",
+      "fileCount": 7
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780450210672,
+  "updatedAt": 1780455466669,
   "publishedVersion": "v13",
   "publishedAt": 1780450414765
 }

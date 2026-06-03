@@ -1,62 +1,61 @@
 # AI对话区消息展示效果优化方案
 
-> 版本：v1.0  
+> 版本：v2.0  
 > 创建日期：2026-06-03  
-> 关联问题：AI对话区消息展示效果需要优化，提升阅读体验和视觉层次  
+> 更新日期：2026-06-04  
+> 关联问题：消息操作功能过于单一、滚动体验不佳、代码块对非专业用户不友好  
 > 状态：方案评审中
 
 ---
 
-## 一、现状分析
+## 一、调整说明（v2.0）
 
-### 1.1 现有架构
+根据评审反馈，对 v1.0 方案做出以下调整：
 
-AI对话区消息展示采用三层组件结构：
+| 变更项 | v1.0 | v2.0 |
+|--------|------|------|
+| 移动端适配 | ✅ 考虑 | ❌ 不考虑（仅 PC 端） |
+| 空状态优化 | ✅ 问题 2 | ❌ 移除（当前信息密度可接受） |
+| 折叠状态记忆 | ✅ 问题 6 | ❌ 移除（流式结束后自动折叠的行为已足够） |
+| 代码块优化 | ✅ 问题 7（加功能） | ⚠️ 改为**简化展示**（面向非专业用户） |
+| 消息操作功能 | 仅复制 | ✅ 新增：复制、重新生成、回撤、反馈 |
+| 消息编辑 | ❌ | ✅ 新增：用户消息编辑重发 |
 
-| 层级           | 组件                           | 文件                                    | 职责                         |
-| -------------- | ------------------------------ | --------------------------------------- | ---------------------------- |
-| **容器层**     | `AIChat`                       | `ai-chat.tsx`                           | 整体布局、状态管理、滚动控制 |
-| **消息列表层** | `ChatMessages`                 | `chat-messages.tsx`                     | 消息遍历渲染、空状态展示     |
-| **消息渲染层** | `Message` / `AssistantMessage` | `message.tsx` / `assistant-message.tsx` | 单条消息内容渲染、折叠交互   |
+---
 
-### 1.2 当前展示效果
+## 二、现状分析
 
-#### 1.2.1 用户消息
+### 2.1 现有架构
 
-- 右对齐气泡样式（`max-w-[80%]`）
-- 圆角卡片（`rounded-2xl rounded-tr-sm`）
-- 灰色背景（`bg-muted`）
-- 支持文本换行和自动断词
+AI 对话区消息展示采用三层组件结构：
 
-#### 1.2.2 AI消息（AssistantMessage）
+| 层级 | 组件 | 文件 | 职责 |
+|------|------|------|------|
+| **容器层** | `AIChat` | `ai-chat.tsx` | 整体布局、状态管理、滚动控制 |
+| **消息列表层** | `ChatMessages` | `chat-messages.tsx` | 消息遍历渲染、空状态展示 |
+| **消息渲染层** | `Message` / `AssistantMessage` | `message.tsx` / `assistant-message.tsx` | 单条消息内容渲染、折叠交互 |
 
-当前AI消息渲染采用**智能分块策略**（`renderBlocks`），已实现以下聚合：
+### 2.2 当前展示能力（已实现）
 
-| 内容类型      | 聚合规则                   | 展示形式                  | 折叠行为                   |
-| ------------- | -------------------------- | ------------------------- | -------------------------- |
-| **思考过程**  | 连续 reasoning 合并为一组  | `Reasoning` 组件          | 流式展开 → 结束后800ms折叠 |
-| **工具调用**  | 连续同类型工具（≥2个）合并 | `ToolCallGroup` 组件      | 手动展开/折叠              |
-| **执行阶段**  | reasoning + tool 交替混合  | `ExecutionPhase` 组件     | 流式展开 → 结束后800ms折叠 |
-| **文本回复**  | 独立文本块                 | `Streamdown` Markdown渲染 | 不折叠                     |
-| **图片/文件** | 独立渲染                   | `<img>` / `<a>`           | 不折叠                     |
+当前 AI 消息渲染采用**智能分块策略**（`renderBlocks`），已具备完整聚合能力：
 
-#### 1.2.3 空状态
+| 内容类型 | 聚合规则 | 展示形式 | 折叠行为 |
+|---------|---------|---------|---------|
+| 思考过程 | 连续 reasoning 合并为一组 | `Reasoning` 组件 | 流式展开 → 结束后 800ms 折叠 |
+| 工具调用 | 连续同类型工具（≥2个）合并 | `ToolCallGroup` 组件 | 手动展开/折叠 |
+| 执行阶段 | reasoning + tool 交替混合 | `ExecutionPhase` 组件 | 流式展开 → 结束后 800ms 折叠 |
+| 文本回复 | 独立文本块 | `Streamdown` Markdown 渲染 | 不折叠 |
+| 图片/文件 | 独立渲染 | `<img>` / `<a>` | 不折叠 |
 
-- 居中显示机器人图标（`Bot`，`h-12 w-12` 即 48×48px）
-- "AI 助手"标题（`text-lg`）+ "输入自然语言指令"提示（`text-sm`）
-- 3条示例指令（静态 `<p>` 标签，`text-xs bg-muted px-2 py-1 rounded`，不可点击）
+**结论**：消息**展示结构本身已较完善**，主要短板在于：
+1. **滚动体验**（强制跟随，用户无法回看）
+2. **消息操作**（仅复制，无重新生成/回撤/编辑/反馈）
+3. **代码块展示**（对非专业用户过于技术化）
+4. **流式指示器**（信息量不足）
 
-### 1.3 存在的问题
+### 2.3 关键问题清单
 
-#### 问题 1：滚动体验不佳
-
-**现象**：
-
-- 当前使用 `scrollIntoView({ behavior: "smooth" })` 在 `messages` 或 `streamContent` 变化时触发
-- **流式输出期间频繁滚动**，用户无法回看历史消息
-- **缺少用户手动滚动打断机制**，强制滚动到最新
-
-**影响**：用户阅读体验差，无法在AI输出过程中回看上方内容
+#### 问题 1：滚动体验不佳（P0）
 
 **代码位置**：`ai-chat.tsx` 第 145-147 行
 
@@ -66,180 +65,123 @@ useEffect(() => {
 }, [messages, streamContent]);
 ```
 
----
-
-#### 问题 2：空状态信息密度低
-
 **现象**：
-
-- 空状态占据较大垂直空间（`py-12`）
-- 示例指令仅展示3条静态文本，无法点击快速发送
-- 缺少近期对话历史快捷入口
-
-**影响**：新用户引导不足，老用户缺少效率工具
-
-**代码位置**：`chat-messages.tsx` 第 24-52 行
+- 每次 `messages` 或 `streamContent` 变化都触发滚动
+- **流式输出期间频繁滚动**，用户无法回看历史
+- **缺少用户手动滚动打断机制**
+- 滚动容器是 `ConversationContent` 中的 `ScrollAreaPrimitive`（Radix ScrollArea），而非普通 div
 
 ---
 
-#### 问题 3：流式输出指示器不明显
+#### 问题 2：消息操作功能单一（P0）
 
-**现象**：
+**当前状态**：AI 消息仅有 `hover` 显示的"复制"按钮（`assistant-message.tsx` 第 460-474 行）。
 
-- 当前仅在 `isStreaming && renderBlocks.length > 0` 时显示一行底部小字："AI 工作中..."（`text-[11px]`）
-- 初始加载时（`renderBlocks` 为空）使用 `showInitialLoading` 渲染空的 `Reasoning` 骨架
-- 缺少字数统计或耗时提示
-- 流式文本块的 `caret="block"` 光标效果在长文本中不够醒目
+**缺失的关键操作**：
+- **重新生成**：对 AI 回答不满意时，一键用相同问题重新请求
+- **回撤**：撤销上一轮 AI 对文件的修改，同时删除对应的问答对
+- **编辑**：修改用户已发送的消息并重新请求
+- **反馈**：点赞/点踩，用于评估回答质量
 
-**影响**：用户不确定AI是否正在处理或已卡住
-
-**代码位置**：`assistant-message.tsx` 第 453-458 行
-
----
-
-#### 问题 4：消息间距和视觉层次不统一
-
-**现象**：
-
-- 用户消息与AI消息间距由 `ConversationContent` 统一管理（`gap-4 p-4`，`conversation.tsx` 第29行）
-- AI消息内部各Block间距不一致（外层 `gap-2`，但折叠触发器 `py-0.5`、执行阶段内部 `py-0.5` 偏紧凑）
-- 折叠组件触发器字号偏小（`text-[11px]`），与正文 `text-[14px]` 落差较大
-
-**影响**：视觉噪音大，阅读节奏被打断
+**当前消息持久化能力**：
+- `POST /api/sessions/{sessionId}/messages`：整体覆盖写（`message-service.ts`）
+- `agent-service` 有 `/api/agent/:sessionId/rollback` 端点，但**当前为空实现**（直接返回成功）
+- `SnapshotService` 已具备文件快照对比和恢复能力（`snapshot-service.ts`）
 
 ---
 
-#### 问题 5：复制按钮交互体验差
+#### 问题 3：代码块对非专业用户过于技术化（P1）
 
-**现象**：
+**当前状态**：`@streamdown/code` 插件渲染的代码块包含：
+- 语法高亮 + 行号 + 语言标签 + 复制按钮
+- 完整展示原始代码（占大量垂直空间）
 
-- 复制按钮仅在 `group-hover` 时显示（`opacity-0 group-hover:opacity-100`）
-- 位置固定在右下角（`absolute -bottom-8 right-0`）
-- **可能遮挡下方消息**
-- 移动端无法使用（无hover状态）
+**目标用户画像**：本项目面向**非专业用户**（运营/产品/设计师），通常**不看代码**，AI 生成的代码对他们而言是噪音。
 
-**影响**：复制功能可发现性差，移动端完全不可用
-
-**代码位置**：`assistant-message.tsx` 第 460-474 行
+**需求**：代码块应**默认折叠**，仅显示"已生成 X 行代码"的摘要，用户可选择性展开。
 
 ---
 
-#### 问题 6：折叠组件缺乏记忆机制
+#### 问题 4：流式指示器信息量不足（P2）
 
-**现象**：
+**当前状态**：`assistant-message.tsx` 第 453-458 行，在 `isStreaming && renderBlocks.length > 0` 时仅显示一行小字 "AI 工作中..."。
 
-- 每次流式输出结束后，思考过程和执行阶段自动折叠（800ms延迟）
-- **用户手动展开的折叠块在下次AI输出时会被重置**
-- 缺少用户偏好记忆
-
-**影响**：用户需要反复展开相同类型的折叠块
+**缺失信息**：
+- 已耗时（用户不知道是卡住还是在工作）
+- 当前阶段（"思考中" / "生成中" / "工具调用中"）
 
 ---
 
-#### 问题 7：代码块渲染缺少优化
+#### 问题 5：间距和视觉层次微调（P2）
 
-**现象**：
-
-- `Streamdown` 使用 `@streamdown/code` 插件，但缺少：
-  - 代码块复制按钮
-  - 语言标签显示
-  - 代码折叠功能（长代码块占据大量空间）
-
-**影响**：代码阅读体验差，特别是长代码块
+**当前状态**：
+- 外层 `ConversationContent` 已有 `gap-4 p-4`（`conversation.tsx` 第 29 行），消息间距已统一
+- AI 消息内部折叠触发器字号偏小（`text-[11px]`），与正文 `text-[14px]` 落差较大，点击区域也偏小
 
 ---
 
-## 二、优化方案设计
+## 三、优化方案设计
 
-### 2.1 优化目标
+### 3.1 优化目标与优先级
 
-| 优化项     | 目标                        | 优先级 |
-| ---------- | --------------------------- | ------ |
-| 滚动体验   | 智能滚动 + 用户打断机制     | P0     |
-| 空状态     | 可点击示例 + 历史快捷入口   | P1     |
-| 流式指示器 | 增强视觉反馈 + 进度提示     | P1     |
-| 间距统一   | 建立统一间距规范            | P1     |
-| 复制按钮   | 移动端适配 + 位置优化       | P2     |
-| 折叠记忆   | localStorage 持久化用户偏好 | P2     |
-| 代码块优化 | 复制 + 语言标签 + 折叠      | P2     |
+| 优化项 | 目标 | 优先级 | 工作量 |
+|--------|------|--------|--------|
+| 智能滚动控制 | 用户可打断 + 回到底部按钮 | **P0** | 2h |
+| 消息操作功能扩展 | 复制/重新生成/回撤/编辑/反馈 | **P0** | 5-6h |
+| 代码块简化展示 | 默认折叠，仅显示摘要 | **P1** | 1.5h |
+| 流式指示器增强 | 显示耗时和阶段 | **P2** | 1h |
+| 间距微调 | 增大折叠触发器字号和点击区 | **P2** | 0.5h |
 
 ---
 
-### 2.2 优化方案 1：智能滚动控制（P0）
+### 3.2 方案 1：智能滚动控制（P0）
 
-#### 2.2.1 方案设计
+#### 3.2.1 技术前提
 
-引入**用户滚动意图检测**机制。
+当前 `ConversationContent` 使用 `ScrollAreaPrimitive`（Radix ScrollArea），滚动发生在内部 `viewport` 元素上，而非外层容器。`scrollIntoView` 方案不直接适用。
 
-> **重要前提**：当前 `ConversationContent` 使用的是 `@radix-ui/react-scroll-area` 封装的 `ScrollArea` 组件（见 `conversation.tsx`），而非普通 `<div>`。Radix ScrollArea 的滚动事件不在外层容器上，而是在内部的 `viewport` 元素上。因此 `scrollIntoView` 方案需要适配为**操作 ScrollArea 的 viewport scrollTop**，或改用原生滚动 + `overflow-y-auto`。
+**推荐方案**：将 `ConversationContent` 替换为原生滚动容器（`<div>` + `overflow-y-auto`），简化滚动控制。Radix ScrollArea 的主要价值是自定义滚动条样式，这个收益在聊天场景下远低于滚动控制的复杂度。
 
-**方案 A（推荐）：替换为原生滚动**
-
-将 `ConversationContent` 的 `ScrollAreaPrimitive` 替换为原生 `<div>` + `overflow-y-auto`，简化滚动控制逻辑：
-
-```tsx
-// conversation.tsx 改动
-const ConversationContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => (
-    <div ref={ref} className={cn('flex-1 min-h-0 overflow-y-auto', className)} {...props}>
-      <div className="flex flex-col gap-4 p-4 max-w-full min-w-0">{children}</div>
-    </div>
-  )
-);
-```
+#### 3.2.2 滚动控制逻辑
 
 ```typescript
-// ai-chat.tsx 新增滚动控制逻辑
-const [isUserScrolling, setIsUserScrolling] = useState(false);
+// ai-chat.tsx
 const scrollContainerRef = useRef<HTMLDivElement>(null);
-const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+const [isUserScrolling, setIsUserScrolling] = useState(false);
 
-// 监听滚动
+// 监听滚动，判断是否在底部附近
 const handleScroll = useCallback(() => {
   const el = scrollContainerRef.current;
   if (!el) return;
-  const threshold = 100;
+  const threshold = 100; // 距底部 100px 内视为"在底部"
   const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   setIsUserScrolling(!isNearBottom);
 }, []);
 
-// 智能自动滚动（仅非用户滚动时触发）
+// 智能自动滚动：仅当用户未手动滚动时
 useEffect(() => {
   if (isUserScrolling) return;
   const el = scrollContainerRef.current;
   if (!el) return;
   el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
 }, [messages, currentMessage.parts, isUserScrolling]);
+
+// 用户点击"回到底部"
+const scrollToBottom = useCallback(() => {
+  const el = scrollContainerRef.current;
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  setIsUserScrolling(false);
+}, []);
 ```
 
-**方案 B：保留 ScrollArea，通过 ref 操作 viewport**
-
-保留 `ScrollAreaPrimitive`，但需要通过 `data-radix-scroll-area-viewport` 选择器获取内部滚动容器，操作其 `scrollTop`。侵入性较大，不推荐。
-
-#### 2.2.2 交互逻辑
-
-| 场景               | 行为                             |
-| ------------------ | -------------------------------- |
-| 用户在底部         | 新消息自动滚动到底部             |
-| 用户手动向上滚动   | 停止自动滚动，显示"回到底部"按钮 |
-| 用户点击"回到底部" | 滚动到底部，恢复自动滚动         |
-| AI输出结束3秒后    | 自动恢复自动滚动                 |
-
-#### 2.2.3 UI改动
-
-在 `ChatMessages` 组件底部新增"回到底部"浮动按钮（使用已有的 `ConversationScrollButton` 组件风格）：
+#### 3.2.3 "回到底部"按钮
 
 ```tsx
 {isUserScrolling && isStreaming && (
   <button
-    onClick={() => {
-      scrollContainerRef.current?.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-      setIsUserScrolling(false);
-    }}
-    className="sticky bottom-4 self-center bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 z-10"
+    onClick={scrollToBottom}
+    className="sticky bottom-4 self-center bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg text-sm flex items-center gap-2 z-10"
   >
     <ArrowDown className="h-4 w-4" />
     回到底部
@@ -247,513 +189,496 @@ useEffect(() => {
 )}
 ```
 
-> **注意**：使用 `sticky` 而非 `fixed`，避免脱离对话区容器导致遮挡其他区域。
+> 使用 `sticky` 而非 `fixed`，避免脱离对话区容器。
 
-#### 2.2.4 文件改动
+#### 3.2.4 文件改动
 
-| 文件                | 改动                                                           |
-| ------------------- | -------------------------------------------------------------- |
-| `ai-chat.tsx`       | 新增 `isUserScrolling` 状态、`handleScroll` 回调、智能滚动逻辑 |
-| `chat-messages.tsx` | 接收 `onScroll` 回调、新增"回到底部"按钮                       |
-| `conversation.tsx`    | 替换 `ScrollAreaPrimitive` 为原生滚动容器（方案A），或保留 ScrollArea 并适配 viewport 操作（方案B） |
+| 文件 | 改动 |
+|------|------|
+| `conversation.tsx` | `ConversationContent` 替换为原生 `<div>` + `overflow-y-auto` |
+| `ai-chat.tsx` | 新增 `scrollContainerRef`、`isUserScrolling`、`handleScroll`、`scrollToBottom` |
+| `chat-messages.tsx` | 新增"回到底部"按钮（条件渲染） |
 
 ---
 
-### 2.3 优化方案 2：空状态增强（P1）
+### 3.3 方案 2：消息操作功能扩展（P0，核心新增）
 
-#### 2.3.1 方案设计
+#### 3.3.1 操作功能矩阵
 
-**新版空状态布局**：
+| 操作 | 适用对象 | 触发方式 | 行为 | 后端依赖 |
+|------|---------|---------|------|---------|
+| **复制** | AI 消息 | hover 按钮 | 复制文本内容到剪贴板 | 无 |
+| **重新生成** | AI 消息 | hover 按钮 | 找到配对的用户消息，重新发送，替换当前 AI 回复 | `handleSend` + 消息截断 |
+| **编辑** | 用户消息 | hover 按钮 | 进入编辑态，修改后重发，删除后续所有消息 | 消息截断 + `handleSend` |
+| **回撤** | AI 消息（有文件修改时） | hover 按钮 | 恢复文件到本轮对话前的状态 + 删除本轮问答 | `snapshotService` + 消息截断 |
+| **点赞/点踩** | AI 消息 | hover 按钮 | 标记反馈，可持久化 | 消息持久化 |
+
+#### 3.3.2 操作栏 UI 设计
+
+在 AI 消息底部显示操作栏（PC 端仅 hover 时显示）：
 
 ```
-┌─────────────────────────────────────┐
-│          [机器人图标]                 │
-│                                     │
-│         AI 助手                      │
-│    输入自然语言指令，AI将帮您修改代码   │
-│                                     │
-│  ┌─ 快捷示例（可点击）──────────┐    │
-│  │ 💬 "把标题改成轮播图"         │    │
-│  │ 🎨 "添加一个按钮组件"         │    │
-│  │ 🎨 "修改配色方案为蓝色"       │    │
-│  └─────────────────────────────┘    │
-│                                     │
-│  ┌─ 最近对话──────────────────┐    │
-│  │ 🕐 2小时前：优化首页布局     │    │
-│  │ 🕐 昨天：添加用户中心页面    │    │
-│  └────────────────────────────┘    │
-└─────────────────────────────────────┘
+┌─ AI 消息内容 ─────────────────────────────────┐
+│ [思考过程]                                    │
+│ [执行阶段]                                    │
+│ 这里是 AI 的回复文本...                       │
+│                                               │
+│ [📋 复制] [🔄 重新生成] [↩️ 回撤] [👍] [👎]     │  ← hover 显示
+└───────────────────────────────────────────────┘
 ```
 
-#### 2.3.2 核心改动
-
-1. **示例指令可点击**：点击直接发送到AI
-2. **视觉优化**：增加图标、圆角、hover效果、箭头指示
-3. **最近对话历史**（可选，需额外数据源）：展示最近3条对话，需从历史会话 API 获取，当前 `ChatMessages` 组件无此数据，需新增 prop 或通过 SWR 请求
+**组件结构**：
 
 ```tsx
-function EmptyState({ onSend }: { onSend: (message: string) => void }) {
-  const examples = [
-    { icon: "💬", text: "把标题改成轮播图" },
-    { icon: "🎨", text: "添加一个按钮组件" },
-    { icon: "🎨", text: "修改配色方案为蓝色" },
-  ];
+function MessageActionBar({
+  message,
+  onRegenerate,
+  onRollback,
+  onFeedback,
+  hasFileChanges,
+}: MessageActionBarProps) {
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
 
   return (
-    <div className="flex flex-col items-center justify-center py-8 space-y-6 text-center">
-      <div className="p-6 rounded-full bg-primary/10">
-        <Bot className="h-16 w-16 text-primary" />
-      </div>
-      <div className="space-y-2">
-        <p className="text-xl font-semibold">AI 助手</p>
-        <p className="text-sm text-muted-foreground">
-          输入自然语言指令，AI 将帮您修改代码
-        </p>
-      </div>
-
-      {/* 快捷示例 */}
-      <div className="space-y-2 text-left max-w-md w-full">
-        <p className="text-xs font-medium text-muted-foreground">快捷示例：</p>
-        <div className="space-y-1">
-          {examples.map((example, i) => (
-            <button
-              key={i}
-              onClick={() => onSend(example.text)}
-              className="w-full text-left text-sm bg-muted hover:bg-muted/80 px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <span>{example.icon}</span>
-              <span className="flex-1">{example.text}</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+      <ActionButton icon={Copy} label="复制" onClick={handleCopy} />
+      <ActionButton icon={RotateCcw} label="重新生成" onClick={onRegenerate} />
+      {hasFileChanges && (
+        <ActionButton icon={Undo2} label="回撤" onClick={onRollback} />
+      )}
+      <ActionButton
+        icon={ThumbsUp}
+        label="点赞"
+        active={feedback === 'up'}
+        onClick={() => handleFeedback('up')}
+      />
+      <ActionButton
+        icon={ThumbsDown}
+        label="点踩"
+        active={feedback === 'down'}
+        onClick={() => handleFeedback('down')}
+      />
     </div>
   );
 }
 ```
 
-#### 2.3.3 文件改动
+#### 3.3.3 核心操作实现
 
-| 文件                | 改动                                |
-| ------------------- | ----------------------------------- |
-| `chat-messages.tsx` | 替换空状态组件、新增 `onSend` prop  |
-| `ai-chat.tsx`       | 传递 `handleSend` 到 `ChatMessages` |
+##### (a) 重新生成（Regenerate）
+
+```typescript
+// use-chat-stream.ts 新增
+const handleRegenerate = useCallback(
+  (targetAssistantId: string) => {
+    const msgs = messagesRef.current;
+    const targetIndex = msgs.findIndex(m => m.id === targetAssistantId);
+    if (targetIndex < 1) return;
+
+    // 向前找到配对的用户消息
+    const userMsg = msgs.slice(0, targetIndex).reverse().find(m => m.role === 'user');
+    if (!userMsg) return;
+
+    // 截断消息到目标 AI 消息之前
+    const truncated = msgs.slice(0, targetIndex);
+    setMessages(truncated);
+    persistMessages(sessionId, truncated);
+
+    // 重新发送用户消息
+    handleSend(userMsg.content, userMsg.parts?.filter(p => p.type === 'image') as ImageAttachment[]);
+  },
+  [messagesRef, setMessages, sessionId, handleSend]
+);
+```
+
+##### (b) 编辑用户消息（Edit & Resend）
+
+```typescript
+// 在 Message 组件（用户消息）中
+const [editing, setEditing] = useState(false);
+const [editContent, setEditContent] = useState(message.content);
+
+const handleSubmitEdit = () => {
+  if (!editContent.trim() || editContent === message.content) {
+    setEditing(false);
+    return;
+  }
+  // 截断当前用户消息及之后的所有消息
+  const msgIndex = messages.findIndex(m => m.id === message.id);
+  const truncated = messages.slice(0, msgIndex);
+  setMessages(truncated);
+  // 用新内容重发
+  handleSend(editContent);
+  setEditing(false);
+};
+```
+
+UI：编辑态将消息气泡替换为 `<textarea>` + 确认/取消按钮。
+
+##### (c) 回撤（Rollback）
+
+**回撤涉及两个层面**：
+
+1. **消息层**：截断本轮问答
+2. **文件层**：恢复工作空间文件到本轮 AI 操作前的状态
+
+```typescript
+// use-chat-stream.ts 新增
+const handleRollback = useCallback(
+  async (targetAssistantId: string) => {
+    const msgs = messagesRef.current;
+    const targetIndex = msgs.findIndex(m => m.id === targetAssistantId);
+    if (targetIndex < 1) return;
+
+    // 1. 调用后端 rollback 恢复文件
+    try {
+      await fetch(`/api/agent/${agentSessionId}/rollback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assistantMessageId: targetAssistantId }),
+      });
+      // 触发文件刷新
+      onSnapshotReady?.();
+    } catch (e) {
+      console.warn('[Rollback] File rollback failed:', e);
+    }
+
+    // 2. 截断消息
+    const truncated = msgs.slice(0, targetIndex);
+    setMessages(truncated);
+    await persistMessages(sessionId, truncated);
+  },
+  [messagesRef, setMessages, sessionId, agentSessionId, onSnapshotReady]
+);
+```
+
+**后端改造**：当前 `agent-service` 的 `/rollback` 是空实现，需补充：
+- 接收 `assistantMessageId` 参数
+- 通过 `SnapshotService` 恢复到该消息生成前的文件状态
+- 如果项目使用 `project-workspace-manager` 的版本快照（`SNAPSHOTS_DIR`），可调用 `restoreVersion`
+
+**回撤条件判断**：
+- 仅当 AI 消息关联了文件修改（`files` 字段非空）时显示回撤按钮
+- 如果 AI 消息只是纯文本回复（无工具调用），仅显示"重新生成"即可
+
+##### (d) 反馈（Thumbs Up/Down）
+
+```typescript
+// 反馈存储在消息对象上
+interface ChatMessage {
+  // ... 现有字段
+  feedback?: 'up' | 'down' | null;
+}
+
+const handleFeedback = useCallback(
+  (messageId: string, type: 'up' | 'down') => {
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === messageId ? { ...m, feedback: type } : m
+      )
+    );
+    // 持久化
+    const updated = messagesRef.current.map(m =>
+      m.id === messageId ? { ...m, feedback: type } : m
+    );
+    persistMessages(sessionId, updated);
+  },
+  [messagesRef, setMessages, sessionId]
+);
+```
+
+#### 3.3.4 用户消息操作栏
+
+用户消息 hover 时显示"编辑"按钮：
+
+```
+                                        ┌─────────────────┐
+                                        │ 用户消息内容     │ [✏️ 编辑]
+                                        └─────────────────┘
+```
+
+点击后进入编辑态，气泡变为 textarea + 确认/取消按钮。
+
+#### 3.3.5 文件改动汇总
+
+| 文件 | 改动 |
+|------|------|
+| `assistant-message.tsx` | 新增 `MessageActionBar`（复制/重新生成/回撤/反馈） |
+| `message.tsx` | 用户消息新增编辑按钮和编辑态 |
+| `use-chat-stream.ts` | 新增 `handleRegenerate`、`handleRollback`、`handleFeedback` |
+| `message-service.ts` | 无改动（`persistMessages` 已支持覆盖写） |
+| `agent-service/routes/agent.ts` | 补全 `/rollback` 端点实现 |
 
 ---
 
-### 2.4 优化方案 3：流式输出指示器增强（P1）
+### 3.4 方案 3：代码块简化展示（P1）
 
-#### 2.4.1 方案设计
+#### 3.4.1 目标
 
-**当前指示器**：
-
-```
-[⏳ AI 工作中...]  // text-[11px] text-muted-foreground/50
-```
-
-**优化后指示器**：
+面向非专业用户，代码块应**默认折叠**，仅显示一行摘要：
 
 ```
-┌─────────────────────────────────┐
-│ ⏳ AI 正在思考...               │
-│ ▓▓▓▓▓▓▓▓░░░░░░░░  45%         │
-│ 已生成 128 字 | 用时 3.2 秒     │
-└─────────────────────────────────┘
+┌─ 💻 已生成 42 行 TypeScript 代码 · 点击展开 ─┐
+└──────────────────────────────────────────────┘
 ```
 
-#### 2.4.2 核心改动
+点击后展开完整代码块（保留语法高亮）。
 
-1. **字数统计**：基于 `currentMessage` 的 text parts 实时计算字数
-2. **耗时统计**：记录流式开始时间
-3. **脉冲动画增强**：当前 `animate-spin` 的 Loader2 已存在，可增强整体视觉效果
+#### 3.4.2 实现方案
 
-> **注意**：不使用进度条。AI 响应长度不可预测，基于字符数估算百分比（如 `charCount / 2000 * 100`）会严重误导用户（实际可能远超或远低于 2000 字）。改为仅显示字数和耗时的纯信息型指示器。
+`@streamdown/code` 插件不支持折叠配置，需通过**自定义 Markdown 渲染**在 `Streamdown` 外层拦截代码块。
+
+**方案 A（推荐）：后处理 DOM 包裹**
+
+在 `AssistantMessage` 的 text block 渲染后，通过 CSS 选择器找到代码块并包裹：
+
+```tsx
+// 自定义 Hook：折叠代码块
+function useCodeBlockFolding(containerRef: RefObject<HTMLDivElement>) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new MutationObserver(() => {
+      container.querySelectorAll('pre:not([data-foldable])').forEach(pre => {
+        pre.setAttribute('data-foldable', 'true');
+        const lineCount = pre.textContent?.split('\n').length ?? 0;
+        if (lineCount > 5) {
+          pre.classList.add('code-block-collapsed');
+        }
+      });
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+}
+```
+
+**方案 B：自定义 Streamdown 组件**
+
+使用 Streamdown 的 `components` 自定义渲染，将 `code` 节点替换为自定义折叠组件：
+
+```tsx
+<Streamdown
+  plugins={{ code, mermaid, math, cjk }}
+  components={{
+    code: (props) => <CollapsibleCodeBlock {...props} />,
+  }}
+>
+  {block.content}
+</Streamdown>
+```
+
+> 需确认 Streamdown 是否暴露 `components.code` 插槽（v1.0 文档未明确说明，实施前需验证）。
+
+#### 3.4.3 视觉设计
+
+**折叠态**：
+```
+┌─ 💻 42 行 TypeScript · index.tsx ──────────────── [展开 ▸] ─┐
+└──────────────────────────────────────────────────────────────┘
+```
+
+**展开态**：
+```
+┌─ 💻 42 行 TypeScript · index.tsx ──────────────── [折叠 ▾] ─┐
+│  1 │ import { useState } from 'react';                      │
+│  2 │                                                        │
+│  3 │ export function App() {                                │
+│  ...                                                       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**样式要点**：
+- 折叠态高度固定为单行（`h-10`），隐藏溢出
+- 文件路径从代码围栏元信息或上下文推断
+- 行数从代码内容计算
+
+#### 3.4.4 文件改动
+
+| 文件 | 改动 |
+|------|------|
+| 新增 `collapsible-code-block.tsx` | 折叠代码块组件 |
+| `assistant-message.tsx` | text 渲染块使用自定义代码块组件 |
+
+---
+
+### 3.5 方案 4：流式指示器增强（P2）
+
+#### 3.5.1 当前行为
+
+- 初始加载（`renderBlocks` 为空）：显示空 `Reasoning` 骨架
+- 有内容后：底部显示 "AI 工作中..." 小字
+
+#### 3.5.2 优化方向
+
+显示**已耗时**（唯一的可观测指标，不显示进度百分比）：
 
 ```tsx
 function StreamingIndicator({ startTime }: { startTime: number }) {
   const [, forceUpdate] = useState(0);
-
-  // 每 100ms 刷新一次耗时显示
   useEffect(() => {
-    const timer = setInterval(() => forceUpdate(n => n + 1), 100);
+    const timer = setInterval(() => forceUpdate(n => n + 1), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const elapsed = (Date.now() - startTime) / 1000;
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
 
   return (
-    <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60 py-1">
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5">
       <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-      <span>AI 生成中 · {elapsed.toFixed(1)}s</span>
+      <span>AI 生成中 · {elapsed}s</span>
     </div>
   );
 }
 ```
 
-> 保持与当前指示器风格一致的极简设计，仅增加耗时信息，不引入进度条。
+> **不使用进度条**：AI 响应长度不可预测，百分比会严重误导用户。
 
-#### 2.4.3 文件改动
+#### 3.5.3 文件改动
 
-| 文件                    | 改动                                      |
-| ----------------------- | ----------------------------------------- |
-| `assistant-message.tsx` | 替换底部流式指示器、新增 `startTime` prop |
-| `use-chat-stream.ts`    | 记录流式开始时间并传递                    |
-
----
-
-### 2.5 优化方案 4：间距规范统一（P1）
-
-#### 2.5.1 间距设计规范
-
-建立统一间距变量：
-
-| 场景            | 间距      | Tailwind    |
-| --------------- | --------- | ----------- |
-| 消息之间        | 16px      | `gap-4`     |
-| AI消息内部Block | 8px       | `gap-2`     |
-| 折叠组件触发器  | 12px 16px | `py-3 px-4` |
-| 折叠组件内容    | 8px 12px  | `py-2 px-3` |
-| 文本块内部      | 4px       | `space-y-1` |
-
-#### 2.5.2 核心改动
-
-当前外层 `ConversationContent` 已有 `gap-4 p-4`（`conversation.tsx` 第29行），消息间距已经统一。优化聚焦于 **AI消息内部** 的间距调整：
-
-**修改 `assistant-message.tsx`**：
-
-```tsx
-// 外层容器保持 gap-2（与 ConversationContent 的 gap-4 形成层次）
-// 主要调整折叠组件触发器的视觉大小，使其更易点击
-
-// 折叠组件触发器 — 增大可点击区域和字号
-<CollapsibleTrigger className="flex w-full items-center gap-1.5 py-1.5 text-[12px] transition-colors select-none min-w-0 group/phase">
-  {/* 之前是 py-0.5 text-[11px]，增大后更易点击 */}
-```
-
-> **不做的事**：不修改 `ConversationContent` 的 `gap-4`，不在 `chat-messages.tsx` 中额外包裹 `mb-4`（会导致双重间距）。
-
-#### 2.5.3 文件改动
-
-| 文件                    | 改动                 |
-| ----------------------- | -------------------- |
-| `assistant-message.tsx` | 微调折叠触发器间距（`py-0.5` → `py-1.5`）和字号（`text-[11px]` → `text-[12px]`） |
-| `reasoning.tsx`         | 同步调整触发器间距                                             |
-| `tool.tsx`              | 同步调整工具卡片间距                                           |
+| 文件 | 改动 |
+|------|------|
+| `assistant-message.tsx` | 替换底部指示器组件 |
+| `use-chat-stream.ts` | 记录 `streamStartTime` 并传递 |
 
 ---
 
-### 2.6 优化方案 5：复制按钮优化（P2）
+### 3.6 方案 5：间距微调（P2）
 
-#### 2.6.1 方案设计
+#### 3.6.1 当前状态
 
-**当前问题**：绝对定位在底部，hover显示，移动端不可用
+外层 `ConversationContent` 已有 `gap-4 p-4`，消息间距已统一。AI 消息内部折叠触发器字号偏小。
 
-**优化方案**：
+#### 3.6.2 调整
 
-1. 改为消息右上角常驻图标（降低透明度）
-2. hover时高亮
-3. 移动端始终可见
+| 元素 | 当前 | 调整为 |
+|------|------|--------|
+| 折叠触发器 padding | `py-0.5` | `py-1.5` |
+| 折叠触发器字号 | `text-[11px]` | `text-xs`（12px） |
+| 工具图标 | `h-3 w-3` | 保持（与触发器协调） |
 
-```tsx
-function CopyButton({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false);
+> **不做的事**：不修改 `ConversationContent` 的 `gap-4`，不在 `chat-messages.tsx` 中额外包裹 `mb-4`。
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+#### 3.6.3 文件改动
 
-  return (
-    <button
-      onClick={handleCopy}
-      className={cn(
-        "absolute top-2 right-2 p-1.5 rounded transition-all",
-        "opacity-50 hover:opacity-100 focus:opacity-100",
-        "md:opacity-0 md:group-hover:opacity-100", // 桌面端hover显示
-        "bg-background/80 backdrop-blur shadow-sm",
-        copied && "opacity-100 text-green-500",
-      )}
-      aria-label={copied ? "已复制" : "复制消息"}
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
-    </button>
-  );
-}
-```
-
-#### 2.6.2 文件改动
-
-| 文件                    | 改动                   |
-| ----------------------- | ---------------------- |
-| `assistant-message.tsx` | 替换复制按钮组件和位置 |
+| 文件 | 改动 |
+|------|------|
+| `assistant-message.tsx` | 微调 `ToolCallGroup` 和 `ExecutionPhase` 触发器 |
+| `reasoning.tsx` | 同步调整 `ReasoningTrigger` |
 
 ---
 
-### 2.7 优化方案 6：折叠状态记忆（P2）
+## 四、实施计划
 
-#### 2.7.1 方案设计
+### 4.1 Phase 1：核心能力（P0，7-8h）
 
-使用 `localStorage` 记忆用户对折叠块的偏好：
+| 任务 | 预估 | 优先级 |
+|------|------|--------|
+| 智能滚动控制 + "回到底部"按钮 | 2h | P0 |
+| `MessageActionBar` 组件（复制 + 重新生成 + 反馈） | 2h | P0 |
+| 用户消息编辑重发 | 1.5h | P0 |
+| 回撤功能（前端 + 后端 `/rollback` 补全） | 2-2.5h | P0 |
 
-```typescript
-function useFoldMemory(key: string, defaultOpen: boolean = false) {
-  const [open, setOpen] = useState(() => {
-    if (typeof window === "undefined") return defaultOpen;
-    const saved = localStorage.getItem(`ai-chat-fold-${key}`);
-    return saved ? JSON.parse(saved) : defaultOpen;
-  });
+### 4.2 Phase 2：体验优化（P1-P2，3h）
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`ai-chat-fold-${key}`, JSON.stringify(open));
-    }
-  }, [open, key]);
-
-  return [open, setOpen] as const;
-}
-```
-
-**使用示例**：
-
-```tsx
-function ExecutionPhase({ parts, isStreaming }) {
-  const [open, setOpen] = useFoldMemory("execution-phase", false);
-
-  // 流式输出时强制展开，但不覆盖用户记忆
-  useEffect(() => {
-    if (isStreaming) {
-      setOpen(true);
-    }
-  }, [isStreaming]);
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      ...
-    </Collapsible>
-  );
-}
-```
-
-#### 2.7.2 文件改动
-
-| 文件                      | 改动                                          |
-| ------------------------- | --------------------------------------------- |
-| 新增 `use-fold-memory.ts` | 新建自定义Hook                                |
-| `assistant-message.tsx`   | 在 `ExecutionPhase` 和 `ToolCallGroup` 中使用 |
-| `reasoning.tsx`           | 在 `Reasoning` 组件中使用                     |
+| 任务 | 预估 | 优先级 |
+|------|------|--------|
+| 代码块简化展示（默认折叠） | 1.5h | P1 |
+| 流式指示器增强 | 1h | P2 |
+| 间距微调 | 0.5h | P2 |
 
 ---
 
-### 2.8 优化方案 7：代码块渲染优化（P2）
+## 五、验证标准
 
-#### 2.8.1 现状说明
+### Phase 1 验证
 
-`@streamdown/code` 插件（v1.1.1）已**内置**以下功能：
-- ✅ 语言标签显示（通过 Markdown 代码围栏 ```language 自动识别）
-- ✅ 复制按钮（hover 显示，移动端常驻，流式中自动禁用）
-- ✅ 行号显示
-- ✅ 200+ 语言语法高亮（Shiki）
-- ✅ 双主题（亮/暗模式）
+- [ ] 用户向上滚动时自动滚动停止，显示"回到底部"按钮
+- [ ] 点击"回到底部"后恢复自动跟随
+- [ ] AI 消息 hover 时显示操作栏（复制/重新生成/反馈）
+- [ ] 点击"重新生成"：原 AI 回复被替换，新回复正常流式输出
+- [ ] 有文件修改的 AI 消息显示"回撤"按钮
+- [ ] 点击"回撤"：文件恢复到 AI 操作前状态 + 本轮问答消失
+- [ ] 用户消息 hover 时显示"编辑"按钮
+- [ ] 编辑用户消息并提交：后续消息全部删除，新回复正常生成
+- [ ] 点赞/点踩状态持久化到消息存储
 
-因此，**复制按钮和语言标签无需额外开发**，只需确认 `controls` 配置正确。
+### Phase 2 验证
 
-#### 2.8.2 可优化项
-
-1. **代码块折叠**：`@streamdown/code` 不支持代码块折叠，需自定义包装组件
-2. **主题自定义**：可通过 `createCodePlugin({ themes: [...] })` 或 `shikiTheme` prop 调整配色
-3. **流式禁用复制**：当前已传 `isAnimating={...}` 到 Streamdown，复制按钮在流式中自动禁用（内置行为）
-
-#### 2.8.3 长代码块折叠方案
-
-如需折叠超长代码块，需在 `Streamdown` 外层包裹自定义组件，通过 CSS `max-height` + `overflow: hidden` + 渐变遮罩实现：
-
-```tsx
-function CodeBlockWrapper({ children }: { children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const [isLong, setIsLong] = useState(false);
-
-  useEffect(() => {
-    if (ref.current && ref.current.scrollHeight > 400) {
-      setIsLong(true);
-    }
-  }, [children]);
-
-  return (
-    <div className="relative">
-      <div
-        ref={ref}
-        className={cn(
-          'overflow-hidden transition-all',
-          !expanded && isLong && 'max-h-[400px]'
-        )}
-      >
-        {children}
-      </div>
-      {!expanded && isLong && (
-        <>
-          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
-          <button
-            onClick={() => setExpanded(true)}
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-muted/80 backdrop-blur px-3 py-1 rounded-full text-xs"
-          >
-            展开全部
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-```
-
-> **注意**：此方案需通过 CSS 选择器或 `remark` 插件在代码块外包裹 `CodeBlockWrapper`，实现复杂度较高，建议评估 ROI 后决定是否实施。
-
-#### 2.8.4 文件改动
-
-| 文件                    | 改动                                                |
-| ----------------------- | --------------------------------------------------- |
-| `assistant-message.tsx` | 确认 `controls={{ code: true }}` 配置正确（当前已设置） |
+- [ ] 代码块默认折叠，显示行数和语言
+- [ ] 点击展开后显示完整语法高亮代码
+- [ ] 流式指示器显示耗时（每秒更新）
+- [ ] 折叠触发器字号和点击区域明显增大
 
 ---
 
-## 三、实施计划
+## 六、风险评估
 
-### 3.1 分阶段实施
+### 6.1 技术风险
 
-#### Phase 1：核心体验优化（P0 + P1）
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| ScrollArea 替换为原生滚动 | 滚动条样式变化 | 通过 Tailwind `scrollbar` 工具类或自定义 CSS 保持风格一致 |
+| `/rollback` 端点补全依赖 `SnapshotService` | 快照可能不存在或已过期 | 添加 `try-catch`，失败时仅截断消息并提示"文件恢复失败，请手动操作" |
+| 回撤后文件刷新 | 预览区可能不同步 | 回撤后调用 `onSnapshotReady` 触发预览刷新 |
+| Streamdown `components.code` 插槽 | 可能不暴露 | 实施前验证，不可用则降级为 DOM 后处理方案 |
+| 消息编辑触发重新生成 | 可能与流式状态冲突 | 编辑按钮仅在 `!isStreaming` 时可用 |
 
-**工作量**：4-6小时
+### 6.2 用户体验风险
 
-| 任务           | 预估时间 | 优先级 |
-| -------------- | -------- | ------ |
-| 智能滚动控制   | 2h       | P0     |
-| 间距规范统一   | 1h       | P1     |
-| 空状态增强     | 1.5h     | P1     |
-| 流式指示器增强 | 1.5h     | P1     |
-
-#### Phase 2：交互体验优化（P2）
-
-**工作量**：3-4小时
-
-| 任务         | 预估时间 | 优先级 |
-| ------------ | -------- | ------ |
-| 复制按钮优化 | 1h       | P2     |
-| 折叠状态记忆 | 1.5h     | P2     |
-| 代码块优化   | 1.5h     | P2     |
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 回撤功能误操作 | 文件被意外恢复 | 回撤前弹出确认对话框："确定撤销本轮修改？文件将恢复到 AI 操作前的状态" |
+| 代码块折叠后用户找不到代码 | 调试困难 | 折叠摘要明确显示行数+语言，展开操作一键可达 |
+| 操作栏 hover 才可发现 | 功能可发现性差 | 操作栏使用低透明度常驻（而非完全隐藏），PC 端鼠标移入即高亮 |
 
 ---
 
-### 3.2 验证标准
+## 七、设计细节
 
-#### Phase 1 验证
+### 7.1 视觉规范（PC 端专用）
 
-- [ ] 用户向上滚动时，自动滚动停止，显示"回到底部"按钮
-- [ ] 点击"回到底部"后恢复自动滚动
-- [ ] 空状态示例指令可点击发送
-- [ ] 流式输出显示进度条和统计信息
-- [ ] 消息间距统一，视觉层次清晰
+| 元素 | 规范 |
+|------|------|
+| 操作栏按钮 | `p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50` |
+| 操作栏间距 | `gap-1`，距消息内容 `mt-1` |
+| 回撤确认弹窗 | 使用现有 `AlertDialog` 组件 |
+| 代码块折叠摘要 | `bg-muted/30 rounded-md px-3 py-2 text-xs cursor-pointer hover:bg-muted/50` |
+| 编辑态 textarea | `w-full rounded-md border border-input bg-background px-3 py-2 text-sm` |
 
-#### Phase 2 验证
+### 7.2 交互规范
 
-- [ ] 复制按钮在桌面端hover显示，移动端常驻
-- [ ] 刷新页面后，折叠块状态保持用户上次操作
-- [ ] 代码块语言标签和复制按钮正常工作（确认 `controls.code` 配置）
-- [ ] 长代码块（如实施折叠方案）可展开查看完整内容
-
----
-
-## 四、风险评估
-
-### 4.1 技术风险
-
-| 风险                  | 影响           | 缓解措施                                   |
-| --------------------- | -------------- | ------------------------------------------ |
-| 滚动事件频繁触发      | 性能下降       | 使用 `throttle` 或 `requestAnimationFrame` |
-| localStorage 不可用   | 折叠记忆失效   | 添加 `typeof window` 检查和 try-catch      |
-| Streamdown 插件配置限制 | 代码块折叠不可行 | 已确认 @streamdown/code 不支持折叠配置，需自定义 CSS 包裹方案 |
-| 进度条估算不准        | 用户体验差     | 基于历史数据动态调整阈值                   |
-
-### 4.2 用户体验风险
-
-| 风险             | 影响         | 缓解措施                             |
-| ---------------- | ------------ | ------------------------------------ |
-| 滚动逻辑过于复杂 | 用户困惑     | 提供明确的视觉反馈（"回到底部"按钮） |
-| 折叠记忆过于激进 | 新消息被折叠 | 流式输出时强制展开                   |
-| 进度条误导用户   | 预期不符     | ~~已移除进度条~~，仅显示字数和耗时         |
+| 操作 | 行为 |
+|------|------|
+| 复制 | 点击后图标变为 ✅ "已复制"，2s 后恢复 |
+| 重新生成 | 禁用状态：`isStreaming` 时不可点击 |
+| 回撤 | 点击 → 弹出确认对话框 → 确认后执行 |
+| 编辑 | 气泡 → textarea（保留原内容），确认/取消按钮 |
+| 反馈 | 点赞/点踩二选一，再次点击取消 |
 
 ---
 
-## 五、设计细节
+## 八、后续优化方向
 
-### 5.1 视觉规范
-
-| 元素       | 规范                                              |
-| ---------- | ------------------------------------------------- |
-| 消息间距   | `gap-4`（16px）                                   |
-| 折叠触发器 | `py-1.5 text-[12px]`（微调增大）                   |
-| 流式指示器 | `flex items-center gap-2 text-[11px]`              |
-| 复制按钮   | `p-1.5 rounded opacity-50 hover:opacity-100`      |
-| 空状态示例 | `bg-muted hover:bg-muted/80 px-3 py-2 rounded-lg` |
-
-### 5.2 动画规范
-
-| 动画     | 规范                                         |
-| -------- | -------------------------------------------- |
-| 滚动     | `behavior: "smooth"`                         |
-| 折叠展开 | `data-[state=open]:animate-collapsible-down` |
-| 流式脉冲 | `animate-pulse`                              |
-| 进度条   | `transition-all duration-300 ease-out`       |
-| 按钮淡入 | `animate-in fade-in slide-in-from-bottom-2`  |
-
-### 5.3 响应式适配
-
-| 元素       | 桌面端              | 移动端        |
-| ---------- | ------------------- | ------------- |
-| 复制按钮   | hover显示           | 常驻显示      |
+- **消息搜索**：在对话历史中搜索关键词并高亮
+- **消息导出**：导出对话为 Markdown/PDF
+- **批量操作**：长按/右键菜单触发更多操作
+- **回撤版本浏览**：可视化文件变更 diff
 
 ---
 
-## 六、后续优化方向
-
-### 6.1 智能滚动优化
-
-- 基于用户阅读速度动态调整滚动阈值
-- 添加"阅读模式"（完全禁用自动滚动）
-
-### 6.2 消息搜索
-
-- 在对话历史中搜索关键词
-- 高亮匹配内容
-
-### 6.3 消息分组
-
-- 按时间分组（"今天"、"昨天"、"上周"）
-- 按主题分组（基于AI响应内容）
-
-### 6.4 导出功能
-
-- 导出对话为 Markdown/PDF
-- 生成对话摘要
-
----
-
-## 七、相关文档
+## 九、相关文档
 
 - [AI对话核心问题分析报告](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/plans/已完成/AI对话/AI对话核心问题分析报告.md)
 - [AI对话消息智能聚合展示优化方案](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/plans/已完成/AI对话/AI对话消息智能聚合展示优化方案.md)
 - [AI对话区连续思考与工具调用折叠优化方案](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/plans/已完成/AI对话区连续思考与工具调用折叠优化方案.md)
 - [ai-chat.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/ai-chat.tsx)
 - [assistant-message.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/assistant-message.tsx)
-- [chat-messages.tsx](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/chat/chat-messages.tsx)
+- [use-chat-stream.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts)
+- [snapshot-service.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/agent-service/src/session/snapshot-service.ts)
 
 ---
 
 **文档维护者**：AI 辅助生成  
-**最后更新**：2026-06-03  
-**文档状态**：方案评审中
+**最后更新**：2026-06-04  
+**文档状态**：v2.0 方案评审中

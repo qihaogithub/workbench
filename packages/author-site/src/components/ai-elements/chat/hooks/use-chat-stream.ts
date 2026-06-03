@@ -87,6 +87,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const streamSessionIdRef = useRef<string>("");
   const lastEventAtRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const memoryFilePathsRef = useRef<Set<string>>(new Set());
 
   const SILENCE_THRESHOLD_MS = 30000;
   const SILENCE_TICK_MS = 1000;
@@ -173,6 +174,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       ]);
 
       try {
+        memoryFilePathsRef.current.clear();
         setIsStreaming(true);
         setStreamContent("");
         setPlan("");
@@ -275,6 +277,10 @@ export function useChatStream(options: UseChatStreamOptions) {
                 content: operation.content,
               });
 
+              if (operation.path.endsWith(".md")) {
+                memoryFilePathsRef.current.add(operation.path);
+              }
+
               if (fileUpdateTimer) {
                 clearTimeout(fileUpdateTimer);
               }
@@ -337,6 +343,11 @@ export function useChatStream(options: UseChatStreamOptions) {
                   );
 
             if (finalFiles.length > 0) {
+              for (const f of finalFiles) {
+                if (f.path && f.path.endsWith(".md")) {
+                  memoryFilePathsRef.current.add(f.path);
+                }
+              }
               onFilesChange?.(finalFiles);
             }
 
@@ -463,6 +474,11 @@ export function useChatStream(options: UseChatStreamOptions) {
           await persistMessages(sessionId, httpUpdatedMessages);
 
           if (result.data?.files && result.data.files.length > 0) {
+            for (const f of result.data.files) {
+              if (f.path && f.path.endsWith(".md")) {
+                memoryFilePathsRef.current.add(f.path);
+              }
+            }
             onFilesChange?.(result.data.files);
             const { codeUpdated, schemaUpdated } = extractCodeAndSchemaUpdates(
               result.data.files,
@@ -582,6 +598,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     setPlan,
     pendingPermissionRequest,
     silenceSeconds,
+    memoryFilePathsRef,
     handleSend,
     handleCancel,
     handlePermissionResponse,

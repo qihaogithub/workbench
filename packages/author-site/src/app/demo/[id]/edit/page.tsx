@@ -932,6 +932,33 @@ ${context.details}
                     // AI finish snapshot applied — bump version to trigger PreviewPanel recompile & ConfigForm rebuild
                     setSnapshotVersion((v) => v + 1);
                   }}
+                  onMemoryUpdate={async (filePath) => {
+                    try {
+                      const res = await fetch(
+                        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+                      );
+                      const data = await res.json();
+                      if (data.success) {
+                        setWsCodeDialogData({
+                          filePath: data.data.path,
+                          content: data.data.content,
+                          editable: data.data.editable,
+                        });
+                        setWsCodeDialogOpen(true);
+                      } else {
+                        toast({
+                          title: "加载文件失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
+                      }
+                    } catch {
+                      toast({
+                        title: "加载文件失败",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
                   externalMessages={aiMessages}
                   externalIsStreaming={aiIsStreaming}
                   externalStreamContent={aiStreamContent}
