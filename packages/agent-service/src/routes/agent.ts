@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
+import { BackendAgent } from '../core/backend-agent';
 import { getSessionStore } from '../session/session-store';
 import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
@@ -120,8 +121,8 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         }
 
         // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-        if (systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
-          await (agent as any).updateSystemPrompt(systemPrompt);
+        if (systemPrompt && agent instanceof BackendAgent) {
+          await agent.updateSystemPrompt(systemPrompt);
         }
 
         sessionStore.update(sessionId, {

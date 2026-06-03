@@ -9,7 +9,6 @@ import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix }
 
 // v3.2: 静态 system prompt 缓存在 module 顶部
 const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
-console.log('[StreamService] STATIC_SYSTEM_PROMPT length:', STATIC_SYSTEM_PROMPT.length, 'contains memory.md:', STATIC_SYSTEM_PROMPT.includes('memory.md'));
 
 /**
  * 异步获取 L3 上下文前缀和 L4 记忆内容（通过服务端 API 避免客户端打包 fs）
@@ -36,14 +35,6 @@ async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; mem
     }
     const l3 = buildDynamicContextPrefix(json.data);
     const memory = json.data.memoryContent ? buildMemoryPrefix(json.data.memoryContent) : null;
-    console.log(
-      "[StreamService] L3 prefix fetched, length:",
-      l3.length,
-      "pageCount:",
-      json.data.pageCount,
-      "memoryContent:",
-      memory ? "present" : "absent"
-    );
     return { l3, memory };
   } catch (error) {
     console.warn("[StreamService] fetchContextPrefix 失败:", error);

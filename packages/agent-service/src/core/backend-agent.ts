@@ -139,4 +139,12 @@ export class BackendAgent extends BaseAgent {
     }
     return null;
   }
+
+  async updateSystemPrompt(newPrompt: string): Promise<void> {
+    if (this.backend.updateSystemPrompt) {
+      await this.backend.updateSystemPrompt(newPrompt);
+    } else {
+      throw new Error("updateSystemPrompt not supported by backend");
+    }
+  }
 }

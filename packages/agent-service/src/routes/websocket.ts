@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket, { WebSocketServer } from "ws";
 import { getAgentManager } from "../core/agent-manager";
+import { BackendAgent } from "../core/backend-agent";
 import {
   AgentConfig,
   AgentResult,
@@ -207,11 +208,13 @@ export async function registerWebSocketRoutes(
               }
 
               // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-              if (message.systemPrompt && 'updateSystemPrompt' in agent && typeof (agent as any).updateSystemPrompt === 'function') {
+              if (message.systemPrompt && agent instanceof BackendAgent) {
                 logger.info({ sessionId, promptLength: message.systemPrompt.length }, 'WebSocket: calling updateSystemPrompt');
-                await (agent as any).updateSystemPrompt(message.systemPrompt);
+                await agent.updateSystemPrompt(message.systemPrompt);
+              } else if (!message.systemPrompt) {
+                logger.info({ sessionId }, 'WebSocket: no systemPrompt in message, skipping update');
               } else {
-                logger.warn({ sessionId, hasPrompt: !!message.systemPrompt, hasMethod: 'updateSystemPrompt' in agent }, 'WebSocket: updateSystemPrompt NOT called');
+                logger.warn({ sessionId, agentType: agent.constructor.name }, 'WebSocket: agent is not BackendAgent, cannot updateSystemPrompt');
               }
 
               sendMessage({

@@ -7,7 +7,6 @@ import { scanWorkspaceContext, readMemoryContent } from '@/lib/agent/scan-worksp
 // v3.2: 静态 system prompt 缓存在 module 顶部（应用启动后不再变）
 // 缓存收益：每次 sendMessage 都不变 → LLM API prompt caching 100% 命中
 const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
-console.log('[AI Chat Route] STATIC_SYSTEM_PROMPT length:', STATIC_SYSTEM_PROMPT.length, 'contains memory.md:', STATIC_SYSTEM_PROMPT.includes('memory.md'));
 
 export async function POST(request: NextRequest) {
   try {

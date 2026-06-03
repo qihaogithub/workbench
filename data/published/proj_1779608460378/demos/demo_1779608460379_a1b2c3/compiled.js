@@ -121,8 +121,8 @@ export default function PhoneSquare(props) {
             )
           ]})
 
-          /* 小Banner滚动区 */
-          , _jsx('div', { className: "shrink-0 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide"      , children: 
+          /* 小Banner滚动区 - 添加 mt-5 与大Banner间隔20px */
+          , _jsx('div', { className: "shrink-0 mt-5 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide"       , children: 
             miniBanners.map((url, i) => (
               _jsx('img', {
 

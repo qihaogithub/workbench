@@ -1,9 +1,9 @@
 # AI 对话记忆功能方案 — memory.md
 
-> 版本：v2.1（实施中）  
+> 版本：v2.2（已上线）  
 > 创建日期：2026-06-02  
-> 最后更新：2026-06-02  
-> 状态：实施中（第一阶段遇到阻塞，System Prompt 注入未生效）  
+> 最后更新：2026-06-03  
+> 状态：已完成  
 > 类型：方案设计 + 实施记录
 
 ---
@@ -179,8 +179,6 @@ memory.md 内容极简（几行偏好+几条决策），不会显著增加 token
 
 ### 2.6 实现方式
 
-### 2.6 实现方式
-
 #### 2.6.1 记忆注入（L4 层）
 
 在发送消息前，读取工作区根目录的 `memory.md`，将内容注入到会话首条消息中：
@@ -222,21 +220,21 @@ memory.md 内容极简（几行偏好+几条决策），不会显著增加 token
 
 ## 四、实施计划
 
-### 第一阶段：Prompt 调整（约 0.5 天）
+### 第一阶段：Prompt 调整（已完成 ✅）
 
-1. 将「2.3 AI 维护规则」翻译为 System Prompt 格式
-2. 注入到 `buildStaticSystemPrompt()` 的 L2 层
-3. 确认 AI 能看到并理解 memory.md 的操作规范
-4. 本地测试验证
+1. ✅ 将「2.3 AI 维护规则」翻译为 System Prompt 格式
+2. ✅ 注入到 `buildStaticSystemPrompt()` 的 L2 层
+3. ✅ 确认 AI 能看到并理解 memory.md 的操作规范
+4. ✅ 本地测试验证
 
-### 第二阶段：初始记忆创建
+### 第二阶段：初始记忆创建（已完成 ✅）
 
-1. 用一场对话让 AI 了解项目基础信息
-2. AI 自动生成第一版 memory.md
-3. 人工检查内容是否准确、易读
-4. 将 memory.md 纳入 `.gitignore`（因为包含用户个人偏好）
+1. ✅ 用一场对话让 AI 了解项目基础信息
+2. ✅ AI 自动生成第一版 memory.md
+3. ✅ 人工检查内容是否准确、易读
+4. ✅ 将 memory.md 纳入 `.gitignore`（因为包含用户个人偏好）
 
-### 第三阶段：行为观察与调优（可选）
+### 第三阶段：行为观察与调优（未开始 🔲）
 
 1. 观察 AI 的实际记录行为
 2. 根据表现调整记录的敏感度和频率
@@ -246,7 +244,7 @@ memory.md 内容极简（几行偏好+几条决策），不会显著增加 token
 
 ## 五、实施记录
 
-### 7.1 第一阶段实施（2026-06-02）
+### 5.1 第一阶段实施（2026-06-02）
 
 #### 已完成的代码改动
 
@@ -254,12 +252,14 @@ memory.md 内容极简（几行偏好+几条决策），不会显著增加 token
 |---|---|
 | `packages/author-site/src/lib/agent/system-prompt.ts` | 新增 `MEMORY_MAINTENANCE_RULES` 常量（约 60 行，完整翻译自方案 2.3 节）；新增 `buildMemoryPrefix(content)` 函数（纯字符串格式化，含字数统计）；`L4_NOTICE` 重命名为 `USER_CONFIRMATION_NOTICE`（现为 L5）；`buildStaticSystemPrompt()` 的拼接顺序改为 `[DEMO_GENERATOR_TEMPLATE, MEMORY_MAINTENANCE_RULES, USER_CONFIRMATION_NOTICE]` |
 | `packages/author-site/src/lib/agent/scan-workspace.ts` | 新增 `readMemoryContent(workingDir)` 函数（服务端文件读取，容错返回 null） |
-| `packages/author-site/src/app/api/ai/chat/route.ts` | HTTP 路径：在 L3 上下文后追加 memory.md 内容注入 |
+| `packages/author-site/src/app/api/ai/chat/route.ts` | HTTP 路径：在 L3 上下文后追加 memory.md 内容注入；清理调试日志 |
 | `packages/author-site/src/app/api/agent/workspace-context/route.ts` | API 响应新增 `memoryContent` 字段，供 streaming 客户端获取 |
-| `packages/author-site/src/components/ai-elements/chat/services/stream-service.ts` | 新增 `hasInjectedMemory` 标记，首条消息注入 L4 记忆（后续消息跳过）；`close()` 时重置标记；函数 `fetchDynamicContextPrefix` 重命名为 `fetchContextPrefix`，返回 `{ l3, memory }` |
-| `packages/agent-service/src/routes/websocket.ts` | `updateSystemPrompt()` 调用从 `agent.start()` 之前移至之后（修复时序 Bug）；添加诊断日志 |
-| `packages/agent-service/src/routes/agent.ts` | 同上，HTTP 路径的 `updateSystemPrompt()` 时序修复 |
+| `packages/author-site/src/components/ai-elements/chat/services/stream-service.ts` | 新增 `hasInjectedMemory` 标记，首条消息注入 L4 记忆（后续消息跳过）；`close()` 时重置标记；函数 `fetchDynamicContextPrefix` 重命名为 `fetchContextPrefix`，返回 `{ l3, memory }`；清理调试日志 |
+| `packages/agent-service/src/routes/websocket.ts` | `updateSystemPrompt()` 调用从 `agent.start()` 之前移至之后（修复时序 Bug）；将调用方式从 `'updateSystemPrompt' in agent` 改为 `agent instanceof BackendAgent && agent.updateSystemPrompt()` |
+| `packages/agent-service/src/routes/agent.ts` | 同上，HTTP 路径的 `updateSystemPrompt()` 时序修复 + 类型安全调用 |
+| `packages/agent-service/src/core/backend-agent.ts` | 新增 `updateSystemPrompt(newPrompt)` 方法，委托到 `this.backend.updateSystemPrompt()`（阻塞问题根因修复） |
 | `packages/agent-service/src/backends/pi-agent.ts` | `updateSystemPrompt()` 日志从 `logger.debug` 改为 `logger.info`（便于诊断） |
+| `packages/agent-service/tests/unit/update-system-prompt.test.ts` | 新增 2 个 BackendAgent 委托测试 |
 | `.gitignore` | 添加 `memory.md` |
 
 #### 遇到的 Bug 及修复
@@ -268,39 +268,19 @@ memory.md 内容极简（几行偏好+几条决策），不会显著增加 token
 |---|---|---|---|
 | 1 | `Module not found: Can't resolve 'fs'` | `system-prompt.ts` 导入了 `fs`/`path`，但该文件被客户端 `stream-service.ts` 引用，浏览器环境无 Node.js 模块 | 将 `readMemoryContent()` 从 `system-prompt.ts` 移至纯服务端的 `scan-workspace.ts`；`buildMemoryPrefix()` 保留在 `system-prompt.ts`（纯字符串操作） |
 | 2 | `updateSystemPrompt` 调用时机错误 | 在 `agent.start()` 之前调用，此时 Pi Agent 的 `this.agent` 实例尚未创建（在 `initialize()` 中创建），`updateSystemPrompt` 检测到 `!this.agent` 后静默返回 | 将 `updateSystemPrompt()` 调用移至 `agent.start()` 之后，并移出 `if (agent.status === 'initializing')` 块以确保覆盖已有会话 |
+| 3 | **System Prompt 注入核心阻塞**（最严重） | `manager.getOrCreate()` 返回 `BaseAgent`（实际为 `BackendAgent`），但 `updateSystemPrompt` 定义在 `PiAgentBackend` 上，`BackendAgent` 未转发此方法。`'updateSystemPrompt' in agent` 对 `BackendAgent` 返回 `false` | 在 `BackendAgent` 上新增 `updateSystemPrompt()` 委托方法；调用方改用 `agent instanceof BackendAgent` 检查 |
 
-### 7.2 当前阻塞问题
+#### System Prompt 最终传递链路
 
-**现象**：完成上述所有修复后，AI 对话中仍然不知道 memory.md 的存在，也不会主动创建 memory.md。
-
-**已验证的事实**：
-- 浏览器 Console 显示：`[StreamService] STATIC_SYSTEM_PROMPT length: 5024 contains memory.md: true` → 前端侧 System Prompt 内容正确
-- 工作区中 `memoryContent: absent` → memory.md 不存在是预期的（尚未创建）
-- agent-service 终端**未出现**诊断日志 `System prompt updated via updateSystemPrompt` → System Prompt **未成功传递到 Pi Agent 实例**
-
-**根因假设**：
-
-System Prompt 的传递链路为：
 ```
-stream-service.ts (STATIC_SYSTEM_PROMPT)
-  → WebSocket send({ systemPrompt: ... })
-    → websocket.ts (message.systemPrompt)
-      → agent.updateSystemPrompt(message.systemPrompt)
-        → pi-agent.ts (this.agent.state.systemPrompt = newPrompt)
+stream-service.ts (STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt())
+  → AgentStream.send(content, id, { systemPrompt: STATIC_SYSTEM_PROMPT })
+    → WebSocket JSON: { type: "message", systemPrompt: "...", ... }
+      → websocket.ts: message.systemPrompt
+        → agent instanceof BackendAgent && agent.updateSystemPrompt(message.systemPrompt)
+          → BackendAgent.updateSystemPrompt() → this.backend.updateSystemPrompt()
+            → PiAgentBackend.updateSystemPrompt() → this.agent.state.systemPrompt = newPrompt
 ```
-
-其中一个环节断裂。可能原因按优先级排列：
-
-1. **WebSocket 消息中 `systemPrompt` 字段为空**：`stream-service.ts` 中 `this.stream.send(finalContent, ..., { systemPrompt: STATIC_SYSTEM_PROMPT })` 传递了 systemPrompt，但 `AgentStream.send()` 方法将其放入 JSON 的 `options` 嵌套对象而非顶层。`websocket.ts` 从 `message.systemPrompt` 读取顶层字段 → 可能为 `undefined`。
-
-2. **`'updateSystemPrompt' in agent` 检查失败**：`agentManager.getOrCreate()` 返回 `BaseAgent` 类型，而 `updateSystemPrompt` 定义在 `PiAgentBackend` 上（通过 `BackendAgent` 继承链）。JavaScript 的 `in` 运算符应能查到原型链上的方法，但不排除存在代理对象或类型包装导致检查失败。
-
-3. **Pi Agent 的 `AgentState.systemPrompt` 并非实际生效字段**：`pi-agent.ts` 中 `this.agent.state.systemPrompt = newPrompt` 直接赋值，但 Pi Agent 内部可能在某处缓存了初始 systemPrompt（如 `createMutableAgentState` 的闭包变量），读到的仍是旧值。
-
-**下一步调试方向**：
-- 在 `websocket.ts` 中添加 `logger.info({ hasPrompt: !!message.systemPrompt, length: message.systemPrompt?.length })` 确认字段是否存在
-- 在 `pi-agent.ts` 的 `sendMessage()` 中读取 `this.agent.state.systemPrompt` 确认是否被修改
-- 考虑绕过 `updateSystemPrompt`，直接在 `PiAgentBackend` 构造函数或 `initialize()` 中接收并设置 systemPrompt
 
 ---
 

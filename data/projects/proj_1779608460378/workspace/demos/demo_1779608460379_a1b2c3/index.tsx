@@ -121,8 +121,8 @@ export default function PhoneSquare(props: DemoProps) {
             />
           </div>
 
-          {/* 小Banner滚动区 */}
-          <div className="shrink-0 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide">
+          {/* 小Banner滚动区 - 添加 mt-5 与大Banner间隔20px */}
+          <div className="shrink-0 mt-5 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide">
             {miniBanners.map((url, i) => (
               <img
                 key={i}

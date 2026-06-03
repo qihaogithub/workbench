@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PiAgentBackend } from '../../src/backends/pi-agent';
+import { BackendAgent } from '../../src/core/backend-agent';
 import { AgentConfig } from '../../src/core/types';
 
 vi.mock('fs', () => ({
@@ -34,8 +35,27 @@ describe('PiAgentBackend - updateSystemPrompt (PI-4)', () => {
 
   it('buildSystemPrompt 私有方法应已删除（v3.2 拆分）', () => {
     const backend = new PiAgentBackend(mockConfig) as any;
-    // 私有方法在编译后仍存在但不应被外部调用
-    // 这里我们仅通过 ts 类型层面验证
     expect(typeof backend.updateSystemPrompt).toBe('function');
+  });
+});
+
+describe('BackendAgent - updateSystemPrompt 委托', () => {
+  const mockConfig: AgentConfig = {
+    sessionId: 'test',
+    workingDir: '/tmp/test-workspace',
+  };
+
+  it('应委托到 backend 的 updateSystemPrompt', async () => {
+    const updateFn = vi.fn().mockResolvedValue(undefined);
+    const mockBackend = { updateSystemPrompt: updateFn, onStream: vi.fn() } as any;
+    const agent = new BackendAgent(mockConfig, mockBackend);
+    await agent.updateSystemPrompt('new prompt');
+    expect(updateFn).toHaveBeenCalledWith('new prompt');
+  });
+
+  it('backend 不支持 updateSystemPrompt 时应抛出错误', async () => {
+    const mockBackend = { onStream: vi.fn() } as any;
+    const agent = new BackendAgent(mockConfig, mockBackend);
+    await expect(agent.updateSystemPrompt('new prompt')).rejects.toThrow('updateSystemPrompt not supported');
   });
 });
