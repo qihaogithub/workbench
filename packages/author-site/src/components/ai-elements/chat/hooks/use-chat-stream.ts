@@ -697,7 +697,20 @@ export function useChatStream(options: UseChatStreamOptions) {
       setMessages(truncated);
       persistMessages(sessionId, truncated);
 
-      handleSend(newContent);
+      const msg = msgs[msgIndex];
+      const imageParts = msg.parts?.filter((p) => p.type === "image") || [];
+      const images: ImageAttachment[] | undefined = imageParts.length > 0
+        ? imageParts.map((p) => {
+            if (p.type !== "image") return undefined;
+            const match = p.url.match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+              return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
+            }
+            return undefined;
+          }).filter((img): img is ImageAttachment => img !== undefined)
+        : undefined;
+
+      handleSend(newContent, images);
     },
     [messagesRef, setMessages, sessionId, handleSend],
   );

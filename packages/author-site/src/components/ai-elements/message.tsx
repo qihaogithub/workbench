@@ -214,8 +214,25 @@ export function Message({
       );
     }
 
+    const userImageParts = (message.parts || []).filter(
+      (p): p is Extract<MessagePart, { type: "image" }> =>
+        p.type === "image",
+    );
+
     return (
       <div className={cn("flex flex-col gap-2 group items-end min-w-0", className)}>
+        {userImageParts.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-end max-w-[80%]">
+            {userImageParts.map((part, i) => (
+              <img
+                key={`user-img-${i}`}
+                src={part.url}
+                alt={part.alt || "用户上传图片"}
+                className="max-w-[200px] max-h-[200px] rounded-lg object-cover border border-border/50"
+              />
+            ))}
+          </div>
+        )}
         {message.content && (
           <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
             <div className="whitespace-pre-wrap break-words">

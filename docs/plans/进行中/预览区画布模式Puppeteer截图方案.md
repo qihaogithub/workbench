@@ -17,7 +17,7 @@
 
 ### 0.2 决策
 
-**放弃 DOM 采集方案，改用 Puppeteer 服务端截图**。画布展示真实页面 PNG 截图（由 agent-service 后台生成），恢复单页/宫格模式的 iframe 实时预览不受影响。
+**放弃 DOM 采集方案，改用 Puppeteer 服务端截图**。画布展示真实页面 PNG 截图（由独立截图服务生成），恢复单页/宫格模式的 iframe 实时预览不受影响。
 
 ---
 
@@ -25,7 +25,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    agent-service (Fastify)               │
+│            screenshot-service (Fastify, 端口 3202)       │
 │  ┌────────────────────────────────────────────────────┐  │
 │  │  /api/screenshots/*                                │  │
 │  │  ┌──────────────┐   ┌─────────────────────────┐   │  │
@@ -52,7 +52,7 @@
 │  ┌────────────────────────────────────────────────────┐  │
 │  │  PreviewCanvas.tsx                                │  │
 │  │  进入画布 → 请求批量截图                           │  │
-│  │  渲染 <img src="/api/screenshots/...">            │  │
+│  │  渲染 <img src="screenshot-service/...">          │  │
 │  └────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -61,7 +61,7 @@
 
 | 变更 | 说明 |
 |------|------|
-| 新增 | agent-service 截图 API（复用现有 Fastify 服务，不拆新服务） |
+| 新增 | `packages/screenshot-service/` 独立截图服务（Fastify，端口 3202） |
 | 新增 | Puppeteer Browser 单例管理（启动/复用/销毁） |
 | 新增 | `data/screenshots/` 截图文件存储（独立于现有 `data/snapshots/` 版本快照） |
 | 新增 | CanvasPageItem `<img>` 展示截图（替代 ThumbnailRenderer） |
@@ -74,20 +74,42 @@
 
 ## 二、架构设计
 
-### 2.1 集成位置：agent-service
+### 2.1 独立服务：screenshot-service
 
-**不再新建独立服务**，将截图能力作为 agent-service 的 `/api/screenshots/*` 路由。理由：
+**新建 `packages/screenshot-service/`**，作为独立 Fastify 服务运行在端口 3202。理由：
 
-| 维度 | 独立服务 | 集成到 agent-service |
-|------|---------|---------------------|
-| 部署 | 多一个 Docker 容器 + 端口 | 零新增容器 |
-| 通信 | 跨服务 HTTP 调用 | API 层合并，编译仍需跨服务调用 `/api/compile` |
-| 维护 | 单独构建/部署/监控 | 与现有服务一致 |
-| 资源 | 独立 Node 进程 | 共享 Node 进程（Browser 单例独立） |
+| 维度 | 集成到 agent-service | 独立 screenshot-service |
+|------|---------------------|------------------------|
+| 职责 | 混合：AI Agent + 截图，职责不清 | 单一：只负责截图，职责清晰 |
+| 部署 | 零新增容器 | 多一个 Docker 容器 + 端口 |
+| 故障隔离 | Puppeteer crash 可能影响 Agent 服务 | 互不影响，截图服务挂了画布降级为 PageSkeleton |
+| 资源 | 共享 Node 进程（Chromium 子进程仍独立） | 独立 Node 进程 + Chromium 子进程 |
+| 扩缩容 | 无法独立扩缩 | 可独立扩缩截图服务 |
+| 编译 | 跨服务调用 author-site `/api/compile` | 同上（跨服务调用不可避免） |
 
-Puppeteer 的 Chromium 进程仍然是独立子进程，不受 Node 进程影响。集成到 agent-service 只是 API 层合并，Browser 管理不变。
+**结论**：截图服务与 Agent 服务职责完全不同，独立部署更合理。多一个容器的代价换来的是清晰的职责边界和故障隔离。
 
-### 2.2 Browser 管理
+### 2.2 服务结构
+
+```
+packages/screenshot-service/
+  src/
+    server.ts                  # Fastify 启动 + 信号处理
+    routes/
+      index.ts                 # 路由注册
+      screenshots.ts           # 截图 API 4 个端点
+    utils/
+      browser-pool.ts          # Puppeteer Browser 单例 + 并发控制
+      compile-client.ts        # 跨服务调用 author-site /api/compile
+      compile-cache.ts         # 编译结果缓存（LRU，200 条）
+      screenshot-store.ts      # 截图文件读写 + meta.json 管理
+    config.ts                  # 端口/超时/并发数等配置
+  package.json
+  tsconfig.json
+  vitest.config.ts
+```
+
+### 2.3 Browser 管理
 
 ```
 首次请求 → launch Chromium (headless)
@@ -100,19 +122,19 @@ Puppeteer 的 Chromium 进程仍然是独立子进程，不受 Node 进程影响
 ```
 
 - 使用 `puppeteer-core`（不内置 Chromium，依赖系统已安装的 Chrome）
-- 通过 `PUPPETEER_EXECUTABLE_PATH` 环境变量指定路径（与现有 Dockerfile 一致）
+- 通过 `PUPPETEER_EXECUTABLE_PATH` 环境变量指定路径
 - 兜底搜索策略：`PUPPETEER_EXECUTABLE_PATH` → macOS `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` → Linux `/usr/bin/chromium` → `/usr/bin/google-chrome`
 - 启动参数：`--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu`
 - Browser crash 自动重启：捕获 `disconnected` 事件，重新 launch
 
-### 2.3 编译复用
+### 2.4 编译复用
 
 **截图的代码编译路径与实时预览一致**：
 
 ```
 原始代码 (TSX/JSX)
   ↓
-POST /api/compile (author-site 现有 API，agent-service 跨服务调用)
+POST /api/compile (author-site 现有 API，screenshot-service 跨服务调用)
   ↓
 编译结果 { compiledCode, cssImports }
   ↓
@@ -121,14 +143,14 @@ generateIframeHtml(compiledCode, cssImports, configData) → HTML 字符串
 Puppeteer page.setContent(html) → 渲染 → 截图
 ```
 
-- agent-service 通过 HTTP 调用 author-site 的 `/api/compile` 进行编译（`AGENT_SERVICE_URL` 或新增 `AUTHOR_SITE_URL` 环境变量）
+- screenshot-service 通过 HTTP 调用 author-site 的 `/api/compile` 进行编译（`AUTHOR_SITE_URL` 环境变量，默认 `http://localhost:3200`）
 - author-site 的 `compiler.ts` 已有服务端编译缓存（Map，key 为代码 hash + 锁定依赖 JSON，上限 100 条），相同代码不重复编译
-- agent-service 侧新增编译结果缓存（key 为代码 hash，上限 200 条，LRU 淘汰），避免跨服务重复调用
-- iframe-template 的 HTML 生成逻辑不变
+- screenshot-service 侧新增编译结果缓存（key 为代码 hash，上限 200 条，LRU 淘汰），避免跨服务重复调用
+- iframe-template 的 HTML 生成逻辑不变（从 `@opencode-workbench/shared` 导入）
 
-> **注意**：`packages/shared/src/demo/compile-cache.ts` 是浏览器端缓存（key 为 `sessionId:demoId`，20 条 / 5 分钟 TTL），不适用于服务端截图场景。截图场景需在 agent-service 内新建独立的服务端编译缓存。
+> **注意**：`packages/shared/src/demo/compile-cache.ts` 是浏览器端缓存（key 为 `sessionId:demoId`，20 条 / 5 分钟 TTL），不适用于服务端截图场景。截图场景需在 screenshot-service 内新建独立的服务端编译缓存。
 
-### 2.4 截图存储
+### 2.5 截图存储
 
 ```
 data/
@@ -145,22 +167,75 @@ data/
 - 每个页面独立 `meta.json`（记录当前 hash、生成时间、耗时、近 5 个历史 hash），避免多页面并发写入同一 `meta.json` 导致数据损坏
 - `data/screenshots/` 与现有 `data/snapshots/`（项目文件版本快照）完全独立，互不影响
 
-### 2.5 Docker 部署
+### 2.6 Docker 部署
 
-**现有 Dockerfile 已预装 Chromium + Puppeteer**，仅需验证和微调：
+**新建 `docker/screenshot-service/Dockerfile`**：
 
-当前 `docker/agent-service/Dockerfile` 已包含：
 ```dockerfile
-# 已有：安装 Chromium
-RUN apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/*
+FROM node:20-bookworm-slim AS builder
+
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+
+WORKDIR /app
+
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/screenshot-service/package.json ./packages/screenshot-service/
+
+RUN PUPPETEER_SKIP_DOWNLOAD=true pnpm install --no-frozen-lockfile
+
+COPY packages/shared/ ./packages/shared/
+COPY packages/screenshot-service/ ./packages/screenshot-service/
+
+RUN pnpm --filter @opencode-workbench/screenshot-service build
+
+FROM node:20-bookworm
+
+WORKDIR /app
+
+COPY --from=builder /app/packages/screenshot-service/dist/server.js ./server.js
+
+# 安装 Chromium
+RUN apt-get update && apt-get install -y \
+    chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN npm install --no-save ... puppeteer
+
+RUN npm install --no-save fastify @fastify/cors pino puppeteer-core
+
+EXPOSE 3202
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD node -e "fetch('http://localhost:3202/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+
+CMD ["node", "server.js"]
 ```
 
-**需调整**：
-1. 将 `puppeteer` 替换为 `puppeteer-core`（减少镜像体积，避免内置 Chromium 重复）
-2. `docker-compose.yml` 无需新增 `CHROME_PATH`，已有 `PUPPETEER_EXECUTABLE_PATH` 可用
+**docker-compose.yml 新增服务**：
+
+```yaml
+screenshot-service:
+  build:
+    context: .
+    dockerfile: docker/screenshot-service/Dockerfile
+  ports:
+    - "3202:3202"
+  environment:
+    - PORT=3202
+    - HOST=0.0.0.0
+    - AUTHOR_SITE_URL=http://author-site:3200
+    - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    - DATA_DIR=/app/data
+  volumes:
+    - app-data:/app/data
+  depends_on:
+    - author-site
+  restart: unless-stopped
+```
+
+> **注意**：现有 `docker/agent-service/Dockerfile` 中的 `puppeteer` + Chromium 安装应移除，回归 agent-service 纯净的 Agent 服务定位。
 
 ---
 
@@ -262,6 +337,11 @@ RUN npm install --no-save ... puppeteer
 
 - 前端可在轮询中逐步渲染已完成的页面截图，无需等待全部完成
 
+### 3.5 GET /health
+
+- 健康检查端点
+- 返回 `{ status: "ok", timestamp, uptime, browser: "ready" | "launching" | "error" }`
+
 ---
 
 ## 四、截图生成流程
@@ -313,23 +393,29 @@ request (pageId + code + configData)
 
 ## 五、画布集成
 
-### 5.1 进入画布时触发
+### 5.1 前端请求路径
+
+截图服务独立端口，前端需通过 `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` 环境变量（默认 `http://localhost:3202`）访问截图 API。
+
+图片 URL 拼接规则：`${SCREENSHOT_SERVICE_URL}/api/screenshots/file/${projectId}/${pageId}?t=${timestamp}`
+
+### 5.2 进入画布时触发
 
 ```
 用户切换为画布模式
   ↓
 收集所有页面代码
   ↓
-POST /api/screenshots/generate-batch（异步，立即返回 batchId）
+POST ${SCREENSHOT_SERVICE_URL}/api/screenshots/generate-batch（异步，立即返回 batchId）
   ↓
-前端轮询 /api/screenshots/status/{batchId}
+前端轮询 ${SCREENSHOT_SERVICE_URL}/api/screenshots/status/{batchId}
   ↓
 已完成的页面立即渲染 <img>，未完成的显示 PageSkeleton
 ```
 
 **时机**：切换模式时触发一次批量生成。之后用户编辑某页并保存时，触发该页的单独再生成。
 
-### 5.2 CanvasPageItem 渲染逻辑
+### 5.3 CanvasPageItem 渲染逻辑
 
 ```typescript
 if (editingPageId === page.id) {
@@ -343,19 +429,19 @@ return <PageSkeleton name={page.name} />;   // 生成中/失败：轻量占位
 
 **PageSkeleton**：仅显示页面名称 + 尺寸占位框 + 淡入动画（截图加载完成后替换）。不显示任何内容骨架。
 
-### 5.3 编辑后刷新
+### 5.4 编辑后刷新
 
 ```
 用户保存页面修改
   ↓
-调用 /api/screenshots/generate（单页，同步即可）
+调用 ${SCREENSHOT_SERVICE_URL}/api/screenshots/generate（单页，同步即可）
   ↓
 更新 page.screenshotUrl（附带 ?t={timestamp}）
   ↓
 CanvasPageItem 重新渲染 <img>
 ```
 
-### 5.4 zoom 联动（取消阈值切换）
+### 5.5 zoom 联动（取消阈值切换）
 
 **移除** zoom 阈值切换逻辑（当前阈值为 `IFRAME_ZOOM_THRESHOLD = 0.55`，不再根据缩放程度切换 iframe/缩略图）。画布中所有非编辑页面统一展示截图，无论缩放等级。截图默认缩放至卡片尺寸。
 
@@ -385,7 +471,7 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 | 层级 | 位置 | Key | 容量 | 说明 |
 |------|------|-----|------|------|
 | author-site 服务端 | `compiler.ts` | 代码 hash + 锁定依赖 JSON | 100 条 | 已有，无需修改 |
-| agent-service 侧 | 新增 `screenshot-compile-cache.ts` | 代码 hash | 200 条，LRU | 避免跨服务重复调用 |
+| screenshot-service 侧 | `compile-cache.ts` | 代码 hash | 200 条，LRU | 避免跨服务重复调用 |
 
 > **注意**：`packages/shared/src/demo/compile-cache.ts` 是浏览器端缓存（key 为 `sessionId:demoId`，20 条 / 5 分钟 TTL），不适用于服务端截图场景，不在截图链路中使用。
 
@@ -401,7 +487,8 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 | Browser crash | 监听 `disconnected` 事件 → 自动 restart → 重试未完成截图 |
 | 磁盘空间不足 | 截图写入失败，返回错误但不崩溃 |
 | 全部截图失败 | 画布显示全为 PageSkeleton，用户仍可编辑 |
-| author-service 不可达 | 编译请求失败，该页显示 PageSkeleton |
+| author-site 不可达 | 编译请求失败，该页显示 PageSkeleton |
+| screenshot-service 不可达 | 所有页面显示 PageSkeleton，画布可正常使用 |
 
 **PageSkeleton 设计**：带页面名称的浅灰色占位框（与卡片尺寸一致），左上角显示页面名，无骨架/图标/动画，极其轻量。
 
@@ -409,28 +496,42 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 
 ## 八、文件变更清单
 
-### 8.1 新增文件（6 个）
+### 8.1 新增文件
+
+**screenshot-service 包**（`packages/screenshot-service/`）：
 
 | 文件 | 位置 | 说明 |
 |------|------|------|
-| `screenshot-routes.ts` | `packages/agent-service/src/routes/` | 截图 API 4 个端点 |
-| `screenshot-renderer.ts` | `packages/agent-service/src/utils/` | Puppeteer Browser 单例 + 渲染逻辑 |
-| `screenshot-compile-cache.ts` | `packages/agent-service/src/utils/` | 服务端编译结果缓存（LRU，200 条） |
+| `server.ts` | `src/` | Fastify 启动 + CORS + 信号处理 |
+| `config.ts` | `src/` | 端口/超时/并发数等配置 |
+| `routes/index.ts` | `src/routes/` | 路由注册入口 |
+| `routes/screenshots.ts` | `src/routes/` | 截图 API 4 个端点 |
+| `utils/browser-pool.ts` | `src/utils/` | Puppeteer Browser 单例 + 并发控制 |
+| `utils/compile-client.ts` | `src/utils/` | 跨服务调用 author-site /api/compile |
+| `utils/compile-cache.ts` | `src/utils/` | 编译结果缓存（LRU，200 条） |
+| `utils/screenshot-store.ts` | `src/utils/` | 截图文件读写 + meta.json 管理 |
+| `package.json` | 根 | 包配置 + 依赖 |
+| `tsconfig.json` | 根 | TypeScript 配置 |
+| `vitest.config.ts` | 根 | 测试配置 |
+
+**其他新增**：
+
+| 文件 | 位置 | 说明 |
+|------|------|------|
 | `PageSkeleton.tsx` | `packages/shared/src/demo/` | 截图未就绪时的轻量占位组件 |
 | `useScreenshotGeneration.ts` | `packages/author-site/src/components/demo/` | React Hook，管理截图生命周期 |
 | `data/screenshots/.gitkeep` | `data/screenshots/` | 截图存储目录占位 |
+| `Dockerfile` | `docker/screenshot-service/` | 截图服务 Docker 镜像 |
 
-### 8.2 修改文件（7 个）
+### 8.2 修改文件（5 个）
 
 | 文件 | 变更 |
 |------|------|
-| `packages/agent-service/src/routes/index.ts` | 注册 `registerScreenshotRoutes` |
-| `packages/agent-service/src/server.ts` | SIGTERM / SIGINT 时关闭 Browser |
-| `packages/agent-service/package.json` | 新增 `puppeteer-core` 依赖 |
 | `packages/shared/src/demo/PreviewCanvas.tsx` | 进入画布时触发批量截图；移除 Thumbnail 生成逻辑 |
 | `packages/shared/src/demo/CanvasPageItem.tsx` | `<img>` 替代 ThumbnailRenderer；移除 zoom 阈值切换 |
 | `packages/shared/src/demo/index.ts` | 移除 Thumbnail 导出，新增 PageSkeleton |
 | `packages/author-site/src/app/demo/[id]/edit/page.tsx` | 接入 useScreenshotGeneration；移除 useThumbnailGeneration |
+| `docker-compose.yml` | 新增 screenshot-service 服务定义 |
 
 ### 8.3 移除文件（7 个）
 
@@ -450,26 +551,40 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 |------|------|
 | `packages/author-site/src/components/demo/useThumbnailGeneration.ts` | Thumbnail 生命周期 Hook |
 
-### 8.5 Docker 调整
+### 8.5 Docker 清理
 
 | 文件 | 变更 |
 |------|------|
-| `docker/agent-service/Dockerfile` | `puppeteer` → `puppeteer-core`（减少镜像体积） |
+| `docker/agent-service/Dockerfile` | 移除 `puppeteer` + Chromium 安装（回归纯 Agent 服务） |
+
+### 8.6 workspace 配置
+
+| 文件 | 变更 |
+|------|------|
+| `pnpm-workspace.yaml` | 新增 `packages/screenshot-service` |
 
 ---
 
 ## 九、实施步骤
 
-### Phase 1：核心基础设施（agent-service）
+### Phase 1：搭建 screenshot-service 骨架
 
-1. 安装 `puppeteer-core` 依赖到 `agent-service`
-2. 实现 `screenshot-renderer.ts`（Browser 单例 + `renderPage()` + crash 自动重启）
-3. 实现 `screenshot-compile-cache.ts`（LRU 编译缓存，200 条）
-4. 实现 `screenshot-routes.ts`（generate / generate-batch / file / status）
-5. 注册路由到 `routes/index.ts`，SIGTERM / SIGINT 时关闭 Browser
+1. 创建 `packages/screenshot-service/` 包结构（package.json / tsconfig.json / vitest.config.ts）
+2. 注册到 `pnpm-workspace.yaml`
+3. 实现 `server.ts`（Fastify 启动 + CORS + 健康检查 + 信号处理）
+4. 实现 `config.ts`（端口 3202、AUTHOR_SITE_URL、并发数等）
+5. 验证服务可独立启动
+
+### Phase 2：核心截图逻辑
+
+1. 实现 `browser-pool.ts`（Browser 单例 + `renderPage()` + crash 自动重启）
+2. 实现 `compile-client.ts`（跨服务调用 author-site /api/compile）
+3. 实现 `compile-cache.ts`（LRU 编译缓存，200 条）
+4. 实现 `screenshot-store.ts`（截图文件读写 + per-page meta.json）
+5. 实现 `screenshots.ts` 路由（generate / generate-batch / file / status）
 6. 编写单元测试（Browser mock + 路由测试）
 
-### Phase 2：前端集成（author-site + shared）
+### Phase 3：前端集成（author-site + shared）
 
 1. 新建 `PageSkeleton.tsx`，替换 ThumbnailPlaceholder 引用
 2. 新建 `useScreenshotGeneration.ts`，管理进入画布时的异步批量生成 + 轮询
@@ -477,27 +592,28 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 4. 修改 `PreviewCanvas.tsx`：进入画布触发批量截图，移除 Thumbnail 逻辑
 5. 修改 edit `page.tsx`：接入 useScreenshotGeneration
 
-### Phase 3：清理
+### Phase 4：清理
 
 1. 删除 7 个 Thumbnail 文件
 2. 删除 `useThumbnailGeneration.ts`
 3. 更新 `index.ts` 导出
+4. 清理 agent-service Dockerfile 中的 puppeteer + Chromium
 
-### Phase 4：Docker 验证
+### Phase 5：Docker 部署
 
-1. 调整 agent-service Dockerfile（`puppeteer` → `puppeteer-core`）
-2. 验证 `PUPPETEER_EXECUTABLE_PATH` 环境变量在 Docker 中正确指向 Chromium
+1. 新建 `docker/screenshot-service/Dockerfile`
+2. 更新 `docker-compose.yml`（新增 screenshot-service 服务）
 3. 验证截图在 Docker 环境中正常工作
 
 ---
 
 ## 十、与旧方案的关键差异
 
-> **说明**：项目中不存在独立的 `packages/snapshot-service/` 包。当前 Dockerfile 中已预装 `puppeteer` + Chromium 但未使用，以下对比基于 Dockerfile 中残留的旧截图服务痕迹。
+> **说明**：当前 `docker/agent-service/Dockerfile` 中已预装 `puppeteer` + Chromium 但未使用，以下对比基于此残留痕迹。
 
 | 维度 | 旧方案（Dockerfile 残留） | 本次方案 |
 |------|-------------------------|---------|
-| 部署形式 | 独立服务痕迹（Dockerfile 中 puppeteer） | 集成到 agent-service（端口 3201） |
+| 部署形式 | 混入 agent-service（Dockerfile 中 puppeteer） | 独立 screenshot-service（端口 3202） |
 | Puppeteer 包 | `puppeteer`（内置 Chromium，镜像体积大） | `puppeteer-core`（复用系统 Chrome，镜像更小） |
 | 编译器 | 不明（Dockerfile 无编译相关） | 跨服务调用 author-site `/api/compile`（与前端一致） |
 | 存储 | 不明 | hash 版本化 + per-page meta.json |
@@ -506,3 +622,4 @@ hash = shortHash(code + JSON.stringify(configData) + width + height + SNAPSHOT_V
 | 超时 | 无 | 15s 硬超时 |
 | 并发控制 | 不明 | 最大 3 Page 并行 |
 | Browser 容错 | 无 | crash 自动重启 |
+| 故障隔离 | 无（与 Agent 服务耦合） | 完全隔离（截图服务挂了不影响 Agent） |

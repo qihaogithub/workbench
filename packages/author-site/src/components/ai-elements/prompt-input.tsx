@@ -312,6 +312,21 @@ export function PromptInputTextarea({
     }
   }
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageFiles: File[] = []
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) imageFiles.push(file)
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault()
+      context.addFiles(imageFiles)
+    }
+  }
+
   React.useEffect(() => {
     const textarea = textareaRef.current
     if (textarea) {
@@ -326,6 +341,7 @@ export function PromptInputTextarea({
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
       placeholder={placeholder}
       disabled={context.status !== 'idle'}
       className={cn(
