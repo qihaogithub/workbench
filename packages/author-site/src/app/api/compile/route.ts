@@ -58,17 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (result && sessionId && typeof sessionId === 'string') {
-      const effectiveDemoId = demoId || (() => {
-        try {
-          return getSessionMeta(sessionId)?.demoId;
-        } catch {
-          return undefined;
-        }
-      })();
-
-      if (effectiveDemoId) {
-        // 图片已通过图床绝对 URL 直接访问，无需路径重写
-      }
+      // 图片已通过图床绝对 URL 直接访问，无需路径重写
     }
 
     // 异步解析并锁定依赖版本（不阻塞响应）

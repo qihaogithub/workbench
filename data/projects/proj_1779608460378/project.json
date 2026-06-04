@@ -16,9 +16,9 @@
       "parentId": null
     },
     {
-      "id": "demo_1780542213561_k8m2n9",
-      "name": "全屏展示页-手机",
-      "order": 3,
+      "id": "demo_1780550141175_a79047",
+      "name": "全屏展示页-第二关已解锁",
+      "order": 4,
       "parentId": null
     }
   ],
@@ -345,10 +345,18 @@
       "sessionId": "session-1780546070330-xtfgry1ld",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v39",
       "fileCount": 13
+    },
+    {
+      "versionId": "v40",
+      "savedAt": 1780550317332,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780550141181-dem6z6klg",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v40",
+      "fileCount": 11
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780546340422,
+  "updatedAt": 1780550317339,
   "publishedVersion": "v21",
   "publishedAt": 1780468794271
 }

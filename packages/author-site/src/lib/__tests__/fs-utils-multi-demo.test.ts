@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import {
   generateDemoPageId,
+  generatePageSlug,
   getDemoDirPath,
   readDemoPageMeta,
   writeDemoPageMeta,
@@ -21,25 +22,58 @@ function cleanup(p: string): void {
 }
 
 describe("多 Demo 页面 — fs-utils", () => {
-  describe("generateDemoPageId", () => {
-    it("应符合 demo_<ts>_<rand6> 形态", () => {
-      const id = generateDemoPageId();
-      expect(id).toMatch(/^demo_\d+_[0-9a-z]{1,6}$/);
+  describe("generatePageSlug", () => {
+    it("英文名称应转为小写连字符", () => {
+      expect(generatePageSlug("Landing Page")).toBe("landing-page");
+      expect(generatePageSlug("Product Detail")).toBe("product-detail");
     });
 
-    it("同一毫秒下批量生成不应碰撞（蒙特卡洛 1000 次）", () => {
+    it("应丢弃非 ASCII 字符", () => {
+      expect(generatePageSlug("首页 Home")).toBe("home");
+    });
+
+    it("纯中文应回退为 page", () => {
+      expect(generatePageSlug("首页")).toBe("page");
+      expect(generatePageSlug("商品详情")).toBe("page");
+    });
+
+    it("空字符串应回退为 page", () => {
+      expect(generatePageSlug("")).toBe("page");
+    });
+
+    it("应截断到 20 字符", () => {
+      expect(
+        generatePageSlug("a-very-long-page-name-that-exceeds").length,
+      ).toBeLessThanOrEqual(20);
+    });
+
+    it("应合并连续连字符并去除首尾", () => {
+      expect(generatePageSlug("  hello   world  ")).toBe("hello-world");
+    });
+  });
+
+  describe("generateDemoPageId", () => {
+    it("有名称时应生成 slug_rand 形态", () => {
+      const id = generateDemoPageId("Homepage");
+      expect(id).toMatch(/^homepage_[0-9a-z]{4}$/);
+    });
+
+    it("英文名称应保持小写", () => {
+      const id = generateDemoPageId("Landing Page");
+      expect(id).toMatch(/^landing-page_[0-9a-z]{4}$/);
+    });
+
+    it("无名称时应使用 default-page", () => {
+      const id = generateDemoPageId();
+      expect(id).toMatch(/^default-page_[0-9a-z]{4}$/);
+    });
+
+    it("同一名称批量生成不应碰撞（蒙特卡洛 1000 次）", () => {
       const ids = new Set<string>();
-      const fixedNow = Date.now();
-      const realNow = Date.now;
-      Date.now = () => fixedNow;
-      try {
-        for (let i = 0; i < 1000; i++) {
-          ids.add(generateDemoPageId());
-        }
-      } finally {
-        Date.now = realNow;
+      for (let i = 0; i < 1000; i++) {
+        ids.add(generateDemoPageId("test"));
       }
-      // 1000 次随机 6 位 base36（约 21 亿空间），允许极低概率碰撞但应非常接近 1000
+      // 1000 次随机 4 位 base36（约 170 万空间），允许极低概率碰撞
       expect(ids.size).toBeGreaterThanOrEqual(995);
     });
   });
@@ -69,7 +103,9 @@ describe("多 Demo 页面 — fs-utils", () => {
       const demoId = result.demoIds[0];
       const demoDir = path.join(ws, "demos", demoId);
       expect(fs.existsSync(path.join(demoDir, "index.tsx"))).toBe(true);
-      expect(fs.existsSync(path.join(demoDir, "config.schema.json"))).toBe(true);
+      expect(fs.existsSync(path.join(demoDir, "config.schema.json"))).toBe(
+        true,
+      );
       expect(fs.existsSync(path.join(ws, "workspace-tree.json"))).toBe(true);
     });
 
@@ -137,7 +173,11 @@ describe("多 Demo 页面 — fs-utils", () => {
 
     it("损坏的 workspace-tree.json 时自动从旧格式迁移", () => {
       // 写入损坏的 workspace-tree.json
-      fs.writeFileSync(path.join(ws, "workspace-tree.json"), "{corrupt-json", "utf-8");
+      fs.writeFileSync(
+        path.join(ws, "workspace-tree.json"),
+        "{corrupt-json",
+        "utf-8",
+      );
 
       // readDemoPageMeta 应不抛错，尝试迁移后返回 null（因为旧格式也不存在）
       expect(readDemoPageMeta(ws, "demo_nonexist")).toBeNull();
@@ -151,10 +191,16 @@ describe("多 Demo 页面 — fs-utils", () => {
     });
     afterEach(() => cleanup(ws));
 
-    function createPages(pageMetas: Array<{ id: string; name: string; order: number }>) {
+    function createPages(
+      pageMetas: Array<{ id: string; name: string; order: number }>,
+    ) {
       const treePath = path.join(ws, "workspace-tree.json");
-      const pages = pageMetas.map(m => ({ ...m, parentId: null }));
-      fs.writeFileSync(treePath, JSON.stringify({ folders: [], pages }, null, 2), "utf-8");
+      const pages = pageMetas.map((m) => ({ ...m, parentId: null }));
+      fs.writeFileSync(
+        treePath,
+        JSON.stringify({ folders: [], pages }, null, 2),
+        "utf-8",
+      );
 
       for (const m of pageMetas) {
         const dir = path.join(ws, "demos", m.id);
@@ -203,13 +249,13 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(list.map((d) => d.id)).toEqual(["ok"]);
     });
 
-    it("workspace-tree.json 缺失但目录存在时使用 id 名称兜底", () => {
-      createDemoNoMeta("nometa");
+    it("workspace-tree.json 缺失但目录存在时从目录名提取可读名称", () => {
+      createDemoNoMeta("product-detail_a3f2");
 
       const list = listDemoPages(ws);
       expect(list).toHaveLength(1);
-      expect(list[0].id).toBe("nometa");
-      expect(list[0].name).toBe("nometa");
+      expect(list[0].id).toBe("product-detail_a3f2");
+      expect(list[0].name).toBe("product detail");
     });
   });
 });

@@ -20,7 +20,7 @@ import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
 export function findProjectRoot(cwd: string): string {
   let current = path.resolve(cwd);
   while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
       return current;
     }
     current = path.dirname(current);
@@ -28,7 +28,8 @@ export function findProjectRoot(cwd: string): string {
   return cwd;
 }
 
-const DATA_DIR = process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
+const DATA_DIR =
+  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
 const PROJECTS_DIR =
   process.env.PROJECTS_DIR || path.join(DATA_DIR, "projects");
 const SESSIONS_DIR =
@@ -104,18 +105,18 @@ export function getSessionPath(sessionId: string, projectId?: string): string {
 
 export function findSessionPath(sessionId: string): string | null {
   console.log(`[findSessionPath] 查找 session: ${sessionId}`);
-  
+
   if (!fs.existsSync(SESSIONS_DIR)) {
     console.error(`[findSessionPath] SESSIONS_DIR 不存在: ${SESSIONS_DIR}`);
     return null;
   }
 
   console.log(`[findSessionPath] SESSIONS_DIR: ${SESSIONS_DIR}`);
-  
+
   // 先尝试新结构: {userId}/{projectId}/{sessionId}/
   const level1Entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
   console.log(`[findSessionPath] level1 目录数: ${level1Entries.length}`);
-  
+
   for (const level1 of level1Entries) {
     if (!level1.isDirectory()) continue;
 
@@ -141,7 +142,9 @@ export function findSessionPath(sessionId: string): string | null {
         fs.existsSync(sessionPathByName) &&
         fs.statSync(sessionPathByName).isDirectory()
       ) {
-        console.log(`[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`);
+        console.log(
+          `[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`,
+        );
         return sessionPathByName;
       }
 
@@ -157,7 +160,9 @@ export function findSessionPath(sessionId: string): string | null {
           try {
             const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
             if (meta.sessionId === sessionId) {
-              console.log(`[findSessionPath] 找到 session (新结构-meta): ${level3Path}`);
+              console.log(
+                `[findSessionPath] 找到 session (新结构-meta): ${level3Path}`,
+              );
               return level3Path;
             }
           } catch {
@@ -257,12 +262,48 @@ const DEFAULT_DEMO_SCHEMA = JSON.stringify(
 // ============================================================
 
 /**
- * 生成 Demo 页面 ID。
- * 格式 `demo_${Date.now()}_${random6}` 与现有 workspaceId 风格一致，
- * 防止快速 AI 操作中毫秒级时间戳碰撞。
+ * 将页面名称转为文件系统安全的 slug。
+ * - ASCII 字母数字保留，空格/特殊字符 → `-`，全小写
+ * - 非 ASCII 字符（中文等）直接丢弃
+ * - 合并连续 `-`，去除首尾 `-`
+ * - 截断到 20 字符
+ * - 空结果回退 `page`
+ *
+ * @example
+ *   generatePageSlug("Landing Page")    // → "landing-page"
+ *   generatePageSlug("Product Detail")  // → "product-detail"
+ *   generatePageSlug("首页")            // → "page"（中文被丢弃，回退默认）
+ *   generatePageSlug("首页 Home")       // → "home"
+ *   generatePageSlug("")                // → "page"
  */
-export function generateDemoPageId(): string {
-  return `demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+export function generatePageSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    // 保留 ASCII 字母数字和空格/连字符，丢弃其他字符（含中文）
+    .replace(/[^a-z0-9\s-]/g, "")
+    // 空格替换为 `-`
+    .replace(/\s+/g, "-")
+    // 合并连续 `-`
+    .replace(/-{2,}/g, "-")
+    // 去除首尾 `-`
+    .replace(/^-|-$/g, "")
+    // 截断到 20 字符
+    .slice(0, 20)
+    // 截断后可能产生尾部 `-`
+    .replace(/-$/, "");
+
+  return slug || "page";
+}
+
+/**
+ * 生成 Demo 页面 ID。
+ * 格式 `{slug}_{4位随机}`，如 `product-detail_a3f2`。
+ * slug 由 `generatePageSlug(name)` 生成，保证目录名有语义。
+ */
+export function generateDemoPageId(name?: string): string {
+  const slug = generatePageSlug(name || "Default Page");
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `${slug}_${rand}`;
 }
 
 /**
@@ -300,7 +341,9 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
           parentId: (f.parentId ?? null) as string | null,
         }));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const pages: DemoPageMeta[] = [];
@@ -313,12 +356,14 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
         try {
           const m = JSON.parse(fs.readFileSync(legacyMetaPath, "utf-8"));
           pages.push({
-            id: m.id as string || entry.name,
-            name: m.name as string || entry.name,
+            id: (m.id as string) || entry.name,
+            name: (m.name as string) || entry.name,
             order: typeof m.order === "number" ? m.order : pages.length,
             parentId: (m.parentId ?? null) as string | null,
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       } else {
         // 目录存在但无 .demo.json：用目录名兜底
         const dir = path.join(demosDir, entry.name);
@@ -328,7 +373,7 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
         ) {
           pages.push({
             id: entry.name,
-            name: entry.name,
+            name: entry.name.split("_")[0].replace(/-/g, " "),
             order: pages.length,
             parentId: null,
           });
@@ -355,7 +400,9 @@ function readWorkspaceTree(workspacePath: string): WorkspaceTree {
         folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
         pages: Array.isArray(parsed?.pages) ? parsed.pages : [],
       };
-    } catch { /* fall through to migration */ }
+    } catch {
+      /* fall through to migration */
+    }
   }
   return migrateLegacyToTree(workspacePath);
 }
@@ -384,7 +431,7 @@ export function readDemoPageMeta(
   demoId: string,
 ): DemoPageMeta | null {
   const tree = readWorkspaceTree(workspacePath);
-  return tree.pages.find(p => p.id === demoId) ?? null;
+  return tree.pages.find((p) => p.id === demoId) ?? null;
 }
 
 /**
@@ -397,13 +444,16 @@ export function writeDemoPageMeta(
   patch: Partial<DemoPageMeta>,
 ): DemoPageMeta {
   const tree = readWorkspaceTree(workspacePath);
-  const existingIdx = tree.pages.findIndex(p => p.id === demoId);
+  const existingIdx = tree.pages.findIndex((p) => p.id === demoId);
   const existing = existingIdx !== -1 ? tree.pages[existingIdx] : null;
   const merged: DemoPageMeta = {
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
     order: patch.order ?? existing?.order ?? 0,
-    parentId: patch.parentId !== undefined ? patch.parentId : (existing?.parentId ?? null),
+    parentId:
+      patch.parentId !== undefined
+        ? patch.parentId
+        : (existing?.parentId ?? null),
   };
   if (existingIdx !== -1) {
     tree.pages[existingIdx] = merged;
@@ -438,7 +488,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
   // 同时发现磁盘上有但 tree 中缺失的页面（如 AI Agent 创建后未更新 tree）
   for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    if (result.some(p => p.id === entry.name)) continue;
+    if (result.some((p) => p.id === entry.name)) continue;
     const dir = path.join(demosDir, entry.name);
     if (
       fs.existsSync(path.join(dir, "index.tsx")) &&
@@ -446,7 +496,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     ) {
       result.push({
         id: entry.name,
-        name: entry.name,
+        name: entry.name.split("_")[0].replace(/-/g, " "),
         order: result.length,
         parentId: null,
       });
@@ -489,7 +539,7 @@ export function ensureWorkspaceFiles(workspacePath: string): {
   }
 
   // 仓库为空：创建默认页面
-  const demoId = generateDemoPageId();
+  const demoId = generateDemoPageId("Default Page");
   const demoDir = path.join(demosDir, demoId);
   fs.mkdirSync(demoDir, { recursive: true });
   fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
@@ -612,7 +662,7 @@ export function createSession(projectId: string): SessionMeta {
 
 export function getSessionMeta(sessionId: string): SessionMeta | null {
   console.log(`[getSessionMeta] 获取 session 元数据: ${sessionId}`);
-  
+
   if (!sessionExists(sessionId)) {
     console.error(`[getSessionMeta] session 不存在: ${sessionId}`);
     return null;
@@ -620,7 +670,7 @@ export function getSessionMeta(sessionId: string): SessionMeta | null {
 
   const sessionPath = getSessionPath(sessionId);
   console.log(`[getSessionMeta] sessionPath: ${sessionPath}`);
-  
+
   const metaPath = path.join(sessionPath, ".session.json");
   console.log(`[getSessionMeta] metaPath: ${metaPath}`);
 
@@ -631,10 +681,10 @@ export function getSessionMeta(sessionId: string): SessionMeta | null {
 
   const content = fs.readFileSync(metaPath, "utf-8");
   console.log(`[getSessionMeta] .session.json 内容: ${content}`);
-  
+
   const meta = JSON.parse(content) as SessionMeta;
   console.log(`[getSessionMeta] 解析后的元数据:`, meta);
-  
+
   return meta;
 }
 
@@ -708,13 +758,14 @@ export function readProjectMeta(projectId: string): Project | null {
     const parsed = JSON.parse(content) as Partial<Project>;
     // 防御性兜底：旧版 project.json 可能缺少 demoPages / versions / demoFolders
     const demoPages = Array.isArray(parsed.demoPages)
-      ? parsed.demoPages.map(p => ({ ...p, parentId: p.parentId ?? null }))
+      ? parsed.demoPages.map((p) => ({ ...p, parentId: p.parentId ?? null }))
       : [];
     return {
       ...parsed,
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
-      workspacePath: parsed.workspacePath ?? path.join(projectPath, "workspace"),
+      workspacePath:
+        parsed.workspacePath ?? path.join(projectPath, "workspace"),
       demoPages,
       demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
@@ -969,10 +1020,18 @@ export function findWorkspacePath(workspaceId: string): string | null {
   const userDirs = fs.readdirSync(WORKSPACES_DIR, { withFileTypes: true });
   for (const userDir of userDirs) {
     if (!userDir.isDirectory()) continue;
-    const projectDirs = fs.readdirSync(path.join(WORKSPACES_DIR, userDir.name), { withFileTypes: true });
+    const projectDirs = fs.readdirSync(
+      path.join(WORKSPACES_DIR, userDir.name),
+      { withFileTypes: true },
+    );
     for (const projectDir of projectDirs) {
       if (!projectDir.isDirectory()) continue;
-      const wsPath = path.join(WORKSPACES_DIR, userDir.name, projectDir.name, workspaceId);
+      const wsPath = path.join(
+        WORKSPACES_DIR,
+        userDir.name,
+        projectDir.name,
+        workspaceId,
+      );
       if (fs.existsSync(wsPath) && fs.statSync(wsPath).isDirectory()) {
         return wsPath;
       }
@@ -1012,7 +1071,10 @@ export function getWorkspaceMeta(workspaceId: string): WorkspaceMeta | null {
   }
 }
 
-export function writeWorkspaceMeta(workspaceId: string, meta: WorkspaceMeta): void {
+export function writeWorkspaceMeta(
+  workspaceId: string,
+  meta: WorkspaceMeta,
+): void {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return;
 
@@ -1038,12 +1100,19 @@ export function getWorkspaceFiles(workspaceId: string): DemoFiles | null {
   };
 }
 
-export function updateWorkspaceFiles(workspaceId: string, files: DemoFiles): boolean {
+export function updateWorkspaceFiles(
+  workspaceId: string,
+  files: DemoFiles,
+): boolean {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return false;
 
   fs.writeFileSync(path.join(wsPath, "index.tsx"), files.code, "utf-8");
-  fs.writeFileSync(path.join(wsPath, "config.schema.json"), files.schema, "utf-8");
+  fs.writeFileSync(
+    path.join(wsPath, "config.schema.json"),
+    files.schema,
+    "utf-8",
+  );
   return true;
 }
 
@@ -1185,11 +1254,13 @@ export function createWorkspaceDemoPage(
   if (!wsPath) return null;
 
   const existing = listDemoPages(wsPath);
-  const sameParent = existing.filter(d => (d.parentId ?? null) === (parentId ?? null));
+  const sameParent = existing.filter(
+    (d) => (d.parentId ?? null) === (parentId ?? null),
+  );
   const nextOrder =
     sameParent.length > 0 ? Math.max(...sameParent.map((d) => d.order)) + 1 : 0;
 
-  const demoId = generateDemoPageId();
+  const demoId = generateDemoPageId(name);
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.mkdirSync(demoDir, { recursive: true });
   fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
@@ -1226,11 +1297,13 @@ export function copyWorkspaceDemoPage(
 
   const sourceMeta = readDemoPageMeta(wsPath, sourceDemoId);
   const existing = listDemoPages(wsPath);
-  const sameParent = existing.filter(d => (d.parentId ?? null) === (sourceMeta?.parentId ?? null));
+  const sameParent = existing.filter(
+    (d) => (d.parentId ?? null) === (sourceMeta?.parentId ?? null),
+  );
   const nextOrder =
     sameParent.length > 0 ? Math.max(...sameParent.map((d) => d.order)) + 1 : 0;
 
-  const demoId = generateDemoPageId();
+  const demoId = generateDemoPageId(name);
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.cpSync(sourceDir, demoDir, { recursive: true });
 
@@ -1383,21 +1456,28 @@ export function generateFolderId(): string {
   return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function getFolderDepth(folderId: string, folders: DemoFolderMeta[]): number {
+export function getFolderDepth(
+  folderId: string,
+  folders: DemoFolderMeta[],
+): number {
   let depth = 0;
-  let current = folders.find(f => f.id === folderId);
+  let current = folders.find((f) => f.id === folderId);
   while (current?.parentId) {
     depth++;
-    current = folders.find(f => f.id === current!.parentId);
+    current = folders.find((f) => f.id === current!.parentId);
   }
   return depth;
 }
 
-export function isDescendant(folderId: string, targetParentId: string, folders: DemoFolderMeta[]): boolean {
-  let current = folders.find(f => f.id === targetParentId);
+export function isDescendant(
+  folderId: string,
+  targetParentId: string,
+  folders: DemoFolderMeta[],
+): boolean {
+  let current = folders.find((f) => f.id === targetParentId);
   while (current) {
     if (current.id === folderId) return true;
-    current = folders.find(f => f.id === current!.parentId);
+    current = folders.find((f) => f.id === current!.parentId);
   }
   return false;
 }
@@ -1411,14 +1491,16 @@ export function createDemoFolder(
   const folders = tree.folders;
 
   if (parentId) {
-    const parent = folders.find(f => f.id === parentId);
+    const parent = folders.find((f) => f.id === parentId);
     if (!parent) return null;
     if (getFolderDepth(parentId, folders) >= 3) return null;
   }
 
-  const sameParent = folders.filter(f => (f.parentId ?? null) === (parentId ?? null));
+  const sameParent = folders.filter(
+    (f) => (f.parentId ?? null) === (parentId ?? null),
+  );
   const nextOrder =
-    sameParent.length > 0 ? Math.max(...sameParent.map(f => f.order)) + 1 : 0;
+    sameParent.length > 0 ? Math.max(...sameParent.map((f) => f.order)) + 1 : 0;
 
   const folder: DemoFolderMeta = {
     id: generateFolderId(),
@@ -1438,11 +1520,11 @@ export function updateDemoFolder(
   patch: { name?: string; parentId?: string | null; order?: number },
 ): DemoFolderMeta | null {
   const tree = readWorkspaceTree(workspacePath);
-  const index = tree.folders.findIndex(f => f.id === folderId);
+  const index = tree.folders.findIndex((f) => f.id === folderId);
   if (index === -1) return null;
 
   if (patch.parentId !== undefined && patch.parentId !== null) {
-    const targetParent = tree.folders.find(f => f.id === patch.parentId);
+    const targetParent = tree.folders.find((f) => f.id === patch.parentId);
     if (!targetParent) return null;
     if (isDescendant(folderId, patch.parentId, tree.folders)) return null;
     if (getFolderDepth(folderId, tree.folders) + 1 > 3) return null;
@@ -1466,7 +1548,7 @@ export function deleteDemoFolder(
   deleteContents: boolean = false,
 ): { success: boolean; deletedPageIds?: string[] } {
   const tree = readWorkspaceTree(workspacePath);
-  const index = tree.folders.findIndex(f => f.id === folderId);
+  const index = tree.folders.findIndex((f) => f.id === folderId);
   if (index === -1) return { success: false };
 
   const deletedPageIds: string[] = [];
@@ -1493,21 +1575,23 @@ export function deleteDemoFolder(
       }
     }
 
-    tree.folders = tree.folders.filter(f => !descendantFolderIds.has(f.id));
-    tree.pages = tree.pages.filter(p => !deletedPageIds.includes(p.id));
+    tree.folders = tree.folders.filter((f) => !descendantFolderIds.has(f.id));
+    tree.pages = tree.pages.filter((p) => !deletedPageIds.includes(p.id));
     writeWorkspaceTree(workspacePath, tree);
   } else {
-    tree.folders = tree.folders.filter(f => f.id !== folderId);
+    tree.folders = tree.folders.filter((f) => f.id !== folderId);
     for (const f of tree.folders) {
       if (f.parentId === folderId) {
-        f.parentId = tree.folders.find(fo => fo.id === folderId)?.parentId ?? null;
+        f.parentId =
+          tree.folders.find((fo) => fo.id === folderId)?.parentId ?? null;
       }
     }
 
     let changed = false;
     for (const p of tree.pages) {
       if (p.parentId === folderId) {
-        p.parentId = tree.folders.find(fo => fo.id === folderId)?.parentId ?? null;
+        p.parentId =
+          tree.folders.find((fo) => fo.id === folderId)?.parentId ?? null;
         changed = true;
       }
     }
@@ -1526,17 +1610,25 @@ export function reorderDemoPages(
   const tree = readWorkspaceTree(workspacePath);
 
   for (const u of pageUpdates) {
-    const idx = tree.pages.findIndex(p => p.id === u.id);
+    const idx = tree.pages.findIndex((p) => p.id === u.id);
     if (idx !== -1) {
-      tree.pages[idx] = { ...tree.pages[idx], order: u.order, parentId: u.parentId };
+      tree.pages[idx] = {
+        ...tree.pages[idx],
+        order: u.order,
+        parentId: u.parentId,
+      };
     }
   }
 
   if (folderUpdates && folderUpdates.length > 0) {
     for (const u of folderUpdates) {
-      const idx = tree.folders.findIndex(f => f.id === u.id);
+      const idx = tree.folders.findIndex((f) => f.id === u.id);
       if (idx !== -1) {
-        tree.folders[idx] = { ...tree.folders[idx], order: u.order, parentId: u.parentId };
+        tree.folders[idx] = {
+          ...tree.folders[idx],
+          order: u.order,
+          parentId: u.parentId,
+        };
       }
     }
   }

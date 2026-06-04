@@ -31,6 +31,12 @@
       "name": "全屏展示页-手机",
       "order": 3,
       "parentId": null
+    },
+    {
+      "id": "demo_1780550141175_a79047",
+      "name": "全屏展示页-第二关已解锁",
+      "order": 4,
+      "parentId": null
     }
   ]
 }

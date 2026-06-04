@@ -11,7 +11,10 @@ vi.mock('fs', () => ({
     mkdir: vi.fn(),
     writeFile: vi.fn(),
   },
-  existsSync: vi.fn(),
+  existsSync: vi.fn().mockReturnValue(false),
+  mkdirSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue(JSON.stringify({ images: [] })),
+  writeFileSync: vi.fn(),
 }));
 
 vi.mock('../../src/utils/logger', () => ({
@@ -39,7 +42,6 @@ class MockRequest extends EventEmitter {
 
 const baseConfig: AgentConfig = {
   sessionId: 'test-session',
-  workingDir: '/tmp/test-workspace',
 };
 
 function createTool(config: AgentConfig = baseConfig) {
@@ -93,7 +95,7 @@ describe('createSaveImageTool', () => {
   });
 
   describe('Base64 来源', () => {
-    it('应正确解码并保存 Base64 图片', async () => {
+    it('应正确解码并保存 Base64 图片，返回绝对 URL', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);
 
@@ -105,14 +107,13 @@ describe('createSaveImageTool', () => {
       } as any);
 
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Reference it in demo code as: ../../images/test-image.png');
-      expect(result.details.path).toBe('images/test-image.png');
+      expect(result.content[0].text).toMatch(/^Image saved: \/api\/images\/[a-f0-9]{12}-test-image\.png$/);
       expect(result.details.format).toBe('png');
       expect(result.details.source).toBe('base64');
-      expect((fs.promises.writeFile as any)).toHaveBeenCalledWith(
-        '/tmp/test-workspace/images/test-image.png',
-        expect.any(Buffer),
-      );
+      expect(result.details.sha256).toHaveLength(12);
+      expect(fs.promises.writeFile).toHaveBeenCalled();
+      const writeCall = (fs.promises.writeFile as any).mock.calls[0];
+      expect(writeCall[0]).toMatch(/images\/[a-f0-9]{12}-test-image\.png$/);
     });
 
     it('空 Base64 数据应被拒绝', async () => {
@@ -127,7 +128,7 @@ describe('createSaveImageTool', () => {
       expect(result.content[0].text).toContain('Empty Base64 data');
     });
 
-    it('应保存到自定义目录', async () => {
+    it('directory 参数应被忽略（图床统一存储）', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);
 
@@ -140,11 +141,27 @@ describe('createSaveImageTool', () => {
       } as any);
 
       expect(result.isError).toBeFalsy();
-      expect(result.details.path).toBe('assets/images/hero.png');
-      expect((fs.promises.writeFile as any)).toHaveBeenCalledWith(
-        '/tmp/test-workspace/assets/images/hero.png',
-        expect.any(Buffer),
-      );
+      const writeCall = (fs.promises.writeFile as any).mock.calls[0];
+      expect(writeCall[0]).toMatch(/images\/[a-f0-9]{12}-hero\.png$/);
+    });
+  });
+
+  describe('去重', () => {
+    it('相同内容图片应复用已有文件', async () => {
+      (fs.promises.mkdir as any).mockResolvedValue(undefined);
+      (fs.promises.writeFile as any).mockResolvedValue(undefined);
+      (fs.existsSync as any).mockReturnValue(true);
+
+      const tool = createTool();
+      const result = await tool.execute('id', {
+        source: 'base64',
+        data: 'dGVzdA==',
+        filename: 'duplicate.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Image saved');
+      expect(fs.promises.writeFile).not.toHaveBeenCalled();
     });
   });
 
@@ -162,21 +179,6 @@ describe('createSaveImageTool', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('too large');
-    });
-  });
-
-  describe('路径安全', () => {
-    it('应拒绝越权路径', async () => {
-      const tool = createTool();
-      const result = await tool.execute('id', {
-        source: 'base64',
-        data: 'dGVzdA==',
-        filename: 'test.png',
-        directory: '../outside',
-      } as any);
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('not allowed');
     });
   });
 
@@ -210,6 +212,7 @@ describe('createSaveImageTool', () => {
     it('写入失败应返回错误', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockRejectedValue(new Error('Disk full'));
+      (fs.existsSync as any).mockReturnValue(false);
 
       const tool = createTool();
       const result = await tool.execute('id', {
@@ -220,6 +223,26 @@ describe('createSaveImageTool', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Error saving image');
+    });
+  });
+
+  describe('项目图片清单', () => {
+    it('配置了 demoId 时应更新 images.json', async () => {
+      (fs.promises.mkdir as any).mockResolvedValue(undefined);
+      (fs.promises.writeFile as any).mockResolvedValue(undefined);
+
+      const tool = createTool({
+        ...baseConfig,
+        demoId: 'test-project',
+      });
+      const result = await tool.execute('id', {
+        source: 'base64',
+        data: 'dGVzdA==',
+        filename: 'hero.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(fs.writeFileSync).toHaveBeenCalled();
     });
   });
 });

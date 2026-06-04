@@ -320,9 +320,5 @@ export function compileSession(
 
   const result = compileCode(code, lockedDependencies);
 
-  if (demoId) {
-    return result;
-  }
-
   return result;
 }

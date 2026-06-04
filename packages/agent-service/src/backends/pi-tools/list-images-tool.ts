@@ -16,10 +16,17 @@ function findProjectRoot(cwd: string): string {
   return cwd;
 }
 
-const DATA_DIR = path.resolve(
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-);
-const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
+let _projectsDir: string | null = null;
+
+function getProjectsDir(): string {
+  if (!_projectsDir) {
+    const dataDir = path.resolve(
+      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
+    );
+    _projectsDir = path.join(dataDir, 'projects');
+  }
+  return _projectsDir;
+}
 
 interface ProjectImageEntry {
   id: string;
@@ -54,7 +61,7 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
         };
       }
 
-      const manifestPath = path.join(PROJECTS_DIR, config.demoId, 'images.json');
+      const manifestPath = path.join(getProjectsDir(), config.demoId, 'images.json');
 
       if (!fs.existsSync(manifestPath)) {
         return {

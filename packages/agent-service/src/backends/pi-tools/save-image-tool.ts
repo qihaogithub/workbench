@@ -45,11 +45,32 @@ function findProjectRoot(cwd: string): string {
   return cwd;
 }
 
-const DATA_DIR = path.resolve(
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-);
-const IMAGES_DIR = path.join(DATA_DIR, 'images');
-const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
+let _dataDir: string | null = null;
+let _imagesDir: string | null = null;
+let _projectsDir: string | null = null;
+
+function getDataDir(): string {
+  if (!_dataDir) {
+    _dataDir = path.resolve(
+      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
+    );
+  }
+  return _dataDir;
+}
+
+function getImagesDir(): string {
+  if (!_imagesDir) {
+    _imagesDir = path.join(getDataDir(), 'images');
+  }
+  return _imagesDir;
+}
+
+function getProjectsDir(): string {
+  if (!_projectsDir) {
+    _projectsDir = path.join(getDataDir(), 'projects');
+  }
+  return _projectsDir;
+}
 
 function downloadImageFromUrl(urlString: string): Promise<{
   buffer?: Buffer;
@@ -200,7 +221,7 @@ interface ProjectImageManifest {
 }
 
 function getProjectManifest(projectId: string): ProjectImageManifest {
-  const manifestPath = path.join(PROJECTS_DIR, projectId, 'images.json');
+  const manifestPath = path.join(getProjectsDir(), projectId, 'images.json');
   if (!fs.existsSync(manifestPath)) {
     return { images: [] };
   }
@@ -213,7 +234,7 @@ function getProjectManifest(projectId: string): ProjectImageManifest {
 }
 
 function addToProjectManifest(projectId: string, entry: ProjectImageEntry): void {
-  const manifestPath = path.join(PROJECTS_DIR, projectId, 'images.json');
+  const manifestPath = path.join(getProjectsDir(), projectId, 'images.json');
   const dir = path.dirname(manifestPath);
   ensureDir(dir);
 
@@ -303,10 +324,10 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       const sha256 = computeSha256(buffer);
       const hashPrefix = sha256.slice(0, 12);
       const storedFilename = `${hashPrefix}-${filename}`;
-      const storedPath = path.join(IMAGES_DIR, storedFilename);
+      const storedPath = path.join(getImagesDir(), storedFilename);
       const publicUrl = `/api/images/${storedFilename}`;
 
-      ensureDir(IMAGES_DIR);
+      ensureDir(getImagesDir());
 
       try {
         if (fs.existsSync(storedPath)) {

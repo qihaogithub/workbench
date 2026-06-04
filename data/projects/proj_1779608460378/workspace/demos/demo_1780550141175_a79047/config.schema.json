@@ -1,30 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
   "$demo": {
-    "previewSize": { "width": 375, "height": 812 }
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
   },
+  "title": "全屏展示页-第二关已解锁",
+  "type": "object",
   "properties": {
     "displayImage": {
       "type": "string",
       "format": "image",
       "title": "展示图片",
       "description": "全屏展示的图片，推荐尺寸 375×812",
-      "default": "./images/#static 背景-4.png",
+      "default": "./images/第二关已解锁.webp",
       "ui:options": {
         "accept": "image/*",
-        "maxSize": 5242880,
+        "maxSize": 10485760,
         "minWidth": 375,
-        "minHeight": 812,
-        "maxWidth": 375,
-        "maxHeight": 812
+        "minHeight": 812
       }
     },
     "backgroundColor": {
       "type": "string",
       "format": "color",
       "title": "背景色",
-      "description": "图片加载前的背景色",
+      "description": "图片加载前的背景颜色",
       "default": "#000000"
     }
   }
