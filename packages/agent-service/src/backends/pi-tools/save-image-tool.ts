@@ -2,11 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
+import * as crypto from 'crypto';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
-import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 
@@ -27,12 +27,29 @@ const SaveImageParams = Type.Object({
   }),
   directory: Type.Optional(
     Type.String({
-      description: '保存目录（相对于工作空间），默认为 images',
+      description: '已废弃：图片统一保存到图床，忽略此参数',
     }),
   ),
 });
 
 type SaveImageParams = Static<typeof SaveImageParams>;
+
+function findProjectRoot(cwd: string): string {
+  let current = path.resolve(cwd);
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return cwd;
+}
+
+const DATA_DIR = path.resolve(
+  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
+);
+const IMAGES_DIR = path.join(DATA_DIR, 'images');
+const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
 
 function downloadImageFromUrl(urlString: string): Promise<{
   buffer?: Buffer;
@@ -158,20 +175,69 @@ function downloadImageFromUrl(urlString: string): Promise<{
   return doDownload(urlString, 0);
 }
 
-export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
-  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
-  const workingDir = config.workingDir || '.';
-  const demoId = config.demoId;
-  const defaultDirectory = demoId ? `demos/${demoId}/images` : 'images';
+function computeSha256(buffer: Buffer): string {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
 
+function ensureDir(dir: string): void {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+interface ProjectImageEntry {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  format: string;
+  createdAt: number;
+  createdBy: 'user' | 'ai' | 'figma';
+}
+
+interface ProjectImageManifest {
+  images: ProjectImageEntry[];
+}
+
+function getProjectManifest(projectId: string): ProjectImageManifest {
+  const manifestPath = path.join(PROJECTS_DIR, projectId, 'images.json');
+  if (!fs.existsSync(manifestPath)) {
+    return { images: [] };
+  }
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return { images: [] };
+  }
+}
+
+function addToProjectManifest(projectId: string, entry: ProjectImageEntry): void {
+  const manifestPath = path.join(PROJECTS_DIR, projectId, 'images.json');
+  const dir = path.dirname(manifestPath);
+  ensureDir(dir);
+
+  const manifest = getProjectManifest(projectId);
+
+  const existingIndex = manifest.images.findIndex((img) => img.id === entry.id);
+  if (existingIndex >= 0) {
+    manifest.images[existingIndex] = entry;
+  } else {
+    manifest.images.push(entry);
+  }
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+}
+
+export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
   return {
     name: 'saveImage',
     label: 'Save Image',
     description:
-      'Save an image to the workspace from Base64 data or a remote URL. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+      'Save an image to the image server from Base64 data or a remote URL. The image is stored globally and can be accessed via an absolute URL like /api/images/{hash}-{filename}.png from anywhere in the app, including iframe previews. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
-      const { source, data, filename, directory = defaultDirectory } = args;
+      const { source, data, filename } = args;
 
       if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(filename)) {
         logger.warn({ filename }, 'saveImage: invalid filename');
@@ -234,40 +300,56 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         };
       }
 
-      const relativePath = path.join(directory, filename);
-      const absolutePath = path.resolve(workingDir, relativePath);
+      const sha256 = computeSha256(buffer);
+      const hashPrefix = sha256.slice(0, 12);
+      const storedFilename = `${hashPrefix}-${filename}`;
+      const storedPath = path.join(IMAGES_DIR, storedFilename);
+      const publicUrl = `/api/images/${storedFilename}`;
 
-      if (!isPathAllowed(relativePath, workingDir, permissions)) {
-        logger.warn({ relativePath }, 'saveImage: path denied by permissions');
-        return {
-          content: [{ type: 'text', text: `Error: Path "${relativePath}" is not allowed by workspace permissions` }],
-          details: { path: relativePath, error: 'permission denied' },
-          isError: true,
-        };
-      }
+      ensureDir(IMAGES_DIR);
 
       try {
-        await fs.promises.mkdir(path.dirname(absolutePath), { recursive: true });
-        await fs.promises.writeFile(absolutePath, buffer);
+        if (fs.existsSync(storedPath)) {
+          logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
+        } else {
+          await fs.promises.writeFile(storedPath, buffer);
+          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix }, 'Image saved to image server');
+        }
 
-        logger.debug({ path: relativePath, size: buffer.length, source }, 'Image saved successfully');
+        if (config.demoId) {
+          const entry: ProjectImageEntry = {
+            id: hashPrefix,
+            filename,
+            url: publicUrl,
+            size: buffer.length,
+            format: ext,
+            createdAt: Date.now(),
+            createdBy: 'ai',
+          };
+          try {
+            addToProjectManifest(config.demoId, entry);
+          } catch (manifestError) {
+            logger.warn({ demoId: config.demoId, error: manifestError }, 'saveImage: failed to update project image manifest');
+          }
+        }
 
         return {
-          content: [{ type: 'text', text: `Image saved to: ./${relativePath}` }],
+          content: [{ type: 'text', text: `Image saved: ${publicUrl}` }],
           details: {
-            path: relativePath,
+            url: publicUrl,
+            path: storedFilename,
             size: buffer.length,
             format: ext,
             source,
-            absolutePath,
+            sha256: hashPrefix,
           },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ path: relativePath, error: message }, 'Failed to save image');
+        logger.error({ path: storedFilename, error: message }, 'Failed to save image');
         return {
           content: [{ type: 'text', text: `Error saving image: ${message}` }],
-          details: { path: relativePath, error: 'save_failed' },
+          details: { path: storedFilename, error: 'save_failed' },
           isError: true,
         };
       }

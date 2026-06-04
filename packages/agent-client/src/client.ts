@@ -319,6 +319,7 @@ export class AgentStream {
         id: id || `msg-${Date.now()}`,
         content,
         workingDir: options?.workingDir,
+        demoId: options?.demoId,
         images: options?.images,
         systemPrompt: options?.systemPrompt,
         options,

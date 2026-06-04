@@ -79,6 +79,7 @@ export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
   workingDir?: string;
+  demoId?: string;
   images?: ImageAttachment[];
   /**
    * v3.2: 静态 system prompt 注入（L2 + L4）

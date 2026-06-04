@@ -7,7 +7,6 @@ import {
   getWorkspaceDemoPageFiles,
 } from './fs-utils';
 import { getCdnBaseUrl } from './cdn-config';
-import { rewriteLocalAssetPaths } from './rewrite-local-paths';
 
 export interface CompileResult {
   compiledCode: string;
@@ -322,8 +321,7 @@ export function compileSession(
   const result = compileCode(code, lockedDependencies);
 
   if (demoId) {
-    const basePath = `demos/${demoId}/`;
-    result.compiledCode = rewriteLocalAssetPaths(result.compiledCode, basePath, sessionId);
+    return result;
   }
 
   return result;

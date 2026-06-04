@@ -16,9 +16,9 @@
       "parentId": null
     },
     {
-      "id": "demo_1780476667099_tpyf4j",
-      "name": "图片展示页-手机",
-      "order": 2,
+      "id": "demo_1780542213561_k8m2n9",
+      "name": "全屏展示页-手机",
+      "order": 3,
       "parentId": null
     }
   ],
@@ -296,10 +296,59 @@
       "sessionId": "session-1780478222891-ifk64qnbf",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v33",
       "fileCount": 13
+    },
+    {
+      "versionId": "v34",
+      "savedAt": 1780538500884,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780536323230-c3sd8dfte",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v34",
+      "fileCount": 11
+    },
+    {
+      "versionId": "v35",
+      "savedAt": 1780542589486,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780542213567-ra5huxmi6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v35",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v36",
+      "savedAt": 1780542748434,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v36_backup",
+      "fileCount": 15,
+      "note": "从 v34 恢复"
+    },
+    {
+      "versionId": "v37",
+      "savedAt": 1780542754023,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780542600919-etg6y2oaj",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v37",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v38",
+      "savedAt": 1780545963055,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780545889228-lm3s56jdv",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v38",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v39",
+      "savedAt": 1780546340419,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780546070330-xtfgry1ld",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v39",
+      "fileCount": 13
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780480626871,
+  "updatedAt": 1780546340422,
   "publishedVersion": "v21",
   "publishedAt": 1780468794271
 }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
 import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
-import { rewriteLocalAssetPaths } from '@/lib/rewrite-local-paths';
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,11 +67,7 @@ export async function POST(request: NextRequest) {
       })();
 
       if (effectiveDemoId) {
-        const basePath = `demos/${effectiveDemoId}/`;
-        result = {
-          ...result,
-          compiledCode: rewriteLocalAssetPaths(result.compiledCode, basePath, sessionId),
-        };
+        // 图片已通过图床绝对 URL 直接访问，无需路径重写
       }
     }
 

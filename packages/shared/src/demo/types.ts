@@ -1,3 +1,7 @@
+import type { ThumbnailMeta } from "./thumbnail-types";
+
+export type { ThumbnailMeta, ThumbnailBlock, ThumbnailLayoutEvidence, RawElementSnapshot, ThumbnailHashInput } from "./thumbnail-types";
+
 export interface PreviewSize {
   width?: string | number;
   height?: string | number;
@@ -31,7 +35,6 @@ export interface PreviewPanelProps {
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
-  snapshotVersion?: number;
 }
 
 export interface ConfigFormProps {
@@ -72,7 +75,7 @@ export interface CanvasPageData {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
-  snapshotUrl?: string;
+  thumbnailMeta?: ThumbnailMeta;
 }
 
 export interface PreviewCanvasProps {
@@ -85,8 +88,6 @@ export interface PreviewCanvasProps {
   onCanvasStateChange: (state: CanvasState) => void;
   onPageConfigEdit?: (pageId: string) => void;
   onCanvasClick?: () => void;
-  snapshots?: Record<string, string>;
-  snapshotVersion?: number;
   className?: string;
   editingPageId?: string;
 }
@@ -112,7 +113,6 @@ export interface GridIframeProps {
   hasChanges: boolean;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
-  snapshotVersion?: number;
 }
 
 export interface PreviewGridProps {
@@ -127,7 +127,6 @@ export interface PreviewGridProps {
   changedPageIds?: Set<string>;
   configDataMap?: Record<string, Record<string, unknown>>;
   previewSize?: PreviewSize;
-  snapshotVersion?: number;
   flashCardId?: string;
   showToolbar?: boolean;
   showModeToggle?: boolean;

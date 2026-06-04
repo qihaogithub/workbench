@@ -25,6 +25,12 @@
       "name": "图片展示页-手机",
       "order": 2,
       "parentId": null
+    },
+    {
+      "id": "demo_1780542213561_k8m2n9",
+      "name": "全屏展示页-手机",
+      "order": 3,
+      "parentId": null
     }
   ]
 }

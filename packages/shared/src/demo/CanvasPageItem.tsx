@@ -3,6 +3,8 @@
 import React, { useState, useCallback, useRef } from "react";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
+import { ThumbnailRenderer } from "./ThumbnailRenderer";
+import { ThumbnailPlaceholder } from "./ThumbnailPlaceholder";
 import type { CanvasPageLayout, CanvasPageData } from "./types";
 
 interface CanvasPageItemProps {
@@ -10,8 +12,7 @@ interface CanvasPageItemProps {
   layout: CanvasPageLayout;
   editable: boolean;
   isEditing?: boolean;
-  snapshotUrl?: string;
-  snapshotVersion?: number;
+  zoom?: number;
   sessionId?: string;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void;
@@ -20,13 +21,14 @@ interface CanvasPageItemProps {
   className?: string;
 }
 
+const IFRAME_ZOOM_THRESHOLD = 0.55;
+
 export function CanvasPageItem({
   page,
   layout,
   editable,
   isEditing = false,
-  snapshotUrl,
-  snapshotVersion,
+  zoom = 0,
   sessionId,
   onLayoutChange,
   onConfigEdit,
@@ -80,14 +82,6 @@ export function CanvasPageItem({
     [isEditing, page.id, onConfigEdit],
   );
 
-  const agentUrl = typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "")
-    : "";
-
-  const imageSrc = snapshotUrl
-    ? `${agentUrl}${snapshotUrl}?v=${snapshotVersion || 0}`
-    : undefined;
-
   return (
     <div
       className={cn(
@@ -112,7 +106,7 @@ export function CanvasPageItem({
       }}
       onMouseEnter={() => setIsHovering(true)}
     >
-      {isEditing ? (
+      {isEditing || (zoom >= IFRAME_ZOOM_THRESHOLD && page.code) ? (
         <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
           <PreviewPanel
             code={page.code}
@@ -120,30 +114,22 @@ export function CanvasPageItem({
             demoId={page.id}
             configData={page.configData}
             previewSize={page.previewSize}
-            snapshotVersion={snapshotVersion}
           />
         </div>
-      ) : imageSrc ? (
-        <>
-          <img
-            src={imageSrc}
-            alt={page.name}
-            className="w-full h-full object-cover rounded-lg shadow-md border border-border/50"
-            draggable={false}
-          />
+      ) : page.thumbnailMeta ? (
+        <div className="relative w-full h-full rounded-lg overflow-hidden shadow-md">
+          <ThumbnailRenderer meta={page.thumbnailMeta} className="w-full h-full" />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 rounded-b-lg">
             <span className="text-xs text-white font-medium truncate block">
               {page.name}
             </span>
           </div>
-        </>
-      ) : (
-        <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center border border-border/50">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
         </div>
+      ) : (
+        <ThumbnailPlaceholder pageName={page.name} />
       )}
 
-      {isHovering && !isEditing && onConfigEdit && (
+      {isHovering && !isEditing && zoom < IFRAME_ZOOM_THRESHOLD && onConfigEdit && (
         <button
           type="button"
           className="absolute top-2 right-2 bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded shadow transition-opacity"

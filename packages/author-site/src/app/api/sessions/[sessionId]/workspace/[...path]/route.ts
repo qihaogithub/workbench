@@ -17,6 +17,88 @@ const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json',
 };
 
+function serveFile(workspacePath: string, fileRelPath: string): NextResponse | null {
+  const filePath = path.resolve(workspacePath, fileRelPath);
+
+  if (!filePath.startsWith(path.resolve(workspacePath))) {
+    return null;
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const stat = fs.statSync(filePath);
+  if (stat.isDirectory()) {
+    return null;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+  const buffer = fs.readFileSync(filePath);
+
+  return new NextResponse(buffer, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(stat.size),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+function resolveFallbackFile(
+  workspacePath: string,
+  pathSegments: string[],
+): string | null {
+  const filename = pathSegments[pathSegments.length - 1];
+
+  // 1. 按文件名在 workspace 根目录的常用文件夹中查找
+  const rootFallbackDirs = ['images', 'assets'];
+  for (const dir of rootFallbackDirs) {
+    const found = path.join(dir, filename);
+    const fallbackPath = path.resolve(workspacePath, found);
+    if (
+      fallbackPath.startsWith(path.resolve(workspacePath)) &&
+      fs.existsSync(fallbackPath) &&
+      !fs.statSync(fallbackPath).isDirectory()
+    ) {
+      return found;
+    }
+  }
+
+  // 2. 从请求路径中提取后缀，尝试作为 workspace 相对路径
+  //    demos/demo_xxx/images/hero.png → 尝试 demo_xxx/images/hero.png, images/hero.png
+  for (let i = 1; i < pathSegments.length; i++) {
+    const suffixPath = pathSegments.slice(i).join('/');
+    const fallbackPath = path.resolve(workspacePath, suffixPath);
+    if (
+      fallbackPath.startsWith(path.resolve(workspacePath)) &&
+      fs.existsSync(fallbackPath) &&
+      !fs.statSync(fallbackPath).isDirectory()
+    ) {
+      return suffixPath;
+    }
+  }
+
+  // 3. 如果请求路径以 demos/ 开头，也尝试去掉 demos/ 前缀
+  if (pathSegments.length >= 2 && pathSegments[0] === 'demos') {
+    const withoutDemos = pathSegments.slice(2).join('/');
+    if (withoutDemos) {
+      const fallbackPath = path.resolve(workspacePath, withoutDemos);
+      if (
+        fallbackPath.startsWith(path.resolve(workspacePath)) &&
+        fs.existsSync(fallbackPath) &&
+        !fs.statSync(fallbackPath).isDirectory()
+      ) {
+        return withoutDemos;
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { sessionId: string; path: string[] } },
@@ -38,61 +120,17 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid path' }, { status: 403 });
   }
 
-  const filePath = path.resolve(workspacePath, relativePath);
-
-  if (!filePath.startsWith(path.resolve(workspacePath))) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  // 精确路径查找
+  const exactResponse = serveFile(workspacePath, relativePath);
+  if (exactResponse) {
+    return exactResponse;
   }
 
-  if (!fs.existsSync(filePath)) {
-    // 回退查找：当精确路径找不到文件时，尝试在 workspace 根目录下按文件名查找
-    // 例如请求 demos/{demoId}/images/xxx.png 但文件实际在 images/xxx.png
-    const filename = pathSegments[pathSegments.length - 1];
-    const fallbackDirs = ['images', 'assets'];
-
-    for (const dir of fallbackDirs) {
-      const fallbackPath = path.resolve(workspacePath, dir, filename);
-      if (
-        fallbackPath.startsWith(path.resolve(workspacePath)) &&
-        fs.existsSync(fallbackPath)
-      ) {
-        const fallbackStat = fs.statSync(fallbackPath);
-        if (!fallbackStat.isDirectory()) {
-          const fallbackExt = path.extname(fallbackPath).toLowerCase();
-          const fallbackContentType = MIME_TYPES[fallbackExt] || 'application/octet-stream';
-          const fallbackBuffer = fs.readFileSync(fallbackPath);
-
-          return new NextResponse(fallbackBuffer, {
-            headers: {
-              'Content-Type': fallbackContentType,
-              'Content-Length': String(fallbackStat.size),
-              'Cache-Control': 'public, max-age=31536000, immutable',
-              'Access-Control-Allow-Origin': '*',
-            },
-          });
-        }
-      }
-    }
-
-    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+  // 回退查找：在多个候选位置搜索文件
+  const fallbackPath = resolveFallbackFile(workspacePath, pathSegments);
+  if (fallbackPath) {
+    return serveFile(workspacePath, fallbackPath)!;
   }
 
-  const stat = fs.statSync(filePath);
-  if (stat.isDirectory()) {
-    return NextResponse.json({ error: 'Cannot serve directory' }, { status: 400 });
-  }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-  const buffer = fs.readFileSync(filePath);
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': contentType,
-      'Content-Length': String(stat.size),
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
+  return NextResponse.json({ error: 'File not found' }, { status: 404 });
 }

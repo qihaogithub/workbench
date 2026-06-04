@@ -152,6 +152,7 @@ export class StreamService {
     message: string,
     workingDir?: string,
     images?: ImageAttachment[],
+    demoId?: string,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -184,6 +185,7 @@ export class StreamService {
     this.stream.send(finalContent, `msg-${Date.now()}`, {
       stream: true,
       workingDir,
+      demoId,
       images,
       systemPrompt: STATIC_SYSTEM_PROMPT,
     } as any);

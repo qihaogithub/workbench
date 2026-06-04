@@ -23,8 +23,6 @@ import type {
   VersionInfo,
   MultiDemoFiles,
 } from "@opencode-workbench/shared";
-import { generateThumbnail } from "./screenshot";
-
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export interface CreateSessionResult {
@@ -407,10 +405,6 @@ export function saveEditSession(
     writeProjectMeta(projectId, project);
 
     syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
-
-    generateThumbnail(projectId).catch((err) => {
-      console.warn(`[saveEditSession] 缩略图生成失败:`, err);
-    });
 
     const metaPath = path.join(sessionPath!, ".session.json");
     if (fs.existsSync(metaPath)) {

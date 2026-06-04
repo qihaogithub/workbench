@@ -74,7 +74,6 @@
     "lucide-react": "^0.323.0",
     "markdown-it": "^14.2.0",
     "next": "14.1.0",
-    "playwright": "^1.59.1",
     "prismjs": "^1.30.0",
     "prosemirror-markdown": "^1.13.4",
     "react": "^18.2.0",

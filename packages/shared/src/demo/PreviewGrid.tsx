@@ -85,7 +85,6 @@ interface GridIframeProps {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   rowHeight?: number;
-  snapshotVersion?: number;
   cssImports?: string[];
 }
 
@@ -97,7 +96,6 @@ function GridIframe({
   configData,
   previewSize,
   rowHeight,
-  snapshotVersion,
   cssImports,
 }: GridIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -285,7 +283,7 @@ function GridIframe({
     return () => {
       cancelled = true;
     };
-  }, [visible, isAuthorMode, sessionId, page.id, page.code, snapshotVersion]);
+  }, [visible, isAuthorMode, sessionId, page.id, page.code]);
 
   useEffect(() => {
     if (!iframeReadyRef.current || !blobUrlRef.current) return;
@@ -407,7 +405,6 @@ export function PreviewGrid({
   changedPageIds,
   configDataMap,
   previewSize,
-  snapshotVersion,
   flashCardId,
   showToolbar = true,
   showModeToggle = false,
@@ -505,7 +502,7 @@ export function PreviewGrid({
                 </svg>
                 单页
               </button>
-              <button
+                 <button
                 type="button"
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
@@ -530,6 +527,32 @@ export function PreviewGrid({
                   <rect width="7" height="7" x="3" y="14" rx="1" />
                 </svg>
                 宫格
+              </button>
+              <button
+                type="button"
+                onClick={() => onPreviewModeChange("canvas")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
+                  "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+                  <line x1="8" y1="2" x2="8" y2="18" />
+                  <line x1="16" y1="6" x2="16" y2="22" />
+                </svg>
+                画布
               </button>
             </div>
           ) : (
@@ -669,7 +692,6 @@ export function PreviewGrid({
                           configData={configDataMap?.[page.id] ?? {}}
                           previewSize={effectiveSize}
                           rowHeight={rowHeight}
-                          snapshotVersion={snapshotVersion}
                         />
                       </div>
                     );

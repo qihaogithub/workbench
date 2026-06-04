@@ -5,7 +5,6 @@ import { registerProjectRoutes } from "./projects";
 import { registerValidateRoutes } from "./validate";
 import { registerModelsRoutes } from "./models";
 import { registerInternalConfigRoutes } from "./internal-config";
-import { registerSnapshotRoutes } from "./snapshots";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   await registerAgentRoutes(fastify);
@@ -14,5 +13,4 @@ export async function registerRoutes(fastify: FastifyInstance) {
   await registerValidateRoutes(fastify);
   await registerModelsRoutes(fastify);
   await registerInternalConfigRoutes(fastify);
-  await registerSnapshotRoutes(fastify);
 }

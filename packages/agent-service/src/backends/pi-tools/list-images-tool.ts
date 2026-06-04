@@ -1,0 +1,104 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { Type, type Static } from 'typebox';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
+import type { AgentConfig } from '../../core/types';
+import { logger } from '../../utils/logger';
+
+function findProjectRoot(cwd: string): string {
+  let current = path.resolve(cwd);
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return cwd;
+}
+
+const DATA_DIR = path.resolve(
+  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
+);
+const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
+
+interface ProjectImageEntry {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  format: string;
+  createdAt: number;
+  createdBy: 'user' | 'ai' | 'figma';
+}
+
+interface ProjectImageManifest {
+  images: ProjectImageEntry[];
+}
+
+const ListImagesParams = Type.Object({});
+
+type ListImagesParams = Static<typeof ListImagesParams>;
+
+export function createListImagesTool(config: AgentConfig): AgentTool {
+  return {
+    name: 'listImages',
+    label: 'List Project Images',
+    description:
+      'List all images that have been uploaded to the current project. Use this to check what images are already available before creating new ones, to avoid duplicate uploads.',
+    parameters: ListImagesParams,
+    execute: async (_toolCallId: string) => {
+      if (!config.demoId) {
+        return {
+          content: [{ type: 'text', text: 'No project associated with this session. Images are not tracked.' }],
+          details: { images: [] },
+        };
+      }
+
+      const manifestPath = path.join(PROJECTS_DIR, config.demoId, 'images.json');
+
+      if (!fs.existsSync(manifestPath)) {
+        return {
+          content: [{ type: 'text', text: 'No images have been uploaded to this project yet.' }],
+          details: { images: [] },
+        };
+      }
+
+      try {
+        const raw = fs.readFileSync(manifestPath, 'utf-8');
+        const manifest: ProjectImageManifest = JSON.parse(raw);
+
+        if (manifest.images.length === 0) {
+          return {
+            content: [{ type: 'text', text: 'No images have been uploaded to this project yet.' }],
+            details: { images: [] },
+          };
+        }
+
+        const imageList = manifest.images
+          .map(
+            (img) =>
+              `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB, added by ${img.createdBy})`,
+          )
+          .join('\n');
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Project images (${manifest.images.length} total):\n${imageList}`,
+            },
+          ],
+          details: { images: manifest.images },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.error({ demoId: config.demoId, error: message }, 'listImages: failed to read manifest');
+        return {
+          content: [{ type: 'text', text: `Error reading project images: ${message}` }],
+          details: { error: 'read_failed' },
+          isError: true,
+        };
+      }
+    },
+  };
+}

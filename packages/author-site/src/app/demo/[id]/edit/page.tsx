@@ -11,7 +11,8 @@ import {
   ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
-import type { PreviewMode, CanvasState } from "../../../../../components/demo";
+import type { PreviewMode, CanvasState, ThumbnailMeta } from "../../../../../components/demo";
+import { useThumbnailGeneration } from "@/components/demo/useThumbnailGeneration";
 import {
   parseFigmaText,
   buildFigmaText,
@@ -103,6 +104,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [configDataMap, setConfigDataMap] = useState<
     Record<string, Record<string, unknown>>
   >({});
+  const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -150,7 +152,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     pages: {},
   });
   const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
-  const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
+  const { thumbnailMetaMap, setThumbnailMetaMap } = useThumbnailGeneration(demoId);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -176,7 +178,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
-  const [snapshotVersion, setSnapshotVersion] = useState(0);
 
   const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -191,62 +192,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const configData = configDataMap[activeDemoId] ?? {};
 
-  // 加载已有截图列表
-  const loadSnapshots = useCallback(async () => {
-    try {
-      const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
-      const res = await fetch(`${agentUrl}/api/snapshots/list/${demoId}`);
-      const data = await res.json();
-      if (data.success) {
-        setSnapshotUrls(data.data.urls || {});
-      }
-    } catch (error) {
-      console.error("加载截图列表失败:", error);
-    }
-  }, [demoId]);
 
-  // 代码变更时后台生成截图
-  const generateSnapshotForPage = useCallback(
-    async (pageId: string, pageCode: string, pageConfig: Record<string, unknown>) => {
-      try {
-        const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
-        const res = await fetch(`${agentUrl}/api/snapshots/generate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId: demoId,
-            pageId,
-            code: pageCode,
-            configData: pageConfig,
-            width: 375,
-            height: 812,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setSnapshotUrls((prev) => ({ ...prev, [pageId]: data.data.url }));
-        }
-      } catch {
-        // 后台静默失败，不影响编辑
-      }
-    },
-    [demoId],
-  );
-
-  // snapshotVersion 变化时后台生成截图
-  useEffect(() => {
-    if (activeDemoId && code) {
-      generateSnapshotForPage(activeDemoId, code, configData);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshotVersion]);
-
-  // 切换到画布模式时加载截图
-  useEffect(() => {
-    if (previewMode === "canvas") {
-      loadSnapshots();
-    }
-  }, [previewMode, loadSnapshots]);
 
   /**
    * Unified snapshot application entry.
@@ -294,9 +240,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           newSchema ?? extractSchemaFromFigma(prev) ?? schema;
         return buildFigmaText(currentCode, currentSchema);
       });
-
-      // Increment snapshot version to drive PreviewPanel and ConfigForm updates
-      setSnapshotVersion((v) => v + 1);
 
       if (source === "ai-realtime" || source === "ai-finish") {
         // Cancel any pending schema auto-regeneration
@@ -496,17 +439,22 @@ ${context.details}
         setEditorContent(buildFigmaText(loadedCode, loadedSchema));
 
         const allDefaults: Record<string, Record<string, unknown>> = {};
+        const codes: Record<string, string> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
-            { schema: string },
+            { code: string; schema: string },
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            if (demo.code) {
+              codes[pageId] = demo.code;
+            }
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
         }
         setConfigDataMap(allDefaults);
+        setPageCodes(codes);
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -529,6 +477,15 @@ ${context.details}
 
     loadDemo();
   }, [demoId, toast]);
+
+  useEffect(() => {
+    if (activeDemoId && code) {
+      setPageCodes((prev) => {
+        if (prev[activeDemoId] === code) return prev;
+        return { ...prev, [activeDemoId]: code };
+      });
+    }
+  }, [code, activeDemoId]);
 
   // 组件卸载时清理 Schema 自动重新生成定时器
   useEffect(() => {
@@ -1017,8 +974,7 @@ ${context.details}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
                   onSnapshotReady={() => {
-                    // AI finish snapshot applied — bump version to trigger PreviewPanel recompile & ConfigForm rebuild
-                    setSnapshotVersion((v) => v + 1);
+                    invalidateCompileCache(sessionId, activeDemoId);
                   }}
                   onMemoryUpdate={async (filePath) => {
                     try {
@@ -1534,54 +1490,85 @@ ${context.details}
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
               {previewMode === "canvas" ? (
-                <PreviewCanvas
-                  editable
-                  sessionId={sessionId}
-                  projectId={demoId}
-                  pages={demoPages.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    order: p.order,
-                    code: code,
-                    configData: configDataMap[p.id],
-                    previewSize: previewSize,
-                  }))}
-                  snapshots={snapshotUrls}
-                  canvasState={canvasState}
-                  onCanvasStateChange={setCanvasState}
-                  editingPageId={canvasEditingPageId ?? undefined}
-                  onPageConfigEdit={(pageId) => {
-                    setCanvasEditingPageId(pageId);
-                    setActiveDemoId(pageId);
-                    if (sessionId) {
-                      fetch(`/api/sessions/${sessionId}/files/${pageId}`)
-                        .then((res) => res.json())
-                        .then((data) => {
-                          if (data.success) {
-                            setCode(data.data.code);
-                            setSchema(data.data.schema);
-                            setEditorContent(
-                              buildFigmaText(data.data.code, data.data.schema),
-                            );
-                            setConfigDataMap((prev) => {
-                              if (prev[pageId]) return prev;
-                              const defaults = getSafeMergedDefaults(
-                                data.data.schema,
-                              );
-                              return { ...prev, [pageId]: defaults };
-                            });
-                            const size = getPreviewSize(data.data.schema);
-                            setPreviewSize(size);
-                          }
-                        })
-                        .catch((err) => console.error("加载页面失败:", err));
-                    }
-                  }}
-                  onCanvasClick={() => {
-                    setCanvasEditingPageId(null);
-                  }}
-                  snapshotVersion={snapshotVersion}
-                />
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("single")}
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        单页
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("grid")}
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
+                      >
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                        宫格
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
+                      >
+                        <Map className="h-3.5 w-3.5" />
+                        画布
+                      </button>
+                    </div>
+                    <div className="flex-1" />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <PreviewCanvas
+                      editable
+                      sessionId={sessionId}
+                      projectId={demoId}
+                      pages={demoPages.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        order: p.order,
+                        code: pageCodes[p.id] || code,
+                        configData: configDataMap[p.id],
+                        previewSize: previewSize,
+                        thumbnailMeta: thumbnailMetaMap[p.id],
+                      }))}
+                      canvasState={canvasState}
+                      onCanvasStateChange={setCanvasState}
+                      editingPageId={canvasEditingPageId ?? undefined}
+                      onPageConfigEdit={(pageId) => {
+                        setCanvasEditingPageId(pageId);
+                        setActiveDemoId(pageId);
+                        if (sessionId) {
+                          fetch(`/api/sessions/${sessionId}/files/${pageId}`)
+                            .then((res) => res.json())
+                            .then((data) => {
+                              if (data.success) {
+                                setCode(data.data.code);
+                                setSchema(data.data.schema);
+                                setEditorContent(
+                                  buildFigmaText(data.data.code, data.data.schema),
+                                );
+                                setConfigDataMap((prev) => {
+                                  if (prev[pageId]) return prev;
+                                  const defaults = getSafeMergedDefaults(
+                                    data.data.schema,
+                                  );
+                                  return { ...prev, [pageId]: defaults };
+                                });
+                                const size = getPreviewSize(data.data.schema);
+                                setPreviewSize(size);
+                              }
+                            })
+                            .catch((err) => console.error("加载页面失败:", err));
+                        }
+                      }}
+                      onCanvasClick={() => {
+                        setCanvasEditingPageId(null);
+                      }}
+                    />
+                  </div>
+                </div>
               ) : previewMode === "single" ? (
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
@@ -1672,7 +1659,6 @@ ${context.details}
                       demoId={activeDemoId}
                       configData={configData}
                       previewSize={previewSize}
-                      snapshotVersion={snapshotVersion}
                     />
                   </div>
                 </div>
@@ -1726,7 +1712,6 @@ ${context.details}
                   }}
                   configDataMap={configDataMap}
                   previewSize={previewSize}
-                  snapshotVersion={snapshotVersion}
                   flashCardId={flashGridCardId ?? undefined}
                 />
               )}

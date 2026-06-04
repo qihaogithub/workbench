@@ -4,6 +4,7 @@ import { createReadFileTool, createWriteFileTool, createListFilesTool } from './
 import { createBashTool } from './bash-tool';
 import { createSchemaValidateTool } from './schema-tool';
 import { createSaveImageTool } from './save-image-tool';
+import { createListImagesTool } from './list-images-tool';
 
 export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
   return [
@@ -13,5 +14,6 @@ export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
     createBashTool(config),
     createSchemaValidateTool(config),
     createSaveImageTool(config),
+    createListImagesTool(config),
   ];
 }

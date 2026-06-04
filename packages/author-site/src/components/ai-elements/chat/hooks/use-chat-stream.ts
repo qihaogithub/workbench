@@ -433,7 +433,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         // v3.2: sendMessage 是 async，等待 L3 拼装完再发送
         // fire-and-forget：不让发送等待阻塞 UI，但 L3 fetch 顺序保证
-        void streamService.sendMessage(userMessage, workingDir, images);
+        void streamService.sendMessage(userMessage, workingDir, images, demoId);
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
@@ -447,6 +447,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             agentSessionId,
             userMessage,
             {
+              demoId,
               workingDir,
               images,
               options: {

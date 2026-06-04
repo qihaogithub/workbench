@@ -118,7 +118,6 @@ export default function ViewerProjectPage() {
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
-  const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);
@@ -293,27 +292,6 @@ export default function ViewerProjectPage() {
     [handlePageChange, gridSelectOnly]
   );
 
-  // 加载截图列表
-  const loadSnapshots = useCallback(async () => {
-    try {
-      const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
-      const res = await fetch(`${agentUrl}/api/snapshots/list/${projectId}`);
-      const result = await res.json();
-      if (result.success) {
-        setSnapshotUrls(result.data.urls || {});
-      }
-    } catch (error) {
-      console.error("加载截图列表失败:", error);
-    }
-  }, [projectId]);
-
-  // 切换到画布模式时加载截图
-  useEffect(() => {
-    if (previewMode === "canvas") {
-      loadSnapshots();
-    }
-  }, [previewMode, loadSnapshots]);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -471,7 +449,6 @@ export default function ViewerProjectPage() {
                 configData: configDataMap[p.id],
                 previewSize: previewSize,
               }))}
-              snapshots={snapshotUrls}
               canvasState={canvasState}
               onCanvasStateChange={setCanvasState}
               onPageConfigEdit={(pageId) => {

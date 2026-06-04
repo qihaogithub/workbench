@@ -87,7 +87,7 @@ describe('createSaveImageTool', () => {
           filename,
         } as any);
         expect(result.isError).toBeFalsy();
-        expect(result.content[0].text).toContain('Image saved to');
+        expect(result.content[0].text).toContain('Image saved');
       }
     });
   });
@@ -105,7 +105,7 @@ describe('createSaveImageTool', () => {
       } as any);
 
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Image saved to: ./images/test-image.png');
+      expect(result.content[0].text).toContain('Reference it in demo code as: ../../images/test-image.png');
       expect(result.details.path).toBe('images/test-image.png');
       expect(result.details.format).toBe('png');
       expect(result.details.source).toBe('base64');

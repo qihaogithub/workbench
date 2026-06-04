@@ -36,6 +36,7 @@ interface ClientMessage {
   sessionId?: string;
   modelId?: string;
   workingDir?: string;
+  demoId?: string;
   images?: ImageAttachment[];
   /** v3.2: 静态 system prompt 注入（L2 + L4） */
   systemPrompt?: string;
@@ -162,6 +163,7 @@ export async function registerWebSocketRoutes(
               const config: AgentConfig = {
                 sessionId,
                 workingDir: message.workingDir,
+                demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
 
@@ -346,6 +348,7 @@ export async function registerWebSocketRoutes(
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 workingDir: message.workingDir,
+                demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
               };
 
@@ -462,6 +465,7 @@ export async function registerWebSocketRoutes(
                 const config: AgentConfig = {
                   sessionId,
                   workingDir: message.workingDir || process.cwd(),
+                  demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
                 };
                 agent = manager.getOrCreate(sessionId, config);
