@@ -4,15 +4,65 @@ import type { ImageReference } from './types';
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
+const API_IMAGE_PREFIX = '/api/images/';
+
 function isLocalPath(p: string): boolean {
   if (/^(https?:|data:|\/\/)/i.test(p)) return false;
   if (/placehold\.co|placeholder\.com/i.test(p)) return false;
+  if (p.startsWith(API_IMAGE_PREFIX)) return false;
   return IMAGE_EXTENSIONS.test(p);
+}
+
+function isApiImagePath(p: string): boolean {
+  return p.startsWith(API_IMAGE_PREFIX) && IMAGE_EXTENSIONS.test(p);
+}
+
+function getDataDir(): string {
+  return process.env.DATA_DIR
+    ? path.resolve(process.env.DATA_DIR)
+    : (() => {
+        let current = path.resolve(process.cwd());
+        while (current !== path.dirname(current)) {
+          if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+            return path.join(current, 'data');
+          }
+          current = path.dirname(current);
+        }
+        return path.join(process.cwd(), 'data');
+      })();
 }
 
 function resolvePath(relativePath: string, sourceFile: string): string {
   const sourceDir = path.dirname(sourceFile);
   return path.resolve(sourceDir, relativePath);
+}
+
+function resolveApiImagePath(apiPath: string): string {
+  const filename = apiPath.slice(API_IMAGE_PREFIX.length);
+  return path.join(getDataDir(), 'images', filename);
+}
+
+function addReference(
+  references: ImageReference[],
+  imgPath: string,
+  sourceFile: string,
+  type: ImageReference['type'],
+): void {
+  if (isApiImagePath(imgPath)) {
+    references.push({
+      originalPath: imgPath,
+      absolutePath: resolveApiImagePath(imgPath),
+      sourceFile,
+      type,
+    });
+  } else if (isLocalPath(imgPath)) {
+    references.push({
+      originalPath: imgPath,
+      absolutePath: resolvePath(imgPath, sourceFile),
+      sourceFile,
+      type,
+    });
+  }
 }
 
 function extractImageReferences(
@@ -24,41 +74,17 @@ function extractImageReferences(
   const imgRegex = /<img[^>]+src=["']([^"']+)["']/g;
   let match: RegExpExecArray | null;
   while ((match = imgRegex.exec(content)) !== null) {
-    const src = match[1];
-    if (isLocalPath(src)) {
-      references.push({
-        originalPath: src,
-        absolutePath: resolvePath(src, sourceFile),
-        sourceFile,
-        type: 'img-src',
-      });
-    }
+    addReference(references, match[1], sourceFile, 'img-src');
   }
 
   const cssUrlRegex = /url\(["']?([^"')]+)["']?\)/g;
   while ((match = cssUrlRegex.exec(content)) !== null) {
-    const url = match[1];
-    if (isLocalPath(url)) {
-      references.push({
-        originalPath: url,
-        absolutePath: resolvePath(url, sourceFile),
-        sourceFile,
-        type: 'css-url',
-      });
-    }
+    addReference(references, match[1], sourceFile, 'css-url');
   }
 
   const importRegex = /import\s+\w+\s+from\s+["']([^"']+(?:\.png|\.jpe?g|\.gif|\.webp|\.svg))["']/g;
   while ((match = importRegex.exec(content)) !== null) {
-    const importPath = match[1];
-    if (isLocalPath(importPath)) {
-      references.push({
-        originalPath: importPath,
-        absolutePath: resolvePath(importPath, sourceFile),
-        sourceFile,
-        type: 'import',
-      });
-    }
+    addReference(references, match[1], sourceFile, 'import');
   }
 
   return references;
@@ -111,4 +137,4 @@ function dedupeReferences(refs: ImageReference[]): ImageReference[] {
   });
 }
 
-export { extractImageReferences, isLocalPath };
+export { extractImageReferences, isLocalPath, isApiImagePath };

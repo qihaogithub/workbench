@@ -1,5 +1,5 @@
 import type { PublishContext, UploadResult } from './types';
-import { scanImageReferences, isLocalPath } from './image-scanner';
+import { scanImageReferences, isLocalPath, isApiImagePath } from './image-scanner';
 import { OSSUploader } from './oss-uploader';
 import { getOSSConfig, isOSSConfigured } from './oss-config';
 
@@ -22,18 +22,20 @@ export async function processImagesForPublish(
 
   onProgress?.(0, 100, '扫描图片引用...');
   const references = scanImageReferences(workspacePath);
-  const localImages = references.filter((ref) => isLocalPath(ref.originalPath));
+  const uploadableImages = references.filter(
+    (ref) => isLocalPath(ref.originalPath) || isApiImagePath(ref.originalPath),
+  );
 
-  if (localImages.length === 0) {
+  if (uploadableImages.length === 0) {
     onProgress?.(100, 100, '未发现本地图片引用');
     return { success: true, urlMap: new Map(), errors: [], imageCount: 0 };
   }
 
-  onProgress?.(10, 100, `发现 ${localImages.length} 张图片，准备上传...`);
+  onProgress?.(10, 100, `发现 ${uploadableImages.length} 张图片，准备上传...`);
 
   const ossConfig = getOSSConfig();
   const uploader = new OSSUploader(ossConfig, context.projectId);
-  const results = await uploader.uploadBatch(localImages, {
+  const results = await uploader.uploadBatch(uploadableImages, {
     concurrency: 5,
     onProgress: (current, total) => {
       const percent = 10 + Math.floor((current / Math.max(total, 1)) * 80);
@@ -58,6 +60,6 @@ export async function processImagesForPublish(
     success: errors.length === 0,
     urlMap,
     errors,
-    imageCount: localImages.length,
+    imageCount: uploadableImages.length,
   };
 }

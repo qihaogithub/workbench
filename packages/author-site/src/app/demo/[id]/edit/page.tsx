@@ -822,25 +822,28 @@ ${context.details}
   const handleCancel = async () => {
     try {
       if (sessionId) {
-        const res = await fetch(`/api/sessions/${sessionId}`, {
-          method: "DELETE",
+        // 归档 Session 而非删除，保留消息历史供后续查看
+        const res = await fetch(`/api/sessions/${sessionId}/meta`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "discarded" }),
         });
 
         if (!res.ok) {
           const data = await res.json();
-          console.error("[Cancel] Failed to delete session:", sessionId, data);
+          console.error("[Cancel] Failed to archive session:", sessionId, data);
           toast({
-            title: "清理失败",
+            title: "归档失败",
             description:
-              data.error?.message || "Session 清理失败，可能需要手动清理",
+              data.error?.message || "Session 归档失败，可能需要手动清理",
             variant: "destructive",
           });
         }
       }
     } catch (error) {
-      console.error("[Cancel] Error deleting session:", error);
+      console.error("[Cancel] Error archiving session:", error);
       toast({
-        title: "清理失败",
+        title: "归档失败",
         description: error instanceof Error ? error.message : "未知错误",
         variant: "destructive",
       });

@@ -103,6 +103,7 @@ deletePage({
 
 - **禁止页面级 Schema 与项目级 Schema 出现同名字段** —— 写入前必须自检：读取 `project.config.schema.json` 的 properties，确保新页面的 `config.schema.json` 中没有重名字段
 - 新建页面时使用默认模板（在 Props 中**只**声明页面级字段，项目级字段通过 props 解构使用）
+- **配置字段增删必须由用户明确指示** —— 不得自行推测、推断或隐式添加/删除 `config.schema.json` 或 `project.config.schema.json` 中的字段。只有当用户明确说"加一个配置"、"删除这个字段"等时才可操作，AI 不得因样式调整、组件修改等原因自行增删配置字段
 
 ## 代码质量标准（每个页面内）
 
@@ -162,6 +163,7 @@ export default function Demo({
 - ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入前必须自检）
 - ❌ 在单个页面中使用 `import './xxx'` 相对路径导入
 - ❌ 在 Props 接口中重复声明项目级字段（违反运行时注入约定）
+- ❌ 未经用户明确指示，自行添加或删除 `config.schema.json` / `project.config.schema.json` 中的配置字段（配置字段的增删必须来自用户的明确指令，不得由 AI 推测）
 - ❌ 询问用户"要修改哪个文件"，你应该根据以下规则自主判断
 
 ## 文件修改决策规则

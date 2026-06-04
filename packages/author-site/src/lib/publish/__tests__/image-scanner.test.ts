@@ -1,4 +1,4 @@
-import { extractImageReferences, isLocalPath } from '../image-scanner';
+import { extractImageReferences, isLocalPath, isApiImagePath } from '../image-scanner';
 
 describe('isLocalPath', () => {
   it('本地相对路径返回 true', () => {
@@ -35,6 +35,27 @@ describe('isLocalPath', () => {
     expect(isLocalPath('photo.webp')).toBe(true);
     expect(isLocalPath('photo.svg')).toBe(true);
   });
+
+  it('/api/images/ 路径返回 false（属于图床路径，不是本地路径）', () => {
+    expect(isLocalPath('/api/images/a1b2c3d4-hero.png')).toBe(false);
+  });
+});
+
+describe('isApiImagePath', () => {
+  it('/api/images/ 路径返回 true', () => {
+    expect(isApiImagePath('/api/images/a1b2c3d4-hero.png')).toBe(true);
+    expect(isApiImagePath('/api/images/abc123-photo.jpg')).toBe(true);
+  });
+
+  it('非 /api/images/ 前缀返回 false', () => {
+    expect(isApiImagePath('./images/hero.png')).toBe(false);
+    expect(isApiImagePath('/assets/bg.jpg')).toBe(false);
+    expect(isApiImagePath('https://example.com/image.png')).toBe(false);
+  });
+
+  it('/api/images/ 路径但无图片扩展名返回 false', () => {
+    expect(isApiImagePath('/api/images/data.json')).toBe(false);
+  });
 });
 
 describe('extractImageReferences', () => {
@@ -47,6 +68,27 @@ describe('extractImageReferences', () => {
     expect(refs[0]).toMatchObject({
       originalPath: './images/hero.png',
       type: 'img-src',
+    });
+  });
+
+  it('提取 <img> 标签中的图床图片', () => {
+    const content = '<img src="/api/images/a1b2c3d4-hero.png" alt="Hero" />';
+    const refs = extractImageReferences(content, sourceFile);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: '/api/images/a1b2c3d4-hero.png',
+      type: 'img-src',
+    });
+    expect(refs[0].absolutePath).toContain('data/images/a1b2c3d4-hero.png');
+  });
+
+  it('提取 CSS url() 中的图床图片', () => {
+    const content = 'style={{ backgroundImage: "url(\'/api/images/abc123-bg.jpg\')" }}';
+    const refs = extractImageReferences(content, sourceFile);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: '/api/images/abc123-bg.jpg',
+      type: 'css-url',
     });
   });
 
@@ -82,13 +124,14 @@ describe('extractImageReferences', () => {
     expect(refs).toHaveLength(0);
   });
 
-  it('提取多种类型引用', () => {
+  it('提取多种类型引用（含图床路径）', () => {
     const content = `
       import hero from "./images/hero.png";
       <img src="./thumbnail.jpg" />
+      <img src="/api/images/a1b2c3d4-product.png" />
       <div style={{ backgroundImage: "url('./bg.svg')" }} />
     `;
     const refs = extractImageReferences(content, sourceFile);
-    expect(refs).toHaveLength(3);
+    expect(refs).toHaveLength(4);
   });
 });

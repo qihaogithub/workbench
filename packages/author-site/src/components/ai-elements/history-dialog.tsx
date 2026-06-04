@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Trash2, Plus, Clock, AlertCircle, MessageSquare } from 'lucide-react'
+import { Trash2, Plus, Clock, AlertCircle, MessageSquare, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SessionItem {
@@ -48,6 +48,7 @@ export function HistoryDialog({
   const [sessions, setSessions] = useState<SessionItem[]>([])
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [exportingId, setExportingId] = useState<string | null>(null)
 
   const fetchSessions = useCallback(async () => {
     if (!projectId) return
@@ -84,6 +85,40 @@ export function HistoryDialog({
       console.error('Failed to delete session:', error)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleExport = async (sessionId: string, createdAt: number) => {
+    setExportingId(sessionId)
+    try {
+      const [messagesRes, metaRes] = await Promise.all([
+        fetch(`/api/sessions/${sessionId}/messages`),
+        fetch(`/api/sessions/${sessionId}`),
+      ])
+      const messagesData = await messagesRes.json()
+      const metaData = await metaRes.json()
+
+      const exportData = {
+        sessionId,
+        exportedAt: new Date().toISOString(),
+        session: metaData.success ? metaData.data : null,
+        messages: messagesData.success ? messagesData.data : [],
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const date = new Date(createdAt).toLocaleDateString('zh-CN').replace(/\//g, '-')
+      a.href = url
+      a.download = `对话记录-${date}-${sessionId.slice(0, 8)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export session:', error)
+    } finally {
+      setExportingId(null)
     }
   }
 
@@ -147,10 +182,8 @@ export function HistoryDialog({
                         'border-primary bg-primary/5',
                     )}
                     onClick={() => {
-                      if (!session.isExpired) {
-                        onSelectSession(session.sessionId, session.workspaceId || undefined)
-                        onOpenChange(false)
-                      }
+                      onSelectSession(session.sessionId, session.workspaceId || undefined)
+                      onOpenChange(false)
                     }}
                   >
                     <div className="flex-1 min-w-0">
@@ -180,6 +213,19 @@ export function HistoryDialog({
                         {session.title ? formatTime(session.createdAt) : `Session: ${session.sessionId.slice(0, 16)}...`}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleExport(session.sessionId, session.createdAt)
+                      }}
+                      disabled={exportingId === session.sessionId}
+                      title="导出对话"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

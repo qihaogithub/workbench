@@ -1,6 +1,4 @@
-interface DemoProps {
-  showFreeTrial?: boolean;
-}
+interface DemoProps {}
 
 const subjects = [
   { key: 'yuedu', label: '阅读', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a9956e79.png', bgClass: 'bg-[#fff2ea]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(255,237,224,1.00)]', textColor: 'text-[#6b2d03]' },
@@ -30,7 +28,6 @@ const subjects = [
 ];
 
 export default function PhoneSquare(props: DemoProps) {
-  const { showFreeTrial = true } = props;
   // 项目级共享配置：运行时注入，不在 Props 接口中声明
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
@@ -132,36 +129,32 @@ export default function PhoneSquare(props: DemoProps) {
             ))}
           </div>
 
-          {/* 免费试一试区域 — 由 showFreeTrial 控制显隐 */}
-          {showFreeTrial && (
-            <>
-              <div className="w-[335px] shrink-0 pt-6 flex flex-col justify-end items-start">
-                <div className="self-stretch shrink-0 px-1 inline-flex justify-between items-center">
-                  <div className="grow basis-0 min-w-0 justify-start text-[#3f3f3f] text-lg font-medium font-sans leading-[27px]">
-                    免费试一试
-                  </div>
-                  <div className="h-6 shrink-0 pl-3 pr-1.5 rounded-[99px] outline outline-1 outline-offset-[-1px] outline-[#f4f3f3] flex justify-center items-center gap-0.5">
-                    <div className="shrink-0 text-right justify-start text-[#b2b2b2] text-sm font-normal font-sans leading-[30px] tracking-wider whitespace-nowrap">
-                      K1学什么？
-                    </div>
-                    <img
-                      src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_3a5cb93a.svg"
-                      className="relative w-[29.01px] h-4 shrink-0 origin-top-left -rotate-90 max-w-none"
-                      alt="arrow"
-                    />
-                  </div>
-                </div>
+          {/* 免费试一试区域 — 始终显示 */}
+          <div className="w-[335px] shrink-0 pt-6 flex flex-col justify-end items-start">
+            <div className="self-stretch shrink-0 px-1 inline-flex justify-between items-center">
+              <div className="grow basis-0 min-w-0 justify-start text-[#3f3f3f] text-lg font-medium font-sans leading-[27px]">
+                免费试一试
               </div>
+              <div className="h-6 shrink-0 pl-3 pr-1.5 rounded-[99px] outline outline-1 outline-offset-[-1px] outline-[#f4f3f3] flex justify-center items-center gap-0.5">
+                <div className="shrink-0 text-right justify-start text-[#b2b2b2] text-sm font-normal font-sans leading-[30px] tracking-wider whitespace-nowrap">
+                  K1学什么？
+                </div>
+                <img
+                  src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_3a5cb93a.svg"
+                  className="relative w-[29.01px] h-4 shrink-0 origin-top-left -rotate-90 max-w-none"
+                  alt="arrow"
+                />
+              </div>
+            </div>
+          </div>
 
-              {/* 课程卡片 */}
-              <img
-                src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_f9228c0.png"
-                alt="course card"
-                className="object-cover max-w-none"
-                style={{ width: 335, height: 293 }}
-              />
-            </>
-          )}
+          {/* 课程卡片 */}
+          <img
+            src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_f9228c0.png"
+            alt="course card"
+            className="object-cover max-w-none"
+            style={{ width: 335, height: 293 }}
+          />
         </div>
       </div>
 

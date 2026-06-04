@@ -8,12 +8,5 @@
   },
   "title": "广场页面 - 手机版配置",
   "type": "object",
-  "properties": {
-    "showFreeTrial": {
-      "type": "boolean",
-      "title": "显示「免费试一试」",
-      "description": "控制免费试一试区域及下方课程卡片的显示/隐藏",
-      "default": true
-    }
-  }
+  "properties": {}
 }

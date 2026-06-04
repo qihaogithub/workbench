@@ -1,10 +1,4 @@
-import {jsx as _jsx, jsxs as _jsxs} from 'https://esm.sh/react@18.3.1/jsx-runtime';import React from 'https://esm.sh/react@18.3.1';
-
-
-
-
-
-
+import {jsx as _jsx, jsxs as _jsxs} from 'https://esm.sh/react@18.3.1/jsx-runtime';
 
 const subjects = [
   { key: 'yuedu', label: '阅读', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a9956e79.png', bgClass: 'bg-[#fff2ea]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(255,237,224,1.00)]', textColor: 'text-[#6b2d03]' },
@@ -34,6 +28,7 @@ const subjects = [
 ];
 
 export default function PhoneSquare(props) {
+  // 项目级共享配置：运行时注入，不在 Props 接口中声明
   const {
     bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',
     bigBannerBackground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png',
@@ -45,7 +40,7 @@ export default function PhoneSquare(props) {
       'https://r2-asset-worker.qihaogo.workers.dev/figma/h_3be0b370.png',
       'https://r2-asset-worker.qihaogo.workers.dev/figma/h_f4868f75.png',
     ],
-  } = props;
+  } = props ;
 
   return (
     _jsxs('div', {
@@ -115,15 +110,15 @@ export default function PhoneSquare(props) {
             )
             /* 可配置的大Banner前景图 */
             , _jsx('img', {
-              src: bigBannerForeground,
+              src: bigBannerForeground ,
               alt: "banner-fg",
               className: "absolute bottom-0 left-1/2 -translate-x-1/2 h-full object-contain z-10"      ,}
             )
           ]})
 
-          /* 小Banner滚动区 - 添加 mt-5 与大Banner间隔20px */
+          /* 小Banner滚动区 */
           , _jsx('div', { className: "shrink-0 mt-5 inline-flex justify-start items-start gap-2 overflow-x-auto figma-scrollbar-hide"       , children: 
-            miniBanners.map((url, i) => (
+            (miniBanners ).map((url, i) => (
               _jsx('img', {
 
                 src: url,
@@ -134,7 +129,7 @@ export default function PhoneSquare(props) {
             ))
           })
 
-          /* 免费试一试区域 */
+          /* 免费试一试区域 — 始终显示 */
           , _jsx('div', { className: "w-[335px] shrink-0 pt-6 flex flex-col justify-end items-start"      , children: 
             _jsxs('div', { className: "self-stretch shrink-0 px-1 inline-flex justify-between items-center"     , children: [
               _jsx('div', { className: "grow basis-0 min-w-0 justify-start text-[#3f3f3f] text-lg font-medium font-sans leading-[27px]"        , children: "免费试一试"

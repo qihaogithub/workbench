@@ -6,6 +6,7 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { archiveSession } from "@/lib/session-manager";
 import fs from "fs";
 import path from "path";
 
@@ -57,6 +58,14 @@ export async function PATCH(
 
     if (updates.status === "editing") {
       meta.expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+    }
+
+    // 当状态变为 discarded/archived 时，归档 Session（清理 workspace 但保留消息历史）
+    if (updates.status === "discarded" || updates.status === "archived") {
+      archiveSession(sessionId, updates.status);
+      // archiveSession 已更新 meta 并写回，重新读取
+      const updatedMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      return NextResponse.json(createApiSuccess(updatedMeta));
     }
 
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");

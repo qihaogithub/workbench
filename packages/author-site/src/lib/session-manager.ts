@@ -181,19 +181,23 @@ export function findActiveSession(
           continue;
         }
 
-        // 发现过期 session，主动删除
+        // 发现过期 session，归档而非删除（保留消息历史）
         if (Date.now() > meta.expiresAt) {
+          // 仅清理 workspace 临时文件，保留 session 元数据和消息
           if (meta.workspaceId) {
             const wsPath = findWorkspacePath(meta.workspaceId);
-            if (wsPath) {
+            if (wsPath && fs.existsSync(wsPath)) {
               fs.rmSync(wsPath, { recursive: true, force: true });
             }
           }
-          fs.rmSync(path.join(projectSessionDir, entry.name), {
-            recursive: true,
-            force: true,
-          });
-          console.log(`[Session] Cleaned up expired session: ${entry.name}`);
+          // 更新状态为 expired 而非删除
+          if (meta.status === 'editing') {
+            meta.status = 'expired';
+            try {
+              fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+            } catch { /* ignore write error */ }
+          }
+          console.log(`[Session] Archived expired session: ${entry.name}`);
           continue;
         }
 
@@ -449,13 +453,28 @@ export function saveEditSession(
     if (fs.existsSync(metaPath)) {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
       meta.status = 'saved';
+      meta.savedAt = Date.now();
       fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     }
 
+    // 归档而非删除：保留 .session.json 和 .messages.json 供历史对话查看
+    // 仅清理 workspace 临时文件以节省空间
     try {
-      deleteSession(sessionId);
+      if (workspaceId) {
+        const wsPath = findWorkspacePath(workspaceId);
+        if (wsPath && fs.existsSync(wsPath)) {
+          fs.rmSync(wsPath, { recursive: true, force: true });
+        }
+      }
+      // 清理 session 目录下的 demos 和 assets 子目录（保留元数据和消息）
+      const sessionDirEntries = fs.readdirSync(sessionPath!, { withFileTypes: true });
+      for (const entry of sessionDirEntries) {
+        if (entry.isDirectory() && (entry.name === 'demos' || entry.name === 'assets')) {
+          fs.rmSync(path.join(sessionPath!, entry.name), { recursive: true, force: true });
+        }
+      }
     } catch (e) {
-      console.warn(`[saveEditSession] 清理 session 失败，但保存已成功:`, e);
+      console.warn(`[saveEditSession] 清理 workspace 失败，但保存已成功:`, e);
     }
 
     return {
@@ -472,37 +491,59 @@ export function saveEditSession(
   }
 }
 
-export function dropEditSession(sessionId: string): boolean {
-  return deleteSession(sessionId);
-}
-
-export function discardEditSession(sessionId: string): boolean {
+export function archiveSession(sessionId: string, status: 'discarded' | 'saved' | 'archived' = 'discarded'): boolean {
   const sessionPath = getSessionPath(sessionId);
   if (!sessionPath || !fs.existsSync(sessionPath)) {
     return false;
   }
 
   const metaPath = path.join(sessionPath, ".session.json");
-  if (fs.existsSync(metaPath)) {
-    try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      if (meta.workspaceId) {
-        const wsPath = findWorkspacePath(meta.workspaceId);
-        if (wsPath) {
-          fs.rmSync(wsPath, { recursive: true, force: true });
-        }
-      }
-    } catch {
-      // 元数据读取失败不影响后续删除
-    }
+  if (!fs.existsSync(metaPath)) {
+    return false;
   }
 
-  fs.rmSync(sessionPath, { recursive: true, force: true });
-  return true;
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+
+    // 清理 workspace 临时文件
+    if (meta.workspaceId) {
+      const wsPath = findWorkspacePath(meta.workspaceId);
+      if (wsPath && fs.existsSync(wsPath)) {
+        fs.rmSync(wsPath, { recursive: true, force: true });
+      }
+    }
+
+    // 清理 session 目录下的 demos 和 assets 子目录（保留元数据和消息）
+    const sessionDirEntries = fs.readdirSync(sessionPath, { withFileTypes: true });
+    for (const entry of sessionDirEntries) {
+      if (entry.isDirectory() && (entry.name === 'demos' || entry.name === 'assets')) {
+        fs.rmSync(path.join(sessionPath, entry.name), { recursive: true, force: true });
+      }
+    }
+
+    // 更新状态
+    meta.status = status;
+    meta.archivedAt = Date.now();
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function dropEditSession(sessionId: string): boolean {
+  return deleteSession(sessionId);
+}
+
+export function discardEditSession(sessionId: string): boolean {
+  // 归档而非删除，保留消息历史
+  return archiveSession(sessionId, 'discarded');
 }
 
 /**
  * 清理指定用户的过期 Session
+ * 仅清理 workspace 临时文件，保留 session 元数据和消息历史
  */
 export function cleanupExpiredSessions(userId: string): string[] {
   const userSessionsDir = path.join(getSessionsDir(), userId);
@@ -534,14 +575,18 @@ export function cleanupExpiredSessions(userId: string): string[] {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         if (Date.now() > meta.expiresAt) {
+          // 仅清理 workspace，保留 session 元数据和消息
           if (meta.workspaceId) {
             const wsPath = findWorkspacePath(meta.workspaceId);
-            if (wsPath) fs.rmSync(wsPath, { recursive: true, force: true });
+            if (wsPath && fs.existsSync(wsPath)) {
+              fs.rmSync(wsPath, { recursive: true, force: true });
+            }
           }
-          fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
-            recursive: true,
-            force: true,
-          });
+          // 更新状态为 expired
+          if (meta.status === 'editing') {
+            meta.status = 'expired';
+            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+          }
           cleaned.push(sessionDir.name);
         }
       } catch {
@@ -555,6 +600,7 @@ export function cleanupExpiredSessions(userId: string): string[] {
 
 /**
  * 全局清理：遍历所有用户的过期 Session（用于后台定时任务）
+ * 仅清理 workspace 临时文件，保留 session 元数据和消息历史
  */
 export function cleanupAllExpiredSessions(): string[] {
   const sessionsDir = getSessionsDir();
@@ -595,14 +641,18 @@ export function cleanupAllExpiredSessions(): string[] {
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           if (Date.now() > meta.expiresAt) {
+            // 仅清理 workspace，保留 session 元数据和消息
             if (meta.workspaceId) {
               const wsPath = findWorkspacePath(meta.workspaceId);
-              if (wsPath) fs.rmSync(wsPath, { recursive: true, force: true });
+              if (wsPath && fs.existsSync(wsPath)) {
+                fs.rmSync(wsPath, { recursive: true, force: true });
+              }
             }
-            fs.rmSync(path.join(projectSessionDir, sessionDir.name), {
-              recursive: true,
-              force: true,
-            });
+            // 更新状态为 expired
+            if (meta.status === 'editing') {
+              meta.status = 'expired';
+              fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+            }
             cleaned.push(sessionDir.name);
           }
         } catch {

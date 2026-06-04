@@ -14,26 +14,8 @@
       "parentId": null
     },
     {
-      "id": "demo_1780476667099_tpyf4j",
-      "name": "图片展示页-手机",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "demo_1780542213561_k8m2n9",
-      "name": "全屏展示页-手机",
-      "order": 3,
-      "parentId": null
-    },
-    {
       "id": "demo_1780550141175_a79047",
       "name": "demo页面",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "page_0nei",
-      "name": "新建页面",
       "order": 2,
       "parentId": null
     }
