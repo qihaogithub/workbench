@@ -255,3 +255,31 @@ export function cleanupOrphanWorkspaces(
 
   return cleaned;
 }
+
+/**
+ * 将会话工作区替换为项目工作区的最新内容。
+ * 用于版本恢复后同步会话工作区。
+ */
+export function syncSessionFromProject(
+  userId: string,
+  projectId: string,
+  workspaceId: string,
+): string | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const projectPath = getProjectPath(projectId);
+  const projectWorkspacePath = path.join(projectPath, "workspace");
+  if (!fs.existsSync(projectWorkspacePath)) return null;
+
+  fs.rmSync(wsPath, { recursive: true, force: true });
+  fs.cpSync(projectWorkspacePath, wsPath, { recursive: true });
+
+  const meta = getWorkspaceMetaFromFs(workspaceId);
+  if (meta) {
+    meta.updatedAt = Date.now();
+    writeWorkspaceMeta(workspaceId, meta);
+  }
+
+  return wsPath;
+}

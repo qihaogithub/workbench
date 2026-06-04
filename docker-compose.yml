@@ -40,6 +40,7 @@ services:
       - NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST:-}
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
       - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
+      - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-true}
       - DATA_DIR=/app/data
@@ -47,6 +48,25 @@ services:
       - app-data:/app/data
     depends_on:
       - agent-service
+    restart: unless-stopped
+
+  screenshot-service:
+    build:
+      context: .
+      dockerfile: docker/screenshot-service/Dockerfile
+    ports:
+      - "3202:3202"
+    environment:
+      - PORT=3202
+      - HOST=0.0.0.0
+      - AUTHOR_SITE_URL=http://author-site:3200
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - DATA_DIR=/app/data
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      - author-site
     restart: unless-stopped
 
   viewer-site:

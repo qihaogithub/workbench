@@ -4,20 +4,28 @@
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460377/workspace",
   "demoPages": [
     {
-      "id": "demo_1779608460377_w4j5h1",
-      "name": "通用弹窗-手机",
+      "id": "pad-popup_a3f2",
+      "name": "通用弹窗 - 平板版",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "name": "通用弹窗 - 手机版",
       "order": 1,
-      "parentId": null,
-      "createdAt": 1779608460377,
-      "updatedAt": 1780299068935
+      "parentId": null
     },
     {
       "id": "demo_1779608460377_f8g6t2",
-      "name": "通用弹窗-平板",
+      "name": "demo",
       "order": 2,
-      "parentId": null,
-      "createdAt": 1779608460378,
-      "updatedAt": 1780280852769
+      "parentId": null
+    },
+    {
+      "id": "demo_1779608460377_w4j5h1",
+      "name": "demo",
+      "order": 3,
+      "parentId": null
     }
   ],
   "demoFolders": [],
@@ -215,10 +223,18 @@
       "sessionId": "session-1780296613609-yhtkqlvzy",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v24",
       "fileCount": 6
+    },
+    {
+      "versionId": "v25",
+      "savedAt": 1780558847330,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780558721260-k2o27ej35",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v25",
+      "fileCount": 11
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1780299070224,
+  "updatedAt": 1780558847332,
   "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
   "publishedVersion": "v23",
   "publishedAt": 1780292121719

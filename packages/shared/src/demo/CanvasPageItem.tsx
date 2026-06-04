@@ -3,8 +3,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
-import { ThumbnailRenderer } from "./ThumbnailRenderer";
-import { ThumbnailPlaceholder } from "./ThumbnailPlaceholder";
+import { PageSkeleton } from "./PageSkeleton";
 import type { CanvasPageLayout, CanvasPageData } from "./types";
 
 interface CanvasPageItemProps {
@@ -14,14 +13,14 @@ interface CanvasPageItemProps {
   isEditing?: boolean;
   zoom?: number;
   sessionId?: string;
+  screenshotUrl?: string;
+  screenshotLoading?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   className?: string;
 }
-
-const IFRAME_ZOOM_THRESHOLD = 0.55;
 
 export function CanvasPageItem({
   page,
@@ -30,6 +29,8 @@ export function CanvasPageItem({
   isEditing = false,
   zoom = 0,
   sessionId,
+  screenshotUrl,
+  screenshotLoading,
   onLayoutChange,
   onConfigEdit,
   onDragStart,
@@ -106,7 +107,7 @@ export function CanvasPageItem({
       }}
       onMouseEnter={() => setIsHovering(true)}
     >
-      {isEditing || (zoom >= IFRAME_ZOOM_THRESHOLD && page.code) ? (
+      {isEditing ? (
         <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
           <PreviewPanel
             code={page.code}
@@ -116,9 +117,14 @@ export function CanvasPageItem({
             previewSize={page.previewSize}
           />
         </div>
-      ) : page.thumbnailMeta ? (
+      ) : screenshotUrl ? (
         <div className="relative w-full h-full rounded-lg overflow-hidden shadow-md">
-          <ThumbnailRenderer meta={page.thumbnailMeta} className="w-full h-full" />
+          <img
+            src={screenshotUrl}
+            alt={page.name}
+            className="w-full h-full object-contain"
+            loading="lazy"
+          />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 rounded-b-lg">
             <span className="text-xs text-white font-medium truncate block">
               {page.name}
@@ -126,10 +132,10 @@ export function CanvasPageItem({
           </div>
         </div>
       ) : (
-        <ThumbnailPlaceholder pageName={page.name} />
+        <PageSkeleton pageName={page.name} />
       )}
 
-      {isHovering && !isEditing && zoom < IFRAME_ZOOM_THRESHOLD && onConfigEdit && (
+      {isHovering && !isEditing && onConfigEdit && (
         <button
           type="button"
           className="absolute top-2 right-2 bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded shadow transition-opacity"

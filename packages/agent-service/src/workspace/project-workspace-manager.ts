@@ -467,6 +467,10 @@ export class ProjectWorkspaceManager {
     // 从快照恢复
     await copyDirectory(version.snapshotPath, project.workspacePath);
 
+    // 创建恢复后状态的新快照
+    const restoreSnapshotPath = path.join(SNAPSHOTS_DIR, projectId, newVersionId);
+    await copyDirectory(project.workspacePath, restoreSnapshotPath);
+
     // 统计文件数量
     const fileCount = await countFiles(project.workspacePath);
 
@@ -476,7 +480,7 @@ export class ProjectWorkspaceManager {
       savedAt: Date.now(),
       savedBy: username,
       sessionId: 'restore',
-      snapshotPath: backupPath,
+      snapshotPath: restoreSnapshotPath,
       fileCount,
       note: `从 ${versionId} 恢复`,
     };

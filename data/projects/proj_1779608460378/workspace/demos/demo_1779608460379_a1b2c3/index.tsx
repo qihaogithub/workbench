@@ -3,7 +3,7 @@ interface DemoProps {
 }
 
 const subjects = [
-  { key: 'yuedu', label: '阅读11', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a9956e79.png', bgClass: 'bg-[#fff2ea]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(255,237,224,1.00)]', textColor: 'text-[#6b2d03]' },
+  { key: 'yuedu', label: '阅读', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a9956e79.png', bgClass: 'bg-[#fff2ea]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(255,237,224,1.00)]', textColor: 'text-[#6b2d03]' },
   { key: 'yizhi', label: '益智', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_ac2976ba.png', bgClass: 'bg-[#eaf9ff]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(224,246,255,1.00)]', textColor: 'text-[#004161]' },
   { key: 'meiyu', label: '美育', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a1fb5f78.png', bgClass: 'bg-[#f9f5ff]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(243,235,255,1.00)]', textColor: 'text-[#452270]' },
   { key: 'xiezuo', label: '写作', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_61d1c2e6.png', bgClass: 'bg-[#eefceb]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(229,250,224,1.00)]', textColor: 'text-[#0d5100]' },

@@ -11,8 +11,8 @@ import {
   ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
-import type { PreviewMode, CanvasState, ThumbnailMeta } from "../../../../../components/demo";
-import { useThumbnailGeneration } from "@/components/demo/useThumbnailGeneration";
+import type { PreviewMode, CanvasState } from "../../../../../components/demo";
+import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
 import {
   parseFigmaText,
   buildFigmaText,
@@ -156,7 +156,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     pages: {},
   });
   const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
-  const { thumbnailMetaMap, setThumbnailMetaMap } = useThumbnailGeneration(demoId);
+  const {
+    pageScreenshots,
+    isGenerating: isScreenshotGenerating,
+    startBatchGeneration,
+    regeneratePage,
+    getScreenshotUrl,
+  } = useScreenshotGeneration({
+    projectId: demoId,
+    sessionId,
+    enabled: previewMode === "canvas",
+  });
+
+  // 切换到画布模式时触发批量截图
+  useEffect(() => {
+    if (previewMode === "canvas" && demoPages.length > 0 && !isScreenshotGenerating) {
+      const pages = demoPages
+        .filter((p) => pageCodes[p.id] || code)
+        .map((p) => ({
+          pageId: p.id,
+          code: pageCodes[p.id] || code,
+          configData: configDataMap[p.id] || {},
+        }));
+      if (pages.length > 0) {
+        startBatchGeneration(pages);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewMode]);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -636,6 +663,53 @@ ${context.details}
         versionId: version.versionId,
         username: 'user',
       });
+
+      const syncRes = await fetch(`/api/sessions/${sessionId}/sync-project`, {
+        method: 'POST',
+      });
+      if (!syncRes.ok) {
+        throw new Error('同步会话工作区失败');
+      }
+
+      const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+      const filesData = await filesRes.json();
+      if (filesData.success) {
+        const multi = filesData.data;
+        const pageIds = (multi.demoPages || []).map(
+          (p: { id: string }) => p.id,
+        );
+        const newActiveId = pageIds.includes(activeDemoId)
+          ? activeDemoId
+          : pageIds[0];
+        const targetDemo = multi.demos?.[newActiveId];
+
+        if (newActiveId && newActiveId !== activeDemoId) {
+          setActiveDemoId(newActiveId);
+        }
+
+        if (targetDemo) {
+          applyDemoSnapshot({
+            code: targetDemo.code ?? '',
+            schema: targetDemo.schema ?? '',
+            source: 'manual-load',
+          });
+        }
+
+        setDemoPages(
+          pageIds.map((id: string) => ({
+            id,
+            name:
+              multi.demoPages.find(
+                (p: { id: string }) => p.id === id,
+              )?.name || id,
+            order: 0,
+            parentId: null,
+          })),
+        );
+        setDemoFolders(multi.demoFolders || []);
+        setProjectConfigSchema(multi.projectConfigSchema);
+      }
+
       toast({
         title: '恢复成功',
         description: `已恢复到新版本 ${result.newVersionId}`,
@@ -1530,11 +1604,15 @@ ${context.details}
                         code: pageCodes[p.id] || code,
                         configData: configDataMap[p.id],
                         previewSize: previewSize,
-                        thumbnailMeta: thumbnailMetaMap[p.id],
                       }))}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
                       editingPageId={canvasEditingPageId ?? undefined}
+                      screenshotUrls={Object.fromEntries(
+                        Object.entries(pageScreenshots)
+                          .filter(([, s]) => s.screenshotUrl)
+                          .map(([id, s]) => [id, s.screenshotUrl!])
+                      )}
                       onPageConfigEdit={(pageId) => {
                         setCanvasEditingPageId(pageId);
                         setActiveDemoId(pageId);

@@ -5,7 +5,7 @@ interface DemoProps {
 
 export default function FullScreenImage(props: DemoProps) {
   const {
-    displayImage = '/api/images/6f9819021808-page.webp',
+    displayImage = './images/第二关已解锁.webp',
     backgroundColor = '#000000',
   } = props;
 

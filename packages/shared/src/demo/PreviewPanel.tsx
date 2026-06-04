@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
 import { generateIframeHtml } from "./iframe-template";
 
@@ -217,6 +217,7 @@ export function PreviewPanel({
   const [lastSuccessfulResult, setLastSuccessfulResult] =
     useState<CompileResult | null>(null);
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
+  const [contentLoaded, setContentLoaded] = useState(false);
 
   const isUrlMode = !!compiledJsUrl;
 
@@ -421,6 +422,7 @@ export function PreviewPanel({
 
         case "LOADED":
           setRuntimeError(null);
+          setContentLoaded(true);
           break;
 
         case "RUNTIME_ERROR":
@@ -443,6 +445,16 @@ export function PreviewPanel({
     sendUpdateCode,
     sendUpdateCodeUrl,
   ]);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setContainerWidth(rect.width);
+      setContainerHeight(rect.height);
+    }
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -486,6 +498,10 @@ export function PreviewPanel({
       URL.revokeObjectURL(url);
     };
   }, [isUrlMode]);
+
+  useEffect(() => {
+    setContentLoaded(false);
+  }, [iframeSrcUrl]);
 
   return (
     <>
@@ -540,12 +556,21 @@ export function PreviewPanel({
         className="w-full h-full flex flex-col items-center"
       >
         {iframeSrcUrl && (
-          <div style={wrapperStyle} className="rounded-lg border border-border">
+          <div style={{ ...wrapperStyle, marginTop: 0, marginBottom: 0 }} className="rounded-lg border border-border relative">
+            {!contentLoaded && !isCompiling && (
+              <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg">
+                <div className="animate-pulse rounded-full h-8 w-8 border-2 border-muted-foreground/30" />
+              </div>
+            )}
             <iframe
               ref={iframeRef}
               sandbox="allow-scripts allow-same-origin"
               src={iframeSrcUrl}
-              style={iframeStyle}
+              style={{
+                ...iframeStyle,
+                opacity: contentLoaded ? 1 : 0,
+                transition: 'opacity 0.2s ease-in-out',
+              }}
               title="预览"
             />
           </div>

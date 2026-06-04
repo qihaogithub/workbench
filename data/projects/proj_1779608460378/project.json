@@ -377,10 +377,28 @@
       "sessionId": "session-1780553024377-1jpulm22w",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v43",
       "fileCount": 12
+    },
+    {
+      "versionId": "v44",
+      "savedAt": 1780558334525,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v44",
+      "fileCount": 10,
+      "note": "从 v42 恢复"
+    },
+    {
+      "versionId": "v45",
+      "savedAt": 1780558358599,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v45",
+      "fileCount": 12,
+      "note": "从 v40 恢复"
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780554399471,
+  "updatedAt": 1780558358599,
   "publishedVersion": "v21",
   "publishedAt": 1780468794271
 }

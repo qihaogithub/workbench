@@ -1,7 +1,3 @@
-import type { ThumbnailMeta } from "./thumbnail-types";
-
-export type { ThumbnailMeta, ThumbnailBlock, ThumbnailLayoutEvidence, RawElementSnapshot, ThumbnailHashInput } from "./thumbnail-types";
-
 export interface PreviewSize {
   width?: string | number;
   height?: string | number;
@@ -75,7 +71,6 @@ export interface CanvasPageData {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
-  thumbnailMeta?: ThumbnailMeta;
 }
 
 export interface PreviewCanvasProps {
@@ -90,6 +85,7 @@ export interface PreviewCanvasProps {
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;
+  screenshotUrls?: Record<string, string>;
 }
 
 export interface PreviewState {
