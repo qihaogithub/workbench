@@ -975,9 +975,6 @@ ${context.details}
                   workspaceId={workspaceId || undefined}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
-                  onSnapshotReady={() => {
-                    // 已在 applyDemoSnapshot 中调用 invalidateCompileCache，此处无需重复
-                  }}
                   onMemoryUpdate={async (filePath) => {
                     try {
                       const res = await fetch(

@@ -31,7 +31,6 @@ interface AIChatProps {
   onFilesChange?: (
     files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
   ) => void;
-  onSnapshotReady?: () => void;
   externalMessages?: ChatMessage[];
   externalIsStreaming?: boolean;
   externalStreamContent?: string;
@@ -61,7 +60,6 @@ export function AIChat({
   onCodeUpdate,
   onSchemaUpdate,
   onFilesChange,
-  onSnapshotReady,
   externalMessages,
   externalIsStreaming,
   externalStreamContent,
@@ -133,7 +131,6 @@ export function AIChat({
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
-    onSnapshotReady,
     messagesRef,
     setMessages,
     setIsStreaming,

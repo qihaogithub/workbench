@@ -46,7 +46,6 @@ interface UseChatStreamOptions {
       action: "created" | "modified" | "deleted";
     }>,
   ) => void;
-  onSnapshotReady?: () => void;
   messagesRef: React.MutableRefObject<ChatMessage[]>;
   setMessages: (
     updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
@@ -70,7 +69,6 @@ export function useChatStream(options: UseChatStreamOptions) {
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
-    onSnapshotReady,
     messagesRef,
     setMessages,
     setIsStreaming,
@@ -426,7 +424,6 @@ export function useChatStream(options: UseChatStreamOptions) {
               }
             }
 
-            onSnapshotReady?.();
             realtimeFilesRef.clear();
           },
 
@@ -566,7 +563,6 @@ export function useChatStream(options: UseChatStreamOptions) {
       onCodeUpdate,
       onSchemaUpdate,
       onFilesChange,
-      onSnapshotReady,
       setMessages,
       setIsStreaming,
       setStreamContent,
@@ -678,7 +674,6 @@ export function useChatStream(options: UseChatStreamOptions) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ assistantMessageId: targetAssistantId }),
         });
-        onSnapshotReady?.();
       } catch (e) {
         console.warn("[Rollback] File rollback failed:", e);
       }
@@ -687,7 +682,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       setMessages(truncated);
       await persistMessages(sessionId, truncated);
     },
-    [messagesRef, setMessages, sessionId, agentSessionId, onSnapshotReady],
+    [messagesRef, setMessages, sessionId, agentSessionId],
   );
 
   const handleEditResend = useCallback(
