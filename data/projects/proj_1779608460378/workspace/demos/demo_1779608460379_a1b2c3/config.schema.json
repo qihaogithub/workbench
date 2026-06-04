@@ -6,28 +6,14 @@
       "height": 812
     }
   },
-  "title": "全屏展示页-第二关已解锁",
+  "title": "广场页面 - 手机版配置",
   "type": "object",
   "properties": {
-    "displayImage": {
-      "type": "string",
-      "format": "image",
-      "title": "展示图片",
-      "description": "全屏展示的图片，推荐尺寸 375×812",
-      "default": "./images/第二关已解锁.webp",
-      "ui:options": {
-        "accept": "image/*",
-        "maxSize": 10485760,
-        "minWidth": 375,
-        "minHeight": 812
-      }
-    },
-    "backgroundColor": {
-      "type": "string",
-      "format": "color",
-      "title": "背景色",
-      "description": "图片加载前的背景颜色",
-      "default": "#000000"
+    "showFreeTrial": {
+      "type": "boolean",
+      "title": "显示「免费试一试」",
+      "description": "控制免费试一试区域及下方课程卡片的显示/隐藏",
+      "default": true
     }
   }
 }

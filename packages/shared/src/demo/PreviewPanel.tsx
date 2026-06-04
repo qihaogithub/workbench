@@ -477,7 +477,7 @@ export function PreviewPanel({
   );
 
   useEffect(() => {
-    const html = generateIframeHtml({ supportUrlMode: isUrlMode });
+    const html = generateIframeHtml({ supportUrlMode: isUrlMode, baseOrigin: window.location.origin });
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     setIframeSrcUrl(url);

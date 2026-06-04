@@ -16,6 +16,9 @@ import {
 import {
   processFileChanges,
   extractCodeAndSchemaUpdates,
+  isCodeFile,
+  isSchemaFile,
+  normalizePath,
   type FileChangeEntry,
 } from "../utils/chat-file-utils";
 import {
@@ -322,24 +325,54 @@ export function useChatStream(options: UseChatStreamOptions) {
               messagesRef.current.length === 0,
             );
 
-            // Flush any pending realtime files first
+            // ── 1. 清除 pending timer（不调用 processRealtimeFiles，避免路径 A 重复触发） ──
             if (fileUpdateTimer) {
               clearTimeout(fileUpdateTimer);
               fileUpdateTimer = null;
-              processRealtimeFiles();
             }
 
-            // Build final file list: prefer result.files (backend drain guarantees completeness)
-            const finalFiles: FileChangeEntry[] =
-              result.files && result.files.length > 0
-                ? result.files
-                : Array.from(realtimeFilesRef.entries()).map(
-                    ([path, info]) => ({
-                      path,
-                      action: info.action as "created" | "modified" | "deleted",
-                      content: info.content,
-                    }),
-                  );
+            // ── 2. 检测实时流已更新的数据类型 ──
+            let realtimeUpdatedCode = false;
+            let realtimeUpdatedSchema = false;
+            for (const [path, info] of realtimeFilesRef.entries()) {
+              const normalizedPath = normalizePath(path);
+              if (isCodeFile(normalizedPath) && info.content) realtimeUpdatedCode = true;
+              if (isSchemaFile(normalizedPath) && info.content) realtimeUpdatedSchema = true;
+            }
+
+            // ── 3. Flush 实时流文件到 UI（保持流式阶段的预览体验） ──
+            const pendingRealtimeFiles = Array.from(realtimeFilesRef.entries()).map(
+              ([path, info]) => ({
+                path,
+                action: info.action as "created" | "modified" | "deleted",
+                content: info.content,
+              }),
+            );
+            if (pendingRealtimeFiles.length > 0) {
+              processFileChanges(pendingRealtimeFiles, {
+                onCodeUpdate,
+                onSchemaUpdate,
+                onFilesChange,
+              });
+            }
+
+            // ── 4. 构建最终文件列表：realtimeFilesRef 优先，result.files 仅补充缺失文件 ──
+            const realtimeFileMap = new Map<string, FileChangeEntry>();
+            for (const [path, info] of realtimeFilesRef.entries()) {
+              realtimeFileMap.set(path, {
+                path,
+                action: info.action as "created" | "modified" | "deleted",
+                content: info.content,
+              });
+            }
+            if (result.files && result.files.length > 0) {
+              for (const f of result.files) {
+                if (!realtimeFileMap.has(f.path)) {
+                  realtimeFileMap.set(f.path, f);
+                }
+              }
+            }
+            const finalFiles = Array.from(realtimeFileMap.values());
 
             if (finalFiles.length > 0) {
               for (const f of finalFiles) {
@@ -352,33 +385,38 @@ export function useChatStream(options: UseChatStreamOptions) {
 
             setIsStreaming(false);
 
-            // Apply code/schema updates from final files
+            // ── 5. 从 finalFiles 提取更新，但跳过实时流已更新的数据类型（避免旧值覆盖新值） ──
             const { codeUpdated, schemaUpdated } =
               finalFiles.length > 0
                 ? extractCodeAndSchemaUpdates(finalFiles, {
-                    onCodeUpdate: (code) => onCodeUpdate?.(code, "ai-finish"),
-                    onSchemaUpdate: (schema) =>
-                      onSchemaUpdate?.(schema, "ai-finish"),
+                    onCodeUpdate: realtimeUpdatedCode
+                      ? undefined
+                      : (code) => onCodeUpdate?.(code, "ai-finish"),
+                    onSchemaUpdate: realtimeUpdatedSchema
+                      ? undefined
+                      : (schema) => onSchemaUpdate?.(schema, "ai-finish"),
                   })
                 : { codeUpdated: false, schemaUpdated: false };
 
-            // HTTP fallback: only fetch if NEITHER code NOR schema was updated
-            if (!codeUpdated && !schemaUpdated) {
+            // ── 6. HTTP 兜底：仅在完全没有数据更新时触发 ──
+            const effectiveCodeUpdated = realtimeUpdatedCode || codeUpdated;
+            const effectiveSchemaUpdated = realtimeUpdatedSchema || schemaUpdated;
+
+            if (!effectiveCodeUpdated && !effectiveSchemaUpdated) {
               const filesData = await fetchSessionFiles(sessionId, demoId);
               if (filesData) {
                 const { code, schema } = filesData;
-                if (code && !codeUpdated) onCodeUpdate?.(code, "ai-finish");
-                if (schema && !schemaUpdated)
-                  onSchemaUpdate?.(schema, "ai-finish");
+                if (code) onCodeUpdate?.(code, "ai-finish");
+                if (schema) onSchemaUpdate?.(schema, "ai-finish");
 
                 const fetchedFiles: FileChangeEntry[] = [];
-                if (!codeUpdated && code)
+                if (code)
                   fetchedFiles.push({
                     path: "index.tsx",
                     action: "modified",
                     content: code,
                   });
-                if (!schemaUpdated && schema)
+                if (schema)
                   fetchedFiles.push({
                     path: "config.schema.json",
                     action: "modified",
@@ -388,9 +426,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               }
             }
 
-            // Signal that the AI edit snapshot is fully applied
             onSnapshotReady?.();
-
             realtimeFilesRef.clear();
           },
 

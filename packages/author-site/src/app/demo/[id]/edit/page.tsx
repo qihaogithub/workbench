@@ -100,6 +100,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [code, setCode] = useState("");
   const [schema, setSchema] = useState("");
   const [editorContent, setEditorContent] = useState("");
+  const codeRef = useRef(code);
+  codeRef.current = code;
+  const schemaRef = useRef(schema);
+  schemaRef.current = schema;
 
   const [configDataMap, setConfigDataMap] = useState<
     Record<string, Record<string, unknown>>
@@ -208,6 +212,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
       if (newCode !== undefined) {
         setCode((prev) => (prev === newCode ? prev : newCode));
+        codeRef.current = newCode;
         if (sessionId && activeDemoId) {
           invalidateCompileCache(sessionId, activeDemoId);
         }
@@ -215,16 +220,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
       if (newSchema !== undefined) {
         setSchema(newSchema);
+        schemaRef.current = newSchema;
         setPreviewSize(getPreviewSize(newSchema));
 
-        // Merge config defaults using the new schema with smart merge strategy
         try {
           setConfigDataMap((prev) => {
             const current = prev[activeDemoIdRef.current] ?? {};
             const merged = mergeConfigWithUserValues(
               current,
               newSchema,
-              schema, // Pass old schema to detect user modifications
+              schemaRef.current,
             );
             return { ...prev, [activeDemoIdRef.current]: merged };
           });
@@ -233,23 +238,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       }
 
-      // Update editorContent from the latest code+schema
       setEditorContent((prev) => {
-        const currentCode = newCode ?? extractCodeFromFigma(prev) ?? code;
-        const currentSchema =
-          newSchema ?? extractSchemaFromFigma(prev) ?? schema;
+        const currentCode = newCode ?? extractCodeFromFigma(prev) ?? codeRef.current;
+        const currentSchema = newSchema ?? extractSchemaFromFigma(prev) ?? schemaRef.current;
         return buildFigmaText(currentCode, currentSchema);
       });
 
       if (source === "ai-realtime" || source === "ai-finish") {
-        // Cancel any pending schema auto-regeneration
         if (schemaRegenerateTimerRef.current) {
           clearTimeout(schemaRegenerateTimerRef.current);
           schemaRegenerateTimerRef.current = null;
         }
       }
     },
-    [code, schema, sessionId, activeDemoId],
+    [sessionId, activeDemoId],
   );
 
   const scrollToBottom = () => {
@@ -974,7 +976,7 @@ ${context.details}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
                   onSnapshotReady={() => {
-                    invalidateCompileCache(sessionId, activeDemoId);
+                    // 已在 applyDemoSnapshot 中调用 invalidateCompileCache，此处无需重复
                   }}
                   onMemoryUpdate={async (filePath) => {
                     try {

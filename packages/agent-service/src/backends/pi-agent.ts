@@ -7,6 +7,7 @@ import { getBackendProvidersManager } from '../config/backend-providers';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 // 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
 // (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
@@ -184,29 +185,51 @@ export class PiAgentBackend implements IBackendAdapter {
           },
         }));
       } else {
-        // 非多模态模型：自动保存图片到工作区，把路径写入提示文本
-        const savedPaths: string[] = [];
-        const workingDir = this.config.workingDir || '.';
+        // 非多模态模型：自动保存图片到图床，返回绝对 URL
+        const savedUrls: string[] = [];
 
         for (const img of images) {
-          const filename = img.name || `image-${Date.now()}-${savedPaths.length + 1}.png`;
-          const relativePath = path.join('images', filename);
-          const absolutePath = path.resolve(workingDir, relativePath);
+          const filename = img.name || `image-${Date.now()}-${savedUrls.length + 1}.png`;
 
           try {
             const buffer = Buffer.from(img.data, 'base64');
-            await fs.promises.mkdir(path.dirname(absolutePath), { recursive: true });
-            await fs.promises.writeFile(absolutePath, buffer);
-            savedPaths.push(relativePath);
-            logger.info({ path: relativePath, size: buffer.length }, "Auto-saved image to workspace");
+            const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+            const hashPrefix = sha256.slice(0, 12);
+            const storedFilename = `${hashPrefix}-${filename}`;
+            const dataDir = process.env.DATA_DIR
+              ? path.resolve(process.env.DATA_DIR)
+              : (() => {
+                  let current = path.resolve(process.cwd());
+                  while (current !== path.dirname(current)) {
+                    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+                      return path.join(current, 'data');
+                    }
+                    current = path.dirname(current);
+                  }
+                  return path.join(process.cwd(), 'data');
+                })();
+            const imagesDir = path.join(dataDir, 'images');
+            const storedPath = path.join(imagesDir, storedFilename);
+            const publicUrl = `/api/images/${storedFilename}`;
+
+            if (!fs.existsSync(imagesDir)) {
+              fs.mkdirSync(imagesDir, { recursive: true });
+            }
+
+            if (!fs.existsSync(storedPath)) {
+              await fs.promises.writeFile(storedPath, buffer);
+            }
+
+            savedUrls.push(publicUrl);
+            logger.info({ publicUrl, size: buffer.length }, 'Auto-saved image to image server');
           } catch (error) {
-            logger.error({ path: relativePath, error }, "Failed to auto-save image");
+            logger.error({ filename, error }, 'Failed to auto-save image');
           }
         }
 
-        if (savedPaths.length > 0) {
-          const pathList = savedPaths.map((p) => `- ./${p}`).join('\n');
-          promptContent = `${content}\n\n[已自动保存 ${savedPaths.length} 张图片到工作区：\n${pathList}\n如需在页面中使用这些图片，直接引用上述路径即可。也可使用 saveImage 工具重新保存。]`;
+        if (savedUrls.length > 0) {
+          const urlList = savedUrls.map((u) => `- ${u}`).join('\n');
+          promptContent = `${content}\n\n[已自动保存 ${savedUrls.length} 张图片到图床，绝对 URL 如下，可直接在页面中使用：\n${urlList}]`;
         }
       }
     }

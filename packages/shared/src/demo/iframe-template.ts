@@ -4,6 +4,7 @@ export interface IframeTemplateOptions {
   configData?: Record<string, unknown>;
   cdnBaseUrl?: string;
   supportUrlMode?: boolean;
+  baseOrigin?: string;
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
@@ -27,6 +28,7 @@ export function generateIframeHtml(
     configData,
     cdnBaseUrl,
     supportUrlMode = true,
+    baseOrigin,
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
 
@@ -112,11 +114,14 @@ export function generateIframeHtml(
           });
       }`;
 
+  const baseTag = baseOrigin ? `<base href="${baseOrigin}/">` : '';
+
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${baseTag}
   <link rel="preconnect" href="${cdnBase}" crossorigin>
   <link rel="dns-prefetch" href="${cdnBase}">
   <style>

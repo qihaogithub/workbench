@@ -236,6 +236,7 @@ function GridIframe({
         const html = generateIframeHtml({
           supportUrlMode: true,
           configData: resolvedConfig,
+          baseOrigin: window.location.origin,
         });
         if (cancelled) return;
 
@@ -263,6 +264,7 @@ function GridIframe({
         compiledCode,
         cssImports: codeCssImports,
         configData: resolvedConfig,
+        baseOrigin: window.location.origin,
       });
       const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);

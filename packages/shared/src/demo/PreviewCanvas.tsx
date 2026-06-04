@@ -115,6 +115,7 @@ export function PreviewCanvas({
           cssImports,
           configData,
           supportUrlMode: false,
+          baseOrigin: window.location.origin,
         });
 
         const iframe = document.createElement("iframe");
