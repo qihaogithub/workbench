@@ -14,6 +14,7 @@ import {
   FinishEvent,
   StatusEvent,
   FileOperationEvent,
+  PermissionRequestEvent,
   ConfigUpdatedEvent,
 } from "./types";
 import { EventEmitter } from "events";
@@ -120,6 +121,7 @@ interface EventMap {
   finish: FinishEvent;
   status: StatusEvent;
   file_operation: FileOperationEvent;
+  permission_request: PermissionRequestEvent;
   config_updated: ConfigUpdatedEvent;
 }
 

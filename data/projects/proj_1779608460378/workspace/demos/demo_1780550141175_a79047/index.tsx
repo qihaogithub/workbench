@@ -5,7 +5,7 @@ interface DemoProps {
 
 export default function FullScreenImage(props: DemoProps) {
   const {
-    displayImage = './images/第二关已解锁.webp',
+    displayImage = '/api/images/edf7425b1b1f-demo-gradient.png',
     backgroundColor = '#000000',
   } = props;
 

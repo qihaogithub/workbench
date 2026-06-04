@@ -10,6 +10,7 @@ const AGENT_EVENT_TYPES = [
   "plan",
   "error",
   "status",
+  "permission_request",
   "file_operation",
 ] as const;
 
@@ -227,6 +228,22 @@ export class WebSocketEventRouter {
           id: messageId,
           sessionId: this.sessionId,
           status: event.status,
+        });
+        break;
+
+      case "permission_request":
+        logger.info(
+          {
+            event: "permission_request",
+            toolCallId: event.permissionRequest?.toolCall?.toolCallId,
+          },
+          "[WebSocket] Forwarding permission_request event to client",
+        );
+        this.sendMessage({
+          type: "permission_request",
+          id: messageId,
+          sessionId: this.sessionId,
+          permissionRequest: event.permissionRequest,
         });
         break;
 

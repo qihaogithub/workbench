@@ -17,19 +17,12 @@
     },
     {
       "id": "demo_1780550141175_a79047",
-      "name": "全屏展示页-第二关已解锁",
-      "order": 4,
+      "name": "demo页面",
+      "order": 2,
       "parentId": null
     }
   ],
-  "demoFolders": [
-    {
-      "id": "folder_1780469500065_lwynmd",
-      "name": "测试文件夹",
-      "parentId": null,
-      "order": 0
-    }
-  ],
+  "demoFolders": [],
   "versions": [
     {
       "versionId": "v1",
@@ -395,10 +388,42 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v45",
       "fileCount": 12,
       "note": "从 v40 恢复"
+    },
+    {
+      "versionId": "v46",
+      "savedAt": 1780563011153,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780562610561-a23d8shao",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v46",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v47",
+      "savedAt": 1780563317845,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563158112-6wi35jzi6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v47",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v48",
+      "savedAt": 1780563528903,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563322912-klt3qs6ze",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v48",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v49",
+      "savedAt": 1780563574846,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563533539-p7grfabhl",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v49",
+      "fileCount": 10
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780558358599,
+  "updatedAt": 1780563574848,
   "publishedVersion": "v21",
   "publishedAt": 1780468794271
 }

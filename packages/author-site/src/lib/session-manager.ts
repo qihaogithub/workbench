@@ -109,6 +109,45 @@ export function archiveActiveSession(
   return null;
 }
 
+/**
+ * 限制项目下的 Session 数量，超出时删除最旧的
+ * @returns 被删除的 Session 数量
+ */
+export function enforceSessionLimit(userId: string, projectId: string, maxCount = 5): number {
+  const projectSessionsDir = getProjectSessionDir(userId, projectId);
+  if (!fs.existsSync(projectSessionsDir)) return 0;
+
+  const sessions: Array<{ sessionId: string; createdAt: number }> = [];
+  const entries = fs.readdirSync(projectSessionsDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const metaPath = path.join(projectSessionsDir, entry.name, ".session.json");
+    if (!fs.existsSync(metaPath)) continue;
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      sessions.push({ sessionId: meta.sessionId, createdAt: meta.createdAt || 0 });
+    } catch { /* skip */ }
+  }
+
+  if (sessions.length <= maxCount) return 0;
+
+  sessions.sort((a, b) => a.createdAt - b.createdAt);
+  const toDelete = sessions.slice(0, sessions.length - maxCount);
+
+  let deletedCount = 0;
+  for (const s of toDelete) {
+    try {
+      deleteSession(s.sessionId);
+      deletedCount++;
+    } catch (err) {
+      console.error(`Failed to delete old session ${s.sessionId}:`, err);
+    }
+  }
+
+  return deletedCount;
+}
+
 export function findActiveSession(
   userId: string,
   projectId: string,

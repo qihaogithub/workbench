@@ -14,18 +14,6 @@
       "name": "通用弹窗 - 手机版",
       "order": 1,
       "parentId": null
-    },
-    {
-      "id": "demo_1779608460377_f8g6t2",
-      "name": "demo",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "demo_1779608460377_w4j5h1",
-      "name": "demo",
-      "order": 3,
-      "parentId": null
     }
   ],
   "demoFolders": [],
@@ -231,10 +219,18 @@
       "sessionId": "session-1780558721260-k2o27ej35",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v25",
       "fileCount": 11
+    },
+    {
+      "versionId": "v26",
+      "savedAt": 1780562608089,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780558855545-5rywkj9bu",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v26",
+      "fileCount": 7
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1780558847332,
+  "updatedAt": 1780562608090,
   "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
   "publishedVersion": "v23",
   "publishedAt": 1780292121719

@@ -114,7 +114,8 @@ export type EventType =
   | "plan"
   | "error"
   | "finish"
-  | "status";
+  | "status"
+  | "permission_request";
 
 export interface StreamEvent {
   type: "stream";
@@ -180,6 +181,23 @@ export interface PlanEvent {
   content: string;
 }
 
+export interface PermissionRequestEvent {
+  type: "permission_request";
+  sessionId: string;
+  permissionRequest: {
+    sessionId: string;
+    options: Array<{
+      optionId: string;
+      name: string;
+    }>;
+    toolCall: {
+      toolCallId: string;
+      title?: string;
+      kind?: string;
+    };
+  };
+}
+
 export interface ConfigUpdatedEvent {
   type: "config_updated";
   sessionId: string;
@@ -196,6 +214,7 @@ export type AgentEvent =
   | FinishEvent
   | StatusEvent
   | FileOperationEvent
+  | PermissionRequestEvent
   | ConfigUpdatedEvent;
 
 export type EventHandler<T extends AgentEvent = AgentEvent> = (

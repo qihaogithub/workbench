@@ -137,7 +137,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
     };
     const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
     const tools = createWorkbenchTools(customConfig);
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);

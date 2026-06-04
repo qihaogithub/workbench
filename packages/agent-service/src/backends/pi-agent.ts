@@ -1,6 +1,7 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
 import { createWorkbenchTools } from './pi-tools';
+import { PERMISSION_TIMEOUT } from './pi-tools/delete-page-tool';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
@@ -46,6 +47,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private files: FileChange[] = [];
   private timeout?: number;
   private sessionId: string | null = null;
+  private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
 
   constructor(config: AgentConfig) {
     this.config = config;
@@ -96,6 +98,54 @@ export class PiAgentBackend implements IBackendAdapter {
             if (args.path && !isPathAllowed(args.path, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {
               return { block: true, reason: `Access denied: path "${args.path}" is not allowed by workspace permissions` };
             }
+          }
+          if (toolName === 'deletePage') {
+            const args = context.args as { pageId: string; pageName: string };
+            const toolCallId = context.toolCall.id || `del_${Date.now()}`;
+            const sessionId = this.sessionId ?? this.config.sessionId;
+
+            logger.info({ toolCallId, pageId: args.pageId, pageName: args.pageName }, 'deletePage: requesting permission');
+
+            // 发出 permission_request 事件，等待前端用户确认
+            if (this.eventCallback) {
+              this.eventCallback({
+                type: 'permission_request',
+                sessionId,
+                permissionRequest: {
+                  sessionId,
+                  options: [
+                    { optionId: 'allow_once', name: '确认删除' },
+                    { optionId: 'reject_once', name: '取消' },
+                  ],
+                  toolCall: {
+                    toolCallId,
+                    title: `删除页面: ${args.pageName}`,
+                    kind: 'execute',
+                  },
+                },
+              });
+            }
+
+            // 等待用户确认或超时
+            const approved = await new Promise<boolean>((resolve, reject) => {
+              this.pendingPermissions.set(toolCallId, { resolve, reject });
+
+              // 超时自动拒绝
+              setTimeout(() => {
+                if (this.pendingPermissions.has(toolCallId)) {
+                  this.pendingPermissions.delete(toolCallId);
+                  logger.warn({ toolCallId }, 'deletePage: permission request timed out');
+                  resolve(false);
+                }
+              }, PERMISSION_TIMEOUT);
+            });
+
+            if (!approved) {
+              logger.info({ toolCallId, pageId: args.pageId }, 'deletePage: permission denied');
+              return { block: true, reason: `用户取消了删除页面「${args.pageName}」的操作` };
+            }
+
+            logger.info({ toolCallId, pageId: args.pageId }, 'deletePage: permission granted');
           }
           return undefined;
         },
@@ -427,6 +477,20 @@ export class PiAgentBackend implements IBackendAdapter {
 
   getWorkingDir(): string | null {
     return this.config.workingDir ?? null;
+  }
+
+  /**
+   * 解除权限等待：前端用户确认或取消后调用
+   */
+  resolvePermission(toolCallId: string, approved: boolean): void {
+    const pending = this.pendingPermissions.get(toolCallId);
+    if (pending) {
+      this.pendingPermissions.delete(toolCallId);
+      pending.resolve(approved);
+      logger.info({ toolCallId, approved }, 'deletePage: permission resolved');
+    } else {
+      logger.warn({ toolCallId }, 'deletePage: no pending permission found for toolCallId');
+    }
   }
 
   private setupEventMapping(): void {

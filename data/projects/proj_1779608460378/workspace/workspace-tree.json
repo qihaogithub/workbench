@@ -1,12 +1,5 @@
 {
-  "folders": [
-    {
-      "id": "folder_1780469500065_lwynmd",
-      "name": "测试文件夹",
-      "parentId": null,
-      "order": 0
-    }
-  ],
+  "folders": [],
   "pages": [
     {
       "id": "demo_1779608460379_a1b2c3",
@@ -30,6 +23,18 @@
       "id": "demo_1780542213561_k8m2n9",
       "name": "全屏展示页-手机",
       "order": 3,
+      "parentId": null
+    },
+    {
+      "id": "demo_1780550141175_a79047",
+      "name": "demo页面",
+      "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "page_0nei",
+      "name": "新建页面",
+      "order": 2,
       "parentId": null
     }
   ]

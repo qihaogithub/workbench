@@ -11,7 +11,7 @@ import {
   getWorkspaceMultiDemoFiles,
   getWorkspaceFiles,
 } from "@/lib/fs-utils";
-import { findActiveSession, createEditSession, archiveActiveSession } from "@/lib/session-manager";
+import { findActiveSession, createEditSession, archiveActiveSession, enforceSessionLimit } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function POST(request: NextRequest) {
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createEditSession(userId, projectId, workspaceId);
+    enforceSessionLimit(userId, projectId, 5);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {
     console.error("Error creating session:", error);

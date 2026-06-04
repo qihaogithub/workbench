@@ -30,7 +30,7 @@ interface StreamParams {
 }
 
 interface ClientMessage {
-  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models";
+  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -46,6 +46,9 @@ interface ClientMessage {
     resumeSessionId?: string;
   };
   timestamp?: number;
+  /** permission_response: 权限确认响应 */
+  permissionId?: string;
+  optionId?: string;
 }
 
 interface ActiveConnection {
@@ -538,6 +541,40 @@ export async function registerWebSocketRoutes(
               type: "pong",
               timestamp: Date.now(),
             });
+            break;
+          }
+
+          case "permission_response": {
+            const permissionId = message.permissionId;
+            const optionId = message.optionId;
+            if (!permissionId || !optionId) {
+              sendMessage({
+                type: "error",
+                id: message.id || "unknown",
+                error: {
+                  code: "INVALID_PARAMS",
+                  message: "permission_response 需要 permissionId 和 optionId",
+                },
+              });
+              return;
+            }
+
+            const approved = optionId === 'allow_once';
+            logger.info(
+              { sessionId, permissionId, optionId, approved },
+              "WebSocket permission_response received",
+            );
+
+            try {
+              const agent = manager.get(sessionId);
+              if (agent && agent instanceof BackendAgent) {
+                agent.resolvePermission(permissionId, approved);
+              } else {
+                logger.warn({ sessionId }, "No agent found for permission_response");
+              }
+            } catch (error) {
+              logger.error({ error, permissionId }, "Failed to resolve permission");
+            }
             break;
           }
 

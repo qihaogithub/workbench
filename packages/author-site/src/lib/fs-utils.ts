@@ -1330,6 +1330,13 @@ export function deleteWorkspaceDemoPage(
   const demoDir = getDemoDirPath(wsPath, demoId);
   if (!fs.existsSync(demoDir)) return false;
   fs.rmSync(demoDir, { recursive: true, force: true });
+  // 同步更新 workspace-tree.json，移除已删除页面的记录
+  const tree = readWorkspaceTree(wsPath);
+  const originalLength = tree.pages.length;
+  tree.pages = tree.pages.filter((p) => p.id !== demoId);
+  if (tree.pages.length !== originalLength) {
+    writeWorkspaceTree(wsPath, tree);
+  }
   return true;
 }
 
