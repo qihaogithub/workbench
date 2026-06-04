@@ -16,8 +16,10 @@ src/
 │   ├── base.ts             # 后端适配器接口（IBackendAdapter）
 │   ├── pi-agent.ts         # Pi Agent 后端实现
 │   ├── pi-tools/           # Pi Agent 工具集
-│   │   ├── index.ts        # 工具导出（7 个工具）
+│   │   ├── index.ts        # 工具导出（9 个工具）
 │   │   ├── file-tools.ts   # 文件操作工具
+│   │   ├── read-file-lines-tool.ts # 带行号读取文件
+│   │   ├── edit-file-tool.ts # 精确编辑文件（old_string/new_string 替换）
 │   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
 │   │   ├── schema-tool.ts  # config.schema.json 校验
 │   │   ├── save-image-tool.ts # 图片保存工具（图床 + SHA256 去重）
@@ -66,11 +68,13 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 暴露 7 个工具：
+`src/backends/pi-tools/` 暴露 9 个工具：
 
 | 工具 | 用途 |
 |:-----|:-----|
 | `readFile` | 读取工作空间内文件 |
+| `readFileWithLines` | 带行号读取文件，支持行范围选择 |
+| `editFile` | 精确编辑文件（old_string/new_string 替换） |
 | `writeFile` | 写入工作空间内文件（变更会被捕获） |
 | `listFiles` | 列出目录文件 |
 | `bash` | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo） |

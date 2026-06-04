@@ -5,7 +5,7 @@ import {
 } from "@opencode-workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
-import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix } from "@/lib/agent/system-prompt";
+import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix, buildKnowledgeIndexPrefix } from "@/lib/agent/system-prompt";
 
 // v3.2: 静态 system prompt 缓存在 module 顶部
 const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
@@ -14,7 +14,7 @@ const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
  * 异步获取 L3 上下文前缀和 L4 记忆内容（通过服务端 API 避免客户端打包 fs）
  * 失败时返回空字符串（仍会发，但会让 AI 不知道页面列表/记忆）
  */
-async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; memory: string | null }> {
+async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; memory: string | null; knowledgeIndex: string | null }> {
   try {
     const response = await fetch(
       `/api/agent/workspace-context?workingDir=${encodeURIComponent(workingDir)}`,
@@ -26,19 +26,20 @@ async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; mem
         response.status,
         response.statusText
       );
-      return { l3: "", memory: null };
+      return { l3: "", memory: null, knowledgeIndex: null };
     }
     const json = await response.json();
     if (!json?.success || !json?.data) {
       console.warn("[StreamService] workspace-context 返回失败:", json);
-      return { l3: "", memory: null };
+      return { l3: "", memory: null, knowledgeIndex: null };
     }
     const l3 = buildDynamicContextPrefix(json.data);
     const memory = json.data.memoryContent ? buildMemoryPrefix(json.data.memoryContent) : null;
-    return { l3, memory };
+    const knowledgeIndex = json.data.knowledgeIndex || null;
+    return { l3, memory, knowledgeIndex };
   } catch (error) {
     console.warn("[StreamService] fetchContextPrefix 失败:", error);
-    return { l3: "", memory: null };
+    return { l3: "", memory: null, knowledgeIndex: null };
   }
 }
 
@@ -165,16 +166,21 @@ export class StreamService {
     if (workingDir) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
       let ctx = await fetchContextPrefix(workingDir);
-      if (!ctx.l3 && !ctx.memory) {
+      if (!ctx.l3 && !ctx.memory && !ctx.knowledgeIndex) {
         await new Promise((r) => setTimeout(r, 200));
         ctx = await fetchContextPrefix(workingDir);
       }
       if (ctx.l3) {
+        // 知识库索引：每条消息都注入（与 L3 同频，因为知识库可能被用户更新）
+        const knowledgePrefix = ctx.knowledgeIndex
+          ? buildKnowledgeIndexPrefix(ctx.knowledgeIndex)
+          : '';
+        // L4 记忆：仅首条消息注入
         const memoryPrefix = (!this.hasInjectedMemory && ctx.memory) ? ctx.memory : '';
         if (memoryPrefix) {
           this.hasInjectedMemory = true;
         }
-        finalContent = `${ctx.l3}${memoryPrefix}${message}`;
+        finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${message}`;
       } else {
         console.warn(
           "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态"
@@ -215,6 +221,13 @@ export class StreamService {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "get_models", workingDir }));
+    }
+  }
+
+  forwardConsoleEntries(entries: Array<{ level: string; args: string; timestamp: number }>): void {
+    const ws = (this.stream as any)?.ws;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "console_data", entries }));
     }
   }
 

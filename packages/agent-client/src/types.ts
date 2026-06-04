@@ -135,3 +135,10 @@ export interface ApiError {
 }
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
+
+/** 控制台日志条目（agent-service 侧缓冲） */
+export interface ConsoleEntry {
+  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  args: string;
+  timestamp: number;
+}

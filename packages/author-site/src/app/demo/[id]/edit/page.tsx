@@ -38,6 +38,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AIChat } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
+import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
+import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
 import { ResizablePanelGroup, ResizablePanel } from "@/components/ui/resizable";
 import {
   Bot,
@@ -61,6 +63,7 @@ import {
   Clock,
   User,
   RefreshCw,
+  FolderOpen,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -80,6 +83,8 @@ import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
+import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
+import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
 import type { DemoPageMeta, DemoFolderMeta, VersionHistoryResponse, VersionInfo } from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { format } from "date-fns";
@@ -170,6 +175,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     editable: boolean;
   }>({ filePath: "", content: "", editable: false });
 
+  // 知识库文档弹窗状态
+  const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
+  const [kbDocDialogMode, setKbDocDialogMode] = useState<KnowledgeDocDialogMode>("read");
+  const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(null);
+
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
   const [aiStreamContent, setAiStreamContent] = useState("");
@@ -181,7 +191,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
+  const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
+
+  // Console buffer for forwarding iframe console logs to agent-service
+  const streamServiceRef = useRef<StreamService | null>(null);
+  const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
   const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -953,8 +968,8 @@ ${context.details}
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="code" className="gap-2">
-                  <FileCode2 className="h-4 w-4" />
-                  代码
+                  <FolderOpen className="h-4 w-4" />
+                  文件
                 </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2">
                   <History className="h-4 w-4" />
@@ -1142,6 +1157,7 @@ ${context.details}
                   }}
                   triggerAutoSend={triggerAutoSend}
                   onTriggerAutoSendHandled={() => setTriggerAutoSend(null)}
+                  externalStreamServiceRef={streamServiceRef}
                   errorBanner={
                     errorBannerVisible && validationResult.errors.length > 0 ? (
                       <ErrorBanner
@@ -1160,36 +1176,102 @@ ${context.details}
                 value="code"
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
               >
-                <WorkspaceFileTree
-                  sessionId={sessionId}
-                  onFileSelect={async (filePath, editable) => {
-                    try {
-                      const res = await fetch(
-                        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        setWsCodeDialogData({
-                          filePath: data.data.path,
-                          content: data.data.content,
-                          editable: data.data.editable,
-                        });
-                        setWsCodeDialogOpen(true);
-                      } else {
-                        toast({
-                          title: "加载文件失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({
-                        title: "加载文件失败",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                />
+                <div className="flex items-center gap-1 px-3 py-2 border-b">
+                  <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFileView("doc")}
+                      className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "doc" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      文档
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFileView("code")}
+                      className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <FileCode2 className="h-3.5 w-3.5" />
+                      代码
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  {fileView === "doc" ? (
+                    <KnowledgePanel
+                      workingDir={tempWorkspace || undefined}
+                      onDocSelect={(item, mode) => {
+                        setKbDocDialogItem(item);
+                        setKbDocDialogMode(mode);
+                        setKbDocDialogOpen(true);
+                      }}
+                      onDocAdd={() => {
+                        setKbDocDialogItem(null);
+                        setKbDocDialogMode("add");
+                        setKbDocDialogOpen(true);
+                      }}
+                      onMemorySelect={async () => {
+                        if (!sessionId) return;
+                        try {
+                          const res = await fetch(
+                            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent("memory.md")}`,
+                          );
+                          const data = await res.json();
+                          if (data.success) {
+                            setWsCodeDialogData({
+                              filePath: data.data.path,
+                              content: data.data.content,
+                              editable: data.data.editable,
+                            });
+                            setWsCodeDialogOpen(true);
+                          } else {
+                            toast({
+                              title: "加载文件失败",
+                              description: data.error?.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch {
+                          toast({
+                            title: "加载文件失败",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    />
+                  ) : (
+                    <WorkspaceFileTree
+                      sessionId={sessionId}
+                      onFileSelect={async (filePath, editable) => {
+                        try {
+                          const res = await fetch(
+                            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+                          );
+                          const data = await res.json();
+                          if (data.success) {
+                            setWsCodeDialogData({
+                              filePath: data.data.path,
+                              content: data.data.content,
+                              editable: data.data.editable,
+                            });
+                            setWsCodeDialogOpen(true);
+                          } else {
+                            toast({
+                              title: "加载文件失败",
+                              description: data.error?.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch {
+                          toast({
+                            title: "加载文件失败",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    />
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent
@@ -1538,6 +1620,7 @@ ${context.details}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
                       editingPageId={canvasEditingPageId ?? undefined}
+                      onConsoleEntry={handleConsoleEntry}
                       onPageConfigEdit={(pageId) => {
                         setCanvasEditingPageId(pageId);
                         setActiveDemoId(pageId);
@@ -1661,6 +1744,7 @@ ${context.details}
                       demoId={activeDemoId}
                       configData={configData}
                       previewSize={previewSize}
+                      onConsoleEntry={handleConsoleEntry}
                     />
                   </div>
                 </div>
@@ -1675,6 +1759,7 @@ ${context.details}
                   gridScale={gridScale}
                   onGridScaleChange={setGridScale}
                   onGridColumnsChange={setGridColumns}
+                  onConsoleEntry={handleConsoleEntry}
                   onCardClick={(pageId) => {
                     if (pageId === activeDemoId) return;
                     setActiveDemoId(pageId);
@@ -1821,6 +1906,17 @@ ${context.details}
         }}
         onSaved={({ filePath, content }) => {
           handleWorkspaceFileSaved(filePath, content);
+        }}
+      />
+
+      <KnowledgeDocDialog
+        open={kbDocDialogOpen}
+        onOpenChange={setKbDocDialogOpen}
+        mode={kbDocDialogMode}
+        item={kbDocDialogItem}
+        workingDir={tempWorkspace || undefined}
+        onSaved={() => {
+          window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
     </div>

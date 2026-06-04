@@ -9,6 +9,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
+/**
+ * 判断文件路径是否属于知识库目录（knowledge/）
+ * 统一为相对路径再判断，兼容绝对路径和相对路径输入
+ */
+function isKnowledgeBasePath(filePath: string, workingDir: string): boolean {
+  const resolved = path.resolve(workingDir, filePath);
+  const relative = path.relative(workingDir, resolved);
+  const normalized = relative.replace(/\\/g, '/');
+  return normalized === 'knowledge' ||
+         normalized.startsWith('knowledge/') ||
+         normalized.startsWith('knowledge\\');
+}
+
 // 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
 // (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
 let _serviceConfig: ServiceConfig | null = null;
@@ -91,6 +104,18 @@ export class PiAgentBackend implements IBackendAdapter {
         },
         beforeToolCall: async (context: any) => {
           const toolName = context.toolCall.name;
+
+          // 知识库写保护：拦截 writeFile 对 knowledge/ 路径的写入
+          if (toolName === 'writeFile') {
+            const args = context.args as { path?: string };
+            if (args.path && isKnowledgeBasePath(args.path, this.config.workingDir ?? '')) {
+              return {
+                block: true,
+                reason: '知识库文件由用户管理，AI 不可修改。如需更新请提示用户在知识库面板中操作。',
+              };
+            }
+          }
+
           if (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'listFiles') {
             const args = context.args as { path?: string };
             if (args.path && !isPathAllowed(args.path, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {

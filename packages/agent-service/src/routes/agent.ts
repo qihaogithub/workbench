@@ -4,6 +4,7 @@ import { BackendAgent } from '../core/backend-agent';
 import { getSessionStore } from '../session/session-store';
 import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
+import { consoleBuffer } from '../session/console-buffer';
 import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig } from '../core/types';
@@ -193,6 +194,8 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         await workspaceManager.cleanup(session.workingDir);
         snapshotService.clearSnapshot(session.workingDir);
       }
+
+      consoleBuffer.clear(sessionId);
 
       await manager.destroy(sessionId);
       sessionStore.delete(sessionId);

@@ -5,7 +5,7 @@ import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import { ThumbnailRenderer } from "./ThumbnailRenderer";
 import { ThumbnailPlaceholder } from "./ThumbnailPlaceholder";
-import type { CanvasPageLayout, CanvasPageData } from "./types";
+import type { CanvasPageLayout, CanvasPageData, ConsoleLogPayload } from "./types";
 
 interface CanvasPageItemProps {
   page: CanvasPageData;
@@ -19,6 +19,7 @@ interface CanvasPageItemProps {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   className?: string;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
 const IFRAME_ZOOM_THRESHOLD = 0.55;
@@ -34,6 +35,7 @@ export function CanvasPageItem({
   onConfigEdit,
   onDragStart,
   onDragEnd,
+  onConsoleEntry,
 }: CanvasPageItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
@@ -114,6 +116,7 @@ export function CanvasPageItem({
             demoId={page.id}
             configData={page.configData}
             previewSize={page.previewSize}
+            onConsoleEntry={onConsoleEntry}
           />
         </div>
       ) : page.thumbnailMeta ? (

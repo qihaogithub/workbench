@@ -17,6 +17,7 @@ import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
 import type { PermissionRequest } from "./chat/services/stream-service";
+import type { StreamService } from "./chat/services/stream-service";
 import { X, FileText, ArrowDown } from "lucide-react";
 
 interface AIChatProps {
@@ -49,6 +50,8 @@ interface AIChatProps {
   errorBanner?: React.ReactNode;
   /** AI 更新了 .md 记忆文件时的回调，用于打开编辑器查看 */
   onMemoryUpdate?: (filePath: string) => void;
+  /** 外部 StreamService 引用，用于控制台数据转发等场景 */
+  externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
 
 export function AIChat({
@@ -77,6 +80,7 @@ export function AIChat({
   onTriggerAutoSendHandled,
   errorBanner,
   onMemoryUpdate,
+  externalStreamServiceRef,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -142,6 +146,7 @@ export function AIChat({
     setCurrentMessage,
     onModelsEvent: handleModelsEvent,
     onModelStateError: handleModelError,
+    externalStreamServiceRef,
   });
 
   const [memoryUpdateFiles, setMemoryUpdateFiles] = useState<string[]>([]);

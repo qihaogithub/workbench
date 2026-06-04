@@ -53,3 +53,10 @@ export function buildMemoryPrefix(content: string): string {
   const charCount = content.replace(/\s/g, '').length;
   return `\n\n## 项目记忆（跨会话长期记忆）\n\n${content}\n\n[系统：当前 memory.md 共 ${charCount} 字]\n`;
 }
+
+/**
+ * 将知识库索引格式化为 L3 前缀（紧接页面列表之后）
+ */
+export function buildKnowledgeIndexPrefix(content: string): string {
+  return `\n\n${content}\n`;
+}

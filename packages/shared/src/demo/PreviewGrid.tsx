@@ -28,6 +28,7 @@ import type {
   GridPageItem,
   PreviewGridProps,
   PreviewMode,
+  ConsoleLogPayload,
 } from "./types";
 
 type AlignmentMode = "center" | "top";
@@ -86,6 +87,7 @@ interface GridIframeProps {
   previewSize?: PreviewSize;
   rowHeight?: number;
   cssImports?: string[];
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
 function GridIframe({
@@ -97,6 +99,7 @@ function GridIframe({
   previewSize,
   rowHeight,
   cssImports,
+  onConsoleEntry,
 }: GridIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -158,10 +161,14 @@ function GridIframe({
           );
         }
       }
+
+      if (event.data?.type === "CONSOLE_LOG" && event.data?.payload) {
+        onConsoleEntry?.(event.data.payload);
+      }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [isAuthorMode, page.code]);
+  }, [isAuthorMode, page.code, onConsoleEntry]);
 
   useEffect(() => {
     if (!visible) {
@@ -412,6 +419,7 @@ export function PreviewGrid({
   showModeToggle = false,
   onPreviewModeChange,
   className,
+  onConsoleEntry,
 }: PreviewGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridMeasureRef = useRef<HTMLDivElement>(null);
@@ -694,6 +702,7 @@ export function PreviewGrid({
                           configData={configDataMap?.[page.id] ?? {}}
                           previewSize={effectiveSize}
                           rowHeight={rowHeight}
+                          onConsoleEntry={onConsoleEntry}
                         />
                       </div>
                     );

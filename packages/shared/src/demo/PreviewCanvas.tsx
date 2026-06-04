@@ -51,6 +51,7 @@ export function PreviewCanvas({
   onCanvasClick,
   className,
   editingPageId,
+  onConsoleEntry,
 }: PreviewCanvasProps) {
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -368,6 +369,7 @@ export function PreviewCanvas({
             sessionId={sessionId}
             onLayoutChange={handleLayoutChange}
             onConfigEdit={onPageConfigEdit}
+            onConsoleEntry={onConsoleEntry}
           />
         ))}
       </CanvasViewport>

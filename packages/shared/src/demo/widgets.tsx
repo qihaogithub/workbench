@@ -269,8 +269,8 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         className="hidden"
       />
       <div className="flex items-start gap-3">
-        {value && (
-          <div className="relative w-[120px] h-[120px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
+        {value ? (
+          <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
             <img
               src={value}
               alt="Preview"
@@ -301,29 +301,30 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
               </button>
             </div>
           </div>
-        )}
-        <div
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
-          className={cn(
-            'w-[120px] h-[120px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
-            isUploading
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-          )}
-        >
-          {isUploading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          ) : (
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="p-1.5 rounded-full bg-muted">
-                <Upload className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              'w-[80px] h-[80px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
+              isUploading
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+            )}
+          >
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            ) : (
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 rounded-full bg-muted">
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <span className="text-xs text-muted-foreground">Upload</span>
               </div>
-              <span className="text-xs text-muted-foreground">Upload</span>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}

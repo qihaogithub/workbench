@@ -140,10 +140,12 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig);
       
-      expect(tools).toHaveLength(7);
+      expect(tools).toHaveLength(9);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
+      expect(toolNames).toContain('readFileWithLines');
+      expect(toolNames).toContain('editFile');
       expect(toolNames).toContain('writeFile');
       expect(toolNames).toContain('listFiles');
       expect(toolNames).toContain('bash');

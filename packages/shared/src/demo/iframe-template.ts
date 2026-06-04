@@ -9,6 +9,38 @@ export interface IframeTemplateOptions {
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
 
+const consoleInterceptScript = `
+(function() {
+  const _orig = {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+    info: console.info.bind(console),
+    debug: console.debug.bind(console),
+  };
+  function _serialize(args) {
+    return Array.from(args).map(a => {
+      if (a === null) return 'null';
+      if (a === undefined) return 'undefined';
+      if (typeof a === 'object') {
+        try { return JSON.stringify(a, null, 2); }
+        catch { return String(a); }
+      }
+      return String(a);
+    }).join(' ');
+  }
+  ['log','warn','error','info','debug'].forEach(lv => {
+    console[lv] = function() {
+      _orig[lv].apply(console, arguments);
+      window.parent.postMessage({
+        type: 'CONSOLE_LOG',
+        payload: { level: lv, args: _serialize(arguments), timestamp: Date.now() }
+      }, '*');
+    };
+  });
+})();
+`;
+
 function generateCssLinks(cssImports: string[], cdnBase: string): string {
   if (!cssImports.length) return "";
   return cssImports
@@ -146,6 +178,8 @@ ${cssLinks}
   <div id="root"></div>
 
   <script type="module">
+    ${consoleInterceptScript}
+
     import React from '${cdnBase}/react@18.3.1';
     import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
 
