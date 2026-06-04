@@ -1,4 +1,4 @@
-export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, GridPageItem, GridIframeProps, PreviewGridProps } from './types';
+export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, GridPageItem, GridIframeProps, PreviewGridProps, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasPageData, PreviewCanvasProps } from './types';
 export { getOrderable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
@@ -15,4 +15,9 @@ export type { ImageItem, ImageListWidgetProps } from './ImageListWidget';
 export { generateIframeHtml, buildIframeHtml } from './iframe-template';
 export { getEffectivePreviewSize, parseSizeValue, getAspectRatioValue, getBaseRowHeight, useVisiblePages, resolveImageUrls, FLASH_ANIMATION_CSS } from './preview-grid-utils';
 export { PreviewGrid } from './PreviewGrid';
-export { cn } from './utils';
+export { PreviewCanvas } from './PreviewCanvas';
+export { CanvasViewport } from './CanvasViewport';
+export { CanvasPageItem } from './CanvasPageItem';
+export { CanvasToolbar } from './CanvasToolbar';
+export { saveCanvasLayout } from './canvas-utils';
+export { cn, debounce } from './utils';

@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
-import type { PreviewMode, PreviewSize } from "../../../../components/demo";
+import { PreviewPanel, ConfigForm, PreviewGrid, PreviewCanvas, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
+import type { PreviewMode, PreviewSize, CanvasState } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   FileText,
   LayoutGrid,
+  Map,
   Settings,
   Loader2,
 } from "lucide-react";
@@ -113,6 +114,11 @@ export default function ViewerProjectPage() {
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
+  const [canvasState, setCanvasState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {},
+  });
+  const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);
@@ -216,7 +222,7 @@ export default function ViewerProjectPage() {
           }
           break;
         case "VIEWER_SET_MODE":
-          if (msg.mode === "single" || msg.mode === "grid") {
+          if (msg.mode === "single" || msg.mode === "grid" || msg.mode === "canvas") {
             setPreviewMode(msg.mode);
           }
           break;
@@ -286,6 +292,27 @@ export default function ViewerProjectPage() {
     },
     [handlePageChange, gridSelectOnly]
   );
+
+  // 加载截图列表
+  const loadSnapshots = useCallback(async () => {
+    try {
+      const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
+      const res = await fetch(`${agentUrl}/api/snapshots/list/${projectId}`);
+      const result = await res.json();
+      if (result.success) {
+        setSnapshotUrls(result.data.urls || {});
+      }
+    } catch (error) {
+      console.error("加载截图列表失败:", error);
+    }
+  }, [projectId]);
+
+  // 切换到画布模式时加载截图
+  useEffect(() => {
+    if (previewMode === "canvas") {
+      loadSnapshots();
+    }
+  }, [previewMode, loadSnapshots]);
 
   if (isLoading) {
     return (
@@ -390,6 +417,17 @@ export default function ViewerProjectPage() {
                       <LayoutGrid className="h-3.5 w-3.5" />
                       宫格
                     </button>
+                    <button
+                      onClick={() => setPreviewMode("canvas")}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                        previewMode === "canvas"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      }`}
+                    >
+                      <Map className="h-3.5 w-3.5" />
+                      画布
+                    </button>
                   </div>
                 </div>
               )}
@@ -421,7 +459,26 @@ export default function ViewerProjectPage() {
             </PopoverContent>
           </Popover>
 
-          {previewMode === "single" ? (
+          {previewMode === "canvas" ? (
+            <PreviewCanvas
+              editable={false}
+              projectId={projectId}
+              pages={gridPages.map((p) => ({
+                id: p.id,
+                name: p.name,
+                order: p.order,
+                code: data?.demoPages.find((d) => d.id === p.id)?.code,
+                configData: configDataMap[p.id],
+                previewSize: previewSize,
+              }))}
+              snapshots={snapshotUrls}
+              canvasState={canvasState}
+              onCanvasStateChange={setCanvasState}
+              onPageConfigEdit={(pageId) => {
+                handlePageChange(pageId);
+              }}
+            />
+          ) : previewMode === "single" ? (
             <div
               className="p-4 h-full overflow-y-auto preview-single-scroll"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

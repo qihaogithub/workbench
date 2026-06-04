@@ -101,15 +101,43 @@ function computePreviewScale(
   };
 }
 
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
+
+function resolveRelativePath(relativePath: string, basePath: string): string {
+  const parts = basePath.split('/').filter(p => p !== '');
+  const relativeParts = relativePath.split('/');
+
+  for (const part of relativeParts) {
+    if (part === '.' || part === '') continue;
+    if (part === '..') {
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+
+  return parts.join('/');
+}
+
 function resolveImageUrls(
   data: Record<string, unknown>,
+  sessionId?: string,
+  demoId?: string,
 ): Record<string, unknown> {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   if (!origin) return data;
 
+  const basePath = demoId ? `demos/${demoId}/` : '';
+
   function walk(value: unknown): unknown {
-    if (typeof value === "string" && value.startsWith("/api/sessions/")) {
-      return origin + value;
+    if (typeof value === "string") {
+      if (value.startsWith("/api/sessions/")) {
+        return origin + value;
+      }
+      if (sessionId && basePath && /^\.\.?\/[^'")\s]*$/.test(value) && IMAGE_EXT_RE.test(value)) {
+        const resolved = resolveRelativePath(value, basePath);
+        return `${origin}/api/sessions/${sessionId}/workspace/${resolved}`;
+      }
     }
     if (Array.isArray(value)) {
       return value.map(walk);
@@ -205,7 +233,7 @@ export function PreviewPanel({
         return;
       }
 
-      const resolvedConfig = resolveImageUrls(config);
+      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
 
       iframe.contentWindow.postMessage(
         {
@@ -217,7 +245,7 @@ export function PreviewPanel({
         "*",
       );
     },
-    [],
+    [sessionId, demoId],
   );
 
   const sendUpdateCodeUrl = useCallback(
@@ -227,7 +255,7 @@ export function PreviewPanel({
         return;
       }
 
-      const resolvedConfig = resolveImageUrls(config);
+      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
 
       iframe.contentWindow.postMessage(
         {
@@ -249,7 +277,7 @@ export function PreviewPanel({
       return;
     }
 
-    const resolvedConfig = resolveImageUrls(config);
+    const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
 
     iframe.contentWindow.postMessage(
       {

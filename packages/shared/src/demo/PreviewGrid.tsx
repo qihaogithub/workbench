@@ -138,7 +138,7 @@ function GridIframe({
 
         if (!isAuthorMode) {
           const resolvedConfig = configDataRef.current
-            ? resolveImageUrls(configDataRef.current)
+            ? resolveImageUrls(configDataRef.current, { sessionId: sessionIdRef.current || undefined, demoId: page.id })
             : {};
           iframe.contentWindow?.postMessage(
             {
@@ -152,7 +152,7 @@ function GridIframe({
           );
         } else {
           const resolvedConfig = configDataRef.current
-            ? resolveImageUrls(configDataRef.current)
+            ? resolveImageUrls(configDataRef.current, { sessionId: sessionIdRef.current || undefined, demoId: page.id })
             : {};
           iframe.contentWindow?.postMessage(
             { type: "UPDATE_CONFIG", configData: resolvedConfig },
@@ -233,7 +233,7 @@ function GridIframe({
         }
       } else {
         const resolvedConfig = configDataRef.current
-          ? resolveImageUrls(configDataRef.current)
+          ? resolveImageUrls(configDataRef.current, { sessionId: sessionIdRef.current || undefined, demoId: page.id })
           : {};
         const html = generateIframeHtml({
           supportUrlMode: true,
@@ -259,7 +259,7 @@ function GridIframe({
       if (cancelled) return;
 
       const resolvedConfig = configDataRef.current
-        ? resolveImageUrls(configDataRef.current)
+        ? resolveImageUrls(configDataRef.current, { sessionId: sessionIdRef.current || undefined, demoId: page.id })
         : {};
       const html = generateIframeHtml({
         compiledCode,
@@ -291,7 +291,7 @@ function GridIframe({
     if (!iframeReadyRef.current || !blobUrlRef.current) return;
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
-    const resolvedConfig = configData ? resolveImageUrls(configData) : {};
+    const resolvedConfig = configData ? resolveImageUrls(configData, { sessionId: sessionIdRef.current || undefined, demoId: page.id }) : {};
 
     if (!isAuthorMode) {
       iframe.contentWindow.postMessage(

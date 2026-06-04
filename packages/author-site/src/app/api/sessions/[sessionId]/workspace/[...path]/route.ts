@@ -45,6 +45,35 @@ export async function GET(
   }
 
   if (!fs.existsSync(filePath)) {
+    // 回退查找：当精确路径找不到文件时，尝试在 workspace 根目录下按文件名查找
+    // 例如请求 demos/{demoId}/images/xxx.png 但文件实际在 images/xxx.png
+    const filename = pathSegments[pathSegments.length - 1];
+    const fallbackDirs = ['images', 'assets'];
+
+    for (const dir of fallbackDirs) {
+      const fallbackPath = path.resolve(workspacePath, dir, filename);
+      if (
+        fallbackPath.startsWith(path.resolve(workspacePath)) &&
+        fs.existsSync(fallbackPath)
+      ) {
+        const fallbackStat = fs.statSync(fallbackPath);
+        if (!fallbackStat.isDirectory()) {
+          const fallbackExt = path.extname(fallbackPath).toLowerCase();
+          const fallbackContentType = MIME_TYPES[fallbackExt] || 'application/octet-stream';
+          const fallbackBuffer = fs.readFileSync(fallbackPath);
+
+          return new NextResponse(fallbackBuffer, {
+            headers: {
+              'Content-Type': fallbackContentType,
+              'Content-Length': String(fallbackStat.size),
+              'Cache-Control': 'public, max-age=31536000, immutable',
+              'Access-Control-Allow-Origin': '*',
+            },
+          });
+        }
+      }
+    }
+
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 

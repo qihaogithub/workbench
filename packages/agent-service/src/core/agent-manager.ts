@@ -48,8 +48,17 @@ export class AgentManager implements IAgentManager {
   }
 
   getOrCreate(sessionId: string, config: AgentConfig): BaseAgent {
-    if (this.agents.has(sessionId)) {
-      return this.agents.get(sessionId)!;
+    const existingAgent = this.agents.get(sessionId);
+
+    if (existingAgent) {
+      if (this.hasConfigChanged(existingAgent, config)) {
+        logger.info(
+          { sessionId, oldConfig: existingAgent.getConfig(), newConfig: config },
+          'Agent config changed, updating',
+        );
+        existingAgent.updateConfig(config);
+      }
+      return existingAgent;
     }
 
     logger.info({ workingDir: config.workingDir }, 'Agent getOrCreate')
@@ -58,6 +67,15 @@ export class AgentManager implements IAgentManager {
     this.agents.set(sessionId, agent);
 
     return agent;
+  }
+
+  private hasConfigChanged(agent: BaseAgent, newConfig: AgentConfig): boolean {
+    const current = agent.getConfig();
+    return (
+      current.workingDir !== newConfig.workingDir ||
+      current.model !== newConfig.model ||
+      current.demoId !== newConfig.demoId
+    );
   }
 
   get(sessionId: string): BaseAgent | undefined {

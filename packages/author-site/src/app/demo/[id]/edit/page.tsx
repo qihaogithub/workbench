@@ -6,11 +6,12 @@ import {
   PreviewPanel,
   ConfigForm,
   PreviewGrid,
+  PreviewCanvas,
   invalidateCompileCache,
   ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
-import type { PreviewMode } from "../../../../../components/demo";
+import type { PreviewMode, CanvasState } from "../../../../../components/demo";
 import {
   parseFigmaText,
   buildFigmaText,
@@ -50,6 +51,7 @@ import {
   Copy,
   LayoutGrid,
   FileText,
+  Map,
   ShieldCheck,
   Upload,
   CheckCircle,
@@ -142,6 +144,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [gridScale, setGridScale] = useState(1.0);
   const [flashGridCardId, setFlashGridCardId] = useState<string | null>(null);
 
+  // 画布模式状态
+  const [canvasState, setCanvasState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {},
+  });
+  const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
+  const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
+
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState("");
@@ -180,6 +190,63 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
+
+  // 加载已有截图列表
+  const loadSnapshots = useCallback(async () => {
+    try {
+      const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
+      const res = await fetch(`${agentUrl}/api/snapshots/list/${demoId}`);
+      const data = await res.json();
+      if (data.success) {
+        setSnapshotUrls(data.data.urls || {});
+      }
+    } catch (error) {
+      console.error("加载截图列表失败:", error);
+    }
+  }, [demoId]);
+
+  // 代码变更时后台生成截图
+  const generateSnapshotForPage = useCallback(
+    async (pageId: string, pageCode: string, pageConfig: Record<string, unknown>) => {
+      try {
+        const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
+        const res = await fetch(`${agentUrl}/api/snapshots/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: demoId,
+            pageId,
+            code: pageCode,
+            configData: pageConfig,
+            width: 375,
+            height: 812,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSnapshotUrls((prev) => ({ ...prev, [pageId]: data.data.url }));
+        }
+      } catch {
+        // 后台静默失败，不影响编辑
+      }
+    },
+    [demoId],
+  );
+
+  // snapshotVersion 变化时后台生成截图
+  useEffect(() => {
+    if (activeDemoId && code) {
+      generateSnapshotForPage(activeDemoId, code, configData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotVersion]);
+
+  // 切换到画布模式时加载截图
+  useEffect(() => {
+    if (previewMode === "canvas") {
+      loadSnapshots();
+    }
+  }, [previewMode, loadSnapshots]);
 
   /**
    * Unified snapshot application entry.
@@ -1466,7 +1533,56 @@ ${context.details}
 
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
-              {previewMode === "single" ? (
+              {previewMode === "canvas" ? (
+                <PreviewCanvas
+                  editable
+                  sessionId={sessionId}
+                  projectId={demoId}
+                  pages={demoPages.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    order: p.order,
+                    code: code,
+                    configData: configDataMap[p.id],
+                    previewSize: previewSize,
+                  }))}
+                  snapshots={snapshotUrls}
+                  canvasState={canvasState}
+                  onCanvasStateChange={setCanvasState}
+                  editingPageId={canvasEditingPageId ?? undefined}
+                  onPageConfigEdit={(pageId) => {
+                    setCanvasEditingPageId(pageId);
+                    setActiveDemoId(pageId);
+                    if (sessionId) {
+                      fetch(`/api/sessions/${sessionId}/files/${pageId}`)
+                        .then((res) => res.json())
+                        .then((data) => {
+                          if (data.success) {
+                            setCode(data.data.code);
+                            setSchema(data.data.schema);
+                            setEditorContent(
+                              buildFigmaText(data.data.code, data.data.schema),
+                            );
+                            setConfigDataMap((prev) => {
+                              if (prev[pageId]) return prev;
+                              const defaults = getSafeMergedDefaults(
+                                data.data.schema,
+                              );
+                              return { ...prev, [pageId]: defaults };
+                            });
+                            const size = getPreviewSize(data.data.schema);
+                            setPreviewSize(size);
+                          }
+                        })
+                        .catch((err) => console.error("加载页面失败:", err));
+                    }
+                  }}
+                  onCanvasClick={() => {
+                    setCanvasEditingPageId(null);
+                  }}
+                  snapshotVersion={snapshotVersion}
+                />
+              ) : previewMode === "single" ? (
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
@@ -1484,6 +1600,14 @@ ${context.details}
                       >
                         <LayoutGrid className="h-3.5 w-3.5" />
                         宫格
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("canvas")}
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
+                      >
+                        <Map className="h-3.5 w-3.5" />
+                        画布
                       </button>
                     </div>
                     <div className="flex-1" />

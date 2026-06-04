@@ -44,7 +44,52 @@ export interface ConfigFormProps {
   sessionId?: string;
 }
 
-export type PreviewMode = "single" | "grid";
+export type PreviewMode = "single" | "grid" | "canvas";
+
+export interface CanvasPageLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex?: number;
+}
+
+export interface CanvasViewportState {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface CanvasState {
+  pages: Record<string, CanvasPageLayout>;
+  viewport: CanvasViewportState;
+}
+
+export interface CanvasPageData {
+  id: string;
+  name: string;
+  code?: string;
+  configData?: Record<string, unknown>;
+  previewSize?: PreviewSize;
+  order: number;
+  snapshotUrl?: string;
+}
+
+export interface PreviewCanvasProps {
+  editable?: boolean;
+  sessionId?: string;
+  projectId?: string;
+  pages: CanvasPageData[];
+  activePageId?: string;
+  canvasState: CanvasState;
+  onCanvasStateChange: (state: CanvasState) => void;
+  onPageConfigEdit?: (pageId: string) => void;
+  onCanvasClick?: () => void;
+  snapshots?: Record<string, string>;
+  snapshotVersion?: number;
+  className?: string;
+  editingPageId?: string;
+}
 
 export interface PreviewState {
   mode: PreviewMode;

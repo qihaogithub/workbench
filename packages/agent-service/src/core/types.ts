@@ -180,6 +180,12 @@ export interface PlanEvent {
   content: string;
 }
 
+export interface ConfigUpdatedEvent {
+  type: "config_updated";
+  sessionId: string;
+  config: AgentConfig;
+}
+
 export type AgentEvent =
   | StreamEvent
   | ThoughtEvent
@@ -189,7 +195,8 @@ export type AgentEvent =
   | ErrorEvent
   | FinishEvent
   | StatusEvent
-  | FileOperationEvent;
+  | FileOperationEvent
+  | ConfigUpdatedEvent;
 
 export type EventHandler<T extends AgentEvent = AgentEvent> = (
   event: T,

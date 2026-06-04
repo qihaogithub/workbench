@@ -14,6 +14,7 @@ import {
   FinishEvent,
   StatusEvent,
   FileOperationEvent,
+  ConfigUpdatedEvent,
 } from "./types";
 import { EventEmitter } from "events";
 
@@ -60,6 +61,11 @@ export abstract class BaseAgent extends EventEmitter {
   ): Promise<AgentResult>;
   abstract cancel(): void;
   abstract kill(): Promise<void>;
+  abstract updateConfig(config: Partial<AgentConfig>): void;
+
+  getConfig(): AgentConfig {
+    return { ...this.config };
+  }
 
   on<K extends keyof EventMap>(
     event: K,
@@ -114,6 +120,7 @@ interface EventMap {
   finish: FinishEvent;
   status: StatusEvent;
   file_operation: FileOperationEvent;
+  config_updated: ConfigUpdatedEvent;
 }
 
 interface AgentInfo {

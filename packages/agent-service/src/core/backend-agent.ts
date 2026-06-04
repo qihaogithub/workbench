@@ -1,6 +1,7 @@
 import { BaseAgent } from "./agent";
 import { AgentConfig, AgentResult, SendMessageOptions } from "./types";
 import { IBackendAdapter } from "../backends/base";
+import { logger } from "../utils/logger";
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
@@ -146,6 +147,42 @@ export class BackendAgent extends BaseAgent {
       await this.backend.updateSystemPrompt(newPrompt);
     } else {
       throw new Error("updateSystemPrompt not supported by backend");
+    }
+  }
+
+  updateConfig(config: Partial<AgentConfig>): void {
+    let changed = false;
+
+    if (config.workingDir !== undefined && this.config.workingDir !== config.workingDir) {
+      logger.info(
+        { sessionId: this.sessionId, oldDir: this.config.workingDir, newDir: config.workingDir },
+        'Updating workingDir',
+      );
+      this.config.workingDir = config.workingDir;
+      changed = true;
+    }
+
+    if (config.model !== undefined && this.config.model !== config.model) {
+      logger.info(
+        { sessionId: this.sessionId, oldModel: this.config.model, newModel: config.model },
+        'Updating model',
+      );
+      this.config.model = config.model;
+      changed = true;
+    }
+
+    if (config.demoId !== undefined && this.config.demoId !== config.demoId) {
+      this.config.demoId = config.demoId;
+      changed = true;
+    }
+
+    if (changed) {
+      this.lastActivityAt = new Date();
+      this.emit("config_updated", {
+        type: "config_updated",
+        sessionId: this.sessionId,
+        config: this.getConfig(),
+      });
     }
   }
 }

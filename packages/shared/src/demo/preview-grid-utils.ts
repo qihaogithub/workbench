@@ -109,15 +109,50 @@ export function useVisiblePages(
   return visiblePages;
 }
 
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
+
+function resolveRelativePath(relativePath: string, basePath: string): string {
+  const parts = basePath.split('/').filter(p => p !== '');
+  const relativeParts = relativePath.split('/');
+
+  for (const part of relativeParts) {
+    if (part === '.' || part === '') continue;
+    if (part === '..') {
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+
+  return parts.join('/');
+}
+
+export interface ResolveImageUrlsOptions {
+  sessionId?: string;
+  demoId?: string;
+}
+
 export function resolveImageUrls(
   data: Record<string, unknown>,
+  options?: ResolveImageUrlsOptions,
 ): Record<string, unknown> {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   if (!origin) return data;
 
+  const { sessionId, demoId } = options || {};
+  const basePath = demoId ? `demos/${demoId}/` : '';
+
   function walk(value: unknown): unknown {
-    if (typeof value === "string" && value.startsWith("/api/sessions/")) {
-      return origin + value;
+    if (typeof value === "string") {
+      // 已有的绝对 API 路径：补全 origin
+      if (value.startsWith("/api/sessions/")) {
+        return origin + value;
+      }
+      // 相对路径图片：改写为 API 绝对路径
+      if (sessionId && basePath && /^\.\.?\/[^'")\s]*$/.test(value) && IMAGE_EXT_RE.test(value)) {
+        const resolved = resolveRelativePath(value, basePath);
+        return `${origin}/api/sessions/${sessionId}/workspace/${resolved}`;
+      }
     }
     if (Array.isArray(value)) {
       return value.map(walk);
