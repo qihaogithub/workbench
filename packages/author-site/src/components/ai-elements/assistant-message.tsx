@@ -20,7 +20,6 @@ import {
   Sparkles,
   RotateCcw,
   Undo2,
-  ArrowDown,
 } from "lucide-react";
 import {
   Collapsible,
@@ -567,7 +566,6 @@ function ExecutionPhase({
   const [open, setOpen] = useState(false);
   const wasStreamingRef = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [isUserScrollingPhase, setIsUserScrollingPhase] = useState(false);
   const isUserScrollingPhaseRef = useRef(false);
 
   const handlePhaseScroll = useCallback(() => {
@@ -577,7 +575,6 @@ function ExecutionPhase({
     const isNearBottom =
       el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
     isUserScrollingPhaseRef.current = !isNearBottom;
-    setIsUserScrollingPhase(!isNearBottom);
   }, []);
 
   useEffect(() => {
@@ -587,14 +584,6 @@ function ExecutionPhase({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [parts, isStreaming, isComplete]);
-
-  const scrollPhaseToBottom = useCallback(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    isUserScrollingPhaseRef.current = false;
-    setIsUserScrollingPhase(false);
-  }, []);
 
   useEffect(() => {
     if (isStreaming && !isComplete) {
@@ -620,8 +609,6 @@ function ExecutionPhase({
     (p) => p.type === "tool" && p.status === "running",
   );
 
-  const isStreamingPhase = isStreaming && !isComplete;
-
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-1.5 text-xs transition-colors select-none min-w-0 group/phase">
@@ -644,7 +631,7 @@ function ExecutionPhase({
           <div
             ref={contentRef}
             onScroll={handlePhaseScroll}
-            className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto scrollbar-thin"
+            className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin"
           >
             {parts.map((part, i) => {
               if (part.type === "reasoning") {
@@ -654,7 +641,7 @@ function ExecutionPhase({
                     className="flex items-start gap-1.5 text-[11px] text-muted-foreground/70 py-0.5"
                   >
                     <Sparkles className="h-3 w-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1 leading-relaxed">
+                    <div className="min-w-0 flex-1 leading-relaxed break-words overflow-hidden">
                       <Streamdown
                         plugins={{ code, cjk }}
                         controls={{ table: false, code: true }}
@@ -695,17 +682,7 @@ function ExecutionPhase({
               return null;
             })}
           </div>
-          {isStreamingPhase && isUserScrollingPhase && (
-            <div className="sticky bottom-0 flex justify-center pt-1 pb-1">
-              <button
-                onClick={scrollPhaseToBottom}
-                className="bg-muted/80 text-muted-foreground px-3 py-1 rounded-full text-xs flex items-center gap-1 hover:bg-muted transition-colors"
-              >
-                <ArrowDown className="h-3 w-3" />
-                回到底部
-              </button>
-            </div>
-          )}
+
         </div>
       </CollapsibleContent>
     </Collapsible>

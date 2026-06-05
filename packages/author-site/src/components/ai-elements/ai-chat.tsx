@@ -157,33 +157,54 @@ export function AIChat({
   }, [isStreaming, memoryFilePathsRef]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const isAutoScrollingRef = useRef(false);
   const handleSendRef = useRef(handleSend);
   handleSendRef.current = handleSend;
   const onTriggerAutoSendHandledRef = useRef(onTriggerAutoSendHandled);
   onTriggerAutoSendHandledRef.current = onTriggerAutoSendHandled;
 
   const handleScroll = useCallback(() => {
+    // 忽略程序触发的滚动事件，避免竞态条件
+    if (isAutoScrollingRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
     const threshold = 100;
     const isNearBottom =
       el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    const wasUserScrolling = isUserScrollingRef.current;
+    isUserScrollingRef.current = !isNearBottom;
     setIsUserScrolling(!isNearBottom);
+    // 用户滚回底部时，恢复自动滚动
+    if (wasUserScrolling && isNearBottom) {
+      isAutoScrollingRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
-    if (isUserScrolling) return;
+    if (isUserScrollingRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
+    isAutoScrollingRef.current = true;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, streamContent, isUserScrolling]);
+    // smooth 滚动完成后重置标记
+    const timer = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [messages, streamContent]);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    isUserScrollingRef.current = false;
     setIsUserScrolling(false);
+    isAutoScrollingRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, 400);
   }, []);
 
   const handleCancelStream = useCallback(() => {
