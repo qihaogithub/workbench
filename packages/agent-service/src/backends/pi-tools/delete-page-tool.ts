@@ -18,15 +18,38 @@ const DeletePageParams = Type.Object({
 
 type DeletePageParams = Static<typeof DeletePageParams>;
 
-export function createDeletePageTool(config: AgentConfig): AgentTool<typeof DeletePageParams> {
+/**
+ * 权限确认回调类型
+ * @param toolCallId 工具调用 ID
+ * @param pageName 页面名称
+ * @returns true 表示用户确认，false 表示用户取消或超时
+ */
+export type PermissionHandler = (toolCallId: string, pageName: string) => Promise<boolean>;
+
+export function createDeletePageTool(config: AgentConfig, permissionHandler?: PermissionHandler): AgentTool<typeof DeletePageParams> {
   return {
     name: 'deletePage',
     label: 'Delete Page',
     description:
       '删除指定页面。调用前系统会自动弹出确认弹窗，需用户确认后才执行删除。删除文件夹时其下所有子页面也会被一并删除。项目至少保留一个页面，无法删除最后一个页面。',
     parameters: DeletePageParams,
-    execute: async (_toolCallId: string, args: DeletePageParams) => {
+    execute: async (toolCallId: string, args: DeletePageParams) => {
       const { pageId, pageName } = args;
+
+      // 权限确认：如果提供了 permissionHandler，先等待用户确认
+      if (permissionHandler) {
+        const approved = await permissionHandler(toolCallId, pageName);
+        if (!approved) {
+          logger.info({ toolCallId, pageId }, 'deletePage: permission denied by user');
+          return {
+            content: [{ type: 'text' as const, text: `用户取消了删除页面「${pageName}」的操作` }],
+            details: { pageId, pageName, cancelled: true },
+            isError: true,
+          };
+        }
+        logger.info({ toolCallId, pageId }, 'deletePage: permission granted by user');
+      }
+
       const projectId = config.demoId;
       const sessionId = config.sessionId;
 
@@ -105,6 +128,6 @@ export function createDeletePageTool(config: AgentConfig): AgentTool<typeof Dele
 }
 
 /**
- * 权限等待超时时间（毫秒），供 pi-agent.ts 的 beforeToolCall 使用
+ * 权限等待超时时间（毫秒），供 pi-agent.ts 使用
  */
 export const PERMISSION_TIMEOUT = PERMISSION_TIMEOUT_MS;

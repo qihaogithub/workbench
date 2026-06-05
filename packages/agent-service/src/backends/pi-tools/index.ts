@@ -8,9 +8,11 @@ import { createSchemaValidateTool } from './schema-tool';
 import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createListImagesTool } from './list-images-tool';
-import { createDeletePageTool } from './delete-page-tool';
+import { createDeletePageTool, type PermissionHandler } from './delete-page-tool';
 
-export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
+export type { PermissionHandler };
+
+export function createWorkbenchTools(config: AgentConfig, permissionHandler?: PermissionHandler): AgentTool[] {
   return [
     createReadFileTool(config),
     createReadFileLinesTool(config),
@@ -22,6 +24,6 @@ export function createWorkbenchTools(config: AgentConfig): AgentTool[] {
     createSaveImageTool(config),
     createGetConsoleLogsTool(config),
     createListImagesTool(config),
-    createDeletePageTool(config),
+    createDeletePageTool(config, permissionHandler),
   ];
 }

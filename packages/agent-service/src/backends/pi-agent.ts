@@ -1,6 +1,6 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
-import { createWorkbenchTools } from './pi-tools';
+import { createWorkbenchTools, type PermissionHandler } from './pi-tools';
 import { PERMISSION_TIMEOUT } from './pi-tools/delete-page-tool';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
@@ -34,17 +34,23 @@ function getServiceConfig(): ServiceConfig {
 }
 
 // 动态导入 ESM-only 依赖
-let Agent: any;
-let streamSimple: any;
+let AgentHarness: any;
+let NodeExecutionEnv: any;
+let InMemorySessionRepo: any;
 let getModel: any;
 let getModels: any;
 
 async function loadPiAgentDeps() {
-  if (!Agent) {
+  if (!AgentHarness) {
     const piAgentCore = await import('@earendil-works/pi-agent-core');
+    AgentHarness = piAgentCore.AgentHarness;
+    InMemorySessionRepo = piAgentCore.InMemorySessionRepo;
+
+    // NodeExecutionEnv 从 /node 子入口导入
+    const piAgentCoreNode = await import('@earendil-works/pi-agent-core/node');
+    NodeExecutionEnv = piAgentCoreNode.NodeExecutionEnv;
+
     const piAi = await import('@earendil-works/pi-ai');
-    Agent = piAgentCore.Agent;
-    streamSimple = piAi.streamSimple;
     getModel = piAi.getModel;
     getModels = piAi.getModels;
   }
@@ -52,14 +58,19 @@ async function loadPiAgentDeps() {
 
 export class PiAgentBackend implements IBackendAdapter {
   readonly name = "pi-agent";
-  
-  private agent: any = null;
+
+  private harness: any = null;
+  private env: any = null;
+  private session: any = null;
+  private sessionRepo: any = null;
   private config: AgentConfig;
   private status: BackendStatus = "idle";
   private eventCallback?: (event: AgentEvent) => void;
   private files: FileChange[] = [];
   private timeout?: number;
   private sessionId: string | null = null;
+  private currentSystemPrompt: string = '';
+  private unsubFns: Array<() => void> = [];
   private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
 
   constructor(config: AgentConfig) {
@@ -72,124 +83,46 @@ export class PiAgentBackend implements IBackendAdapter {
     }
 
     this.status = "initializing";
-    logger.info("Initializing Pi Agent backend");
+    logger.info("Initializing Pi Agent backend (AgentHarness)");
 
     try {
       // 动态加载 ESM 依赖
       await loadPiAgentDeps();
-      
-      const tools = createWorkbenchTools(this.config);
+
+      // 1. 创建 ExecutionEnv
+      this.env = new NodeExecutionEnv({ cwd: this.config.workingDir ?? process.cwd() });
+
+      // 2. 创建 Session
+      this.sessionRepo = new InMemorySessionRepo();
+      this.session = await this.sessionRepo.create();
+
+      // 3. 创建工具（传入 deletePage 权限确认回调）
+      const tools = createWorkbenchTools(this.config, (toolCallId, pageName) => this.requestPermission(toolCallId, pageName));
+
+      // 4. 获取模型
       const model = this.getModel();
-      
+
       logger.info({ modelId: model.id, provider: model.provider, baseUrl: model.baseUrl }, "Pi Agent model configured");
-      
-      this.agent = new Agent({
-        initialState: {
-          model: model,
-          // v3.2: 使用占位 systemPrompt，运行时由 author-site 端通过 updateSystemPrompt 注入
-          // 这样 system prompt 100% 静态 → LLM API 缓存持续命中
-          systemPrompt: '# Workbench AI 编码助手\n\n等待 system prompt 注入...',
-          tools: tools,
-        },
-        streamFn: streamSimple,
-        getApiKey: async (provider: string) => {
-          // 优先级：backendProviders.apiKey > model.apiKey > piAgent.apiKey > env var > service config
-          const providerConfig = getBackendProvidersManager().getProvider(provider);
-          const apiKey =
-            providerConfig?.apiKey ||
-            (model as any).apiKey ||
-            this.config.piAgent?.apiKey ||
-            process.env[`${provider.toUpperCase()}_API_KEY`] ||
-            getServiceConfig().piAgent.apiKey;
-          logger.info({ provider, apiKeyLength: apiKey?.length }, "Pi Agent getApiKey called");
-          return apiKey;
-        },
-        beforeToolCall: async (context: any) => {
-          const toolName = context.toolCall.name;
 
-          // 知识库写保护：拦截 writeFile 对 knowledge/ 路径的写入
-          if (toolName === 'writeFile') {
-            const args = context.args as { path?: string };
-            if (args.path && isKnowledgeBasePath(args.path, this.config.workingDir ?? '')) {
-              return {
-                block: true,
-                reason: '知识库文件由用户管理，AI 不可修改。如需更新请提示用户在知识库面板中操作。',
-              };
-            }
-          }
-
-          if (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'listFiles') {
-            const args = context.args as { path?: string };
-            if (args.path && !isPathAllowed(args.path, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {
-              return { block: true, reason: `Access denied: path "${args.path}" is not allowed by workspace permissions` };
-            }
-          }
-          if (toolName === 'deletePage') {
-            const args = context.args as { pageId: string; pageName: string };
-            const toolCallId = context.toolCall.id || `del_${Date.now()}`;
-            const sessionId = this.sessionId ?? this.config.sessionId;
-
-            logger.info({ toolCallId, pageId: args.pageId, pageName: args.pageName }, 'deletePage: requesting permission');
-
-            // 发出 permission_request 事件，等待前端用户确认
-            if (this.eventCallback) {
-              this.eventCallback({
-                type: 'permission_request',
-                sessionId,
-                permissionRequest: {
-                  sessionId,
-                  options: [
-                    { optionId: 'allow_once', name: '确认删除' },
-                    { optionId: 'reject_once', name: '取消' },
-                  ],
-                  toolCall: {
-                    toolCallId,
-                    title: `删除页面: ${args.pageName}`,
-                    kind: 'execute',
-                  },
-                },
-              });
-            }
-
-            // 等待用户确认或超时
-            const approved = await new Promise<boolean>((resolve, reject) => {
-              this.pendingPermissions.set(toolCallId, { resolve, reject });
-
-              // 超时自动拒绝
-              setTimeout(() => {
-                if (this.pendingPermissions.has(toolCallId)) {
-                  this.pendingPermissions.delete(toolCallId);
-                  logger.warn({ toolCallId }, 'deletePage: permission request timed out');
-                  resolve(false);
-                }
-              }, PERMISSION_TIMEOUT);
-            });
-
-            if (!approved) {
-              logger.info({ toolCallId, pageId: args.pageId }, 'deletePage: permission denied');
-              return { block: true, reason: `用户取消了删除页面「${args.pageName}」的操作` };
-            }
-
-            logger.info({ toolCallId, pageId: args.pageId }, 'deletePage: permission granted');
-          }
-          return undefined;
-        },
-        afterToolCall: async (context: any) => {
-          if (context.toolCall.name === 'writeFile' && !context.isError) {
-            const args = context.args as { path: string; content: string };
-            this.files.push({
-              path: args.path,
-              action: 'modified',
-              content: args.content,
-            });
-          }
-          return undefined;
-        },
+      // 5. 创建 AgentHarness
+      this.harness = new AgentHarness({
+        env: this.env,
+        session: this.session,
+        tools,
+        model,
+        systemPrompt: (context: any) => this.buildSystemPrompt(context),
+        getApiKeyAndHeaders: (model: any) => this.getApiKeyAndHeaders(model),
+        thinkingLevel: 'off',
       });
 
+      // 6. 注册 Hook 事件（替代 beforeToolCall/afterToolCall）
+      this.setupHooks();
+
+      // 7. 注册观察事件（替代 setupEventMapping）
       this.setupEventMapping();
+
       this.status = "ready";
-      logger.info("Pi Agent backend initialized");
+      logger.info("Pi Agent backend (AgentHarness) initialized");
     } catch (error) {
       this.status = "error";
       logger.error({ error }, "Failed to initialize Pi Agent backend");
@@ -222,7 +155,7 @@ export class PiAgentBackend implements IBackendAdapter {
         api: 'openai-completions' as const,
         provider: provider,
         baseUrl: baseUrl,
-        // 若 backendProviders 配置了 apiKey,附加到 model 对象上(供 Agent.getApiKey 使用)
+        // 若 backendProviders 配置了 apiKey,附加到 model 对象上
         ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
         reasoning: false,
         input: ['text'] as const,
@@ -236,21 +169,221 @@ export class PiAgentBackend implements IBackendAdapter {
     return getModel(provider, modelId);
   }
 
+  /**
+   * AgentHarness 的 getApiKeyAndHeaders 回调
+   * 参数从 provider: string 改为 model: Model<any>
+   * 返回值从 string | undefined 改为 { apiKey, headers? } | undefined
+   */
+  private async getApiKeyAndHeaders(model: any): Promise<{ apiKey: string; headers?: Record<string, string> } | undefined> {
+    const provider = model.provider;
+    const providersManager = getBackendProvidersManager();
+
+    // 优先级：backendProviders.apiKey > model.apiKey > piAgent.apiKey > env var > serviceConfig
+    const providerConfig = providersManager.getProvider(provider);
+    const apiKey =
+      providerConfig?.apiKey ||
+      model.apiKey ||
+      this.config.piAgent?.apiKey ||
+      process.env[`${provider.toUpperCase()}_API_KEY`] ||
+      getServiceConfig().piAgent.apiKey;
+
+    logger.info({ provider, apiKeyLength: apiKey?.length }, "Pi Agent getApiKeyAndHeaders called");
+
+    if (!apiKey) return undefined;
+
+    return { apiKey };
+  }
+
+  /**
+   * 注册 Hook 事件（替代 beforeToolCall/afterToolCall）
+   */
+  private setupHooks(): void {
+    // 替代 beforeToolCall — 权限检查
+    const unsubToolCall = this.harness.on("tool_call", (event: any) => {
+      const { toolName, input } = event;
+
+      // 1. 路径权限校验
+      if (['readFile', 'writeFile', 'listFiles'].includes(toolName)) {
+        const targetPath = (input as any).path || (input as any).filePath;
+        if (targetPath && !isPathAllowed(targetPath, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {
+          return { block: true, reason: `Access denied: path "${targetPath}" is not allowed by workspace permissions` };
+        }
+      }
+
+      // 2. 知识库写保护
+      if (toolName === 'writeFile') {
+        const targetPath = (input as any).path;
+        if (targetPath && isKnowledgeBasePath(targetPath, this.config.workingDir ?? '')) {
+          return { block: true, reason: '知识库文件由用户管理，AI 不可修改。如需更新请提示用户在知识库面板中操作。' };
+        }
+      }
+
+      // 注意：deletePage 权限确认已移至工具 execute 内部（通过 permissionHandler 回调），
+      // 因为 on("tool_call") hook 是同步的，无法 await 用户确认
+
+      return undefined; // 允许工具调用
+    });
+    this.unsubFns.push(unsubToolCall);
+
+    // 替代 afterToolCall — 捕获文件变更
+    const unsubToolResult = this.harness.on("tool_result", (event: any) => {
+      const { toolName, input, isError } = event;
+
+      if (toolName === 'writeFile' && !isError) {
+        this.files.push({
+          path: (input as any).path,
+          action: 'modified',
+          content: (input as any).content,
+        });
+      }
+      return undefined; // 不修改结果
+    });
+    this.unsubFns.push(unsubToolResult);
+  }
+
+  /**
+   * deletePage 权限确认：发出 permission_request 事件，等待用户确认或超时
+   * 此方法由 deletePage 工具的 execute 函数调用（异步等待）
+   */
+  private requestPermission(toolCallId: string, pageName: string): Promise<boolean> {
+    const sessionId = this.sessionId ?? this.config.sessionId;
+
+    logger.info({ toolCallId, pageName }, 'deletePage: requesting permission');
+
+    // 发出 permission_request 事件，等待前端用户确认
+    if (this.eventCallback) {
+      this.eventCallback({
+        type: 'permission_request',
+        sessionId,
+        permissionRequest: {
+          sessionId,
+          options: [
+            { optionId: 'allow_once', name: '确认删除' },
+            { optionId: 'reject_once', name: '取消' },
+          ],
+          toolCall: {
+            toolCallId,
+            title: `删除页面: ${pageName}`,
+            kind: 'execute',
+          },
+        },
+      });
+    }
+
+    // 等待用户确认或超时
+    return new Promise<boolean>((resolve) => {
+      this.pendingPermissions.set(toolCallId, { resolve, reject: (err: Error) => resolve(false) });
+
+      // 超时自动拒绝
+      setTimeout(() => {
+        if (this.pendingPermissions.has(toolCallId)) {
+          this.pendingPermissions.delete(toolCallId);
+          logger.warn({ toolCallId }, 'deletePage: permission request timed out');
+          resolve(false);
+        }
+      }, PERMISSION_TIMEOUT);
+    });
+  }
+
+  /**
+   * 事件映射：将 AgentHarness 事件映射为应用层 AgentEvent
+   */
+  private setupEventMapping(): void {
+    const unsub = this.harness.subscribe((event: any) => {
+      if (!this.eventCallback) return;
+
+      const sessionId = this.sessionId ?? this.config.sessionId;
+
+      switch (event.type) {
+        // 流式文本（来自底层 Agent）
+        case 'message_update': {
+          const assistantEvent = event.assistantMessageEvent;
+          if (assistantEvent.type === 'text_delta') {
+            this.eventCallback({
+              type: 'stream',
+              sessionId,
+              content: assistantEvent.delta,
+              done: false,
+            });
+          } else if (assistantEvent.type === 'thinking_delta') {
+            this.eventCallback({
+              type: 'thought',
+              sessionId,
+              content: assistantEvent.delta,
+              done: false,
+            });
+          }
+          break;
+        }
+
+        // Agent 结束（来自底层 Agent）
+        case 'agent_end':
+          this.eventCallback({
+            type: 'finish',
+            sessionId,
+            result: {
+              success: true,
+              content: '',
+              files: this.files.length > 0 ? this.files : undefined,
+            },
+          });
+          break;
+
+        // 工具调用（来自 AgentHarness 自有事件）
+        case 'tool_call':
+          this.eventCallback({
+            type: 'tool_call',
+            sessionId,
+            toolCallId: event.toolCallId,
+            status: 'in_progress',
+            title: event.toolName,
+            kind: 'execute',
+          });
+          break;
+
+        // 工具结果（来自 AgentHarness 自有事件）
+        case 'tool_result':
+          this.eventCallback({
+            type: 'tool_call_update',
+            sessionId,
+            toolCallId: event.toolCallId,
+            status: event.isError ? 'failed' : 'completed',
+          });
+          break;
+
+        // 上下文压缩完成
+        case 'session_compact':
+          this.eventCallback({
+            type: 'status',
+            sessionId,
+            status: 'processing',
+          });
+          break;
+
+        // 保存点（可用于持久化会话状态）
+        case 'save_point':
+          // 未来可在此持久化 Session
+          break;
+      }
+    });
+    this.unsubFns.push(unsub);
+  }
+
   async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string> {
-    if (!this.agent) throw new Error("Agent not initialized");
+    if (!this.harness) throw new Error("Agent not initialized");
     this.status = "busy";
     this.files = [];
-    
+
     const images = options?.images;
-    const model = this.agent.state.model;
+    const model = this.getModel();
     const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
 
     let promptContent = content;
-    let imageContent: Array<{ type: string; source: { type: string; media_type: string; data: string } }> | undefined;
+    let imageContent: any[] | undefined;
 
     if (images && images.length > 0) {
       if (modelSupportsImages) {
-        // 多模态模型：直接传图片
+        // 多模态模型：直接传图片（适配 AgentHarness 的 ImageContent 格式）
         imageContent = images.map((img) => ({
           type: "image" as const,
           source: {
@@ -313,39 +446,20 @@ export class PiAgentBackend implements IBackendAdapter {
       { contentLength: promptContent.length, imageCount: images?.length || 0, modelSupportsImages },
       "Pi Agent sending message",
     );
-    
+
     try {
-      await this.agent.prompt(promptContent, imageContent);
-      logger.info("Pi Agent prompt sent, waiting for idle");
-      await this.agent.waitForIdle();
-      logger.info("Pi Agent idle, extracting response");
+      // harness.prompt() 直接返回 AssistantMessage，无需 waitForIdle + 手动消息提取
+      const result = await this.harness.prompt(promptContent, { images: imageContent });
       this.status = "ready";
-      
-      // 检查错误消息
-      if (this.agent.state.errorMessage) {
-        logger.error({ errorMessage: this.agent.state.errorMessage }, "Pi Agent error message");
-      }
-      
-      const lastAssistantMessage = this.agent.state.messages
-        .filter((m: any) => m.role === 'assistant')
-        .pop();
-      
-      if (lastAssistantMessage && 'content' in lastAssistantMessage) {
-        // 检查消息是否有错误
-        if ('errorMessage' in lastAssistantMessage && lastAssistantMessage.errorMessage) {
-          logger.error({ errorMessage: lastAssistantMessage.errorMessage }, "Pi Agent assistant message error");
-        }
-        
-        const result = lastAssistantMessage.content
-          .filter((c: any) => c.type === 'text')
-          .map((c: any) => c.text)
-          .join('');
-        logger.info({ resultLength: result.length }, "Pi Agent response extracted");
-        return result;
-      }
-      
-      logger.warn("No assistant message found");
-      return '';
+
+      // result 是 AssistantMessage，直接提取文本
+      const text = result.content
+        ?.filter((c: any) => c.type === 'text')
+        ?.map((c: any) => c.text)
+        ?.join('') || '';
+
+      logger.info({ resultLength: text.length }, "Pi Agent response extracted");
+      return text;
     } catch (error) {
       this.status = "error";
       logger.error({ error }, "Failed to send message");
@@ -362,33 +476,54 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   async destroy(): Promise<void> {
-    this.agent?.abort();
-    this.agent = null;
+    // 取消所有订阅
+    for (const unsub of this.unsubFns) {
+      unsub();
+    }
+    this.unsubFns = [];
+
+    // 中止 harness
+    if (this.harness) {
+      await this.harness.abort();
+      this.harness = null;
+    }
+
+    // 清理 ExecutionEnv
+    if (this.env) {
+      await this.env.cleanup();
+      this.env = null;
+    }
+
+    this.session = null;
+    this.sessionRepo = null;
     this.files = [];
     this.status = "idle";
     logger.info("Pi Agent backend destroyed");
   }
 
   async checkHealth(): Promise<boolean> {
-    return this.agent !== null;
+    return this.harness !== null;
   }
 
   async start(options?: { resumeSessionId?: string }): Promise<void> {
     this.sessionId = options?.resumeSessionId ?? null;
-    if (!this.agent) {
+    if (!this.harness) {
       await this.initialize();
     }
   }
 
   async setModel(modelId: string): Promise<void> {
-    if (!this.agent) throw new Error("Agent not initialized");
+    if (!this.harness) throw new Error("Agent not initialized");
     const [provider, id] = modelId.split('/');
     this.config.piAgent = {
       ...this.config.piAgent,
       provider: provider || this.config.piAgent?.provider,
       model: id || modelId,
     };
-    logger.info({ modelId }, "Model set for Pi Agent backend");
+    // 使用 harness.setModel() 运行时切换，无需重建
+    const model = this.getModel();
+    await this.harness.setModel(model);
+    logger.info({ modelId }, "Model switched at runtime");
   }
 
   async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
@@ -396,8 +531,6 @@ export class PiAgentBackend implements IBackendAdapter {
     const providersManager = getBackendProvidersManager();
 
     // 优先级: 推送的 activeModelId > this.config.piAgent > serviceConfig 默认
-    // 注意: split 可能在末尾产生空字符串 (e.g. "anthropic/" -> ["anthropic", ""]),
-    //       此时应回退到 this.config.piAgent, 否则 modelId 变空
     const activeFromManager = providersManager.getActiveModelId();
     const [managerProvider, ...managerRest] = activeFromManager
       ? activeFromManager.split("/")
@@ -421,7 +554,6 @@ export class PiAgentBackend implements IBackendAdapter {
     };
 
     // 1) 当前激活 provider: 优先使用 backendProviders 中声明的模型列表
-    //    仅当 backendProviders 中没有该 provider 的配置时，才回退到 pi-ai 内置模型
     const providerModels = providersManager.getProviderModels(provider);
     if (providerModels.length > 0) {
       for (const m of providerModels) {
@@ -447,8 +579,7 @@ export class PiAgentBackend implements IBackendAdapter {
       }
     }
 
-    // 3) 遍历其他 backendProviders, 把每个 provider 的每个模型都加入列表
-    //    修复前: 只返回当前 provider 的模型, 用户配置的其他供应商看不到
+    // 2) 遍历其他 backendProviders, 把每个 provider 的每个模型都加入列表
     const allProviders = providersManager.getConfig().providers;
     for (const p of allProviders) {
       if (p.id === provider) continue;
@@ -464,7 +595,7 @@ export class PiAgentBackend implements IBackendAdapter {
       );
     }
 
-    // 4) 终极 fallback: 若仍为空 (没有 backendProviders 也没有 builtin), 用当前 model 配置构造一个
+    // 3) 终极 fallback: 若仍为空, 用当前 model 配置构造一个
     if (availableModels.length === 0 && modelId) {
       add(`${provider}/${modelId}`, modelId);
       logger.info(
@@ -494,7 +625,11 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   cancelPrompt(): void {
-    this.agent?.abort();
+    if (this.harness) {
+      // abort() 返回 Promise，但 cancelPrompt 是同步方法
+      // 用 void 忽略 Promise，避免未处理的 rejection
+      void this.harness.abort();
+    }
   }
 
   getWorkingDir(): string | null {
@@ -515,127 +650,26 @@ export class PiAgentBackend implements IBackendAdapter {
     }
   }
 
-  private setupEventMapping(): void {
-    this.agent!.subscribe((event: any) => {
-      if (!this.eventCallback) return;
-      
-      const sessionId = this.sessionId ?? this.config.sessionId;
-
-      switch (event.type) {
-        case 'message_update': {
-          const assistantEvent = event.assistantMessageEvent;
-          if (assistantEvent.type === 'text_delta') {
-            this.eventCallback({
-              type: 'stream',
-              sessionId,
-              content: assistantEvent.delta,
-              done: false,
-            });
-          } else if (assistantEvent.type === 'thinking_delta') {
-            this.eventCallback({
-              type: 'thought',
-              sessionId,
-              content: assistantEvent.delta,
-              done: false,
-            });
-          }
-          break;
-        }
-        case 'tool_execution_start':
-          this.eventCallback({
-            type: 'tool_call',
-            sessionId,
-            toolCallId: event.toolCallId,
-            status: 'in_progress',
-            title: event.toolName,
-            kind: 'execute',
-          });
-          break;
-        case 'tool_execution_end':
-          this.eventCallback({
-            type: 'tool_call_update',
-            sessionId,
-            toolCallId: event.toolCallId,
-            status: event.isError ? 'failed' : 'completed',
-          });
-          break;
-        case 'agent_end':
-          this.eventCallback({
-            type: 'finish',
-            sessionId,
-            result: {
-              success: true,
-              content: '',
-              files: this.files.length > 0 ? this.files : undefined,
-            },
-          });
-          break;
-      }
-    });
+  /**
+   * 动态 System Prompt 函数 — 利用 AgentHarness 提供的丰富上下文
+   */
+  private buildSystemPrompt(context: {
+    env: any;
+    session: any;
+    model: any;
+    thinkingLevel: any;
+    activeTools: any[];
+    resources: any;
+  }): string {
+    return this.currentSystemPrompt || '# Workbench AI 编码助手\n\n等待 system prompt 注入...';
   }
 
   /**
-   * v3.2: 运行时更新 system prompt（仅接收静态部分 L2 + L4）
-   *
-   * - 不重建 Agent 实例，保留对话历史（messages 数组不变）
-   * - 依赖 Pi Agent core 的 AgentState.systemPrompt 是可写字段
-   * - 调用频率：可低频（静态部分实际上一次都不变），保留接口以备规则更新
+   * 运行时更新 system prompt
+   * 存储到 currentSystemPrompt，动态函数自动读取，无需重建 AgentHarness
    */
   async updateSystemPrompt(newPrompt: string): Promise<void> {
-    if (!this.agent) {
-      logger.warn('updateSystemPrompt called before agent initialized, ignoring');
-      return;
-    }
-    this.agent.state.systemPrompt = newPrompt;
-    logger.info({ promptLength: newPrompt.length }, 'System prompt updated via updateSystemPrompt');
-  }
-
-  /**
-   * @deprecated v3.2 拆分：硬编码 system prompt 模板已迁至 author-site 端
-   * （packages/shared/src/agent-prompts/demo-generator.template.ts + author-site/src/lib/agent/system-prompt.ts）
-   */
-  private buildSystemPrompt(): string {
-    return [
-      '你是 Workbench 的 AI 编码助手，负责生成和修改 React 组件代码。',
-      '',
-      '## 角色定位',
-      '- 你是一个专业的 React 开发工程师',
-      '- 你专注于生成高质量、可维护的 TypeScript 代码',
-      '- 你遵循最佳实践和代码规范',
-      '',
-      '## 工作空间规则',
-      `- 工作目录: ${this.config.workingDir}`,
-      `- 只能读写工作目录内的文件`,
-      `- 修改 config.schema.json 后需校验格式`,
-      `- 不能执行危险的系统命令（如 rm -rf、chmod 等）`,
-      '',
-      '## 可用依赖',
-      '- react, react-dom',
-      '- tailwindcss',
-      '- clsx, tailwind-merge, class-variance-authority (cva)',
-      '- lucide-react (图标)',
-      '- framer-motion (动画)',
-      '',
-      '## 代码规范',
-      '- 使用 TypeScript 编写类型安全的代码',
-      '- 使用 Tailwind CSS 进行样式设计',
-      '- 默认导出 React 组件',
-      '- 使用 clsx + tailwind-merge 处理动态类名',
-      '- 组件文件使用 .tsx 扩展名',
-      '- 工具函数使用 .ts 扩展名',
-      '',
-      '## 工作流程',
-      '1. 理解用户需求',
-      '2. 设计组件结构',
-      '3. 编写代码实现',
-      '4. 确保代码可编译',
-      '5. 如有需要，更新 config.schema.json',
-      '',
-      '## 质量要求',
-      '- 代码必须是类型安全的',
-      '- 组件应该是可复用的',
-      '- 样式应该是响应式的',
-      '- 遵循 React 最佳实践',
-    ].join('\n');
+    this.currentSystemPrompt = newPrompt;
+    logger.info({ promptLength: newPrompt.length }, 'System prompt updated');
   }
 }

@@ -71,9 +71,9 @@ export class AgentManager implements IAgentManager {
 
   private hasConfigChanged(agent: BaseAgent, newConfig: AgentConfig): boolean {
     const current = agent.getConfig();
+    // 模型变化不再需要重建（可用 harness.setModel() 运行时切换）
     return (
       current.workingDir !== newConfig.workingDir ||
-      current.model !== newConfig.model ||
       current.demoId !== newConfig.demoId
     );
   }
