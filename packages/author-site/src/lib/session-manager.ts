@@ -353,7 +353,7 @@ export interface SaveEditSessionResult {
 
 export function saveEditSession(
   sessionId: string,
-  userId?: string,
+  username?: string,
   note?: string,
 ): SaveEditSessionResult {
   const sessionMeta = getEditSession(sessionId);
@@ -434,7 +434,7 @@ export function saveEditSession(
     const versionInfo: VersionInfo = {
       versionId,
       savedAt: Date.now(),
-      savedBy: userId || sessionMeta.userId || 'anonymous',
+      savedBy: username || '未知用户',
       sessionId,
       snapshotPath,
       fileCount: countFiles(workspacePath),

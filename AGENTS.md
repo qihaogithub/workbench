@@ -4,7 +4,7 @@
 
 ## Monorepo 结构
 
-pnpm workspaces (`pnpm@8.15.0`, `node >=18`, `shamefully-hoist=true`), 6 个包：
+pnpm workspaces (`pnpm@8.15.0`, `node >=18`, `shamefully-hoist=true`), 7 个包：
 
 | 包名 | 路径 | 类型 | 端口 | 测试框架 |
 |---|---|---|---|---|
@@ -14,6 +14,7 @@ pnpm workspaces (`pnpm@8.15.0`, `node >=18`, `shamefully-hoist=true`), 6 个包�
 | `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify 服务 | 3201 | **vitest** |
 | `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | — | — |
 | `@opencode-workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具 (ESM) | — | — |
+| `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify 服务 (Puppeteer) | 3202 | **vitest** |
 
 `packages/web/` 存在于文件系统但**不是 workspace 成员**（无 package.json），不应引入或修改。
 
@@ -24,8 +25,8 @@ pnpm workspaces (`pnpm@8.15.0`, `node >=18`, `shamefully-hoist=true`), 6 个包�
 ## 开发者命令
 
 ```bash
-pnpm dev                              # 并行启动 author + agent + viewer
-pnpm dev:author / dev:agent / dev:viewer  # 单服务启动
+pnpm dev                              # 并行启动 author + agent + viewer + snapshot + screenshot
+pnpm dev:author / dev:agent / dev:viewer / dev:screenshot  # 单服务启动
 pnpm build                            # next build author-site
 pnpm build:viewer                     # next build viewer-site
 pnpm lint                             # ESLint (author-site next lint)
@@ -54,6 +55,10 @@ pnpm --filter @opencode-workbench/agent-service test:smoke  # 需要 ACP_SMOKE_R
 ```bash
 pnpm --filter @opencode-workbench/author-site db:init  # 初始化 SQLite users.db
 ```
+
+## Screenshot 服务
+
+Puppeteer 截图服务（`packages/screenshot-service/`），端口 3202。依赖 author-site 的 `/api/compile` 端点和本地 Chrome。截图存储于 `data/screenshots/`。支持同步单页截图和异步批量截图，使用 LRU 编译缓存和文件系统截图缓存。
 
 ## Playwright E2E 测试
 

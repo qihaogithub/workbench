@@ -447,7 +447,7 @@ export default function ViewerProjectPage() {
                 order: p.order,
                 code: data?.demoPages.find((d) => d.id === p.id)?.code,
                 configData: configDataMap[p.id],
-                previewSize: previewSize,
+                previewSize: p.previewSize,
               }))}
               canvasState={canvasState}
               onCanvasStateChange={setCanvasState}

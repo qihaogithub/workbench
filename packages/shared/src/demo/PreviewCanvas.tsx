@@ -9,6 +9,15 @@ import type { PreviewCanvasProps, CanvasState, CanvasPageLayout } from "./types"
 
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
 
+function resolvePageSize(previewSize?: { width?: string | number; height?: string | number }): { width: number; height: number } {
+  const w = previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
+  const h = previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
+  return {
+    width: Number.isFinite(w) && w > 0 ? w : DEFAULT_PAGE_SIZE.width,
+    height: Number.isFinite(h) && h > 0 ? h : DEFAULT_PAGE_SIZE.height,
+  };
+}
+
 function computeInitialLayout(
   pages: PreviewCanvasProps["pages"],
 ): Record<string, CanvasPageLayout> {
@@ -16,17 +25,23 @@ function computeInitialLayout(
   const cols = 3;
   const gap = 40;
 
+  let maxColWidth = 0;
+  const pageSizes = pages.map((page) => {
+    const size = resolvePageSize(page.previewSize);
+    if (size.width > maxColWidth) maxColWidth = size.width;
+    return size;
+  });
+
   pages.forEach((page, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const w = DEFAULT_PAGE_SIZE.width;
-    const h = DEFAULT_PAGE_SIZE.height;
+    const size = pageSizes[i];
 
     layout[page.id] = {
-      x: col * (w + gap),
-      y: row * (h + gap),
-      width: w,
-      height: h,
+      x: col * (maxColWidth + gap),
+      y: row * (DEFAULT_PAGE_SIZE.height + gap),
+      width: size.width,
+      height: size.height,
       zIndex: i,
     };
   });
@@ -118,12 +133,10 @@ export function PreviewCanvas({
           <CanvasPageItem
             key={page.id}
             page={page}
-            layout={effectivePages[page.id] || {
-              x: 0,
-              y: 0,
-              width: DEFAULT_PAGE_SIZE.width,
-              height: DEFAULT_PAGE_SIZE.height,
-            }}
+            layout={effectivePages[page.id] || (() => {
+              const size = resolvePageSize(page.previewSize);
+              return { x: 0, y: 0, width: size.width, height: size.height };
+            })()}
             editable={editable}
             isEditing={editingPageId === page.id}
             zoom={canvasState.viewport.zoom}

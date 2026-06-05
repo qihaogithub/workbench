@@ -38,14 +38,22 @@ const HIDDEN_ENTRIES = new Set([
   ".git",
   ".workspace.json",
   ".folders.json",
+]);
+
+/** 在文档视图模式下额外隐藏的目录（由 KnowledgePanel 管理） */
+const DOC_VIEW_HIDDEN_ENTRIES = new Set([
   "knowledge",
 ]);
 
 /**
  * 判断文件/目录是否应在文件树中隐藏
+ * @param name 文件/目录名
+ * @param showKnowledge 是否显示 knowledge 目录（代码视图模式下为 true）
  */
-export function isHiddenEntry(name: string): boolean {
-  return HIDDEN_ENTRIES.has(name);
+export function isHiddenEntry(name: string, showKnowledge = false): boolean {
+  if (HIDDEN_ENTRIES.has(name)) return true;
+  if (!showKnowledge && DOC_VIEW_HIDDEN_ENTRIES.has(name)) return true;
+  return false;
 }
 
 /**

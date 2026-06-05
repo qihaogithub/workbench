@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useRef } from "react";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
-import { PageSkeleton } from "./PageSkeleton";
 import type { CanvasPageLayout, CanvasPageData, ConsoleLogPayload } from "./types";
 
 interface CanvasPageItemProps {
@@ -47,6 +46,7 @@ export function CanvasPageItem({
     (e: React.MouseEvent) => {
       if (!editable || isEditing) return;
       e.stopPropagation();
+      e.preventDefault();
       setIsDragging(true);
       startPosRef.current = { x: e.clientX, y: e.clientY };
       layoutStartRef.current = { x: layout.x, y: layout.y };
@@ -88,7 +88,7 @@ export function CanvasPageItem({
   return (
     <div
       className={cn(
-        "absolute transition-shadow duration-200",
+        "absolute transition-shadow duration-200 select-none",
         editable && !isEditing && "cursor-move",
         isDragging && "shadow-2xl opacity-90",
         isEditing && "ring-2 ring-blue-500",
@@ -108,6 +108,7 @@ export function CanvasPageItem({
         setIsHovering(false);
       }}
       onMouseEnter={() => setIsHovering(true)}
+      onDragStart={(e) => e.preventDefault()}
     >
       {isEditing ? (
         <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
@@ -125,8 +126,9 @@ export function CanvasPageItem({
           <img
             src={screenshotUrl}
             alt={page.name}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain pointer-events-none"
             loading="lazy"
+            draggable={false}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 rounded-b-lg">
             <span className="text-xs text-white font-medium truncate block">
@@ -135,7 +137,21 @@ export function CanvasPageItem({
           </div>
         </div>
       ) : (
-        <PageSkeleton pageName={page.name} />
+        <div className="relative w-full h-full rounded-lg overflow-hidden shadow-md">
+          <PreviewPanel
+            code={page.code}
+            sessionId={sessionId}
+            demoId={page.id}
+            configData={page.configData}
+            previewSize={page.previewSize}
+            onConsoleEntry={onConsoleEntry}
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 rounded-b-lg pointer-events-none">
+            <span className="text-xs text-white font-medium truncate block">
+              {page.name}
+            </span>
+          </div>
+        </div>
       )}
 
       {isHovering && !isEditing && onConfigEdit && (

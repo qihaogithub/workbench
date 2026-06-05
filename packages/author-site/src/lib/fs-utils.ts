@@ -1183,7 +1183,7 @@ export function getLatestVersion(projectId: string): VersionInfo | null {
 export function restoreVersion(
   projectId: string,
   versionId: string,
-  userId?: string,
+  username?: string,
 ): { success: boolean; newVersionId?: string; error?: string } {
   const project = readProjectMeta(projectId);
   if (!project) {
@@ -1210,7 +1210,7 @@ export function restoreVersion(
   const backupVersion: VersionInfo = {
     versionId: backupVersionId,
     savedAt: Date.now(),
-    savedBy: userId || "system",
+    savedBy: username || "system",
     sessionId: `restore-from-${versionId}`,
     snapshotPath: backupSnapshotPath,
     fileCount: countFiles(workspacePath),
@@ -1230,7 +1230,7 @@ export function restoreVersion(
   const restoreVersionInfo: VersionInfo = {
     versionId: restoreVersionId,
     savedAt: Date.now(),
-    savedBy: userId || "system",
+    savedBy: username || "system",
     sessionId: `restore-${versionId}`,
     snapshotPath: restoreSnapshotPath,
     fileCount: countFiles(workspacePath),

@@ -16,6 +16,7 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
     volumes:
       - app-data:/app/data
     restart: unless-stopped
@@ -44,6 +45,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-true}
       - DATA_DIR=/app/data
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
+      - ADMIN_SECRET=${ADMIN_SECRET:-}
     volumes:
       - app-data:/app/data
     depends_on:
@@ -77,8 +80,8 @@ services:
       - "3300:80"
     volumes:
       - app-data:/app/data:ro
-    profiles:
-      - viewer
+    depends_on:
+      - author-site
     restart: unless-stopped
 
 volumes:

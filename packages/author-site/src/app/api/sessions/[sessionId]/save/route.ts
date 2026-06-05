@@ -25,7 +25,7 @@ export async function POST(
     const { sessionId } = params;
     const body = await request.json().catch(() => ({}));
 
-    const result = saveEditSession(sessionId, body.userId, body.note);
+    const result = saveEditSession(sessionId, payload.username, body.note);
 
     if (!result.success) {
       return NextResponse.json(

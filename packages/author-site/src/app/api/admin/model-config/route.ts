@@ -265,6 +265,47 @@ export async function PUT(request: NextRequest) {
       updatedConfig.multimodalModels = body.multimodalModels;
     }
 
+    // 当保存 backendProviders 时，自动将供应商 ID 前缀同步到 frontend.autoEnableRules
+    // 确保新添加的供应商模型不会被前端白名单过滤掉
+    if (body.backendProviders !== undefined) {
+      const providers = body.backendProviders.providers || [];
+      const providerPrefixes = providers
+        .filter((p: { enabled?: boolean }) => p.enabled !== false)
+        .map((p: { id: string }) => `${p.id}/`);
+
+      if (providerPrefixes.length > 0) {
+        const existingFrontend = updatedConfig.frontend || {};
+        const existingRules: Array<{ type: string; value: string }> =
+          Array.isArray(existingFrontend.autoEnableRules)
+            ? existingFrontend.autoEnableRules
+            : [];
+
+        // 收集已有的前缀规则值
+        const existingPrefixValues = new Set(
+          existingRules
+            .filter((r) => r.type === "prefix")
+            .map((r) => r.value),
+        );
+
+        // 添加缺失的供应商前缀规则
+        const newRules = providerPrefixes
+          .filter((prefix: string) => !existingPrefixValues.has(prefix))
+          .map((prefix: string) => ({ type: "prefix" as const, value: prefix }));
+
+        if (newRules.length > 0) {
+          const allRules = [...existingRules, ...newRules];
+          updatedConfig.frontend = {
+            ...existingFrontend,
+            autoEnableRules: allRules,
+            // 同步旧结构
+            allowedPrefixes: allRules
+              .filter((r) => r.type === "prefix")
+              .map((r) => r.value),
+          };
+        }
+      }
+    }
+
     // 写入数据库
     writeDbConfig(CONFIG_ID, updatedConfig, "admin");
 

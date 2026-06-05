@@ -20,6 +20,7 @@ const ZOOM_STEP = 1.1;
 export function CanvasViewport({
   viewport,
   onViewportChange,
+  editable = false,
   onCanvasClick,
   children,
   className,
@@ -72,6 +73,7 @@ export function CanvasViewport({
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
+      if (!editable) return;
       e.preventDefault();
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -88,7 +90,7 @@ export function CanvasViewport({
 
       onViewportChange({ x: newX, y: newY, zoom: newZoom });
     },
-    [viewport, onViewportChange],
+    [viewport, onViewportChange, editable],
   );
 
   return (
@@ -96,7 +98,7 @@ export function CanvasViewport({
       ref={containerRef}
       className={cn(
         "w-full h-full overflow-hidden",
-        isPanning ? "cursor-grabbing" : "cursor-grab",
+        editable && (isPanning ? "cursor-grabbing" : "cursor-grab"),
         className,
       )}
       data-canvas-root="true"
@@ -113,7 +115,9 @@ export function CanvasViewport({
           willChange: isPanning ? "transform" : "auto",
           width: 0,
           height: 0,
+          userSelect: "none",
         }}
+        onDragStart={(e) => e.preventDefault()}
       >
         {children}
       </div>

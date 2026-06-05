@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/toast-provider";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Plus,
   Lock,
@@ -16,8 +20,10 @@ import {
   Loader2,
   Lightbulb,
   FolderOpen,
+  ChevronRight,
   ChevronDown,
   Brain,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,6 +49,13 @@ export function KnowledgePanel({
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [builtinExpanded, setBuiltinExpanded] = useState(true);
+  const [userExpanded, setUserExpanded] = useState(true);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const builtinItems = items.filter((item) => item.source === "system");
+  const userItems = items.filter((item) => item.source === "user");
 
   const fetchItems = useCallback(async () => {
     if (!workingDir) return;
@@ -93,12 +106,58 @@ export function KnowledgePanel({
     [workingDir, toast, fetchItems]
   );
 
-  // 暴露刷新方法给父组件
-  const refresh = useCallback(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // 上传文件处理
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !workingDir) return;
 
-  // 通过 ref 或回调暴露 refresh — 使用自定义事件
+      if (!file.name.endsWith(".md")) {
+        toast({
+          title: "仅支持 .md 格式文件",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const content = await file.text();
+        const title = file.name.replace(/\.md$/, "");
+        const res = await fetch(
+          `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title,
+              description: `上传的文档: ${file.name}`,
+              content,
+            }),
+          }
+        );
+        const data = await res.json();
+        if (data.success) {
+          toast({ title: "上传成功" });
+          fetchItems();
+        } else {
+          toast({
+            title: "上传失败",
+            description: data.error?.message,
+            variant: "destructive",
+          });
+        }
+      } catch {
+        toast({ title: "上传失败", variant: "destructive" });
+      }
+
+      // 重置 input 以允许重复上传同一文件
+      e.target.value = "";
+      setAddMenuOpen(false);
+    },
+    [workingDir, toast, fetchItems]
+  );
+
+  // 监听 knowledge-updated 事件
   useEffect(() => {
     const handler = () => fetchItems();
     window.addEventListener("knowledge-updated", handler);
@@ -107,69 +166,152 @@ export function KnowledgePanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <h3 className="text-sm font-medium">项目知识库</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={() => onDocAdd?.()}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          添加
-        </Button>
+      {/* AI 记忆横幅 */}
+      <div
+        className="mx-3 mt-3 px-3 py-2.5 rounded-lg border bg-muted/40 dark:bg-muted/20 border-border/60 cursor-pointer hover:bg-muted/60 dark:hover:bg-muted/30 transition-colors"
+        onClick={() => onMemorySelect?.()}
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted dark:bg-muted">
+            <Brain className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-foreground">AI 记忆</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              记录 AI 对项目的理解和偏好
+            </div>
+          </div>
+          <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      {/* 文件树区域 */}
+      <ScrollArea className="flex-1 mt-1">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : items.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>暂无知识文档</p>
-            <p className="text-xs mt-1">点击「添加」创建知识文档</p>
-          </div>
         ) : (
           <div className="pb-4">
-            {/* memory.md 文件项 */}
-            <div
-              className="group flex items-center gap-1.5 py-1 px-2 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
-              onClick={() => onMemorySelect?.()}
-            >
-              <Brain className="h-4 w-4 text-purple-500 shrink-0" />
-              <span className="truncate text-foreground flex-1">memory.md</span>
-              <span className="text-[10px] text-muted-foreground">AI 记忆</span>
-              <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <Eye className="h-3 w-3 text-muted-foreground" />
-                <Pencil className="h-3 w-3 text-blue-400" />
-              </span>
+            {/* 内置知识库 */}
+            <div className="mt-1">
+              <div
+                className="group flex items-center gap-1.5 py-1.5 px-3 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
+                onClick={() => setBuiltinExpanded(!builtinExpanded)}
+              >
+                {builtinExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
+                <span className="font-medium text-foreground flex-1">
+                  内置知识库
+                </span>
+              </div>
+              {builtinExpanded && (
+                <div className="space-y-0">
+                  {builtinItems.map((item) => (
+                    <KnowledgeFileItem
+                      key={item.id}
+                      item={item}
+                      onSelect={() => onDocSelect?.(item, "read")}
+                      indent={24}
+                    />
+                  ))}
+                  {builtinItems.length === 0 && (
+                    <div className="py-2 px-3 text-xs text-muted-foreground" style={{ paddingLeft: 24 + 12 }}>
+                      暂无内置文档
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* knowledge 根文件夹 */}
-            <div className="flex items-center gap-1.5 py-1 px-2">
-              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-              <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
-              <span className="text-sm font-medium text-foreground">
-                knowledge
-              </span>
-              <span className="text-xs text-muted-foreground ml-1">
-                ({items.length})
-              </span>
-            </div>
-
-            {/* 文件列表 - 树形缩进 */}
-            <div className="space-y-0">
-              {items.map((item) => (
-                <KnowledgeFileItem
-                  key={item.id}
-                  item={item}
-                  onSelect={() => onDocSelect?.(item, "read")}
-                  onEdit={() => onDocSelect?.(item, "edit")}
-                  onDelete={() => handleDelete(item)}
+            {/* 项目知识库 */}
+            <div className="mt-0.5">
+              <div
+                className="group flex items-center gap-1.5 py-1.5 px-3 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
+                onClick={() => setUserExpanded(!userExpanded)}
+              >
+                {userExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <FolderOpen className="h-4 w-4 text-blue-500 shrink-0" />
+                <span className="font-medium text-foreground flex-1">
+                  项目知识库
+                </span>
+                {/* 添加按钮 */}
+                <Popover open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    side="bottom"
+                    className="w-40 p-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        onDocAdd?.();
+                      }}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      新建文件
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      上传文件
+                    </button>
+                  </PopoverContent>
+                </Popover>
+                {/* 隐藏的文件上传 input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".md"
+                  className="hidden"
+                  onChange={handleFileUpload}
                 />
-              ))}
+              </div>
+              {userExpanded && (
+                <div className="space-y-0">
+                  {userItems.map((item) => (
+                    <KnowledgeFileItem
+                      key={item.id}
+                      item={item}
+                      onSelect={() => onDocSelect?.(item, "read")}
+                      onEdit={() => onDocSelect?.(item, "edit")}
+                      onDelete={() => handleDelete(item)}
+                      indent={24}
+                    />
+                  ))}
+                  {userItems.length === 0 && (
+                    <div className="py-2 px-3 text-xs text-muted-foreground" style={{ paddingLeft: 24 + 12 }}>
+                      暂无文档，点击 + 添加
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -191,18 +333,20 @@ function KnowledgeFileItem({
   onSelect,
   onEdit,
   onDelete,
+  indent = 24,
 }: {
   item: KnowledgeItem;
   onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  indent?: number;
 }) {
   const isSystem = item.source === "system";
 
   return (
     <div
       className="group flex items-center gap-1.5 py-1 px-2 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
-      style={{ paddingLeft: 24 + 8 }}
+      style={{ paddingLeft: indent + 8 }}
       onClick={onSelect}
     >
       {isSystem ? (
@@ -211,19 +355,11 @@ function KnowledgeFileItem({
         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
       )}
       <span className="truncate text-foreground flex-1">{item.title}</span>
-      {isSystem && (
-        <Badge
-          variant="secondary"
-          className="text-[10px] h-4 px-1 shrink-0"
-        >
-          系统
-        </Badge>
-      )}
       <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <Eye className="h-3 w-3 text-muted-foreground" />
-        {!isSystem && <Pencil className="h-3 w-3 text-blue-400" />}
+        {!isSystem && onEdit && <Pencil className="h-3 w-3 text-blue-400" />}
       </span>
-      {!isSystem && (
+      {!isSystem && onEdit && onDelete && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

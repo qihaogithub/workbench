@@ -57,6 +57,15 @@ NEXT_PUBLIC_WEB_URL="$(read_env_value "NEXT_PUBLIC_WEB_URL")"
 CORS_ORIGINS="$(read_env_value "CORS_ORIGINS")"
 JWT_SECRET="$(read_env_value "JWT_SECRET")"
 USE_SECURE_COOKIE="$(read_env_value "USE_SECURE_COOKIE")"
+INTERNAL_API_TOKEN="$(read_env_value "INTERNAL_API_TOKEN")"
+ADMIN_SECRET="$(read_env_value "ADMIN_SECRET")"
+PI_AGENT_PROVIDER="$(read_env_value "PI_AGENT_PROVIDER")"
+PI_AGENT_API_KEY="$(read_env_value "PI_AGENT_API_KEY")"
+PI_AGENT_MODEL="$(read_env_value "PI_AGENT_MODEL")"
+PI_AGENT_BASE_URL="$(read_env_value "PI_AGENT_BASE_URL")"
+
+NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="$(read_env_value "NEXT_PUBLIC_SCREENSHOT_SERVICE_URL")"
+NEXT_PUBLIC_VIEWER_URL="$(read_env_value "NEXT_PUBLIC_VIEWER_URL")"
 
 # 生成部署环境文件
 cat > "${DEPLOY_ENV_FILE}" <<EOF
@@ -64,9 +73,17 @@ NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
 NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
 NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL}
+NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL}
+NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
 CORS_ORIGINS=${CORS_ORIGINS}
 JWT_SECRET=${JWT_SECRET}
 USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
+INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+ADMIN_SECRET=${ADMIN_SECRET}
+PI_AGENT_PROVIDER=${PI_AGENT_PROVIDER}
+PI_AGENT_API_KEY=${PI_AGENT_API_KEY}
+PI_AGENT_MODEL=${PI_AGENT_MODEL}
+PI_AGENT_BASE_URL=${PI_AGENT_BASE_URL}
 EOF
 
 trap 'rm -f "${DEPLOY_ENV_FILE}"' EXIT
@@ -119,6 +136,7 @@ rsync -avz --progress --delete \
     --exclude '/.git/' \
     --exclude '/.gitignore' \
     --exclude '/.agents/' \
+    --exclude '/.codegraph/' \
     --exclude '/.env' \
     --exclude '/.env.docker' \
     --exclude '/.venv/' \
@@ -149,17 +167,17 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     # 复制部署环境文件
     cp -f .deploy.env .env.docker
 
-    # 构建并启动核心服务（不含 viewer-site）
+    # 构建并启动全部服务
     docker compose --env-file .env.docker build \
         --build-arg GIT_COMMIT='${GIT_COMMIT}' \
         --build-arg GIT_BRANCH='${GIT_BRANCH}' \
         --build-arg BUILD_TIME='${BUILD_TIME}' \
-        agent-service author-site
+        agent-service author-site screenshot-service viewer-site
 
     docker compose --env-file .env.docker up -d --force-recreate \
-        agent-service author-site
+        agent-service author-site screenshot-service viewer-site
 
-    echo '✅ 核心服务已启动'
+    echo '✅ 全部服务已启动'
 "
 
 # ================= 5. 部署后自检 =================
@@ -197,7 +215,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     echo '⏳ 等待容器启动...'
     for i in \$(seq 1 60); do
         all_running=true
-        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1 opencode-workbench-viewer-site-1; do
             status=\$(docker inspect -f '{{.State.Status}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$status\" != 'running' ]; then
                 all_running=false
@@ -218,12 +236,14 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     # 检查容器运行状态
     check_container_running opencode-workbench-agent-service-1
     check_container_running opencode-workbench-author-site-1
+    check_container_running opencode-workbench-screenshot-service-1
+    check_container_running opencode-workbench-viewer-site-1
 
     # 等待健康检查（最多 90 秒）
     echo '⏳ 等待健康检查...'
     for i in \$(seq 1 90); do
         all_healthy=true
-        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1; do
             health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$health\" != 'healthy' ]; then
                 all_healthy=false
@@ -235,7 +255,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         fi
         if [ \"\$i\" -eq 90 ]; then
             echo '❌ 健康检查超时'
-            for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1; do
+            for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1; do
                 check_container_healthy \"\$name\"
             done
             exit 1
@@ -246,6 +266,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     # 健康检查
     check_container_healthy opencode-workbench-agent-service-1
     check_container_healthy opencode-workbench-author-site-1
+    check_container_healthy opencode-workbench-screenshot-service-1
 
     # API 端点检查（重试 30 秒）
     for i in \$(seq 1 30); do
@@ -273,6 +294,32 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         fi
         sleep 1
     done
+
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3202/health >/dev/null 2>&1; then
+            echo '✅ screenshot-service 健康检查通过'
+            break
+        fi
+        if [ \"\$i\" -eq 30 ]; then
+            echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
+            docker logs --tail=120 opencode-workbench-screenshot-service-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
+
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3300 >/dev/null 2>&1; then
+            echo '✅ viewer-site 健康检查通过'
+            break
+        fi
+        if [ \"\$i\" -eq 30 ]; then
+            echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
+            docker logs --tail=120 opencode-workbench-viewer-site-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
 "
 
 echo ""
@@ -280,10 +327,7 @@ echo -e "${GREEN}🎉 部署成功（含自检）！${NC}"
 echo -e "访问地址: http://${SERVER_IP}:3200"
 echo ""
 echo -e "${YELLOW}📋 服务端口说明:${NC}"
-echo -e "   author-site:    http://${SERVER_IP}:3200  (前端界面)"
-echo -e "   agent-service:  http://${SERVER_IP}:3201  (Agent 服务)"
-echo ""
-echo -e "${YELLOW}💡 可选: 启动预览端 viewer-site:${NC}"
-echo -e "   ssh ${SERVER_USER}@${SERVER_IP}"
-echo -e "   cd ${REMOTE_DIR}"
-echo -e "   docker compose --env-file .env.docker --profile viewer up -d viewer-site"
+echo -e "   author-site:       http://${SERVER_IP}:3200  (前端界面)"
+echo -e "   agent-service:     http://${SERVER_IP}:3201  (Agent 服务)"
+echo -e "   screenshot-service: http://${SERVER_IP}:3202  (截图服务)"
+echo -e "   viewer-site:       http://${SERVER_IP}:3300  (预览端)"

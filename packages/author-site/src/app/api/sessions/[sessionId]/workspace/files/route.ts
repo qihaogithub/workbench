@@ -82,6 +82,7 @@ export async function GET(
     // 解析请求的子路径
     const { searchParams } = new URL(request.url);
     const relativePath = searchParams.get("path") || "";
+    const showKnowledge = searchParams.get("showKnowledge") === "true";
 
     // 安全校验：防止路径遍历
     const resolvedPath = path.resolve(wsPath, relativePath);
@@ -113,7 +114,7 @@ export async function GET(
     const children: WorkspaceFileNode[] = [];
 
     for (const entry of entries) {
-      if (isHiddenEntry(entry.name)) continue;
+      if (isHiddenEntry(entry.name, showKnowledge)) continue;
 
       const entryRelPath = relativePath
         ? `${relativePath}/${entry.name}`

@@ -420,33 +420,30 @@ export class PiAgentBackend implements IBackendAdapter {
       availableModels.push({ id, label });
     };
 
-    // 1) 当前激活 provider: 优先尝试 pi-ai 内置 KnownProvider
-    let builtinHit = false;
-    try {
-      if (getModels) {
-        const models = getModels(provider);
-        if (models.length > 0) {
-          builtinHit = true;
-          for (const m of models) {
-            add(`${provider}/${m.id}`, m.name || m.id);
-          }
-        }
-      }
-    } catch (error) {
-      logger.warn({ error, provider }, "Failed to get available models from pi-ai");
-    }
-
-    // 2) 自定义 provider (内置未命中): 回退到 backendProviders 当前 provider 的模型
-    if (!builtinHit) {
-      const providerModels = providersManager.getProviderModels(provider);
+    // 1) 当前激活 provider: 优先使用 backendProviders 中声明的模型列表
+    //    仅当 backendProviders 中没有该 provider 的配置时，才回退到 pi-ai 内置模型
+    const providerModels = providersManager.getProviderModels(provider);
+    if (providerModels.length > 0) {
       for (const m of providerModels) {
         add(m.id, m.label);
       }
-      if (providerModels.length > 0) {
-        logger.info(
-          { provider, modelCount: providerModels.length },
-          "Using backendProviders for active provider model list",
-        );
+      logger.info(
+        { provider, modelCount: providerModels.length },
+        "Using backendProviders for active provider model list",
+      );
+    } else {
+      // pi-ai 内置 KnownProvider 回退
+      try {
+        if (getModels) {
+          const models = getModels(provider);
+          if (models.length > 0) {
+            for (const m of models) {
+              add(`${provider}/${m.id}`, m.name || m.id);
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn({ error, provider }, "Failed to get available models from pi-ai");
       }
     }
 

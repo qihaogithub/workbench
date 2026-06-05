@@ -55,7 +55,6 @@ import {
   LayoutGrid,
   FileText,
   Map,
-  ShieldCheck,
   Upload,
   CheckCircle,
   History,
@@ -64,6 +63,7 @@ import {
   User,
   RefreshCw,
   FolderOpen,
+  ArrowLeft,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -79,6 +79,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ErrorBanner } from "@/components/demo/ErrorBanner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
@@ -114,6 +122,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     Record<string, Record<string, unknown>>
   >({});
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
+  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -135,6 +144,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
   );
@@ -231,6 +242,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string>('');
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -263,7 +275,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (newSchema !== undefined) {
         setSchema(newSchema);
         schemaRef.current = newSchema;
-        setPreviewSize(getPreviewSize(newSchema));
+        const size = getPreviewSize(newSchema);
+        setPreviewSize(size);
+        setPagePreviewSizeMap((prev) => {
+          const id = activeDemoIdRef.current;
+          if (!id || !size) return prev;
+          return { ...prev, [id]: size };
+        });
 
         try {
           setConfigDataMap((prev) => {
@@ -291,6 +309,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           clearTimeout(schemaRegenerateTimerRef.current);
           schemaRegenerateTimerRef.current = null;
         }
+      }
+
+      if (source === "ai-realtime" || source === "ai-finish") {
+        setHasUnsavedChanges(true);
       }
     },
     [sessionId, activeDemoId],
@@ -451,6 +473,15 @@ ${context.details}
         setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
+
+        // 记录每个页面的 previewSize
+        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        for (const page of pagesWithSize) {
+          if (page.previewSize) {
+            previewSizeMap[page.id] = page.previewSize;
+          }
+        }
+        setPagePreviewSizeMap(previewSizeMap);
 
         let loadedCode = "";
         let loadedSchema = "";
@@ -633,6 +664,17 @@ ${context.details}
     });
   }, [demoId]);
 
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success && data.data?.username) {
+          setCurrentUsername(data.data.username);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const loadVersionHistory = useCallback(async () => {
     try {
       const data = await projectApiClient.getVersionHistory(demoId);
@@ -676,7 +718,7 @@ ${context.details}
     try {
       const result = await projectApiClient.restoreVersion(demoId, {
         versionId: version.versionId,
-        username: 'user',
+        username: currentUsername || '未知用户',
       });
 
       const syncRes = await fetch(`/api/sessions/${sessionId}/sync-project`, {
@@ -818,11 +860,10 @@ ${context.details}
         description: "Demo 已更新",
       });
 
+      setHasUnsavedChanges(false);
       setPublishStatus('unpublished_changes');
 
       loadVersionHistory();
-
-      router.push("/");
     } catch (error) {
       toast({
         title: "保存失败",
@@ -834,34 +875,36 @@ ${context.details}
     }
   };
 
-  const handleCancel = async () => {
+  const handleBackClick = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setShowExitDialog(true);
+    } else {
+      router.push("/");
+    }
+  }, [hasUnsavedChanges, router]);
+
+  const handleSaveAndExit = async () => {
+    setShowExitDialog(false);
+    await handleSave();
+    router.push("/");
+  };
+
+  const handleDirectExit = async () => {
+    setShowExitDialog(false);
     try {
       if (sessionId) {
-        // 归档 Session 而非删除，保留消息历史供后续查看
         const res = await fetch(`/api/sessions/${sessionId}/meta`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "discarded" }),
         });
-
         if (!res.ok) {
           const data = await res.json();
-          console.error("[Cancel] Failed to archive session:", sessionId, data);
-          toast({
-            title: "归档失败",
-            description:
-              data.error?.message || "Session 归档失败，可能需要手动清理",
-            variant: "destructive",
-          });
+          console.error("[Exit] Failed to archive session:", sessionId, data);
         }
       }
     } catch (error) {
-      console.error("[Cancel] Error archiving session:", error);
-      toast({
-        title: "归档失败",
-        description: error instanceof Error ? error.message : "未知错误",
-        variant: "destructive",
-      });
+      console.error("[Exit] Error archiving session:", error);
     } finally {
       router.push("/");
     }
@@ -930,6 +973,15 @@ ${context.details}
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
         <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={handleBackClick}
+            title="返回首页"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           {isEditingName ? (
             <Input
               autoFocus
@@ -952,18 +1004,6 @@ ${context.details}
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
-            onClick={handleManualCheck}
-            disabled={isChecking}
-          >
-            <ShieldCheck className="h-4 w-4" />
-            <span className="text-xs">
-              {isChecking ? "检查中..." : "检查代码"}
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
             onClick={() => setCoverDialogOpen(true)}
           >
             <ImageIcon className="h-4 w-4" />
@@ -971,9 +1011,6 @@ ${context.details}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleCancel}>
-            取消
-          </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? (
               <>
@@ -985,8 +1022,12 @@ ${context.details}
             )}
           </Button>
           <Button
-            onClick={handlePublish}
+            onClick={async () => {
+              await handleSave();
+              await handlePublish();
+            }}
             disabled={
+              isSaving ||
               publishing ||
               publishStatus === 'published' ||
               publishStatus === null
@@ -997,7 +1038,7 @@ ${context.details}
             {publishing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                发布中...
+                保存并发布中...
               </>
             ) : publishStatus === 'published' ? (
               <>
@@ -1007,7 +1048,7 @@ ${context.details}
             ) : (
               <>
                 <Upload className="h-4 w-4" />
-                发布
+                保存并发布
               </>
             )}
           </Button>
@@ -1250,12 +1291,12 @@ ${context.details}
                 value="code"
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
               >
-                <div className="flex items-center gap-1 px-3 py-2 border-b">
-                  <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                <div className="flex items-center justify-center gap-1 px-3 py-2 border-b">
+                  <div className="flex items-center gap-1 rounded-md border border-border p-0.5 w-full max-w-[200px]">
                     <button
                       type="button"
                       onClick={() => setFileView("doc")}
-                      className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "doc" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`flex-1 justify-center inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "doc" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <FileText className="h-3.5 w-3.5" />
                       文档
@@ -1263,7 +1304,7 @@ ${context.details}
                     <button
                       type="button"
                       onClick={() => setFileView("code")}
-                      className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`flex-1 justify-center inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <FileCode2 className="h-3.5 w-3.5" />
                       代码
@@ -1316,6 +1357,7 @@ ${context.details}
                   ) : (
                     <WorkspaceFileTree
                       sessionId={sessionId}
+                      showKnowledge={true}
                       onFileSelect={async (filePath, editable) => {
                         try {
                           const res = await fetch(
@@ -1623,10 +1665,6 @@ ${context.details}
                                 <User className="h-3 w-3" />
                                 {version.savedBy}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <FileText className="h-3 w-3" />
-                                {version.fileCount} 文件
-                              </span>
                             </div>
                             {version.note && (
                               <p className="mt-1 text-xs text-muted-foreground truncate">{version.note}</p>
@@ -1688,7 +1726,7 @@ ${context.details}
                         order: p.order,
                         code: pageCodes[p.id] || code,
                         configData: configDataMap[p.id],
-                        previewSize: previewSize,
+                        previewSize: pagePreviewSizeMap[p.id],
                       }))}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
@@ -1997,6 +2035,32 @@ ${context.details}
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
+
+      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>未保存的更改</DialogTitle>
+            <DialogDescription>
+              你有未保存的更改，是否在退出前保存？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={handleDirectExit}>
+              直接退出
+            </Button>
+            <Button onClick={handleSaveAndExit} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                "保存并退出"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

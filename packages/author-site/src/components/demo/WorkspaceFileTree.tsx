@@ -9,6 +9,7 @@ import type { WorkspaceFileNode } from "@/lib/workspace-file-utils";
 interface WorkspaceFileTreeProps {
   sessionId: string;
   onFileSelect: (filePath: string, editable: boolean) => void;
+  showKnowledge?: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ interface WorkspaceFileTreeProps {
 export function WorkspaceFileTree({
   sessionId,
   onFileSelect,
+  showKnowledge = false,
 }: WorkspaceFileTreeProps) {
   const [rootTree, setRootTree] = useState<WorkspaceFileNode | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -38,7 +40,7 @@ export function WorkspaceFileTree({
       setError(null);
       try {
         const res = await fetch(
-          `/api/sessions/${sessionId}/workspace/files?path=`,
+          `/api/sessions/${sessionId}/workspace/files?path=&showKnowledge=${showKnowledge}`,
         );
         const data = await res.json();
         if (cancelled) return;
@@ -60,7 +62,7 @@ export function WorkspaceFileTree({
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, showKnowledge]);
 
   // 懒加载子目录
   const loadChildren = useCallback(
@@ -70,7 +72,7 @@ export function WorkspaceFileTree({
       setLoadingPaths((prev) => new Set(prev).add(folderPath));
       try {
         const res = await fetch(
-          `/api/sessions/${sessionId}/workspace/files?path=${encodeURIComponent(folderPath)}`,
+          `/api/sessions/${sessionId}/workspace/files?path=${encodeURIComponent(folderPath)}&showKnowledge=${showKnowledge}`,
         );
         const data = await res.json();
 
@@ -95,7 +97,7 @@ export function WorkspaceFileTree({
         });
       }
     },
-    [sessionId, loadedPaths],
+    [sessionId, loadedPaths, showKnowledge],
   );
 
   // 切换文件夹展开/折叠
