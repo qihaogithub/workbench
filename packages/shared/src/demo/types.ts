@@ -35,6 +35,7 @@ export interface PreviewPanelProps {
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
+  fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
@@ -92,6 +93,7 @@ export interface PreviewCanvasProps {
   editingPageId?: string;
   screenshotUrls?: Record<string, string>;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  focusPageId?: string;
 }
 
 export interface PreviewState {

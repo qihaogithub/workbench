@@ -261,6 +261,7 @@ export function CanvasPageItem({
           demoId={page.id}
           configData={page.configData}
           previewSize={page.previewSize}
+          fillContainer
           onConsoleEntry={onConsoleEntry}
         />
       </div>
@@ -289,7 +290,6 @@ export function CanvasPageItem({
       className={cn(
         "absolute transition-shadow duration-200 select-none",
         canInteract && !isResizing && "cursor-move",
-        isDragging && "shadow-2xl opacity-90",
         isEditing && "ring-2 ring-blue-500",
       )}
       style={{
@@ -317,7 +317,7 @@ export function CanvasPageItem({
           <div
             key={handle}
             data-resize-handle={handle}
-            className="absolute w-2 h-2 bg-white border border-blue-500 rounded-sm opacity-0 hover:opacity-100 hover:scale-125 transition-all z-20"
+            className="absolute w-3 h-3 bg-white border-2 border-blue-500 rounded-sm opacity-60 hover:opacity-100 hover:scale-125 transition-all z-20"
             style={{
               ...HANDLE_DEFS[handle].style,
               cursor: HANDLE_DEFS[handle].cursor,
@@ -337,7 +337,7 @@ export function CanvasPageItem({
       )}
 
       {isDragging && (
-        <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none" />
+        <div className="absolute inset-0 rounded-lg border-2 border-blue-500 pointer-events-none" />
       )}
 
       {isResizing && (

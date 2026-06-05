@@ -97,6 +97,7 @@ export function PreviewCanvas({
   editingPageId,
   screenshotUrls,
   onConsoleEntry,
+  focusPageId,
 }: PreviewCanvasProps) {
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -166,6 +167,23 @@ export function PreviewCanvas({
       ),
     [effectivePages, canvasState.viewport, containerSize],
   );
+
+  useEffect(() => {
+    if (!focusPageId) return;
+    const pageLayout = effectivePages[focusPageId];
+    if (!pageLayout) return;
+    const cw = containerSize.width;
+    const ch = containerSize.height;
+    if (cw === 0 || ch === 0) return;
+    const zoom = canvasState.viewport.zoom || 1;
+    const cx = pageLayout.x + pageLayout.width / 2;
+    const cy = pageLayout.y + pageLayout.height / 2;
+    updateState((prev) => ({
+      ...prev,
+      viewport: { ...prev.viewport, x: cw / 2 - cx * zoom, y: ch / 2 - cy * zoom },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPageId]);
 
   return (
     <div

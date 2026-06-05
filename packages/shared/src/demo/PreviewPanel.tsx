@@ -33,10 +33,29 @@ function computePreviewScale(
   size?: PreviewSize,
   containerWidth?: number,
   containerHeight?: number,
+  fillContainer?: boolean,
 ): PreviewScaleResult {
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
   const designWidth = parseSizeValue(effectiveSize.width) ?? 375;
   const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
+
+  if (fillContainer) {
+    return {
+      designWidth,
+      designHeight,
+      scale: 1,
+      wrapperStyle: {
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+      },
+      iframeStyle: {
+        width: "100%",
+        height: "100%",
+        border: "none",
+      },
+    };
+  }
 
   if (!containerWidth || !containerHeight) {
     return {
@@ -203,6 +222,7 @@ export function PreviewPanel({
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
+  fillContainer = false,
   onConsoleEntry,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -495,6 +515,7 @@ export function PreviewPanel({
     previewSize,
     containerWidth,
     containerHeight,
+    fillContainer,
   );
 
   useEffect(() => {

@@ -172,6 +172,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     pages: {},
   });
   const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
+  const [focusCanvasPageId, setFocusCanvasPageId] = useState<string | undefined>(undefined);
+
+  // 页面定位完成后清除 focusPageId，以便再次点击同一页面时重新触发
+  useEffect(() => {
+    if (focusCanvasPageId) {
+      const timer = setTimeout(() => setFocusCanvasPageId(undefined), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [focusCanvasPageId]);
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
@@ -1409,6 +1418,9 @@ ${context.details}
                       setFlashGridCardId(pageId);
                       setTimeout(() => setFlashGridCardId(null), 1600);
                     }
+                    if (previewMode === "canvas") {
+                      setFocusCanvasPageId(pageId);
+                    }
                     if (sessionId) {
                       try {
                         const res = await fetch(
@@ -1730,6 +1742,7 @@ ${context.details}
                       }))}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
+                      focusPageId={focusCanvasPageId}
                       editingPageId={canvasEditingPageId ?? undefined}
                       screenshotUrls={Object.fromEntries(
                         Object.entries(pageScreenshots)
