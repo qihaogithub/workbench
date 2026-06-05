@@ -182,18 +182,41 @@ export function AIChat({
     }
   }, []);
 
+  // 监听滚动容器内容高度变化，确保子组件（如 ExecutionPhase）内容增长时也自动滚动
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (isUserScrollingRef.current) return;
+      isAutoScrollingRef.current = true;
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+        isAutoScrollingRef.current = false;
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (isUserScrollingRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
+    // 流式输出时用即时滚动跟上内容增长，非流式时用平滑滚动
+    const behavior: ScrollBehavior = isStreaming ? "instant" : "smooth";
     isAutoScrollingRef.current = true;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    // smooth 滚动完成后重置标记
-    const timer = setTimeout(() => {
-      isAutoScrollingRef.current = false;
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [messages, streamContent]);
+    // 等 DOM 渲染完成后再滚动
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      if (behavior === "instant") {
+        isAutoScrollingRef.current = false;
+      } else {
+        const timer = setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 400);
+      }
+    });
+  }, [messages, streamContent, isStreaming, currentMessage]);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;

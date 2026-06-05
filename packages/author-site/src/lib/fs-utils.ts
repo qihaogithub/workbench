@@ -835,6 +835,8 @@ export function ensureWorkspaceFiles(workspacePath: string): {
   }
 
   if (existing.length > 0) {
+    // 确保 workspace-tree.json 存在且与磁盘一致（修复 Docker 部署后页面丢失问题）
+    readWorkspaceTree(workspacePath);
     return { demoIds: existing };
   }
 

@@ -71,8 +71,12 @@ export class WorkspaceManager {
     const normalizedPath = normalizeWorkspacePath(workspace);
 
     if (!fs.existsSync(normalizedPath)) {
-      await fs.promises.mkdir(normalizedPath, { recursive: true });
-      logger.debug({ workspacePath: normalizedPath }, 'User workspace created');
+      // 不再创建空目录：如果路径不存在，说明 author-site 尚未创建工作空间
+      // 或者路径有误。创建空目录会导致 scanWorkspaceContext 返回"暂无页面"
+      logger.warn(
+        { workspacePath: normalizedPath },
+        'User workspace path does not exist, skipping directory creation to avoid empty workspace',
+      );
     } else {
       logger.debug({ workspacePath: normalizedPath }, 'Using existing user workspace');
     }

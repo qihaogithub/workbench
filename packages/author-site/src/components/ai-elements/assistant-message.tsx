@@ -582,7 +582,10 @@ function ExecutionPhase({
     if (isUserScrollingPhaseRef.current) return;
     const el = contentRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    // 流式输出时用即时滚动跟上内容增长
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+    });
   }, [parts, isStreaming, isComplete]);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { SystemPromptContext } from "./system-prompt";
+import { listDemoPages } from "../fs-utils";
 
 const MAX_INLINE_PAGES = 2;
 
@@ -69,40 +70,15 @@ function formatPageList(pages: PageInfo[]): string {
 export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   const pages: PageInfo[] = [];
 
-  // 优先从 workspace-tree.json 读取页面元数据
-  const treePath = path.join(workingDir, "workspace-tree.json");
-  if (fs.existsSync(treePath)) {
-    try {
-      const tree = JSON.parse(fs.readFileSync(treePath, "utf-8"));
-      const treePages = Array.isArray(tree?.pages) ? tree.pages : [];
-      for (const p of treePages) {
-        pages.push({
-          id: p.id || "",
-          name: p.name || p.id || "",
-          indexPath: path.join("demos", p.id, "index.tsx"),
-          schemaPath: path.join("demos", p.id, "config.schema.json"),
-        });
-      }
-    } catch {
-      /* fall through to directory scan */
-    }
-  }
-
-  // 兜底：扫描 demos/ 目录（tree 不存在或损坏时）
-  if (pages.length === 0) {
-    const demosDir = path.join(workingDir, "demos");
-    if (fs.existsSync(demosDir)) {
-      for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
-        if (entry.isDirectory()) {
-          pages.push({
-            id: entry.name,
-            name: entry.name.split("_")[0].replace(/-/g, " "),
-            indexPath: path.join("demos", entry.name, "index.tsx"),
-            schemaPath: path.join("demos", entry.name, "config.schema.json"),
-          });
-        }
-      }
-    }
+  // 使用 listDemoPages 读取页面列表（自动处理 workspace-tree.json 迁移和磁盘发现）
+  const demoPages = listDemoPages(workingDir);
+  for (const p of demoPages) {
+    pages.push({
+      id: p.id,
+      name: p.name,
+      indexPath: path.join("demos", p.id, "index.tsx"),
+      schemaPath: path.join("demos", p.id, "config.schema.json"),
+    });
   }
 
   // 页面数 ≤ 2 时直接读文件内容嵌入 L3（> 2 时全部不嵌入，避免 L3 过大）

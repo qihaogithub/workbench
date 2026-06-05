@@ -40,8 +40,10 @@ describe('WorkspaceManager', () => {
       expect(fs.existsSync(info.path)).toBe(true);
     });
 
-    it('应创建用户指定工作空间', async () => {
+    it('应使用已存在的用户指定工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'my-project');
+      // 预创建目录（模拟 author-site 已创建的工作空间）
+      fs.mkdirSync(userPath, { recursive: true });
       const info = await manager.create({
         workspace: userPath,
         customWorkspace: true,
@@ -51,6 +53,18 @@ describe('WorkspaceManager', () => {
       expect(info.customWorkspace).toBe(true);
       expect(info.path).toBe(path.resolve(userPath));
       expect(fs.existsSync(info.path)).toBe(true);
+    });
+
+    it('路径不存在时不应创建空目录', async () => {
+      const userPath = path.join(userWorkspaceDir, 'nonexistent-project');
+      const info = await manager.create({
+        workspace: userPath,
+        customWorkspace: true,
+      });
+
+      // 返回路径但不创建空目录
+      expect(info.path).toBe(path.resolve(userPath));
+      expect(fs.existsSync(info.path)).toBe(false);
     });
 
     it('应自动推断 customWorkspace', async () => {
@@ -74,6 +88,8 @@ describe('WorkspaceManager', () => {
 
     it('不应清理用户工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'user-project');
+      // 预创建目录（模拟 author-site 已创建的工作空间）
+      fs.mkdirSync(userPath, { recursive: true });
       const info = await manager.create({
         workspace: userPath,
         customWorkspace: true,
@@ -92,6 +108,8 @@ describe('WorkspaceManager', () => {
 
     it('应正确识别用户工作空间', async () => {
       const userPath = path.join(userWorkspaceDir, 'check-project');
+      // 预创建目录（模拟 author-site 已创建的工作空间）
+      fs.mkdirSync(userPath, { recursive: true });
       const info = await manager.create({
         workspace: userPath,
         customWorkspace: true,
