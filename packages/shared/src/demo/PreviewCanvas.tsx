@@ -1,17 +1,21 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem } from "./CanvasPageItem";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { cn } from "./utils";
-import type { PreviewCanvasProps, CanvasState, CanvasPageLayout } from "./types";
+import type { PreviewCanvasProps, CanvasState, CanvasPageLayout, CanvasViewportState } from "./types";
 
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
 
-function resolvePageSize(previewSize?: { width?: string | number; height?: string | number }): { width: number; height: number } {
-  const w = previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
-  const h = previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
+function resolvePageSize(
+  previewSize?: { width?: string | number; height?: string | number },
+): { width: number; height: number } {
+  const w =
+    previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
+  const h =
+    previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
   return {
     width: Number.isFinite(w) && w > 0 ? w : DEFAULT_PAGE_SIZE.width,
     height: Number.isFinite(h) && h > 0 ? h : DEFAULT_PAGE_SIZE.height,
@@ -47,6 +51,37 @@ function computeInitialLayout(
   });
 
   return layout;
+}
+
+function getVisiblePageIds(
+  pages: Record<string, CanvasPageLayout>,
+  viewport: CanvasViewportState,
+  containerWidth: number,
+  containerHeight: number,
+  buffer: number = 200,
+): Set<string> {
+  const visible = new Set<string>();
+  if (containerWidth === 0 || containerHeight === 0) {
+    for (const id of Object.keys(pages)) visible.add(id);
+    return visible;
+  }
+
+  const vx = -viewport.x / viewport.zoom;
+  const vy = -viewport.y / viewport.zoom;
+  const vw = containerWidth / viewport.zoom;
+  const vh = containerHeight / viewport.zoom;
+
+  for (const [id, layout] of Object.entries(pages)) {
+    if (
+      layout.x + layout.width + buffer > vx &&
+      layout.x - buffer < vx + vw &&
+      layout.y + layout.height + buffer > vy &&
+      layout.y - buffer < vy + vh
+    ) {
+      visible.add(id);
+    }
+  }
+  return visible;
 }
 
 export function PreviewCanvas({
@@ -101,8 +136,42 @@ export function PreviewCanvas({
     [updateState],
   );
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerSize({ width: el.clientWidth, height: el.clientHeight });
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setContainerSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const visiblePageIds = useMemo(
+    () =>
+      getVisiblePageIds(
+        effectivePages,
+        canvasState.viewport,
+        containerSize.width,
+        containerSize.height,
+      ),
+    [effectivePages, canvasState.viewport, containerSize],
+  );
+
   return (
-    <div className={cn("w-full h-full relative overflow-hidden bg-muted/30", className)}>
+    <div
+      ref={containerRef}
+      className={cn("w-full h-full relative overflow-hidden bg-muted/30", className)}
+    >
       {editable && (
         <CanvasToolbar
           zoom={canvasState.viewport.zoom}
@@ -133,13 +202,17 @@ export function PreviewCanvas({
           <CanvasPageItem
             key={page.id}
             page={page}
-            layout={effectivePages[page.id] || (() => {
-              const size = resolvePageSize(page.previewSize);
-              return { x: 0, y: 0, width: size.width, height: size.height };
-            })()}
+            layout={
+              effectivePages[page.id] ||
+              (() => {
+                const size = resolvePageSize(page.previewSize);
+                return { x: 0, y: 0, width: size.width, height: size.height };
+              })()
+            }
             editable={editable}
             isEditing={editingPageId === page.id}
             zoom={canvasState.viewport.zoom}
+            visible={visiblePageIds.has(page.id)}
             sessionId={sessionId}
             screenshotUrl={screenshotUrls?.[page.id]}
             onLayoutChange={handleLayoutChange}

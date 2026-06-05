@@ -20,18 +20,88 @@
       "name": "demo页面",
       "order": 2,
       "parentId": null
+    },
+    {
+      "id": "page_bv0k",
+      "name": "广场页面-平板 - 副本",
+      "order": 3,
+      "parentId": null
+    },
+    {
+      "id": "page_ihtj",
+      "name": "广场页面-平板 - 副本",
+      "order": 4,
+      "parentId": null
+    },
+    {
+      "id": "page_b31r",
+      "name": "广场页面-平板 - 副本",
+      "order": 5,
+      "parentId": null
+    },
+    {
+      "id": "page_brjd",
+      "name": "广场页面-平板 - 副本",
+      "order": 6,
+      "parentId": null
+    },
+    {
+      "id": "page_2vpk",
+      "name": "广场页面-平板 - 副本 - 副本",
+      "order": 7,
+      "parentId": null
+    },
+    {
+      "id": "page_c99m",
+      "name": "广场页面-平板 - 副本",
+      "order": 8,
+      "parentId": null
+    },
+    {
+      "id": "page_e2j6",
+      "name": "广场页面-平板 - 副本",
+      "order": 9,
+      "parentId": null
+    },
+    {
+      "id": "page_b9db",
+      "name": "广场页面-平板 - 副本",
+      "order": 10,
+      "parentId": null
+    },
+    {
+      "id": "page_q3yo",
+      "name": "广场页面-手机 - 副本",
+      "order": 11,
+      "parentId": null
+    },
+    {
+      "id": "page_gwdv",
+      "name": "广场页面-手机 - 副本",
+      "order": 12,
+      "parentId": null
+    },
+    {
+      "id": "page_qza9",
+      "name": "广场页面-手机 - 副本",
+      "order": 13,
+      "parentId": null
+    },
+    {
+      "id": "page_8hcu",
+      "name": "广场页面-手机 - 副本",
+      "order": 14,
+      "parentId": null
+    },
+    {
+      "id": "page_ugfv",
+      "name": "广场页面-手机 - 副本",
+      "order": 15,
+      "parentId": null
     }
   ],
   "demoFolders": [],
   "versions": [
-    {
-      "versionId": "v7",
-      "savedAt": 1780071637954,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780071636398-t6x1ie5id",
-      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v7",
-      "fileCount": 6
-    },
     {
       "versionId": "v8",
       "savedAt": 1780072538130,
@@ -428,10 +498,18 @@
       "sessionId": "session-1780636925548-36gjeoi41",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v51",
       "fileCount": 11
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780671345039,
+      "savedBy": "qihao",
+      "sessionId": "session-1780667670139-a580ohnlo",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v51",
+      "fileCount": 36
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780637821808,
+  "updatedAt": 1780671345053,
   "publishedVersion": "v51",
   "publishedAt": 1780565770336
 }
