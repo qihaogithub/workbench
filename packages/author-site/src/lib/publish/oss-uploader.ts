@@ -94,7 +94,21 @@ export class OSSUploader {
         };
       }
 
-      const ossKey = this.generateOSSKey(image.absolutePath);
+      const contentHash = this.computeFileMD5(image.absolutePath);
+      const ossKey = this.generateOSSKey(contentHash, image.absolutePath);
+
+      // 检查 OSS 上是否已存在相同内容的文件
+      const existing = await this.checkIfExists(ossKey);
+      if (existing) {
+        return {
+          localPath: image.originalPath,
+          ossUrl: existing.url,
+          ossKey,
+          size: stat.size,
+          success: true,
+        };
+      }
+
       const result = await this.client.put(ossKey, image.absolutePath);
 
       return {
@@ -116,16 +130,25 @@ export class OSSUploader {
     }
   }
 
-  private generateOSSKey(absolutePath: string): string {
-    const ext = path.extname(absolutePath);
-    const baseName = path.basename(absolutePath, ext);
-    const hash = crypto
-      .createHash('md5')
-      .update(absolutePath + Date.now())
-      .digest('hex')
-      .slice(0, 8);
+  private computeFileMD5(filePath: string): string {
+    const buffer = fs.readFileSync(filePath);
+    return crypto.createHash('md5').update(buffer).digest('hex');
+  }
 
-    return `${this.pathPrefix}/${this.projectId}/images/${baseName}-${hash}${ext}`;
+  private generateOSSKey(contentMD5: string, filePath: string): string {
+    const ext = path.extname(filePath);
+    return `${this.pathPrefix}/${this.projectId}/images/${contentMD5}${ext}`;
+  }
+
+  private async checkIfExists(ossKey: string): Promise<{ url: string } | null> {
+    try {
+      const result = await this.client.head(ossKey);
+      // head 成功说明文件已存在，拼接访问 URL
+      const url = this.client.generateObjectUrl(ossKey);
+      return { url };
+    } catch {
+      return null;
+    }
   }
 
   private dedupe(images: ImageReference[]): ImageReference[] {

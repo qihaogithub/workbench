@@ -1,7 +1,5 @@
-import type { ThumbnailMeta } from "./thumbnail-types";
 import type { ConsoleLogPayload } from "./iframe-types";
 
-export type { ThumbnailMeta, ThumbnailBlock, ThumbnailLayoutEvidence, RawElementSnapshot, ThumbnailHashInput } from "./thumbnail-types";
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload } from "./iframe-types";
 
 export interface PreviewSize {
