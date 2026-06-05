@@ -239,7 +239,7 @@ export function ImageListWidget({
         {value.map((item, index) => (
           <div
             key={`${item.url}-${index}`}
-            className="relative w-[120px] h-[120px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
+            className="relative w-[80px] h-[80px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
           >
             <img
               src={item.url}
@@ -273,7 +273,7 @@ export function ImageListWidget({
         ))}
 
         {isUploading && (
-          <div className="w-[120px] h-[120px] rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 shrink-0">
+          <div className="w-[80px] h-[80px] rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 shrink-0">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <span className="text-xs text-muted-foreground">文件上传中</span>
             <div className="w-full max-w-[80px] h-1 bg-muted rounded-full overflow-hidden">
@@ -287,7 +287,7 @@ export function ImageListWidget({
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="w-[120px] h-[120px] min-w-[120px] min-h-[120px] rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors shrink-0"
+            className="w-[80px] h-[80px] min-w-[80px] min-h-[80px] rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors shrink-0"
           >
             <Plus className="w-5 h-5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Upload</span>

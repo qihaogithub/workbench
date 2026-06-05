@@ -1,3 +1,28 @@
+const fs = require("fs");
+const path = require("path");
+
+// 加载 monorepo 根目录 .env，使 INTERNAL_API_TOKEN 等变量对 Next.js 可用
+const rootEnvPath = path.resolve(__dirname, "../../.env");
+if (fs.existsSync(rootEnvPath)) {
+  const envContent = fs.readFileSync(rootEnvPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIndex = trimmed.indexOf("=");
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const rawValue = trimmed.slice(eqIndex + 1).trim();
+    const value = rawValue.startsWith('"') && rawValue.endsWith('"')
+      ? rawValue.slice(1, -1)
+      : rawValue.startsWith("'") && rawValue.endsWith("'")
+        ? rawValue.slice(1, -1)
+        : rawValue;
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",

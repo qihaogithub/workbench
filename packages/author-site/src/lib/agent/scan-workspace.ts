@@ -148,3 +148,70 @@ export function readMemoryContent(workingDir: string): string | null {
     return null;
   }
 }
+
+/**
+ * 扫描知识库索引（读取 knowledge/manifest.json 并格式化为索引文本）
+ * 容错：manifest.json 不存在或解析失败时返回 null
+ */
+export function scanKnowledgeIndex(workingDir: string): string | null {
+  const manifestPath = path.join(workingDir, "knowledge", "manifest.json");
+  try {
+    if (!fs.existsSync(manifestPath)) return null;
+    const content = fs.readFileSync(manifestPath, "utf-8");
+    const manifest = JSON.parse(content);
+    if (!manifest.items || manifest.items.length === 0) return null;
+    const lines = manifest.items.map(
+      (item: { title: string; description: string; fileName: string }) =>
+        `- ${item.title}：${item.description}（knowledge/${item.fileName}）`
+    );
+    return `项目知识库（共 ${manifest.items.length} 篇）：\n${lines.join("\n")}\n→ 需要查阅时请用 readFile 读取对应文件`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 将旧项目的 references/ 目录迁移到 knowledge/ 目录
+ * 仅在 references/ 存在且 knowledge/ 不存在时执行，迁移后删除旧目录
+ */
+export function migrateReferencesToKnowledge(workingDir: string): void {
+  const referencesDir = path.join(workingDir, "references");
+  const knowledgeDir = path.join(workingDir, "knowledge");
+
+  // 仅在 references/ 存在且 knowledge/ 不存在时迁移
+  if (!fs.existsSync(referencesDir) || fs.existsSync(knowledgeDir)) return;
+
+  fs.mkdirSync(knowledgeDir, { recursive: true });
+
+  // 读取 references/ 下所有 .md 文件
+  const files = fs.readdirSync(referencesDir).filter(f => f.endsWith(".md"));
+  const items = files.map((file, index) => {
+    const title = file.replace(/\.md$/, "");
+    // 复制文件到 knowledge/
+    fs.copyFileSync(
+      path.join(referencesDir, file),
+      path.join(knowledgeDir, file)
+    );
+    return {
+      id: `kb_sys_${String(index + 1).padStart(3, "0")}`,
+      title,
+      source: "system",
+      description: "系统预设参考文档",
+      fileName: file,
+      addedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  // 写入 manifest.json
+  if (items.length > 0) {
+    fs.writeFileSync(
+      path.join(knowledgeDir, "manifest.json"),
+      JSON.stringify({ version: 1, items }, null, 2),
+      "utf-8"
+    );
+  }
+
+  // 删除旧 references/ 目录
+  fs.rmSync(referencesDir, { recursive: true });
+}

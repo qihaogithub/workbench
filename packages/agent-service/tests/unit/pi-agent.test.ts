@@ -140,15 +140,18 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig);
       
-      expect(tools).toHaveLength(8);
+      expect(tools).toHaveLength(11);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
+      expect(toolNames).toContain('readFileWithLines');
+      expect(toolNames).toContain('editFile');
       expect(toolNames).toContain('writeFile');
       expect(toolNames).toContain('listFiles');
       expect(toolNames).toContain('bash');
       expect(toolNames).toContain('schemaValidate');
       expect(toolNames).toContain('saveImage');
+      expect(toolNames).toContain('getConsoleLogs');
       expect(toolNames).toContain('listImages');
       expect(toolNames).toContain('deletePage');
     });

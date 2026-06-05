@@ -1,3 +1,9 @@
+import type { ThumbnailMeta } from "./thumbnail-types";
+import type { ConsoleLogPayload } from "./iframe-types";
+
+export type { ThumbnailMeta, ThumbnailBlock, ThumbnailLayoutEvidence, RawElementSnapshot, ThumbnailHashInput } from "./thumbnail-types";
+export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload } from "./iframe-types";
+
 export interface PreviewSize {
   width?: string | number;
   height?: string | number;
@@ -31,6 +37,7 @@ export interface PreviewPanelProps {
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
 export interface ConfigFormProps {
@@ -86,6 +93,7 @@ export interface PreviewCanvasProps {
   className?: string;
   editingPageId?: string;
   screenshotUrls?: Record<string, string>;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
 export interface PreviewState {
@@ -109,6 +117,7 @@ export interface GridIframeProps {
   hasChanges: boolean;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }
 
 export interface PreviewGridProps {
@@ -128,4 +137,5 @@ export interface PreviewGridProps {
   showModeToggle?: boolean;
   onPreviewModeChange?: (mode: PreviewMode) => void;
   className?: string;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
 }

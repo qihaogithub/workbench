@@ -20,6 +20,7 @@
 | [02-接口规范.md](./02-接口规范.md)           | REST API、WebSocket 协议、类型定义                 | 2        | 已更新 |
 | [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        | 已更新 |
 | [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        | 已完成 |
+| [05-快照服务.md](./05-快照服务.md)           | 双模式架构、变更比较、丢弃回滚、Session 生命周期   | 5        | 已完成 |
 
 ---
 
@@ -47,21 +48,20 @@
 - [Agent 管理器](./03-核心模块设计.md#24-agent-管理器-agent-managerts)
 - [OpenCode 后端](./03-核心模块设计.md#32-opencode-后端-backendopencodets)
 
-### 开发计划
+### SSE Drain 机制
 
-- [里程碑](./04-开发计划.md#12-里程碑)
-- [Phase 1：基础框架](./04-开发计划.md#二phase-1基础框架搭建)
-- [Phase 2：核心功能](./04-开发计划.md#三phase-2核心功能实现)
-- [Phase 3：集成迁移](./04-开发计划.md#四phase-3集成与迁移)
-- [风险应对](./04-开发计划.md#七风险与应对)
+- [SSE 时序竞争问题](./04_SSE_Drain机制.md#一问题背景)
+- [Drain 机制设计](./04_SSE_Drain机制.md#二drain-机制设计)
+- [测试覆盖](./04_SSE_Drain机制.md#三测试覆盖)
 
-### 部署方案
+### 快照服务
 
-- [Docker 部署](./05-部署方案.md#二docker-部署)
-- [Kubernetes 部署](./05-部署方案.md#三kubernetes-部署可选)
-- [环境变量](./05-部署方案.md#四环境变量配置)
-- [监控日志](./05-部署方案.md#五监控与日志)
-- [故障排查](./05-部署方案.md#七故障排查)
+- [双模式架构](./05-快照服务.md#二双模式架构)
+- [初始化流程](./05-快照服务.md#三核心流程)
+- [变更比较流程](./05-快照服务.md#32-变更比较流程)
+- [丢弃变更与回滚](./05-快照服务.md#33-丢弃变更流程)
+- [API 方法一览](./05-快照服务.md#五api-方法一览)
+- [与 Session 生命周期关系](./05-快照服务.md#十与-session-生命周期的关系)
 
 ---
 
@@ -120,6 +120,7 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 - `packages/agent-service/src/core/` - 核心模块（Agent、Factory、Manager）
 - `packages/agent-service/src/backends/` - 后端适配器（14+ 后端）
 - `packages/agent-service/src/routes/` - API 路由
+- `packages/agent-service/src/session/` - 会话管理（SessionStore、SessionGuard、SnapshotService）
 - `packages/shared/src/` - 共享类型
 
 ---
@@ -179,3 +180,4 @@ Electron 生命周期           →      Fastify 生命周期
 | 2026-04-05 | v1.0 | 初始版本，完成全部文档             |
 | 2026-04-05 | v1.1 | 添加 AionUi 参考指南               |
 | 2026-05-29 | v2.0 | 根据代码实现全面更新文档，对齐现状 |
+| 2026-06-04 | v2.1 | 新增 05-快照服务文档 |

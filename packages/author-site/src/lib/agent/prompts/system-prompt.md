@@ -148,12 +148,21 @@ export default function Demo({
 - 符合 JSON Schema 规范
 - properties 与该页面特有的字段一一对应（**严禁**包含项目配置中已有的字段）
 - 每个属性有合理的 default 值
-- 充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`（详见 `references/config-system.md`）
+- 充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`（详见知识库中配置系统参考文档）
 - **图片尺寸校验**：当图片有明确的尺寸要求时，必须在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
 
-# 参考文件
+## 知识库查阅
 
-生成或修改 `config.schema.json` 前，**必须先读取** `references/config-system.md`，了解配置系统支持的控件类型、扩展字段和完整示例。
+项目知识库中包含系统参考和用户添加的知识文档（knowledge/ 目录）。当用户的问题涉及以下场景时，应先读取相关知识文档：
+- 生成或修改 config.schema.json 时，必须先读取配置系统参考文档
+- 用户提及项目特有的设计规范、样式标准
+- 用户使用项目特有的业务术语
+- 用户要求遵循特定的编码约定或组件用法
+- 用户明确要求"按照知识库中的规范来做"
+
+查阅方式：先从上下文中的知识库索引确定需要读取的文件名，再用 readFile 读取 knowledge/{文件名}。
+
+知识库文件由用户管理，AI 不得修改或删除知识库中的文件。
 
 ## 禁止行为
 
@@ -314,3 +323,30 @@ saveImage({
 - 删除页面（deletePage 工具）
 
 收到 `permission_request` 事件后等待用户授权，不要直接继续操作。用户取消时工具会被阻止执行，AI 应告知用户操作已取消。
+
+---
+
+## 预览调试工具
+
+### 获取控制台日志
+
+使用 `getConsoleLogs` 工具可以获取 iframe 预览沙箱的控制台输出，用于调试运行时问题：
+
+```typescript
+// 获取最近 50 条日志（默认）
+getConsoleLogs({});
+
+// 只获取错误日志
+getConsoleLogs({ level: "error" });
+
+// 获取最近 10 条警告
+getConsoleLogs({ level: "warn", limit: 10 });
+
+// 获取指定时间之后的日志
+getConsoleLogs({ since: 1700000000000 });
+```
+
+**使用场景**：
+- 用户报告页面白屏或功能异常时，先调用 `getConsoleLogs({ level: "error" })` 查看错误信息
+- 修改代码后，调用 `getConsoleLogs({})` 确认是否还有警告或错误
+- 注意：仅包含用户打开预览后产生的日志，如果用户未打开预览，结果可能为空

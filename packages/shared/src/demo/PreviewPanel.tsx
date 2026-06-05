@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { PreviewPanelProps, PreviewSize } from "./types";
+import type { ConsoleLogPayload } from "./iframe-types";
 import { generateIframeHtml } from "./iframe-template";
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
@@ -202,6 +203,7 @@ export function PreviewPanel({
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
+  onConsoleEntry,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -429,6 +431,12 @@ export function PreviewPanel({
           setRuntimeError(error || "组件运行时发生错误");
           onError?.(new Error(error || "组件运行时发生错误"));
           break;
+
+        case "CONSOLE_LOG":
+          if (event.data?.payload) {
+            onConsoleEntry?.(event.data.payload as ConsoleLogPayload);
+          }
+          break;
       }
     };
 
@@ -442,6 +450,7 @@ export function PreviewPanel({
     lastSuccessfulResult,
     configData,
     onError,
+    onConsoleEntry,
     sendUpdateCode,
     sendUpdateCodeUrl,
   ]);

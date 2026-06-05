@@ -58,6 +58,7 @@ interface UseChatStreamOptions {
   ) => void;
   onModelsEvent?: (event: StreamEvent) => void;
   onModelStateError?: () => void;
+  externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
 
 export function useChatStream(options: UseChatStreamOptions) {
@@ -77,6 +78,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     setCurrentMessage,
     onModelsEvent,
     onModelStateError,
+    externalStreamServiceRef,
   } = options;
 
   const [plan, setPlan] = useState<string>("");
@@ -187,6 +189,9 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         const streamService = new StreamService();
         streamServiceRef.current = streamService;
+        if (externalStreamServiceRef) {
+          externalStreamServiceRef.current = streamService;
+        }
 
         const stream = await streamService.connect(agentSessionId, sessionId);
         streamSessionIdRef.current = sessionId;

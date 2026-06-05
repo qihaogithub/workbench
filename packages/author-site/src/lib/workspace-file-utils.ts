@@ -38,7 +38,7 @@ const HIDDEN_ENTRIES = new Set([
   ".git",
   ".workspace.json",
   ".folders.json",
-  "references",
+  "knowledge",
 ]);
 
 /**

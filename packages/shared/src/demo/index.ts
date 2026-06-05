@@ -1,4 +1,7 @@
 export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, GridPageItem, GridIframeProps, PreviewGridProps, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasPageData, PreviewCanvasProps } from './types';
+export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload } from './iframe-types';
+export type { ThumbnailMeta, ThumbnailBlock, ThumbnailLayoutEvidence, RawElementSnapshot, ThumbnailHashInput } from './thumbnail-types';
+export { THUMBNAIL_GENERATOR_VERSION } from './thumbnail-types';
 export { getOrderable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';

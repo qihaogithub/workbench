@@ -16,6 +16,7 @@ import {
 import { getSessionStore } from "../session/session-store";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
+import { consoleBuffer } from "../session/console-buffer";
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
@@ -30,7 +31,7 @@ interface StreamParams {
 }
 
 interface ClientMessage {
-  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response";
+  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response" | "console_data";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -40,6 +41,7 @@ interface ClientMessage {
   images?: ImageAttachment[];
   /** v3.2: 静态 system prompt 注入（L2 + L4） */
   systemPrompt?: string;
+  entries?: Array<{ level: 'log' | 'warn' | 'error' | 'info' | 'debug'; args: string; timestamp: number }>;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -135,6 +137,14 @@ export async function registerWebSocketRoutes(
               message: "消息格式无效，必须为 JSON",
             },
           });
+          return;
+        }
+
+        // Handle console_data before switch — auxiliary data channel, no Agent involvement
+        if (message.type === "console_data" && Array.isArray(message.entries)) {
+          for (const entry of message.entries) {
+            consoleBuffer.addEntry(sessionId, entry);
+          }
           return;
         }
 
@@ -619,6 +629,7 @@ export async function registerWebSocketRoutes(
               await workspaceManager.cleanup(session.workingDir);
               snapshotService.clearSnapshot(session.workingDir);
             }
+            consoleBuffer.clear(sessionId);
             sessionStore.delete(sessionId);
           }
         }
