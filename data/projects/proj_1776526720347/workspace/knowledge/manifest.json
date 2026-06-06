@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "kb_sys_001",
+      "title": "配置系统参考",
+      "source": "system",
+      "description": "配置系统支持的控件类型、扩展字段和完整示例",
+      "fileName": "配置系统参考.md",
+      "addedAt": "2026-06-06T04:54:19.031Z",
+      "updatedAt": "2026-06-06T04:54:19.031Z"
+    }
+  ]
+}
