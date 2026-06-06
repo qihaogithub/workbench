@@ -82,6 +82,23 @@ export function mergeSchemaDefaults(
     merged.__order = order;
   }
 
+  // Add __orderH from schema
+  if (parsedSchema.$demo?.orderableHorizontal && Array.isArray(parsedSchema.$demo.orderableHorizontal)) {
+    merged.__orderH = parsedSchema.$demo.orderableHorizontal;
+  }
+
+  // Add __positions from schema
+  if (parsedSchema.$demo?.positionable && typeof parsedSchema.$demo.positionable === "object") {
+    const posConfig = parsedSchema.$demo.positionable as { items?: string[]; defaults?: Record<string, { x: number; y: number }> };
+    if (Array.isArray(posConfig.items)) {
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const key of posConfig.items) {
+        positions[key] = posConfig.defaults?.[key] || { x: 0, y: 0 };
+      }
+      merged.__positions = positions;
+    }
+  }
+
   return merged;
 }
 

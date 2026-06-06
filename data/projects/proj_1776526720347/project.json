@@ -1,7 +1,7 @@
 {
   "id": "proj_1776526720347",
   "name": "配置项示例",
-  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode工作台\\packages\\web\\data\\projects\\proj_1776526720347\\workspace",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1776526720347\\workspace",
   "versions": [
     {
       "versionId": "v1",
@@ -409,20 +409,52 @@
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "demoPages": [
     {
-      "id": "demo_1778077850198_fjxwmf",
-      "name": "配置展示 · 数据内容类",
-      "order": 5,
+      "id": "demo_1779000000100_text",
+      "name": "文本输入",
+      "order": 1,
       "parentId": null,
-      "createdAt": 1778077850205,
-      "updatedAt": 1779932178510
+      "createdAt": 1779000000100,
+      "updatedAt": 1779000000100
     },
     {
-      "id": "demo_1778751411983_7h2rpo",
-      "name": "配置展示 · 样式布局类",
-      "order": 7,
+      "id": "demo_1779000000200_number",
+      "name": "数字与范围",
+      "order": 2,
       "parentId": null,
-      "createdAt": 1778751411983,
-      "updatedAt": 1779076535713
+      "createdAt": 1779000000200,
+      "updatedAt": 1779000000200
+    },
+    {
+      "id": "demo_1779000000300_switch",
+      "name": "开关与选择",
+      "order": 3,
+      "parentId": null,
+      "createdAt": 1779000000300,
+      "updatedAt": 1779000000300
+    },
+    {
+      "id": "demo_1779000000400_color",
+      "name": "颜色与图片",
+      "order": 4,
+      "parentId": null,
+      "createdAt": 1779000000400,
+      "updatedAt": 1779000000400
+    },
+    {
+      "id": "demo_1779000000500_array",
+      "name": "数据列表",
+      "order": 5,
+      "parentId": null,
+      "createdAt": 1779000000500,
+      "updatedAt": 1779000000500
+    },
+    {
+      "id": "demo_1779000000600_position",
+      "name": "位置与排序",
+      "order": 6,
+      "parentId": null,
+      "createdAt": 1779000000600,
+      "updatedAt": 1779000000600
     }
   ],
   "demoFolders": [],

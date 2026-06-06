@@ -451,6 +451,7 @@ export function PreviewCanvas({
         }
         editable={editable}
         onCanvasClick={handleCanvasClick}
+        onPageClick={(pageId) => onPageConfigEdit?.(pageId)}
         onFitToScreen={handleFitToScreen}
         onToolModeChange={setToolMode}
         alignmentGuides={alignmentGuides}

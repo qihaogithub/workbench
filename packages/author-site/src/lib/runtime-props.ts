@@ -148,5 +148,15 @@ export function mergeConfigWithUserValues(
     result.__order = currentConfig.__order;
   }
 
+  // 处理 __orderH 元数据
+  if (currentConfig.__orderH) {
+    result.__orderH = currentConfig.__orderH;
+  }
+
+  // 处理 __positions 元数据
+  if (currentConfig.__positions) {
+    result.__positions = currentConfig.__positions;
+  }
+
   return result;
 }

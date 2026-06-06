@@ -1,43 +1,20 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Banner Demo Config",
   "type": "object",
-  "properties": {
-    "banner": {
-      "type": "string",
-      "title": "Banner",
-      "description": "Recommended size: 750x400px, supports JPG, PNG, WebP formats",
-      "default": "https://picsum.photos/750/400",
-      "ui:widget": "file",
-      "ui:options": {
-        "accept": "image/*",
-        "maxSize": 5242880,
-        "placeholder": "Enter image URL or upload"
-      }
-    },
-    "title": {
-      "type": "string",
-      "title": "Event Title",
-      "default": "Exciting Event Coming",
-      "maxLength": 20
-    },
-    "description": {
-      "type": "string",
-      "title": "Event Description",
-      "default": "Limited time offer, don't miss out"
-    },
-    "theme": {
-      "type": "string",
-      "title": "Theme Color",
-      "enum": ["light", "dark", "colorful"],
-      "enumNames": ["Light Mode", "Dark Mode", "Colorful Gradient"],
-      "default": "light"
-    },
-    "showBadge": {
-      "type": "boolean",
-      "title": "Show Event Badge",
-      "default": true
-    }
+  "$demo": {
+    "previewSize": { "width": 1024, "height": 768 }
   },
-  "required": ["banner", "title"]
+  "properties": {
+    "heroTitle": {
+      "type": "string",
+      "title": "主标题",
+      "default": "配置项示例",
+      "description": "首页的大标题文字"
+    },
+    "heroDescription": {
+      "type": "string",
+      "title": "描述文字",
+      "default": "本演示项目展示配置面板支持的所有配置项类型，点击下方卡片进入对应分类页面",
+      "description": "标题下方的描述性文字"
+    }
+  }
 }

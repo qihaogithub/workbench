@@ -35,19 +35,45 @@ function computePreviewScale(
   containerWidth?: number,
   containerHeight?: number,
   fillContainer?: boolean,
+  effectiveHeight?: number,
 ): PreviewScaleResult {
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
   const designWidth = parseSizeValue(effectiveSize.width) ?? 375;
   const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
+  const useEffectiveHeight = effectiveHeight != null && effectiveHeight > designHeight;
+  const iframeHeight = useEffectiveHeight ? effectiveHeight : designHeight;
 
   if (fillContainer) {
-    // 保持设计尺寸宽高比，通过 transform scale 适配容器
     if (containerWidth && containerHeight) {
+      if (useEffectiveHeight) {
+        const scale = containerWidth / designWidth;
+        return {
+          designWidth,
+          designHeight: iframeHeight,
+          scale,
+          wrapperStyle: {
+            width: "100%",
+            height: "100%",
+            overflow: "hidden",
+            position: "relative",
+          },
+          iframeStyle: {
+            width: designWidth,
+            height: iframeHeight,
+            border: "none",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          },
+        };
+      }
+
       const scaleX = containerWidth / designWidth;
       const scaleY = containerHeight / designHeight;
       const scale = Math.min(scaleX, scaleY);
 
-      // 居中偏移
       const displayWidth = designWidth * scale;
       const displayHeight = designHeight * scale;
       const offsetX = (containerWidth - displayWidth) / 2;
@@ -76,10 +102,10 @@ function computePreviewScale(
       };
     }
 
-    // 容器尺寸未知时，先以原始尺寸渲染
+    const fallbackHeight = useEffectiveHeight ? iframeHeight : designHeight;
     return {
       designWidth,
-      designHeight,
+      designHeight: fallbackHeight,
       scale: 1,
       wrapperStyle: {
         width: "100%",
@@ -89,7 +115,7 @@ function computePreviewScale(
       },
       iframeStyle: {
         width: designWidth,
-        height: designHeight,
+        height: fallbackHeight,
         border: "none",
         position: "absolute",
         top: 0,
@@ -266,6 +292,8 @@ export function PreviewPanel({
   previewSize,
   fillContainer = false,
   onConsoleEntry,
+  onContentHeightChange,
+  effectiveHeight,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -516,6 +544,12 @@ export function PreviewPanel({
           onError?.(new Error(error || "组件运行时发生错误"));
           break;
 
+        case "RESIZE":
+          if (typeof event.data?.height === "number") {
+            onContentHeightChange?.(event.data.height);
+          }
+          break;
+
         case "CONSOLE_LOG":
           if (event.data?.payload) {
             onConsoleEntry?.(event.data.payload as ConsoleLogPayload);
@@ -535,6 +569,7 @@ export function PreviewPanel({
     configData,
     onError,
     onConsoleEntry,
+    onContentHeightChange,
     sendUpdateCode,
     sendUpdateCodeUrl,
   ]);
@@ -597,6 +632,7 @@ export function PreviewPanel({
     containerWidth,
     containerHeight,
     fillContainer,
+    effectiveHeight,
   );
 
   useEffect(() => {

@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": { "width": 1024, "height": 768 }
+  },
+  "properties": {
+    "showHeader": {
+      "type": "boolean",
+      "title": "显示头部",
+      "default": true,
+      "description": "是否显示页面顶部导航栏"
+    },
+    "showSidebar": {
+      "type": "boolean",
+      "title": "显示侧边栏",
+      "default": true,
+      "description": "是否显示左侧边栏"
+    },
+    "showFooter": {
+      "type": "boolean",
+      "title": "显示底部",
+      "default": true,
+      "description": "是否显示页面底部信息栏"
+    },
+    "enableShadow": {
+      "type": "boolean",
+      "title": "卡片阴影",
+      "default": true,
+      "description": "是否为卡片添加阴影效果"
+    },
+    "layout": {
+      "type": "string",
+      "title": "布局方式",
+      "enum": ["grid", "list", "masonry"],
+      "enumNames": ["网格布局", "列表布局", "瀑布流布局"],
+      "default": "grid",
+      "description": "内容区域的排列方式"
+    },
+    "theme": {
+      "type": "string",
+      "title": "主题风格",
+      "enum": ["light", "dark", "ocean"],
+      "enumNames": ["明亮", "暗黑", "海洋"],
+      "default": "light",
+      "description": "页面的整体视觉风格"
+    },
+    "cardSize": {
+      "type": "string",
+      "title": "卡片尺寸",
+      "enum": ["small", "medium", "large"],
+      "enumNames": ["小", "中", "大"],
+      "default": "medium",
+      "description": "内容卡片的大小"
+    }
+  }
+}

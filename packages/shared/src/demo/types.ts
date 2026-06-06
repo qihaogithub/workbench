@@ -10,9 +10,21 @@ export interface PreviewSize {
   scale?: number;
 }
 
+export interface PositionableConfig {
+  items: string[];
+  defaults?: Record<string, PositionItem>;
+}
+
+export interface PositionItem {
+  x: number;
+  y: number;
+}
+
 export interface DemoMeta {
   previewSize?: PreviewSize;
   orderable?: string[];
+  orderableHorizontal?: string[];
+  positionable?: PositionableConfig;
   [key: string]: unknown;
 }
 
@@ -37,6 +49,8 @@ export interface PreviewPanelProps {
   previewSize?: PreviewSize;
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onContentHeightChange?: (contentHeight: number) => void;
+  effectiveHeight?: number;
 }
 
 export interface ConfigFormProps {

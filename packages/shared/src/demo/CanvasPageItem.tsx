@@ -174,13 +174,57 @@ export function CanvasPageItem({
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const containerRef = useRef<HTMLDivElement>(null);
-  // 非交互模式下点击追踪标记
-  const isClickTrackingRef = useRef(false);
+
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+
+  const handleContentHeightChange = useCallback(
+    (newContentHeight: number) => {
+      const designHeight =
+        page.previewSize?.height != null
+          ? Number(page.previewSize.height)
+          : 812;
+      const designWidth =
+        page.previewSize?.width != null
+          ? Number(page.previewSize.width)
+          : 375;
+
+      if (newContentHeight <= designHeight) {
+        if (contentHeight !== null) setContentHeight(null);
+        return;
+      }
+
+      setContentHeight(newContentHeight);
+
+      const currentLayout = layoutRef.current;
+      const scale = currentLayout.width / designWidth;
+      const newHeight = newContentHeight * scale;
+
+      if (Math.abs(newHeight - currentLayout.height) < 1) return;
+
+      onLayoutChange?.(page.id, {
+        ...currentLayout,
+        height: newHeight,
+      });
+    },
+    [page.id, page.previewSize, onLayoutChange, contentHeight],
+  );
+
+  const effectiveHeight =
+    contentHeight != null &&
+    page.previewSize?.height != null &&
+    contentHeight > Number(page.previewSize.height)
+      ? contentHeight
+      : undefined;
 
   // 当 screenshotUrl 变化时重置截图加载状态
   React.useEffect(() => {
     setScreenshotLoaded(false);
   }, [screenshotUrl]);
+
+  // 当 previewSize 变化时重置内容高度
+  React.useEffect(() => {
+    setContentHeight(null);
+  }, [page.previewSize]);
 
   const canInteract = editable && !isEditing && toolMode === "select";
   const showEdgeHandles = isHovering && canInteract && !isDragging && !isResizing;
@@ -219,14 +263,8 @@ export function CanvasPageItem({
       startPosRef.current = { x: e.clientX, y: e.clientY };
 
       if (!canInteract) {
-        // 非交互模式：阻止冒泡以防止 CanvasViewport 捕获指针，
-        // 这样我们可以在 pointerUp 中检测点击并触发 onConfigEdit
-        if (e.button !== 0) return;
-        const target = e.target as HTMLElement;
-        if (target.closest("button")) return;
-        e.stopPropagation();
-        target.setPointerCapture(e.pointerId);
-        isClickTrackingRef.current = true;
+        // hand 模式下事件被 viewport capture phase 拦截，不会到达这里
+        // 但保留安全检查
         return;
       }
       if (e.button !== 0) return;
@@ -330,16 +368,6 @@ export function CanvasPageItem({
         onDragEnd?.();
         return;
       }
-      // 非交互模式下的点击检测
-      if (isClickTrackingRef.current) {
-        isClickTrackingRef.current = false;
-        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-        const dx = e.clientX - startPosRef.current.x;
-        const dy = e.clientY - startPosRef.current.y;
-        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-          onConfigEdit?.(page.id);
-        }
-      }
     },
     [isDragging, isResizing, onDragEnd, onConfigEdit, page.id],
   );
@@ -347,7 +375,6 @@ export function CanvasPageItem({
   const handleLostPointerCapture = useCallback(() => {
     setIsDragging(false);
     setIsResizing(null);
-    isClickTrackingRef.current = false;
     onDragEnd?.();
   }, [onDragEnd]);
 
@@ -403,6 +430,8 @@ export function CanvasPageItem({
             previewSize={page.previewSize}
             fillContainer
             onConsoleEntry={onConsoleEntry}
+            onContentHeightChange={handleContentHeightChange}
+            effectiveHeight={effectiveHeight}
           />
         </div>
       )}
@@ -430,6 +459,7 @@ export function CanvasPageItem({
   return (
     <div
       ref={containerRef}
+      data-page-id={page.id}
       className={cn(
         "absolute rounded-lg overflow-hidden transition-shadow duration-200 select-none",
         isEditing && "ring-2 ring-blue-500",

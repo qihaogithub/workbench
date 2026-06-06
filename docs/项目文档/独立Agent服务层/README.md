@@ -1,8 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.0
+> 版本：v2.2
 > 创建日期：2026-04-05
-> 更新日期：2026-05-29
+> 更新日期：2026-06-06
 
 ---
 
@@ -121,7 +121,16 @@ Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase
 - `packages/agent-service/src/backends/` - 后端适配器（14+ 后端）
 - `packages/agent-service/src/routes/` - API 路由
 - `packages/agent-service/src/session/` - 会话管理（SessionStore、SessionGuard、SnapshotService）
+- `packages/agent-client/src/` - 浏览器端 SDK，封装 HTTP + WebSocket 通信
+- `packages/screenshot-service/src/` - 截图服务（Puppeteer + Fastify）
 - `packages/shared/src/` - 共享类型
+
+### 相关包说明
+
+| 包 | 路径 | 说明 |
+|:---|:-----|:-----|
+| agent-client | `packages/agent-client/` | 浏览器端 SDK，提供 AgentClient（HTTP）和 AgentStream（WebSocket）类 |
+| screenshot-service | `packages/screenshot-service/` | Puppeteer 截图服务，支持同步/异步截图模式 |
 
 ---
 

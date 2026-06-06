@@ -2,15 +2,39 @@
   "folders": [],
   "pages": [
     {
-      "id": "demo_1778077850198_fjxwmf",
-      "name": "demo",
+      "id": "demo_1779000000100_text",
+      "name": "文本输入",
       "order": 0,
       "parentId": null
     },
     {
-      "id": "demo_1778751411983_7h2rpo",
-      "name": "demo",
+      "id": "demo_1779000000200_number",
+      "name": "数字与范围",
       "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779000000300_switch",
+      "name": "开关与选择",
+      "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779000000400_color",
+      "name": "颜色与图片",
+      "order": 3,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779000000500_array",
+      "name": "数据列表",
+      "order": 4,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779000000600_position",
+      "name": "位置与排序",
+      "order": 5,
       "parentId": null
     }
   ]

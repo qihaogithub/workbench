@@ -1,6 +1,6 @@
-export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasPageData, PreviewCanvasProps } from './types';
+export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasPageData, PreviewCanvasProps, PositionableConfig, PositionItem } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload } from './iframe-types';
-export { getOrderable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
+export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
 export { ConfigForm } from './ConfigForm';

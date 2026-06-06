@@ -9,6 +9,7 @@ interface CanvasViewportProps {
   onViewportChange: (viewport: CanvasViewportState) => void;
   editable?: boolean;
   onCanvasClick?: () => void;
+  onPageClick?: (pageId: string) => void;
   onFitToScreen?: () => void;
   onToolModeChange?: (mode: CanvasToolMode) => void;
   children?: React.ReactNode;
@@ -26,6 +27,7 @@ export function CanvasViewport({
   onViewportChange,
   editable = false,
   onCanvasClick,
+  onPageClick,
   onFitToScreen,
   onToolModeChange,
   children,
@@ -40,6 +42,8 @@ export function CanvasViewport({
   const viewportStartRef = useRef({ x: 0, y: 0 });
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
+  // 记录 pointerDown 时的目标页面 ID（用于 hand 模式下点击页面触发配置面板）
+  const clickedPageIdRef = useRef<string | null>(null);
 
   const rafIdRef = useRef(0);
   const pendingViewportRef = useRef<CanvasViewportState | null>(null);
@@ -170,18 +174,25 @@ export function CanvasViewport({
     };
   }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange, onCanvasClick]);
 
-  // capture phase：在事件到达子元素（CanvasPageItem）之前拦截平移
+  // capture phase：拦截需要优先处理的平移
   const handlePointerDownCapture = useCallback(
     (e: React.PointerEvent) => {
       if (!editable) return;
 
       const isMiddleButton = e.button === 1;
       const isSpaceLeftClick = e.button === 0 && spaceHeld;
+      // hand 模式下，左键点击任何区域都触发平移（包括页面）
       const isHandModeLeftClick = toolMode === "hand" && e.button === 0;
 
       if (isHandModeLeftClick || isSpaceLeftClick || isMiddleButton) {
-        // 阻止事件到达 CanvasPageItem，防止其开始拖拽
+        // 阻止事件到达 CanvasPageItem，防止其开始拖拽或捕获指针
         e.stopPropagation();
+
+        // 记录点击的页面 ID（用于 pointerUp 时判断是否触发配置面板）
+        const target = e.target as HTMLElement;
+        const pageEl = target.closest("[data-page-id]");
+        clickedPageIdRef.current = pageEl ? pageEl.getAttribute("data-page-id") : null;
+
         setIsPanning(true);
         startPosRef.current = { x: e.clientX, y: e.clientY };
         viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
@@ -192,23 +203,26 @@ export function CanvasViewport({
     [editable, toolMode, spaceHeld, markInteracting],
   );
 
-  // bubble phase：处理画布空白区域的点击（select 模式下点击空白区域取消选中）
+  // bubble phase：处理 select 模式下点击画布空白区域的平移
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      // 平移已在 capture phase 处理，这里只处理 select 模式下点击画布空白区域
-      if (toolMode !== "select" || e.button !== 0 || spaceHeld) return;
+      // hand 模式、空格+左键、中键已在 capture phase 处理
+      if (toolMode === "hand" || e.button === 1 || (e.button === 0 && spaceHeld)) return;
 
-      // 判断是否点击在画布空白区域（viewport 容器本身或 transform 层，而非页面元素）
-      const target = e.target as HTMLElement;
-      const isCanvasBackground =
-        target === containerRef.current || target === containerRef.current?.firstElementChild;
+      // select 模式下，点击画布空白区域触发平移
+      if (toolMode === "select" && e.button === 0) {
+        const target = e.target as HTMLElement;
+        const isCanvasBackground =
+          target === containerRef.current || target === containerRef.current?.firstElementChild;
 
-      if (isCanvasBackground) {
-        setIsPanning(true);
-        startPosRef.current = { x: e.clientX, y: e.clientY };
-        viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
-        containerRef.current?.setPointerCapture(e.pointerId);
-        markInteracting();
+        if (isCanvasBackground) {
+          clickedPageIdRef.current = null;
+          setIsPanning(true);
+          startPosRef.current = { x: e.clientX, y: e.clientY };
+          viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
+          containerRef.current?.setPointerCapture(e.pointerId);
+          markInteracting();
+        }
       }
     },
     [toolMode, spaceHeld, markInteracting],
@@ -236,11 +250,19 @@ export function CanvasViewport({
       containerRef.current?.releasePointerCapture(e.pointerId);
       const dx = e.clientX - startPosRef.current.x;
       const dy = e.clientY - startPosRef.current.y;
-      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-        onCanvasClick?.();
+      const isClick = Math.abs(dx) < 3 && Math.abs(dy) < 3;
+      if (isClick) {
+        if (clickedPageIdRef.current) {
+          // hand 模式下点击页面 → 触发配置面板
+          onPageClick?.(clickedPageIdRef.current);
+        } else {
+          // 点击画布空白区域 → 取消选中
+          onCanvasClick?.();
+        }
       }
+      clickedPageIdRef.current = null;
     },
-    [isPanning, onCanvasClick, markInteractingEnd],
+    [isPanning, onCanvasClick, onPageClick, markInteractingEnd],
   );
 
   const handleWheel = useCallback(

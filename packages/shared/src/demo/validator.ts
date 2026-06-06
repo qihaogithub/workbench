@@ -1,4 +1,4 @@
-import type { PreviewSize } from "./types";
+import type { PreviewSize, PositionableConfig, PositionItem } from "./types";
 
 export function isSchemaEmpty(schema?: string | null): boolean {
   if (!schema) return true;
@@ -30,6 +30,20 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
     const orderable = getOrderable(schema);
     if (orderable) {
       defaults.__order = [...orderable];
+    }
+
+    const orderableH = getOrderableHorizontal(schema);
+    if (orderableH) {
+      defaults.__orderH = [...orderableH];
+    }
+
+    const positionable = getPositionable(schema);
+    if (positionable) {
+      const positions: Record<string, PositionItem> = {};
+      for (const key of positionable.items) {
+        positions[key] = positionable.defaults?.[key] || { x: 0, y: 0 };
+      }
+      defaults.__positions = positions;
     }
 
     return defaults;
@@ -85,6 +99,62 @@ export function getOrderable(schema: string): string[] | undefined {
     );
 
     return validKeys.length >= 2 ? validKeys : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getOrderableHorizontal(schema: string): string[] | undefined {
+  try {
+    const parsed = JSON.parse(schema);
+
+    const orderableH = parsed.$demo?.orderableHorizontal;
+    if (!Array.isArray(orderableH) || orderableH.length < 2) {
+      return undefined;
+    }
+
+    const validKeys = orderableH.filter(
+      (key): key is string => typeof key === "string",
+    );
+
+    return validKeys.length >= 2 ? validKeys : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getPositionable(
+  schema: string,
+): PositionableConfig | undefined {
+  try {
+    const parsed = JSON.parse(schema);
+
+    const positionable = parsed.$demo?.positionable;
+    if (!positionable || !Array.isArray(positionable.items) || positionable.items.length < 1) {
+      return undefined;
+    }
+
+    const validItems = positionable.items.filter(
+      (key: unknown): key is string => typeof key === "string",
+    );
+
+    if (validItems.length < 1) return undefined;
+
+    const defaults: Record<string, PositionItem> = {};
+    if (positionable.defaults && typeof positionable.defaults === "object") {
+      for (const [key, val] of Object.entries(positionable.defaults)) {
+        if (
+          val &&
+          typeof val === "object" &&
+          typeof (val as Record<string, unknown>).x === "number" &&
+          typeof (val as Record<string, unknown>).y === "number"
+        ) {
+          defaults[key] = { x: (val as { x: number; y: number }).x, y: (val as { x: number; y: number }).y };
+        }
+      }
+    }
+
+    return { items: validItems, defaults };
   } catch {
     return undefined;
   }

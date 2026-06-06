@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": { "width": 1024, "height": 768 }
+  },
+  "properties": {
+    "stats": {
+      "type": "array",
+      "title": "统计指标",
+      "description": "顶部展示的关键数据指标（数组配置，每项包含标签、数值和单位）",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "title": "指标名称" },
+          "value": { "type": "number", "title": "指标数值" },
+          "unit": { "type": "string", "title": "单位" }
+        }
+      },
+      "default": [
+        { "label": "活跃用户", "value": 12847, "unit": "人" },
+        { "label": "月营收", "value": 89.5, "unit": "万" },
+        { "label": "转化率", "value": 3.42, "unit": "%" },
+        { "label": "满意度", "value": 97, "unit": "%" }
+      ]
+    },
+    "features": {
+      "type": "array",
+      "title": "功能列表",
+      "description": "功能特性展示列表（数组配置，每项包含图标、标题和描述）",
+      "items": {
+        "type": "object",
+        "properties": {
+          "icon": { "type": "string", "title": "图标" },
+          "title": { "type": "string", "title": "功能名称" },
+          "desc": { "type": "string", "title": "功能描述" }
+        }
+      },
+      "default": [
+        { "icon": "🚀", "title": "极速部署", "desc": "一键发布，秒级上线" },
+        { "icon": "🎨", "title": "可视化配置", "desc": "所见即所得的编辑体验" },
+        { "icon": "🔒", "title": "安全可靠", "desc": "企业级安全保障" },
+        { "icon": "📊", "title": "数据分析", "desc": "实时数据洞察" },
+        { "icon": "🔄", "title": "自动同步", "desc": "多端数据实时同步" },
+        { "icon": "💡", "title": "智能推荐", "desc": "AI 驱动的个性化推荐" }
+      ]
+    }
+  }
+}
