@@ -49,7 +49,7 @@ export interface ConfigFormProps {
   sessionId?: string;
 }
 
-export type PreviewMode = "single" | "grid" | "canvas";
+export type PreviewMode = "single" | "canvas";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
 export type CanvasToolMode = "hand" | "select";
@@ -130,43 +130,6 @@ export interface PreviewCanvasProps {
 export interface PreviewState {
   mode: PreviewMode;
   activePageId: string;
-  gridColumns: 2 | 3 | 4;
 }
 
-export interface GridPageItem {
-  id: string;
-  name: string;
-  order: number;
-  previewSize?: PreviewSize;
-  code?: string;
-}
 
-export interface GridIframeProps {
-  sessionId?: string;
-  page: GridPageItem;
-  visible: boolean;
-  hasChanges: boolean;
-  configData?: Record<string, unknown>;
-  previewSize?: PreviewSize;
-  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
-}
-
-export interface PreviewGridProps {
-  sessionId?: string;
-  demoPages: GridPageItem[];
-  activePageId: string;
-  gridColumns: 2 | 3 | 4;
-  gridScale?: number;
-  onGridScaleChange?: (scale: number) => void;
-  onGridColumnsChange: (columns: 2 | 3 | 4) => void;
-  onCardClick: (pageId: string) => void;
-  changedPageIds?: Set<string>;
-  configDataMap?: Record<string, Record<string, unknown>>;
-  previewSize?: PreviewSize;
-  flashCardId?: string;
-  showToolbar?: boolean;
-  showModeToggle?: boolean;
-  onPreviewModeChange?: (mode: PreviewMode) => void;
-  className?: string;
-  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
-}

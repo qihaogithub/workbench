@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   ChevronRight,
   FileText,
-  LayoutGrid,
 } from "lucide-react";
 import {
   getProjects,
@@ -26,10 +25,10 @@ import type {
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
-import { PreviewPanel, PreviewGrid } from "@/components/demo";
+import { PreviewPanel } from "@/components/demo";
 import { ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
-import type { PreviewSize, PreviewMode } from "@opencode-workbench/shared/demo";
+import type { PreviewSize } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -345,9 +344,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activePageId, setActivePageId] = useState<string>("");
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
-  const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
-  const [gridScale, setGridScale] = useState(1);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(),
   );
@@ -360,7 +356,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   >({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
-  const [flashGridCardId, setFlashGridCardId] = useState<string | null>(null);
 
   useEffect(() => {
     getProjectData(projectId)
@@ -444,13 +439,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       } else {
         setPreviewSize(undefined);
       }
-
-      if (previewMode === "grid") {
-        setFlashGridCardId(pageId);
-        setTimeout(() => setFlashGridCardId(null), 1600);
-      }
     },
-    [project, configDataMap, pageSchemaMap, previewMode],
+    [project, configDataMap, pageSchemaMap],
   );
 
   const handleConfigChange = useCallback(
@@ -485,15 +475,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       });
     },
     [],
-  );
-
-  const handleGridCardClick = useCallback(
-    (pageId: string) => {
-      handlePageChange(pageId);
-      setFlashDirectoryId(pageId);
-      setTimeout(() => setFlashDirectoryId(null), 1600);
-    },
-    [handlePageChange],
   );
 
   const toggleFolder = useCallback((folderId: string) => {
@@ -540,16 +521,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
 
-  const gridPages = project.demoPages.map((p, index) => ({
-    id: p.id,
-    name: p.name,
-    order: index,
-    code: getCompiledJsUrl(projectId, p.compiledJsPath),
-    previewSize: pageSchemaMap[p.id]
-      ? getPreviewSize(pageSchemaMap[p.id])
-      : undefined,
-  }));
-
   const compiledUrl = activePage
     ? getCompiledJsUrl(projectId, activePage.compiledJsPath)
     : "";
@@ -593,60 +564,35 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden">
-          {previewMode === "single" ? (
-            <div className="flex flex-col h-full">
-              <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    单页
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewMode("grid")}
-                    className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    宫格
-                  </button>
-                </div>
-                <div className="flex-1" />
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  单页
+                </button>
               </div>
-              <div
-                className="flex-1 overflow-y-auto"
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-              >
-                <style>{`
-                  .preview-single-scroll::-webkit-scrollbar { display: none; }
-                `}</style>
-              {activePage && (
-                <PreviewPanel
-                  compiledJsUrl={compiledUrl}
-                  configData={configData}
-                  previewSize={previewSize}
-                />
-              )}
+              <div className="flex-1" />
             </div>
-            </div>
-          ) : (
-            <PreviewGrid
-              demoPages={gridPages}
-              activePageId={activePageId}
-              showModeToggle
-              onPreviewModeChange={setPreviewMode}
-              gridColumns={gridColumns}
-              gridScale={gridScale}
-              onGridScaleChange={setGridScale}
-              onGridColumnsChange={setGridColumns}
-              onCardClick={handleGridCardClick}
-              configDataMap={configDataMap}
-              previewSize={previewSize}
-              flashCardId={flashGridCardId ?? undefined}
-            />
-          )}
+            <div
+              className="flex-1 overflow-y-auto"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              <style>{`
+                .preview-single-scroll::-webkit-scrollbar { display: none; }
+              `}</style>
+            {activePage && (
+              <PreviewPanel
+                compiledJsUrl={compiledUrl}
+                configData={configData}
+                previewSize={previewSize}
+              />
+            )}
+          </div>
+          </div>
         </div>
 
         {hasSchema && (

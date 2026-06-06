@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
   ConfigForm,
-  PreviewGrid,
   PreviewCanvas,
   invalidateCompileCache,
   ConfigScopeWrapper,
@@ -52,7 +51,6 @@ import {
   MoreVertical,
   Eye,
   Copy,
-  LayoutGrid,
   FileText,
   Map,
   Upload,
@@ -162,9 +160,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 预览模式状态
   const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
-  const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(2);
-  const [gridScale, setGridScale] = useState(1.0);
-  const [flashGridCardId, setFlashGridCardId] = useState<string | null>(null);
 
   // 画布模式状态
   const [canvasState, setCanvasState] = useState<CanvasState>({
@@ -1453,10 +1448,6 @@ ${context.details}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
                     setActiveDemoId(pageId);
-                    if (previewMode === "grid") {
-                      setFlashGridCardId(pageId);
-                      setTimeout(() => setFlashGridCardId(null), 1600);
-                    }
                     if (previewMode === "canvas") {
                       setFocusCanvasPageId(pageId);
                       setCanvasEditingPageId(pageId);
@@ -1751,14 +1742,6 @@ ${context.details}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPreviewMode("grid")}
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                        宫格
-                      </button>
-                      <button
-                        type="button"
                         className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
                       >
                         <Map className="h-3.5 w-3.5" />
@@ -1823,7 +1806,7 @@ ${context.details}
                     />
                   </div>
                 </div>
-              ) : previewMode === "single" ? (
+              ) : (
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
@@ -1833,14 +1816,6 @@ ${context.details}
                       >
                         <FileText className="h-3.5 w-3.5" />
                         单页
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewMode("grid")}
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                        宫格
                       </button>
                       <button
                         type="button"
@@ -1917,59 +1892,6 @@ ${context.details}
                     />
                   </div>
                 </div>
-              ) : (
-                <PreviewGrid
-                  sessionId={sessionId}
-                  demoPages={demoPages}
-                  activePageId={activeDemoId}
-                  showModeToggle
-                  onPreviewModeChange={setPreviewMode}
-                  gridColumns={gridColumns}
-                  gridScale={gridScale}
-                  onGridScaleChange={setGridScale}
-                  onGridColumnsChange={setGridColumns}
-                  onConsoleEntry={handleConsoleEntry}
-                  onCardClick={(pageId) => {
-                    if (pageId === activeDemoId) return;
-                    setActiveDemoId(pageId);
-                    const clickedPage = demoPages.find(
-                      (p) => p.id === pageId,
-                    ) as
-                      | (DemoPageMeta & {
-                          previewSize?: import("@opencode-workbench/shared/demo").PreviewSize;
-                        })
-                      | undefined;
-                    if (clickedPage?.previewSize) {
-                      setPreviewSize(clickedPage.previewSize);
-                    }
-                    if (sessionId) {
-                      fetch(`/api/sessions/${sessionId}/files/${pageId}`)
-                        .then((res) => res.json())
-                        .then((data) => {
-                          if (data.success) {
-                            setCode(data.data.code);
-                            setSchema(data.data.schema);
-                            setEditorContent(
-                              buildFigmaText(data.data.code, data.data.schema),
-                            );
-                            setConfigDataMap((prev) => {
-                              if (prev[pageId]) return prev;
-                              const defaults = getSafeMergedDefaults(
-                                data.data.schema,
-                              );
-                              return { ...prev, [pageId]: defaults };
-                            });
-                            const size = getPreviewSize(data.data.schema);
-                            setPreviewSize(size);
-                          }
-                        })
-                        .catch((err) => console.error("加载页面失败:", err));
-                    }
-                  }}
-                  configDataMap={configDataMap}
-                  previewSize={previewSize}
-                  flashCardId={flashGridCardId ?? undefined}
-                />
               )}
             </div>
           </ResizablePanel>

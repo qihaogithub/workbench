@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewGrid, PreviewCanvas, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
+import { PreviewPanel, ConfigForm, PreviewCanvas, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
 import type { PreviewMode, PreviewSize, CanvasState } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
@@ -10,7 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
   FileText,
-  LayoutGrid,
   Map,
   Settings,
   Loader2,
@@ -77,7 +76,6 @@ export default function ViewerProjectPage() {
   const searchParams = useSearchParams();
 
   const modeParam = searchParams.get("mode") as PreviewMode | null;
-  const columnsParam = searchParams.get("columns");
   const configParam = searchParams.get("config");
   const configWidthParam = searchParams.get("configWidth");
   const pagesParam = searchParams.get("pages");
@@ -87,7 +85,6 @@ export default function ViewerProjectPage() {
   const themeParam = searchParams.get("theme");
   const backgroundParam = searchParams.get("background");
   const configDataParam = searchParams.get("configData");
-  const gridSelectOnlyParam = searchParams.get("gridSelectOnly");
   const pageListParam = searchParams.get("pageList");
   const canvasConfigParam = searchParams.get("canvasConfig");
 
@@ -96,7 +93,6 @@ export default function ViewerProjectPage() {
   const showPages = pagesParam !== "false";
   const showToolbar = toolbarParam !== "false";
   const showModeSwitch = modeSwitchParam !== "false";
-  const gridSelectOnly = gridSelectOnlyParam === "true";
   const showPageList = pageListParam === "true";
   const previewBackground = backgroundParam || "#fff";
   // 画布模式配置面板显隐模式：always（常驻，默认）| onclick（按需显示）
@@ -108,10 +104,7 @@ export default function ViewerProjectPage() {
 
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>(
-    modeParam === "canvas" ? "canvas" : modeParam === "grid" ? "grid" : "single"
-  );
-  const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(
-    columnsParam === "3" ? 3 : columnsParam === "4" ? 4 : 2
+    modeParam === "canvas" ? "canvas" : "single"
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
@@ -233,7 +226,7 @@ export default function ViewerProjectPage() {
           }
           break;
         case "VIEWER_SET_MODE":
-          if (msg.mode === "single" || msg.mode === "grid" || msg.mode === "canvas") {
+          if (msg.mode === "single" || msg.mode === "canvas") {
             setPreviewMode(msg.mode);
           }
           break;
@@ -296,16 +289,6 @@ export default function ViewerProjectPage() {
       }
     },
     [data, getSafeMergedDefaults]
-  );
-
-  const handleGridCardClick = useCallback(
-    (pageId: string) => {
-      handlePageChange(pageId);
-      if (!gridSelectOnly) {
-        setPreviewMode("single");
-      }
-    },
-    [handlePageChange, gridSelectOnly]
   );
 
   if (isLoading) {
@@ -401,17 +384,6 @@ export default function ViewerProjectPage() {
                       单页
                     </button>
                     <button
-                      onClick={() => setPreviewMode("grid")}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                        previewMode === "grid"
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                      宫格
-                    </button>
-                    <button
                       onClick={() => setPreviewMode("canvas")}
                       className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
                         previewMode === "canvas"
@@ -422,31 +394,6 @@ export default function ViewerProjectPage() {
                       <Map className="h-3.5 w-3.5" />
                       画布
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {previewMode === "grid" && showModeSwitch && (
-                <div className="mt-3 pt-3 border-t" />
-              )}
-
-              {previewMode === "grid" && (
-                <div className="space-y-2">
-                  <span className="text-xs font-medium text-muted-foreground">每行显示</span>
-                  <div className="flex gap-1">
-                    {([2, 3, 4] as const).map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setGridColumns(n)}
-                        className={`flex-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                          gridColumns === n
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    ))}
                   </div>
                 </div>
               )}
@@ -480,7 +427,7 @@ export default function ViewerProjectPage() {
                 }
               }}
             />
-          ) : previewMode === "single" ? (
+          ) : (
             <div
               className="p-4 h-full overflow-y-auto preview-single-scroll"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -499,16 +446,6 @@ export default function ViewerProjectPage() {
                 />
               )}
             </div>
-          ) : (
-            <PreviewGrid
-              demoPages={gridPages}
-              activePageId={activeDemoId}
-              gridColumns={gridColumns}
-              onGridColumnsChange={setGridColumns}
-              onCardClick={handleGridCardClick}
-              configDataMap={configDataMap}
-              previewSize={previewSize}
-            />
           )}
         </div>
 
