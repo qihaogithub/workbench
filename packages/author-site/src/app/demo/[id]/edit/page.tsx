@@ -190,12 +190,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   } = useScreenshotGeneration({
     projectId: demoId,
     sessionId,
-    enabled: previewMode === "canvas",
+    enabled: true, // 截图常驻生成，不再仅限画布模式
   });
 
-  // 切换到画布模式时触发批量截图
+  // 截图 debounce 再生定时器
+  const screenshotRegenerateTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // debounce 3s 触发单页截图再生
+  const scheduleScreenshotRegenerate = useCallback((pageId: string, pageCode: string) => {
+    const timers = screenshotRegenerateTimerRef.current;
+    if (timers[pageId]) clearTimeout(timers[pageId]);
+    timers[pageId] = setTimeout(() => {
+      const config = configDataMap[pageId] || {};
+      regeneratePage(pageId, pageCode, config);
+      delete timers[pageId];
+    }, 3000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regeneratePage]);
+
+  // 切换到画布模式时触发批量截图，或首次加载时生成截图
   useEffect(() => {
-    if (previewMode === "canvas" && demoPages.length > 0 && !isScreenshotGenerating) {
+    if (demoPages.length > 0 && !isScreenshotGenerating) {
       const pages = demoPages
         .filter((p) => pageCodes[p.id] || code)
         .map((p) => ({
@@ -618,16 +633,29 @@ ${context.details}
 
     const size = getPreviewSize(parsed.schema);
     setPreviewSize(size);
+
+    // 代码变更后 debounce 3s 触发截图再生
+    scheduleScreenshotRegenerate(activeDemoIdRef.current, parsed.code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
-    setConfigDataMap((prev) => ({
-      ...prev,
-      [activeDemoIdRef.current]: {
-        ...(prev[activeDemoIdRef.current] ?? {}),
-        ...data,
-      },
-    }));
+    setConfigDataMap((prev) => {
+      const next = {
+        ...prev,
+        [activeDemoIdRef.current]: {
+          ...(prev[activeDemoIdRef.current] ?? {}),
+          ...data,
+        },
+      };
+      // 配置变更后 debounce 3s 触发截图再生
+      const currentCode = codeRef.current;
+      if (currentCode) {
+        scheduleScreenshotRegenerate(activeDemoIdRef.current, currentCode);
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSchemaChange = useCallback(
@@ -1945,54 +1973,96 @@ ${context.details}
               <div className="p-4 flex flex-col">
                 {hasAnyConfig && (
                   <>
-                    {showProjectConfig && (
-                      <ConfigScopeWrapper
-                        scope="project"
-                        hideHeader={!hasBothScopes}
-                      >
-                        <ConfigForm
-                          key={`project-${projectConfigSchema}`}
-                          schema={projectConfigSchema!}
-                          onChange={(data) => {
-                            setConfigDataMap((prev) => {
-                              const next = { ...prev };
-                              for (const pageId of Object.keys(next)) {
-                                next[pageId] = { ...next[pageId], ...data };
-                              }
-                              for (const page of demoPages) {
-                                if (!next[page.id]) {
-                                  next[page.id] = { ...data };
+                    {previewMode === "canvas" ? (
+                      /* Canvas 模式：合并为一个连续表单，无标题和分隔线 */
+                      <>
+                        {showProjectConfig && (
+                          <ConfigForm
+                            key={`project-${projectConfigSchema}`}
+                            schema={projectConfigSchema!}
+                            onChange={(data) => {
+                              setConfigDataMap((prev) => {
+                                const next = { ...prev };
+                                for (const pageId of Object.keys(next)) {
+                                  next[pageId] = { ...next[pageId], ...data };
                                 }
-                              }
-                              return next;
-                            });
-                          }}
-                          onSchemaChange={handleProjectSchemaChange}
-                          initialData={configData}
-                          sessionId={sessionId}
-                        />
-                      </ConfigScopeWrapper>
-                    )}
+                                for (const page of demoPages) {
+                                  if (!next[page.id]) {
+                                    next[page.id] = { ...data };
+                                  }
+                                }
+                                return next;
+                              });
+                            }}
+                            onSchemaChange={handleProjectSchemaChange}
+                            initialData={configData}
+                            sessionId={sessionId}
+                          />
+                        )}
+                        {showPageConfig && (
+                          <ConfigForm
+                            key={activeDemoId}
+                            schema={schema}
+                            onChange={handleConfigChange}
+                            onSchemaChange={handleSchemaChange}
+                            initialData={configData}
+                            sessionId={sessionId}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      /* 非 Canvas 模式：保持原有 ConfigScopeWrapper + 分隔线 */
+                      <>
+                        {showProjectConfig && (
+                          <ConfigScopeWrapper
+                            scope="project"
+                            hideHeader={!hasBothScopes}
+                          >
+                            <ConfigForm
+                              key={`project-${projectConfigSchema}`}
+                              schema={projectConfigSchema!}
+                              onChange={(data) => {
+                                setConfigDataMap((prev) => {
+                                  const next = { ...prev };
+                                  for (const pageId of Object.keys(next)) {
+                                    next[pageId] = { ...next[pageId], ...data };
+                                  }
+                                  for (const page of demoPages) {
+                                    if (!next[page.id]) {
+                                      next[page.id] = { ...data };
+                                    }
+                                  }
+                                  return next;
+                                });
+                              }}
+                              onSchemaChange={handleProjectSchemaChange}
+                              initialData={configData}
+                              sessionId={sessionId}
+                            />
+                          </ConfigScopeWrapper>
+                        )}
 
-                    {showProjectConfig && showPageConfig && (
-                      <div className="h-[2px] bg-border my-3" />
-                    )}
+                        {showProjectConfig && showPageConfig && (
+                          <div className="h-[2px] bg-border my-3" />
+                        )}
 
-                    {showPageConfig && (
-                      <ConfigScopeWrapper
-                        scope="page"
-                        pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
-                        hideHeader={!hasBothScopes}
-                      >
-                        <ConfigForm
-                          key={activeDemoId}
-                          schema={schema}
-                          onChange={handleConfigChange}
-                          onSchemaChange={handleSchemaChange}
-                          initialData={configData}
-                          sessionId={sessionId}
-                        />
-                      </ConfigScopeWrapper>
+                        {showPageConfig && (
+                          <ConfigScopeWrapper
+                            scope="page"
+                            pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
+                            hideHeader={!hasBothScopes}
+                          >
+                            <ConfigForm
+                              key={activeDemoId}
+                              schema={schema}
+                              onChange={handleConfigChange}
+                              onSchemaChange={handleSchemaChange}
+                              initialData={configData}
+                              sessionId={sessionId}
+                            />
+                          </ConfigScopeWrapper>
+                        )}
+                      </>
                     )}
                   </>
                 )}

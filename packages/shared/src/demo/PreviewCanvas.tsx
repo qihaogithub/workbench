@@ -5,7 +5,14 @@ import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem } from "./CanvasPageItem";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { cn } from "./utils";
-import type { PreviewCanvasProps, CanvasState, CanvasPageLayout, CanvasViewportState } from "./types";
+import type {
+  PreviewCanvasProps,
+  CanvasState,
+  CanvasPageLayout,
+  CanvasViewportState,
+  AlignmentGuide,
+  CanvasToolMode,
+} from "./types";
 
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
 
@@ -84,6 +91,147 @@ function getVisiblePageIds(
   return visible;
 }
 
+const SNAP_THRESHOLD = 8; // 吸附阈值（px）
+
+interface AlignmentPoint {
+  position: number;
+  edgeType: "left" | "right" | "center-x" | "top" | "bottom" | "center-y";
+}
+
+function getAlignmentPoints(layout: CanvasPageLayout): AlignmentPoint[] {
+  return [
+    { position: layout.x, edgeType: "left" },
+    { position: layout.x + layout.width, edgeType: "right" },
+    { position: layout.x + layout.width / 2, edgeType: "center-x" },
+    { position: layout.y, edgeType: "top" },
+    { position: layout.y + layout.height, edgeType: "bottom" },
+    { position: layout.y + layout.height / 2, edgeType: "center-y" },
+  ];
+}
+
+function computeAlignment(
+  movingLayout: CanvasPageLayout,
+  otherLayouts: CanvasPageLayout[],
+  isResizing: boolean,
+  edge?: string,
+): { layout: CanvasPageLayout; guides: AlignmentGuide[] } {
+  const guides: AlignmentGuide[] = [];
+  let snappedX: number | undefined;
+  let snappedY: number | undefined;
+
+  const movingPoints = getAlignmentPoints(movingLayout);
+
+  for (const other of otherLayouts) {
+    const otherPoints = getAlignmentPoints(other);
+
+    // 水平对齐（X轴）
+    for (const mp of movingPoints) {
+      if (mp.edgeType === "center-x") {
+        for (const op of otherPoints) {
+          if (op.edgeType === "center-x") {
+            const diff = Math.abs(mp.position - op.position);
+            if (diff < SNAP_THRESHOLD) {
+              snappedX = op.position - (movingLayout.x + movingLayout.width / 2);
+              guides.push({
+                type: "vertical",
+                position: op.position,
+                start: Math.min(movingLayout.y, other.y) - 10,
+                end: Math.max(movingLayout.y + movingLayout.height, other.y + other.height) + 10,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 边缘对齐
+    const leftRightPairs: [string, string][] = [
+      ["left", "left"],
+      ["left", "right"],
+      ["right", "left"],
+      ["right", "right"],
+    ];
+    for (const [mpType, opType] of leftRightPairs) {
+      const mp = movingPoints.find((p) => p.edgeType === mpType);
+      const op = otherPoints.find((p) => p.edgeType === opType);
+      if (mp && op) {
+        const diff = Math.abs(mp.position - op.position);
+        if (diff < SNAP_THRESHOLD) {
+          if (mpType === "left") {
+            snappedX = op.position - movingLayout.x;
+          } else {
+            snappedX = op.position - (movingLayout.x + movingLayout.width);
+          }
+          guides.push({
+            type: "vertical",
+            position: op.position,
+            start: Math.min(movingLayout.y, other.y) - 10,
+            end: Math.max(movingLayout.y + movingLayout.height, other.y + other.height) + 10,
+          });
+        }
+      }
+    }
+
+    // 垂直对齐（Y轴）
+    for (const mp of movingPoints) {
+      if (mp.edgeType === "center-y") {
+        for (const op of otherPoints) {
+          if (op.edgeType === "center-y") {
+            const diff = Math.abs(mp.position - op.position);
+            if (diff < SNAP_THRESHOLD) {
+              snappedY = op.position - (movingLayout.y + movingLayout.height / 2);
+              guides.push({
+                type: "horizontal",
+                position: op.position,
+                start: Math.min(movingLayout.x, other.x) - 10,
+                end: Math.max(movingLayout.x + movingLayout.width, other.x + other.width) + 10,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 上下边缘对齐
+    const topBottomPairs: [string, string][] = [
+      ["top", "top"],
+      ["top", "bottom"],
+      ["bottom", "top"],
+      ["bottom", "bottom"],
+    ];
+    for (const [mpType, opType] of topBottomPairs) {
+      const mp = movingPoints.find((p) => p.edgeType === mpType);
+      const op = otherPoints.find((p) => p.edgeType === opType);
+      if (mp && op) {
+        const diff = Math.abs(mp.position - op.position);
+        if (diff < SNAP_THRESHOLD) {
+          if (mpType === "top") {
+            snappedY = op.position - movingLayout.y;
+          } else {
+            snappedY = op.position - (movingLayout.y + movingLayout.height);
+          }
+          guides.push({
+            type: "horizontal",
+            position: op.position,
+            start: Math.min(movingLayout.x, other.x) - 10,
+            end: Math.max(movingLayout.x + movingLayout.width, other.x + other.width) + 10,
+          });
+        }
+      }
+    }
+  }
+
+  const result = { ...movingLayout };
+  if (snappedX !== undefined) {
+    result.x = result.x + snappedX;
+  }
+  if (snappedY !== undefined) {
+    result.y = result.y + snappedY;
+  }
+
+  return { layout: result, guides };
+}
+
 export function PreviewCanvas({
   editable = false,
   sessionId,
@@ -103,6 +251,13 @@ export function PreviewCanvas({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: computeInitialLayout(pages),
   });
+
+  // 对齐辅助线状态
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
+  const [activeDragPageId, setActiveDragPageId] = useState<string | null>(null);
+
+  // 工具模式状态
+  const [toolMode, setToolMode] = useState<CanvasToolMode>("hand");
 
   const canvasState = externalState || internalState;
 
@@ -136,6 +291,47 @@ export function PreviewCanvas({
     },
     [updateState],
   );
+
+  // 开始拖拽/缩放时，清空辅助线
+  const handleDragStart = useCallback(
+    (pageId: string) => {
+      setActiveDragPageId(pageId);
+      setAlignmentGuides([]);
+    },
+    [],
+  );
+
+  // 拖拽/缩放过程中计算对齐
+  const handleDragMove = useCallback(
+    (pageId: string, layout: CanvasPageLayout, edge?: string) => {
+      if (!activeDragPageId || activeDragPageId !== pageId) return;
+
+      // 获取其他页面的布局
+      const otherLayouts = Object.entries(effectivePages)
+        .filter(([id]) => id !== pageId)
+        .map(([, l]) => l);
+
+      const { layout: alignedLayout, guides } = computeAlignment(
+        layout,
+        otherLayouts,
+        !!edge,
+        edge,
+      );
+
+      setAlignmentGuides(guides);
+      updateState((prev) => ({
+        ...prev,
+        pages: { ...prev.pages, [pageId]: alignedLayout },
+      }));
+    },
+    [activeDragPageId, effectivePages, updateState],
+  );
+
+  // 结束拖拽/缩放时，清空辅助线
+  const handleDragEnd = useCallback(() => {
+    setActiveDragPageId(null);
+    setAlignmentGuides([]);
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -185,6 +381,43 @@ export function PreviewCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPageId]);
 
+  // 适应屏幕：计算所有页面的包围盒，调整 zoom 和 pan 使所有页面完整显示
+  const handleFitToScreen = useCallback(() => {
+    const pageLayouts = Object.values(effectivePages);
+    if (pageLayouts.length === 0) return;
+    const cw = containerSize.width;
+    const ch = containerSize.height;
+    if (cw === 0 || ch === 0) return;
+
+    // 计算包围盒
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pageLayouts) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + p.width);
+      maxY = Math.max(maxY, p.y + p.height);
+    }
+    const bboxW = maxX - minX;
+    const bboxH = maxY - minY;
+    if (bboxW === 0 || bboxH === 0) return;
+
+    // 留 10% 边距
+    const zoom = Math.min(cw / bboxW, ch / bboxH) * 0.9;
+    const clampedZoom = Math.min(Math.max(zoom, 0.05), 3);
+
+    // 居中
+    const cx = minX + bboxW / 2;
+    const cy = minY + bboxH / 2;
+    updateState((prev) => ({
+      ...prev,
+      viewport: {
+        x: cw / 2 - cx * clampedZoom,
+        y: ch / 2 - cy * clampedZoom,
+        zoom: clampedZoom,
+      },
+    }));
+  }, [effectivePages, containerSize, updateState]);
+
   return (
     <div
       ref={containerRef}
@@ -205,6 +438,9 @@ export function PreviewCanvas({
               viewport: { x: 40, y: 40, zoom: 0.5 },
             }))
           }
+          onFitToScreen={handleFitToScreen}
+          toolMode={toolMode}
+          onToolModeChange={setToolMode}
         />
       )}
 
@@ -215,6 +451,10 @@ export function PreviewCanvas({
         }
         editable={editable}
         onCanvasClick={handleCanvasClick}
+        onFitToScreen={handleFitToScreen}
+        onToolModeChange={setToolMode}
+        alignmentGuides={alignmentGuides}
+        toolMode={toolMode}
       >
         {pages.map((page) => (
           <CanvasPageItem
@@ -236,6 +476,10 @@ export function PreviewCanvas({
             onLayoutChange={handleLayoutChange}
             onConfigEdit={onPageConfigEdit}
             onConsoleEntry={onConsoleEntry}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            toolMode={toolMode}
           />
         ))}
       </CanvasViewport>

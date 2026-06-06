@@ -9,8 +9,8 @@ interface CacheEntry {
   timestamp: number
 }
 
-const MAX_CACHE_SIZE = 20
-const CACHE_TTL = 5 * 60 * 1000
+const MAX_CACHE_SIZE = 200
+const CACHE_TTL = 30 * 60 * 1000
 
 const compileCache = new Map<string, CacheEntry>()
 
@@ -48,4 +48,15 @@ export function invalidateCompileCache(sessionId: string, demoId?: string): void
       }
     }
   }
+}
+
+export function hasCachedCompile(sessionId: string, demoId: string): boolean {
+  const key = buildKey(sessionId, demoId)
+  const cached = compileCache.get(key)
+  if (!cached) return false
+  if (Date.now() - cached.timestamp > CACHE_TTL) {
+    compileCache.delete(key)
+    return false
+  }
+  return true
 }

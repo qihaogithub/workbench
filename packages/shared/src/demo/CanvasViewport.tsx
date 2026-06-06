@@ -2,15 +2,19 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "./utils";
-import type { CanvasViewportState } from "./types";
+import type { CanvasViewportState, AlignmentGuide, CanvasToolMode } from "./types";
 
 interface CanvasViewportProps {
   viewport: CanvasViewportState;
   onViewportChange: (viewport: CanvasViewportState) => void;
   editable?: boolean;
   onCanvasClick?: () => void;
+  onFitToScreen?: () => void;
+  onToolModeChange?: (mode: CanvasToolMode) => void;
   children?: React.ReactNode;
   className?: string;
+  alignmentGuides?: AlignmentGuide[];
+  toolMode?: CanvasToolMode;
 }
 
 const MIN_ZOOM = 0.05;
@@ -22,11 +26,16 @@ export function CanvasViewport({
   onViewportChange,
   editable = false,
   onCanvasClick,
+  onFitToScreen,
+  onToolModeChange,
   children,
   className,
+  alignmentGuides = [],
+  toolMode = "hand",
 }: CanvasViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const viewportStartRef = useRef({ x: 0, y: 0 });
   const viewportRef = useRef(viewport);
@@ -61,18 +70,127 @@ export function CanvasViewport({
     }, 100);
   }, []);
 
+  // 键盘快捷键
+  useEffect(() => {
+    if (!editable) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Space 键：切换为平移模式
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        setSpaceHeld(true);
+      }
+
+      // H 键：切换到拖动工具
+      if (e.key === "h" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+        onToolModeChange?.("hand");
+      }
+
+      // V 键：切换到选择工具
+      if (e.key === "v" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+        onToolModeChange?.("select");
+      }
+
+      // Ctrl/Cmd + 0：适应屏幕
+      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        onFitToScreen?.();
+      }
+
+      // Ctrl/Cmd + 1：1:1 缩放
+      if ((e.ctrlKey || e.metaKey) && e.key === "1") {
+        e.preventDefault();
+        const vp = viewportRef.current;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+          const scale = 1 / vp.zoom;
+          scheduleUpdate({
+            x: cx - (cx - vp.x) * scale,
+            y: cy - (cy - vp.y) * scale,
+            zoom: 1,
+          });
+        }
+      }
+
+      // Ctrl/Cmd + =：放大
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        const vp = viewportRef.current;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+          const newZoom = Math.min(vp.zoom * ZOOM_STEP, MAX_ZOOM);
+          const scale = newZoom / vp.zoom;
+          scheduleUpdate({
+            x: cx - (cx - vp.x) * scale,
+            y: cy - (cy - vp.y) * scale,
+            zoom: newZoom,
+          });
+        }
+      }
+
+      // Ctrl/Cmd + -：缩小
+      if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+        e.preventDefault();
+        const vp = viewportRef.current;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+          const newZoom = Math.max(vp.zoom / ZOOM_STEP, MIN_ZOOM);
+          const scale = newZoom / vp.zoom;
+          scheduleUpdate({
+            x: cx - (cx - vp.x) * scale,
+            y: cy - (cy - vp.y) * scale,
+            zoom: newZoom,
+          });
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setSpaceHeld(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange]);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (e.button !== 0 && e.button !== 1) return;
-      if (e.target === e.currentTarget || (e.target as HTMLElement).closest("[data-canvas-root]")) {
+      // 中键始终触发平移
+      // Space + 左键始终触发平移
+      // hand 模式下，左键点击画布空白区域也触发平移
+      // select 模式下，左键点击画布空白区域不触发平移
+      const isMiddleButton = e.button === 1;
+      const isSpaceLeftClick = e.button === 0 && spaceHeld;
+      const isCanvasBackground =
+        e.target === e.currentTarget || (e.target as HTMLElement).closest("[data-canvas-root]");
+      const isHandModePan = toolMode === "hand" && e.button === 0 && isCanvasBackground;
+
+      const isPanTrigger = isMiddleButton || isSpaceLeftClick || isHandModePan;
+
+      if (isPanTrigger) {
         setIsPanning(true);
         startPosRef.current = { x: e.clientX, y: e.clientY };
         viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
         markInteracting();
+        if (isMiddleButton || isSpaceLeftClick) {
+          e.stopPropagation();
+        }
       }
     },
-    [markInteracting],
+    [markInteracting, spaceHeld, toolMode],
   );
 
   const handlePointerMove = useCallback(
@@ -138,15 +256,29 @@ export function CanvasViewport({
     };
   }, []);
 
+  // 光标样式：hand 模式显示抓手，select 模式默认光标（空格时显示抓手）
+  const cursorClass = editable
+    ? toolMode === "hand"
+      ? isPanning
+        ? "cursor-grabbing"
+        : "cursor-grab"
+      : spaceHeld
+        ? isPanning
+          ? "cursor-grabbing"
+          : "cursor-grab"
+        : ""
+    : "";
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        "w-full h-full overflow-hidden",
-        editable && (isPanning ? "cursor-grabbing" : "cursor-grab"),
+        "w-full h-full overflow-hidden outline-none",
+        cursorClass,
         className,
       )}
       data-canvas-root="true"
+      tabIndex={0}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -165,6 +297,41 @@ export function CanvasViewport({
         onDragStart={(e) => e.preventDefault()}
       >
         {children}
+
+        {/* 对齐辅助线 */}
+        {alignmentGuides.map((guide, index) => {
+          if (guide.type === "vertical") {
+            return (
+              <div
+                key={`v-${index}`}
+                className="absolute pointer-events-none"
+                style={{
+                  left: guide.position,
+                  top: guide.start,
+                  width: 1,
+                  height: guide.end - guide.start,
+                  backgroundColor: "#ef4444",
+                  zIndex: 9999,
+                }}
+              />
+            );
+          } else {
+            return (
+              <div
+                key={`h-${index}`}
+                className="absolute pointer-events-none"
+                style={{
+                  left: guide.start,
+                  top: guide.position,
+                  width: guide.end - guide.start,
+                  height: 1,
+                  backgroundColor: "#ef4444",
+                  zIndex: 9999,
+                }}
+              />
+            );
+          }
+        })}
       </div>
     </div>
   );

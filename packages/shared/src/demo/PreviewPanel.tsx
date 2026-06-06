@@ -4,6 +4,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import type { PreviewPanelProps, PreviewSize } from "./types";
 import type { ConsoleLogPayload } from "./iframe-types";
 import { generateIframeHtml } from "./iframe-template";
+import { getCachedCompile, setCachedCompile } from "./compile-cache";
 
 const DEFAULT_PREVIEW_SIZE: PreviewSize = {
   width: 375,
@@ -40,6 +41,42 @@ function computePreviewScale(
   const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
 
   if (fillContainer) {
+    // 保持设计尺寸宽高比，通过 transform scale 适配容器
+    if (containerWidth && containerHeight) {
+      const scaleX = containerWidth / designWidth;
+      const scaleY = containerHeight / designHeight;
+      const scale = Math.min(scaleX, scaleY);
+
+      // 居中偏移
+      const displayWidth = designWidth * scale;
+      const displayHeight = designHeight * scale;
+      const offsetX = (containerWidth - displayWidth) / 2;
+      const offsetY = (containerHeight - displayHeight) / 2;
+
+      return {
+        designWidth,
+        designHeight,
+        scale,
+        wrapperStyle: {
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          position: "relative",
+        },
+        iframeStyle: {
+          width: designWidth,
+          height: designHeight,
+          border: "none",
+          position: "absolute",
+          top: offsetY / scale,
+          left: offsetX / scale,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        },
+      };
+    }
+
+    // 容器尺寸未知时，先以原始尺寸渲染
     return {
       designWidth,
       designHeight,
@@ -48,11 +85,16 @@ function computePreviewScale(
         width: "100%",
         height: "100%",
         overflow: "hidden",
+        position: "relative",
       },
       iframeStyle: {
-        width: "100%",
-        height: "100%",
+        width: designWidth,
+        height: designHeight,
         border: "none",
+        position: "absolute",
+        top: 0,
+        left: 0,
+        transformOrigin: "top left",
       },
     };
   }
@@ -338,6 +380,23 @@ export function PreviewPanel({
 
     const compile = async () => {
       try {
+        // 先检查编译缓存
+        if (sessionId && demoId) {
+          const cached = getCachedCompile(sessionId, demoId);
+          if (cached) {
+            const compileResult: CompileResult = cached;
+            setLastSuccessfulResult(compileResult);
+            const currentConfig = configDataRef.current || {};
+            if (iframeReadyRef.current) {
+              sendUpdateCode(compileResult, currentConfig);
+            } else {
+              setPendingCompileResult(compileResult);
+            }
+            setIsCompiling(false);
+            return;
+          }
+        }
+
         const body: Record<string, unknown> = sessionId
           ? { sessionId, code }
           : { code };
@@ -363,6 +422,11 @@ export function PreviewPanel({
 
         const compileResult: CompileResult = result.data;
         setLastSuccessfulResult(compileResult);
+
+        // 写入编译缓存
+        if (sessionId && demoId) {
+          setCachedCompile(sessionId, demoId, compileResult);
+        }
 
         const currentConfig = configDataRef.current || {};
         if (iframeReadyRef.current) {
@@ -586,7 +650,7 @@ export function PreviewPanel({
         className="w-full h-full flex flex-col items-center"
       >
         {iframeSrcUrl && (
-          <div style={{ ...wrapperStyle, marginTop: 0, marginBottom: 0 }} className="rounded-lg border border-border relative">
+          <div style={{ ...wrapperStyle, marginTop: 0, marginBottom: 0 }} className={fillContainer ? "relative" : "rounded-lg border border-border relative"}>
             {!contentLoaded && !isCompiling && (
               <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg">
                 <div className="animate-pulse rounded-full h-8 w-8 border-2 border-muted-foreground/30" />

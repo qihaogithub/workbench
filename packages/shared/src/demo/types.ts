@@ -51,6 +51,9 @@ export interface ConfigFormProps {
 
 export type PreviewMode = "single" | "grid" | "canvas";
 
+/** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
+export type CanvasToolMode = "hand" | "select";
+
 export interface CanvasPageLayout {
   x: number;
   y: number;
@@ -78,6 +81,34 @@ export interface CanvasPageData {
   previewSize?: PreviewSize;
   order: number;
 }
+
+export interface AlignmentGuide {
+  /** 辅助线类型 */
+  type: "vertical" | "horizontal";
+  /** 辅助线位置（画布坐标） */
+  position: number;
+  /** 辅助线范围起点 */
+  start: number;
+  /** 辅助线范围终点 */
+  end: number;
+}
+
+export interface AlignmentResult {
+  /** 吸附后的布局 */
+  layout: CanvasPageLayout;
+  /** 是否有吸附发生 */
+  snapped: boolean;
+  /** 对齐辅助线列表 */
+  guides: AlignmentGuide[];
+}
+
+export interface DragState {
+  pageId: string;
+  layout: CanvasPageLayout;
+  edge?: ResizeEdge;
+}
+
+export type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export interface PreviewCanvasProps {
   editable?: boolean;
