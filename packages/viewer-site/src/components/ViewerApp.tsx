@@ -437,7 +437,9 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       if (schema) {
         setPreviewSize(getPreviewSize(schema));
       } else {
-        setPreviewSize(undefined);
+        // schema 不可用时，使用页面自带的 previewSize 作为 fallback
+        const page = project.demoPages.find((p) => p.id === pageId);
+        setPreviewSize(page?.previewSize ?? undefined);
       }
     },
     [project, configDataMap, pageSchemaMap],

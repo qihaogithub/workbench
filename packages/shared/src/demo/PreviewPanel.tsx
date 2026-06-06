@@ -547,7 +547,7 @@ export function PreviewPanel({
       setContainerWidth(rect.width);
       setContainerHeight(rect.height);
     }
-  }, []);
+  }, [previewSize]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -562,6 +562,23 @@ export function PreviewPanel({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // 页面切换时重置外层滚动容器的 scrollTop，避免 iframe 偏移到底部
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // 向上查找最近的可滚动父容器
+    let parent: HTMLElement | null = el.parentElement;
+    while (parent) {
+      const style = getComputedStyle(parent);
+      const overflowY = style.overflowY;
+      if ((overflowY === 'auto' || overflowY === 'scroll') && parent.scrollTop > 0) {
+        parent.scrollTop = 0;
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }, [previewSize]);
 
   useEffect(() => {
     const iframe = iframeRef.current;

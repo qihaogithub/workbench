@@ -1448,6 +1448,10 @@ ${context.details}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
                     setActiveDemoId(pageId);
+                    // 同步设置 previewSize，避免 fetch 期间用旧尺寸渲染
+                    if (pagePreviewSizeMap[pageId]) {
+                      setPreviewSize(pagePreviewSizeMap[pageId]);
+                    }
                     if (previewMode === "canvas") {
                       setFocusCanvasPageId(pageId);
                       setCanvasEditingPageId(pageId);
@@ -1832,6 +1836,10 @@ ${context.details}
                         value={activeDemoId}
                         onValueChange={async (pageId) => {
                           setActiveDemoId(pageId);
+                          // 同步设置 previewSize，避免 fetch 期间用旧尺寸渲染
+                          if (pagePreviewSizeMap[pageId]) {
+                            setPreviewSize(pagePreviewSizeMap[pageId]);
+                          }
                           if (sessionId) {
                             try {
                               const res = await fetch(
