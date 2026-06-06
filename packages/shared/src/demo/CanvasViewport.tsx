@@ -170,32 +170,48 @@ export function CanvasViewport({
     };
   }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange, onCanvasClick]);
 
-  const handlePointerDown = useCallback(
+  // capture phase：在事件到达子元素（CanvasPageItem）之前拦截平移
+  const handlePointerDownCapture = useCallback(
     (e: React.PointerEvent) => {
-      // 中键始终触发平移
-      // Space + 左键始终触发平移
-      // hand 模式下，左键点击画布空白区域也触发平移
-      // select 模式下，左键点击画布空白区域不触发平移
+      if (!editable) return;
+
       const isMiddleButton = e.button === 1;
       const isSpaceLeftClick = e.button === 0 && spaceHeld;
-      const isCanvasBackground =
-        e.target === e.currentTarget || (e.target as HTMLElement).closest("[data-canvas-root]");
-      const isHandModePan = toolMode === "hand" && e.button === 0 && isCanvasBackground;
+      const isHandModeLeftClick = toolMode === "hand" && e.button === 0;
 
-      const isPanTrigger = isMiddleButton || isSpaceLeftClick || isHandModePan;
-
-      if (isPanTrigger) {
+      if (isHandModeLeftClick || isSpaceLeftClick || isMiddleButton) {
+        // 阻止事件到达 CanvasPageItem，防止其开始拖拽
+        e.stopPropagation();
         setIsPanning(true);
         startPosRef.current = { x: e.clientX, y: e.clientY };
         viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        containerRef.current?.setPointerCapture(e.pointerId);
         markInteracting();
-        if (isMiddleButton || isSpaceLeftClick) {
-          e.stopPropagation();
-        }
       }
     },
-    [markInteracting, spaceHeld, toolMode],
+    [editable, toolMode, spaceHeld, markInteracting],
+  );
+
+  // bubble phase：处理画布空白区域的点击（select 模式下点击空白区域取消选中）
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      // 平移已在 capture phase 处理，这里只处理 select 模式下点击画布空白区域
+      if (toolMode !== "select" || e.button !== 0 || spaceHeld) return;
+
+      // 判断是否点击在画布空白区域（viewport 容器本身或 transform 层，而非页面元素）
+      const target = e.target as HTMLElement;
+      const isCanvasBackground =
+        target === containerRef.current || target === containerRef.current?.firstElementChild;
+
+      if (isCanvasBackground) {
+        setIsPanning(true);
+        startPosRef.current = { x: e.clientX, y: e.clientY };
+        viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
+        containerRef.current?.setPointerCapture(e.pointerId);
+        markInteracting();
+      }
+    },
+    [toolMode, spaceHeld, markInteracting],
   );
 
   const handlePointerMove = useCallback(
@@ -217,7 +233,7 @@ export function CanvasViewport({
       if (!isPanning) return;
       setIsPanning(false);
       markInteractingEnd();
-      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+      containerRef.current?.releasePointerCapture(e.pointerId);
       const dx = e.clientX - startPosRef.current.x;
       const dy = e.clientY - startPosRef.current.y;
       if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
@@ -284,6 +300,7 @@ export function CanvasViewport({
       )}
       data-canvas-root="true"
       tabIndex={0}
+      onPointerDownCapture={handlePointerDownCapture}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
