@@ -67,6 +67,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private status: BackendStatus = "idle";
   private eventCallback?: (event: AgentEvent) => void;
   private files: FileChange[] = [];
+  private readKnowledgeFiles: Set<string> = new Set();
   private timeout?: number;
   private sessionId: string | null = null;
   private currentSystemPrompt: string = '';
@@ -218,6 +219,19 @@ export class PiAgentBackend implements IBackendAdapter {
         }
       }
 
+      // 3. Schema 修改前置校验：必须先读配置系统参考
+      if (toolName === 'writeFile' || toolName === 'editFile') {
+        const schemaPath = (input as any).path;
+        if (schemaPath && String(schemaPath).replace(/\\/g, '/').endsWith('config.schema.json')) {
+          if (!this.readKnowledgeFiles.has('配置系统参考.md')) {
+            return {
+              block: true,
+              reason: '修改 config.schema.json 前，请先用 readFile 读取 knowledge/配置系统参考.md，了解系统支持的控件类型、扩展字段和配置规范，避免生成无效 schema。',
+            };
+          }
+        }
+      }
+
       // 注意：deletePage 权限确认已移至工具 execute 内部（通过 permissionHandler 回调），
       // 因为 on("tool_call") hook 是同步的，无法 await 用户确认
 
@@ -235,6 +249,15 @@ export class PiAgentBackend implements IBackendAdapter {
           action: 'modified',
           content: (input as any).content,
         });
+      }
+
+      // 追踪知识文件读取
+      if ((toolName === 'readFile' || toolName === 'readFileWithLines') && !isError) {
+        const readPath = (input as any).path;
+        if (readPath && isKnowledgeBasePath(readPath, this.config.workingDir ?? '')) {
+          const basename = path.basename(readPath);
+          this.readKnowledgeFiles.add(basename);
+        }
       }
       return undefined; // 不修改结果
     });

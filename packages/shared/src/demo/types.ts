@@ -13,6 +13,7 @@ export interface PreviewSize {
 export interface PositionableConfig {
   items: string[];
   defaults?: Record<string, PositionItem>;
+  size?: { width: number; height: number };
 }
 
 export interface PositionItem {

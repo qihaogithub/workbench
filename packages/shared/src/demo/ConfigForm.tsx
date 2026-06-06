@@ -914,7 +914,7 @@ function PositionControl({
   onPositionsChange,
   previewSize,
 }: {
-  positionable: { items: string[]; defaults?: Record<string, { x: number; y: number }> };
+  positionable: { items: string[]; defaults?: Record<string, { x: number; y: number }>; size?: { width: number; height: number } };
   positions: Record<string, { x: number; y: number }>;
   defaultPositions: Record<string, { x: number; y: number }>;
   titleMap: Record<string, string>;
@@ -925,11 +925,15 @@ function PositionControl({
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Calculate canvas dimensions based on previewSize (parent container)
+  // Calculate canvas dimensions based on positionable.size if provided, otherwise previewSize
   const MAX_CANVAS_WIDTH = 280;
   const MAX_CANVAS_HEIGHT = 200;
-  const containerWidth = typeof previewSize?.width === "number" ? previewSize.width : 800;
-  const containerHeight = typeof previewSize?.height === "number" ? previewSize.height : 600;
+  const containerWidth =
+    positionable.size?.width ??
+    (typeof previewSize?.width === "number" ? previewSize.width : 800);
+  const containerHeight =
+    positionable.size?.height ??
+    (typeof previewSize?.height === "number" ? previewSize.height : 600);
   const aspectRatio = containerWidth / containerHeight;
 
   let CANVAS_WIDTH: number, CANVAS_HEIGHT: number;
@@ -970,9 +974,10 @@ function PositionControl({
   const handleCoordChange = (key: string, axis: "x" | "y", value: string) => {
     const num = parseInt(value, 10);
     if (isNaN(num)) return;
+    const maxVal = axis === "x" ? containerWidth : containerHeight;
     onPositionsChange({
       ...positions,
-      [key]: { ...positions[key], [axis]: Math.max(0, num) },
+      [key]: { ...positions[key], [axis]: Math.max(0, Math.min(num, maxVal)) },
     });
   };
 
@@ -1074,6 +1079,7 @@ function PositionControl({
                         value={pos.x}
                         onChange={(e) => handleCoordChange(key, "x", e.target.value)}
                         className="h-6 w-16 text-xs px-1.5"
+                        min={0}
                         max={containerWidth}
                       />
                     </div>
@@ -1084,6 +1090,7 @@ function PositionControl({
                         value={pos.y}
                         onChange={(e) => handleCoordChange(key, "y", e.target.value)}
                         className="h-6 w-16 text-xs px-1.5"
+                        min={0}
                         max={containerHeight}
                       />
                     </div>

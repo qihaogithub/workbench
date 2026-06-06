@@ -420,6 +420,70 @@ const CONFIG_SYSTEM_REFERENCE_CONTENT = `# 配置系统参考手册
 - 组件代码读取 \`props.__order\` 决定渲染顺序
 - 未在 \`orderable\` 中的属性不参与排序
 
+### $demo.orderableHorizontal — 横向排序
+
+用法与 \`orderable\` 相同，区别是排序方向为横向。声明哪些子组件支持横向拖拽排序（放在 schema 根级别）：
+
+\`\`\`json
+{
+  "$demo": {
+    "orderableHorizontal": ["navHome", "navProducts", "navAbout", "navContact"]
+  },
+  "properties": {
+    "navHome": { "type": "string", "title": "首页", "default": "首页" },
+    "navProducts": { "type": "string", "title": "产品", "default": "产品" },
+    "navAbout": { "type": "string", "title": "关于", "default": "关于" },
+    "navContact": { "type": "string", "title": "联系", "default": "联系我们" }
+  }
+}
+\`\`\`
+
+规则：
+
+- 至少 2 项才会显示排序控件
+- 排序结果以 \`__orderH\` 属性注入组件 props
+- 组件代码读取 \`props.__orderH\` 决定横向渲染顺序
+
+### $demo.positionable — 元素自由定位
+
+声明哪些元素支持用户拖拽/输入自由坐标（放在 schema 根级别）：
+
+\`\`\`json
+{
+  "$demo": {
+    "positionable": {
+      "items": ["badge1", "badge2", "badge3", "badge4"],
+      "size": { "width": 720, "height": 220 },
+      "defaults": {
+        "badge1": { "x": 100, "y": 50 },
+        "badge2": { "x": 300, "y": 50 },
+        "badge3": { "x": 500, "y": 50 },
+        "badge4": { "x": 200, "y": 160 }
+      }
+    }
+  },
+  "properties": {
+    "badge1": { "type": "string", "title": "徽章1", "default": "NEW" },
+    "badge2": { "type": "string", "title": "徽章2", "default": "HOT" }
+  }
+}
+\`\`\`
+
+字段说明：
+
+| 字段 | 必填 | 说明 |
+| ---- | ---- | ---- |
+| \`items\` | ✅ | 支持自由定位的属性键列表 |
+| \`size\` | ❌ | 定位容器的实际渲染尺寸（px），不填则回退到 \`$demo.previewSize\`。应确切匹配 demo 中定位容器的宽高（含 padding/border），确保小地图坐标与实际布局一致 |
+| \`defaults\` | ❌ | 各元素的默认坐标 \`{x, y}\`，不填则回退到 \`{x: 0, y: 0}\` |
+
+规则：
+
+- 至少 1 项才会显示定位控件
+- 坐标以 \`__positions\` 属性注入组件 props（类型为 \`Record<string, {x: number, y: number}>\`）
+- 组件代码读取 \`props.__positions[key]\` 获取元素坐标，通过 CSS \`position: absolute; left: x; top: y\` 渲染
+- 配置面板中的小地图和输入框的坐标空间受 \`size\` 约束，超限值会被自动截断
+
 ### $demo.note — 属性级备注
 
 为配置项添加富文本备注（放在各属性下）：
@@ -448,7 +512,16 @@ const CONFIG_SYSTEM_REFERENCE_CONTENT = `# 配置系统参考手册
   "type": "object",
   "$demo": {
     "previewSize": { "width": 375, "height": 812 },
-    "orderable": ["heroSection", "featureList", "testimonialSection"]
+    "orderable": ["heroSection", "featureList", "testimonialSection"],
+    "orderableHorizontal": ["navHome", "navProducts", "navAbout"],
+    "positionable": {
+      "items": ["badge1", "badge2"],
+      "size": { "width": 335, "height": 200 },
+      "defaults": {
+        "badge1": { "x": 80, "y": 60 },
+        "badge2": { "x": 240, "y": 60 }
+      }
+    }
   },
   "properties": {
     "pageTitle": {
@@ -547,6 +620,33 @@ const CONFIG_SYSTEM_REFERENCE_CONTENT = `# 配置系统参考手册
           "default": "<p>用户好评</p>"
         }
       }
+    },
+    "navHome": {
+      "type": "string",
+      "title": "导航首页",
+      "default": "首页"
+    },
+    "navProducts": {
+      "type": "string",
+      "title": "导航产品",
+      "default": "产品"
+    },
+    "navAbout": {
+      "type": "string",
+      "title": "导航关于",
+      "default": "关于"
+    },
+    "badge1": {
+      "type": "string",
+      "title": "徽章1",
+      "default": "NEW",
+      "description": "可自由定位的徽章"
+    },
+    "badge2": {
+      "type": "string",
+      "title": "徽章2",
+      "default": "HOT",
+      "description": "可自由定位的徽章"
     }
   },
   "required": ["pageTitle", "brandColor"]

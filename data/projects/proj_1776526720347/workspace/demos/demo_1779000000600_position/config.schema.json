@@ -6,6 +6,7 @@
     "orderableHorizontal": ["navHome", "navProducts", "navAbout", "navContact"],
     "positionable": {
       "items": ["badge1", "badge2", "badge3", "badge4"],
+      "size": { "width": 686, "height": 220 },
       "defaults": {
         "badge1": { "x": 80, "y": 60 },
         "badge2": { "x": 260, "y": 60 },

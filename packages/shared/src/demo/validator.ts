@@ -154,7 +154,18 @@ export function getPositionable(
       }
     }
 
-    return { items: validItems, defaults };
+    const size =
+      positionable.size &&
+      typeof positionable.size === "object" &&
+      typeof (positionable.size as Record<string, unknown>).width === "number" &&
+      typeof (positionable.size as Record<string, unknown>).height === "number"
+        ? {
+            width: (positionable.size as { width: number }).width,
+            height: (positionable.size as { height: number }).height,
+          }
+        : undefined;
+
+    return { items: validItems, defaults, size };
   } catch {
     return undefined;
   }

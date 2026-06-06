@@ -136,11 +136,30 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
     const content = fs.readFileSync(manifestPath, "utf-8");
     const manifest = JSON.parse(content);
     if (!manifest.items || manifest.items.length === 0) return null;
-    const lines = manifest.items.map(
-      (item: { title: string; description: string; fileName: string }) =>
-        `- ${item.title}：${item.description}（knowledge/${item.fileName}）`
+    const systemItems = manifest.items.filter(
+      (item: { source?: string }) => item.source === 'system'
     );
-    return `项目知识库（共 ${manifest.items.length} 篇）：\n${lines.join("\n")}\n→ 需要查阅时请用 readFile 读取对应文件`;
+    const userItems = manifest.items.filter(
+      (item: { source?: string }) => item.source !== 'system'
+    );
+
+    const sections: string[] = [];
+    if (systemItems.length > 0) {
+      const lines = systemItems.map(
+        (item: { title: string; description: string; fileName: string }) =>
+          `  - ${item.title}：${item.description}（knowledge/${item.fileName}）`
+      );
+      sections.push(`\u{1F4D6} 系统内置：\n${lines.join('\n')}`);
+    }
+    if (userItems.length > 0) {
+      const lines = userItems.map(
+        (item: { title: string; description: string; fileName: string }) =>
+          `  - ${item.title}：${item.description}（knowledge/${item.fileName}）`
+      );
+      sections.push(`\u{1F4C4} 用户添加：\n${lines.join('\n')}`);
+    }
+
+    return `项目知识库（共 ${manifest.items.length} 篇）：\n${sections.join('\n')}\n→ 需要查阅时请用 readFile 读取对应文件`;
   } catch {
     return null;
   }
