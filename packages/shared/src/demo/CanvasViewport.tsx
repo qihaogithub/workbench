@@ -149,6 +149,11 @@ export function CanvasViewport({
           });
         }
       }
+
+      // Escape：取消选中页面（触发 onCanvasClick）
+      if (e.key === "Escape") {
+        onCanvasClick?.();
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -163,7 +168,7 @@ export function CanvasViewport({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange]);
+  }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange, onCanvasClick]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {

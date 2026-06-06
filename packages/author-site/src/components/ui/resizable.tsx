@@ -28,6 +28,8 @@ interface ResizablePanelGroupProps {
   direction?: "horizontal" | "vertical";
   defaultSizes?: number[];
   minSizes?: number[];
+  /** 当此值变化时，重置 sizes 为 defaultSizes（避免 key 变化导致子树卸载重建） */
+  sizesKey?: string;
 }
 
 export function ResizablePanelGroup({
@@ -36,6 +38,7 @@ export function ResizablePanelGroup({
   direction = "horizontal",
   defaultSizes = [33, 34, 33],
   minSizes = [15, 15, 15],
+  sizesKey,
 }: ResizablePanelGroupProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sizes, setSizes] = useState<number[]>(defaultSizes);
@@ -43,6 +46,11 @@ export function ResizablePanelGroup({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const dragStartX = useRef(0);
   const dragStartSizes = useRef<number[]>([]);
+
+  // sizesKey 变化时重置面板尺寸（面板数量变化时使用）
+  useEffect(() => {
+    setSizes(defaultSizes);
+  }, [sizesKey]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, index: number) => {

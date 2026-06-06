@@ -174,6 +174,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
   const [focusCanvasPageId, setFocusCanvasPageId] = useState<string | undefined>(undefined);
 
+  // 画布模式下配置面板按需显示：选中页面时显示，无选中时隐藏
+  const isConfigPanelVisible = previewMode !== "canvas" || !!canvasEditingPageId;
+
   // 页面定位完成后清除 focusPageId，以便再次点击同一页面时重新触发
   useEffect(() => {
     if (focusCanvasPageId) {
@@ -181,6 +184,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return () => clearTimeout(timer);
     }
   }, [focusCanvasPageId]);
+
+  // 切换到画布模式时清除选中状态，配置面板隐藏
+  useEffect(() => {
+    if (previewMode === "canvas") {
+      setCanvasEditingPageId(null);
+    }
+  }, [previewMode]);
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
@@ -1094,9 +1104,10 @@ ${context.details}
 
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup
+          sizesKey={isConfigPanelVisible ? "3panel" : "2panel"}
           direction="horizontal"
-          defaultSizes={[25, 50, 25]}
-          minSizes={[20, 20, 20]}
+          defaultSizes={isConfigPanelVisible ? [25, 50, 25] : [25, 75]}
+          minSizes={isConfigPanelVisible ? [20, 20, 20] : [20, 30]}
           className="h-full"
         >
           <ResizablePanel className="flex flex-col border-r bg-card">
@@ -1448,6 +1459,7 @@ ${context.details}
                     }
                     if (previewMode === "canvas") {
                       setFocusCanvasPageId(pageId);
+                      setCanvasEditingPageId(pageId);
                     }
                     if (sessionId) {
                       try {
@@ -1962,21 +1974,29 @@ ${context.details}
             </div>
           </ResizablePanel>
 
-          <ResizablePanel className="border-l bg-card flex flex-col">
-            <div className="px-4 py-3 border-b">
-              <h2 className="text-sm font-medium">配置面板</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                修改配置项，预览区将实时更新
-              </p>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-4 flex flex-col">
-                {hasAnyConfig && (
-                  <>
-                    {previewMode === "canvas" ? (
-                      /* Canvas 模式：合并为一个连续表单，无标题和分隔线 */
-                      <>
-                        {showProjectConfig && (
+          {isConfigPanelVisible && (
+            <ResizablePanel className="border-l bg-card flex flex-col">
+              <div className="px-4 py-3 border-b">
+                <h2 className="text-sm font-medium">配置面板</h2>
+                {previewMode === "canvas" && canvasEditingPageId ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {demoPages.find((p) => p.id === canvasEditingPageId)?.name}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    修改配置项，预览区将实时更新
+                  </p>
+                )}
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-4 flex flex-col">
+                  {hasAnyConfig && (
+                    <>
+                      {showProjectConfig && (
+                        <ConfigScopeWrapper
+                          scope="project"
+                          hideHeader={!hasBothScopes}
+                        >
                           <ConfigForm
                             key={`project-${projectConfigSchema}`}
                             schema={projectConfigSchema!}
@@ -1998,8 +2018,19 @@ ${context.details}
                             initialData={configData}
                             sessionId={sessionId}
                           />
-                        )}
-                        {showPageConfig && (
+                        </ConfigScopeWrapper>
+                      )}
+
+                      {showProjectConfig && showPageConfig && (
+                        <div className="h-[2px] bg-border my-3" />
+                      )}
+
+                      {showPageConfig && (
+                        <ConfigScopeWrapper
+                          scope="page"
+                          pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
+                          hideHeader={!hasBothScopes}
+                        >
                           <ConfigForm
                             key={activeDemoId}
                             schema={schema}
@@ -2008,67 +2039,14 @@ ${context.details}
                             initialData={configData}
                             sessionId={sessionId}
                           />
-                        )}
-                      </>
-                    ) : (
-                      /* 非 Canvas 模式：保持原有 ConfigScopeWrapper + 分隔线 */
-                      <>
-                        {showProjectConfig && (
-                          <ConfigScopeWrapper
-                            scope="project"
-                            hideHeader={!hasBothScopes}
-                          >
-                            <ConfigForm
-                              key={`project-${projectConfigSchema}`}
-                              schema={projectConfigSchema!}
-                              onChange={(data) => {
-                                setConfigDataMap((prev) => {
-                                  const next = { ...prev };
-                                  for (const pageId of Object.keys(next)) {
-                                    next[pageId] = { ...next[pageId], ...data };
-                                  }
-                                  for (const page of demoPages) {
-                                    if (!next[page.id]) {
-                                      next[page.id] = { ...data };
-                                    }
-                                  }
-                                  return next;
-                                });
-                              }}
-                              onSchemaChange={handleProjectSchemaChange}
-                              initialData={configData}
-                              sessionId={sessionId}
-                            />
-                          </ConfigScopeWrapper>
-                        )}
-
-                        {showProjectConfig && showPageConfig && (
-                          <div className="h-[2px] bg-border my-3" />
-                        )}
-
-                        {showPageConfig && (
-                          <ConfigScopeWrapper
-                            scope="page"
-                            pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
-                            hideHeader={!hasBothScopes}
-                          >
-                            <ConfigForm
-                              key={activeDemoId}
-                              schema={schema}
-                              onChange={handleConfigChange}
-                              onSchemaChange={handleSchemaChange}
-                              initialData={configData}
-                              sessionId={sessionId}
-                            />
-                          </ConfigScopeWrapper>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </ScrollArea>
-          </ResizablePanel>
+                        </ConfigScopeWrapper>
+                      )}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
+            </ResizablePanel>
+          )}
         </ResizablePanelGroup>
       </div>
 

@@ -147,7 +147,7 @@ export function CanvasPageItem({
   screenshotLoading: _screenshotLoading,
   visible = true,
   onLayoutChange,
-  onConfigEdit: _onConfigEdit,
+  onConfigEdit,
   onConsoleEntry,
   onDragStart,
   onDragMove,
@@ -174,6 +174,8 @@ export function CanvasPageItem({
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const containerRef = useRef<HTMLDivElement>(null);
+  // 非交互模式下点击追踪标记
+  const isClickTrackingRef = useRef(false);
 
   // 当 screenshotUrl 变化时重置截图加载状态
   React.useEffect(() => {
@@ -213,7 +215,20 @@ export function CanvasPageItem({
 
   const handleDragPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (!canInteract) return;
+      // 始终记录起始位置，用于点击检测
+      startPosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (!canInteract) {
+        // 非交互模式：阻止冒泡以防止 CanvasViewport 捕获指针，
+        // 这样我们可以在 pointerUp 中检测点击并触发 onConfigEdit
+        if (e.button !== 0) return;
+        const target = e.target as HTMLElement;
+        if (target.closest("button")) return;
+        e.stopPropagation();
+        target.setPointerCapture(e.pointerId);
+        isClickTrackingRef.current = true;
+        return;
+      }
       if (e.button !== 0) return;
 
       // 如果点在边框热区，启动缩放而非拖拽
@@ -301,6 +316,12 @@ export function CanvasPageItem({
         setIsDragging(false);
         (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
         onDragEnd?.();
+        // 拖拽距离很小时视为点击，触发 onConfigEdit
+        const dx = e.clientX - startPosRef.current.x;
+        const dy = e.clientY - startPosRef.current.y;
+        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+          onConfigEdit?.(page.id);
+        }
         return;
       }
       if (isResizing) {
@@ -309,13 +330,24 @@ export function CanvasPageItem({
         onDragEnd?.();
         return;
       }
+      // 非交互模式下的点击检测
+      if (isClickTrackingRef.current) {
+        isClickTrackingRef.current = false;
+        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+        const dx = e.clientX - startPosRef.current.x;
+        const dy = e.clientY - startPosRef.current.y;
+        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+          onConfigEdit?.(page.id);
+        }
+      }
     },
-    [isDragging, isResizing, onDragEnd],
+    [isDragging, isResizing, onDragEnd, onConfigEdit, page.id],
   );
 
   const handleLostPointerCapture = useCallback(() => {
     setIsDragging(false);
     setIsResizing(null);
+    isClickTrackingRef.current = false;
     onDragEnd?.();
   }, [onDragEnd]);
 

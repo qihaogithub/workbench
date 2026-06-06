@@ -89,6 +89,7 @@ export default function ViewerProjectPage() {
   const configDataParam = searchParams.get("configData");
   const gridSelectOnlyParam = searchParams.get("gridSelectOnly");
   const pageListParam = searchParams.get("pageList");
+  const canvasConfigParam = searchParams.get("canvasConfig");
 
   const showConfig = configParam !== "false";
   const configWidth = configWidthParam ? parseInt(configWidthParam, 10) : 320;
@@ -98,6 +99,8 @@ export default function ViewerProjectPage() {
   const gridSelectOnly = gridSelectOnlyParam === "true";
   const showPageList = pageListParam === "true";
   const previewBackground = backgroundParam || "#fff";
+  // 画布模式配置面板显隐模式：always（常驻，默认）| onclick（按需显示）
+  const canvasConfigMode = canvasConfigParam === "onclick" ? "onclick" : "always";
 
   const [data, setData] = useState<ViewerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,7 +108,7 @@ export default function ViewerProjectPage() {
 
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>(
-    modeParam === "grid" ? "grid" : "single"
+    modeParam === "canvas" ? "canvas" : modeParam === "grid" ? "grid" : "single"
   );
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(
     columnsParam === "3" ? 3 : columnsParam === "4" ? 4 : 2
@@ -118,6 +121,8 @@ export default function ViewerProjectPage() {
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
+  // 画布模式按需显示：选中页面 ID（仅 canvasConfig=onclick 模式使用）
+  const [canvasSelectedPageId, setCanvasSelectedPageId] = useState<string | null>(null);
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);
@@ -140,6 +145,13 @@ export default function ViewerProjectPage() {
   useEffect(() => {
     applyTheme(themeParam);
   }, [themeParam]);
+
+  // 切换到画布模式时清除选中状态（按需显示模式下配置面板隐藏）
+  useEffect(() => {
+    if (previewMode === "canvas" && canvasConfigMode === "onclick") {
+      setCanvasSelectedPageId(null);
+    }
+  }, [previewMode, canvasConfigMode]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -228,6 +240,10 @@ export default function ViewerProjectPage() {
         case "VIEWER_SET_PAGE":
           if (typeof msg.pageId === "string") {
             setActiveDemoId(msg.pageId);
+            // 按需显示模式下同步选中状态
+            if (canvasConfigMode === "onclick" && previewMode === "canvas") {
+              setCanvasSelectedPageId(msg.pageId);
+            }
           }
           break;
       }
@@ -451,8 +467,17 @@ export default function ViewerProjectPage() {
               }))}
               canvasState={canvasState}
               onCanvasStateChange={setCanvasState}
+              editingPageId={canvasConfigMode === "onclick" ? canvasSelectedPageId ?? undefined : undefined}
               onPageConfigEdit={(pageId) => {
                 handlePageChange(pageId);
+                if (canvasConfigMode === "onclick") {
+                  setCanvasSelectedPageId(pageId);
+                }
+              }}
+              onCanvasClick={() => {
+                if (canvasConfigMode === "onclick") {
+                  setCanvasSelectedPageId(null);
+                }
               }}
             />
           ) : previewMode === "single" ? (
@@ -488,6 +513,10 @@ export default function ViewerProjectPage() {
         </div>
 
         {showConfig && (
+          previewMode !== "canvas" ||
+          canvasConfigMode === "always" ||
+          !!canvasSelectedPageId
+        ) && (
           <div
             className="border-l shrink-0 flex flex-col"
             style={{ width: configWidth }}
