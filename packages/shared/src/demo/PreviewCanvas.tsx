@@ -246,6 +246,7 @@ export function PreviewCanvas({
   screenshotUrls,
   onConsoleEntry,
   focusPageId,
+  onPositionableSizes,
 }: PreviewCanvasProps) {
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -481,6 +482,7 @@ export function PreviewCanvas({
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
             toolMode={toolMode}
+            onPositionableSizes={onPositionableSizes}
           />
         ))}
       </CanvasViewport>

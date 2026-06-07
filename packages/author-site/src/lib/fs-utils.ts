@@ -211,6 +211,7 @@ export function listProjects(): DemoMeta[] {
       updatedAt: stats.mtimeMs,
       thumbnail: project?.thumbnail,
       demoCount: project?.demoPages?.length ?? 1,
+      demoPages: project?.demoPages ?? undefined,
     });
   }
 

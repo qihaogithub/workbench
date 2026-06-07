@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import type { PreviewPanelProps, PreviewSize } from "./types";
+import type { PreviewPanelProps, PreviewSize, PositionableSizeItem } from "./types";
 import type { ConsoleLogPayload } from "./iframe-types";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
@@ -294,6 +294,7 @@ export function PreviewPanel({
   onConsoleEntry,
   onContentHeightChange,
   effectiveHeight,
+  onPositionableSizes,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -378,6 +379,14 @@ export function PreviewPanel({
       },
       "*",
     );
+  }, []);
+
+  const sendCollectPositionableSizes = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    iframe.contentWindow.postMessage({ type: "COLLECT_POSITIONABLE_SIZES" }, "*");
   }, []);
 
   useEffect(() => {
@@ -503,6 +512,12 @@ export function PreviewPanel({
     }
 
     sendUpdateConfig(configData || {});
+
+    // 配置变更后延迟收集 positionable 元素尺寸
+    if (contentLoaded && onPositionableSizes) {
+      const timer = setTimeout(sendCollectPositionableSizes, 200);
+      return () => clearTimeout(timer);
+    }
   }, [
     configData,
     iframeReady,
@@ -511,6 +526,9 @@ export function PreviewPanel({
     lastSuccessfulResult,
     runtimeError,
     sendUpdateConfig,
+    contentLoaded,
+    onPositionableSizes,
+    sendCollectPositionableSizes,
   ]);
 
   useEffect(() => {
@@ -537,6 +555,11 @@ export function PreviewPanel({
         case "LOADED":
           setRuntimeError(null);
           setContentLoaded(true);
+          sendCollectPositionableSizes();
+          break;
+
+        case "COMPONENT_READY":
+          sendCollectPositionableSizes();
           break;
 
         case "RUNTIME_ERROR":
@@ -555,6 +578,12 @@ export function PreviewPanel({
             onConsoleEntry?.(event.data.payload as ConsoleLogPayload);
           }
           break;
+
+        case "POSITIONABLE_SIZES_RESULT":
+          if (event.data?.sizes) {
+            onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
+          }
+          break;
       }
     };
 
@@ -570,8 +599,10 @@ export function PreviewPanel({
     onError,
     onConsoleEntry,
     onContentHeightChange,
+    onPositionableSizes,
     sendUpdateCode,
     sendUpdateCodeUrl,
+    sendCollectPositionableSizes,
   ]);
 
   useLayoutEffect(() => {

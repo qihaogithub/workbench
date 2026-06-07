@@ -1,6 +1,6 @@
-import type { ConsoleLogPayload } from "./iframe-types";
+import type { ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
 
-export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload } from "./iframe-types";
+export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
 
 export interface PreviewSize {
   width?: string | number;
@@ -52,6 +52,7 @@ export interface PreviewPanelProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onContentHeightChange?: (contentHeight: number) => void;
   effectiveHeight?: number;
+  onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
 }
 
 export interface ConfigFormProps {
@@ -62,6 +63,7 @@ export interface ConfigFormProps {
   readonly?: boolean;
   className?: string;
   sessionId?: string;
+  positionableItemSizes?: Record<string, PositionableSizeItem>;
 }
 
 export type PreviewMode = "single" | "canvas";
@@ -140,6 +142,7 @@ export interface PreviewCanvasProps {
   screenshotUrls?: Record<string, string>;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   focusPageId?: string;
+  onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
 }
 
 export interface PreviewState {

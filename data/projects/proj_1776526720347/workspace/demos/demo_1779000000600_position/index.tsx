@@ -12,6 +12,7 @@ interface Props {
   badge2?: string;
   badge3?: string;
   badge4?: string;
+  logoImage?: string;
   __order?: string[];
   __orderH?: string[];
   __positions?: Record<string, { x: number; y: number }>;
@@ -35,6 +36,7 @@ const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   badge2: { x: 260, y: 50 },
   badge3: { x: 440, y: 50 },
   badge4: { x: 170, y: 170 },
+  logoImage: { x: 500, y: 130 },
 };
 
 const PositionDemo: React.FC<Props> = (props) => {
@@ -54,6 +56,7 @@ const PositionDemo: React.FC<Props> = (props) => {
     badge2 = 'HOT',
     badge3 = 'PRO',
     badge4 = 'BETA',
+    logoImage,
     __order,
     __orderH,
     __positions,
@@ -112,11 +115,28 @@ const PositionDemo: React.FC<Props> = (props) => {
               const pos = positions[key] || { x: 0, y: 0 };
               const color = BADGE_COLORS[key] || '#94a3b8';
               return (
-                <div key={key} style={{ position: 'absolute', left: pos.x, top: pos.y, padding: '5px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, color: '#fff', backgroundColor: color, whiteSpace: 'nowrap' }}>
+                <div key={key} data-pos-key={key} style={{ position: 'absolute', left: pos.x, top: pos.y, padding: '5px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, color: '#fff', backgroundColor: color, whiteSpace: 'nowrap' }}>
                   {text} <span style={{ opacity: 0.7, fontSize: '10px' }}>({pos.x},{pos.y})</span>
                 </div>
               );
             })}
+            {logoImage && (
+              <img
+                data-pos-key="logoImage"
+                src={logoImage}
+                alt="Logo"
+                style={{
+                  position: 'absolute',
+                  left: positions.logoImage?.x ?? 500,
+                  top: positions.logoImage?.y ?? 130,
+                  maxWidth: '120px',
+                  maxHeight: '60px',
+                  objectFit: 'contain',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

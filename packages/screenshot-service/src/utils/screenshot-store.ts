@@ -79,8 +79,12 @@ export async function readScreenshot(
   } else {
     // Read current version via meta
     const meta = await readMeta(projectId, pageId);
-    if (!meta) return null;
-    filePath = getScreenshotPath(projectId, pageId, meta.currentHash);
+    if (meta) {
+      filePath = getScreenshotPath(projectId, pageId, meta.currentHash);
+    } else {
+      // Fallback: read current version directly (pageId.png)
+      filePath = getCurrentScreenshotPath(projectId, pageId);
+    }
   }
 
   try {

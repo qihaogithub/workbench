@@ -30,6 +30,82 @@ function formatDate(timestamp: number): string {
   return `${y}/${m}/${d} ${h}:${min}`;
 }
 
+/** 根据页面数量返回 CSS grid 布局类名 */
+function getGridClass(count: number): string {
+  if (count === 1) return "grid-cols-1 grid-rows-1";
+  if (count === 2) return "grid-cols-2 grid-rows-1";
+  if (count === 3) return "grid-cols-2 grid-rows-2";
+  return "grid-cols-2 grid-rows-2";
+}
+
+/** 截图拼接封面组件 */
+function ScreenshotCover({ demo }: { demo: DemoMeta }) {
+  const pages = demo.demoPages ?? [];
+  // 最多展示 4 个页面截图
+  const displayPages = pages.slice(0, 4);
+  const extraCount = pages.length - 4;
+
+  if (displayPages.length === 0) {
+    return <PlaceholderIcon />;
+  }
+
+  return (
+    <div className={`grid ${getGridClass(displayPages.length)} gap-0.5 h-full w-full`}>
+      {displayPages.map((page, index) => {
+        const isLast = index === displayPages.length - 1;
+        const url = `/api/screenshots/file/${demo.id}/${page.id}`;
+        return (
+          <div key={page.id} className="relative overflow-hidden">
+            <img
+              src={url}
+              alt={page.name}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                // 截图不存在时隐藏该图片，显示占位背景
+                (e.target as HTMLImageElement).style.display = "none";
+                const parent = (e.target as HTMLImageElement).parentElement;
+                if (parent) {
+                  parent.classList.add("bg-muted/60");
+                }
+              }}
+            />
+            {isLast && extraCount > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                <span className="text-sm font-medium text-foreground">
+                  +{extraCount}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 默认占位图标 */
+function PlaceholderIcon() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-6 w-6 text-muted-foreground/60"
+        >
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export function DemoCard({ demo, onDelete }: DemoCardProps) {
   return (
     <Link href={`/demo/${demo.id}/edit`}>
@@ -41,23 +117,12 @@ export function DemoCard({ demo, onDelete }: DemoCardProps) {
               alt={demo.name}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-6 w-6 text-muted-foreground/60"
-                >
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </div>
+          ) : demo.demoPages && demo.demoPages.length > 0 ? (
+            <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+              <ScreenshotCover demo={demo} />
             </div>
+          ) : (
+            <PlaceholderIcon />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>

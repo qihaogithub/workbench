@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
-import type { CanvasPageLayout, CanvasPageData, ConsoleLogPayload, CanvasToolMode } from "./types";
+import type { CanvasPageLayout, CanvasPageData, ConsoleLogPayload, CanvasToolMode, PositionableSizeItem } from "./types";
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -27,6 +27,7 @@ interface CanvasPageItemProps {
   onDragEnd?: () => void;
   // 工具模式
   toolMode?: CanvasToolMode;
+  onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
 }
 
 const MIN_SIZE = 100;
@@ -153,6 +154,7 @@ export function CanvasPageItem({
   onDragMove,
   onDragEnd,
   toolMode = "hand",
+  onPositionableSizes,
 }: CanvasPageItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
@@ -432,6 +434,7 @@ export function CanvasPageItem({
             onConsoleEntry={onConsoleEntry}
             onContentHeightChange={handleContentHeightChange}
             effectiveHeight={effectiveHeight}
+            onPositionableSizes={onPositionableSizes}
           />
         </div>
       )}

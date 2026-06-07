@@ -273,6 +273,70 @@ ${cssLinks}
         }
       }
 
+      if (type === 'COLLECT_POSITIONABLE_SIZES') {
+        // 使用 requestAnimationFrame 等待 React 渲染完成后再测量 DOM
+        requestAnimationFrame(function() {
+          try {
+            var posElements = document.querySelectorAll('[data-pos-key]');
+            var sizes = {};
+            // 检查是否有未加载完成的图片
+            var pendingImages = [];
+            for (var i = 0; i < posElements.length; i++) {
+              var el = posElements[i];
+              var key = el.getAttribute('data-pos-key');
+              if (key) {
+                // 如果元素本身就是 img 或包含 img，检查加载状态
+                var imgs = el.tagName === 'IMG' ? [el] : el.querySelectorAll('img');
+                for (var j = 0; j < imgs.length; j++) {
+                  if (!imgs[j].complete) {
+                    pendingImages.push(imgs[j]);
+                  }
+                }
+              }
+            }
+            function measureAndReport() {
+              var posElements2 = document.querySelectorAll('[data-pos-key]');
+              var sizes2 = {};
+              for (var k = 0; k < posElements2.length; k++) {
+                var el2 = posElements2[k];
+                var key2 = el2.getAttribute('data-pos-key');
+                if (key2) {
+                  var rect = el2.getBoundingClientRect();
+                  sizes2[key2] = { width: Math.round(rect.width), height: Math.round(rect.height) };
+                }
+              }
+              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2 }, '*');
+            }
+            if (pendingImages.length > 0) {
+              // 等待所有图片加载完成后再测量
+              var reported = false;
+              var loaded = 0;
+              function safeReport() {
+                if (reported) return;
+                reported = true;
+                measureAndReport();
+              }
+              pendingImages.forEach(function(img) {
+                img.addEventListener('load', function() {
+                  loaded++;
+                  if (loaded === pendingImages.length) safeReport();
+                });
+                img.addEventListener('error', function() {
+                  loaded++;
+                  if (loaded === pendingImages.length) safeReport();
+                });
+              });
+              // 超时兜底：500ms 后强制测量
+              setTimeout(safeReport, 500);
+            } else {
+              measureAndReport();
+            }
+          } catch (err) {
+            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {} }, '*');
+          }
+        });
+      }
+
       if (type === 'COLLECT_THUMBNAIL_LAYOUT') {
         try {
           (function() {

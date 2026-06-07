@@ -5,6 +5,7 @@ export interface DemoMeta {
   updatedAt: number;
   thumbnail?: string;
   demoCount?: number;
+  demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
 }
 
 export interface DemoFiles {

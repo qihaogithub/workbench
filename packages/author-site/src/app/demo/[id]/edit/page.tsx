@@ -10,7 +10,7 @@ import {
   ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
-import type { PreviewMode, CanvasState } from "../../../../../components/demo";
+import type { PreviewMode, CanvasState, PositionableSizeItem } from "../../../../../components/demo";
 import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
 import {
   parseFigmaText,
@@ -121,6 +121,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >({});
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
+  const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -1777,6 +1778,7 @@ ${context.details}
                           .map(([id, s]) => [id, s.screenshotUrl!])
                       )}
                       onConsoleEntry={handleConsoleEntry}
+                      onPositionableSizes={setPositionableItemSizes}
                       onPageConfigEdit={(pageId) => {
                         setCanvasEditingPageId(pageId);
                         setActiveDemoId(pageId);
@@ -1897,6 +1899,7 @@ ${context.details}
                       configData={configData}
                       previewSize={previewSize}
                       onConsoleEntry={handleConsoleEntry}
+                      onPositionableSizes={setPositionableItemSizes}
                     />
                   </div>
                 </div>
@@ -1968,6 +1971,7 @@ ${context.details}
                             onSchemaChange={handleSchemaChange}
                             initialData={configData}
                             sessionId={sessionId}
+                            positionableItemSizes={positionableItemSizes}
                           />
                         </ConfigScopeWrapper>
                       )}

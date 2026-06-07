@@ -913,6 +913,7 @@ function PositionControl({
   titleMap,
   onPositionsChange,
   previewSize,
+  itemSizes,
 }: {
   positionable: { items: string[]; defaults?: Record<string, { x: number; y: number }>; size?: { width: number; height: number } };
   positions: Record<string, { x: number; y: number }>;
@@ -920,6 +921,7 @@ function PositionControl({
   titleMap: Record<string, string>;
   onPositionsChange: (newPositions: Record<string, { x: number; y: number }>) => void;
   previewSize?: { width?: number | string; height?: number | string };
+  itemSizes?: Record<string, { width: number; height: number }>;
 }) {
   const [open, setOpen] = useState(true);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
@@ -959,11 +961,18 @@ function PositionControl({
       const rect = canvasRef.current.getBoundingClientRect();
       const canvasX = Math.max(0, Math.min(e.clientX - rect.left, CANVAS_WIDTH));
       const canvasY = Math.max(0, Math.min(e.clientY - rect.top, CANVAS_HEIGHT));
-      const x = Math.round(canvasX / scaleFactor);
-      const y = Math.round(canvasY / scaleFactor);
+      let x = Math.round(canvasX / scaleFactor);
+      let y = Math.round(canvasY / scaleFactor);
+      // 根据元素尺寸约束有效拖拽范围
+      const elementWidth = itemSizes?.[draggingKey]?.width ?? 0;
+      const elementHeight = itemSizes?.[draggingKey]?.height ?? 0;
+      const maxX = containerWidth - elementWidth;
+      const maxY = containerHeight - elementHeight;
+      x = Math.max(0, Math.min(x, maxX));
+      y = Math.max(0, Math.min(y, maxY));
       onPositionsChange({ ...positions, [draggingKey]: { x, y } });
     },
-    [draggingKey, positions, onPositionsChange, scaleFactor, CANVAS_WIDTH, CANVAS_HEIGHT],
+    [draggingKey, positions, onPositionsChange, scaleFactor, CANVAS_WIDTH, CANVAS_HEIGHT, containerWidth, containerHeight, itemSizes],
   );
 
   const handleCanvasMouseUp = useCallback(() => {
@@ -973,7 +982,9 @@ function PositionControl({
   const handleCoordChange = (key: string, axis: "x" | "y", value: string) => {
     const num = parseInt(value, 10);
     if (isNaN(num)) return;
-    const maxVal = axis === "x" ? containerWidth : containerHeight;
+    const elementWidth = itemSizes?.[key]?.width ?? 0;
+    const elementHeight = itemSizes?.[key]?.height ?? 0;
+    const maxVal = axis === "x" ? containerWidth - elementWidth : containerHeight - elementHeight;
     onPositionsChange({
       ...positions,
       [key]: { ...positions[key], [axis]: Math.max(0, Math.min(num, maxVal)) },
@@ -1044,19 +1055,32 @@ function PositionControl({
                 const pos = positions[key] || { x: 0, y: 0 };
                 const canvasX = pos.x * scaleFactor;
                 const canvasY = pos.y * scaleFactor;
+                const size = itemSizes?.[key];
+                // 按比例渲染元素实际形状
+                const canvasW = size ? size.width * scaleFactor : undefined;
+                const canvasH = size ? size.height * scaleFactor : undefined;
+                const hasSize = size && size.width > 0 && size.height > 0;
                 return (
                   <div
                     key={key}
-                    className={`absolute flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border cursor-grab active:cursor-grabbing select-none transition-shadow ${
+                    className={`absolute flex items-center justify-center text-[10px] font-medium border cursor-grab active:cursor-grabbing select-none transition-shadow ${
                       draggingKey === key
-                        ? "bg-primary text-primary-foreground border-primary shadow-md z-10"
-                        : "bg-background text-foreground border-border shadow-sm hover:border-primary/50"
+                        ? "bg-primary/20 text-primary border-primary shadow-md z-10"
+                        : "bg-background/80 text-foreground border-border shadow-sm hover:border-primary/50"
                     }`}
-                    style={{ left: canvasX, top: canvasY }}
+                    style={{
+                      left: canvasX,
+                      top: canvasY,
+                      ...(hasSize ? { width: canvasW, height: canvasH } : { padding: '2px 6px' }),
+                      borderRadius: 2,
+                    }}
                     onMouseDown={(e) => handleCanvasMouseDown(key, e)}
                   >
-                    <Move className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate max-w-[60px]">{titleMap[key] || key}</span>
+                    {hasSize ? (
+                      <span className="truncate overflow-hidden text-center leading-none" style={{ fontSize: Math.min(10, (canvasW ?? 60) / (titleMap[key]?.length ?? 4) * 1.5) }}>{titleMap[key] || key}</span>
+                    ) : (
+                      <span className="truncate max-w-[60px]">{titleMap[key] || key}</span>
+                    )}
                   </div>
                 );
               })}
@@ -1066,6 +1090,10 @@ function PositionControl({
             <div className="space-y-1">
               {positionable.items.map((key) => {
                 const pos = positions[key] || { x: 0, y: 0 };
+                const elementWidth = itemSizes?.[key]?.width ?? 0;
+                const elementHeight = itemSizes?.[key]?.height ?? 0;
+                const maxX = containerWidth - elementWidth;
+                const maxY = containerHeight - elementHeight;
                 return (
                   <div key={key} className="flex items-center gap-2 text-xs">
                     <span className="text-muted-foreground w-[70px] truncate" title={titleMap[key] || key}>
@@ -1079,7 +1107,7 @@ function PositionControl({
                         onChange={(e) => handleCoordChange(key, "x", e.target.value)}
                         className="h-6 w-16 text-xs px-1.5"
                         min={0}
-                        max={containerWidth}
+                        max={maxX}
                       />
                     </div>
                     <div className="flex items-center gap-1">
@@ -1090,7 +1118,7 @@ function PositionControl({
                         onChange={(e) => handleCoordChange(key, "y", e.target.value)}
                         className="h-6 w-16 text-xs px-1.5"
                         min={0}
-                        max={containerHeight}
+                        max={maxY}
                       />
                     </div>
                   </div>
@@ -1123,6 +1151,7 @@ export function ConfigForm({
   readonly,
   className,
   sessionId,
+  positionableItemSizes,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
@@ -1408,6 +1437,7 @@ export function ConfigForm({
                 titleMap={titleMapPos}
                 onPositionsChange={handlePositionsChange}
                 previewSize={previewSize}
+                itemSizes={positionableItemSizes}
               />
               <Separator className="my-2" />
             </>
