@@ -107,12 +107,12 @@ const PositionDemo: React.FC<Props> = (props) => {
       <div style={{ backgroundColor: cardBg, borderRadius: '12px', border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
         <div style={{ padding: '10px 20px', borderBottom: `1px solid ${borderColor}`, fontSize: '12px', fontWeight: 600, color: primaryColor }}>positionable · 自由坐标</div>
         <div style={{ padding: '16px' }}>
-          <div style={{ position: 'relative', minHeight: '220px', backgroundColor: sectionBg, borderRadius: '10px', border: `2px dashed ${borderColor}` }}>
+          <div style={{ position: 'relative', minHeight: '220px', backgroundColor: sectionBg, borderRadius: '10px', border: `2px dashed ${borderColor}`, overflow: 'hidden' }}>
             {Object.entries(badgeData).map(([key, text]) => {
               const pos = positions[key] || { x: 0, y: 0 };
               const color = BADGE_COLORS[key] || '#94a3b8';
               return (
-                <div key={key} style={{ position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', padding: '5px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, color: '#fff', backgroundColor: color, whiteSpace: 'nowrap' }}>
+                <div key={key} style={{ position: 'absolute', left: pos.x, top: pos.y, padding: '5px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, color: '#fff', backgroundColor: color, whiteSpace: 'nowrap' }}>
                   {text} <span style={{ opacity: 0.7, fontSize: '10px' }}>({pos.x},{pos.y})</span>
                 </div>
               );

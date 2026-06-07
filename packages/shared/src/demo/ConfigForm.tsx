@@ -959,7 +959,6 @@ function PositionControl({
       const rect = canvasRef.current.getBoundingClientRect();
       const canvasX = Math.max(0, Math.min(e.clientX - rect.left, CANVAS_WIDTH));
       const canvasY = Math.max(0, Math.min(e.clientY - rect.top, CANVAS_HEIGHT));
-      // Convert canvas coordinates to container coordinates
       const x = Math.round(canvasX / scaleFactor);
       const y = Math.round(canvasY / scaleFactor);
       onPositionsChange({ ...positions, [draggingKey]: { x, y } });
@@ -1053,7 +1052,7 @@ function PositionControl({
                         ? "bg-primary text-primary-foreground border-primary shadow-md z-10"
                         : "bg-background text-foreground border-border shadow-sm hover:border-primary/50"
                     }`}
-                    style={{ left: canvasX, top: canvasY, transform: "translate(-50%, -50%)" }}
+                    style={{ left: canvasX, top: canvasY }}
                     onMouseDown={(e) => handleCanvasMouseDown(key, e)}
                   >
                     <Move className="h-2.5 w-2.5 shrink-0" />
