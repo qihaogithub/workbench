@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { MoreVertical, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,51 @@ function getGridClass(count: number): string {
   return "grid-cols-2 grid-rows-2";
 }
 
+/** 单个页面截图格 */
+function PageScreenshotCell({
+  projectId,
+  page,
+  showOverlay,
+  overlayText,
+}: {
+  projectId: string;
+  page: { id: string; name: string };
+  showOverlay: boolean;
+  overlayText?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const url = `/api/screenshots/file/${projectId}/${page.id}`;
+
+  const handleError = useCallback(() => {
+    setFailed(true);
+  }, []);
+
+  return (
+    <div className="relative overflow-hidden bg-muted/40 flex items-center justify-center">
+      {!failed ? (
+        <img
+          src={url}
+          alt={page.name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={handleError}
+        />
+      ) : (
+        <span className="text-[10px] text-muted-foreground/70 truncate px-1 text-center max-w-full">
+          {page.name}
+        </span>
+      )}
+      {showOverlay && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+          <span className="text-sm font-medium text-foreground">
+            {overlayText}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 截图拼接封面组件 */
 function ScreenshotCover({ demo }: { demo: DemoMeta }) {
   const pages = demo.demoPages ?? [];
@@ -53,31 +99,14 @@ function ScreenshotCover({ demo }: { demo: DemoMeta }) {
     <div className={`grid ${getGridClass(displayPages.length)} gap-0.5 h-full w-full`}>
       {displayPages.map((page, index) => {
         const isLast = index === displayPages.length - 1;
-        const url = `/api/screenshots/file/${demo.id}/${page.id}`;
         return (
-          <div key={page.id} className="relative overflow-hidden">
-            <img
-              src={url}
-              alt={page.name}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              onError={(e) => {
-                // 截图不存在时隐藏该图片，显示占位背景
-                (e.target as HTMLImageElement).style.display = "none";
-                const parent = (e.target as HTMLImageElement).parentElement;
-                if (parent) {
-                  parent.classList.add("bg-muted/60");
-                }
-              }}
-            />
-            {isLast && extraCount > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                <span className="text-sm font-medium text-foreground">
-                  +{extraCount}
-                </span>
-              </div>
-            )}
-          </div>
+          <PageScreenshotCell
+            key={page.id}
+            projectId={demo.id}
+            page={page}
+            showOverlay={isLast && extraCount > 0}
+            overlayText={isLast && extraCount > 0 ? `+${extraCount}` : undefined}
+          />
         );
       })}
     </div>
