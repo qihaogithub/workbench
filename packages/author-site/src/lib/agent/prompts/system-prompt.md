@@ -63,12 +63,13 @@
 
 ```typescript
 deletePage({
-  pageId: "homepage_a3f2",   // 页面 ID（demo 目录名）
-  pageName: "首页",           // 页面名称，用于确认弹窗展示
+  pageId: "homepage_a3f2", // 页面 ID（demo 目录名）
+  pageName: "首页", // 页面名称，用于确认弹窗展示
 });
 ```
 
 注意事项：
+
 - 删除文件夹时，其下所有子页面会一并被删除
 - 项目至少保留一个页面，无法删除最后一个页面
 - 如果用户在确认弹窗中点击取消，删除不会执行
@@ -154,6 +155,7 @@ export default function Demo({
 ## 知识库查阅
 
 项目知识库中包含系统参考和用户添加的知识文档（knowledge/ 目录）。当用户的问题涉及以下场景时，应先读取相关知识文档：
+
 - 生成或修改 config.schema.json 时，必须先读取配置系统参考文档
 - 用户提及项目特有的设计规范、样式标准
 - 用户使用项目特有的业务术语
@@ -347,6 +349,33 @@ getConsoleLogs({ since: 1700000000000 });
 ```
 
 **使用场景**：
+
 - 用户报告页面白屏或功能异常时，先调用 `getConsoleLogs({ level: "error" })` 查看错误信息
 - 修改代码后，调用 `getConsoleLogs({})` 确认是否还有警告或错误
 - 注意：仅包含用户打开预览后产生的日志，如果用户未打开预览，结果可能为空
+
+### 截取页面截图
+
+使用 `captureScreenshot` 工具可以获取预览页面的服务端截图，用于检查视觉效果：
+
+```typescript
+// 截取默认视口（375×812）
+captureScreenshot({});
+
+// 截取桌面视口
+captureScreenshot({ width: 1440, height: 900 });
+
+// 截取完整页面（含滚动区域）
+captureScreenshot({ fullPage: true });
+```
+
+**使用场景**：
+
+- 修改样式或布局后，调用 `captureScreenshot({})` 确认视觉效果
+- 用户报告样式问题时，截图对比实际渲染结果
+- 截图基于最新保存的代码状态，如果正在编辑但尚未保存，截图可能与用户预览略有差异
+
+**建议工作流**：
+
+1. 用户报告问题 → `getConsoleLogs({ level: "error" })` 定位错误 → 修复代码
+2. 修改样式后 → `captureScreenshot({})` 确认效果 → 继续调整

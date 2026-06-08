@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { MoreVertical, Trash2 } from "lucide-react";
+import { MoreVertical, Trash2, FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -69,9 +69,12 @@ function PageScreenshotCell({
           onError={handleError}
         />
       ) : (
-        <span className="text-[10px] text-muted-foreground/70 truncate px-1 text-center max-w-full">
-          {page.name}
-        </span>
+        <div className="flex flex-col items-center justify-center h-full w-full bg-gradient-to-br from-muted/60 to-muted gap-1">
+          <FileText className="h-4 w-4 text-muted-foreground/50" />
+          <span className="text-[10px] text-muted-foreground/60 truncate px-1 text-center max-w-full leading-tight">
+            {page.name}
+          </span>
+        </div>
       )}
       {showOverlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/60">
@@ -96,7 +99,9 @@ function ScreenshotCover({ demo }: { demo: DemoMeta }) {
   }
 
   return (
-    <div className={`grid ${getGridClass(displayPages.length)} gap-0.5 h-full w-full`}>
+    <div
+      className={`grid ${getGridClass(displayPages.length)} gap-0.5 h-full w-full`}
+    >
       {displayPages.map((page, index) => {
         const isLast = index === displayPages.length - 1;
         return (
@@ -105,7 +110,9 @@ function ScreenshotCover({ demo }: { demo: DemoMeta }) {
             projectId={demo.id}
             page={page}
             showOverlay={isLast && extraCount > 0}
-            overlayText={isLast && extraCount > 0 ? `+${extraCount}` : undefined}
+            overlayText={
+              isLast && extraCount > 0 ? `+${extraCount}` : undefined
+            }
           />
         );
       })}

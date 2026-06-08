@@ -16,13 +16,15 @@ src/
 │   ├── base.ts             # 后端适配器接口（IBackendAdapter）
 │   ├── pi-agent.ts         # Pi Agent 后端实现
 │   ├── pi-tools/           # Pi Agent 工具集
-│   │   ├── index.ts        # 工具导出（9 个工具）
+│   │   ├── index.ts        # 工具导出（11 个工具）
 │   │   ├── file-tools.ts   # 文件操作工具
 │   │   ├── read-file-lines-tool.ts # 带行号读取文件
 │   │   ├── edit-file-tool.ts # 精确编辑文件（old_string/new_string 替换）
 │   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
 │   │   ├── schema-tool.ts  # config.schema.json 校验
 │   │   ├── save-image-tool.ts # 图片保存工具（图床 + SHA256 去重）
+│   │   ├── console-tool.ts   # 控制台日志获取工具
+│   │   ├── screenshot-tool.ts # 页面截图工具（调用 screenshot-service HTTP API）
 │   │   └── list-images-tool.ts # 项目图片清单查询
 │   └── index.ts            # 模块导出
 ├── core/                   # 核心逻辑
@@ -61,6 +63,7 @@ tests/
 ```
 
 **关键点：**
+
 - **进程内嵌入**：Pi Agent 核心以 npm 依赖方式嵌入，无需独立进程或端口
 - **动态导入**：`pi-agent.ts` 通过 `await import('@earendil-works/pi-agent-core')` 动态加载，避免 ESM/CJS 兼容问题
 - **流式响应**：`Agent.subscribe(event)` 推送 `message_update`、`tool_execution_start/end`、`agent_end` 事件
@@ -68,19 +71,21 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 暴露 9 个工具：
+`src/backends/pi-tools/` 暴露 11 个工具：
 
-| 工具 | 用途 |
-|:-----|:-----|
-| `readFile` | 读取工作空间内文件 |
-| `readFileWithLines` | 带行号读取文件，支持行范围选择 |
-| `editFile` | 精确编辑文件（old_string/new_string 替换） |
-| `writeFile` | 写入工作空间内文件（变更会被捕获） |
-| `listFiles` | 列出目录文件 |
-| `bash` | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo） |
-| `schemaValidate` | 校验 config.schema.json 格式 |
-| `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
-| `listImages` | 查询当前项目已上传的图片清单 |
+| 工具                | 用途                                                                        |
+| :------------------ | :-------------------------------------------------------------------------- |
+| `readFile`          | 读取工作空间内文件                                                          |
+| `readFileWithLines` | 带行号读取文件，支持行范围选择                                              |
+| `editFile`          | 精确编辑文件（old_string/new_string 替换）                                  |
+| `writeFile`         | 写入工作空间内文件（变更会被捕获）                                          |
+| `listFiles`         | 列出目录文件                                                                |
+| `bash`              | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo）       |
+| `schemaValidate`    | 校验 config.schema.json 格式                                                |
+| `saveImage`         | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
+| `listImages`        | 查询当前项目已上传的图片清单                                                |
+| `getConsoleLogs`    | 获取 iframe 预览沙箱的控制台输出（console.log/warn/error/info/debug）       |
+| `captureScreenshot` | 通过 screenshot-service HTTP API 截取预览页面截图（返回 base64 PNG）        |
 
 ### Shell 白名单
 
@@ -98,6 +103,7 @@ PI_AGENT_PROVIDER=jojo                # anthropic / openai / google / 自定义 
 PI_AGENT_MODEL=deepseek-v4-flash      # 模型 ID
 PI_AGENT_BASE_URL=https://token.xjjj.co/v1  # 自定义 API 基础地址（OpenAI 兼容格式）
 PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
+SCREENSHOT_SERVICE_URL=http://localhost:3202  # 截图服务地址（captureScreenshot 工具使用）
 ```
 
 完整配置加载逻辑见 `src/utils/config.ts`。
@@ -105,9 +111,11 @@ PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 ## HTTP API 路由
 
 ### POST /api/agent/:sessionId/message
+
 发送消息到指定会话。
 
 **请求体：**
+
 ```typescript
 {
   content: string;
@@ -123,29 +131,37 @@ PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 ```
 
 ### GET /api/agent/:sessionId
+
 获取会话信息。
 
 ### DELETE /api/agent/:sessionId
+
 销毁指定会话。
 
 ### GET /api/agent/:sessionId/files
+
 获取会话中修改的文件列表。
 
 ### GET /api/sessions
+
 列出所有会话。
 
 **查询参数：**
+
 - `status`: 按状态过滤
 - `limit`: 限制数量
 - `offset`: 偏移量
 
 ### POST /api/agent/:sessionId/rollback
+
 回滚文件修改。
 
 ### GET /models
+
 获取可用模型列表（创建临时 Pi Agent 实例调用 `getModelInfo()`）。
 
 ### GET /health
+
 健康检查端点（返回 status/timestamp/uptime/agents）。
 
 ## IBackendAdapter 接口
@@ -154,16 +170,34 @@ PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 export interface IBackendAdapter {
   readonly name: string;
   initialize(): Promise<void>;
-  sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string>;
+  sendMessage(
+    content: string,
+    options?: { stream?: boolean; images?: ImageAttachment[] },
+  ): Promise<string>;
   onStream(callback: (event: AgentEvent) => void): void;
   getStatus(): Promise<BackendStatus>;
   destroy(): Promise<void>;
   checkHealth(): Promise<boolean>;
   start?(options?: { resumeSessionId?: string }): Promise<void>;
   setModel?(modelId: string): Promise<void>;
-  getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
+  getModelInfo?():
+    | {
+        currentModelId: string | null;
+        availableModels: Array<{ id: string; label: string }>;
+        canSwitch: boolean;
+      }
+    | null
+    | Promise<{
+        currentModelId: string | null;
+        availableModels: Array<{ id: string; label: string }>;
+        canSwitch: boolean;
+      } | null>;
   getCurrentSessionId?(): string | null;
-  getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+  getFiles?(): Array<{
+    path: string;
+    action: "created" | "modified" | "deleted";
+    content?: string;
+  }>;
   setPromptTimeout?(seconds: number): void;
   cancelPrompt?(): void;
   getWorkingDir?(): string | null;
@@ -200,35 +234,40 @@ pnpm typecheck
 
 ## 测试策略
 
-| 测试类型 | 描述 | 文件位置 |
-|:---------|:-----|:---------|
-| **单元测试** | 纯逻辑测试，无需外部依赖 | `tests/unit/*.test.ts` |
+| 测试类型     | 描述                               | 文件位置                      |
+| :----------- | :--------------------------------- | :---------------------------- |
+| **单元测试** | 纯逻辑测试，无需外部依赖           | `tests/unit/*.test.ts`        |
 | **集成测试** | 测试 Pi Agent 后端初始化/事件/配置 | `tests/integration/*.test.ts` |
 
 ## 代码风格与约定
 
 ### TypeScript 配置
+
 - **严格模式**：`strict: true`
 - **目标版本**：ES2020
 - **模块系统**：NodeNext
 
 ### 命名约定
+
 - **类/接口**：PascalCase（`PiAgentBackend`, `AgentConfig`）
 - **函数/变量**：camelCase（`sendPrompt`, `createSession`）
 - **常量**：UPPER_SNAKE_CASE（`SESSION_EXPIRY_MS`）
 - **类型别名**：PascalCase（`AgentType`, `ErrorCode`）
 
 ### 导入顺序
+
 1. Node.js 内置模块
 2. 外部库（fastify, pino 等）
 3. 内部模块（相对路径）
 
 ### 错误处理
+
 - 使用自定义 `ErrorCode` 枚举
 - 错误消息使用中文
 - 所有异步操作使用 try/catch
 
 ### 日志规范
+
 - 使用 pino 日志库
 - 通过 `src/utils/logger.ts` 统一导出
 - 日志级别：`debug`, `info`, `warn`, `error`

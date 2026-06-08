@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,47 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       demo.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [demos, searchQuery]);
+
+  // 为无封面的项目自动补生缺失截图
+  const ensureTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (ensureTriggeredRef.current || demos.length === 0) return;
+    ensureTriggeredRef.current = true;
+
+    const projectsNeedingScreenshots = demos.filter(
+      (d) => !d.thumbnail && d.demoPages && d.demoPages.length > 0,
+    );
+
+    if (projectsNeedingScreenshots.length === 0) return;
+
+    let hasGenerated = false;
+
+    // 并行触发所有无封面项目的截图补生
+    Promise.all(
+      projectsNeedingScreenshots.map((d) =>
+        fetch("/api/screenshots/ensure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId: d.id }),
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.success && result.data?.generated > 0) {
+              hasGenerated = true;
+            }
+          })
+          .catch(() => {
+            // 静默失败
+          }),
+      ),
+    ).then(() => {
+      // 如果有新截图生成，延迟后刷新列表以展示新截图
+      if (hasGenerated) {
+        setTimeout(() => revalidate(), 5000);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demos]);
 
   const handleCreate = async (name: string) => {
     const response = await createDemo(name);

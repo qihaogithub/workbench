@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   ChevronRight,
   FileText,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   getProjects,
@@ -26,7 +27,13 @@ import type {
   PublishedDemoPage,
 } from "@/lib/api";
 import { PreviewPanel } from "@/components/demo";
-import { ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "@/components/demo";
+import { PreviewCanvas } from "@/components/demo";
+import type { PreviewMode, CanvasState } from "@/components/demo";
+import {
+  ConfigForm,
+  ConfigScopeWrapper,
+  isSchemaEmpty,
+} from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,9 +60,7 @@ function mergeConfigDefaults(
   projectSchema?: string,
   pageSchema?: string,
 ): Record<string, unknown> {
-  const projectDefaults = projectSchema
-    ? getDefaultValues(projectSchema)
-    : {};
+  const projectDefaults = projectSchema ? getDefaultValues(projectSchema) : {};
   const pageDefaults = pageSchema ? getDefaultValues(pageSchema) : {};
   return { ...projectDefaults, ...pageDefaults };
 }
@@ -351,11 +356,16 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [configDataMap, setConfigDataMap] = useState<
     Record<string, Record<string, unknown>>
   >({});
-  const [pageSchemaMap, setPageSchemaMap] = useState<
-    Record<string, string>
-  >({});
+  const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
+    {},
+  );
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
+  const [canvasState, setCanvasState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {},
+  });
 
   useEffect(() => {
     getProjectData(projectId)
@@ -375,10 +385,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           for (const page of data.demoPages) {
             if (page.schemaPath) {
               try {
-                const schema = await getDemoSchema(
-                  projectId,
-                  page.schemaPath,
-                );
+                const schema = await getDemoSchema(projectId, page.schemaPath);
                 const schemaStr = JSON.stringify(schema);
                 schemaMap[page.id] = schemaStr;
                 const defaults = mergeConfigDefaults(
@@ -529,10 +536,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col h-full">
-      <Header
-        name={project.name}
-        onBack={() => router.push("/")}
-      />
+      <Header name={project.name} onBack={() => router.push("/")} />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project.demoPages.length > 1 && (
           <div className="w-56 border-r border-border shrink-0 flex flex-col">
@@ -567,37 +571,78 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex flex-col h-full">
-            <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  单页
-                </button>
+            {project.demoPages.length > 1 && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("single")}
+                    className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${
+                      previewMode === "single"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    单页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("canvas")}
+                    className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${
+                      previewMode === "canvas"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <MapIcon className="h-3.5 w-3.5" />
+                    画布
+                  </button>
+                </div>
+                <div className="flex-1" />
               </div>
-              <div className="flex-1" />
-            </div>
-            <div
-              className="flex-1 overflow-y-auto"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              <style>{`
-                .preview-single-scroll::-webkit-scrollbar { display: none; }
-              `}</style>
-            {activePage && (
-              <PreviewPanel
-                compiledJsUrl={compiledUrl}
-                configData={configData}
-                previewSize={previewSize}
-              />
             )}
-          </div>
+            {previewMode === "canvas" ? (
+              <div className="flex-1 overflow-hidden">
+                <PreviewCanvas
+                  editable={false}
+                  projectId={projectId}
+                  pages={project.demoPages.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    order: p.order,
+                    compiledJsUrl: getCompiledJsUrl(
+                      projectId,
+                      p.compiledJsPath,
+                    ),
+                    configData: configDataMap[p.id],
+                    previewSize: p.previewSize,
+                  }))}
+                  canvasState={canvasState}
+                  onCanvasStateChange={setCanvasState}
+                />
+              </div>
+            ) : (
+              <div
+                className="flex-1 overflow-y-auto"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                <style>{`
+                  .preview-single-scroll::-webkit-scrollbar { display: none; }
+                `}</style>
+                {activePage && (
+                  <PreviewPanel
+                    compiledJsUrl={compiledUrl}
+                    configData={configData}
+                    previewSize={previewSize}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {hasSchema && (
+        {hasSchema && previewMode !== "canvas" && (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
             <div className="px-4 py-2.5 border-b border-border">
               <h2 className="text-sm font-medium">配置面板</h2>
@@ -617,9 +662,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     />
                   </ConfigScopeWrapper>
                 )}
-                {hasProjectConfig && hasPageConfig && (
-                  <Separator />
-                )}
+                {hasProjectConfig && hasPageConfig && <Separator />}
                 {hasPageConfig && (
                   <ConfigScopeWrapper
                     scope="page"

@@ -10,7 +10,11 @@ import {
   ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
-import type { PreviewMode, CanvasState, PositionableSizeItem } from "../../../../../components/demo";
+import type {
+  PreviewMode,
+  CanvasState,
+  PositionableSizeItem,
+} from "../../../../../components/demo";
 import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
 import {
   parseFigmaText,
@@ -90,8 +94,17 @@ import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
-import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
-import type { DemoPageMeta, DemoFolderMeta, VersionHistoryResponse, VersionInfo } from "@opencode-workbench/shared";
+import {
+  KnowledgeDocDialog,
+  type KnowledgeItem,
+  type KnowledgeDocDialogMode,
+} from "@/components/demo/KnowledgeDocDialog";
+import type {
+  DemoPageMeta,
+  DemoFolderMeta,
+  VersionHistoryResponse,
+  VersionInfo,
+} from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -120,8 +133,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     Record<string, Record<string, unknown>>
   >({});
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
-  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
-  const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
+  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<
+    Record<string, import("@opencode-workbench/shared/demo").PreviewSize>
+  >({});
+  const [positionableItemSizes, setPositionableItemSizes] = useState<
+    Record<string, PositionableSizeItem>
+  >({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -167,11 +184,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
-  const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
-  const [focusCanvasPageId, setFocusCanvasPageId] = useState<string | undefined>(undefined);
+  const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(
+    null,
+  );
+  const [focusCanvasPageId, setFocusCanvasPageId] = useState<
+    string | undefined
+  >(undefined);
 
   // 画布模式下配置面板按需显示：选中页面时显示，无选中时隐藏
-  const isConfigPanelVisible = previewMode !== "canvas" || !!canvasEditingPageId;
+  const isConfigPanelVisible =
+    previewMode !== "canvas" || !!canvasEditingPageId;
 
   // 页面定位完成后清除 focusPageId，以便再次点击同一页面时重新触发
   useEffect(() => {
@@ -200,23 +222,37 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   });
 
   // 截图 debounce 再生定时器
-  const screenshotRegenerateTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const screenshotRegenerateTimerRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
+
+  // 标记数据加载完成后是否已触发过首次批量截图
+  const initialBatchTriggeredRef = useRef(false);
 
   // debounce 3s 触发单页截图再生
-  const scheduleScreenshotRegenerate = useCallback((pageId: string, pageCode: string) => {
-    const timers = screenshotRegenerateTimerRef.current;
-    if (timers[pageId]) clearTimeout(timers[pageId]);
-    timers[pageId] = setTimeout(() => {
-      const config = configDataMap[pageId] || {};
-      regeneratePage(pageId, pageCode, config);
-      delete timers[pageId];
-    }, 3000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regeneratePage]);
+  const scheduleScreenshotRegenerate = useCallback(
+    (pageId: string, pageCode: string) => {
+      const timers = screenshotRegenerateTimerRef.current;
+      if (timers[pageId]) clearTimeout(timers[pageId]);
+      timers[pageId] = setTimeout(() => {
+        const config = configDataMap[pageId] || {};
+        regeneratePage(pageId, pageCode, config);
+        delete timers[pageId];
+      }, 3000);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [regeneratePage],
+  );
 
-  // 切换到画布模式时触发批量截图，或首次加载时生成截图
+  // 数据加载完成后触发首次批量截图，或切换到画布模式时重新生成
   useEffect(() => {
-    if (demoPages.length > 0 && !isScreenshotGenerating) {
+    // 守卫：数据未加载完成或正在生成中
+    if (isLoading || demoPages.length === 0 || isScreenshotGenerating) return;
+
+    // 首次数据就绪 或 切换预览模式时触发
+    if (!initialBatchTriggeredRef.current || previewMode === "canvas") {
+      initialBatchTriggeredRef.current = true;
+
       const pages = demoPages
         .filter((p) => pageCodes[p.id] || code)
         .map((p) => ({
@@ -229,7 +265,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode]);
+  }, [isLoading, previewMode]);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -245,8 +281,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 知识库文档弹窗状态
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
-  const [kbDocDialogMode, setKbDocDialogMode] = useState<KnowledgeDocDialogMode>("read");
-  const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(null);
+  const [kbDocDialogMode, setKbDocDialogMode] =
+    useState<KnowledgeDocDialogMode>("read");
+  const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(
+    null,
+  );
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -266,21 +305,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const streamServiceRef = useRef<StreamService | null>(null);
   const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
-  const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
+  const [publishStatus, setPublishStatus] = useState<
+    "never_published" | "published" | "unpublished_changes" | null
+  >(null);
   const [publishing, setPublishing] = useState(false);
 
-  const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
+  const [versionHistory, setVersionHistory] =
+    useState<VersionHistoryResponse | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
-  const [currentUsername, setCurrentUsername] = useState<string>('');
+  const [currentUsername, setCurrentUsername] = useState<string>("");
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
-
-
 
   /**
    * Unified snapshot application entry.
@@ -329,8 +369,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       setEditorContent((prev) => {
-        const currentCode = newCode ?? extractCodeFromFigma(prev) ?? codeRef.current;
-        const currentSchema = newSchema ?? extractSchemaFromFigma(prev) ?? schemaRef.current;
+        const currentCode =
+          newCode ?? extractCodeFromFigma(prev) ?? codeRef.current;
+        const currentSchema =
+          newSchema ?? extractSchemaFromFigma(prev) ?? schemaRef.current;
         return buildFigmaText(currentCode, currentSchema);
       });
 
@@ -505,7 +547,10 @@ ${context.details}
         setProjectConfigSchema(multi.projectConfigSchema);
 
         // 记录每个页面的 previewSize
-        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        const previewSizeMap: Record<
+          string,
+          import("@opencode-workbench/shared/demo").PreviewSize
+        > = {};
         for (const page of pagesWithSize) {
           if (page.previewSize) {
             previewSizeMap[page.id] = page.previewSize;
@@ -699,18 +744,21 @@ ${context.details}
   );
 
   useEffect(() => {
-    projectApiClient.getPublishStatus(demoId).then((result) => {
-      setPublishStatus(result.status);
-      setPublishedVersion(result.publishedVersion);
-    }).catch(() => {
-      setPublishStatus(null);
-    });
+    projectApiClient
+      .getPublishStatus(demoId)
+      .then((result) => {
+        setPublishStatus(result.status);
+        setPublishedVersion(result.publishedVersion);
+      })
+      .catch(() => {
+        setPublishStatus(null);
+      });
   }, [demoId]);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
         if (data?.success && data.data?.username) {
           setCurrentUsername(data.data.username);
         }
@@ -735,17 +783,18 @@ ${context.details}
     setPublishing(true);
     try {
       const publishResult = await projectApiClient.publishProject(demoId);
-      setPublishStatus('published');
+      setPublishStatus("published");
       setPublishedVersion(publishResult.publishedVersion);
       toast({
-        title: '发布成功',
+        title: "发布成功",
         description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
       });
     } catch (publishErr) {
       toast({
-        title: '发布失败',
-        description: publishErr instanceof Error ? publishErr.message : '发布失败',
-        variant: 'destructive',
+        title: "发布失败",
+        description:
+          publishErr instanceof Error ? publishErr.message : "发布失败",
+        variant: "destructive",
       });
     } finally {
       setPublishing(false);
@@ -753,7 +802,11 @@ ${context.details}
   };
 
   const handleRestoreVersion = async (version: VersionInfo) => {
-    if (!confirm(`确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`)) {
+    if (
+      !confirm(
+        `确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`,
+      )
+    ) {
       return;
     }
 
@@ -761,14 +814,14 @@ ${context.details}
     try {
       const result = await projectApiClient.restoreVersion(demoId, {
         versionId: version.versionId,
-        username: currentUsername || '未知用户',
+        username: currentUsername || "未知用户",
       });
 
       const syncRes = await fetch(`/api/sessions/${sessionId}/sync-project`, {
-        method: 'POST',
+        method: "POST",
       });
       if (!syncRes.ok) {
-        throw new Error('同步会话工作区失败');
+        throw new Error("同步会话工作区失败");
       }
 
       const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
@@ -789,9 +842,9 @@ ${context.details}
 
         if (targetDemo) {
           applyDemoSnapshot({
-            code: targetDemo.code ?? '',
-            schema: targetDemo.schema ?? '',
-            source: 'manual-load',
+            code: targetDemo.code ?? "",
+            schema: targetDemo.schema ?? "",
+            source: "manual-load",
           });
         }
 
@@ -799,9 +852,8 @@ ${context.details}
           pageIds.map((id: string) => ({
             id,
             name:
-              multi.demoPages.find(
-                (p: { id: string }) => p.id === id,
-              )?.name || id,
+              multi.demoPages.find((p: { id: string }) => p.id === id)?.name ||
+              id,
             order: 0,
             parentId: null,
           })),
@@ -811,7 +863,7 @@ ${context.details}
       }
 
       toast({
-        title: '恢复成功',
+        title: "恢复成功",
         description: `已恢复到新版本 ${result.newVersionId}`,
       });
       await loadVersionHistory();
@@ -820,9 +872,9 @@ ${context.details}
       setPublishedVersion(statusResult.publishedVersion);
     } catch (err) {
       toast({
-        title: '恢复失败',
-        description: err instanceof Error ? err.message : '恢复版本失败',
-        variant: 'destructive',
+        title: "恢复失败",
+        description: err instanceof Error ? err.message : "恢复版本失败",
+        variant: "destructive",
       });
     } finally {
       setRestoring(null);
@@ -904,7 +956,7 @@ ${context.details}
       });
 
       setHasUnsavedChanges(false);
-      setPublishStatus('unpublished_changes');
+      setPublishStatus("unpublished_changes");
 
       loadVersionHistory();
     } catch (error) {
@@ -963,7 +1015,10 @@ ${context.details}
 
   // 处理 AI Schema 更新 — 通过 applyDemoSnapshot 统一应用
   const handleSchemaUpdate = useCallback(
-    (newSchema: string, source: "ai-realtime" | "ai-finish" = "ai-realtime") => {
+    (
+      newSchema: string,
+      source: "ai-realtime" | "ai-finish" = "ai-realtime",
+    ) => {
       applyDemoSnapshot({ schema: newSchema, source });
     },
     [applyDemoSnapshot],
@@ -1072,10 +1127,12 @@ ${context.details}
             disabled={
               isSaving ||
               publishing ||
-              publishStatus === 'published' ||
+              publishStatus === "published" ||
               publishStatus === null
             }
-            variant={publishStatus === 'unpublished_changes' ? 'default' : 'outline'}
+            variant={
+              publishStatus === "unpublished_changes" ? "default" : "outline"
+            }
             className="gap-2"
           >
             {publishing ? (
@@ -1083,7 +1140,7 @@ ${context.details}
                 <Loader2 className="h-4 w-4 animate-spin" />
                 保存并发布中...
               </>
-            ) : publishStatus === 'published' ? (
+            ) : publishStatus === "published" ? (
               <>
                 <CheckCircle className="h-4 w-4" />
                 已发布
@@ -1642,24 +1699,29 @@ ${context.details}
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">当前版本</span>
                       {versionHistory && (
-                        <Badge variant="default">{versionHistory.currentVersion}</Badge>
+                        <Badge variant="default">
+                          {versionHistory.currentVersion}
+                        </Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       {publishStatus && (
                         <Badge
                           variant={
-                            publishStatus === 'published' ? 'secondary' :
-                            publishStatus === 'unpublished_changes' ? 'default' :
-                            'outline'
+                            publishStatus === "published"
+                              ? "secondary"
+                              : publishStatus === "unpublished_changes"
+                                ? "default"
+                                : "outline"
                           }
                         >
-                          {publishStatus === 'published' && '已发布'}
-                          {publishStatus === 'unpublished_changes' && '有未发布变更'}
-                          {publishStatus === 'never_published' && '未发布'}
+                          {publishStatus === "published" && "已发布"}
+                          {publishStatus === "unpublished_changes" &&
+                            "有未发布变更"}
+                          {publishStatus === "never_published" && "未发布"}
                         </Badge>
                       )}
-                      {publishedVersion && publishStatus === 'published' && (
+                      {publishedVersion && publishStatus === "published" && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <RefreshCw className="h-3 w-3" />
                           {publishedVersion}
@@ -1681,19 +1743,37 @@ ${context.details}
                         return (
                           <div
                             key={version.versionId}
-                            className={`p-3 rounded-lg border ${isLatest ? 'border-primary/30 bg-primary/5' : 'border-border'}`}
+                            className={`p-3 rounded-lg border ${isLatest ? "border-primary/30 bg-primary/5" : "border-border"}`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{version.versionId}</span>
-                                {isLatest && <Badge variant="default" className="text-[10px] h-4 px-1">最新</Badge>}
-                                {version.sessionId === 'restore' && <Badge variant="secondary" className="text-[10px] h-4 px-1">恢复</Badge>}
+                                <span className="text-sm font-medium">
+                                  {version.versionId}
+                                </span>
+                                {isLatest && (
+                                  <Badge
+                                    variant="default"
+                                    className="text-[10px] h-4 px-1"
+                                  >
+                                    最新
+                                  </Badge>
+                                )}
+                                {version.sessionId === "restore" && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px] h-4 px-1"
+                                  >
+                                    恢复
+                                  </Badge>
+                                )}
                               </div>
                               <Button
-                                variant={isLatest ? 'ghost' : 'ghost'}
+                                variant={isLatest ? "ghost" : "ghost"}
                                 size="sm"
                                 onClick={() => handleRestoreVersion(version)}
-                                disabled={restoring === version.versionId || isLatest}
+                                disabled={
+                                  restoring === version.versionId || isLatest
+                                }
                                 className="h-7 gap-1 text-xs"
                               >
                                 {restoring === version.versionId ? (
@@ -1701,13 +1781,15 @@ ${context.details}
                                 ) : (
                                   <RotateCcw className="h-3 w-3" />
                                 )}
-                                {isLatest ? '当前' : '恢复'}
+                                {isLatest ? "当前" : "恢复"}
                               </Button>
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {format(version.savedAt, 'MM-dd HH:mm', { locale: zhCN })}
+                                {format(version.savedAt, "MM-dd HH:mm", {
+                                  locale: zhCN,
+                                })}
                               </span>
                               <span className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
@@ -1715,7 +1797,9 @@ ${context.details}
                               </span>
                             </div>
                             {version.note && (
-                              <p className="mt-1 text-xs text-muted-foreground truncate">{version.note}</p>
+                              <p className="mt-1 text-xs text-muted-foreground truncate">
+                                {version.note}
+                              </p>
                             )}
                           </div>
                         );
@@ -1727,7 +1811,6 @@ ${context.details}
                   )}
                 </div>
               </TabsContent>
-
             </Tabs>
           </ResizablePanel>
 
@@ -1775,7 +1858,7 @@ ${context.details}
                       screenshotUrls={Object.fromEntries(
                         Object.entries(pageScreenshots)
                           .filter(([, s]) => s.screenshotUrl)
-                          .map(([id, s]) => [id, s.screenshotUrl!])
+                          .map(([id, s]) => [id, s.screenshotUrl!]),
                       )}
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
@@ -1790,7 +1873,10 @@ ${context.details}
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
-                                  buildFigmaText(data.data.code, data.data.schema),
+                                  buildFigmaText(
+                                    data.data.code,
+                                    data.data.schema,
+                                  ),
                                 );
                                 setConfigDataMap((prev) => {
                                   if (prev[pageId]) return prev;
@@ -1803,7 +1889,9 @@ ${context.details}
                                 setPreviewSize(size);
                               }
                             })
-                            .catch((err) => console.error("加载页面失败:", err));
+                            .catch((err) =>
+                              console.error("加载页面失败:", err),
+                            );
                         }
                       }}
                       onCanvasClick={() => {
@@ -1852,7 +1940,10 @@ ${context.details}
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
-                                  buildFigmaText(data.data.code, data.data.schema),
+                                  buildFigmaText(
+                                    data.data.code,
+                                    data.data.schema,
+                                  ),
                                 );
                                 setConfigDataMap((prev) => {
                                   if (prev[pageId]) return prev;
@@ -1961,7 +2052,9 @@ ${context.details}
                       {showPageConfig && (
                         <ConfigScopeWrapper
                           scope="page"
-                          pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
+                          pageName={
+                            demoPages.find((p) => p.id === activeDemoId)?.name
+                          }
                           hideHeader={!hasBothScopes}
                         >
                           <ConfigForm

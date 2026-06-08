@@ -363,7 +363,11 @@ export function getPublishStatus(projectId: string): {
       ? project.versions[project.versions.length - 1].versionId
       : undefined;
 
-  const status = !project.publishedVersion
+  const isValidPublishedVersion =
+    project.publishedVersion &&
+    project.versions.some((v) => v.versionId === project.publishedVersion);
+
+  const status = !isValidPublishedVersion
     ? "never_published"
     : project.publishedVersion === currentVersion
       ? "published"
@@ -371,8 +375,8 @@ export function getPublishStatus(projectId: string): {
 
   return {
     projectId: project.id,
-    publishedVersion: project.publishedVersion ?? null,
-    publishedAt: project.publishedAt ?? null,
+    publishedVersion: isValidPublishedVersion ? project.publishedVersion ?? null : null,
+    publishedAt: isValidPublishedVersion ? project.publishedAt ?? null : null,
     currentVersion: currentVersion ?? null,
     hasUnpublishedChanges: status === "unpublished_changes",
     status,

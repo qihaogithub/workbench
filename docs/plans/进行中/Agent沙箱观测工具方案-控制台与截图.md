@@ -18,10 +18,10 @@
 
 为 Agent 新增两个观测工具：
 
-| 工具 | 能力 | 场景 |
-|------|------|------|
-| `getConsoleLogs` | 获取 iframe 沙箱的控制台输出 | 调试运行时错误、检查数据流、验证逻辑 |
-| `captureScreenshot` | 获取 iframe 沙箱的页面截图 | 检查视觉效果、布局问题、响应式适配 |
+| 工具                | 能力                         | 场景                                 |
+| ------------------- | ---------------------------- | ------------------------------------ |
+| `getConsoleLogs`    | 获取 iframe 沙箱的控制台输出 | 调试运行时错误、检查数据流、验证逻辑 |
+| `captureScreenshot` | 获取 iframe 沙箱的页面截图   | 检查视觉效果、布局问题、响应式适配   |
 
 ### 0.3 与现有方案的关系
 
@@ -36,10 +36,10 @@
 
 ### 1.1 两条独立数据通路
 
-| 能力 | 数据源 | 通路 | 原因 |
-|------|--------|------|------|
-| 控制台数据 | 客户端 iframe | iframe → postMessage → PreviewPanel 回调 → useConsoleBuffer → StreamService → WebSocket → agent-service ConsoleBuffer | 控制台输出依赖真实运行环境（用户交互、React 状态、CDN 加载），服务端 Puppeteer 无法复现 |
-| 截图 | 服务端 Puppeteer | agent-service → 读取代码 → 编译 → Puppeteer 渲染 → PNG base64 | 像素级截图需要完整浏览器渲染，客户端 `html2canvas` 保真度低且受 CORS 限制 |
+| 能力       | 数据源           | 通路                                                                                                                  | 原因                                                                                    |
+| ---------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 控制台数据 | 客户端 iframe    | iframe → postMessage → PreviewPanel 回调 → useConsoleBuffer → StreamService → WebSocket → agent-service ConsoleBuffer | 控制台输出依赖真实运行环境（用户交互、React 状态、CDN 加载），服务端 Puppeteer 无法复现 |
+| 截图       | 服务端 Puppeteer | agent-service → 读取代码 → 编译 → Puppeteer 渲染 → PNG base64                                                         | 像素级截图需要完整浏览器渲染，客户端 `html2canvas` 保真度低且受 CORS 限制               |
 
 ### 1.2 架构图
 
@@ -79,9 +79,16 @@
 │  Agent Tools                                                    │
 │  ┌──────────────────┐  ┌────────────────────────────┐           │
 │  │ getConsoleLogs   │  │ captureScreenshot          │           │
-│  │ → 读 ConsoleBuffer│  │ → Puppeteer 渲染 + 截图   │           │
-│  └──────────────────┘  └────────────────────────────┘           │
-│                                                                 │
+│  │ → 读 ConsoleBuffer│  │ → 调用 screenshot-service │           │
+│  └──────────────────┘  └─────────────┬──────────────┘           │
+│                                      │                          │
+└──────────────────────────────────────┼──────────────────────────┘
+                                       │ HTTP POST /api/screenshots/generate
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              screenshot-service (Fastify:3202)                   │
+│  Puppeteer Browser 单例 → 编译 → 渲染 → PNG                     │
+│  (与画布截图方案共享基础设施)                                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -162,6 +169,7 @@ if (data.type === 'CONSOLE_LOG' && data.payload) {
 PreviewGrid **不使用 PreviewPanel**，而是使用内部 `GridIframe` 组件。GridIframe 有自己的 iframe 生命周期和消息处理（当前仅处理 `READY`）。
 
 需要修改 GridIframe：
+
 1. 新增 `onConsoleEntry` prop
 2. 在 GridIframe 的 `message` 事件监听中增加 `CONSOLE_LOG` 分支
 
@@ -185,7 +193,7 @@ CanvasPageItem 已在编辑/高缩放状态下渲染 PreviewPanel，只需透传
 
 ```typescript
 interface ConsoleLogPayload {
-  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  level: "log" | "warn" | "error" | "info" | "debug";
   args: string;
   timestamp: number;
 }
@@ -214,12 +222,15 @@ function useConsoleBuffer(streamService: StreamService | null) {
     streamService?.forwardConsoleEntries(entries);
   }, [streamService]);
 
-  const handleConsoleEntry = useCallback((entry: ConsoleLogPayload) => {
-    pendingRef.current.push(entry);
-    if (!timerRef.current) {
-      timerRef.current = setTimeout(flush, FLUSH_INTERVAL);
-    }
-  }, [flush]);
+  const handleConsoleEntry = useCallback(
+    (entry: ConsoleLogPayload) => {
+      pendingRef.current.push(entry);
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(flush, FLUSH_INTERVAL);
+      }
+    },
+    [flush],
+  );
 
   const clearBuffer = useCallback(() => {
     bufferRef.current = [];
@@ -304,10 +315,10 @@ if (data.type === 'console_data' && Array.isArray(data.entries)) {
 新增 `packages/agent-service/src/session/console-buffer.ts`：
 
 ```typescript
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger";
 
 export interface ConsoleEntry {
-  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  level: "log" | "warn" | "error" | "info" | "debug";
   args: string;
   timestamp: number;
 }
@@ -329,17 +340,20 @@ class ConsoleBuffer {
     }
   }
 
-  getEntries(sessionId: string, options?: {
-    level?: string;
-    limit?: number;
-    since?: number;
-  }): ConsoleEntry[] {
+  getEntries(
+    sessionId: string,
+    options?: {
+      level?: string;
+      limit?: number;
+      since?: number;
+    },
+  ): ConsoleEntry[] {
     let entries = this.buffers.get(sessionId) || [];
     if (options?.level) {
-      entries = entries.filter(e => e.level === options.level);
+      entries = entries.filter((e) => e.level === options.level);
     }
     if (options?.since) {
-      entries = entries.filter(e => e.timestamp >= options.since!);
+      entries = entries.filter((e) => e.timestamp >= options.since!);
     }
     if (options?.limit && options.limit > 0) {
       entries = entries.slice(-options.limit);
@@ -368,38 +382,48 @@ export const consoleBuffer = new ConsoleBuffer();
 新增 `packages/agent-service/src/backends/pi-tools/console-tool.ts`：
 
 ```typescript
-import { Type, type Static } from 'typebox';
-import type { AgentTool } from '@earendil-works/pi-agent-core';
-import type { AgentConfig } from '../../core/types';
-import { consoleBuffer } from '../../session/console-buffer';
+import { Type, type Static } from "typebox";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentConfig } from "../../core/types";
+import { consoleBuffer } from "../../session/console-buffer";
 
 const GetConsoleLogsParams = Type.Object({
   level: Type.Optional(
-    Type.Union([
-      Type.Literal('log'),
-      Type.Literal('warn'),
-      Type.Literal('error'),
-      Type.Literal('info'),
-      Type.Literal('debug'),
-    ], { description: '过滤日志级别，不传则返回所有级别' })
+    Type.Union(
+      [
+        Type.Literal("log"),
+        Type.Literal("warn"),
+        Type.Literal("error"),
+        Type.Literal("info"),
+        Type.Literal("debug"),
+      ],
+      { description: "过滤日志级别，不传则返回所有级别" },
+    ),
   ),
   limit: Type.Optional(
-    Type.Number({ description: '返回最近的 N 条日志，默认 50，最大 200', minimum: 1, maximum: 200, default: 50 })
+    Type.Number({
+      description: "返回最近的 N 条日志，默认 50，最大 200",
+      minimum: 1,
+      maximum: 200,
+      default: 50,
+    }),
   ),
   since: Type.Optional(
-    Type.Number({ description: 'Unix 时间戳（毫秒），仅返回此时间之后的日志' })
+    Type.Number({ description: "Unix 时间戳（毫秒），仅返回此时间之后的日志" }),
   ),
 });
 type GetConsoleLogsParams = Static<typeof GetConsoleLogsParams>;
 
-export function createGetConsoleLogsTool(config: AgentConfig): AgentTool<typeof GetConsoleLogsParams> {
+export function createGetConsoleLogsTool(
+  config: AgentConfig,
+): AgentTool<typeof GetConsoleLogsParams> {
   return {
-    name: 'getConsoleLogs',
-    label: 'Get Console Logs',
+    name: "getConsoleLogs",
+    label: "Get Console Logs",
     description:
-      '获取 iframe 预览沙箱的控制台输出（console.log/warn/error/info/debug）。' +
-      '用于调试用户预览中的运行时问题。返回最近的控制台日志条目。' +
-      '注意：仅包含页面加载后实际产生的日志，如果用户尚未预览页面则可能为空。',
+      "获取 iframe 预览沙箱的控制台输出（console.log/warn/error/info/debug）。" +
+      "用于调试用户预览中的运行时问题。返回最近的控制台日志条目。" +
+      "注意：仅包含页面加载后实际产生的日志，如果用户尚未预览页面则可能为空。",
     parameters: GetConsoleLogsParams,
     execute: async (_toolCallId: string, args: GetConsoleLogsParams) => {
       const entries = consoleBuffer.getEntries(config.sessionId, {
@@ -410,21 +434,34 @@ export function createGetConsoleLogsTool(config: AgentConfig): AgentTool<typeof 
 
       if (entries.length === 0) {
         return {
-          content: [{ type: 'text' as const, text: 'No console logs available. The user may not have opened the preview yet.' }],
+          content: [
+            {
+              type: "text" as const,
+              text: "No console logs available. The user may not have opened the preview yet.",
+            },
+          ],
           details: { count: 0, sessionId: config.sessionId },
         };
       }
 
       const formatted = entries
-        .map(e => `[${new Date(e.timestamp).toISOString()}] [${e.level.toUpperCase()}] ${e.args}`)
-        .join('\n');
+        .map(
+          (e) =>
+            `[${new Date(e.timestamp).toISOString()}] [${e.level.toUpperCase()}] ${e.args}`,
+        )
+        .join("\n");
 
       return {
-        content: [{
-          type: 'text' as const,
-          text: `Console Logs (${entries.length} entries):\n\n${formatted}`,
-        }],
-        details: { count: entries.length, filtered: !!(args.level || args.since) },
+        content: [
+          {
+            type: "text" as const,
+            text: `Console Logs (${entries.length} entries):\n\n${formatted}`,
+          },
+        ],
+        details: {
+          count: entries.length,
+          filtered: !!(args.level || args.since),
+        },
       };
     },
   };
@@ -435,26 +472,36 @@ export function createGetConsoleLogsTool(config: AgentConfig): AgentTool<typeof 
 
 ## 三、截图捕获
 
-### 3.1 复用 Puppeteer 基础设施
+### 3.1 复用 screenshot-service HTTP API
 
-截图能力复用 `预览区画布模式Puppeteer截图方案.md` 中设计的 Puppeteer Browser 单例和渲染逻辑：
+截图能力通过调用已实现的 `screenshot-service`（端口 3202）HTTP API 完成，而非在 agent-service 中嵌入 Puppeteer：
 
-| 组件 | 位置 | 说明 |
-|------|------|------|
-| Browser 单例管理 | `screenshot-renderer.ts` | 懒加载启动、crash 自动重启、并发控制 |
-| 编译缓存 | `screenshot-compile-cache.ts` | LRU 200 条，避免重复编译 |
-| HTML 组装 | `iframe-template.ts` | `generateIframeHtml()` 复用 |
+| 组件             | 位置                                             | 说明                                 |
+| ---------------- | ------------------------------------------------ | ------------------------------------ |
+| Browser 单例管理 | `screenshot-service/src/utils/browser-pool.ts`   | 懒加载启动、crash 自动重启、并发控制 |
+| 编译缓存         | `screenshot-service/src/utils/compile-cache.ts`  | LRU 200 条，避免重复编译             |
+| 编译客户端       | `screenshot-service/src/utils/compile-client.ts` | 跨服务调用 author-site /api/compile  |
+| HTML 组装        | `shared/src/demo/iframe-template.ts`             | `generateIframeHtml()` 复用          |
+
+**架构决策**：agent-service 通过 HTTP 调用 screenshot-service，而非嵌入 Puppeteer。理由：
+
+| 维度               | 嵌入 Puppeteer                       | 调用 screenshot-service HTTP API         |
+| ------------------ | ------------------------------------ | ---------------------------------------- |
+| agent-service 依赖 | 需新增 puppeteer-core 依赖           | 无新增依赖                               |
+| 进程模型           | agent-service 进程内 Chromium 子进程 | screenshot-service 独立进程              |
+| 故障隔离           | Puppeteer crash 影响 Agent 服务      | 互不影响                                 |
+| 基础设施复用       | 需重写 browser-pool / compile-cache  | 直接复用 screenshot-service 全部基础设施 |
+| 部署复杂度         | agent-service Dockerfile 需 Chromium | 仅 screenshot-service 容器需 Chromium    |
 
 **与画布截图方案的差异**：
 
-| 维度 | 画布截图（已有方案） | Agent 截图（本方案） |
-|------|---------------------|---------------------|
-| 触发方式 | 前端进入画布时批量触发 | Agent 工具按需调用 |
-| API 端点 | `/api/screenshots/generate` | 工具内部调用，无独立 API |
-| 视口尺寸 | 固定 375×812 | 可自定义，默认 375×812 |
-| 缓存策略 | hash 版本化文件缓存 | 不缓存文件，直接返回 base64 |
-| 返回格式 | PNG 文件 URL | `ImageContent`（base64，供 LLM 多模态消费） |
-| 存储位置 | `data/screenshots/` | 不落盘（内存中直接返回） |
+| 维度     | 画布截图（已有方案）              | Agent 截图（本方案）                        |
+| -------- | --------------------------------- | ------------------------------------------- |
+| 触发方式 | 前端进入画布时批量触发            | Agent 工具按需调用                          |
+| API 端点 | `/api/screenshots/generate-batch` | `/api/screenshots/generate`（同步单页）     |
+| 视口尺寸 | 固定 375×812                      | 可自定义，默认 375×812                      |
+| 返回格式 | PNG 文件 URL（持久化）            | `ImageContent`（base64，供 LLM 多模态消费） |
+| 存储位置 | `data/screenshots/`（磁盘缓存）   | 不落盘（内存中直接返回）                    |
 
 ### 3.2 captureScreenshot 工具定义
 
@@ -463,13 +510,26 @@ export function createGetConsoleLogsTool(config: AgentConfig): AgentTool<typeof 
 ```typescript
 const CaptureScreenshotParams = Type.Object({
   width: Type.Optional(
-    Type.Number({ description: '视口宽度（px），默认 375', minimum: 200, maximum: 1920, default: 375 })
+    Type.Number({
+      description: "视口宽度（px），默认 375",
+      minimum: 200,
+      maximum: 1920,
+      default: 375,
+    }),
   ),
   height: Type.Optional(
-    Type.Number({ description: '视口高度（px），默认 812', minimum: 200, maximum: 1920, default: 812 })
+    Type.Number({
+      description: "视口高度（px），默认 812",
+      minimum: 200,
+      maximum: 1920,
+      default: 812,
+    }),
   ),
   fullPage: Type.Optional(
-    Type.Boolean({ description: '是否截取完整页面（含滚动区域），默认 true', default: true })
+    Type.Boolean({
+      description: "是否截取完整页面（含滚动区域），默认 true",
+      default: true,
+    }),
   ),
 });
 ```
@@ -489,33 +549,31 @@ Agent 调用 captureScreenshot
   │
   ▼
 ① 定位代码文件
-  │  config.demoId → 读取 {workingDir}/{demoId}/index.tsx
-  │  读取项目元数据获取 configData
+  │  config.workingDir + config.demoId → 读取 {workingDir}/{demoId}/index.tsx
+  │  读取 config.schema.json 获取默认 configData
   │
   ▼
-② 编译代码: POST author-site /api/compile
-  │  (复用 screenshot-compile-cache.ts 缓存)
+② 调用 screenshot-service API
+  │  POST ${SCREENSHOT_SERVICE_URL}/api/screenshots/generate
+  │  body: { projectId: config.demoId, pageId: config.demoId, code, configData, width, height }
+  │
+  │  screenshot-service 内部流程：
+  │    → 编译缓存命中检查
+  │    → POST author-site /api/compile（如缓存未命中）
+  │    → generateIframeHtml() HTML 组装
+  │    → Puppeteer Browser 渲染 + 截图
+  │    → 返回 { url, hash, elapsed }
   │
   ├── 编译失败 → 返回 COMPILE_ERROR
+  ├── screenshot-service 不可达 → 返回 SERVICE_UNAVAILABLE
   │
   ▼
-③ HTML 组装: generateIframeHtml(compiledCode, cssImports, configData)
+③ 获取 PNG 文件
+  │  GET ${SCREENSHOT_SERVICE_URL}${url}
+  │  获取 PNG Buffer
   │
   ▼
-④ Puppeteer Browser 单例 → 创建 Page
-  │  viewport {width}×{height}
-  │  page.setContent(html)
-  │
-  ▼
-⑤ 等待渲染完成
-  │  waitForSelector('#root')
-  │  waitForNetworkIdle({ timeout: 10000 })
-  │
-  ▼
-⑥ page.screenshot({ fullPage, type: 'png' })
-  │
-  ▼
-⑦ 返回 ImageContent
+④ 转换为 base64 返回 ImageContent
   │  content: [{ type: 'image', data: base64, mimeType: 'image/png' }]
   │  details: { width, height, sizeKB }
 ```
@@ -525,15 +583,16 @@ Agent 调用 captureScreenshot
 Agent 工作空间中可能有多个 demo 页面。截图工具通过 `config` 中的信息定位代码：
 
 ```
-config.demoId  →  当前 Agent 会话关联的 demo ID
+config.demoId  →  当前 Agent 会话关联的 demo ID（同时用作 projectId 和 pageId）
 config.workingDir  →  工作空间根目录
 
 代码文件路径: path.join(workingDir, demoId, 'index.tsx')
+配置文件路径: path.join(workingDir, demoId, 'config.schema.json')
 ```
 
 **多页面场景**：当前 Agent 会话仅关联一个 `demoId`，截图工具截取该 demo 对应的页面。如果 Agent 需要截取其他页面，可先用 `listFiles` 查看文件结构。
 
-**configData 获取**：从项目元数据文件（`data/projects/{projectId}/project.json`）中读取对应 demo 的 `configData`。
+**configData 获取**：从工作空间中的 `config.schema.json` 读取各属性的 `default` 值组装默认 configData，与 iframe 路由的行为一致。
 
 ### 3.5 返回格式
 
@@ -579,7 +638,7 @@ Pi Agent Core 的 `AgentToolResult.content` 类型为 `(TextContent | ImageConte
 在消息处理中新增分支（在现有 switch 之外添加，因为 `console_data` 是辅助数据通道，不需要 Agent 实例）：
 
 ```typescript
-if (data.type === 'console_data' && Array.isArray(data.entries)) {
+if (data.type === "console_data" && Array.isArray(data.entries)) {
   for (const entry of data.entries) {
     consoleBuffer.addEntry(sessionId, entry);
   }
@@ -595,7 +654,7 @@ if (data.type === 'console_data' && Array.isArray(data.entries)) {
 
 ```typescript
 export interface ConsoleEntry {
-  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  level: "log" | "warn" | "error" | "info" | "debug";
   args: string;
   timestamp: number;
 }
@@ -612,24 +671,24 @@ export interface ConsoleEntry {
 ```typescript
 /** iframe → 父窗口消息类型 */
 export type IframeOutMessageType =
-  | 'READY'
-  | 'LOADED'
-  | 'COMPONENT_READY'
-  | 'RUNTIME_ERROR'
-  | 'RESIZE'
-  | 'THUMBNAIL_LAYOUT_RESULT'
-  | 'THUMBNAIL_LAYOUT_ERROR'
-  | 'CONSOLE_LOG';          // 新增
+  | "READY"
+  | "LOADED"
+  | "COMPONENT_READY"
+  | "RUNTIME_ERROR"
+  | "RESIZE"
+  | "THUMBNAIL_LAYOUT_RESULT"
+  | "THUMBNAIL_LAYOUT_ERROR"
+  | "CONSOLE_LOG"; // 新增
 
 /** 父窗口 → iframe 消息类型 */
 export type IframeInMessageType =
-  | 'UPDATE_CODE'
-  | 'UPDATE_CONFIG'
-  | 'COLLECT_THUMBNAIL_LAYOUT';
+  | "UPDATE_CODE"
+  | "UPDATE_CONFIG"
+  | "COLLECT_THUMBNAIL_LAYOUT";
 
 /** 控制台日志条目（iframe postMessage payload） */
 export interface ConsoleLogPayload {
-  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  level: "log" | "warn" | "error" | "info" | "debug";
   args: string;
   timestamp: number;
 }
@@ -667,16 +726,16 @@ export interface ConsoleLogPayload {
 
 ## 七、错误处理
 
-| 场景 | getConsoleLogs | captureScreenshot |
-|------|---------------|-------------------|
-| 用户未打开预览 | 返回空 + 提示"用户可能尚未预览页面" | N/A（服务端渲染，不依赖用户预览） |
-| WebSocket 未连接 | 返回空 + 提示"数据通道未建立" | N/A（不依赖 WebSocket） |
-| Puppeteer 不可用 | N/A | 返回错误"截图服务不可用" |
-| 编译失败 | N/A | 返回错误 + 编译错误信息 |
-| 截图超时（15s） | N/A | 返回错误"截图超时" |
-| 渲染崩溃（白屏） | N/A | 返回截图（白屏 PNG），Agent 可通过视觉判断 |
-| 控制台缓冲溢出 | 自动丢弃最旧条目 | N/A |
-| 代码文件不存在 | N/A | 返回错误"未找到页面代码文件" |
+| 场景             | getConsoleLogs                      | captureScreenshot                          |
+| ---------------- | ----------------------------------- | ------------------------------------------ |
+| 用户未打开预览   | 返回空 + 提示"用户可能尚未预览页面" | N/A（服务端渲染，不依赖用户预览）          |
+| WebSocket 未连接 | 返回空 + 提示"数据通道未建立"       | N/A（不依赖 WebSocket）                    |
+| Puppeteer 不可用 | N/A                                 | 返回错误"截图服务不可用"                   |
+| 编译失败         | N/A                                 | 返回错误 + 编译错误信息                    |
+| 截图超时（15s）  | N/A                                 | 返回错误"截图超时"                         |
+| 渲染崩溃（白屏） | N/A                                 | 返回截图（白屏 PNG），Agent 可通过视觉判断 |
+| 控制台缓冲溢出   | 自动丢弃最旧条目                    | N/A                                        |
+| 代码文件不存在   | N/A                                 | 返回错误"未找到页面代码文件"               |
 
 ---
 
@@ -684,51 +743,53 @@ export interface ConsoleLogPayload {
 
 ### 8.1 新增文件（4 个，已实施）
 
-| 文件 | 位置 | 说明 | 状态 |
-|------|------|------|------|
-| `console-tool.ts` | `packages/agent-service/src/backends/pi-tools/` | `getConsoleLogs` 工具定义 | ✅ |
-| `console-buffer.ts` | `packages/agent-service/src/session/` | 控制台数据内存缓冲服务 | ✅ |
-| `iframe-types.ts` | `packages/shared/src/demo/` | iframe postMessage 消息类型定义 | ✅ |
-| `useConsoleBuffer.ts` | `packages/author-site/src/components/demo/` | 控制台缓冲 React Hook（限流 + 转发） | ✅ |
+| 文件                  | 位置                                            | 说明                                 | 状态 |
+| --------------------- | ----------------------------------------------- | ------------------------------------ | ---- |
+| `console-tool.ts`     | `packages/agent-service/src/backends/pi-tools/` | `getConsoleLogs` 工具定义            | ✅   |
+| `console-buffer.ts`   | `packages/agent-service/src/session/`           | 控制台数据内存缓冲服务               | ✅   |
+| `iframe-types.ts`     | `packages/shared/src/demo/`                     | iframe postMessage 消息类型定义      | ✅   |
+| `useConsoleBuffer.ts` | `packages/author-site/src/components/demo/`     | 控制台缓冲 React Hook（限流 + 转发） | ✅   |
 
 ### 8.2 待新增文件（1 个，Phase 2）
 
-| 文件 | 位置 | 说明 | 状态 |
-|------|------|------|------|
+| 文件                 | 位置                                            | 说明                         | 状态   |
+| -------------------- | ----------------------------------------------- | ---------------------------- | ------ |
 | `screenshot-tool.ts` | `packages/agent-service/src/backends/pi-tools/` | `captureScreenshot` 工具定义 | 待实施 |
 
-### 8.3 修改文件（13 个，已实施）
+### 8.3 修改文件（12 个，已实施）
 
-| 文件 | 变更 | 状态 |
-|------|------|------|
-| `packages/shared/src/demo/iframe-template.ts` | 注入 console 拦截脚本 | ✅ |
-| `packages/shared/src/demo/types.ts` | `PreviewPanelProps`/`GridIframeProps`/`PreviewGridProps`/`PreviewCanvasProps` 新增 `onConsoleEntry`；导出 `iframe-types` | ✅ |
-| `packages/shared/src/demo/PreviewPanel.tsx` | 新增 `onConsoleEntry` prop；处理 `CONSOLE_LOG` 消息 | ✅ |
-| `packages/shared/src/demo/PreviewGrid.tsx` | GridIframe 新增 `onConsoleEntry` prop；处理 `CONSOLE_LOG` 消息；透传到外部 | ✅ |
-| `packages/shared/src/demo/PreviewCanvas.tsx` | 透传 `onConsoleEntry` 到 CanvasPageItem | ✅ |
-| `packages/shared/src/demo/CanvasPageItem.tsx` | 透传 `onConsoleEntry` 到 PreviewPanel | ✅ |
-| `packages/shared/src/demo/index.ts` | 导出 `IframeOutMessageType`/`IframeInMessageType`/`ConsoleLogPayload` | ✅ |
-| `packages/agent-service/src/backends/pi-tools/index.ts` | 注册 `getConsoleLogs` 工具 | ✅ |
-| `packages/agent-service/src/routes/websocket.ts` | ClientMessage 新增 `console_data` 类型和 `entries` 字段；处理逻辑；连接生命周期清理 consoleBuffer | ✅ |
-| `packages/agent-service/src/routes/agent.ts` | 会话销毁时清理 consoleBuffer | ✅ |
-| `packages/author-site/src/components/ai-elements/chat/services/stream-service.ts` | 新增 `forwardConsoleEntries` 方法 | ✅ |
-| `packages/author-site/src/components/ai-elements/ai-chat.tsx` | 新增 `externalStreamServiceRef` prop | ✅ |
-| `packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts` | 新增 `externalStreamServiceRef` 选项；同步到 StreamService ref | ✅ |
-| `packages/author-site/src/app/demo/[id]/edit/page.tsx` | 接入 `useConsoleBuffer`；透传 `onConsoleEntry` 到 PreviewPanel/PreviewGrid/PreviewCanvas；传递 `externalStreamServiceRef` 到 AIChat | ✅ |
-| `packages/agent-client/src/types.ts` | 新增 `ConsoleEntry` 类型 | ✅ |
-| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 添加 `getConsoleLogs` 工具使用指引 | ✅ |
+| 文件                                                                              | 变更                                                                                                                    | 状态 |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---- |
+| `packages/shared/src/demo/iframe-template.ts`                                     | 注入 console 拦截脚本                                                                                                   | ✅   |
+| `packages/shared/src/demo/types.ts`                                               | `PreviewPanelProps`/`PreviewCanvasProps` 新增 `onConsoleEntry`；导出 `iframe-types`                                     | ✅   |
+| `packages/shared/src/demo/PreviewPanel.tsx`                                       | 新增 `onConsoleEntry` prop；处理 `CONSOLE_LOG` 消息                                                                     | ✅   |
+| `packages/shared/src/demo/PreviewCanvas.tsx`                                      | 透传 `onConsoleEntry` 到 CanvasPageItem                                                                                 | ✅   |
+| `packages/shared/src/demo/CanvasPageItem.tsx`                                     | 透传 `onConsoleEntry` 到 PreviewPanel                                                                                   | ✅   |
+| `packages/shared/src/demo/index.ts`                                               | 导出 `IframeOutMessageType`/`IframeInMessageType`/`ConsoleLogPayload`                                                   | ✅   |
+| `packages/agent-service/src/backends/pi-tools/index.ts`                           | 注册 `getConsoleLogs` 工具                                                                                              | ✅   |
+| `packages/agent-service/src/routes/websocket.ts`                                  | ClientMessage 新增 `console_data` 类型和 `entries` 字段；处理逻辑；连接生命周期清理 consoleBuffer                       | ✅   |
+| `packages/agent-service/src/routes/agent.ts`                                      | 会话销毁时清理 consoleBuffer                                                                                            | ✅   |
+| `packages/author-site/src/components/ai-elements/chat/services/stream-service.ts` | 新增 `forwardConsoleEntries` 方法                                                                                       | ✅   |
+| `packages/author-site/src/components/ai-elements/ai-chat.tsx`                     | 新增 `externalStreamServiceRef` prop                                                                                    | ✅   |
+| `packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts`   | 新增 `externalStreamServiceRef` 选项；同步到 StreamService ref                                                          | ✅   |
+| `packages/author-site/src/app/demo/[id]/edit/page.tsx`                            | 接入 `useConsoleBuffer`；透传 `onConsoleEntry` 到 PreviewPanel/PreviewCanvas；传递 `externalStreamServiceRef` 到 AIChat | ✅   |
+| `packages/agent-client/src/types.ts`                                              | 新增 `ConsoleEntry` 类型                                                                                                | ✅   |
+| `packages/author-site/src/lib/agent/prompts/system-prompt.md`                     | 添加 `getConsoleLogs` 工具使用指引                                                                                      | ✅   |
 
-### 8.4 依赖的前置实施
+> **注**：`PreviewGrid.tsx` 和 `GridIframe` 已从代码库中移除，控制台功能通过 PreviewCanvas → CanvasPageItem → PreviewPanel 链路覆盖。
 
-本方案的 `captureScreenshot` 工具依赖 `预览区画布模式Puppeteer截图方案.md` 中的以下组件：
+### 8.4 依赖的前置实施 ✅ 已就绪
 
-| 组件 | 文件 | 状态 |
-|------|------|------|
-| Puppeteer Browser 单例 | `screenshot-renderer.ts` | 待实施 |
-| 编译缓存 | `screenshot-compile-cache.ts` | 待实施 |
-| 编译调用逻辑 | 跨服务调用 author-site `/api/compile` | 待实施 |
+本方案的 `captureScreenshot` 工具依赖 `preview-service`（端口 3202）的 HTTP API，以下组件已实施：
 
-**建议**：先实施画布截图方案的 Phase 1（核心基础设施），再实施本方案。或两方案合并实施，共享 `screenshot-renderer.ts`。
+| 组件                   | 文件                                             | 状态 |
+| ---------------------- | ------------------------------------------------ | ---- |
+| Puppeteer Browser 单例 | `screenshot-service/src/utils/browser-pool.ts`   | ✅   |
+| 编译缓存               | `screenshot-service/src/utils/compile-cache.ts`  | ✅   |
+| 编译调用逻辑           | `screenshot-service/src/utils/compile-client.ts` | ✅   |
+| 截图路由               | `screenshot-service/src/routes/screenshots.ts`   | ✅   |
+
+agent-service 仅需新增 `SCREENSHOT_SERVICE_URL` 环境变量（默认 `http://localhost:3202`），通过 HTTP 调用即可。
 
 ---
 
@@ -741,7 +802,7 @@ export interface ConsoleLogPayload {
 1. ✅ 新增 `iframe-types.ts`，定义消息类型和 `ConsoleLogPayload`
 2. ✅ 修改 `iframe-template.ts`，注入 console 拦截脚本
 3. ✅ 修改 `PreviewPanel.tsx`，处理 `CONSOLE_LOG` 消息，新增 `onConsoleEntry` prop
-4. ✅ 修改 `PreviewGrid.tsx`，GridIframe 处理 `CONSOLE_LOG` 消息，新增 `onConsoleEntry` prop
+4. ✅ ~~修改 `PreviewGrid.tsx`~~（文件已移除，功能由 PreviewCanvas → CanvasPageItem → PreviewPanel 链路覆盖）
 5. ✅ 修改 `PreviewCanvas.tsx` + `CanvasPageItem.tsx`，透传 `onConsoleEntry` 到 PreviewPanel
 6. ✅ 新增 `useConsoleBuffer.ts` Hook（100ms 限流 + 缓冲 + 转发）
 7. ✅ 新增 `console-buffer.ts` 服务（agent-service 侧）
@@ -764,13 +825,18 @@ export interface ConsoleLogPayload {
 - `externalStreamServiceRef` 通过 `useChatStream` → `AIChat` → 编辑页面的链路传递，使 `useConsoleBuffer` 能访问 StreamService 的底层 WebSocket
 - vitest 测试待补充
 
-### Phase 2：截图捕获（依赖 Puppeteer 基础设施）
+### Phase 2：截图捕获 ✅ 已实施
 
-1. 确认 `screenshot-renderer.ts` 已实施（画布截图方案 Phase 1）
-2. 新增 `screenshot-tool.ts`（`captureScreenshot` 工具）
-3. 实现截图逻辑：定位代码 → 编译 → HTML 组装 → Puppeteer 渲染 → base64 返回
-4. 注册工具到 `pi-tools/index.ts`
-5. 编写 vitest 测试（mock Puppeteer + 工具测试）
+> 实施日期：2026-06-08
+> 架构变更：从嵌入式 Puppeteer 改为调用 screenshot-service HTTP API
+
+1. ✅ agent-service `config.ts` 新增 `screenshotServiceUrl` 环境变量（`SCREENSHOT_SERVICE_URL`，默认 `http://localhost:3202`）
+2. ✅ 新增 `screenshot-tool.ts`（`captureScreenshot` 工具，通过 HTTP 调用 screenshot-service）
+3. ✅ 实现截图逻辑：读取代码 → 读取 configData → POST screenshot-service /generate → GET PNG → base64 ImageContent
+4. ✅ 注册工具到 `pi-tools/index.ts`
+5. ✅ 更新 `system-prompt.md`，追加 `captureScreenshot` 工具使用指引
+6. ✅ 更新 `agent-service/AGENTS.md`，新增工具到列表
+7. ⬜ 编写 vitest 测试（mock fetch + 工具测试）
 
 ### Phase 3：System Prompt 与集成测试
 
@@ -782,14 +848,14 @@ export interface ConsoleLogPayload {
 
 ## 十、风险与缓解
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
-| console 拦截影响 iframe 性能 | 大量 console 输出时 postMessage 频繁 | 100ms 限流批量转发；前端 useConsoleBuffer 合并发送 |
-| Puppeteer 截图耗时影响 Agent 响应速度 | 用户等待时间长 | 超时 15s；工具描述中说明可能耗时 |
-| 控制台缓冲内存泄漏 | 长时间会话占用过多内存 | 500 条上限 + 会话结束清理 + splice 就地裁剪 |
-| WebSocket 断连导致控制台数据丢失 | Agent 获取不到最新日志 | 前端保留最近 500 条缓冲；重连后新日志继续写入 |
-| 渲染崩溃导致截图白屏 | Agent 无法从截图中获取有用信息 | 白屏截图仍返回，Agent 可结合 getConsoleLogs 诊断 |
-| GridIframe 与 PreviewPanel 消息处理不一致 | GridIframe 漏掉控制台数据 | 统一在两个组件中处理 `CONSOLE_LOG`，共享 `ConsoleLogPayload` 类型 |
+| 风险                                  | 影响                                 | 缓解措施                                                                   |
+| ------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| console 拦截影响 iframe 性能          | 大量 console 输出时 postMessage 频繁 | 100ms 限流批量转发；前端 useConsoleBuffer 合并发送                         |
+| Puppeteer 截图耗时影响 Agent 响应速度 | 用户等待时间长                       | 超时 15s；工具描述中说明可能耗时                                           |
+| 控制台缓冲内存泄漏                    | 长时间会话占用过多内存               | 500 条上限 + 会话结束清理 + splice 就地裁剪                                |
+| WebSocket 断连导致控制台数据丢失      | Agent 获取不到最新日志               | 前端保留最近 500 条缓冲；重连后新日志继续写入                              |
+| 渲染崩溃导致截图白屏                  | Agent 无法从截图中获取有用信息       | 白屏截图仍返回，Agent 可结合 getConsoleLogs 诊断                           |
+| screenshot-service 不可达             | Agent 无法截图                       | 工具返回 SERVICE_UNAVAILABLE 错误；截图服务独立部署，不影响 Agent 核心功能 |
 
 ---
 

@@ -1,6 +1,11 @@
 import type { ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
 
-export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
+export type {
+  IframeOutMessageType,
+  IframeInMessageType,
+  ConsoleLogPayload,
+  PositionableSizeItem,
+} from "./iframe-types";
 
 export interface PreviewSize {
   width?: string | number;
@@ -94,6 +99,7 @@ export interface CanvasPageData {
   id: string;
   name: string;
   code?: string;
+  compiledJsUrl?: string;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
@@ -149,5 +155,3 @@ export interface PreviewState {
   mode: PreviewMode;
   activePageId: string;
 }
-
-

@@ -3,7 +3,13 @@
 import React, { useState, useCallback, useRef } from "react";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
-import type { CanvasPageLayout, CanvasPageData, ConsoleLogPayload, CanvasToolMode, PositionableSizeItem } from "./types";
+import type {
+  CanvasPageLayout,
+  CanvasPageData,
+  ConsoleLogPayload,
+  CanvasToolMode,
+  PositionableSizeItem,
+} from "./types";
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -23,7 +29,11 @@ interface CanvasPageItemProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   // 拖拽/缩放回调（用于对齐辅助线）
   onDragStart?: (pageId: string) => void;
-  onDragMove?: (pageId: string, layout: CanvasPageLayout, edge?: string) => void;
+  onDragMove?: (
+    pageId: string,
+    layout: CanvasPageLayout,
+    edge?: string,
+  ) => void;
   onDragEnd?: () => void;
   // 工具模式
   toolMode?: CanvasToolMode;
@@ -161,7 +171,10 @@ export function CanvasPageItem({
   const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   // 右键菜单状态
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   // 截图加载完成后，标记可以卸载 iframe
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
@@ -186,9 +199,7 @@ export function CanvasPageItem({
           ? Number(page.previewSize.height)
           : 812;
       const designWidth =
-        page.previewSize?.width != null
-          ? Number(page.previewSize.width)
-          : 375;
+        page.previewSize?.width != null ? Number(page.previewSize.width) : 375;
 
       if (newContentHeight <= designHeight) {
         if (contentHeight !== null) setContentHeight(null);
@@ -229,7 +240,8 @@ export function CanvasPageItem({
   }, [page.previewSize]);
 
   const canInteract = editable && !isEditing && toolMode === "select";
-  const showEdgeHandles = isHovering && canInteract && !isDragging && !isResizing;
+  const showEdgeHandles =
+    isHovering && canInteract && !isDragging && !isResizing;
 
   /**
    * 四种渲染路径：
@@ -327,8 +339,14 @@ export function CanvasPageItem({
         const s = zoomRef.current || 1;
         const dx = (e.clientX - startPosRef.current.x) / s;
         const dy = (e.clientY - startPosRef.current.y) / s;
-        const designW = page.previewSize?.width != null ? Number(page.previewSize.width) : 375;
-        const designH = page.previewSize?.height != null ? Number(page.previewSize.height) : 812;
+        const designW =
+          page.previewSize?.width != null
+            ? Number(page.previewSize.width)
+            : 375;
+        const designH =
+          page.previewSize?.height != null
+            ? Number(page.previewSize.height)
+            : 812;
         const aspectRatio = designW / designH;
         const newLayout = computeResizeLayout(
           layoutStartRef.current,
@@ -347,7 +365,14 @@ export function CanvasPageItem({
       // 非拖拽/缩放时，更新边框热区 hover 状态
       updateEdgeFromPointer(e);
     },
-    [isDragging, isResizing, page.id, onLayoutChange, onDragMove, updateEdgeFromPointer],
+    [
+      isDragging,
+      isResizing,
+      page.id,
+      onLayoutChange,
+      onDragMove,
+      updateEdgeFromPointer,
+    ],
   );
 
   const handleDragPointerUp = useCallback(
@@ -426,6 +451,7 @@ export function CanvasPageItem({
         >
           <PreviewPanel
             code={page.code}
+            compiledJsUrl={page.compiledJsUrl}
             sessionId={sessionId}
             demoId={page.id}
             configData={page.configData}
@@ -473,7 +499,7 @@ export function CanvasPageItem({
         width: layout.width,
         height: layout.height,
         cursor: activeCursor,
-        zIndex: isEditing ? 10 : layout.zIndex ?? 0,
+        zIndex: isEditing ? 10 : (layout.zIndex ?? 0),
       }}
       onPointerDown={handleDragPointerDown}
       onPointerMove={handleDragPointerMove}

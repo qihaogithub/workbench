@@ -19,17 +19,17 @@ ops-cli 位于 `OPS/CLI/`，运行方式：`cd OPS/CLI && pnpm dev <command> --j
 
 ### CLI 命令速查表
 
-| 命令 | 用途 | 典型场景 |
-|------|------|---------|
-| `ops-cli system --json` | 一键环境诊断 | Step 1: 收集运行时、服务状态、端口、后端可用性 |
-| `ops-cli health --json` | 服务健康检查 | 确认 agent-service 是否运行正常 |
-| `ops-cli diagnose <sid> --json` | 会话错误诊断 | Step 2: 自动化 4 步诊断（健康→会话→测试→分析） |
-| `ops-cli sessions --json` | 列出所有会话 | 查看错误状态会话、资源泄漏 |
-| `ops-cli session <sid> --json` | 会话详情 | 查看特定会话状态、后端、消息数 |
-| `ops-cli logs [sid] --json` | 日志采集 | Step 3: 按级别/关键字过滤日志 |
-| `ops-cli destroy <sid>` | 销毁会话 | 清理错误会话释放资源 |
-| `ops-cli stream <sid> "msg"` | WebSocket 流式测试 | 验证流式响应是否正常 |
-| `ops-cli send <sid> "msg"` | HTTP 消息测试 | 验证非流式响应是否正常 |
+| 命令                            | 用途               | 典型场景                                       |
+| ------------------------------- | ------------------ | ---------------------------------------------- |
+| `ops-cli system --json`         | 一键环境诊断       | Step 1: 收集运行时、服务状态、端口、后端可用性 |
+| `ops-cli health --json`         | 服务健康检查       | 确认 agent-service 是否运行正常                |
+| `ops-cli diagnose <sid> --json` | 会话错误诊断       | Step 2: 自动化 4 步诊断（健康→会话→测试→分析） |
+| `ops-cli sessions --json`       | 列出所有会话       | 查看错误状态会话、资源泄漏                     |
+| `ops-cli session <sid> --json`  | 会话详情           | 查看特定会话状态、后端、消息数                 |
+| `ops-cli logs [sid] --json`     | 日志采集           | Step 3: 按级别/关键字过滤日志                  |
+| `ops-cli destroy <sid>`         | 销毁会话           | 清理错误会话释放资源                           |
+| `ops-cli stream <sid> "msg"`    | WebSocket 流式测试 | 验证流式响应是否正常                           |
+| `ops-cli send <sid> "msg"`      | HTTP 消息测试      | 验证非流式响应是否正常                         |
 
 ### CLI 诊断决策树
 
@@ -69,6 +69,7 @@ ops-cli 位于 `OPS/CLI/`，运行方式：`cd OPS/CLI && pnpm dev <command> --j
 - **环境信息**：开发/测试/生产、浏览器/Node版本等
 
 **CLI 快速采集**：立即运行 `ops-cli system --json`，一次获取：
+
 - Node/pnpm/TypeScript 版本
 - Agent Service 运行状态、PID、端口
 - CLI 后端可用性（opencode/claude/codex 等）

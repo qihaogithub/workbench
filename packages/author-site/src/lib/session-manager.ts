@@ -416,19 +416,27 @@ export function saveEditSession(
       return { success: false, error: `Workspace source not found: ${workspaceId}` };
     }
 
-    fs.rmSync(workspacePath, { recursive: true, force: true });
-    fs.cpSync(sourcePath, workspacePath, {
-      recursive: true,
-      filter: (src: string) => !src.includes('node_modules'),
-    });
+    const tempPath = workspacePath + '.tmp';
+    try {
+      fs.cpSync(sourcePath, tempPath, {
+        recursive: true,
+        filter: (src: string) => !src.includes('node_modules'),
+      });
 
-    const metaInWorkspace = path.join(workspacePath, ".session.json");
-    if (fs.existsSync(metaInWorkspace)) {
-      fs.rmSync(metaInWorkspace, { force: true });
-    }
-    const workspaceJsonInWorkspace = path.join(workspacePath, ".workspace.json");
-    if (fs.existsSync(workspaceJsonInWorkspace)) {
-      fs.rmSync(workspaceJsonInWorkspace, { force: true });
+      const tempMetaJson = path.join(tempPath, ".session.json");
+      if (fs.existsSync(tempMetaJson)) {
+        fs.rmSync(tempMetaJson, { force: true });
+      }
+      const tempWsJson = path.join(tempPath, ".workspace.json");
+      if (fs.existsSync(tempWsJson)) {
+        fs.rmSync(tempWsJson, { force: true });
+      }
+
+      fs.rmSync(workspacePath, { recursive: true, force: true });
+      fs.renameSync(tempPath, workspacePath);
+    } catch (e) {
+      fs.rmSync(tempPath, { recursive: true, force: true });
+      throw e;
     }
 
     const versionInfo: VersionInfo = {
@@ -484,6 +492,25 @@ export function saveEditSession(
     };
   } catch (error) {
     console.error(`[saveEditSession] 保存失败:`, error);
+
+    // 尝试从最新快照恢复 workspace
+    if (project.versions.length > 0) {
+      const latestVersion = project.versions[project.versions.length - 1];
+      const latestSnapshot = latestVersion.snapshotPath;
+      if (fs.existsSync(latestSnapshot)) {
+        console.log(`[saveEditSession] 尝试从快照 ${latestVersion.versionId} 恢复 workspace`);
+        try {
+          if (fs.existsSync(workspacePath)) {
+            fs.rmSync(workspacePath, { recursive: true, force: true });
+          }
+          fs.cpSync(latestSnapshot, workspacePath, { recursive: true });
+          console.log(`[saveEditSession] 恢复成功`);
+        } catch (restoreError) {
+          console.error(`[saveEditSession] 恢复失败:`, restoreError);
+        }
+      }
+    }
+
     if (error instanceof Error) {
       return { success: false, error: `Save failed: ${error.message}` };
     }
