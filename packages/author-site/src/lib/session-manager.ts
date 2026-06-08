@@ -417,6 +417,10 @@ export function saveEditSession(
     }
 
     const tempPath = workspacePath + '.tmp';
+    // 清理上次保存可能残留的临时目录
+    if (fs.existsSync(tempPath)) {
+      fs.rmSync(tempPath, { recursive: true, force: true });
+    }
     try {
       fs.cpSync(sourcePath, tempPath, {
         recursive: true,

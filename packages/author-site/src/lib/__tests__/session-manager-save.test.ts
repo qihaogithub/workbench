@@ -133,6 +133,37 @@ describe("saveEditSession", () => {
     // 这正是我们要修复的问题
   });
 
+  it("存在残留 .tmp 目录时不应影响正常保存", () => {
+    const project = createProject("残留测试");
+    const session = createSession(project.id);
+
+    const workspacePath = getProjectWorkspace(project.id);
+    writeMarkerFile(workspacePath, "干净数据");
+
+    // 模拟上次保存中断残留的 .tmp 目录
+    const tmpPath = workspacePath + ".tmp";
+    fs.mkdirSync(tmpPath);
+    fs.writeFileSync(
+      path.join(tmpPath, "_stale.txt"),
+      "残留的旧临时数据",
+      "utf-8",
+    );
+
+    const sessionPath = getSessionPath(project.id, session.sessionId);
+    fs.writeFileSync(
+      path.join(sessionPath, "_test_marker.txt"),
+      "新数据",
+      "utf-8",
+    );
+
+    const result = saveEditSession(session.sessionId);
+
+    expect(result.success).toBe(true);
+    expect(readMarkerFile(workspacePath)).toBe("新数据");
+    // 残留文件不应出现在最终 workspace 中
+    expect(fs.existsSync(path.join(workspacePath, "_stale.txt"))).toBe(false);
+  });
+
   it("不存在的 session 应返回失败", () => {
     const result = saveEditSession("nonexistent-session-id");
     expect(result.success).toBe(false);
