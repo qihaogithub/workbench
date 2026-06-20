@@ -1,3 +1,5 @@
+import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+
 // ============================================================
 // 基础类型
 // ============================================================
@@ -38,6 +40,7 @@ export interface AgentConfig {
   model?: string;
   timeout?: number;
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
+  backendProviders?: BackendProvidersConfig;
 
   piAgent?: PiAgentConfig;
 }

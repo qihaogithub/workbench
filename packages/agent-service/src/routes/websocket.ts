@@ -14,6 +14,7 @@ import {
   ServerMessage,
 } from "./ws-event-router";
 import { getSessionStore } from "../session/session-store";
+import { getSessionModelConfigs } from "../config/session-model-configs";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
@@ -178,6 +179,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                backendProviders: getSessionModelConfigs().get(sessionId),
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -363,6 +365,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                backendProviders: getSessionModelConfigs().get(resumeSessionId),
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -474,12 +477,14 @@ export async function registerWebSocketRoutes(
           case "get_models": {
             try {
               let agent = manager.get(sessionId);
+              const sessionBackendProviders = getSessionModelConfigs().get(sessionId);
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
                   workingDir: message.workingDir || process.cwd(),
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
+                  backendProviders: sessionBackendProviders,
                 };
                 agent = manager.getOrCreate(sessionId, config);
 
@@ -493,6 +498,13 @@ export async function registerWebSocketRoutes(
                   });
                   await agent.start();
                 }
+              } else if (sessionBackendProviders) {
+                agent = manager.getOrCreate(sessionId, {
+                  ...agent.getConfig(),
+                  workingDir: message.workingDir || agent.getConfig().workingDir,
+                  demoId: message.demoId || agent.getConfig().demoId,
+                  backendProviders: sessionBackendProviders,
+                });
               }
               if (agent && "getModelInfo" in agent) {
                 const modelInfo = await (
@@ -630,6 +642,7 @@ export async function registerWebSocketRoutes(
               snapshotService.clearSnapshot(session.workingDir);
             }
             consoleBuffer.clear(sessionId);
+            getSessionModelConfigs().delete(sessionId);
             sessionStore.delete(sessionId);
           }
         }

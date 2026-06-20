@@ -22,6 +22,15 @@ export function initializeDatabase(): void {
     )
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_model_configs (
+      user_id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // 密码重置日志表
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_logs (

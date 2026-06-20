@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
+import type { BackendProvider, BackendProvidersConfig } from '@opencode-workbench/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -31,6 +32,33 @@ function getServiceConfig(): ServiceConfig {
     _serviceConfig = loadConfig();
   }
   return _serviceConfig;
+}
+
+function findProvider(
+  config: BackendProvidersConfig | undefined,
+  providerId: string,
+): BackendProvider | undefined {
+  return config?.providers.find((provider) => provider.id === providerId && provider.enabled !== false);
+}
+
+function getActiveModelId(config: BackendProvidersConfig | undefined): string | undefined {
+  if (!config) return undefined;
+  if (config.activeModelId) return config.activeModelId;
+
+  const provider =
+    (config.activeProviderId ? findProvider(config, config.activeProviderId) : undefined) ||
+    config.providers.find((item) => item.enabled !== false);
+  if (!provider) return undefined;
+
+  const model = provider.defaultModel || provider.models[0];
+  return model ? `${provider.id}/${model}` : undefined;
+}
+
+function splitFullModelId(fullModelId: string | undefined): { provider?: string; model?: string } {
+  if (!fullModelId) return {};
+  const [provider, ...modelParts] = fullModelId.split('/');
+  const model = modelParts.join('/');
+  return provider && model ? { provider, model } : {};
 }
 
 // 动态导入 ESM-only 依赖
@@ -76,6 +104,36 @@ export class PiAgentBackend implements IBackendAdapter {
 
   constructor(config: AgentConfig) {
     this.config = config;
+  }
+
+  private getSessionProvidersConfig(): BackendProvidersConfig | undefined {
+    return this.config.backendProviders;
+  }
+
+  private getProviderConfig(providerId: string): BackendProvider | undefined {
+    return (
+      findProvider(this.getSessionProvidersConfig(), providerId) ||
+      getBackendProvidersManager().getProvider(providerId)
+    );
+  }
+
+  private resolveProviderAndModel(): { provider: string; modelId: string } {
+    const svc = getServiceConfig();
+    const sessionActive = splitFullModelId(getActiveModelId(this.getSessionProvidersConfig()));
+    const managerActive = splitFullModelId(getBackendProvidersManager().getActiveModelId());
+
+    return {
+      provider:
+        this.config.piAgent?.provider ||
+        sessionActive.provider ||
+        managerActive.provider ||
+        svc.piAgent.provider,
+      modelId:
+        this.config.piAgent?.model ||
+        sessionActive.model ||
+        managerActive.model ||
+        svc.piAgent.model,
+    };
   }
 
   async initialize(): Promise<void> {
@@ -133,13 +191,11 @@ export class PiAgentBackend implements IBackendAdapter {
 
   private getModel() {
     const svc = getServiceConfig();
-    const provider = this.config.piAgent?.provider || svc.piAgent.provider;
+    const { provider, modelId } = this.resolveProviderAndModel();
     // 优先使用 piAgent 配置的 model，不要使用 OpenCode 的 config.model
-    const modelId = this.config.piAgent?.model || svc.piAgent.model;
-    const providersManager = getBackendProvidersManager();
 
     // 1) 优先从 backendProviders 拿 baseURL/apiKey（运行时动态配置）
-    const providerConfig = providersManager.getProvider(provider);
+    const providerConfig = this.getProviderConfig(provider);
     const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
     const apiKeyFromProvider = providerConfig?.apiKey;
 
@@ -177,10 +233,9 @@ export class PiAgentBackend implements IBackendAdapter {
    */
   private async getApiKeyAndHeaders(model: any): Promise<{ apiKey: string; headers?: Record<string, string> } | undefined> {
     const provider = model.provider;
-    const providersManager = getBackendProvidersManager();
 
     // 优先级：backendProviders.apiKey > model.apiKey > piAgent.apiKey > env var > serviceConfig
-    const providerConfig = providersManager.getProvider(provider);
+    const providerConfig = this.getProviderConfig(provider);
     const apiKey =
       providerConfig?.apiKey ||
       model.apiKey ||
@@ -537,7 +592,8 @@ export class PiAgentBackend implements IBackendAdapter {
 
   async setModel(modelId: string): Promise<void> {
     if (!this.harness) throw new Error("Agent not initialized");
-    const [provider, id] = modelId.split('/');
+    const [provider, ...modelParts] = modelId.split('/');
+    const id = modelParts.join('/');
     this.config.piAgent = {
       ...this.config.piAgent,
       provider: provider || this.config.piAgent?.provider,
@@ -550,23 +606,12 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
-    const svc = getServiceConfig();
-    const providersManager = getBackendProvidersManager();
+    const sessionProviders = this.getSessionProvidersConfig();
 
     // 优先级: 推送的 activeModelId > this.config.piAgent > serviceConfig 默认
-    const activeFromManager = providersManager.getActiveModelId();
-    const [managerProvider, ...managerRest] = activeFromManager
-      ? activeFromManager.split("/")
-      : [];
-    const managerModel = managerRest.length ? managerRest.join("/") : "";
-    const useManager = !!(managerProvider && managerModel);
-
-    const provider = useManager
-      ? managerProvider
-      : this.config.piAgent?.provider || svc.piAgent.provider;
-    const modelId = useManager
-      ? managerModel
-      : this.config.piAgent?.model || svc.piAgent.model;
+    const resolved = this.resolveProviderAndModel();
+    const provider = resolved.provider;
+    const modelId = resolved.modelId;
 
     const availableModels: Array<{ id: string; label: string }> = [];
     const seen = new Set<string>();
@@ -577,7 +622,13 @@ export class PiAgentBackend implements IBackendAdapter {
     };
 
     // 1) 当前激活 provider: 优先使用 backendProviders 中声明的模型列表
-    const providerModels = providersManager.getProviderModels(provider);
+    const providerConfig = this.getProviderConfig(provider);
+    const providerModels = providerConfig
+      ? providerConfig.models.map((model) => ({
+          id: `${providerConfig.id}/${model}`,
+          label: model,
+        }))
+      : [];
     if (providerModels.length > 0) {
       for (const m of providerModels) {
         add(m.id, m.label);
@@ -603,7 +654,8 @@ export class PiAgentBackend implements IBackendAdapter {
     }
 
     // 2) 遍历其他 backendProviders, 把每个 provider 的每个模型都加入列表
-    const allProviders = providersManager.getConfig().providers;
+    const allProviders =
+      sessionProviders?.providers || getBackendProvidersManager().getConfig().providers;
     for (const p of allProviders) {
       if (p.id === provider) continue;
       if (p.enabled === false) continue;
@@ -640,6 +692,17 @@ export class PiAgentBackend implements IBackendAdapter {
 
   getFiles(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }> {
     return this.files;
+  }
+
+  updateConfig(config: Partial<AgentConfig>): void {
+    this.config = {
+      ...this.config,
+      ...config,
+      piAgent: {
+        ...this.config.piAgent,
+        ...config.piAgent,
+      },
+    };
   }
 
   setPromptTimeout(seconds: number): void {

@@ -26,6 +26,7 @@ interface BackendWithModelSupport extends IBackendAdapter {
   }>;
   cancelPrompt?: () => void;
   resolvePermission?: (toolCallId: string, approved: boolean) => void;
+  updateConfig?: (config: Partial<AgentConfig>) => void;
 }
 
 export class BackendAgent extends BaseAgent {
@@ -177,7 +178,13 @@ export class BackendAgent extends BaseAgent {
       changed = true;
     }
 
+    if (config.backendProviders !== undefined) {
+      this.config.backendProviders = config.backendProviders;
+      changed = true;
+    }
+
     if (changed) {
+      this.backend.updateConfig?.(this.config);
       this.lastActivityAt = new Date();
       this.emit("config_updated", {
         type: "config_updated",

@@ -125,6 +125,36 @@ describe('PiAgentBackend', () => {
   });
 });
 
+describe('PiAgentBackend session model config', () => {
+  it('uses session backendProviders before global defaults', async () => {
+    const backend = new PiAgentBackend({
+      sessionId: 'test-session',
+      backendProviders: {
+        providers: [
+          {
+            id: 'custom',
+            name: 'Custom',
+            baseURL: 'https://api.example.com/v1',
+            apiKey: 'sk-test',
+            models: ['model-a', 'model-b'],
+            defaultModel: 'model-b',
+            enabled: true,
+          },
+        ],
+        activeProviderId: 'custom',
+        activeModelId: 'custom/model-b',
+      },
+    });
+    const modelInfo = await backend.getModelInfo();
+
+    expect(modelInfo?.currentModelId).toBe('custom/model-b');
+    expect(modelInfo?.availableModels).toEqual([
+      { id: 'custom/model-a', label: 'model-a' },
+      { id: 'custom/model-b', label: 'model-b' },
+    ]);
+  });
+});
+
 describe('PiAgent 工具', () => {
   const mockConfig: AgentConfig = {
     sessionId: 'test-session',

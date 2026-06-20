@@ -74,7 +74,9 @@ export class AgentManager implements IAgentManager {
     // 模型变化不再需要重建（可用 harness.setModel() 运行时切换）
     return (
       current.workingDir !== newConfig.workingDir ||
-      current.demoId !== newConfig.demoId
+      current.demoId !== newConfig.demoId ||
+      JSON.stringify(current.backendProviders ?? null) !==
+        JSON.stringify(newConfig.backendProviders ?? null)
     );
   }
 
