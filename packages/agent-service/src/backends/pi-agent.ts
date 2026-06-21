@@ -7,9 +7,8 @@ import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
 import type { BackendProvider, BackendProvidersConfig } from '@opencode-workbench/shared';
-import * as fs from 'fs';
+import { ImageDescriber, type VisionDescribeRequest } from '../services/image-describer';
 import * as path from 'path';
-import * as crypto from 'crypto';
 
 /**
  * 判断文件路径是否属于知识库目录（knowledge/）
@@ -102,9 +101,14 @@ export class PiAgentBackend implements IBackendAdapter {
   private unsubFns: Array<() => void> = [];
   private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
   private selectedModel: { provider: string; modelId: string } | null = null;
+  private imageDescriber: ImageDescriber;
 
   constructor(config: AgentConfig) {
     this.config = config;
+    this.imageDescriber = new ImageDescriber(
+      {},
+      (request) => this.describeImageWithVisionModel(request),
+    );
   }
 
   private getSessionProvidersConfig(): BackendProvidersConfig | undefined {
@@ -228,6 +232,146 @@ export class PiAgentBackend implements IBackendAdapter {
 
     // 否则使用预定义模型
     return getModel(provider, modelId);
+  }
+
+  private getVisionModel(fullModelId: string) {
+    const svc = getServiceConfig();
+    const parsed = splitFullModelId(fullModelId);
+    const provider = parsed.provider || this.resolveProviderAndModel().provider;
+    const modelId = parsed.model || fullModelId;
+
+    const providerConfig = this.getProviderConfig(provider);
+    const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
+    const apiKeyFromProvider = providerConfig?.apiKey;
+
+    if (baseUrl) {
+      return {
+        id: modelId,
+        name: modelId,
+        api: 'openai-completions' as const,
+        provider,
+        baseUrl,
+        ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
+        reasoning: false,
+        input: ['text', 'image'] as const,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 1024,
+      };
+    }
+
+    const model = getModel(provider, modelId);
+    return {
+      ...model,
+      input: Array.from(new Set([...(model.input || []), 'image'])),
+    };
+  }
+
+  private async describeImageWithVisionModel(request: VisionDescribeRequest): Promise<string> {
+    await loadPiAgentDeps();
+
+    const model = this.getVisionModel(request.modelId);
+    if (model.baseUrl) {
+      const auth = await this.getApiKeyAndHeaders(model);
+      if (!auth?.apiKey) {
+        throw new Error(`Vision model provider "${model.provider}" missing API key`);
+      }
+
+      const response = await fetch(`${model.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${auth.apiKey}`,
+          ...(auth.headers || {}),
+        },
+        body: JSON.stringify({
+          model: model.id,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: request.prompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${request.image.mimeType};base64,${request.image.data}`,
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 300,
+        }),
+        signal: request.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Vision model request failed: ${response.status} ${body}`);
+      }
+
+      const payload = await response.json() as {
+        choices?: Array<{
+          message?: {
+            content?: string | Array<{ type?: string; text?: string }>;
+          };
+        }>;
+      };
+      const content = payload.choices?.[0]?.message?.content;
+      if (typeof content === 'string') {
+        return content;
+      }
+      if (Array.isArray(content)) {
+        return content
+          .filter((item) => item.type === 'text' && item.text)
+          .map((item) => item.text)
+          .join('');
+      }
+      return '';
+    }
+
+    const env = new NodeExecutionEnv({ cwd: this.config.workingDir ?? process.cwd() });
+    const sessionRepo = new InMemorySessionRepo();
+    const session = await sessionRepo.create();
+    const harness = new AgentHarness({
+      env,
+      session,
+      tools: [],
+      model,
+      systemPrompt: '你是图片内容描述助手。只输出图片内容描述，不要寒暄，不要添加 Markdown。',
+      getApiKeyAndHeaders: (model: any) => this.getApiKeyAndHeaders(model),
+      thinkingLevel: 'off',
+    });
+
+    const abort = () => {
+      void harness.abort();
+    };
+    request.signal.addEventListener('abort', abort, { once: true });
+
+    try {
+      const result = await harness.prompt(request.prompt, {
+        images: [
+          {
+            type: 'image' as const,
+            source: {
+              type: 'base64' as const,
+              media_type: request.image.mimeType,
+              data: request.image.data,
+            },
+          },
+        ],
+      });
+
+      return result.content
+        ?.filter((item: any) => item.type === 'text')
+        ?.map((item: any) => item.text)
+        ?.join('')
+        .trim() || '';
+    } finally {
+      request.signal.removeEventListener('abort', abort);
+      await harness.abort().catch(() => undefined);
+      await env.cleanup();
+    }
   }
 
   /**
@@ -475,52 +619,23 @@ export class PiAgentBackend implements IBackendAdapter {
           },
         }));
       } else {
-        // 非多模态模型：自动保存图片到图床，返回绝对 URL
-        const savedUrls: string[] = [];
-
-        for (const img of images) {
-          const filename = img.name || `image-${Date.now()}-${savedUrls.length + 1}.png`;
-
-          try {
-            const buffer = Buffer.from(img.data, 'base64');
-            const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
-            const hashPrefix = sha256.slice(0, 12);
-            const storedFilename = `${hashPrefix}-${filename}`;
-            const dataDir = process.env.DATA_DIR
-              ? path.resolve(process.env.DATA_DIR)
-              : (() => {
-                  let current = path.resolve(process.cwd());
-                  while (current !== path.dirname(current)) {
-                    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-                      return path.join(current, 'data');
-                    }
-                    current = path.dirname(current);
-                  }
-                  return path.join(process.cwd(), 'data');
-                })();
-            const imagesDir = path.join(dataDir, 'images');
-            const storedPath = path.join(imagesDir, storedFilename);
-            const publicUrl = `/api/images/${storedFilename}`;
-
-            if (!fs.existsSync(imagesDir)) {
-              fs.mkdirSync(imagesDir, { recursive: true });
-            }
-
-            if (!fs.existsSync(storedPath)) {
-              await fs.promises.writeFile(storedPath, buffer);
-            }
-
-            savedUrls.push(publicUrl);
-            logger.info({ publicUrl, size: buffer.length }, 'Auto-saved image to image server');
-          } catch (error) {
-            logger.error({ filename, error }, 'Failed to auto-save image');
-          }
+        if (!this.imageDescriber.isAvailable()) {
+          logger.warn(
+            { modelId: model.id, imageCount: images.length },
+            'Image sent to non-vision model but image description is not configured',
+          );
+          throw new Error(
+            '当前模型不支持图片处理。请联系管理员配置识图模型以启用图片理解功能。',
+          );
         }
 
-        if (savedUrls.length > 0) {
-          const urlList = savedUrls.map((u) => `- ${u}`).join('\n');
-          promptContent = `${content}\n\n[已自动保存 ${savedUrls.length} 张图片到图床，绝对 URL 如下，可直接在页面中使用：\n${urlList}]`;
-        }
+        logger.info(
+          { imageCount: images.length, modelId: model.id },
+          'Triggering image pre-description for non-vision model',
+        );
+
+        const imageDescription = await this.imageDescriber.describe(images);
+        promptContent = `【图片内容】${imageDescription}\n\n【用户问题】${content}`;
       }
     }
 

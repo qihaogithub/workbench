@@ -123,6 +123,116 @@ describe('PiAgentBackend', () => {
       expect(status).toBe('idle');
     });
   });
+
+  describe('图片预描述', () => {
+    const textOnlyConfig: AgentConfig = {
+      sessionId: 'test-session',
+      workingDir: '/tmp/test-workspace',
+      backendProviders: {
+        providers: [
+          {
+            id: 'custom',
+            name: 'Custom',
+            baseURL: 'https://api.example.com/v1',
+            apiKey: 'sk-test',
+            models: ['text-model'],
+            defaultModel: 'text-model',
+            enabled: true,
+          },
+        ],
+        activeProviderId: 'custom',
+        activeModelId: 'custom/text-model',
+      },
+    };
+
+    it('非多模态模型收到图片且未配置预描述时应报错', async () => {
+      const backend = new PiAgentBackend(textOnlyConfig);
+      Object.defineProperty(backend, 'harness', {
+        value: { prompt: vi.fn() },
+      });
+
+      await expect(
+        backend.sendMessage('请看图', {
+          images: [
+            {
+              data: Buffer.from('image').toString('base64'),
+              mimeType: 'image/png',
+              name: 'screen.png',
+            },
+          ],
+        }),
+      ).rejects.toThrow('当前模型不支持图片处理');
+    });
+
+    it('非多模态模型收到图片且已配置预描述时应注入描述文本', async () => {
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(textOnlyConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          isAvailable: () => true,
+          describe: vi.fn().mockResolvedValue('图片里有一个红色提交按钮'),
+        },
+      });
+
+      await expect(
+        backend.sendMessage('这个按钮有什么问题？', {
+          images: [
+            {
+              data: Buffer.from('image').toString('base64'),
+              mimeType: 'image/png',
+              name: 'screen.png',
+            },
+          ],
+        }),
+      ).resolves.toBe('ok');
+
+      expect(prompt).toHaveBeenCalledWith(
+        '【图片内容】图片里有一个红色提交按钮\n\n【用户问题】这个按钮有什么问题？',
+        { images: undefined },
+      );
+    });
+
+    it('通过环境变量启用预描述后应走真实 ImageDescriber 缓存路径', async () => {
+      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
+      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
+
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(textOnlyConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+
+      const describeSpy = vi
+        .spyOn(backend as any, 'describeImageWithVisionModel')
+        .mockResolvedValue('图片展示了一个设置面板');
+
+      const image = {
+        data: Buffer.from('same-image').toString('base64'),
+        mimeType: 'image/png',
+        name: 'settings.png',
+      };
+
+      await backend.sendMessage('说明这个界面', { images: [image] });
+      await backend.sendMessage('再次说明这个界面', { images: [image] });
+
+      expect(describeSpy).toHaveBeenCalledTimes(1);
+      expect(describeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          image,
+          modelId: 'custom/vision-model',
+        }),
+      );
+      expect(prompt).toHaveBeenNthCalledWith(
+        1,
+        '【图片内容】图片展示了一个设置面板\n\n【用户问题】说明这个界面',
+        { images: undefined },
+      );
+      expect(prompt).toHaveBeenNthCalledWith(
+        2,
+        '【图片内容】图片展示了一个设置面板\n\n【用户问题】再次说明这个界面',
+        { images: undefined },
+      );
+    });
+  });
 });
 
 describe('PiAgentBackend session model config', () => {
