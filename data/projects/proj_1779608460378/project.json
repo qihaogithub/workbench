@@ -10,122 +10,105 @@
       "parentId": null
     },
     {
+      "id": "page_b31r",
+      "name": "广场页面-平板 - 副本",
+      "order": 0,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
       "id": "demo_1779608460380_d4e5f6",
       "name": "广场页面-平板",
       "order": 1,
       "parentId": null
     },
     {
-      "id": "demo_1780550141175_a79047",
-      "name": "demo页面",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "page_bv0k",
-      "name": "广场页面-平板 - 副本",
-      "order": 3,
-      "parentId": null
-    },
-    {
-      "id": "page_ihtj",
-      "name": "广场页面-平板 - 副本",
-      "order": 4,
-      "parentId": null
-    },
-    {
-      "id": "page_b31r",
-      "name": "广场页面-平板 - 副本",
-      "order": 5,
-      "parentId": null
-    },
-    {
-      "id": "page_brjd",
-      "name": "广场页面-平板 - 副本",
-      "order": 6,
-      "parentId": null
-    },
-    {
       "id": "page_2vpk",
       "name": "广场页面-平板 - 副本 - 副本",
-      "order": 7,
-      "parentId": null
+      "order": 1,
+      "parentId": "folder_1782045243460_8dtpmd"
     },
     {
-      "id": "page_c99m",
-      "name": "广场页面-平板 - 副本",
-      "order": 8,
-      "parentId": null
-    },
-    {
-      "id": "page_e2j6",
-      "name": "广场页面-平板 - 副本",
-      "order": 9,
-      "parentId": null
-    },
-    {
-      "id": "page_b9db",
-      "name": "广场页面-平板 - 副本",
-      "order": 10,
+      "id": "demo_1780550141175_a79047",
+      "name": "科技感首页",
+      "order": 2,
       "parentId": null
     },
     {
       "id": "page_q3yo",
       "name": "广场页面-手机 - 副本",
-      "order": 11,
-      "parentId": null
+      "order": 2,
+      "parentId": "folder_1782045243460_8dtpmd"
     },
     {
       "id": "page_gwdv",
       "name": "广场页面-手机 - 副本",
-      "order": 12,
-      "parentId": null
+      "order": 3,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_b9db",
+      "name": "广场页面-平板 - 副本",
+      "order": 4,
+      "parentId": "folder_1782045243460_8dtpmd"
     },
     {
       "id": "page_qza9",
       "name": "广场页面-手机 - 副本",
-      "order": 13,
-      "parentId": null
+      "order": 5,
+      "parentId": "folder_1782045243460_8dtpmd"
     },
     {
       "id": "page_8hcu",
       "name": "广场页面-手机 - 副本",
-      "order": 14,
-      "parentId": null
+      "order": 6,
+      "parentId": "folder_1782045243460_8dtpmd"
     },
     {
       "id": "page_ugfv",
       "name": "广场页面-手机 - 副本",
-      "order": 15,
-      "parentId": null
+      "order": 7,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_ihtj",
+      "name": "广场页面-平板 - 副本",
+      "order": 8,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_bv0k",
+      "name": "广场页面-平板 - 副本",
+      "order": 9,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_e2j6",
+      "name": "广场页面-平板 - 副本",
+      "order": 10,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_c99m",
+      "name": "广场页面-平板 - 副本",
+      "order": 11,
+      "parentId": "folder_1782045243460_8dtpmd"
+    },
+    {
+      "id": "page_brjd",
+      "name": "广场页面-平板 - 副本",
+      "order": 12,
+      "parentId": "folder_1782045243460_8dtpmd"
     }
   ],
-  "demoFolders": [],
+  "demoFolders": [
+    {
+      "id": "folder_1782045243460_8dtpmd",
+      "name": "副本",
+      "parentId": null,
+      "order": 0
+    }
+  ],
   "versions": [
-    {
-      "versionId": "v8",
-      "savedAt": 1780072538130,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780072052941-69d7yx13q",
-      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v8",
-      "fileCount": 6
-    },
-    {
-      "versionId": "v9",
-      "savedAt": 1780376775516,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780376184185-3a2055yuy",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v9",
-      "fileCount": 8
-    },
-    {
-      "versionId": "v10",
-      "savedAt": 1780377219639,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780376784848-53arzf98h",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v10",
-      "fileCount": 8
-    },
     {
       "versionId": "v11",
       "savedAt": 1780390092889,
@@ -506,10 +489,73 @@
       "sessionId": "session-1780667670139-a580ohnlo",
       "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v51",
       "fileCount": 36
+    },
+    {
+      "versionId": "v53",
+      "savedAt": 1782042340995,
+      "savedBy": "qihao",
+      "sessionId": "session-1782038090256-d9oyuugm6",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v53",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v55",
+      "savedAt": 1782042472032,
+      "savedBy": "qihao",
+      "sessionId": "session-1782042356895-dd6zq72a6",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v55",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v57",
+      "savedAt": 1782045286247,
+      "savedBy": "qihao",
+      "sessionId": "session-1782045205124-h1c2mqzey",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\v57",
+      "fileCount": 36
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1780671345053,
+  "updatedAt": 1782045286253,
   "publishedVersion": "v51",
-  "publishedAt": 1780565770336
+  "publishedAt": 1780565770336,
+  "pageVersions": {
+    "demo_1780550141175_a79047": [
+      {
+        "versionId": "v52",
+        "demoId": "demo_1780550141175_a79047",
+        "demoName": "科技感首页",
+        "savedAt": 1782042338260,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1780550141175_a79047",
+        "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\pages\\demo_1780550141175_a79047\\v52",
+        "fileCount": 2,
+        "note": "修改了科技感首页"
+      },
+      {
+        "versionId": "v54",
+        "demoId": "demo_1780550141175_a79047",
+        "demoName": "科技感首页",
+        "savedAt": 1782042469860,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1780550141175_a79047",
+        "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\pages\\demo_1780550141175_a79047\\v54",
+        "fileCount": 2,
+        "note": "修改了科技感首页"
+      }
+    ],
+    "demo_1779608460379_a1b2c3": [
+      {
+        "versionId": "v56",
+        "demoId": "demo_1779608460379_a1b2c3",
+        "demoName": "广场页面-手机",
+        "savedAt": 1782045284556,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460379_a1b2c3",
+        "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460378\\pages\\demo_1779608460379_a1b2c3\\v56",
+        "fileCount": 2,
+        "note": "修改了广场页面-手机"
+      }
+    ]
+  }
 }

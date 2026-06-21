@@ -66,6 +66,7 @@ export interface PreviewPanelProps {
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
+  placeholderScreenshotUrl?: string;
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onContentHeightChange?: (contentHeight: number) => void;
@@ -121,6 +122,8 @@ export interface CanvasState {
   viewport: CanvasViewportState;
 }
 
+export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
+
 export interface CanvasPageData {
   id: string;
   name: string;
@@ -128,6 +131,12 @@ export interface CanvasPageData {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
+}
+
+export interface CanvasScreenshotState {
+  screenshotUrl?: string;
+  loading: boolean;
+  error?: string;
 }
 
 export interface AlignmentGuide {
@@ -174,6 +183,10 @@ export interface PreviewCanvasProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   focusPageId?: string;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+  screenshotStates?: Record<string, CanvasScreenshotState>;
+  onScreenshotRetry?: (pageId: string) => void;
+  screenshotServiceAvailable?: boolean | null;
+  onScreenshotServiceRetry?: () => void;
 }
 
 export interface PreviewState {

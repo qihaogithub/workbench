@@ -26,6 +26,10 @@ import {
   updateSessionTitle,
   fetchSessionFiles,
 } from "../services/message-service";
+import {
+  buildActiveViewContextPrefix,
+  type ActiveViewContext,
+} from "@/lib/agent/active-view-context";
 
 const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   role: "assistant",
@@ -38,6 +42,7 @@ interface UseChatStreamOptions {
   agentSessionId: string;
   workingDir?: string;
   demoId?: string;
+  activeViewContext?: ActiveViewContext;
   onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
   onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
   onFilesChange?: (
@@ -67,6 +72,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     agentSessionId,
     workingDir,
     demoId,
+    activeViewContext,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
@@ -471,7 +477,13 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         // v3.2: sendMessage 是 async，等待 L3 拼装完再发送
         // fire-and-forget：不让发送等待阻塞 UI，但 L3 fetch 顺序保证
-        void streamService.sendMessage(userMessage, workingDir, images, demoId);
+        void streamService.sendMessage(
+          userMessage,
+          workingDir,
+          images,
+          demoId,
+          activeViewContext,
+        );
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
@@ -481,9 +493,14 @@ export function useChatStream(options: UseChatStreamOptions) {
           const { getAgentClient } = await import("@/lib/agent-client");
           const agentClient = getAgentClient();
 
+          const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
+          const content = activeViewPrefix
+            ? `${activeViewPrefix}${userMessage}`
+            : userMessage;
+
           const result = await agentClient.sendMessage(
             agentSessionId,
-            userMessage,
+            content,
             {
               demoId,
               workingDir,
@@ -565,6 +582,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       sessionId,
       workingDir,
       demoId,
+      activeViewContext,
       onCodeUpdate,
       onSchemaUpdate,
       onFilesChange,

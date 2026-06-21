@@ -79,7 +79,7 @@ describe('extractImageReferences', () => {
       originalPath: '/api/images/a1b2c3d4-hero.png',
       type: 'img-src',
     });
-    expect(refs[0].absolutePath).toContain('data/images/a1b2c3d4-hero.png');
+    expect(refs[0].absolutePath.replace(/\\/g, '/')).toContain('data/images/a1b2c3d4-hero.png');
   });
 
   it('提取 CSS url() 中的图床图片', () => {

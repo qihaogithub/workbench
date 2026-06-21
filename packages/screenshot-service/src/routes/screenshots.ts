@@ -21,6 +21,7 @@ interface GenerateRequest {
   configData: Record<string, unknown>;
   width?: number;
   height?: number;
+  fullPage?: boolean;
   sessionId?: string;
 }
 
@@ -30,6 +31,7 @@ interface BatchPage {
   configData: Record<string, unknown>;
   width?: number;
   height?: number;
+  fullPage?: boolean;
 }
 
 interface GenerateBatchRequest {
@@ -76,11 +78,12 @@ async function generateScreenshot(
   configData: Record<string, unknown>,
   width: number,
   height: number,
+  fullPage: boolean,
   sessionId?: string,
 ): Promise<{ url: string; hash: string; elapsed: number; cached: boolean }> {
   const startTime = Date.now();
 
-  const hash = computeScreenshotHash(code, configData, width, height);
+  const hash = computeScreenshotHash(code, configData, width, height, fullPage);
 
   // Check cache
   if (await screenshotExists(projectId, pageId, hash)) {
@@ -112,7 +115,7 @@ async function generateScreenshot(
 
   // Render screenshot
   const pool = getBrowserPool();
-  const buffer = await pool.renderPage(html, width, height);
+  const buffer = await pool.renderPage(html, width, height, fullPage);
 
   // Save to disk
   const elapsed = Date.now() - startTime;
@@ -135,7 +138,7 @@ async function handleGenerate(
   request: FastifyRequest<{ Body: GenerateRequest }>,
   reply: FastifyReply,
 ) {
-  const { projectId, pageId, code, configData, width, height, sessionId } =
+  const { projectId, pageId, code, configData, width, height, fullPage, sessionId } =
     request.body;
 
   if (!projectId || !pageId || !code) {
@@ -156,6 +159,7 @@ async function handleGenerate(
       configData || {},
       w,
       h,
+      fullPage ?? false,
       sessionId,
     );
 
@@ -257,6 +261,7 @@ async function processBatch(
           page.configData || {},
           w,
           h,
+          page.fullPage ?? false,
           sessionId,
         );
 

@@ -12,7 +12,7 @@
     "title": {
       "type": "string",
       "title": "主标题",
-      "default": "NEXUS",
+      "default": "星核",
       "description": "页面中央的霓虹主标题文字"
     },
     "subtitle": {

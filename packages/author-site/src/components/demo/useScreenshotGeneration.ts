@@ -2,19 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 
-const SCREENSHOT_SERVICE_URL =
-  process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL || "http://localhost:3202";
-
 const POLL_INTERVAL = 1500;
 
-interface ScreenshotInfo {
-  url: string;
-  hash: string;
-  elapsed: number;
-  cached: boolean;
-}
-
-interface PageScreenshotState {
+export interface PageScreenshotState {
   screenshotUrl?: string;
   loading: boolean;
   error?: string;
@@ -34,6 +24,12 @@ interface BatchPageInput {
   height?: number;
 }
 
+function isServiceUnavailable(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const error = (result as { error?: { code?: string } }).error;
+  return error?.code === "SCREENSHOT_SERVICE_UNAVAILABLE";
+}
+
 export function useScreenshotGeneration(
   options: UseScreenshotGenerationOptions,
 ) {
@@ -44,57 +40,109 @@ export function useScreenshotGeneration(
   >({});
   const [batchId, setBatchId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [serviceAvailable, setServiceAvailable] = useState<boolean | null>(
+    null,
+  );
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getScreenshotUrl = useCallback(
     (pageId: string, timestamp?: number) => {
       if (!projectId) return "";
       const t = timestamp || Date.now();
-      return `${SCREENSHOT_SERVICE_URL}/api/screenshots/file/${projectId}/${pageId}?t=${t}`;
+      return `/api/screenshots/file/${encodeURIComponent(
+        projectId,
+      )}/${encodeURIComponent(pageId)}?t=${t}`;
     },
     [projectId],
   );
 
+  const setPagesLoading = useCallback((pages: BatchPageInput[]) => {
+    setPageScreenshots((prev) => {
+      const next = { ...prev };
+      for (const page of pages) {
+        const existing = next[page.pageId];
+        next[page.pageId] = {
+          screenshotUrl: existing?.screenshotUrl,
+          loading: true,
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  const setPagesUnavailable = useCallback((pages: BatchPageInput[]) => {
+    setServiceAvailable(false);
+    setPageScreenshots((prev) => {
+      const next = { ...prev };
+      for (const page of pages) {
+        const existing = next[page.pageId];
+        next[page.pageId] = {
+          screenshotUrl: existing?.screenshotUrl,
+          loading: false,
+          error: "截图服务不可达",
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  const checkServiceHealth = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/screenshots/health", {
+        cache: "no-store",
+      });
+      const result = await response.json();
+      const available = response.ok && result.success;
+      setServiceAvailable(available);
+      return available;
+    } catch {
+      setServiceAvailable(false);
+      return false;
+    }
+  }, []);
+
   const pollBatchStatus = useCallback(
     async (currentBatchId: string) => {
+      if (!projectId) return;
+
       try {
         const response = await fetch(
-          `${SCREENSHOT_SERVICE_URL}/api/screenshots/status/${projectId}/${currentBatchId}`,
+          `/api/screenshots/status/${encodeURIComponent(
+            projectId,
+          )}/${encodeURIComponent(currentBatchId)}`,
         );
         if (!response.ok) return;
 
         const result = await response.json();
         if (!result.success) return;
 
+        setServiceAvailable(true);
         const { data } = result;
 
-        // Update completed pages
         for (const pageResult of data.results) {
           if (pageResult.status === "done" && pageResult.url) {
-            setPageScreenshots((prev) => {
-              const existing = prev[pageResult.pageId];
-              // Skip if already set with same URL
-              if (existing?.screenshotUrl && !existing.loading) return prev;
-              return {
-                ...prev,
-                [pageResult.pageId]: {
-                  screenshotUrl: getScreenshotUrl(pageResult.pageId),
-                  loading: false,
-                },
-              };
-            });
-          } else if (pageResult.status === "failed") {
             setPageScreenshots((prev) => ({
               ...prev,
               [pageResult.pageId]: {
+                screenshotUrl: getScreenshotUrl(pageResult.pageId),
                 loading: false,
-                error: pageResult.error,
               },
             }));
+          } else if (pageResult.status === "failed") {
+            setPageScreenshots((prev) => {
+              const existing = prev[pageResult.pageId];
+              return {
+                ...prev,
+                [pageResult.pageId]: {
+                  screenshotUrl: existing?.screenshotUrl,
+                  loading: false,
+                  error: pageResult.error || "截图生成失败",
+                },
+              };
+            });
           }
         }
 
-        // Stop polling when done
         if (data.status === "completed") {
           if (pollTimerRef.current) {
             clearInterval(pollTimerRef.current);
@@ -103,7 +151,7 @@ export function useScreenshotGeneration(
           setIsGenerating(false);
         }
       } catch {
-        // Polling error — will retry on next interval
+        // Polling errors are retried on the next interval.
       }
     },
     [projectId, getScreenshotUrl],
@@ -113,44 +161,33 @@ export function useScreenshotGeneration(
     async (pages: BatchPageInput[]) => {
       if (!projectId || !enabled || pages.length === 0) return;
 
-      // Mark all pages as loading
-      setPageScreenshots((prev) => {
-        const next = { ...prev };
-        for (const page of pages) {
-          next[page.pageId] = { loading: true };
-        }
-        return next;
-      });
-
+      setPagesLoading(pages);
       setIsGenerating(true);
 
       try {
-        const response = await fetch(
-          `${SCREENSHOT_SERVICE_URL}/api/screenshots/generate-batch`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId,
-              pages: pages.map((p) => ({
-                pageId: p.pageId,
-                code: p.code,
-                configData: p.configData || {},
-                width: p.width,
-                height: p.height,
-              })),
-              sessionId,
-            }),
-          },
-        );
+        const response = await fetch("/api/screenshots/generate-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            pages: pages.map((p) => ({
+              pageId: p.pageId,
+              code: p.code,
+              configData: p.configData || {},
+              width: p.width,
+              height: p.height,
+            })),
+            sessionId,
+          }),
+        });
 
         const result = await response.json();
 
         if (result.success && result.data?.batchId) {
+          setServiceAvailable(true);
           const newBatchId = result.data.batchId;
           setBatchId(newBatchId);
 
-          // Start polling
           if (pollTimerRef.current) {
             clearInterval(pollTimerRef.current);
           }
@@ -159,17 +196,23 @@ export function useScreenshotGeneration(
             POLL_INTERVAL,
           );
 
-          // Initial poll
           pollBatchStatus(newBatchId);
         } else {
-          // Batch creation failed
           setIsGenerating(false);
+          if (isServiceUnavailable(result)) {
+            setPagesUnavailable(pages);
+            return;
+          }
+
+          const errorMessage = result.error?.message || "批量截图创建失败";
           setPageScreenshots((prev) => {
             const next = { ...prev };
             for (const page of pages) {
+              const existing = next[page.pageId];
               next[page.pageId] = {
+                screenshotUrl: existing?.screenshotUrl,
                 loading: false,
-                error: "批量截图创建失败",
+                error: errorMessage,
               };
             }
             return next;
@@ -177,19 +220,17 @@ export function useScreenshotGeneration(
         }
       } catch {
         setIsGenerating(false);
-        setPageScreenshots((prev) => {
-          const next = { ...prev };
-          for (const page of pages) {
-            next[page.pageId] = {
-              loading: false,
-              error: "截图服务不可达",
-            };
-          }
-          return next;
-        });
+        setPagesUnavailable(pages);
       }
     },
-    [projectId, sessionId, enabled, pollBatchStatus],
+    [
+      projectId,
+      sessionId,
+      enabled,
+      pollBatchStatus,
+      setPagesLoading,
+      setPagesUnavailable,
+    ],
   );
 
   const regeneratePage = useCallback(
@@ -202,32 +243,36 @@ export function useScreenshotGeneration(
     ) => {
       if (!projectId || !enabled) return;
 
-      setPageScreenshots((prev) => ({
-        ...prev,
-        [pageId]: { loading: true },
-      }));
+      setPageScreenshots((prev) => {
+        const existing = prev[pageId];
+        return {
+          ...prev,
+          [pageId]: {
+            screenshotUrl: existing?.screenshotUrl,
+            loading: true,
+          },
+        };
+      });
 
       try {
-        const response = await fetch(
-          `${SCREENSHOT_SERVICE_URL}/api/screenshots/generate`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId,
-              pageId,
-              code,
-              configData: configData || {},
-              width,
-              height,
-              sessionId,
-            }),
-          },
-        );
+        const response = await fetch("/api/screenshots/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            pageId,
+            code,
+            configData: configData || {},
+            width,
+            height,
+            sessionId,
+          }),
+        });
 
         const result = await response.json();
 
         if (result.success && result.data?.url) {
+          setServiceAvailable(true);
           setPageScreenshots((prev) => ({
             ...prev,
             [pageId]: {
@@ -236,28 +281,44 @@ export function useScreenshotGeneration(
             },
           }));
         } else {
-          setPageScreenshots((prev) => ({
-            ...prev,
-            [pageId]: {
-              loading: false,
-              error: result.error?.message || "截图生成失败",
-            },
-          }));
+          if (isServiceUnavailable(result)) {
+            setServiceAvailable(false);
+          }
+
+          setPageScreenshots((prev) => {
+            const existing = prev[pageId];
+            return {
+              ...prev,
+              [pageId]: {
+                screenshotUrl: existing?.screenshotUrl,
+                loading: false,
+                error: result.error?.message || "截图生成失败",
+              },
+            };
+          });
         }
       } catch {
-        setPageScreenshots((prev) => ({
-          ...prev,
-          [pageId]: {
-            loading: false,
-            error: "截图服务不可达",
-          },
-        }));
+        setServiceAvailable(false);
+        setPageScreenshots((prev) => {
+          const existing = prev[pageId];
+          return {
+            ...prev,
+            [pageId]: {
+              screenshotUrl: existing?.screenshotUrl,
+              loading: false,
+              error: "截图服务不可达",
+            },
+          };
+        });
       }
     },
     [projectId, sessionId, enabled, getScreenshotUrl],
   );
 
-  // Cleanup polling on unmount
+  useEffect(() => {
+    checkServiceHealth();
+  }, [checkServiceHealth]);
+
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) {
@@ -270,8 +331,11 @@ export function useScreenshotGeneration(
     pageScreenshots,
     isGenerating,
     batchId,
+    serviceAvailable,
+    checkServiceHealth,
     startBatchGeneration,
     regeneratePage,
     getScreenshotUrl,
   };
 }
+

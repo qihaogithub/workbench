@@ -1,6 +1,8 @@
 # Agent 沙箱观测工具方案（控制台数据 + 截图）
 
-> **状态**：Phase 1 已实施 | **日期**：2026-06-04 | **前置**：`预览区画布模式Puppeteer截图方案.md`（共享 Puppeteer 基础设施）
+> **状态**：继续推进 | **日期**：2026-06-04 | **前置**：`预览区画布模式Puppeteer截图方案.md`（共享 Puppeteer 基础设施）
+
+> **2026-06-21 校正进度**：控制台观测链路已经落地，`getConsoleLogs` 工具已注册；截图基础设施不是原方案中的 `screenshot-renderer.ts` / `screenshot-compile-cache.ts`，而是当前已存在的独立 `screenshot-service`。本轮已新增 `captureScreenshot` Pi Agent 工具，扩展 `screenshot-service` 支持 `fullPage` 参数，并补充截图工具单元测试。剩余重点是端到端验证与多模态消费验证。
 
 ---
 
@@ -28,7 +30,7 @@
 - **`预览区画布模式Puppeteer截图方案.md`**：为画布模式 UI 缩略图设计，批量异步生成，面向前端展示
 - **本方案**：为 Agent 调试设计，按需单次捕获，面向 LLM 消费
 
-两者共享 Puppeteer Browser 单例和截图渲染基础设施，但 API 层和调用模式独立。
+两者共享 `screenshot-service` 的 Puppeteer Browser 池、编译缓存和截图文件读取能力；Agent 侧只新增工具编排层，不在 `agent-service` 内重复维护 Puppeteer。
 
 ---
 
@@ -39,7 +41,7 @@
 | 能力 | 数据源 | 通路 | 原因 |
 |------|--------|------|------|
 | 控制台数据 | 客户端 iframe | iframe → postMessage → PreviewPanel 回调 → useConsoleBuffer → StreamService → WebSocket → agent-service ConsoleBuffer | 控制台输出依赖真实运行环境（用户交互、React 状态、CDN 加载），服务端 Puppeteer 无法复现 |
-| 截图 | 服务端 Puppeteer | agent-service → 读取代码 → 编译 → Puppeteer 渲染 → PNG base64 | 像素级截图需要完整浏览器渲染，客户端 `html2canvas` 保真度低且受 CORS 限制 |
+| 截图 | screenshot-service Puppeteer | agent-service 工具 → 读取当前页面代码与默认配置 → 调用 screenshot-service `/api/screenshots/generate` → 读取 PNG → base64 `ImageContent` | 像素级截图需要完整浏览器渲染；复用现有截图服务可避免在 agent-service 重建 Puppeteer 生命周期 |
 
 ### 1.2 架构图
 
@@ -73,8 +75,8 @@
 │  ConsoleBuffer (per session, 内存)                              │
 │  → getConsoleLogs 工具读取                                      │
 │                                                                 │
-│  Puppeteer Browser 单例 (与画布截图方案共享)                    │
-│  → captureScreenshot 工具调用                                   │
+│  captureScreenshot 工具                                         │
+│  → 调用 screenshot-service 生成/读取 PNG                        │
 │                                                                 │
 │  Agent Tools                                                    │
 │  ┌──────────────────┐  ┌────────────────────────────┐           │
@@ -435,26 +437,28 @@ export function createGetConsoleLogsTool(config: AgentConfig): AgentTool<typeof 
 
 ## 三、截图捕获
 
-### 3.1 复用 Puppeteer 基础设施
+### 3.1 复用 screenshot-service 基础设施
 
-截图能力复用 `预览区画布模式Puppeteer截图方案.md` 中设计的 Puppeteer Browser 单例和渲染逻辑：
+当前代码库已经存在独立 `packages/screenshot-service/`，因此本方案不再新增 `screenshot-renderer.ts` 或 `screenshot-compile-cache.ts`。Agent 截图工具复用 screenshot-service 的 Browser 池、编译缓存、HTML 组装与文件读取接口：
 
 | 组件 | 位置 | 说明 |
 |------|------|------|
-| Browser 单例管理 | `screenshot-renderer.ts` | 懒加载启动、crash 自动重启、并发控制 |
-| 编译缓存 | `screenshot-compile-cache.ts` | LRU 200 条，避免重复编译 |
-| HTML 组装 | `iframe-template.ts` | `generateIframeHtml()` 复用 |
+| Browser 池 | `packages/screenshot-service/src/utils/browser-pool.ts` | 懒加载启动、并发控制、页面渲染与截图 |
+| 编译缓存 | `packages/screenshot-service/src/utils/compile-cache.ts` | LRU 缓存，避免重复编译 |
+| 编译调用 | `packages/screenshot-service/src/utils/compile-client.ts` | 调用 author-site `/api/compile` |
+| 截图 API | `packages/screenshot-service/src/routes/screenshots.ts` | `/generate` 生成，`/file/:projectId/:pageId` 读取 PNG |
+| HTML 组装 | `packages/shared/src/demo/iframe-template.ts` | `generateIframeHtml()` 复用 |
 
 **与画布截图方案的差异**：
 
 | 维度 | 画布截图（已有方案） | Agent 截图（本方案） |
 |------|---------------------|---------------------|
 | 触发方式 | 前端进入画布时批量触发 | Agent 工具按需调用 |
-| API 端点 | `/api/screenshots/generate` | 工具内部调用，无独立 API |
+| API 端点 | `/api/screenshots/generate` | 工具内部调用 screenshot-service `/api/screenshots/generate` |
 | 视口尺寸 | 固定 375×812 | 可自定义，默认 375×812 |
-| 缓存策略 | hash 版本化文件缓存 | 不缓存文件，直接返回 base64 |
+| 缓存策略 | hash 版本化文件缓存 | 复用 screenshot-service 文件缓存，工具再读取 PNG 转 base64 |
 | 返回格式 | PNG 文件 URL | `ImageContent`（base64，供 LLM 多模态消费） |
-| 存储位置 | `data/screenshots/` | 不落盘（内存中直接返回） |
+| 存储位置 | `data/screenshots/` | screenshot-service 仍落盘缓存，Agent 工具不新增存储 |
 
 ### 3.2 captureScreenshot 工具定义
 
@@ -489,33 +493,25 @@ Agent 调用 captureScreenshot
   │
   ▼
 ① 定位代码文件
-  │  config.demoId → 读取 {workingDir}/{demoId}/index.tsx
-  │  读取项目元数据获取 configData
+  │  config.demoId → 当前页面 ID
+  │  读取 {workingDir}/demos/{demoId}/index.tsx
+  │  从 workingDir 反推 projectId
+  │  从 config.schema.json 读取默认 configData
   │
   ▼
-② 编译代码: POST author-site /api/compile
-  │  (复用 screenshot-compile-cache.ts 缓存)
+② 调用 screenshot-service: POST /api/screenshots/generate
+  │  body: { projectId, pageId, code, configData, width, height, fullPage, sessionId }
   │
   ├── 编译失败 → 返回 COMPILE_ERROR
   │
   ▼
-③ HTML 组装: generateIframeHtml(compiledCode, cssImports, configData)
+③ screenshot-service 内部编译、组装 HTML、Puppeteer 渲染、写入 PNG 缓存
   │
   ▼
-④ Puppeteer Browser 单例 → 创建 Page
-  │  viewport {width}×{height}
-  │  page.setContent(html)
+④ Agent 工具读取 /api/screenshots/file/{projectId}/{pageId}
   │
   ▼
-⑤ 等待渲染完成
-  │  waitForSelector('#root')
-  │  waitForNetworkIdle({ timeout: 10000 })
-  │
-  ▼
-⑥ page.screenshot({ fullPage, type: 'png' })
-  │
-  ▼
-⑦ 返回 ImageContent
+⑤ 返回 ImageContent
   │  content: [{ type: 'image', data: base64, mimeType: 'image/png' }]
   │  details: { width, height, sizeKB }
 ```
@@ -525,15 +521,17 @@ Agent 调用 captureScreenshot
 Agent 工作空间中可能有多个 demo 页面。截图工具通过 `config` 中的信息定位代码：
 
 ```
-config.demoId  →  当前 Agent 会话关联的 demo ID
+config.demoId  →  当前 Agent 会话关联的页面 ID
 config.workingDir  →  工作空间根目录
 
-代码文件路径: path.join(workingDir, demoId, 'index.tsx')
+代码文件路径: path.join(workingDir, 'demos', demoId, 'index.tsx')
 ```
 
-**多页面场景**：当前 Agent 会话仅关联一个 `demoId`，截图工具截取该 demo 对应的页面。如果 Agent 需要截取其他页面，可先用 `listFiles` 查看文件结构。
+**projectId 获取**：`workingDir` 可能是正式空间 `data/projects/{projectId}/workspace`，也可能是编辑会话空间 `data/sessions/{projectId}/{sessionId}`。工具从路径片段中的 `projects/{projectId}` 或 `sessions/{projectId}` 反推项目 ID。
 
-**configData 获取**：从项目元数据文件（`data/projects/{projectId}/project.json`）中读取对应 demo 的 `configData`。
+**多页面场景**：当前 Agent 会话仅关联一个 `demoId`，截图工具截取该页面。如果 Agent 需要检查其他页面，可先用 `listFiles` 查看 `demos/` 结构，再由前端切换当前页面后继续观察。
+
+**configData 获取**：当前落地版本读取页面 `config.schema.json` 的默认值作为基础配置。用户在前端面板里临时修改但未保存到文件的配置，不会出现在截图中；这与“截图基于当前工作空间文件状态”的工具说明一致。
 
 ### 3.5 返回格式
 
@@ -682,7 +680,7 @@ export interface ConsoleLogPayload {
 
 ## 八、文件变更清单
 
-### 8.1 新增文件（4 个，已实施）
+### 8.1 新增文件（5 个，已实施）
 
 | 文件 | 位置 | 说明 | 状态 |
 |------|------|------|------|
@@ -690,14 +688,15 @@ export interface ConsoleLogPayload {
 | `console-buffer.ts` | `packages/agent-service/src/session/` | 控制台数据内存缓冲服务 | ✅ |
 | `iframe-types.ts` | `packages/shared/src/demo/` | iframe postMessage 消息类型定义 | ✅ |
 | `useConsoleBuffer.ts` | `packages/author-site/src/components/demo/` | 控制台缓冲 React Hook（限流 + 转发） | ✅ |
+| `screenshot-tool.ts` | `packages/agent-service/src/backends/pi-tools/` | `captureScreenshot` 工具定义；调用 screenshot-service 并返回 `ImageContent` | ✅ |
 
-### 8.2 待新增文件（1 个，Phase 2）
+### 8.2 待新增文件
 
 | 文件 | 位置 | 说明 | 状态 |
 |------|------|------|------|
-| `screenshot-tool.ts` | `packages/agent-service/src/backends/pi-tools/` | `captureScreenshot` 工具定义 | 待实施 |
+| 无 | - | Phase 2 当前不需要新增更多文件 | - |
 
-### 8.3 修改文件（13 个，已实施）
+### 8.3 修改文件（本方案相关）
 
 | 文件 | 变更 | 状态 |
 |------|------|------|
@@ -708,7 +707,7 @@ export interface ConsoleLogPayload {
 | `packages/shared/src/demo/PreviewCanvas.tsx` | 透传 `onConsoleEntry` 到 CanvasPageItem | ✅ |
 | `packages/shared/src/demo/CanvasPageItem.tsx` | 透传 `onConsoleEntry` 到 PreviewPanel | ✅ |
 | `packages/shared/src/demo/index.ts` | 导出 `IframeOutMessageType`/`IframeInMessageType`/`ConsoleLogPayload` | ✅ |
-| `packages/agent-service/src/backends/pi-tools/index.ts` | 注册 `getConsoleLogs` 工具 | ✅ |
+| `packages/agent-service/src/backends/pi-tools/index.ts` | 注册 `getConsoleLogs` 与 `captureScreenshot` 工具 | ✅ |
 | `packages/agent-service/src/routes/websocket.ts` | ClientMessage 新增 `console_data` 类型和 `entries` 字段；处理逻辑；连接生命周期清理 consoleBuffer | ✅ |
 | `packages/agent-service/src/routes/agent.ts` | 会话销毁时清理 consoleBuffer | ✅ |
 | `packages/author-site/src/components/ai-elements/chat/services/stream-service.ts` | 新增 `forwardConsoleEntries` 方法 | ✅ |
@@ -716,19 +715,26 @@ export interface ConsoleLogPayload {
 | `packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts` | 新增 `externalStreamServiceRef` 选项；同步到 StreamService ref | ✅ |
 | `packages/author-site/src/app/demo/[id]/edit/page.tsx` | 接入 `useConsoleBuffer`；透传 `onConsoleEntry` 到 PreviewPanel/PreviewGrid/PreviewCanvas；传递 `externalStreamServiceRef` 到 AIChat | ✅ |
 | `packages/agent-client/src/types.ts` | 新增 `ConsoleEntry` 类型 | ✅ |
-| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 添加 `getConsoleLogs` 工具使用指引 | ✅ |
+| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 添加 `getConsoleLogs` 与 `captureScreenshot` 工具使用指引 | ✅ |
+| `packages/screenshot-service/src/routes/screenshots.ts` | `generate` / `generate-batch` 请求支持 `fullPage` 参数 | ✅ |
+| `packages/screenshot-service/src/utils/browser-pool.ts` | `renderPage()` 支持 `fullPage` 截图 | ✅ |
+| `packages/screenshot-service/src/utils/screenshot-store.ts` | 截图 hash 纳入 `fullPage`，避免视口截图与整页截图缓存混用 | ✅ |
+| `packages/agent-service/tests/unit/pi-agent.test.ts` | 更新 Pi Agent 工具数量与 `captureScreenshot` 注册断言 | ✅ |
+| `packages/agent-service/tests/unit/file-tools-permissions.test.ts` | 同步 Pi Agent 工具数量断言 | ✅ |
+| `packages/agent-service/tests/unit/screenshot-tool.test.ts` | 覆盖 `captureScreenshot` 成功返回图片与缺少页面代码文件错误路径 | ✅ |
 
-### 8.4 依赖的前置实施
+### 8.4 依赖的前置实施校正
 
-本方案的 `captureScreenshot` 工具依赖 `预览区画布模式Puppeteer截图方案.md` 中的以下组件：
+原方案提到的 `screenshot-renderer.ts` 与 `screenshot-compile-cache.ts` 当前不存在；实际前置能力已经由 `packages/screenshot-service/` 承担：
 
 | 组件 | 文件 | 状态 |
 |------|------|------|
-| Puppeteer Browser 单例 | `screenshot-renderer.ts` | 待实施 |
-| 编译缓存 | `screenshot-compile-cache.ts` | 待实施 |
-| 编译调用逻辑 | 跨服务调用 author-site `/api/compile` | 待实施 |
+| Puppeteer Browser 池 | `packages/screenshot-service/src/utils/browser-pool.ts` | ✅ |
+| 编译缓存 | `packages/screenshot-service/src/utils/compile-cache.ts` | ✅ |
+| 编译调用逻辑 | `packages/screenshot-service/src/utils/compile-client.ts` | ✅ |
+| 截图生成与读取 API | `packages/screenshot-service/src/routes/screenshots.ts` | ✅ |
 
-**建议**：先实施画布截图方案的 Phase 1（核心基础设施），再实施本方案。或两方案合并实施，共享 `screenshot-renderer.ts`。
+**结论**：不需要先补原计划中的两个新文件；继续推进时应复用 screenshot-service，并围绕 Agent 工具补测试与端到端验证。
 
 ---
 
@@ -762,21 +768,25 @@ export interface ConsoleLogPayload {
 - `ClientMessage.entries` 字段类型使用 `'log' | 'warn' | 'error' | 'info' | 'debug'` 字面量联合类型，确保与 `ConsoleEntry.level` 类型一致
 - `console_data` 消息在 switch 之前处理并 return，不走 Agent sendMessage 流程
 - `externalStreamServiceRef` 通过 `useChatStream` → `AIChat` → 编辑页面的链路传递，使 `useConsoleBuffer` 能访问 StreamService 的底层 WebSocket
-- vitest 测试待补充
+- `getConsoleLogs` 已随 Pi Agent 工具注册测试覆盖；控制台链路的更细粒度 vitest 仍可继续补充
 
-### Phase 2：截图捕获（依赖 Puppeteer 基础设施）
+### Phase 2：截图捕获 ✅ 已实施基础闭环
 
-1. 确认 `screenshot-renderer.ts` 已实施（画布截图方案 Phase 1）
-2. 新增 `screenshot-tool.ts`（`captureScreenshot` 工具）
-3. 实现截图逻辑：定位代码 → 编译 → HTML 组装 → Puppeteer 渲染 → base64 返回
-4. 注册工具到 `pi-tools/index.ts`
-5. 编写 vitest 测试（mock Puppeteer + 工具测试）
+> 实施日期：2026-06-21
 
-### Phase 3：System Prompt 与集成测试
+1. ✅ 校正基础设施：复用现有 `screenshot-service`，不再新增 `screenshot-renderer.ts`
+2. ✅ 新增 `screenshot-tool.ts`（`captureScreenshot` 工具）
+3. ✅ 实现截图逻辑：定位页面代码 → 提取 schema 默认配置 → 调用 screenshot-service → 读取 PNG → base64 返回
+4. ✅ 注册工具到 `pi-tools/index.ts`
+5. ✅ 扩展 screenshot-service：`fullPage` 参数进入渲染与缓存 hash
+6. ✅ 更新 Pi Agent 工具注册测试
+7. ✅ 补充 `captureScreenshot` 成功返回图片与缺少代码文件错误路径单元测试
 
-1. 更新 `buildStaticSystemPrompt()`，追加观测工具使用指引
-2. 端到端验证：Agent 对话 → 调用 getConsoleLogs → 调用 captureScreenshot → 修复代码
-3. 验证多模态模型能否正确消费 `ImageContent` 返回
+### Phase 3：System Prompt 与集成测试（部分完成）
+
+1. ✅ 更新静态 system prompt，追加 `captureScreenshot` 使用指引
+2. ⏳ 端到端验证：Agent 对话 → 调用 getConsoleLogs → 调用 captureScreenshot → 修复代码
+3. ⏳ 验证多模态模型能否正确消费 `ImageContent` 返回
 
 ---
 

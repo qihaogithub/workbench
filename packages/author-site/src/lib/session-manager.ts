@@ -113,9 +113,20 @@ export function archiveActiveSession(
  * 限制项目下的 Session 数量，超出时删除最旧的
  * @returns 被删除的 Session 数量
  */
-export function enforceSessionLimit(userId: string, projectId: string, maxCount = 5): number {
+export function enforceSessionLimit(
+  userId: string,
+  projectId: string,
+  maxCount = 5,
+): number {
+  if (maxCount < 1) return 0;
+
   const projectSessionsDir = getProjectSessionDir(userId, projectId);
-  if (!fs.existsSync(projectSessionsDir)) return 0;
+  if (
+    !fs.existsSync(projectSessionsDir) ||
+    !fs.statSync(projectSessionsDir).isDirectory()
+  ) {
+    return 0;
+  }
 
   const sessions: Array<{ sessionId: string; createdAt: number }> = [];
   const entries = fs.readdirSync(projectSessionsDir, { withFileTypes: true });
@@ -126,7 +137,13 @@ export function enforceSessionLimit(userId: string, projectId: string, maxCount 
     if (!fs.existsSync(metaPath)) continue;
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      sessions.push({ sessionId: meta.sessionId, createdAt: meta.createdAt || 0 });
+      if (meta.demoId !== projectId) continue;
+      if (meta.userId !== userId) continue;
+      if (typeof meta.sessionId !== "string") continue;
+
+      const createdAt =
+        typeof meta.createdAt === "number" ? meta.createdAt : 0;
+      sessions.push({ sessionId: meta.sessionId, createdAt });
     } catch { /* skip */ }
   }
 

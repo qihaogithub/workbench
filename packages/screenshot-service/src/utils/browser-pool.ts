@@ -64,10 +64,20 @@ class BrowserPool {
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
     // Linux
     const linuxPaths = ["/usr/bin/chromium", "/usr/bin/google-chrome"];
+    // Windows
+    const windowsPaths = [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    ];
 
     const { existsSync } = require("fs") as typeof import("fs");
     if (existsSync(macPath)) return macPath;
     for (const p of linuxPaths) {
+      if (existsSync(p)) return p;
+    }
+    for (const p of windowsPaths) {
       if (existsSync(p)) return p;
     }
 
@@ -78,6 +88,7 @@ class BrowserPool {
     html: string,
     width: number,
     height: number,
+    fullPage = false,
   ): Promise<Buffer> {
     const browser = await this.getBrowser();
 
@@ -110,7 +121,7 @@ class BrowserPool {
       }
 
       const buffer = await page.screenshot({
-        fullPage: false,
+        fullPage,
         type: "png",
       });
 

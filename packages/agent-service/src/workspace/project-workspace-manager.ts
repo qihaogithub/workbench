@@ -38,6 +38,18 @@ const PROJECTS_DIR = path.join(BASE_DIR, 'projects');
 const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
 const SNAPSHOTS_DIR = path.join(BASE_DIR, 'snapshots');
 
+function generateVersionId(project: Project): string {
+  const pageVersions = Object.values(project.pageVersions ?? {}).flat();
+  const maxVersion = [...project.versions, ...pageVersions].reduce(
+    (max, version) => {
+      const match = /^v(\d+)$/.exec(version.versionId);
+      return match ? Math.max(max, Number(match[1])) : max;
+    },
+    0
+  );
+  return `v${maxVersion + 1}`;
+}
+
 /**
  * 确保基础目录存在
  */
@@ -344,7 +356,7 @@ export class ProjectWorkspaceManager {
     const project = await readProjectMeta(projectId);
 
     // 生成新版本号
-    const versionId = `v${project.versions.length + 1}`;
+    const versionId = generateVersionId(project);
     const snapshotPath = path.join(SNAPSHOTS_DIR, projectId, versionId);
 
     // 步骤 1: 备份当前正式空间
@@ -458,7 +470,7 @@ export class ProjectWorkspaceManager {
     }
 
     // 生成新版本号
-    const newVersionId = `v${project.versions.length + 1}`;
+    const newVersionId = generateVersionId(project);
 
     // 备份当前状态
     const backupPath = path.join(SNAPSHOTS_DIR, projectId, `${newVersionId}_backup`);

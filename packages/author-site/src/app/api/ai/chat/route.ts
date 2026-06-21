@@ -3,6 +3,10 @@ import { getAgentClient } from '@/lib/agent-client';
 import { getSessionPath, getSessionWorkspacePath } from '@/lib/fs-utils';
 import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix } from '@/lib/agent/system-prompt';
 import { scanWorkspaceContext, readMemoryContent } from '@/lib/agent/scan-workspace';
+import {
+  buildActiveViewContextPrefix,
+  type ActiveViewContext,
+} from '@/lib/agent/active-view-context';
 
 // v3.2: 静态 system prompt 缓存在 module 顶部（应用启动后不再变）
 // 缓存收益：每次 sendMessage 都不变 → LLM API prompt caching 100% 命中
@@ -11,10 +15,11 @@ const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, sessionId: localSessionId, demoId } = body as {
+    const { message, sessionId: localSessionId, demoId, activeViewContext } = body as {
       message: string;
       sessionId?: string;
       demoId?: string;
+      activeViewContext?: ActiveViewContext;
     };
 
     if (!message?.trim()) {
@@ -33,14 +38,15 @@ export async function POST(request: NextRequest) {
     const workingDir = localSessionId
       ? (getSessionWorkspacePath(localSessionId) || getSessionPath(localSessionId))
       : undefined;
-    let finalContent = message;
+    const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
+    let finalContent = activeViewPrefix ? `${activeViewPrefix}${message}` : message;
     if (workingDir) {
       try {
         const context = scanWorkspaceContext(workingDir);
         const dynamicContext = buildDynamicContextPrefix(context);
         const memoryContent = readMemoryContent(workingDir);
         const memoryPrefix = memoryContent ? buildMemoryPrefix(memoryContent) : '';
-        finalContent = `${dynamicContext}${memoryPrefix}${message}`;
+        finalContent = `${dynamicContext}${memoryPrefix}${activeViewPrefix}${message}`;
       } catch (scanError) {
         // 扫描失败不应阻塞对话，记录错误继续发送原始消息
         console.warn('[AI Chat] scanWorkspaceContext 失败，使用原始内容:', scanError);

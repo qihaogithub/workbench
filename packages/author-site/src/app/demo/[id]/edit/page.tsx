@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
@@ -11,8 +11,6 @@ import {
   isSchemaEmpty,
 } from "../../../../../components/demo";
 import type {
-  PreviewMode,
-  CanvasState,
   PositionableSizeItem,
   VisualAnnotation,
   VisualEditPatch,
@@ -21,6 +19,7 @@ import type {
   VisualStyleChange,
 } from "../../../../../components/demo";
 import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
+import { useCanvasWorkspace } from "@/components/demo/useCanvasWorkspace";
 import {
   parseFigmaText,
   buildFigmaText,
@@ -100,8 +99,17 @@ import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
-import type { DemoPageMeta, DemoFolderMeta, VersionHistoryResponse, VersionInfo } from "@opencode-workbench/shared";
+import type {
+  DemoFiles,
+  DemoPageMeta,
+  DemoFolderMeta,
+  PageVersionHistoryResponse,
+  PageVersionInfo,
+  VersionHistoryResponse,
+  VersionInfo,
+} from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -110,6 +118,12 @@ interface DemoEditPageProps {
     id: string;
   };
 }
+
+type AiFileChange = {
+  path: string;
+  action: "created" | "modified" | "deleted";
+  content?: string;
+};
 
 function createVisualId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -132,6 +146,48 @@ function replaceUniqueText(
     code: `${source.slice(0, first)}${after}${source.slice(first + before.length)}`,
   };
 }
+
+const uuidLikePattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function getVersionSavedBy(savedBy?: string): string {
+  if (!savedBy || uuidLikePattern.test(savedBy)) {
+    return "未知用户";
+  }
+  return savedBy;
+}
+
+function getRestoredPageTitle(version: VersionInfo): string {
+  const noteMatch = /从页面\s+(.+?)\s+的历史版本/.exec(version.note ?? "");
+  const sessionMatch = /^restore-page-(.+)-v\d+$/.exec(version.sessionId);
+  const pageName = noteMatch?.[1] || sessionMatch?.[1] || "页面";
+  return `恢复了${pageName}`;
+}
+
+type HistoryEvent =
+  | {
+      id: string;
+      kind: "project";
+      title: "保存项目" | "恢复项目";
+      savedAt: number;
+      savedBy: string;
+      version: VersionInfo;
+      isLatestProject: boolean;
+    }
+  | {
+      id: string;
+      kind: "page";
+      title: string;
+      savedAt: number;
+      version: PageVersionInfo;
+    }
+  | {
+      id: string;
+      kind: "page-restore";
+      title: string;
+      savedAt: number;
+      version: VersionInfo;
+    };
 
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
@@ -190,37 +246,28 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     string | undefined
   >(undefined);
 
-  // 预览模式状态
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
-
-  // 画布模式状态
-  const [canvasState, setCanvasState] = useState<CanvasState>({
-    viewport: { x: 40, y: 40, zoom: 0.5 },
-    pages: {},
+  const {
+    previewMode,
+    setPreviewMode,
+    canvasState,
+    setCanvasState,
+    canvasEditingPageId,
+    setCanvasEditingPageId,
+    focusCanvasPageId,
+    focusCanvasPage,
+    clearCanvasSelection,
+  } = useCanvasWorkspace({
+    sessionId,
+    projectId: demoId,
   });
-  const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(null);
-  const [focusCanvasPageId, setFocusCanvasPageId] = useState<string | undefined>(undefined);
 
   // 画布模式下配置面板按需显示：选中页面时显示，无选中时隐藏
   const isConfigPanelVisible = previewMode !== "canvas" || !!canvasEditingPageId;
-
-  // 页面定位完成后清除 focusPageId，以便再次点击同一页面时重新触发
-  useEffect(() => {
-    if (focusCanvasPageId) {
-      const timer = setTimeout(() => setFocusCanvasPageId(undefined), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [focusCanvasPageId]);
-
-  // 切换到画布模式时清除选中状态，配置面板隐藏
-  useEffect(() => {
-    if (previewMode === "canvas") {
-      setCanvasEditingPageId(null);
-    }
-  }, [previewMode]);
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
+    serviceAvailable: isScreenshotServiceAvailable,
+    checkServiceHealth,
     startBatchGeneration,
     regeneratePage,
     getScreenshotUrl,
@@ -244,6 +291,30 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }, 3000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regeneratePage]);
+
+  const regenerateCanvasScreenshots = useCallback(async () => {
+    const available = await checkServiceHealth();
+    if (!available || demoPages.length === 0) return;
+
+    const pages = demoPages
+      .filter((p) => pageCodes[p.id] || code)
+      .map((p) => ({
+        pageId: p.id,
+        code: pageCodes[p.id] || code,
+        configData: configDataMap[p.id] || {},
+      }));
+
+    if (pages.length > 0) {
+      startBatchGeneration(pages);
+    }
+  }, [
+    checkServiceHealth,
+    code,
+    configDataMap,
+    demoPages,
+    pageCodes,
+    startBatchGeneration,
+  ]);
 
   // 切换到画布模式时触发批量截图，或首次加载时生成截图
   useEffect(() => {
@@ -311,7 +382,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [publishing, setPublishing] = useState(false);
 
   const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
+  const [pageVersionHistories, setPageVersionHistories] = useState<
+    Record<string, PageVersionHistoryResponse>
+  >({});
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [previewVersion, setPreviewVersion] = useState<
+    | {
+        scope: "page";
+        version: PageVersionInfo;
+        files: DemoFiles;
+      }
+    | null
+  >(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>('');
 
@@ -320,6 +402,29 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
+  const activeViewContext = useMemo<ActiveViewContext>(() => {
+    const focusedPageId =
+      previewMode === "canvas"
+        ? (canvasEditingPageId ?? undefined)
+        : (activeDemoId || undefined);
+    const activePage = demoPages.find((page) => page.id === activeDemoId);
+    const focusedPage = focusedPageId
+      ? demoPages.find((page) => page.id === focusedPageId)
+      : undefined;
+    return {
+      previewMode,
+      activePageId: activeDemoId || undefined,
+      activePageName: activePage?.name,
+      focusedPageId,
+      focusedPageName: focusedPage?.name,
+      focusedPagePaths: focusedPageId
+        ? {
+            index: `demos/${focusedPageId}/index.tsx`,
+            schema: `demos/${focusedPageId}/config.schema.json`,
+          }
+        : undefined,
+    };
+  }, [activeDemoId, canvasEditingPageId, demoPages, previewMode]);
 
   /**
    * Unified snapshot application entry.
@@ -332,35 +437,44 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch";
     }) => {
       const { code: newCode, schema: newSchema, source } = params;
+      const targetPageId = activeDemoIdRef.current;
 
       if (newCode !== undefined) {
         setCode((prev) => (prev === newCode ? prev : newCode));
         codeRef.current = newCode;
-        if (sessionId && activeDemoId) {
-          invalidateCompileCache(sessionId, activeDemoId);
+        if (targetPageId) {
+          setPageCodes((prev) =>
+            prev[targetPageId] === newCode
+              ? prev
+              : { ...prev, [targetPageId]: newCode },
+          );
+        }
+        if (sessionId && targetPageId) {
+          invalidateCompileCache(sessionId, targetPageId);
         }
       }
 
       if (newSchema !== undefined) {
+        const oldSchema = schemaRef.current;
         setSchema(newSchema);
         schemaRef.current = newSchema;
         const size = getPreviewSize(newSchema);
         setPreviewSize(size);
         setPagePreviewSizeMap((prev) => {
-          const id = activeDemoIdRef.current;
-          if (!id || !size) return prev;
-          return { ...prev, [id]: size };
+          if (!targetPageId || !size) return prev;
+          return { ...prev, [targetPageId]: size };
         });
 
         try {
           setConfigDataMap((prev) => {
-            const current = prev[activeDemoIdRef.current] ?? {};
+            if (!targetPageId) return prev;
+            const current = prev[targetPageId] ?? {};
             const merged = mergeConfigWithUserValues(
               current,
               newSchema,
-              schemaRef.current,
+              oldSchema,
             );
-            return { ...prev, [activeDemoIdRef.current]: merged };
+            return { ...prev, [targetPageId]: merged };
           });
         } catch (e) {
           console.warn("[DemoEditPage] Failed to merge schema defaults:", e);
@@ -494,7 +608,7 @@ ${context.details}
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demoId }),
+          body: JSON.stringify({ demoId, forceNew: true }),
         });
 
         if (!sessionRes.ok) {
@@ -620,13 +734,14 @@ ${context.details}
   }, [demoId, toast]);
 
   useEffect(() => {
-    if (activeDemoId && code) {
+    const pageId = activeDemoIdRef.current;
+    if (pageId && code) {
       setPageCodes((prev) => {
-        if (prev[activeDemoId] === code) return prev;
-        return { ...prev, [activeDemoId]: code };
+        if (prev[pageId] === code) return prev;
+        return { ...prev, [pageId]: code };
       });
     }
-  }, [code, activeDemoId]);
+  }, [code]);
 
   // 组件卸载时清理 Schema 自动重新生成定时器
   useEffect(() => {
@@ -734,6 +849,84 @@ ${context.details}
     [projectConfigSchema],
   );
 
+  const handleAiFilesChange = useCallback(
+    async (files: AiFileChange[]) => {
+      const hasDeletedPage = files.some(
+        (file) => file.action === "deleted" && file.path.replace(/\\/g, "/").startsWith("demos/"),
+      );
+      if (!hasDeletedPage || !sessionId) return;
+
+      try {
+        const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+        if (!filesRes.ok) {
+          throw new Error("刷新页面列表失败");
+        }
+        const filesData = await filesRes.json();
+        if (!filesData.success) {
+          throw new Error(filesData.error?.message || "刷新页面列表失败");
+        }
+
+        const multi = filesData.data;
+        const rawPages = multi.demoPages || [];
+        const pagesWithSize = rawPages.map(
+          (page: DemoPageMeta) => ({
+            ...page,
+            previewSize: multi.demos?.[page.id]?.schema
+              ? getPreviewSize(multi.demos[page.id].schema)
+              : undefined,
+          }),
+        );
+        setDemoPages(pagesWithSize);
+        setDemoFolders(multi.demoFolders || []);
+        setProjectConfigSchema(multi.projectConfigSchema);
+
+        const pageIds = rawPages.map((page: DemoPageMeta) => page.id);
+        const nextActiveId = pageIds.includes(activeDemoIdRef.current)
+          ? activeDemoIdRef.current
+          : pageIds[0];
+
+        const codes: Record<string, string> = {};
+        const allDefaults: Record<string, Record<string, unknown>> = {};
+        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        if (multi.demos) {
+          for (const [pageId, demo] of Object.entries(multi.demos) as [
+            string,
+            { code: string; schema: string },
+          ][]) {
+            codes[pageId] = demo.code;
+            allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            const pagePreviewSize = getPreviewSize(demo.schema);
+            if (pagePreviewSize) {
+              previewSizeMap[pageId] = pagePreviewSize;
+            }
+          }
+        }
+
+        setPageCodes(codes);
+        setConfigDataMap(allDefaults);
+        setPagePreviewSizeMap(previewSizeMap);
+
+        if (nextActiveId && multi.demos?.[nextActiveId]) {
+          const target = multi.demos[nextActiveId];
+          setActiveDemoId(nextActiveId);
+          setCode(target.code || "");
+          setSchema(target.schema || "");
+          setEditorContent(buildFigmaText(target.code || "", target.schema || ""));
+          setPreviewSize(getPreviewSize(target.schema || ""));
+        }
+
+        toast({ title: "页面列表已刷新" });
+      } catch (error) {
+        toast({
+          title: "刷新页面列表失败",
+          description: error instanceof Error ? error.message : "未知错误",
+          variant: "destructive",
+        });
+      }
+    },
+    [getSafeMergedDefaults, sessionId, toast],
+  );
+
   useEffect(() => {
     projectApiClient.getPublishStatus(demoId).then((result) => {
       setPublishStatus(result.status);
@@ -763,9 +956,38 @@ ${context.details}
     }
   }, [demoId]);
 
+  const loadPageVersionHistories = useCallback(async () => {
+    if (demoPages.length === 0) {
+      setPageVersionHistories({});
+      return;
+    }
+
+    const entries = await Promise.all(
+      demoPages.map(async (page) => {
+        try {
+          const history = await projectApiClient.getPageVersionHistory(
+            demoId,
+            page.id,
+          );
+          return [page.id, history] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setPageVersionHistories(
+      Object.fromEntries(entries.filter((entry): entry is NonNullable<typeof entry> => !!entry)),
+    );
+  }, [demoId, demoPages]);
+
   useEffect(() => {
     loadVersionHistory();
   }, [loadVersionHistory]);
+
+  useEffect(() => {
+    loadPageVersionHistories();
+  }, [loadPageVersionHistories]);
 
   const handlePublish = async () => {
     setPublishing(true);
@@ -865,7 +1087,91 @@ ${context.details}
     }
   };
 
-  const handleSave = async () => {
+  const persistActivePageToSession = async () => {
+    if (!sessionId || !activeDemoId) {
+      throw new Error("未选中页面或 Session 未创建");
+    }
+
+    const saveRes = await fetch(
+      `/api/sessions/${sessionId}/files/${activeDemoId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, schema }),
+      },
+    );
+
+    if (!saveRes.ok) {
+      throw new Error("保存当前页面到临时工作区失败");
+    }
+  };
+
+  const handlePreviewPageVersion = async (version: PageVersionInfo) => {
+    try {
+      const files = await projectApiClient.getPageVersionFiles(
+        demoId,
+        version.demoId,
+        version.versionId,
+      );
+      setPreviewVersion({ scope: "page", version, files });
+    } catch (err) {
+      toast({
+        title: "预览失败",
+        description: err instanceof Error ? err.message : "读取页面版本失败",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestorePageVersion = async (version: PageVersionInfo) => {
+    const pageName =
+      version.demoName ||
+      demoPages.find((page) => page.id === version.demoId)?.name ||
+      version.demoId;
+    if (!confirm(`确定要将页面「${pageName}」恢复到 ${version.versionId} 吗？`)) {
+      return;
+    }
+
+    setRestoring(version.versionId);
+    try {
+      const result = await projectApiClient.restorePageVersion(
+        demoId,
+        version.demoId,
+        version.versionId,
+        { sessionId },
+      );
+
+      if (activeDemoId !== version.demoId) {
+        setActiveDemoId(version.demoId);
+        activeDemoIdRef.current = version.demoId;
+      }
+      applyDemoSnapshot({
+        code: result.files.code,
+        schema: result.files.schema,
+        source: "manual-load",
+      });
+      setPageCodes((prev) => ({ ...prev, [version.demoId]: result.files.code }));
+      setHasUnsavedChanges(false);
+      setPublishStatus("unpublished_changes");
+      setPreviewVersion(null);
+
+      toast({
+        title: "页面恢复成功",
+        description: `已生成项目版本 ${result.newVersionId}`,
+      });
+      await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
+    } catch (err) {
+      toast({
+        title: "页面恢复失败",
+        description: err instanceof Error ? err.message : "恢复页面版本失败",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  const handleSave = async (): Promise<boolean> => {
     if (!sessionId) {
       console.error("[handleSave] sessionId 为空!");
       toast({
@@ -873,7 +1179,7 @@ ${context.details}
         description: "Session 未创建，请刷新页面重试",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     if (!activeDemoId) {
@@ -883,7 +1189,7 @@ ${context.details}
         description: "未选中页面，请先选择要保存的页面",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     if (!validationResult.isValid) {
@@ -924,6 +1230,12 @@ ${context.details}
         throw new Error("保存文件失败");
       }
 
+      const activePage = demoPages.find((page) => page.id === activeDemoId);
+      await projectApiClient.createPageVersion(demoId, activeDemoId, {
+        sessionId,
+        note: activePage ? `修改了${activePage.name}` : "修改了页面",
+      });
+
       const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -943,12 +1255,15 @@ ${context.details}
       setPublishStatus('unpublished_changes');
 
       loadVersionHistory();
+      loadPageVersionHistories();
+      return true;
     } catch (error) {
       toast({
         title: "保存失败",
         description: error instanceof Error ? error.message : "未知错误",
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -1260,6 +1575,77 @@ ${context}
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
   const hasAnyConfig = showProjectConfig || showPageConfig;
+  const activePageName =
+    demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
+  const projectVersions = versionHistory?.versions ?? [];
+  const projectVersionTotal = versionHistory?.totalVersions ?? 0;
+  const pageVersions = Object.values(pageVersionHistories).flatMap(
+    (history) => history.versions,
+  );
+  const historyEvents: HistoryEvent[] = [
+    ...projectVersions.map((version, index): HistoryEvent => {
+      if (version.sessionId.startsWith("restore-page-")) {
+        return {
+          id: `project-page-restore-${version.versionId}`,
+          kind: "page-restore",
+          title: getRestoredPageTitle(version),
+          savedAt: version.savedAt,
+          version,
+        };
+      }
+
+      return {
+        id: `project-${version.versionId}`,
+        kind: "project",
+        title:
+          version.sessionId === "restore" || version.note?.includes("恢复")
+            ? "恢复项目"
+            : "保存项目",
+        savedAt: version.savedAt,
+        savedBy: getVersionSavedBy(version.savedBy),
+        version,
+        isLatestProject: index === 0,
+      };
+    }),
+    ...pageVersions.map((version): HistoryEvent => ({
+      id: `page-${version.demoId}-${version.versionId}`,
+      kind: "page",
+      title: `修改了${version.demoName || version.demoId}`,
+      savedAt: version.savedAt,
+      version,
+    })),
+  ].sort((a, b) => b.savedAt - a.savedAt);
+  const historyEventTotal = projectVersionTotal + pageVersions.length;
+  const historyGroups = historyEvents.reduce<
+    Array<{ key: string; label: string; events: HistoryEvent[] }>
+  >((groups, event) => {
+    const key = format(event.savedAt, "yyyy-MM-dd");
+    const existing = groups.find((group) => group.key === key);
+    if (existing) {
+      existing.events.push(event);
+      return groups;
+    }
+
+    groups.push({
+      key,
+      label: format(event.savedAt, "MM月dd日", { locale: zhCN }),
+      events: [event],
+    });
+    return groups;
+  }, []);
+  const hasPublishableChanges =
+    publishStatus === "never_published" ||
+    publishStatus === "unpublished_changes";
+  const shouldSaveBeforePublish = hasUnsavedChanges;
+  const publishButtonDisabled =
+    isSaving ||
+    publishing ||
+    publishStatus === null ||
+    (!hasUnsavedChanges && !hasPublishableChanges);
+  const publishButtonText = shouldSaveBeforePublish ? "保存并发布" : "发布";
+  const publishingButtonText = shouldSaveBeforePublish
+    ? "保存并发布中..."
+    : "发布中...";
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -1303,7 +1689,7 @@ ${context}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1315,22 +1701,22 @@ ${context}
           </Button>
           <Button
             onClick={async () => {
-              await handleSave();
+              if (shouldSaveBeforePublish) {
+                const saved = await handleSave();
+                if (!saved) {
+                  return;
+                }
+              }
               await handlePublish();
             }}
-            disabled={
-              isSaving ||
-              publishing ||
-              publishStatus === 'published' ||
-              publishStatus === null
-            }
-            variant={publishStatus === 'unpublished_changes' ? 'default' : 'outline'}
+            disabled={publishButtonDisabled}
+            variant={!publishButtonDisabled ? 'default' : 'outline'}
             className="gap-2"
           >
             {publishing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                保存并发布中...
+                {publishingButtonText}
               </>
             ) : publishStatus === 'published' ? (
               <>
@@ -1340,7 +1726,7 @@ ${context}
             ) : (
               <>
                 <Upload className="h-4 w-4" />
-                保存并发布
+                {publishButtonText}
               </>
             )}
           </Button>
@@ -1361,15 +1747,23 @@ ${context}
               onValueChange={setTabValue}
               className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
             >
-              <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
-                <TabsTrigger value="ai" className="gap-2">
+              <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                <TabsTrigger
+                  value="ai"
+                  title="AI 对话"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <Bot className="h-4 w-4" />
-                  AI 对话
+                  {tabValue === "ai" && <span>AI 对话</span>}
                 </TabsTrigger>
-                <TabsTrigger value="pages" className="gap-2">
+                <TabsTrigger
+                  value="pages"
+                  title="页面"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <Layers className="h-4 w-4" />
-                  页面
-                  {demoPages.length > 0 && (
+                  {tabValue === "pages" && <span>页面</span>}
+                  {tabValue === "pages" && demoPages.length > 0 && (
                     <Badge
                       variant="secondary"
                       className="ml-1 text-[10px] h-4 px-1"
@@ -1378,13 +1772,21 @@ ${context}
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="code" className="gap-2">
+                <TabsTrigger
+                  value="code"
+                  title="文件"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <FolderOpen className="h-4 w-4" />
-                  文件
+                  {tabValue === "code" && <span>文件</span>}
                 </TabsTrigger>
-                <TabsTrigger value="history" className="gap-2">
+                <TabsTrigger
+                  value="history"
+                  title="版本"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <History className="h-4 w-4" />
-                  版本
+                  {tabValue === "history" && <span>版本</span>}
                 </TabsTrigger>
               </TabsList>
 
@@ -1398,9 +1800,11 @@ ${context}
                   workingDir={tempWorkspace || undefined}
                   projectId={demoId}
                   demoId={activeDemoId}
+                  activeViewContext={activeViewContext}
                   workspaceId={workspaceId || undefined}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
+                  onFilesChange={handleAiFilesChange}
                   onMemoryUpdate={async (filePath) => {
                     try {
                       const res = await fetch(
@@ -1695,8 +2099,7 @@ ${context}
                       setPreviewSize(pagePreviewSizeMap[pageId]);
                     }
                     if (previewMode === "canvas") {
-                      setFocusCanvasPageId(pageId);
-                      setCanvasEditingPageId(pageId);
+                      focusCanvasPage(pageId);
                     }
                     if (sessionId) {
                       try {
@@ -1705,6 +2108,10 @@ ${context}
                         );
                         const data = await res.json();
                         if (data.success) {
+                          setPageCodes((prev) => ({
+                            ...prev,
+                            [pageId]: data.data.code,
+                          }));
                           setCode(data.data.code);
                           setSchema(data.data.schema);
                           setEditorContent(
@@ -1835,6 +2242,10 @@ ${context}
                             );
                             const fileData = await fileRes.json();
                             if (fileData.success) {
+                              setPageCodes((prev) => ({
+                                ...prev,
+                                [nextPage.id]: fileData.data.code,
+                              }));
                               setCode(fileData.data.code);
                               setSchema(fileData.data.schema);
                               setEditorContent(
@@ -1881,10 +2292,7 @@ ${context}
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">当前版本</span>
-                      {versionHistory && (
-                        <Badge variant="default">{versionHistory.currentVersion}</Badge>
-                      )}
+                      <span className="text-sm font-medium">历史</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {publishStatus && (
@@ -1909,60 +2317,99 @@ ${context}
                     </div>
                   </div>
 
-                  {!versionHistory || versionHistory.versions.length === 0 ? (
+                  {historyEvents.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
                       <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>暂无版本历史</p>
-                      <p className="text-xs mt-1">保存编辑后会创建版本记录</p>
+                      <p className="text-xs mt-1">保存编辑后会记录历史</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {versionHistory.versions.map((version, index) => {
-                        const isLatest = index === 0;
-                        return (
-                          <div
-                            key={version.versionId}
-                            className={`p-3 rounded-lg border ${isLatest ? 'border-primary/30 bg-primary/5' : 'border-border'}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{version.versionId}</span>
-                                {isLatest && <Badge variant="default" className="text-[10px] h-4 px-1">最新</Badge>}
-                                {version.sessionId === 'restore' && <Badge variant="secondary" className="text-[10px] h-4 px-1">恢复</Badge>}
-                              </div>
-                              <Button
-                                variant={isLatest ? 'ghost' : 'ghost'}
-                                size="sm"
-                                onClick={() => handleRestoreVersion(version)}
-                                disabled={restoring === version.versionId || isLatest}
-                                className="h-7 gap-1 text-xs"
-                              >
-                                {restoring === version.versionId ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <RotateCcw className="h-3 w-3" />
-                                )}
-                                {isLatest ? '当前' : '恢复'}
-                              </Button>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {format(version.savedAt, 'MM-dd HH:mm', { locale: zhCN })}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {version.savedBy}
-                              </span>
-                            </div>
-                            {version.note && (
-                              <p className="mt-1 text-xs text-muted-foreground truncate">{version.note}</p>
-                            )}
+                    <div className="space-y-4">
+                      {historyGroups.map((group) => (
+                        <div key={group.key} className="space-y-1">
+                          <div className="pl-2 text-xs font-medium text-muted-foreground">
+                            {group.label}
                           </div>
-                        );
-                      })}
-                      <p className="text-center text-xs text-muted-foreground pt-2">
-                        共 {versionHistory.totalVersions} 个版本
+                          <div className="space-y-1">
+                            {group.events.map((event) => {
+                              const isProjectLike =
+                                event.kind === "project" || event.kind === "page-restore";
+                              const restoreVersion =
+                                event.kind === "project" || event.kind === "page-restore"
+                                  ? event.version
+                                  : null;
+                              return (
+                                <div
+                                  key={event.id}
+                                  className="group flex min-h-10 items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40 focus-within:bg-muted/40"
+                                >
+                                  <span className="w-10 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                                    {format(event.savedAt, 'HH:mm', { locale: zhCN })}
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                    {event.title}
+                                    {event.kind === "project" && (
+                                      <span className="ml-3 inline-flex max-w-[110px] align-middle items-center gap-1 truncate text-xs font-normal text-muted-foreground">
+                                        <User className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{event.savedBy}</span>
+                                      </span>
+                                    )}
+                                  </span>
+                                  <div className="flex w-[96px] shrink-0 items-center justify-end gap-1">
+                                    {event.kind === "page" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handlePreviewPageVersion(event.version)}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        <Eye className="h-3 w-3" />
+                                        查看
+                                      </Button>
+                                    )}
+                                    {event.kind === "page" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestorePageVersion(event.version)}
+                                        disabled={restoring === event.version.versionId}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        {restoring === event.version.versionId ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="h-3 w-3" />
+                                        )}
+                                        恢复
+                                      </Button>
+                                    )}
+                                    {isProjectLike &&
+                                      restoreVersion &&
+                                      !(event.kind === "project" && event.isLatestProject) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestoreVersion(restoreVersion)}
+                                        disabled={restoring === restoreVersion.versionId}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        {restoring === restoreVersion.versionId ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="h-3 w-3" />
+                                        )}
+                                        恢复
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="pt-2 pl-4 text-xs text-muted-foreground">
+                        共 {historyEventTotal} 条历史
                       </p>
                     </div>
                   )}
@@ -1971,7 +2418,6 @@ ${context}
 
             </Tabs>
           </ResizablePanel>
-
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
               {previewMode === "canvas" ? (
@@ -2018,6 +2464,18 @@ ${context}
                           .filter(([, s]) => s.screenshotUrl)
                           .map(([id, s]) => [id, s.screenshotUrl!])
                       )}
+                      screenshotStates={pageScreenshots}
+                      screenshotServiceAvailable={isScreenshotServiceAvailable}
+                      onScreenshotServiceRetry={regenerateCanvasScreenshots}
+                      onScreenshotRetry={(pageId) => {
+                        const page = demoPages.find((p) => p.id === pageId);
+                        if (!page) return;
+                        regeneratePage(
+                          pageId,
+                          pageCodes[pageId] || code,
+                          configDataMap[pageId] || {},
+                        );
+                      }}
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
                       onPageConfigEdit={(pageId) => {
@@ -2028,6 +2486,10 @@ ${context}
                             .then((res) => res.json())
                             .then((data) => {
                               if (data.success) {
+                                setPageCodes((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.code,
+                                }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
@@ -2048,7 +2510,7 @@ ${context}
                         }
                       }}
                       onCanvasClick={() => {
-                        setCanvasEditingPageId(null);
+                        clearCanvasSelection();
                       }}
                     />
                   </div>
@@ -2114,6 +2576,10 @@ ${context}
                               );
                               const data = await res.json();
                               if (data.success) {
+                                setPageCodes((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.code,
+                                }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
@@ -2158,11 +2624,16 @@ ${context}
                       }
                     `}</style>
                     <PreviewPanel
-                      code={code}
+                      code={
+                        activeDemoId ? (pageCodes[activeDemoId] ?? "") : code
+                      }
                       sessionId={sessionId}
                       demoId={activeDemoId}
                       configData={configData}
                       previewSize={previewSize}
+                      placeholderScreenshotUrl={
+                        pageScreenshots[activeDemoId]?.screenshotUrl
+                      }
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
                       visualEditMode={visualEditMode}
@@ -2346,6 +2817,66 @@ ${context}
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
+
+      <Dialog
+        open={!!previewVersion}
+        onOpenChange={(open) => {
+          if (!open) setPreviewVersion(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[82vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              页面版本预览
+              {previewVersion ? ` ${previewVersion.version.versionId}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {previewVersion?.version.demoName || activePageName} 的只读历史内容
+            </DialogDescription>
+          </DialogHeader>
+          {previewVersion && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+              <div className="min-h-0">
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  index.tsx
+                </div>
+                <ScrollArea className="h-[46vh] rounded-md border bg-muted/30">
+                  <pre className="p-3 text-xs leading-relaxed whitespace-pre-wrap break-words">
+                    {previewVersion.files.code}
+                  </pre>
+                </ScrollArea>
+              </div>
+              <div className="min-h-0">
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  config.schema.json
+                </div>
+                <ScrollArea className="h-[46vh] rounded-md border bg-muted/30">
+                  <pre className="p-3 text-xs leading-relaxed whitespace-pre-wrap break-words">
+                    {previewVersion.files.schema}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPreviewVersion(null)}>
+              关闭
+            </Button>
+            {previewVersion && (
+              <Button
+                onClick={() => handleRestorePageVersion(previewVersion.version)}
+                disabled={restoring === previewVersion.version.versionId}
+                className="gap-2"
+              >
+                {restoring === previewVersion.version.versionId && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                恢复到此版本
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <DialogContent>

@@ -1,6 +1,6 @@
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
-import { createWorkbenchTools, type PermissionHandler } from './pi-tools';
+import { createWorkbenchTools, type PermissionHandler, type SubagentRunResult } from './pi-tools';
 import { PERMISSION_TIMEOUT } from './pi-tools/delete-page-tool';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
@@ -60,6 +60,16 @@ function splitFullModelId(fullModelId: string | undefined): { provider?: string;
   return provider && model ? { provider, model } : {};
 }
 
+function getToolResultDetails(event: any): any {
+  return event?.details ?? event?.result?.details ?? event?.output?.details ?? event?.toolResult?.details;
+}
+
+function getDeletedPagesFromToolResult(event: any): Array<{ pageId: string; deletedPaths?: string[] }> {
+  const details = getToolResultDetails(event);
+  if (!details || !Array.isArray(details.deletedPages)) return [];
+  return details.deletedPages.filter((page: any) => typeof page?.pageId === 'string');
+}
+
 // 动态导入 ESM-only 依赖
 let AgentHarness: any;
 let NodeExecutionEnv: any;
@@ -102,6 +112,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
   private selectedModel: { provider: string; modelId: string } | null = null;
   private imageDescriber: ImageDescriber;
+  private activeSubagents: Set<any> = new Set();
 
   constructor(config: AgentConfig) {
     this.config = config;
@@ -109,6 +120,15 @@ export class PiAgentBackend implements IBackendAdapter {
       {},
       (request) => this.describeImageWithVisionModel(request),
     );
+  }
+
+  private areSubagentsEnabled(): boolean {
+    const configured = this.config.piAgent?.subagentsEnabled;
+    return configured ?? getServiceConfig().piAgent.subagentsEnabled;
+  }
+
+  private getSubagentTimeoutMs(): number {
+    return this.config.piAgent?.subagentTimeout ?? getServiceConfig().piAgent.subagentTimeout;
   }
 
   private getSessionProvidersConfig(): BackendProvidersConfig | undefined {
@@ -164,7 +184,14 @@ export class PiAgentBackend implements IBackendAdapter {
       this.session = await this.sessionRepo.create();
 
       // 3. 创建工具（传入 deletePage 权限确认回调）
-      const tools = createWorkbenchTools(this.config, (toolCallId, pageName) => this.requestPermission(toolCallId, pageName));
+      const tools = createWorkbenchTools(
+        this.config,
+        (toolCallId, pageName) => this.requestPermission(toolCallId, pageName),
+        {
+          includeDelegateTask: this.areSubagentsEnabled(),
+          subagentRunner: (params, signal) => this.runSubagent(params, signal),
+        },
+      );
 
       // 4. 获取模型
       const model = this.getModel();
@@ -374,6 +401,109 @@ export class PiAgentBackend implements IBackendAdapter {
     }
   }
 
+  private recordToolFileChange(toolName: string, input: any, isError: boolean, event: any): void {
+    if (isError) return;
+
+    if (toolName === 'writeFile') {
+      this.files.push({
+        path: input.path,
+        action: 'modified',
+        content: input.content,
+      });
+      return;
+    }
+
+    if (toolName === 'editFile') {
+      this.files.push({
+        path: input.path,
+        action: 'modified',
+      });
+      return;
+    }
+
+    if (toolName === 'deletePage' || toolName === 'deletePages') {
+      const deletedPages = getDeletedPagesFromToolResult(event);
+      const changedPaths = new Set<string>();
+      for (const page of deletedPages) {
+        changedPaths.add(`demos/${page.pageId}/`);
+        for (const deletedPath of page.deletedPaths || []) {
+          changedPaths.add(deletedPath);
+        }
+      }
+      if (deletedPages.length > 0) {
+        changedPaths.add('workspace-tree.json');
+      }
+      for (const changedPath of changedPaths) {
+        this.files.push({
+          path: changedPath,
+          action: changedPath === 'workspace-tree.json' ? 'modified' : 'deleted',
+        });
+      }
+    }
+  }
+
+  private setupToolHooks(harness: any, unsubStore: Array<() => void>): void {
+    const unsubToolCall = harness.on("tool_call", (event: any) => {
+      const { toolName, input } = event;
+
+      if (['readFile', 'readFileWithLines', 'writeFile', 'editFile', 'listFiles'].includes(toolName)) {
+        const targetPath = (input as any).path || (input as any).filePath;
+        if (targetPath && !isPathAllowed(targetPath, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)) {
+          return { block: true, reason: `Access denied: path "${targetPath}" is not allowed by workspace permissions` };
+        }
+      }
+
+      if (toolName === 'writeFile' || toolName === 'editFile') {
+        const targetPath = (input as any).path;
+        if (targetPath && isKnowledgeBasePath(targetPath, this.config.workingDir ?? '')) {
+          return { block: true, reason: 'Knowledge base files are user-managed; AI agents may read them but must not modify them.' };
+        }
+      }
+
+      if (toolName === 'writeFile' || toolName === 'editFile') {
+        const schemaPath = (input as any).path;
+        if (schemaPath && String(schemaPath).replace(/\\/g, '/').endsWith('config.schema.json')) {
+          if (!this.readKnowledgeFiles.has('閰嶇疆绯荤粺鍙傝€?md')) {
+            return {
+              block: true,
+              reason: '淇敼 config.schema.json 鍓嶏紝璇峰厛鐢?readFile 璇诲彇 knowledge/閰嶇疆绯荤粺鍙傝€?md锛屼簡瑙ｇ郴缁熸敮鎸佺殑鎺т欢绫诲瀷銆佹墿灞曞瓧娈靛拰閰嶇疆瑙勮寖锛岄伩鍏嶇敓鎴愭棤鏁?schema銆?',
+            };
+          }
+        }
+      }
+
+      return undefined;
+    });
+    unsubStore.push(unsubToolCall);
+
+    const unsubToolResult = harness.on("tool_result", (event: any) => {
+      const { toolName, input, isError } = event;
+
+      this.recordToolFileChange(toolName, input as any, isError, event);
+
+      if ((toolName === 'readFile' || toolName === 'readFileWithLines') && !isError) {
+        const readPath = (input as any).path;
+        if (readPath && isKnowledgeBasePath(readPath, this.config.workingDir ?? '')) {
+          const basename = path.basename(readPath);
+          this.readKnowledgeFiles.add(basename);
+        }
+      }
+      return undefined;
+    });
+    unsubStore.push(unsubToolResult);
+  }
+
+  private buildSubagentSystemPrompt(): string {
+    const basePrompt = this.currentSystemPrompt || '# Workbench AI 缂栫爜鍔╂墜';
+    return `${basePrompt}
+
+# Subagent Mode
+
+You are a short-lived subagent working for the main agent in the same workspace.
+Complete only the delegated task. You may read and edit allowed workspace files, but you must not spawn another subagent.
+Keep the final response concise: summarize what you changed, what you verified, and any remaining risks.`;
+  }
+
   /**
    * AgentHarness 的 getApiKeyAndHeaders 回调
    * 参数从 provider: string 改为 model: Model<any>
@@ -402,6 +532,9 @@ export class PiAgentBackend implements IBackendAdapter {
    * 注册 Hook 事件（替代 beforeToolCall/afterToolCall）
    */
   private setupHooks(): void {
+    this.setupToolHooks(this.harness, this.unsubFns);
+    return;
+
     // 替代 beforeToolCall — 权限检查
     const unsubToolCall = this.harness.on("tool_call", (event: any) => {
       const { toolName, input } = event;
@@ -452,6 +585,26 @@ export class PiAgentBackend implements IBackendAdapter {
           action: 'modified',
           content: (input as any).content,
         });
+      }
+
+      if ((toolName === 'deletePage' || toolName === 'deletePages') && !isError) {
+        const deletedPages = getDeletedPagesFromToolResult(event);
+        const changedPaths = new Set<string>();
+        for (const page of deletedPages) {
+          changedPaths.add(`demos/${page.pageId}/`);
+          for (const deletedPath of page.deletedPaths || []) {
+            changedPaths.add(deletedPath);
+          }
+        }
+        if (deletedPages.length > 0) {
+          changedPaths.add('workspace-tree.json');
+        }
+        for (const changedPath of changedPaths) {
+          this.files.push({
+            path: changedPath,
+            action: changedPath === 'workspace-tree.json' ? 'modified' : 'deleted',
+          });
+        }
       }
 
       // 追踪知识文件读取
@@ -595,6 +748,122 @@ export class PiAgentBackend implements IBackendAdapter {
     this.unsubFns.push(unsub);
   }
 
+  private async runSubagent(
+    params: { task: string; context?: string },
+    signal?: AbortSignal,
+  ): Promise<SubagentRunResult> {
+    if (!this.areSubagentsEnabled()) {
+      throw new Error('Subagents are disabled');
+    }
+
+    await loadPiAgentDeps();
+
+    const startedAt = Date.now();
+    const startFileIndex = this.files.length;
+    const timeoutMs = this.getSubagentTimeoutMs();
+    const controller = new AbortController();
+    const env = new NodeExecutionEnv({ cwd: this.config.workingDir ?? process.cwd() });
+    const sessionRepo = new InMemorySessionRepo();
+    const session = await sessionRepo.create();
+    const unsubs: Array<() => void> = [];
+    let harness: any = null;
+    let timeoutHit = false;
+
+    const abortSubagent = () => {
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+      if (harness) {
+        void harness.abort();
+      }
+    };
+
+    if (signal?.aborted) {
+      abortSubagent();
+    }
+    signal?.addEventListener('abort', abortSubagent, { once: true });
+
+    const timeoutId = setTimeout(() => {
+      timeoutHit = true;
+      abortSubagent();
+    }, timeoutMs);
+    timeoutId.unref?.();
+
+    try {
+      const tools = createWorkbenchTools(
+        this.config,
+        (toolCallId, pageName) => this.requestPermission(toolCallId, pageName),
+        { includeDelegateTask: false },
+      );
+      const model = this.getModel();
+
+      harness = new AgentHarness({
+        env,
+        session,
+        tools,
+        model,
+        systemPrompt: () => this.buildSubagentSystemPrompt(),
+        getApiKeyAndHeaders: (model: any) => this.getApiKeyAndHeaders(model),
+        thinkingLevel: 'off',
+      });
+      this.activeSubagents.add(harness);
+      this.setupToolHooks(harness, unsubs);
+
+      const prompt = [
+        '# Delegated Task',
+        params.task,
+        params.context ? `\n# Additional Context\n${params.context}` : '',
+        '\nReturn a concise summary of what you did, including any files changed.',
+      ].filter(Boolean).join('\n\n');
+
+      const abortPromise = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener(
+          'abort',
+          () => reject(new Error(timeoutHit ? 'Subagent timed out' : 'Subagent aborted')),
+          { once: true },
+        );
+      });
+
+      const result = await Promise.race([
+        harness.prompt(prompt),
+        abortPromise,
+      ]);
+
+      const content = result.content
+        ?.filter((item: any) => item.type === 'text')
+        ?.map((item: any) => item.text)
+        ?.join('')
+        .trim() || '';
+      const files = this.files.slice(startFileIndex);
+
+      return {
+        success: true,
+        content,
+        files: files.length > 0 ? files : undefined,
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        content: message,
+        files: this.files.slice(startFileIndex),
+        durationMs: Date.now() - startedAt,
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortSubagent);
+      for (const unsub of unsubs) {
+        unsub();
+      }
+      if (harness) {
+        this.activeSubagents.delete(harness);
+        await harness.abort().catch(() => undefined);
+      }
+      await env.cleanup();
+    }
+  }
+
   async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string> {
     if (!this.harness) throw new Error("Agent not initialized");
     this.status = "busy";
@@ -684,6 +953,11 @@ export class PiAgentBackend implements IBackendAdapter {
       await this.harness.abort();
       this.harness = null;
     }
+
+    for (const subagent of this.activeSubagents) {
+      await subagent.abort().catch(() => undefined);
+    }
+    this.activeSubagents.clear();
 
     // 清理 ExecutionEnv
     if (this.env) {
@@ -838,6 +1112,9 @@ export class PiAgentBackend implements IBackendAdapter {
       // abort() 返回 Promise，但 cancelPrompt 是同步方法
       // 用 void 忽略 Promise，避免未处理的 rejection
       void this.harness.abort();
+    }
+    for (const subagent of this.activeSubagents) {
+      void subagent.abort();
     }
   }
 

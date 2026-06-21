@@ -42,6 +42,12 @@ describe('buildStaticSystemPrompt', () => {
     const b = buildStaticSystemPrompt();
     expect(a).toBe(b);
   });
+  it('delete page rules require exact IDs from listPages', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('listPages');
+    expect(prompt).toContain('不要根据页面名称、显示顺序或路径片段猜测页面 ID');
+    expect(prompt).toContain('deletePages');
+  });
 });
 
 describe('buildDynamicContextPrefix', () => {

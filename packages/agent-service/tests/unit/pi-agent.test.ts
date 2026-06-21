@@ -321,7 +321,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig);
       
-      expect(tools).toHaveLength(11);
+      expect(tools).toHaveLength(14);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -333,8 +333,11 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('schemaValidate');
       expect(toolNames).toContain('saveImage');
       expect(toolNames).toContain('getConsoleLogs');
+      expect(toolNames).toContain('captureScreenshot');
       expect(toolNames).toContain('listImages');
+      expect(toolNames).toContain('listPages');
       expect(toolNames).toContain('deletePage');
+      expect(toolNames).toContain('deletePages');
     });
 
     it('每个工具应有 label 和 execute 方法', async () => {

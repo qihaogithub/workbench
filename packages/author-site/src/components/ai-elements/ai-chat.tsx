@@ -18,6 +18,7 @@ import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
 import type { PermissionRequest } from "./chat/services/stream-service";
 import type { StreamService } from "./chat/services/stream-service";
+import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { X, FileText, ArrowDown } from "lucide-react";
 
 interface AIChatProps {
@@ -26,6 +27,7 @@ interface AIChatProps {
   workingDir?: string;
   projectId?: string;
   demoId?: string;
+  activeViewContext?: ActiveViewContext;
   workspaceId?: string;
   onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
   onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
@@ -59,6 +61,7 @@ export function AIChat({
   workingDir,
   projectId,
   demoId,
+  activeViewContext,
   workspaceId,
   onCodeUpdate,
   onSchemaUpdate,
@@ -132,6 +135,7 @@ export function AIChat({
     agentSessionId,
     workingDir,
     demoId,
+    activeViewContext,
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,

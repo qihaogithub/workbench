@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Demo 配置",
+  "type": "object",
+  "properties": {},
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  }
+}

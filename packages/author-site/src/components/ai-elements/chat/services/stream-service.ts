@@ -6,6 +6,10 @@ import {
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
 import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix, buildKnowledgeIndexPrefix } from "@/lib/agent/system-prompt";
+import {
+  buildActiveViewContextPrefix,
+  type ActiveViewContext,
+} from "@/lib/agent/active-view-context";
 
 // v3.2: 静态 system prompt 缓存在 module 顶部
 const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
@@ -154,6 +158,7 @@ export class StreamService {
     workingDir?: string,
     images?: ImageAttachment[],
     demoId?: string,
+    activeViewContext?: ActiveViewContext,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -162,7 +167,8 @@ export class StreamService {
     // v3.2: 异步获取 L3 上下文 + L4 记忆（通过服务端 API）→ 拼到 user content 前面
     // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
     // L4 记忆仅在首条消息注入
-    let finalContent = message;
+    const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
+    let finalContent = activeViewPrefix ? `${activeViewPrefix}${message}` : message;
     if (workingDir) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
       let ctx = await fetchContextPrefix(workingDir);
@@ -180,7 +186,7 @@ export class StreamService {
         if (memoryPrefix) {
           this.hasInjectedMemory = true;
         }
-        finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${message}`;
+        finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${activeViewPrefix}${message}`;
       } else {
         console.warn(
           "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态"

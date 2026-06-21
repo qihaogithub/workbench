@@ -57,7 +57,6 @@ export interface HttpMessageOptions {
   message: string;
   demoId?: string;
   workingDir?: string;
-  backend?: string;
   model?: string;
   timeout?: number;
 }
@@ -66,7 +65,6 @@ export interface WebSocketStreamOptions {
   sessionId: string;
   message: string;
   workingDir?: string;
-  backend?: string;
   model?: string;
   timeout?: number;
   wait?: boolean;

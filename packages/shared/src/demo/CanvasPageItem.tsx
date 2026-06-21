@@ -16,10 +16,12 @@ interface CanvasPageItemProps {
   sessionId?: string;
   screenshotUrl?: string;
   screenshotLoading?: boolean;
+  screenshotError?: string;
   visible?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
   className?: string;
+  onScreenshotRetry?: (pageId: string) => void;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   // 拖拽/缩放回调（用于对齐辅助线）
   onDragStart?: (pageId: string) => void;
@@ -145,10 +147,12 @@ export function CanvasPageItem({
   zoom = 1,
   sessionId,
   screenshotUrl,
-  screenshotLoading: _screenshotLoading,
+  screenshotLoading = false,
+  screenshotError,
   visible = true,
   onLayoutChange,
   onConfigEdit,
+  onScreenshotRetry,
   onConsoleEntry,
   onDragStart,
   onDragMove,
@@ -456,6 +460,25 @@ export function CanvasPageItem({
           </div>
         </div>
       )}
+
+      {!isEditing && (screenshotLoading || screenshotError) && (
+        <div className="absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md bg-background/90 px-2 py-1 text-[11px] text-muted-foreground shadow pointer-events-auto">
+          <span>{screenshotLoading ? "截图生成中" : "使用实时预览"}</span>
+          {screenshotError && onScreenshotRetry && (
+            <button
+              type="button"
+              className="text-primary hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                onScreenshotRetry(page.id);
+              }}
+            >
+              重试
+            </button>
+          )}
+        </div>
+      )}
+
     </>
   );
 
@@ -464,7 +487,7 @@ export function CanvasPageItem({
       ref={containerRef}
       data-page-id={page.id}
       className={cn(
-        "absolute rounded-lg overflow-hidden transition-shadow duration-200 select-none",
+        "absolute rounded-lg transition-shadow duration-200 select-none",
         isEditing && "ring-2 ring-blue-500",
       )}
       style={{
@@ -493,7 +516,16 @@ export function CanvasPageItem({
         setContextMenu({ x: e.clientX, y: e.clientY });
       }}
     >
-      {pageContent}
+      <div
+        className="absolute left-0 -top-6 max-w-full truncate text-xs font-medium text-muted-foreground"
+        title={page.name}
+      >
+        {page.name}
+      </div>
+
+      <div className="absolute inset-0 rounded-lg overflow-hidden">
+        {pageContent}
+      </div>
 
       {/* 边框热区 — 四条边 */}
       {showEdgeHandles && (

@@ -7,7 +7,7 @@ interface DemoProps {
 }
 
 export default function CyberpunkShowcase({
-  title = "NEXUS",
+  title = "星核",
   subtitle = "超越边界的数字体验",
   accentColor = "#00F0FF",
   glowColor = "#FF00FF",
@@ -221,27 +221,56 @@ export default function CyberpunkShowcase({
           </div>
         </div>
 
-        {/* 霓虹按钮 */}
-        <button
-          className="mt-8 relative px-10 py-3 rounded-sm overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95"
-          style={{
-            color: accentColor,
-            border: `1px solid ${accentColor}`,
-            textShadow: `0 0 8px ${accentColor}`,
-            boxShadow: `0 0 15px ${accentColor}33, inset 0 0 15px ${accentColor}11`,
-          }}
-        >
-          {/* 按钮背景扫光 */}
+        {/* 霓虹按钮 - 进入系统（增强版） */}
+        <div className="mt-8 relative" style={{ animation: "btnContainerPulse 2s ease-in-out infinite" }}>
+          {/* 按钮外发光 */}
           <div
-            className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
+            className="absolute inset-0 rounded-sm blur-xl opacity-70"
             style={{
-              background: `linear-gradient(90deg, transparent, ${accentColor}22, transparent)`,
+              background: `linear-gradient(135deg, ${accentColor}, ${glowColor})`,
+              animation: "glowPulse 2s ease-in-out infinite",
             }}
           />
-          <span className="relative z-10 text-sm font-mono tracking-[0.25em] uppercase">
-            进入系统
-          </span>
-        </button>
+          {/* 按钮外边框光晕 */}
+          <div
+            className="absolute -inset-[2px] rounded-sm opacity-60"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}, ${glowColor}, ${accentColor})`,
+              backgroundSize: "200% 200%",
+              animation: "borderRotate 3s linear infinite",
+            }}
+          />
+          <button
+            className="relative px-12 py-4 rounded-sm overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+            style={{
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "15px",
+              letterSpacing: "0.3em",
+              background: `linear-gradient(135deg, ${accentColor}dd, ${glowColor}dd)`,
+              textShadow: `0 0 12px ${accentColor}, 0 0 30px ${glowColor}66`,
+              boxShadow: `0 0 30px ${accentColor}44, inset 0 0 20px rgba(255,255,255,0.15)`,
+            }}
+          >
+            {/* 按钮背景扫光 */}
+            <div
+              className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
+              style={{
+                background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)`,
+              }}
+            />
+            {/* 按钮闪烁高光 */}
+            <div
+              className="absolute top-0 left-[10%] right-[10%] h-[1px] opacity-60 group-hover:opacity-100 transition-opacity"
+              style={{
+                background: `linear-gradient(90deg, transparent, #fff, transparent)`,
+              }}
+            />
+            <span className="relative z-10 font-mono tracking-[0.3em] uppercase">
+              进入系统
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ===== 底部装饰线 ===== */}
@@ -296,6 +325,19 @@ export default function CyberpunkShowcase({
         @keyframes barPulse2 {
           0%, 100% { opacity: 0.3; }
           50% { opacity: 0.8; }
+        }
+        @keyframes btnContainerPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+        }
+        @keyframes glowPulse {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50% { opacity: 0.9; transform: scale(1.05); }
+        }
+        @keyframes borderRotate {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
       `}</style>
     </div>

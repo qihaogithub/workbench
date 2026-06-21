@@ -33,7 +33,7 @@ import { Plus, FileText, FolderPlus, Upload } from "lucide-react";
 import {
   flattenTree,
   findItemById,
-  reorderSiblings,
+  moveItemWithinParentAtIndex,
   isDescendantLocal,
 } from "./demo-page-tree-utils";
 import { projectApiClient } from "@/lib/project-api";
@@ -50,6 +50,38 @@ interface DemoPageTreeProps {
   onPageRename: (pageId: string, name: string) => void;
   onPageCopy: (pageId: string) => void;
   onPageDelete: (pageId: string) => void;
+}
+
+function getDropAfter(event: DragEndEvent): boolean {
+  const activeRect =
+    event.active.rect.current.translated ?? event.active.rect.current.initial;
+  const overRect = event.over?.rect;
+  if (!activeRect || !overRect) return false;
+
+  const activeCenterY = activeRect.top + activeRect.height / 2;
+  const overCenterY = overRect.top + overRect.height / 2;
+  return activeCenterY > overCenterY;
+}
+
+function getSiblingIndex<T extends { id: string; order: number; parentId: string | null }>(
+  items: T[],
+  parentId: string | null,
+  itemId: string,
+): number {
+  const siblings = items
+    .filter((item) => (item.parentId ?? null) === parentId)
+    .sort((a, b) => a.order - b.order);
+  return siblings.findIndex((item) => item.id === itemId);
+}
+
+function toReorderUpdates<T extends { id: string; order: number; parentId: string | null }>(
+  items: T[],
+): Array<{ id: string; order: number; parentId: string | null }> {
+  return items.map((item) => ({
+    id: item.id,
+    order: item.order,
+    parentId: item.parentId ?? null,
+  }));
 }
 
 export function DemoPageTree({
@@ -123,175 +155,88 @@ export function DemoPageTree({
         if (isDescendantLocal(activeItem.id, overItem.id, folders)) return;
       }
 
-      // 场景A：拖到文件夹上 → 移入该文件夹
-      // 例外：同级两个文件夹拖拽 → 降级为排序（场景B处理）
-      const isSameLevelFolderDrag =
-        activeIsFolder && overIsFolder && activeParent === overParent;
+      const dropAfter = getDropAfter(event);
 
-      if (overIsFolder && activeParent !== overItem.id && !isSameLevelFolderDrag) {
-        const targetFolderId = overItem.id;
+      if (activeIsFolder) {
+        if (!overIsFolder && activeParent === overParent) return;
 
-        if (activeIsFolder) {
-          try {
-            const sameParent = folders.filter(
-              (f) => (f.parentId ?? null) === targetFolderId && f.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((f) => f.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchFolder(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: targetFolderId, order: nextOrder },
-            );
-            onFoldersChange(
-              folders.map((f) => (f.id === activeItem.id ? updated : f)),
-            );
-            setExpandedFolders((prev) => new Set([...prev, targetFolderId]));
-          } catch {
-            toast({ title: "移动文件夹失败", variant: "destructive" });
-          }
+        let targetParentId: string | null;
+        let targetIndex: number;
+        if (overIsFolder && activeParent === overParent) {
+          const overIndex = getSiblingIndex(folders, overParent, overItem.id);
+          targetParentId = overParent;
+          targetIndex = overIndex + (dropAfter ? 1 : 0);
+        } else if (overIsFolder) {
+          targetParentId = overItem.id;
+          targetIndex = 0;
         } else {
-          try {
-            const sameParent = pages.filter(
-              (p) => (p.parentId ?? null) === targetFolderId && p.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((p) => p.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchDemoPageMeta(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: targetFolderId, order: nextOrder },
-            );
-            onPagesChange(
-              pages.map((p) => (p.id === activeItem.id ? updated : p)),
-            );
-            setExpandedFolders((prev) => new Set([...prev, targetFolderId]));
-          } catch {
-            toast({ title: "移动页面失败", variant: "destructive" });
-          }
+          targetParentId = overParent;
+          targetIndex = folders.filter(
+            (folder) =>
+              folder.id !== activeItem.id &&
+              (folder.parentId ?? null) === targetParentId,
+          ).length;
         }
-        return;
-      }
+        const updatedFolders = moveItemWithinParentAtIndex(
+          folders,
+          activeItem.id,
+          targetParentId,
+          targetIndex,
+        );
 
-      // 场景B：同级同类型排序
-      if (activeParent === overParent && activeIsFolder === overIsFolder) {
-        const pageUpdates: Array<{
-          id: string;
-          order: number;
-          parentId: string | null;
-        }> = [];
-        const folderUpdates: Array<{
-          id: string;
-          order: number;
-          parentId: string | null;
-        }> = [];
-
-        if (activeIsFolder) {
-          const updated = reorderSiblings(
-            folders,
-            activeParent,
-            activeItem.id,
-            overItem.id,
-          );
-          onFoldersChange(updated);
-          for (const f of updated) {
-            if ((f.parentId ?? null) === activeParent) {
-              folderUpdates.push({
-                id: f.id,
-                order: f.order,
-                parentId: f.parentId ?? null,
-              });
-            }
-          }
-        } else {
-          const updated = reorderSiblings(
-            pages,
-            activeParent,
-            activeItem.id,
-            overItem.id,
-          );
-          onPagesChange(updated);
-          for (const p of updated) {
-            if ((p.parentId ?? null) === activeParent) {
-              pageUpdates.push({
-                id: p.id,
-                order: p.order,
-                parentId: p.parentId ?? null,
-              });
-            }
-          }
+        onFoldersChange(updatedFolders);
+        if (targetParentId) {
+          setExpandedFolders((prev) => new Set([...prev, targetParentId]));
         }
 
         try {
           await projectApiClient.reorderDemoPages(
             projectId,
             sessionId,
-            pageUpdates,
-            folderUpdates.length > 0 ? folderUpdates : undefined,
+            [],
+            toReorderUpdates(updatedFolders),
           );
         } catch {
-          toast({ title: "排序保存失败", variant: "destructive" });
+          onFoldersChange(folders);
+          toast({ title: "移动文件夹失败", variant: "destructive" });
         }
         return;
       }
 
-      // 场景C：跨层级移动（拖到不同父级的页面上方 → 移到目标层级末尾）
-      if (activeParent !== overParent) {
-        if (activeIsFolder) {
-          try {
-            const sameParent = folders.filter(
-              (f) => (f.parentId ?? null) === overParent && f.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((f) => f.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchFolder(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: overParent, order: nextOrder },
-            );
-            onFoldersChange(
-              folders.map((f) => (f.id === activeItem.id ? updated : f)),
-            );
-            if (overParent) {
-              setExpandedFolders((prev) => new Set([...prev, overParent]));
-            }
-          } catch {
-            toast({ title: "移动文件夹失败", variant: "destructive" });
-          }
-        } else {
-          try {
-            const sameParent = pages.filter(
-              (p) => (p.parentId ?? null) === overParent && p.id !== activeItem.id,
-            );
-            const nextOrder =
-              sameParent.length > 0
-                ? Math.max(...sameParent.map((p) => p.order)) + 1
-                : 0;
-            const updated = await projectApiClient.patchDemoPageMeta(
-              projectId,
-              activeItem.id,
-              sessionId,
-              { parentId: overParent, order: nextOrder },
-            );
-            onPagesChange(
-              pages.map((p) => (p.id === activeItem.id ? updated : p)),
-            );
-            if (overParent) {
-              setExpandedFolders((prev) => new Set([...prev, overParent]));
-            }
-          } catch {
-            toast({ title: "移动页面失败", variant: "destructive" });
-          }
-        }
+      const overPageIndex = !overIsFolder
+        ? getSiblingIndex(pages, overParent, overItem.id)
+        : -1;
+      const targetParentId = overIsFolder
+        ? overParent
+          ? overParent
+          : overItem.id
+        : overParent;
+      const targetIndex = overIsFolder
+        ? 0
+        : overPageIndex + (dropAfter ? 1 : 0);
+      const updatedPages = moveItemWithinParentAtIndex(
+        pages,
+        activeItem.id,
+        targetParentId,
+        targetIndex,
+      );
+
+      onPagesChange(updatedPages);
+      if (overIsFolder && !overParent) {
+        setExpandedFolders((prev) => new Set([...prev, overItem.id]));
+      } else if (targetParentId) {
+        setExpandedFolders((prev) => new Set([...prev, targetParentId]));
+      }
+
+      try {
+        await projectApiClient.reorderDemoPages(
+          projectId,
+          sessionId,
+          toReorderUpdates(updatedPages),
+        );
+      } catch {
+        onPagesChange(pages);
+        toast({ title: "移动页面失败", variant: "destructive" });
       }
     },
     [
@@ -544,6 +489,7 @@ export function DemoPageTree({
                       folders={folders}
                       pages={pages}
                       isExpanded={flat.isExpanded}
+                      activeDragId={activeId}
                       onToggleFolder={toggleFolder}
                       onPageSelect={onPageSelect}
                       onPageRename={onPageRename}

@@ -11,7 +11,12 @@ import {
   getWorkspaceMultiDemoFiles,
   getWorkspaceFiles,
 } from "@/lib/fs-utils";
-import { findActiveSession, createEditSession, archiveActiveSession, enforceSessionLimit } from "@/lib/session-manager";
+import {
+  archiveActiveSession,
+  createEditSession,
+  enforceSessionLimit,
+  findActiveSession,
+} from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { pushSessionModelConfigToAgent } from "@/lib/agent-providers";
 import { getModelConfig } from "@/lib/model-config";

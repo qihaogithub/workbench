@@ -15,12 +15,14 @@ export function computeScreenshotHash(
   configData: Record<string, unknown>,
   width: number,
   height: number,
+  fullPage = false,
 ): string {
   const input = [
     code,
     JSON.stringify(configData),
     String(width),
     String(height),
+    String(fullPage),
     String(config.snapshotVersion),
   ].join(":");
 

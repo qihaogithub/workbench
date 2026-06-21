@@ -1,5 +1,10 @@
 import useSWR, { mutate } from 'swr'
-import type { DemoMeta, ApiResponse, SessionMeta } from '@opencode-workbench/shared'
+import type {
+  ApiResponse,
+  DemoMeta,
+  ProjectTemplateMeta,
+  SessionMeta,
+} from '@opencode-workbench/shared'
 
 // 真实 API 调用
 const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
@@ -30,11 +35,34 @@ export function useDemos(options?: { fallbackData?: DemoMeta[] }) {
   }
 }
 
-export async function createDemo(name: string): Promise<ApiResponse<DemoMeta>> {
+export function useProjectTemplates() {
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    '/api/templates',
+    () => fetcher<ProjectTemplateMeta[]>('/api/templates'),
+    {
+      revalidateOnFocus: false,
+    }
+  )
+
+  const templates = data?.success ? data.data : []
+  const apiError = data?.success === false ? data.error : null
+
+  return {
+    templates,
+    isLoading,
+    error: error || apiError,
+    revalidate,
+  }
+}
+
+export async function createDemo(
+  name: string,
+  templateId?: string,
+): Promise<ApiResponse<DemoMeta>> {
   const response = await fetch('/api/demos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, templateId }),
   }).then((res) => res.json())
 
   if (response.success) {
@@ -42,6 +70,38 @@ export async function createDemo(name: string): Promise<ApiResponse<DemoMeta>> {
   }
 
   return response
+}
+
+export async function saveDemoAsTemplate(
+  id: string,
+  input: { category: string; name: string; description: string },
+): Promise<ApiResponse<ProjectTemplateMeta>> {
+  const response = await fetch(`/api/demos/${id}/template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/templates')
+  }
+
+  return response
+}
+
+export async function recommendProjectTemplate(
+  description: string,
+): Promise<ApiResponse<{
+  templateId: string
+  reason: string
+  confidence: number
+  template?: ProjectTemplateMeta
+}>> {
+  return fetch('/api/templates/recommend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  }).then((res) => res.json())
 }
 
 export async function deleteDemo(id: string): Promise<ApiResponse<void>> {

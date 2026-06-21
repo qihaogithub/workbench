@@ -9,6 +9,8 @@ export interface ServiceConfig {
     model: string;
     baseUrl: string;
     timeout: number;
+    subagentsEnabled: boolean;
+    subagentTimeout: number;
   };
   rateLimit: {
     max: number;
@@ -28,6 +30,8 @@ export function loadConfig(): ServiceConfig {
       model: process.env.PI_AGENT_MODEL || 'claude-sonnet-4-20250514',
       baseUrl: process.env.PI_AGENT_BASE_URL || '',
       timeout: parseInt(process.env.PI_AGENT_TIMEOUT || '120000', 10),
+      subagentsEnabled: process.env.PI_AGENT_SUBAGENTS_ENABLED !== 'false',
+      subagentTimeout: parseInt(process.env.PI_AGENT_SUBAGENT_TIMEOUT || '120000', 10),
     },
     rateLimit: {
       max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),

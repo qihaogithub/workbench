@@ -82,7 +82,7 @@ pnpm dev send "session-1" "长时间任务" -t 300000
 - `message` - 消息内容(必填)
 - `-d, --demo-id <demoId>` - Demo ID
 - `-w, --working-dir <dir>` - 工作目录路径
-- `-b, --backend <backend>` - Agent 后端类型(默认: opencode)
+- `-m, --model <modelId>` - 模型 ID
 - `-t, --timeout <ms>` - 超时时间,毫秒(默认: 120000)
 
 ---
@@ -253,12 +253,12 @@ pnpm dev diagnose "session-1" -m "你好"
 
   [问题] Session 未正确初始化
   [可能原因]
-    - ACP 连接建立但 createSession 失败
+    - Pi Agent 会话初始化失败
     - Session 超时或失效
-    - opencode CLI 未正确响应
+    - Pi Agent 未正确响应
   [解决方案]
     1. 使用新的 sessionId 重试
-    2. 检查 opencode CLI 是否可用
+    2. 检查 Pi Agent 模型供应商配置
     3. 查看 agent-service 日志
     4. 运行: ops-cli stream "new-session" "测试"
 ```

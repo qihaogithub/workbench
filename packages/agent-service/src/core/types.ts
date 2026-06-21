@@ -39,6 +39,8 @@ export interface AgentConfig {
   demoId?: string;
   model?: string;
   timeout?: number;
+  subagentsEnabled?: boolean;
+  subagentTimeout?: number;
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
   backendProviders?: BackendProvidersConfig;
 
