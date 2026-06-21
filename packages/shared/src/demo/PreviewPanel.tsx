@@ -296,6 +296,7 @@ export function PreviewPanel({
   effectiveHeight,
   onPositionableSizes,
   visualEditMode = false,
+  visualAnnotationMode = false,
   selectedVisualNodeId,
   visualAnnotations = [],
   onVisualHover,
@@ -322,11 +323,13 @@ export function PreviewPanel({
   const isUrlMode = !!compiledJsUrl;
   const visualEditStateRef = useRef({
     enabled: visualEditMode,
+    annotationMode: visualAnnotationMode,
     selectedNodeId: selectedVisualNodeId ?? null,
     annotations: visualAnnotations,
   });
   visualEditStateRef.current = {
     enabled: visualEditMode,
+    annotationMode: visualAnnotationMode,
     selectedNodeId: selectedVisualNodeId ?? null,
     annotations: visualAnnotations,
   };
@@ -416,6 +419,7 @@ export function PreviewPanel({
       {
         type: "UPDATE_VISUAL_EDIT_STATE",
         enabled: state.enabled,
+        annotationMode: state.annotationMode,
         selectedNodeId: state.selectedNodeId,
         annotations: state.annotations,
       },
@@ -636,7 +640,12 @@ export function PreviewPanel({
 
         case "VISUAL_ANNOTATION_CREATE":
           if (event.data?.node) {
-            onVisualAnnotationCreate?.(event.data.node);
+            onVisualAnnotationCreate?.(
+              event.data.node,
+              event.data.text,
+              event.data.annotationId,
+              event.data.styleChanges,
+            );
           }
           break;
       }
@@ -668,7 +677,7 @@ export function PreviewPanel({
   useEffect(() => {
     if (!iframeReadyRef.current) return;
     sendVisualEditState();
-  }, [visualEditMode, selectedVisualNodeId, visualAnnotations, sendVisualEditState]);
+  }, [visualEditMode, visualAnnotationMode, selectedVisualNodeId, visualAnnotations, sendVisualEditState]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;

@@ -18,6 +18,7 @@ import type {
   VisualEditPatch,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualStyleChange,
 } from "../../../../../components/demo";
 import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
 import {
@@ -54,7 +55,6 @@ import {
   FileCode2,
   Loader2,
   ImageIcon,
-  Pencil,
   Trash2,
   MoreVertical,
   Eye,
@@ -71,9 +71,6 @@ import {
   FolderOpen,
   ArrowLeft,
   MessageSquarePlus,
-  MousePointer2,
-  Check,
-  XCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -297,9 +294,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
   const [visualEditMode, setVisualEditMode] = useState(false);
   const [visualAnnotationMode, setVisualAnnotationMode] = useState(false);
-  const [visualCommentDraft, setVisualCommentDraft] = useState("");
-  const [visualCommentNode, setVisualCommentNode] =
-    useState<VisualNodeInfo | null>(null);
   const [hoveredVisualNode, setHoveredVisualNode] =
     useState<VisualNodeInfo | null>(null);
   const [selectedVisualNode, setSelectedVisualNode] =
@@ -326,8 +320,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
-
-
 
   /**
    * Unified snapshot application entry.
@@ -1018,54 +1010,82 @@ ${context.details}
       setSelectedVisualNode(node);
       if (!node) return;
 
-      if (visualAnnotationMode) {
-        setVisualCommentNode(node);
-        setVisualCommentDraft("");
-        return;
-      }
-
-      setTabValue("visual");
     },
-    [toast, visualAnnotationMode],
+    [],
   );
 
   const handleStartVisualAnnotation = useCallback(() => {
+    if (visualAnnotationMode) {
+      const pendingCount = visualAnnotations.filter((item) => !item.resolved).length;
+      if (
+        pendingCount > 0 &&
+        !window.confirm(`当前有 ${pendingCount} 条未发送批注，确定取消并丢弃吗？`)
+      ) {
+        return;
+      }
+      setVisualAnnotationMode(false);
+      setVisualEditMode(false);
+      setSelectedVisualNode(null);
+      setHoveredVisualNode(null);
+      setVisualAnnotations((prev) => prev.filter((item) => item.resolved));
+      return;
+    }
+
     const next = !visualAnnotationMode;
     setVisualAnnotationMode(next);
     setVisualEditMode(next);
-    setVisualCommentNode(null);
-    setVisualCommentDraft("");
-    if (next) {
-      toast({ title: "点击预览区元素以添加批注" });
+    setSelectedVisualNode(null);
+    setHoveredVisualNode(null);
+  }, [visualAnnotationMode, visualAnnotations]);
+
+  const handleSendVisualAnnotationsToAI = useCallback(() => {
+    const activeAnnotations = visualAnnotations.filter((item) => !item.resolved);
+    if (activeAnnotations.length === 0) {
+      return;
     }
-  }, [toast, visualAnnotationMode]);
 
-  const handleSubmitVisualComment = useCallback(() => {
-    const text = visualCommentDraft.trim();
-    if (!visualCommentNode || !text) return;
-    const annotation: VisualAnnotation = {
-      id: createVisualId("note"),
-      nodeId: visualCommentNode.nodeId,
-      domPath: visualCommentNode.domPath,
-      text,
-      createdAt: Date.now(),
-    };
-    setVisualAnnotations((prev) => [annotation, ...prev]);
-    setSelectedVisualNode(visualCommentNode);
-    setVisualCommentNode(null);
-    setVisualCommentDraft("");
+    const summary = `请根据 ${activeAnnotations.length} 条页面批注修改当前页面。`;
+    const context = activeAnnotations
+      .map((annotation, index) => {
+        const styleLines =
+          annotation.styleChanges && annotation.styleChanges.length > 0
+            ? [
+                "- 样式修改：",
+                ...annotation.styleChanges.map(
+                  (change) =>
+                    `  - ${change.label}（${change.property}）：${change.previousValue ?? "未设置"} -> ${change.value}`,
+                ),
+              ]
+            : [];
+        return [
+          `批注 ${index + 1}`,
+          `- 评论：${annotation.text}`,
+          ...styleLines,
+          `- DOM 路径：${annotation.domPath}`,
+          `- 节点 ID：${annotation.nodeId}`,
+        ].join("\n");
+      })
+      .join("\n\n");
+
+    const prompt = `${summary}
+
+请优先读取并修改 demos/${activeDemoIdRef.current}/index.tsx。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。
+
+<!-- VISUAL_ANNOTATION_CONTEXT
+${context}
+-->`;
+
+    setTabValue("ai");
+    setTriggerAutoSend(prompt);
     setVisualAnnotationMode(false);
     setVisualEditMode(false);
-    setTabValue("visual");
-    toast({ title: "批注已添加" });
-  }, [toast, visualCommentDraft, visualCommentNode]);
-
-  const handleCancelVisualComment = useCallback(() => {
-    setVisualCommentNode(null);
-    setVisualCommentDraft("");
-    setVisualAnnotationMode(false);
-    setVisualEditMode(false);
-  }, []);
+    setSelectedVisualNode(null);
+    setVisualAnnotations((prev) =>
+      prev.map((item) =>
+        item.resolved ? item : { ...item, resolved: true },
+      ),
+    );
+  }, [visualAnnotations]);
 
   const handleVisualInlineEdit = useCallback(
     (payload: VisualInlineEditPayload) => {
@@ -1081,7 +1101,7 @@ ${context.details}
       };
       setSelectedVisualNode(payload.node);
       setVisualPatches((prev) => [patch, ...prev]);
-      setTabValue("visual");
+      setTabValue("ai");
       toast({
         title: "已生成文本修改建议",
         description: "请在批注面板中接受或拒绝该修改。",
@@ -1091,23 +1111,29 @@ ${context.details}
   );
 
   const handleCreateVisualAnnotation = useCallback(
-    (text?: string, targetNode?: VisualNodeInfo) => {
+    (
+      text?: string,
+      targetNode?: VisualNodeInfo,
+      styleChanges?: VisualStyleChange[],
+    ) => {
       const node = targetNode ?? selectedVisualNode;
       if (!node) {
-        toast({ title: "请先在预览区选择一个元素" });
         return;
       }
-      const annotationText = text?.trim() || "待处理的页面批注";
+      const annotationText =
+        text?.trim() ||
+        (styleChanges && styleChanges.length > 0 ? "样式修改" : "待处理的页面批注");
       const annotation: VisualAnnotation = {
         id: createVisualId("note"),
         nodeId: node.nodeId,
         domPath: node.domPath,
         text: annotationText,
+        styleChanges,
         createdAt: Date.now(),
       };
       setVisualAnnotations((prev) => [annotation, ...prev]);
     },
-    [selectedVisualNode, toast],
+    [selectedVisualNode],
   );
 
   const handleAcceptVisualPatch = useCallback(
@@ -1124,7 +1150,11 @@ ${context.details}
         return;
       }
 
-      const result = replaceUniqueText(codeRef.current, patch.before, patch.after);
+      const result = replaceUniqueText(
+        codeRef.current,
+        patch.before,
+        patch.after,
+      );
       if (result.error || !result.code) {
         setVisualPatches((prev) =>
           prev.map((item) =>
@@ -1336,18 +1366,6 @@ ${context.details}
                   <Bot className="h-4 w-4" />
                   AI 对话
                 </TabsTrigger>
-                <TabsTrigger value="visual" className="gap-2">
-                  <MousePointer2 className="h-4 w-4" />
-                  批注
-                  {(visualAnnotations.length > 0 || visualPatches.length > 0) && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1 text-[10px] h-4 px-1"
-                    >
-                      {visualAnnotations.length + visualPatches.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
                 <TabsTrigger value="pages" className="gap-2">
                   <Layers className="h-4 w-4" />
                   页面
@@ -1552,178 +1570,6 @@ ${context.details}
                     ) : null
                   }
                 />
-              </TabsContent>
-
-              <TabsContent
-                value="visual"
-                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
-              >
-                <div className="px-4 py-3 border-b space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h2 className="text-sm font-medium">浏览器批注</h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        使用预览区顶部“批注”按钮添加页面留言。
-                      </p>
-                    </div>
-                    {visualAnnotationMode && (
-                      <Badge variant="default" className="shrink-0">
-                        批注中
-                      </Badge>
-                    )}
-                  </div>
-                  {hoveredVisualNode && (
-                    <div className="text-xs text-muted-foreground">
-                      Hover: &lt;{hoveredVisualNode.tagName}&gt;
-                    </div>
-                  )}
-                </div>
-
-                <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-4">
-                    <div className="rounded-md border p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium">当前选区</h3>
-                        {selectedVisualNode && (
-                          <Badge variant="outline">
-                            &lt;{selectedVisualNode.tagName}&gt;
-                          </Badge>
-                        )}
-                      </div>
-                      {selectedVisualNode ? (
-                        <div className="space-y-2 text-xs">
-                          <div className="text-muted-foreground break-all">
-                            {selectedVisualNode.domPath}
-                          </div>
-                          {selectedVisualNode.textContent && (
-                            <p className="line-clamp-3">
-                              {selectedVisualNode.textContent}
-                            </p>
-                          )}
-                          {selectedVisualNode.className && (
-                            <p className="font-mono text-muted-foreground break-all">
-                              {selectedVisualNode.className}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={handleSendSelectionToAI}
-                            >
-                              <Bot className="h-3.5 w-3.5" />
-                              交给 AI
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          尚未选中元素。开启编辑后在预览区点击任意可见元素。
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">待审修改</h3>
-                      {visualPatches.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          暂无修改建议。双击预览中的静态文本可创建第一条建议。
-                        </p>
-                      ) : (
-                        visualPatches.map((patch) => (
-                          <div
-                            key={patch.id}
-                            className="rounded-md border p-3 space-y-2"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {patch.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {patch.file}
-                                </p>
-                              </div>
-                              <Badge
-                                variant={
-                                  patch.status === "accepted"
-                                    ? "default"
-                                    : patch.status === "rejected"
-                                      ? "secondary"
-                                      : "outline"
-                                }
-                              >
-                                {patch.status}
-                              </Badge>
-                            </div>
-                            <div className="grid gap-2 text-xs">
-                              <div className="rounded bg-muted/50 p-2">
-                                <span className="text-muted-foreground">
-                                  修改前：
-                                </span>
-                                {patch.before}
-                              </div>
-                              <div className="rounded bg-primary/5 p-2">
-                                <span className="text-muted-foreground">
-                                  修改后：
-                                </span>
-                                {patch.after}
-                              </div>
-                            </div>
-                            {patch.error && (
-                              <p className="text-xs text-destructive">
-                                {patch.error}
-                              </p>
-                            )}
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                className="gap-1"
-                                disabled={patch.status === "accepted"}
-                                onClick={() => handleAcceptVisualPatch(patch)}
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                                接受
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                disabled={patch.status === "rejected"}
-                                onClick={() => handleRejectVisualPatch(patch.id)}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                                拒绝
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">页面批注</h3>
-                      {visualAnnotations.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          暂无批注。选中元素后点击“添加批注”。
-                        </p>
-                      ) : (
-                        visualAnnotations.map((annotation) => (
-                          <div
-                            key={annotation.id}
-                            className="rounded-md border p-3 space-y-1"
-                          >
-                            <p className="text-sm">{annotation.text}</p>
-                            <p className="text-xs text-muted-foreground break-all">
-                              {annotation.domPath}
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </ScrollArea>
               </TabsContent>
 
               <TabsContent
@@ -2236,8 +2082,22 @@ ${context.details}
                       onClick={handleStartVisualAnnotation}
                     >
                       <MessageSquarePlus className="h-3.5 w-3.5" />
-                      批注
+                      {visualAnnotationMode ? "取消批注" : "批注"}
                     </Button>
+                    {visualAnnotationMode && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8"
+                        disabled={visualAnnotations.filter((item) => !item.resolved).length === 0}
+                        onClick={handleSendVisualAnnotationsToAI}
+                      >
+                        发送批注
+                        {visualAnnotations.filter((item) => !item.resolved).length > 0
+                          ? ` (${visualAnnotations.filter((item) => !item.resolved).length})`
+                          : ""}
+                      </Button>
+                    )}
                     {demoPages.length > 1 && (
                       <Select
                         value={activeDemoId}
@@ -2292,63 +2152,6 @@ ${context.details}
                     className="relative flex-1 overflow-y-auto p-4 preview-single-scroll"
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                   >
-                    {(visualAnnotationMode || visualCommentNode) && (
-                      <div className="absolute left-1/2 top-10 z-30 w-[min(520px,calc(100%-32px))] -translate-x-1/2">
-                        <div className="flex items-center gap-3 rounded-full bg-neutral-900/95 px-4 py-3 shadow-2xl ring-1 ring-white/10">
-                          <MessageSquarePlus className="h-5 w-5 shrink-0 text-blue-400" />
-                          <input
-                            value={visualCommentDraft}
-                            onChange={(event) =>
-                              setVisualCommentDraft(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" && !event.shiftKey) {
-                                event.preventDefault();
-                                handleSubmitVisualComment();
-                              }
-                              if (event.key === "Escape") {
-                                event.preventDefault();
-                                handleCancelVisualComment();
-                              }
-                            }}
-                            placeholder={
-                              visualCommentNode
-                                ? "添加评论..."
-                                : "点击预览区元素后添加评论..."
-                            }
-                            disabled={!visualCommentNode}
-                            autoFocus={!!visualCommentNode}
-                            className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-neutral-400 outline-none disabled:cursor-default"
-                          />
-                          {visualCommentNode ? (
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 rounded-full px-3"
-                                disabled={!visualCommentDraft.trim()}
-                                onClick={handleSubmitVisualComment}
-                              >
-                                发送
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 rounded-full px-3 text-neutral-300 hover:bg-white/10 hover:text-white"
-                                onClick={handleCancelVisualComment}
-                              >
-                                取消
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="shrink-0 text-xs text-neutral-400">
-                              选择元素
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
                     <style>{`
                       .preview-single-scroll::-webkit-scrollbar {
                         display: none;
@@ -2372,9 +2175,46 @@ ${context.details}
                       onVisualHover={setHoveredVisualNode}
                       onVisualSelect={handleVisualSelect}
                       onVisualInlineEdit={handleVisualInlineEdit}
-                      onVisualAnnotationCreate={(node) => {
+                      visualAnnotationMode={visualAnnotationMode}
+                      onVisualAnnotationCreate={(
+                        node,
+                        text,
+                        annotationId,
+                        styleChanges,
+                      ) => {
                         setSelectedVisualNode(node);
-                        setTabValue("visual");
+                        const trimmedText = text?.trim() ?? "";
+                        const hasStyleChanges =
+                          !!styleChanges && styleChanges.length > 0;
+                        if (annotationId && !trimmedText && !hasStyleChanges) {
+                          setVisualAnnotations((prev) =>
+                            prev.filter((annotation) => annotation.id !== annotationId),
+                          );
+                          return;
+                        }
+                        if (trimmedText || hasStyleChanges) {
+                          if (annotationId) {
+                            setVisualAnnotations((prev) =>
+                              prev.map((annotation) =>
+                                annotation.id === annotationId
+                                  ? {
+                                      ...annotation,
+                                      nodeId: node.nodeId,
+                                      domPath: node.domPath,
+                                      text: trimmedText || "样式修改",
+                                      styleChanges,
+                                    }
+                                  : annotation,
+                              ),
+                            );
+                          } else {
+                            handleCreateVisualAnnotation(
+                              trimmedText,
+                              node,
+                              styleChanges,
+                            );
+                          }
+                        }
                       }}
                     />
                   </div>

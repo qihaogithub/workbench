@@ -48,6 +48,20 @@ const visualEditScript = `
   var selectedBox = null;
   var label = null;
   var annotationLayer = null;
+  var commentBubble = null;
+  var commentInput = null;
+  var commentNode = null;
+  var commentElement = null;
+  var commentTextElement = null;
+  var stylePanel = null;
+  var styleToggleButton = null;
+  var styleControlInputs = {};
+  var styleDraft = {};
+  var styleOriginalValues = {};
+  var textOriginalValue = null;
+  var textDraftValue = null;
+  var suppressStyleRestoreOnHide = false;
+  var editingAnnotationId = null;
   var lastHoverId = null;
 
   function ensureLayer() {
@@ -74,6 +88,63 @@ const visualEditScript = `
       annotationLayer.setAttribute('data-visual-overlay', 'annotations');
       annotationLayer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483003;';
       document.body.appendChild(annotationLayer);
+    }
+    if (!commentBubble) {
+      commentBubble = document.createElement('div');
+      commentBubble.setAttribute('data-visual-overlay', 'comment');
+      commentBubble.style.cssText = 'position:fixed;display:none;flex-direction:column;width:min(520px,calc(100vw - 24px));max-height:min(420px,calc(100vh - 24px));overflow:hidden;border-radius:24px;background:rgba(38,38,38,.98);box-shadow:0 18px 45px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);z-index:2147483004;color:#f5f5f5;font-family:system-ui,sans-serif;';
+      var topRow = document.createElement('div');
+      topRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;';
+      styleToggleButton = document.createElement('button');
+      styleToggleButton.type = 'button';
+      styleToggleButton.innerHTML = '<span style="position:relative;display:block;width:16px;height:16px"><span style="position:absolute;left:1px;right:1px;top:3px;height:2px;border-radius:2px;background:currentColor"></span><span style="position:absolute;left:1px;right:1px;top:7px;height:2px;border-radius:2px;background:currentColor"></span><span style="position:absolute;left:1px;right:1px;top:11px;height:2px;border-radius:2px;background:currentColor"></span><span style="position:absolute;left:4px;top:1px;width:4px;height:4px;border-radius:99px;background:#262626;border:1px solid currentColor"></span><span style="position:absolute;right:4px;top:5px;width:4px;height:4px;border-radius:99px;background:#262626;border:1px solid currentColor"></span><span style="position:absolute;left:6px;top:9px;width:4px;height:4px;border-radius:99px;background:#262626;border:1px solid currentColor"></span></span>';
+      styleToggleButton.title = '展开样式编辑';
+      styleToggleButton.style.cssText = 'width:30px;height:30px;border-radius:999px;border:0;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto;';
+      styleToggleButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleStylePanel();
+      });
+      commentInput = document.createElement('input');
+      commentInput.type = 'text';
+      commentInput.placeholder = '描述这些更改...';
+      commentInput.style.cssText = 'min-width:0;flex:1;background:transparent;border:0;outline:0;color:#fff;font:14px/1.4 system-ui,sans-serif;';
+      var addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.textContent = '+';
+      addButton.title = '添加批注';
+      addButton.style.cssText = 'width:30px;height:30px;border-radius:999px;border:0;background:#fff;color:#111827;font:22px/1 system-ui,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto;';
+      addButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        submitComment();
+      });
+      commentInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          submitComment();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          hideCommentBubble();
+        }
+      });
+      commentInput.addEventListener('blur', function() {
+        setTimeout(function() {
+          if (!commentBubble || commentBubble.style.display === 'none') return;
+          if (!editingAnnotationId || !commentInput || commentInput.value.trim()) return;
+          if (document.activeElement && isOverlay(document.activeElement)) return;
+          dismissCommentBubble({ deleteEmptyAnnotation: true });
+        }, 0);
+      });
+      stylePanel = document.createElement('div');
+      stylePanel.style.cssText = 'display:none;border-top:1px solid rgba(255,255,255,.08);padding:0 12px 12px;overflow:auto;';
+      topRow.appendChild(styleToggleButton);
+      topRow.appendChild(commentInput);
+      topRow.appendChild(addButton);
+      commentBubble.appendChild(topRow);
+      commentBubble.appendChild(stylePanel);
+      document.body.appendChild(commentBubble);
     }
   }
 
@@ -112,7 +183,7 @@ const visualEditScript = `
     if (!path) return null;
     try {
       var selector = path.split('>').join(' > ');
-      return document.body.querySelector(selector);
+      return document.body.querySelector(':scope > ' + selector);
     } catch (_err) {
       return null;
     }
@@ -168,11 +239,498 @@ const visualEditScript = `
     label.textContent = '<' + node.tagName + '>' + (node.className ? ' .' + node.className.split(/\\s+/).slice(0, 2).join('.') : '');
   }
 
+  function getElementForNode(node) {
+    if (!node) return null;
+    var el = getElementByPath(node.domPath);
+    if (!el && node.nodeId) {
+      try {
+        el = document.querySelector('[data-visual-node-id="' + node.nodeId.replace(/"/g, '\\\\"') + '"]');
+      } catch (_err) {
+        el = null;
+      }
+    }
+    return el;
+  }
+
+  function getOwnText(el) {
+    if (!el) return '';
+    var text = '';
+    Array.prototype.forEach.call(el.childNodes || [], function(node) {
+      if (node.nodeType === 3) text += node.nodeValue || '';
+    });
+    return text.replace(/\\s+/g, ' ').trim();
+  }
+
+  function findTextEditElement(el) {
+    if (!el) return null;
+    var own = getOwnText(el);
+    if (own) return el;
+    var candidates = Array.prototype.slice.call(el.querySelectorAll('*')).filter(function(item) {
+      var text = getOwnText(item);
+      if (!text) return false;
+      var rect = item.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    if (candidates.length === 0) return null;
+    candidates.sort(function(a, b) {
+      var textA = getOwnText(a);
+      var textB = getOwnText(b);
+      return textA.length - textB.length;
+    });
+    return candidates[0];
+  }
+
+  function isTextStyleProperty(property) {
+    return property === 'color' ||
+      property === 'fontFamily' ||
+      property === 'fontSize' ||
+      property === 'fontWeight' ||
+      property === 'lineHeight' ||
+      property === 'textAlign';
+  }
+
+  function getStyleTarget(property) {
+    return isTextStyleProperty(property) && commentTextElement
+      ? commentTextElement
+      : commentElement;
+  }
+
+  function normalizeStyleValue(property, value) {
+    var trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    if ((property === 'fontSize' ||
+      property === 'width' ||
+      property === 'height' ||
+      property === 'padding' ||
+      property === 'margin' ||
+      property === 'gap' ||
+      property === 'borderRadius' ||
+      property === 'lineHeight') && /^\\d+(\\.\\d+)?$/.test(trimmed)) return trimmed + 'px';
+    return trimmed;
+  }
+
+  function colorToHex(value) {
+    var text = String(value || '');
+    var start = text.indexOf('(');
+    var end = text.indexOf(')');
+    if (start === -1 || end === -1 || end <= start) return '#000000';
+    var parts = text.slice(start + 1, end).split(',').slice(0, 3);
+    if (parts.length < 3) return '#000000';
+    return '#' + parts.map(function(part) {
+      return Math.max(0, Math.min(255, Number(part))).toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function updateStyleDraft(property, labelText, value) {
+    var target = getStyleTarget(property);
+    if (!target) return;
+    var draftKey = (target === commentTextElement ? 'text:' : 'box:') + property;
+    if (styleOriginalValues[draftKey] === undefined) {
+      styleOriginalValues[draftKey] = {
+        element: target,
+        property: property,
+        value: target.style[property] || ''
+      };
+    }
+    var normalized = normalizeStyleValue(property, value);
+    if (!normalized) {
+      target.style[property] = '';
+      delete styleDraft[draftKey];
+    } else {
+      target.style[property] = normalized;
+      styleDraft[draftKey] = {
+        property: property,
+        label: labelText,
+        value: normalized,
+        previousValue: styleOriginalValues[draftKey].value || undefined
+      };
+    }
+    if (commentElement) {
+      var nextNode = getNodeInfo(commentElement);
+      commentNode = nextNode;
+      state.selectedNodeId = nextNode.domPath;
+      drawBox(selectedBox, nextNode);
+    }
+  }
+
+  function makeStyleInput(property, labelText, value, options) {
+    var row = document.createElement('label');
+    row.style.cssText = 'display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;min-height:44px;color:#d4d4d4;font:14px/1.2 system-ui,sans-serif;';
+    var labelNode = document.createElement('span');
+    labelNode.textContent = labelText;
+    row.appendChild(labelNode);
+
+    var input;
+    if (options && options.select) {
+      input = document.createElement('select');
+      var hasValue = options.select.some(function(option) {
+        return option.value === value;
+      });
+      if (value && !hasValue) {
+        var currentOption = document.createElement('option');
+        currentOption.value = value;
+        currentOption.textContent = value;
+        input.appendChild(currentOption);
+      }
+      options.select.forEach(function(option) {
+        var optionNode = document.createElement('option');
+        optionNode.value = option.value;
+        optionNode.textContent = option.label;
+        input.appendChild(optionNode);
+      });
+    } else if (options && options.type === 'color') {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;align-items:center;';
+      var colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = colorToHex(value);
+      colorInput.style.cssText = 'width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:transparent;padding:2px;cursor:pointer;';
+      input = document.createElement('input');
+      input.type = 'text';
+      input.value = value || '';
+      input.style.cssText = 'min-width:0;width:100%;height:36px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);color:#e5e5e5;padding:0 12px;outline:0;font:13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;';
+      colorInput.addEventListener('input', function() {
+        input.value = colorInput.value;
+        updateStyleDraft(property, labelText, input.value);
+      });
+      input.addEventListener('input', function() {
+        updateStyleDraft(property, labelText, input.value);
+      });
+      input.addEventListener('change', function() {
+        colorInput.value = colorToHex(input.value);
+        updateStyleDraft(property, labelText, input.value);
+      });
+      styleControlInputs[property] = input;
+      wrap.appendChild(colorInput);
+      wrap.appendChild(input);
+      row.appendChild(wrap);
+      return row;
+    } else {
+      input = document.createElement('input');
+      input.type = options && options.type ? options.type : 'text';
+      if (options && options.step) input.step = options.step;
+      if (options && options.min) input.min = options.min;
+      if (options && options.max) input.max = options.max;
+    }
+    input.value = value || '';
+    input.style.cssText = 'min-width:0;width:100%;height:36px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);color:#e5e5e5;padding:0 12px;outline:0;font:13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;';
+    input.addEventListener('input', function() {
+      updateStyleDraft(property, labelText, input.value);
+    });
+    input.addEventListener('change', function() {
+      updateStyleDraft(property, labelText, input.value);
+    });
+    styleControlInputs[property] = input;
+    row.appendChild(input);
+    return row;
+  }
+
+  function makeSectionTitle(text) {
+    var title = document.createElement('div');
+    title.textContent = text;
+    title.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);color:#fff;font:600 13px/1 system-ui,sans-serif;';
+    return title;
+  }
+
+  function makeTextContentInput() {
+    if (!commentTextElement) return null;
+    var row = document.createElement('label');
+    row.style.cssText = 'display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;min-height:44px;color:#d4d4d4;font:14px/1.2 system-ui,sans-serif;';
+    var labelNode = document.createElement('span');
+    labelNode.textContent = '文本内容';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = getOwnText(commentTextElement) || commentTextElement.textContent || '';
+    input.style.cssText = 'min-width:0;width:100%;height:36px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);color:#e5e5e5;padding:0 12px;outline:0;font:13px/1.2 system-ui,sans-serif;';
+    input.addEventListener('input', function() {
+      if (textOriginalValue === null) textOriginalValue = commentTextElement.textContent || '';
+      textDraftValue = input.value;
+      commentTextElement.textContent = input.value;
+      if (commentElement) {
+        var nextNode = getNodeInfo(commentElement);
+        commentNode = nextNode;
+        drawBox(selectedBox, nextNode);
+      }
+    });
+    row.appendChild(labelNode);
+    row.appendChild(input);
+    return row;
+  }
+
+  function renderStylePanel() {
+    if (!stylePanel || !commentElement || !commentNode) return;
+    stylePanel.innerHTML = '';
+    styleControlInputs = {};
+    var boxComputed = window.getComputedStyle(commentElement);
+    var textComputed = window.getComputedStyle(commentTextElement || commentElement);
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;height:42px;color:#fff;font:600 14px/1 system-ui,sans-serif;';
+    var tag = document.createElement('span');
+    var textLabel = commentTextElement ? ' · 文本 "' + (getOwnText(commentTextElement) || commentTextElement.textContent || '').slice(0, 12) + '"' : '';
+    tag.textContent = (commentNode.tagName || 'element') + textLabel;
+    var drag = document.createElement('span');
+    drag.textContent = '⋮⋮';
+    drag.style.cssText = 'color:#8a8a8a;font:18px/1 system-ui,sans-serif;letter-spacing:1px;';
+    header.appendChild(tag);
+    header.appendChild(drag);
+    stylePanel.appendChild(header);
+    var textInput = makeTextContentInput();
+    if (textInput) {
+      stylePanel.appendChild(makeSectionTitle('文本'));
+      stylePanel.appendChild(textInput);
+    }
+    stylePanel.appendChild(makeStyleInput('color', '文本颜色', textComputed.color, { type: 'color' }));
+    stylePanel.appendChild(makeStyleInput('fontFamily', '字体', textComputed.fontFamily, {
+      select: [
+        { value: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', label: '系统默认' },
+        { value: '"PingFang SC", "Microsoft YaHei", sans-serif', label: '中文黑体' },
+        { value: 'Arial, sans-serif', label: 'Arial' },
+        { value: 'Inter, sans-serif', label: 'Inter' },
+        { value: 'Georgia, serif', label: 'Georgia' },
+        { value: 'ui-monospace, SFMono-Regular, Menlo, monospace', label: '等宽字体' }
+      ]
+    }));
+    stylePanel.appendChild(makeStyleInput('fontSize', '字号', parseFloat(textComputed.fontSize) || '', { type: 'number', min: '1', step: '1' }));
+    stylePanel.appendChild(makeStyleInput('fontWeight', '字重', textComputed.fontWeight, {
+      select: [
+        { value: '300', label: '300' },
+        { value: '400', label: '400' },
+        { value: '500', label: '500' },
+        { value: '600', label: '600' },
+        { value: '700', label: '700' },
+        { value: '800', label: '800' }
+      ]
+    }));
+    stylePanel.appendChild(makeStyleInput('lineHeight', '行高', textComputed.lineHeight, { type: 'number', min: '1', step: '1' }));
+    stylePanel.appendChild(makeStyleInput('textAlign', '文字对齐', textComputed.textAlign, {
+      select: [
+        { value: 'left', label: '左对齐' },
+        { value: 'center', label: '居中' },
+        { value: 'right', label: '右对齐' },
+        { value: 'justify', label: '两端对齐' }
+      ]
+    }));
+    stylePanel.appendChild(makeSectionTitle('外观'));
+    stylePanel.appendChild(makeStyleInput('backgroundColor', '背景', boxComputed.backgroundColor, { type: 'color' }));
+    stylePanel.appendChild(makeStyleInput('opacity', 'Opacity', boxComputed.opacity, { type: 'number', min: '0', max: '1', step: '0.05' }));
+    stylePanel.appendChild(makeStyleInput('borderRadius', '圆角', boxComputed.borderRadius));
+    stylePanel.appendChild(makeSectionTitle('尺寸与间距'));
+    stylePanel.appendChild(makeStyleInput('width', '宽度', boxComputed.width, { type: 'number', min: '0', step: '1' }));
+    stylePanel.appendChild(makeStyleInput('height', '高度', boxComputed.height, { type: 'number', min: '0', step: '1' }));
+    stylePanel.appendChild(makeStyleInput('padding', '内边距', boxComputed.padding));
+    stylePanel.appendChild(makeStyleInput('margin', '外边距', boxComputed.margin));
+    stylePanel.appendChild(makeSectionTitle('布局'));
+    stylePanel.appendChild(makeStyleInput('display', '布局方式', boxComputed.display, {
+      select: [
+        { value: 'block', label: 'Block' },
+        { value: 'inline-block', label: 'Inline block' },
+        { value: 'flex', label: 'Flex' },
+        { value: 'inline-flex', label: 'Inline flex' },
+        { value: 'grid', label: 'Grid' }
+      ]
+    }));
+    stylePanel.appendChild(makeStyleInput('justifyContent', '主轴对齐', boxComputed.justifyContent, {
+      select: [
+        { value: 'flex-start', label: '起始' },
+        { value: 'center', label: '居中' },
+        { value: 'flex-end', label: '末尾' },
+        { value: 'space-between', label: '两端' },
+        { value: 'space-around', label: '环绕' }
+      ]
+    }));
+    stylePanel.appendChild(makeStyleInput('alignItems', '交叉轴对齐', boxComputed.alignItems, {
+      select: [
+        { value: 'stretch', label: '拉伸' },
+        { value: 'flex-start', label: '起始' },
+        { value: 'center', label: '居中' },
+        { value: 'flex-end', label: '末尾' },
+        { value: 'baseline', label: '基线' }
+      ]
+    }));
+    stylePanel.appendChild(makeStyleInput('gap', '间距', boxComputed.gap));
+    var footer = document.createElement('div');
+    footer.style.cssText = 'position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px -12px -12px;padding:10px 12px;background:linear-gradient(to top,rgba(38,38,38,.98),rgba(38,38,38,.92));border-top:1px solid rgba(255,255,255,.08);';
+    var cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.textContent = '取消';
+    cancelButton.style.cssText = 'height:34px;border-radius:999px;border:0;background:rgba(255,255,255,.08);color:#fff;padding:0 14px;font:14px/1 system-ui,sans-serif;cursor:pointer;';
+    cancelButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelStyleEdit();
+    });
+    var confirmButton = document.createElement('button');
+    confirmButton.type = 'button';
+    confirmButton.textContent = '✓';
+    confirmButton.title = '确认样式修改';
+    confirmButton.style.cssText = 'width:36px;height:36px;border-radius:999px;border:0;background:#a3a3a3;color:#111827;font:18px/1 system-ui,sans-serif;cursor:pointer;';
+    confirmButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      confirmStyleEdit();
+    });
+    footer.appendChild(cancelButton);
+    footer.appendChild(confirmButton);
+    stylePanel.appendChild(footer);
+  }
+
+  function toggleStylePanel() {
+    if (!stylePanel || !styleToggleButton) return;
+    var willOpen = stylePanel.style.display === 'none';
+    stylePanel.style.display = willOpen ? 'block' : 'none';
+    styleToggleButton.style.background = willOpen ? '#2563eb' : 'rgba(255,255,255,.08)';
+    styleToggleButton.title = willOpen ? '收起样式编辑' : '展开样式编辑';
+    if (willOpen) renderStylePanel();
+    if (commentNode) positionCommentBubble(commentNode, willOpen);
+  }
+
+  function getStyleChanges() {
+    var changes = Object.keys(styleDraft).map(function(key) {
+      return styleDraft[key];
+    });
+    if (textDraftValue !== null && textDraftValue !== textOriginalValue) {
+      changes.unshift({
+        property: 'textContent',
+        label: '文本内容',
+        value: textDraftValue,
+        previousValue: textOriginalValue || undefined
+      });
+    }
+    return changes;
+  }
+
+  function restoreStyleDraft() {
+    if (commentTextElement && textOriginalValue !== null) {
+      commentTextElement.textContent = textOriginalValue;
+    }
+    if (!commentElement) return;
+    Object.keys(styleOriginalValues).forEach(function(property) {
+      var original = styleOriginalValues[property];
+      if (original && original.element) {
+        original.element.style[original.property] = original.value || '';
+      }
+    });
+    if (commentNode) {
+      var nextNode = getNodeInfo(commentElement);
+      commentNode = nextNode;
+      drawBox(selectedBox, nextNode);
+    }
+  }
+
+  function resetStylePanelState() {
+    styleDraft = {};
+    styleOriginalValues = {};
+    textOriginalValue = null;
+    textDraftValue = null;
+    suppressStyleRestoreOnHide = false;
+    if (stylePanel) stylePanel.style.display = 'none';
+    if (styleToggleButton) {
+      styleToggleButton.style.background = 'rgba(255,255,255,.08)';
+      styleToggleButton.title = '展开样式编辑';
+    }
+  }
+
+  function cancelStyleEdit() {
+    restoreStyleDraft();
+    resetStylePanelState();
+    if (commentNode) positionCommentBubble(commentNode, false);
+    if (commentInput) commentInput.focus();
+  }
+
+  function confirmStyleEdit() {
+    submitComment({ keepStyles: true });
+  }
+
   function clearHover() {
     if (hoverBox) hoverBox.style.display = 'none';
     if (label) label.style.display = 'none';
     lastHoverId = null;
     window.parent.postMessage({ type: 'VISUAL_HOVER', node: null }, '*');
+  }
+
+  function hideCommentBubble() {
+    if (!suppressStyleRestoreOnHide) {
+      restoreStyleDraft();
+    }
+    commentNode = null;
+    commentElement = null;
+    commentTextElement = null;
+    editingAnnotationId = null;
+    if (commentInput) commentInput.value = '';
+    resetStylePanelState();
+    if (commentBubble) commentBubble.style.display = 'none';
+  }
+
+  function deleteEditingAnnotationIfEmpty() {
+    if (!editingAnnotationId || !commentNode || !commentInput) return false;
+    if (commentInput.value.trim()) return false;
+    if (getStyleChanges().length > 0) return false;
+    window.parent.postMessage({ type: 'VISUAL_ANNOTATION_CREATE', node: commentNode, text: '', annotationId: editingAnnotationId }, '*');
+    return true;
+  }
+
+  function dismissCommentBubble(options) {
+    if (options && options.deleteEmptyAnnotation) {
+      deleteEditingAnnotationIfEmpty();
+    }
+    hideCommentBubble();
+  }
+
+  function submitComment(options) {
+    if (!commentNode || !commentInput) return;
+    var styleChanges = getStyleChanges();
+    var text = commentInput.value.trim();
+    if (!text && styleChanges.length === 0) {
+      deleteEditingAnnotationIfEmpty();
+      hideCommentBubble();
+      return;
+    }
+    if ((options && options.keepStyles) || styleChanges.length > 0) {
+      suppressStyleRestoreOnHide = true;
+    }
+    window.parent.postMessage({
+      type: 'VISUAL_ANNOTATION_CREATE',
+      node: commentNode,
+      text: text,
+      annotationId: editingAnnotationId || undefined,
+      styleChanges: styleChanges
+    }, '*');
+    hideCommentBubble();
+  }
+
+  function positionCommentBubble(node, expanded) {
+    if (!commentBubble || !node) return;
+    var bubbleWidth = Math.min(520, Math.max(260, window.innerWidth - 24));
+    var estimatedHeight = expanded ? Math.min(420, window.innerHeight - 24) : 56;
+    var left = Math.max(12, Math.min(window.innerWidth - bubbleWidth - 12, node.rect.x + node.rect.width / 2 - bubbleWidth / 2));
+    var below = node.rect.y + node.rect.height + 12;
+    var top = below + estimatedHeight < window.innerHeight ? below : Math.max(12, node.rect.y - estimatedHeight - 12);
+    commentBubble.style.left = left + 'px';
+    commentBubble.style.top = top + 'px';
+    commentBubble.style.width = bubbleWidth + 'px';
+  }
+
+  function showCommentBubble(node, initialText, annotationId) {
+    ensureLayer();
+    if (!commentBubble || !commentInput || !node) return;
+    commentNode = node;
+    commentElement = getElementForNode(node);
+    commentTextElement = findTextEditElement(commentElement);
+    editingAnnotationId = annotationId || null;
+    styleDraft = {};
+    styleOriginalValues = {};
+    textOriginalValue = null;
+    textDraftValue = null;
+    suppressStyleRestoreOnHide = false;
+    commentInput.value = initialText || '';
+    if (stylePanel) stylePanel.style.display = 'none';
+    if (styleToggleButton) {
+      styleToggleButton.style.background = 'rgba(255,255,255,.08)';
+      styleToggleButton.title = '展开样式编辑';
+    }
+    positionCommentBubble(node, false);
+    commentBubble.style.display = 'flex';
+    setTimeout(function() { commentInput && commentInput.focus(); }, 0);
   }
 
   function redrawSelection() {
@@ -203,12 +761,17 @@ const visualEditScript = `
       pin.type = 'button';
       pin.title = annotation.text || '批注';
       pin.textContent = '●';
-      pin.style.cssText = 'position:absolute;pointer-events:auto;width:18px;height:18px;border-radius:999px;border:2px solid white;background:#f59e0b;color:#f59e0b;box-shadow:0 2px 8px rgba(15,23,42,.25);font-size:0;left:' + Math.max(2, rect.right - 9) + 'px;top:' + Math.max(2, rect.top - 9) + 'px;';
-      pin.addEventListener('click', function(event) {
+      pin.style.cssText = 'position:absolute;pointer-events:auto;width:24px;height:24px;border-radius:999px;border:3px solid white;background:#f59e0b;color:#f59e0b;box-shadow:0 2px 8px rgba(15,23,42,.25);font-size:0;cursor:pointer;left:' + Math.max(2, rect.right - 12) + 'px;top:' + Math.max(2, rect.top - 12) + 'px;';
+      function openAnnotation(event) {
         event.preventDefault();
         event.stopPropagation();
-        window.parent.postMessage({ type: 'VISUAL_ANNOTATION_CREATE', node: getNodeInfo(el), annotationId: annotation.id }, '*');
-      });
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        var node = getNodeInfo(el);
+        showCommentBubble(node, annotation.text || '', annotation.id);
+        window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+      }
+      pin.addEventListener('pointerdown', openAnnotation, true);
+      pin.addEventListener('click', openAnnotation, true);
       annotationLayer.appendChild(pin);
     });
   }
@@ -216,12 +779,14 @@ const visualEditScript = `
   function setState(next) {
     state = {
       enabled: !!next.enabled,
+      annotationMode: !!next.annotationMode,
       selectedNodeId: next.selectedNodeId || null,
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
     ensureLayer();
     if (!state.enabled) {
       clearHover();
+      hideCommentBubble();
       if (selectedBox) selectedBox.style.display = 'none';
     }
     redrawSelection();
@@ -237,9 +802,21 @@ const visualEditScript = `
     return null;
   }
 
+  function resolveAnnotationTarget(el) {
+    if (!el) return el;
+    if (findTextEditElement(el)) return el;
+    var node = el.parentElement;
+    while (node && node !== document.body) {
+      if (isEditableElement(node) && findTextEditElement(node)) return node;
+      node = node.parentElement;
+    }
+    return el;
+  }
+
   document.addEventListener('mousemove', function(event) {
     if (!state.enabled) return;
     var el = closestEditable(event.target);
+    if (state.annotationMode) el = resolveAnnotationTarget(el);
     if (!el) {
       clearHover();
       return;
@@ -255,6 +832,12 @@ const visualEditScript = `
   document.addEventListener('click', function(event) {
     if (!state.enabled) return;
     if (isOverlay(event.target)) return;
+    if (commentBubble && commentBubble.style.display !== 'none') {
+      dismissCommentBubble({ deleteEmptyAnnotation: true });
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     var el = closestEditable(event.target);
     event.preventDefault();
     event.stopPropagation();
@@ -264,9 +847,23 @@ const visualEditScript = `
     }
     var node = getNodeInfo(el);
     state.selectedNodeId = node.domPath;
-    redrawSelection();
+    drawBox(selectedBox, node);
+    if (state.annotationMode) {
+      showCommentBubble(node);
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+      return;
+    }
     window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
   }, true);
+
+  window.addEventListener('blur', function() {
+    if (!commentBubble || commentBubble.style.display === 'none') return;
+    if (!editingAnnotationId || !commentInput || commentInput.value.trim()) return;
+    setTimeout(function() {
+      if (document.hasFocus()) return;
+      dismissCommentBubble({ deleteEmptyAnnotation: true });
+    }, 0);
+  });
 
   document.addEventListener('dblclick', function(event) {
     if (!state.enabled) return;

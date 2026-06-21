@@ -61,12 +61,20 @@ export interface VisualNodeInfo {
   editCapabilities: Array<'annotate' | 'text' | 'className' | 'structure'>;
 }
 
+export interface VisualStyleChange {
+  property: string;
+  label: string;
+  value: string;
+  previousValue?: string;
+}
+
 export interface VisualAnnotation {
   id: string;
   nodeId: string;
   domPath: string;
   text: string;
   createdAt: number;
+  styleChanges?: VisualStyleChange[];
   resolved?: boolean;
   patchId?: string;
 }

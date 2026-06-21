@@ -4,6 +4,7 @@ import type {
   VisualAnnotation,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualStyleChange,
 } from "./iframe-types";
 
 export type {
@@ -16,6 +17,7 @@ export type {
   VisualInlineEditPayload,
   VisualNodeInfo,
   VisualNodeRect,
+  VisualStyleChange,
 } from "./iframe-types";
 
 export interface PreviewSize {
@@ -75,7 +77,13 @@ export interface PreviewPanelProps {
   onVisualHover?: (node: VisualNodeInfo | null) => void;
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
-  onVisualAnnotationCreate?: (node: VisualNodeInfo) => void;
+  visualAnnotationMode?: boolean;
+  onVisualAnnotationCreate?: (
+    node: VisualNodeInfo,
+    text?: string,
+    annotationId?: string,
+    styleChanges?: VisualStyleChange[],
+  ) => void;
 }
 
 export interface ConfigFormProps {
@@ -172,4 +180,3 @@ export interface PreviewState {
   mode: PreviewMode;
   activePageId: string;
 }
-

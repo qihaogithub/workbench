@@ -127,7 +127,11 @@ export function ChatInput({
         <PromptInputAttachmentsDisplay />
       </PromptInputHeader>
       <PromptInputBody>
-        <PromptInputTextarea placeholder="输入指令，按 Enter 发送..." />
+        <PromptInputTextarea
+          placeholder="输入指令，按 Enter 发送..."
+          minHeight={40}
+          maxHeight={140}
+        />
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
