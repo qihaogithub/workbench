@@ -1,11 +1,13 @@
 import {
   createScreenshotServiceUnavailableResponse,
-  getScreenshotServiceUrl,
+  createScreenshotProxyTimeoutResponse,
+  fetchScreenshotService,
+  isAbortError,
 } from "@/lib/screenshot-service";
 
 export async function GET() {
   try {
-    const response = await fetch(`${getScreenshotServiceUrl()}/health`, {
+    const response = await fetchScreenshotService("/health", {
       cache: "no-store",
     });
 
@@ -18,7 +20,10 @@ export async function GET() {
       success: true,
       data,
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      return createScreenshotProxyTimeoutResponse();
+    }
     return createScreenshotServiceUnavailableResponse();
   }
 }

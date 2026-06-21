@@ -70,6 +70,29 @@ function getDeletedPagesFromToolResult(event: any): Array<{ pageId: string; dele
   return details.deletedPages.filter((page: any) => typeof page?.pageId === 'string');
 }
 
+function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; description?: string }>): string {
+  if (!activeTools.length) return '';
+
+  const lines = activeTools
+    .filter((tool) => typeof tool.name === 'string' && tool.name.trim().length > 0)
+    .map((tool) => {
+      const description = typeof tool.description === 'string' && tool.description.trim()
+        ? `：${tool.description.trim()}`
+        : '';
+      return `- \`${tool.name}\`${description}`;
+    });
+
+  if (!lines.length) return '';
+
+  return [
+    '## 当前实际可用工具',
+    '',
+    '以下列表由运行时 activeTools 自动注入，代表你本轮真正可以调用的工具；如果这里列出了 `delegateTask`，你就可以使用子 Agent。',
+    '',
+    ...lines,
+  ].join('\n');
+}
+
 // 动态导入 ESM-only 依赖
 let AgentHarness: any;
 let NodeExecutionEnv: any;
@@ -421,7 +444,7 @@ export class PiAgentBackend implements IBackendAdapter {
       return;
     }
 
-    if (toolName === 'deletePage' || toolName === 'deletePages') {
+    if (toolName === 'deletePage' || toolName === 'deletePages' || toolName === 'executeDeletePagePlan') {
       const deletedPages = getDeletedPagesFromToolResult(event);
       const changedPaths = new Set<string>();
       for (const page of deletedPages) {
@@ -463,10 +486,10 @@ export class PiAgentBackend implements IBackendAdapter {
       if (toolName === 'writeFile' || toolName === 'editFile') {
         const schemaPath = (input as any).path;
         if (schemaPath && String(schemaPath).replace(/\\/g, '/').endsWith('config.schema.json')) {
-          if (!this.readKnowledgeFiles.has('閰嶇疆绯荤粺鍙傝€?md')) {
+          if (!this.readKnowledgeFiles.has('配置系统参考.md')) {
             return {
               block: true,
-              reason: '淇敼 config.schema.json 鍓嶏紝璇峰厛鐢?readFile 璇诲彇 knowledge/閰嶇疆绯荤粺鍙傝€?md锛屼簡瑙ｇ郴缁熸敮鎸佺殑鎺т欢绫诲瀷銆佹墿灞曞瓧娈靛拰閰嶇疆瑙勮寖锛岄伩鍏嶇敓鎴愭棤鏁?schema銆?',
+              reason: '修改 config.schema.json 前，请先用 readFile 读取 knowledge/配置系统参考.md，了解系统支持的控件类型、扩展字段和配置规范，避免生成无效 schema。',
             };
           }
         }
@@ -494,7 +517,7 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private buildSubagentSystemPrompt(): string {
-    const basePrompt = this.currentSystemPrompt || '# Workbench AI 缂栫爜鍔╂墜';
+    const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手';
     return `${basePrompt}
 
 # Subagent Mode
@@ -587,7 +610,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
         });
       }
 
-      if ((toolName === 'deletePage' || toolName === 'deletePages') && !isError) {
+      if ((toolName === 'deletePage' || toolName === 'deletePages' || toolName === 'executeDeletePagePlan') && !isError) {
         const deletedPages = getDeletedPagesFromToolResult(event);
         const changedPaths = new Set<string>();
         for (const page of deletedPages) {
@@ -624,10 +647,10 @@ Keep the final response concise: summarize what you changed, what you verified, 
    * deletePage 权限确认：发出 permission_request 事件，等待用户确认或超时
    * 此方法由 deletePage 工具的 execute 函数调用（异步等待）
    */
-  private requestPermission(toolCallId: string, pageName: string): Promise<boolean> {
+  private requestPermission(toolCallId: string, request: Parameters<PermissionHandler>[1]): Promise<boolean> {
     const sessionId = this.sessionId ?? this.config.sessionId;
 
-    logger.info({ toolCallId, pageName }, 'deletePage: requesting permission');
+    logger.info({ toolCallId, request }, 'deletePage: requesting permission');
 
     // 发出 permission_request 事件，等待前端用户确认
     if (this.eventCallback) {
@@ -642,8 +665,10 @@ Keep the final response concise: summarize what you changed, what you verified, 
           ],
           toolCall: {
             toolCallId,
-            title: `删除页面: ${pageName}`,
+            title: request.title,
             kind: 'execute',
+            summary: request.summary,
+            planId: request.planId,
           },
         },
       });
@@ -808,6 +833,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
       });
       this.activeSubagents.add(harness);
       this.setupToolHooks(harness, unsubs);
+
+      if (controller.signal.aborted) {
+        await harness.abort().catch(() => undefined);
+        throw new Error(timeoutHit ? 'Subagent timed out' : 'Subagent aborted');
+      }
 
       const prompt = [
         '# Delegated Task',
@@ -1147,7 +1177,9 @@ Keep the final response concise: summarize what you changed, what you verified, 
     activeTools: any[];
     resources: any;
   }): string {
-    return this.currentSystemPrompt || '# Workbench AI 编码助手\n\n等待 system prompt 注入...';
+    const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手\n\n等待 system prompt 注入...';
+    const runtimeTools = formatRuntimeToolsForPrompt(context.activeTools || []);
+    return runtimeTools ? `${basePrompt}\n\n${runtimeTools}` : basePrompt;
   }
 
   /**

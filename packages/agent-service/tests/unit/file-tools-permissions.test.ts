@@ -105,7 +105,7 @@ describe('createBashTool - 权限感知', () => {
     vi.clearAllMocks();
   });
 
-  it('白名单命令 npm 应放行', async () => {
+  it('npm 应被拒绝，避免绕过专用工具写入工作区', async () => {
     const { exec } = await import('child_process');
     const execMock = exec as any;
     execMock.mockImplementation((cmd: string, opts: any, cb: any) => {
@@ -142,8 +142,14 @@ describe('createWorkbenchTools - permissions 透传', () => {
       },
     };
     const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
-    const tools = createWorkbenchTools(customConfig);
-    expect(tools).toHaveLength(14);
+    const tools = createWorkbenchTools(customConfig, undefined, {
+      subagentRunner: async () => ({
+        success: true,
+        content: 'ok',
+        durationMs: 1,
+      }),
+    });
+    expect(tools).toHaveLength(17);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);

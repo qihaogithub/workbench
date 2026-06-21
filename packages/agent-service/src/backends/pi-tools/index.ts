@@ -9,8 +9,18 @@ import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createListImagesTool } from './list-images-tool';
 import { createCaptureScreenshotTool } from './screenshot-tool';
-import { createDeletePageTool, createDeletePagesTool, createListPagesTool, type PermissionHandler } from './delete-page-tool';
+import {
+  createDeletePageTool,
+  createDeletePagesTool,
+  createDeletionPlanStore,
+  createExecuteDeletePagePlanTool,
+  createListPagesTool,
+  createPreviewDeletePagesTool,
+  type PermissionHandler,
+} from './delete-page-tool';
 import { createDelegateTaskTool, type SubagentRunner } from './subagent-tool';
+
+export const WORKBENCH_TOOL_VERSION = 3;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from './subagent-tool';
@@ -25,6 +35,7 @@ export function createWorkbenchTools(
   permissionHandler?: PermissionHandler,
   options: WorkbenchToolsOptions = {},
 ): AgentTool[] {
+  const deletionPlanStore = createDeletionPlanStore();
   const tools: AgentTool[] = [
     createReadFileTool(config),
     createReadFileLinesTool(config),
@@ -38,6 +49,8 @@ export function createWorkbenchTools(
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
     createListPagesTool(config),
+    createPreviewDeletePagesTool(config, deletionPlanStore),
+    createExecuteDeletePagePlanTool(config, deletionPlanStore, permissionHandler),
     createDeletePageTool(config, permissionHandler),
     createDeletePagesTool(config, permissionHandler),
   ];
@@ -47,4 +60,14 @@ export function createWorkbenchTools(
   }
 
   return tools;
+}
+
+export function getWorkbenchToolCapabilities(): { toolVersion: number; toolNames: string[] } {
+  const tools = createWorkbenchTools({ sessionId: 'capabilities' }, undefined, {
+    includeDelegateTask: false,
+  });
+  return {
+    toolVersion: WORKBENCH_TOOL_VERSION,
+    toolNames: tools.map((tool) => tool.name),
+  };
 }

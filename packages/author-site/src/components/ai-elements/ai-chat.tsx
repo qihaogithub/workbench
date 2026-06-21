@@ -317,6 +317,15 @@ export function AIChat({
         </div>
       )}
 
+      {pendingPermissionRequest && (
+        <PermissionDialog
+          request={pendingPermissionRequest}
+          onRespond={handlePermissionResponse}
+          onCancel={handlePermissionCancel}
+          variant="inline"
+        />
+      )}
+
       <ChatPlan plan={plan} isStreaming={isStreaming} />
 
       {errorBanner}
@@ -346,13 +355,6 @@ export function AIChat({
         onNewSession={onNewSession || (() => {})}
       />
 
-      {pendingPermissionRequest && (
-        <PermissionDialog
-          request={pendingPermissionRequest}
-          onRespond={handlePermissionResponse}
-          onCancel={handlePermissionCancel}
-        />
-      )}
     </div>
   );
 }

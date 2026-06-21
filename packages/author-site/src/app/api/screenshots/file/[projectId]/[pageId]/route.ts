@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 import { findProjectRoot } from "@/lib/fs-utils";
-import { getScreenshotServiceUrl } from "@/lib/screenshot-service";
+import { fetchScreenshotService } from "@/lib/screenshot-service";
 
 const DATA_DIR =
   process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
@@ -11,6 +11,11 @@ const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
 
 interface ScreenshotMeta {
   currentHash: string;
+}
+
+function normalizeHash(hash?: string | null): string | null {
+  if (!hash) return null;
+  return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
 }
 
 function readScreenshotMeta(
@@ -32,8 +37,8 @@ async function proxyScreenshotFile(
   search: string,
 ): Promise<Response | null> {
   try {
-    const response = await fetch(
-      `${getScreenshotServiceUrl()}/api/screenshots/file/${encodeURIComponent(
+    const response = await fetchScreenshotService(
+      `/api/screenshots/file/${encodeURIComponent(
         projectId,
       )}/${encodeURIComponent(pageId)}${search}`,
     );
@@ -59,14 +64,22 @@ async function proxyScreenshotFile(
 function readLocalScreenshot(
   projectId: string,
   pageId: string,
+  hash?: string | null,
 ): Buffer | null {
   const projectDir = path.join(SCREENSHOTS_DIR, projectId);
   if (!fs.existsSync(projectDir)) return null;
 
-  const meta = readScreenshotMeta(projectId, pageId);
-  const filePath = meta?.currentHash
-    ? path.join(projectDir, `${pageId}.${meta.currentHash}.png`)
-    : path.join(projectDir, `${pageId}.png`);
+  const normalizedHash = normalizeHash(hash);
+  if (hash && !normalizedHash) return null;
+
+  const filePath = normalizedHash
+    ? path.join(projectDir, `${pageId}.${normalizedHash}.png`)
+    : (() => {
+        const meta = readScreenshotMeta(projectId, pageId);
+        return meta?.currentHash
+          ? path.join(projectDir, `${pageId}.${meta.currentHash}.png`)
+          : path.join(projectDir, `${pageId}.png`);
+      })();
 
   try {
     return fs.readFileSync(filePath);
@@ -87,7 +100,9 @@ export async function GET(
   );
   if (proxied) return proxied;
 
-  const buffer = readLocalScreenshot(projectId, pageId);
+  const rawHash = request.nextUrl.searchParams.get("hash");
+  const hash = normalizeHash(rawHash);
+  const buffer = readLocalScreenshot(projectId, pageId, rawHash);
   if (!buffer) {
     return NextResponse.json(
       {
@@ -101,7 +116,9 @@ export async function GET(
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": hash
+        ? "public, max-age=31536000, immutable"
+        : "no-store",
     },
   });
 }

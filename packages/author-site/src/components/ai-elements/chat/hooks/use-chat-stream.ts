@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
 import type { StreamEvent, ImageAttachment } from "@opencode-workbench/agent-client";
 import {
+  MissingTransactionalDeleteToolsError,
   StreamService,
   type PermissionRequest,
 } from "../services/stream-service";
@@ -36,6 +37,12 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   content: "",
   parts: [],
 };
+
+function isBulkPageDeletionRequest(message: string): boolean {
+  return /删|删除|清理/.test(message) &&
+    /页面|页/.test(message) &&
+    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message);
+}
 
 interface UseChatStreamOptions {
   sessionId: string;
@@ -475,9 +482,8 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         await streamService.waitForConnection(stream);
 
-        // v3.2: sendMessage 是 async，等待 L3 拼装完再发送
-        // fire-and-forget：不让发送等待阻塞 UI，但 L3 fetch 顺序保证
-        void streamService.sendMessage(
+        // 等待 L3 / capabilities 拼装完成再发送，确保能力缺失能被当前流程捕获
+        await streamService.sendMessage(
           userMessage,
           workingDir,
           images,
@@ -487,7 +493,35 @@ export function useChatStream(options: UseChatStreamOptions) {
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
+        if (error instanceof MissingTransactionalDeleteToolsError) {
+          streamServiceRef.current?.close();
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content: error.message,
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          setStreamContent("");
+          setIsStreaming(false);
+          stopSilenceTracking();
+          return;
+        }
+
         console.warn("WebSocket 失败，使用非流式模式:", error);
+
+        if (isBulkPageDeletionRequest(userMessage)) {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content: "当前无法建立安全的事务化删除通道。请确认 Agent Service 已重启并刷新页面后再试。",
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          setStreamContent("");
+          setIsStreaming(false);
+          stopSilenceTracking();
+          streamServiceRef.current?.close();
+          return;
+        }
 
         try {
           const { getAgentClient } = await import("@/lib/agent-client");

@@ -8,7 +8,6 @@ import {
   Maximize,
   Hand,
   MousePointer2,
-  RefreshCw,
 } from "lucide-react";
 import type { CanvasToolMode } from "./types";
 
@@ -19,8 +18,6 @@ interface CanvasToolbarProps {
   onFitToScreen?: () => void;
   toolMode?: CanvasToolMode;
   onToolModeChange?: (mode: CanvasToolMode) => void;
-  screenshotServiceAvailable?: boolean | null;
-  onScreenshotServiceRetry?: () => void;
 }
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
@@ -32,8 +29,6 @@ export function CanvasToolbar({
   onFitToScreen,
   toolMode = "hand",
   onToolModeChange,
-  screenshotServiceAvailable,
-  onScreenshotServiceRetry,
 }: CanvasToolbarProps) {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,24 +49,6 @@ export function CanvasToolbar({
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-background/80 backdrop-blur border rounded-lg shadow p-1">
-      {screenshotServiceAvailable === false && (
-        <>
-          <div className="px-2 text-xs text-amber-700 whitespace-nowrap">
-            截图服务离线，正在使用实时预览
-          </div>
-          {onScreenshotServiceRetry && (
-            <button
-              type="button"
-              onClick={onScreenshotServiceRetry}
-              className="p-1.5 hover:bg-muted rounded"
-              title="重试截图服务"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          )}
-          <div className="w-px h-5 bg-border mx-0.5" />
-        </>
-      )}
       {/* 工具模式切换 */}
       {onToolModeChange && (
         <>

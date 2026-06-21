@@ -56,9 +56,10 @@ interface AssistantMessageProps {
   onRollback?: (targetAssistantId: string) => void;
 }
 
-function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
+function getToolKind(toolName?: string): "read" | "edit" | "execute" | "delegate" | "other" {
   if (!toolName) return "other";
   const name = toolName.toLowerCase();
+  if (name.includes("delegatetask") || name.includes("subagent")) return "delegate";
   if (
     name.includes("read") ||
     name.includes("get") ||
@@ -100,6 +101,7 @@ function getToolIcon(toolKind: string) {
   if (toolKind === "read") return Eye;
   if (toolKind === "edit") return Edit3;
   if (toolKind === "execute") return Terminal;
+  if (toolKind === "delegate") return Sparkles;
   return Wrench;
 }
 
@@ -107,14 +109,21 @@ function getToolGroupLabel(toolKind: string): string {
   if (toolKind === "read") return "读取文件";
   if (toolKind === "edit") return "编辑文件";
   if (toolKind === "execute") return "执行命令";
+  if (toolKind === "delegate") return "子 Agent";
   return "工具操作";
 }
 
 function getToolActionText(part: ToolPart): string {
   const name = (part.toolName || "").toLowerCase();
+  const task = part.parameters?.task;
   const path = (part.parameters?.path || part.parameters?.file_path) as
     | string
     | undefined;
+  if (name.includes("delegatetask") || name.includes("subagent")) {
+    return typeof task === "string" && task.trim()
+      ? `委派子 Agent：${task.trim()}`
+      : "委派子 Agent";
+  }
   if (
     name.includes("read") ||
     name.includes("search") ||
@@ -140,6 +149,129 @@ function getToolActionText(part: ToolPart): string {
     return "执行命令";
   }
   return part.toolName || "未知操作";
+}
+
+function isDelegateTask(part: ToolPart): boolean {
+  return getToolKind(part.toolName) === "delegate";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractResultText(result: unknown): string | undefined {
+  if (typeof result === "string") return result;
+  if (!isRecord(result)) return undefined;
+
+  const content = result.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const text = content
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (isRecord(item) && typeof item.text === "string") return item.text;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    return text || undefined;
+  }
+
+  return undefined;
+}
+
+function getSubagentDetails(part: ToolPart): Record<string, unknown> | undefined {
+  if (!isRecord(part.result)) return undefined;
+  if (isRecord(part.result.details)) return part.result.details;
+  if (
+    "success" in part.result ||
+    "durationMs" in part.result ||
+    "files" in part.result
+  ) {
+    return part.result;
+  }
+  return undefined;
+}
+
+function formatDuration(durationMs?: number): string | undefined {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+    return undefined;
+  }
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
+function getFilePath(file: unknown): string | undefined {
+  if (typeof file === "string") return file;
+  if (!isRecord(file)) return undefined;
+  const path = file.path ?? file.filePath ?? file.name;
+  return typeof path === "string" ? path : undefined;
+}
+
+type SubagentDisplayStatus =
+  | "running"
+  | "completed"
+  | "error"
+  | "aborted"
+  | "timeout";
+
+function getSubagentDisplay(part: ToolPart) {
+  const details = getSubagentDetails(part);
+  const task =
+    typeof part.parameters?.task === "string" && part.parameters.task.trim()
+      ? part.parameters.task.trim()
+      : "子 Agent 任务";
+  const context =
+    typeof part.parameters?.context === "string" && part.parameters.context.trim()
+      ? part.parameters.context.trim()
+      : undefined;
+  const success = typeof details?.success === "boolean" ? details.success : undefined;
+  const content =
+    (typeof details?.content === "string" && details.content) ||
+    extractResultText(part.result);
+  const error =
+    (typeof details?.error === "string" && details.error) ||
+    (part.status === "error" ? content : undefined);
+  const files = Array.isArray(details?.files) ? details.files : [];
+  const durationMs =
+    typeof details?.durationMs === "number"
+      ? details.durationMs
+      : typeof part.duration === "number"
+        ? part.duration
+        : undefined;
+  const lowerFailure = `${error ?? ""} ${content ?? ""}`.toLowerCase();
+
+  let status: SubagentDisplayStatus = "completed";
+  if (part.status === "running") status = "running";
+  else if (success === true) status = "completed";
+  else if (lowerFailure.includes("timed out") || lowerFailure.includes("timeout")) {
+    status = "timeout";
+  } else if (lowerFailure.includes("aborted") || lowerFailure.includes("abort")) {
+    status = "aborted";
+  } else if (part.status === "error" || success === false) {
+    status = "error";
+  }
+
+  return {
+    task,
+    context,
+    status,
+    content,
+    error,
+    files,
+    durationText: formatDuration(durationMs),
+  };
+}
+
+function getSubagentStatusText(status: SubagentDisplayStatus): string {
+  if (status === "running") return "运行中";
+  if (status === "completed") return "已完成";
+  if (status === "timeout") return "超时未完成";
+  if (status === "aborted") return "已取消";
+  return "执行失败";
 }
 
 export function AssistantMessage({
@@ -393,6 +525,15 @@ export function AssistantMessage({
 
         if (block.type === "tool-single") {
           const part = block.part;
+          if (isDelegateTask(part)) {
+            return (
+              <SubagentTaskBlock
+                key={`tool-single-${index}`}
+                part={part}
+              />
+            );
+          }
+
           const toolKind = getToolKind(part.toolName);
           const Icon = getToolIcon(toolKind);
           const actionText = getToolActionText(part);
@@ -412,6 +553,19 @@ export function AssistantMessage({
         }
 
         if (block.type === "tool-group") {
+          if (block.toolKind === "delegate") {
+            return (
+              <div key={`tool-group-${index}`} className="space-y-1">
+                {block.parts.map((part, partIndex) => (
+                  <SubagentTaskBlock
+                    key={`delegate-${part.toolCallId || partIndex}`}
+                    part={part}
+                  />
+                ))}
+              </div>
+            );
+          }
+
           const Icon = getToolIcon(block.toolKind);
           const label = getToolGroupLabel(block.toolKind);
           const hasRunning = block.parts.some((p) => p.status === "running");
@@ -554,6 +708,138 @@ function ToolCallGroup({
   );
 }
 
+function SubagentTaskBlock({ part }: { part: ToolPart }) {
+  const [open, setOpen] = useState(false);
+  const display = getSubagentDisplay(part);
+  const statusText = getSubagentStatusText(display.status);
+  const filePaths = display.files.map(getFilePath).filter(Boolean) as string[];
+  const isRunning = display.status === "running";
+  const isFailed =
+    display.status === "error" ||
+    display.status === "timeout" ||
+    display.status === "aborted";
+  const summaryParts = [statusText];
+
+  if (display.durationText) summaryParts.push(display.durationText);
+  if (filePaths.length > 0) summaryParts.push(`修改 ${filePaths.length} 个文件`);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="rounded-md border border-border/30 bg-muted/20 overflow-hidden">
+        <CollapsibleTrigger className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted/40 min-w-0">
+          <Sparkles
+            className={cn(
+              "h-3.5 w-3.5 flex-shrink-0",
+              isRunning && "animate-pulse text-yellow-500",
+              !isRunning && !isFailed && "text-green-500",
+              isFailed && "text-red-500",
+            )}
+          />
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            <span className="font-medium text-foreground/80">
+              {isRunning ? "子 Agent 正在处理" : "委派子 Agent"}
+            </span>
+            ：{display.task}
+          </span>
+          <span
+            className={cn(
+              "hidden flex-shrink-0 text-[11px] sm:inline",
+              isRunning && "text-yellow-600",
+              !isRunning && !isFailed && "text-green-600",
+              isFailed && "text-red-600",
+            )}
+          >
+            {summaryParts.join(" · ")}
+          </span>
+          {isRunning && (
+            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/60" />
+          )}
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 text-muted-foreground/40 transition-transform flex-shrink-0",
+              open && "rotate-180",
+            )}
+          />
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="space-y-2 border-t border-border/30 px-3 py-2.5 text-xs">
+            <SubagentDetail label="委派任务" value={display.task} />
+            {display.context && (
+              <SubagentDetail label="补充上下文" value={display.context} />
+            )}
+            <SubagentDetail
+              label="状态"
+              value={[
+                statusText,
+                display.durationText,
+                filePaths.length > 0 ? `修改 ${filePaths.length} 个文件` : undefined,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+            {display.content && (
+              <SubagentDetail
+                label={isFailed ? "失败信息" : "子 Agent 摘要"}
+                value={display.content}
+                markdown
+              />
+            )}
+            {!display.content && display.error && (
+              <SubagentDetail label="失败原因" value={display.error} />
+            )}
+            {filePaths.length > 0 && (
+              <div>
+                <div className="mb-1 text-[10px] font-medium text-muted-foreground">
+                  文件变更
+                </div>
+                <ul className="space-y-0.5">
+                  {filePaths.map((path, index) => (
+                    <li
+                      key={`${path}-${index}`}
+                      className="truncate rounded bg-background/50 px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                      title={path}
+                    >
+                      {path}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
+function SubagentDetail({
+  label,
+  value,
+  markdown = false,
+}: {
+  label: string;
+  value: string;
+  markdown?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-medium text-muted-foreground">
+        {label}
+      </div>
+      <div className="min-w-0 rounded bg-background/50 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
+        {markdown ? (
+          <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+            {value}
+          </Streamdown>
+        ) : (
+          <span className="break-words">{value}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ExecutionPhase({
   parts,
   isStreaming,
@@ -602,10 +888,16 @@ function ExecutionPhase({
   }, [isStreaming, isComplete]);
 
   const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
-  const toolCount = parts.filter((p) => p.type === "tool").length;
+  const delegateCount = parts.filter(
+    (p) => p.type === "tool" && isDelegateTask(p),
+  ).length;
+  const toolCount = parts.filter(
+    (p) => p.type === "tool" && !isDelegateTask(p),
+  ).length;
 
   const summaryParts: string[] = [];
   if (reasoningCount > 0) summaryParts.push(`${reasoningCount} 次思考`);
+  if (delegateCount > 0) summaryParts.push(`${delegateCount} 个子 Agent`);
   if (toolCount > 0) summaryParts.push(`${toolCount} 次工具调用`);
 
   const hasRunning = parts.some(
@@ -657,6 +949,15 @@ function ExecutionPhase({
               }
 
               if (part.type === "tool") {
+                if (isDelegateTask(part)) {
+                  return (
+                    <SubagentTaskBlock
+                      key={`exec-subagent-${i}`}
+                      part={part}
+                    />
+                  );
+                }
+
                 const toolKind = getToolKind(part.toolName);
                 const Icon = getToolIcon(toolKind);
                 const actionText = getToolActionText(part);

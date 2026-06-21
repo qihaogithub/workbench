@@ -18,6 +18,7 @@ import { getSessionModelConfigs } from "../config/session-model-configs";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
+import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
@@ -179,6 +180,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
               };
 
@@ -365,6 +367,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),
               };
 
@@ -484,6 +487,7 @@ export async function registerWebSocketRoutes(
                   workingDir: message.workingDir || process.cwd(),
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
+                  toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                 };
                 agent = manager.getOrCreate(sessionId, config);
@@ -503,6 +507,7 @@ export async function registerWebSocketRoutes(
                   ...agent.getConfig(),
                   workingDir: message.workingDir || agent.getConfig().workingDir,
                   demoId: message.demoId || agent.getConfig().demoId,
+                  toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                 });
               }

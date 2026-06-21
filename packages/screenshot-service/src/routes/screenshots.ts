@@ -1,8 +1,15 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { randomUUID } from "crypto";
 import { config } from "../config";
 import { getBrowserPool } from "../utils/browser-pool";
 import { compileCode } from "../utils/compile-client";
 import { getCompileCache } from "../utils/compile-cache";
+import {
+  ScreenshotError,
+  getErrorMessage,
+  getScreenshotErrorCode,
+  type ScreenshotErrorCode,
+} from "../utils/errors";
 import {
   computeScreenshotHash,
   screenshotExists,
@@ -49,6 +56,7 @@ interface BatchResult {
   elapsed?: number;
   cached?: boolean;
   status: "pending" | "rendering" | "done" | "failed";
+  errorCode?: ScreenshotErrorCode;
   error?: string;
 }
 
@@ -60,13 +68,78 @@ interface BatchState {
   completed: number;
   failed: number;
   cached: number;
-  status: "running" | "completed";
+  status: "running" | "completed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  cancelled: boolean;
+  errorsByCode: Partial<Record<ScreenshotErrorCode, number>>;
 }
 
 const batchStore = new Map<string, BatchState>();
+const inFlightScreenshots = new Map<string, Promise<GenerateScreenshotResult>>();
+
+interface ScreenshotTimings {
+  compileMs: number;
+  renderMs: number;
+  writeMs: number;
+  totalMs: number;
+}
+
+interface GenerateScreenshotResult {
+  url: string;
+  hash: string;
+  elapsed: number;
+  cached: boolean;
+  requestId: string;
+  queueWaitMs: number;
+  timings: ScreenshotTimings;
+}
 
 function generateBatchId(): string {
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getRequestId(request: FastifyRequest): string {
+  const header = request.headers["x-request-id"];
+  return typeof header === "string" && header.length > 0
+    ? header
+    : randomUUID();
+}
+
+function touchBatch(batch: BatchState): void {
+  batch.updatedAt = new Date().toISOString();
+}
+
+function cleanupExpiredBatches(): void {
+  const now = Date.now();
+  for (const [batchId, batch] of batchStore.entries()) {
+    if (Date.parse(batch.expiresAt) <= now) {
+      batchStore.delete(batchId);
+    }
+  }
+}
+
+function incrementBatchError(
+  batch: BatchState,
+  code: ScreenshotErrorCode,
+): void {
+  batch.errorsByCode[code] = (batch.errorsByCode[code] || 0) + 1;
+}
+
+function normalizeHash(hash?: string): string | undefined {
+  if (!hash) return undefined;
+  return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : undefined;
+}
+
+function computeBatchPageHash(page: BatchPage): string {
+  return computeScreenshotHash(
+    page.code,
+    page.configData || {},
+    page.width || config.viewport.width,
+    page.height || config.viewport.height,
+    page.fullPage ?? false,
+  );
 }
 
 // --- Screenshot generation ---
@@ -79,8 +152,9 @@ async function generateScreenshot(
   width: number,
   height: number,
   fullPage: boolean,
+  requestId: string,
   sessionId?: string,
-): Promise<{ url: string; hash: string; elapsed: number; cached: boolean }> {
+): Promise<GenerateScreenshotResult> {
   const startTime = Date.now();
 
   const hash = computeScreenshotHash(code, configData, width, height, fullPage);
@@ -92,17 +166,75 @@ async function generateScreenshot(
       hash,
       elapsed: Date.now() - startTime,
       cached: true,
+      requestId,
+      queueWaitMs: 0,
+      timings: {
+        compileMs: 0,
+        renderMs: 0,
+        writeMs: 0,
+        totalMs: Date.now() - startTime,
+      },
     };
   }
 
-  // Compile code (with cache)
+  const inFlightKey = `${projectId}:${pageId}:${hash}`;
+  const inFlight = inFlightScreenshots.get(inFlightKey);
+  if (inFlight) {
+    const result = await inFlight;
+    return { ...result, requestId };
+  }
+
+  const generatePromise = generateScreenshotUncached(
+    projectId,
+    pageId,
+    code,
+    configData,
+    width,
+    height,
+    fullPage,
+    requestId,
+    hash,
+    startTime,
+    sessionId,
+  ).finally(() => {
+    inFlightScreenshots.delete(inFlightKey);
+  });
+
+  inFlightScreenshots.set(inFlightKey, generatePromise);
+  return generatePromise;
+}
+
+async function generateScreenshotUncached(
+  projectId: string,
+  pageId: string,
+  code: string,
+  configData: Record<string, unknown>,
+  width: number,
+  height: number,
+  fullPage: boolean,
+  requestId: string,
+  hash: string,
+  startTime: number,
+  sessionId?: string,
+): Promise<GenerateScreenshotResult> {
   const compileCache = getCompileCache();
-  let compileResult = compileCache.get(code);
+  const cacheScope = sessionId || "global";
+  const compileStart = Date.now();
+  let compileResult = compileCache.get(code, cacheScope);
 
   if (!compileResult) {
-    compileResult = await compileCode(code, sessionId);
-    compileCache.set(code, compileResult);
+    try {
+      compileResult = await compileCode(code, sessionId);
+      compileCache.set(code, compileResult, cacheScope);
+    } catch (error) {
+      throw new ScreenshotError(
+        "COMPILE_ERROR",
+        `代码编译失败: ${getErrorMessage(error)}`,
+        error,
+      );
+    }
   }
+  const compileMs = Date.now() - compileStart;
 
   // Generate HTML
   const html = generateIframeHtml({
@@ -115,20 +247,36 @@ async function generateScreenshot(
 
   // Render screenshot
   const pool = getBrowserPool();
-  const buffer = await pool.renderPage(html, width, height, fullPage);
+  const renderResult = await pool.renderPage(html, width, height, fullPage);
 
   // Save to disk
-  const elapsed = Date.now() - startTime;
-  await writeScreenshot(projectId, pageId, hash, buffer, elapsed);
+  const writeStart = Date.now();
+  await writeScreenshot(
+    projectId,
+    pageId,
+    hash,
+    renderResult.buffer,
+    Date.now() - startTime,
+  );
+  const writeMs = Date.now() - writeStart;
 
   // Cleanup old files in background
   cleanupOldScreenshots(projectId, pageId).catch(() => {});
 
+  const elapsed = Date.now() - startTime;
   return {
     url: `/api/screenshots/file/${projectId}/${pageId}`,
     hash,
     elapsed,
     cached: false,
+    requestId,
+    queueWaitMs: renderResult.queueWaitMs,
+    timings: {
+      compileMs,
+      renderMs: renderResult.renderMs,
+      writeMs,
+      totalMs: elapsed,
+    },
   };
 }
 
@@ -138,6 +286,7 @@ async function handleGenerate(
   request: FastifyRequest<{ Body: GenerateRequest }>,
   reply: FastifyReply,
 ) {
+  const requestId = getRequestId(request);
   const { projectId, pageId, code, configData, width, height, fullPage, sessionId } =
     request.body;
 
@@ -160,7 +309,13 @@ async function handleGenerate(
       w,
       h,
       fullPage ?? false,
+      requestId,
       sessionId,
+    );
+
+    request.log.info(
+      { requestId, projectId, pageId, cached: result.cached, ...result.timings },
+      "screenshot generated",
     );
 
     return reply.send({
@@ -168,18 +323,21 @@ async function handleGenerate(
       data: result,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = getErrorMessage(err);
+    const code = getScreenshotErrorCode(err);
 
-    if (message.includes("Compile") || message.includes("编译")) {
+    request.log.warn({ requestId, projectId, pageId, code, message }, "screenshot failed");
+
+    if (code === "COMPILE_ERROR") {
       return reply.status(422).send({
         success: false,
-        error: { code: "COMPILE_ERROR", message: `代码编译失败: ${message}` },
+        error: { code, message },
       });
     }
 
     return reply.status(500).send({
       success: false,
-      error: { code: "SCREENSHOT_ERROR", message },
+      error: { code, message },
     });
   }
 }
@@ -188,6 +346,7 @@ async function handleGenerateBatch(
   request: FastifyRequest<{ Body: GenerateBatchRequest }>,
   reply: FastifyReply,
 ) {
+  cleanupExpiredBatches();
   const { projectId, pages, sessionId } = request.body;
 
   if (!projectId || !pages?.length) {
@@ -198,9 +357,11 @@ async function handleGenerateBatch(
   }
 
   const batchId = generateBatchId();
+  const now = Date.now();
 
-  const results: BatchResult[] = pages.map((p) => ({
-    pageId: p.pageId,
+  const results: BatchResult[] = pages.map((page) => ({
+    pageId: page.pageId,
+    hash: computeBatchPageHash(page),
     status: "pending" as const,
   }));
 
@@ -213,12 +374,18 @@ async function handleGenerateBatch(
     failed: 0,
     cached: 0,
     status: "running",
+    createdAt: new Date(now).toISOString(),
+    updatedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + config.screenshotBatchTtlMs).toISOString(),
+    cancelled: false,
+    errorsByCode: {},
   };
 
+  const initialResults = results.map((result) => ({ ...result }));
   batchStore.set(batchId, batch);
 
   // Process in background
-  processBatch(batch, pages, sessionId).catch(() => {});
+  processBatch(batch, pages, getRequestId(request), sessionId).catch(() => {});
 
   return reply.send({
     success: true,
@@ -226,6 +393,7 @@ async function handleGenerateBatch(
       batchId,
       total: batch.total,
       cached: 0,
+      results: initialResults,
     },
   });
 }
@@ -233,6 +401,7 @@ async function handleGenerateBatch(
 async function processBatch(
   batch: BatchState,
   pages: BatchPage[],
+  requestId: string,
   sessionId?: string,
 ): Promise<void> {
   const queue = [...pages];
@@ -240,6 +409,7 @@ async function processBatch(
 
   const worker = async () => {
     while (queue.length > 0) {
+      if (batch.cancelled) break;
       const page = queue.shift();
       if (!page) break;
 
@@ -249,6 +419,7 @@ async function processBatch(
       if (resultIndex === -1) continue;
 
       batch.results[resultIndex].status = "rendering";
+      touchBatch(batch);
 
       try {
         const w = page.width || config.viewport.width;
@@ -262,8 +433,11 @@ async function processBatch(
           w,
           h,
           page.fullPage ?? false,
+          requestId,
           sessionId,
         );
+
+        if (batch.cancelled) break;
 
         batch.results[resultIndex] = {
           pageId: page.pageId,
@@ -276,15 +450,21 @@ async function processBatch(
 
         batch.completed++;
         if (result.cached) batch.cached++;
+        touchBatch(batch);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
+        const errorCode = getScreenshotErrorCode(err);
         batch.results[resultIndex] = {
           pageId: page.pageId,
+          hash: computeBatchPageHash(page),
           status: "failed",
+          errorCode,
           error: message,
         };
+        incrementBatchError(batch, errorCode);
         batch.failed++;
         batch.completed++;
+        touchBatch(batch);
       }
     }
   };
@@ -295,12 +475,13 @@ async function processBatch(
 
   await Promise.all(workers);
 
-  batch.status = "completed";
+  batch.status = batch.cancelled ? "cancelled" : "completed";
+  touchBatch(batch);
 
   // Clean up batch state after 5 minutes
   setTimeout(() => {
     batchStore.delete(batch.batchId);
-  }, 5 * 60 * 1000);
+  }, config.screenshotBatchTtlMs);
 }
 
 async function handleFile(
@@ -312,8 +493,16 @@ async function handleFile(
 ) {
   const { projectId, pageId } = request.params;
   const { hash } = request.query;
+  const normalizedHash = normalizeHash(hash);
 
-  const buffer = await readScreenshot(projectId, pageId, hash);
+  if (hash && !normalizedHash) {
+    return reply.status(404).send({
+      success: false,
+      error: { code: "NOT_FOUND", message: "截图文件不存在" },
+    });
+  }
+
+  const buffer = await readScreenshot(projectId, pageId, normalizedHash);
 
   if (!buffer) {
     return reply.status(404).send({
@@ -324,7 +513,10 @@ async function handleFile(
 
   return reply
     .header("Content-Type", "image/png")
-    .header("Cache-Control", "public, max-age=3600")
+    .header(
+      "Cache-Control",
+      normalizedHash ? "public, max-age=31536000, immutable" : "no-store",
+    )
     .send(buffer);
 }
 
@@ -334,6 +526,7 @@ async function handleStatus(
   }>,
   reply: FastifyReply,
 ) {
+  cleanupExpiredBatches();
   const { batchId } = request.params;
   const batch = batchStore.get(batchId);
 
@@ -353,7 +546,42 @@ async function handleStatus(
       failed: batch.failed,
       cached: batch.cached,
       status: batch.status,
+      createdAt: batch.createdAt,
+      updatedAt: batch.updatedAt,
+      expiresAt: batch.expiresAt,
+      errorsByCode: batch.errorsByCode,
+      cancelled: batch.cancelled,
       results: batch.results,
+    },
+  });
+}
+
+async function handleCancel(
+  request: FastifyRequest<{
+    Params: { projectId: string; batchId: string };
+  }>,
+  reply: FastifyReply,
+) {
+  cleanupExpiredBatches();
+  const { batchId } = request.params;
+  const batch = batchStore.get(batchId);
+
+  if (!batch) {
+    return reply.status(404).send({
+      success: false,
+      error: { code: "NOT_FOUND", message: "批量任务不存在" },
+    });
+  }
+
+  batch.cancelled = true;
+  batch.status = "cancelled";
+  touchBatch(batch);
+
+  return reply.send({
+    success: true,
+    data: {
+      batchId: batch.batchId,
+      cancelled: true,
     },
   });
 }
@@ -365,6 +593,7 @@ export async function screenshotRoutes(
 ): Promise<void> {
   fastify.post("/generate", handleGenerate);
   fastify.post("/generate-batch", handleGenerateBatch);
+  fastify.post("/cancel/:projectId/:batchId", handleCancel);
   fastify.get("/file/:projectId/:pageId", handleFile);
   fastify.get("/status/:projectId/:batchId", handleStatus);
 }

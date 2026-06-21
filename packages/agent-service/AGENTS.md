@@ -16,14 +16,16 @@ src/
 │   ├── base.ts             # 后端适配器接口（IBackendAdapter）
 │   ├── pi-agent.ts         # Pi Agent 后端实现
 │   ├── pi-tools/           # Pi Agent 工具集
-│   │   ├── index.ts        # 工具导出（9 个工具）
+│   │   ├── index.ts        # 工具导出（15 个工具）
 │   │   ├── file-tools.ts   # 文件操作工具
 │   │   ├── read-file-lines-tool.ts # 带行号读取文件
 │   │   ├── edit-file-tool.ts # 精确编辑文件（old_string/new_string 替换）
 │   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
 │   │   ├── schema-tool.ts  # config.schema.json 校验
 │   │   ├── save-image-tool.ts # 图片保存工具（图床 + SHA256 去重）
-│   │   └── list-images-tool.ts # 项目图片清单查询
+│   │   ├── list-images-tool.ts # 项目图片清单查询
+│   │   ├── screenshot-tool.ts # 页面截图捕获工具
+│   │   └── subagent-tool.ts # 子 Agent 委派工具
 │   └── index.ts            # 模块导出
 ├── core/                   # 核心逻辑
 │   ├── agent.ts            # Agent 基类
@@ -68,7 +70,7 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 暴露 9 个工具：
+`src/backends/pi-tools/` 暴露 15 个工具：
 
 | 工具 | 用途 |
 |:-----|:-----|
@@ -81,8 +83,16 @@ tests/
 | `schemaValidate` | 校验 config.schema.json 格式 |
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |
+| `getConsoleLogs` | 获取页面控制台日志 |
+| `captureScreenshot` | 捕获页面截图 |
+| `listPages` | 查询工作空间页面清单 |
+| `deletePage` | 删除单个页面（需要权限确认） |
+| `deletePages` | 批量删除页面（需要权限确认） |
+| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent |
 
 ### Shell 白名单
+
+当前默认白名单在 `pi-tools/permissions.ts`：`node`、`ls`、`cat`、`head`、`tail`、`grep`、`find`、`wc`、`echo`；`npm`、`npx`、`node -e`、`rm`、`mv` 等默认拒绝。
 
 `pi-tools/bash-tool.ts:10` 定义 11 个允许的命令：`['npm', 'node', 'npx', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo']`。
 注：`npm install` / `npx` 可写文件系统；`echo` 可重定向。但未含 `rm` / `mv` 等高危命令。
@@ -98,6 +108,8 @@ PI_AGENT_PROVIDER=jojo                # anthropic / openai / google / 自定义 
 PI_AGENT_MODEL=deepseek-v4-flash      # 模型 ID
 PI_AGENT_BASE_URL=https://token.xjjj.co/v1  # 自定义 API 基础地址（OpenAI 兼容格式）
 PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
+PI_AGENT_SUBAGENTS_ENABLED=true       # 是否启用 delegateTask 子 Agent 工具
+PI_AGENT_SUBAGENT_TIMEOUT=120000      # 子 Agent 单次任务超时时间（毫秒）
 ```
 
 完整配置加载逻辑见 `src/utils/config.ts`。

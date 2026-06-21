@@ -4,6 +4,52 @@ import { AgentConfig } from '../../src/core/types';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const piAgentMocks = vi.hoisted(() => {
+  const harnesses: any[] = [];
+  const envs: any[] = [];
+
+  class MockAgentHarness {
+    options: any;
+    handlers = new Map<string, (event: any) => any>();
+    abort = vi.fn().mockResolvedValue({ aborted: true });
+
+    constructor(options: any) {
+      this.options = options;
+      harnesses.push(this);
+    }
+
+    on(type: string, handler: (event: any) => any) {
+      this.handlers.set(type, handler);
+      return vi.fn();
+    }
+
+    subscribe() {
+      return vi.fn();
+    }
+
+    async prompt() {
+      this.handlers.get('tool_result')?.({
+        toolName: 'writeFile',
+        input: { path: 'demos/subagent-result.txt', content: 'done' },
+        isError: false,
+      });
+      return { content: [{ type: 'text', text: 'subagent finished' }] };
+    }
+  }
+
+  class MockNodeExecutionEnv {
+    cwd: string;
+    cleanup = vi.fn().mockResolvedValue(undefined);
+
+    constructor(options: { cwd: string }) {
+      this.cwd = options.cwd;
+      envs.push(this);
+    }
+  }
+
+  return { harnesses, envs, MockAgentHarness, MockNodeExecutionEnv };
+});
+
 vi.mock('fs', () => ({
   promises: {
     readFile: vi.fn(),
@@ -11,6 +57,29 @@ vi.mock('fs', () => ({
     mkdir: vi.fn(),
     readdir: vi.fn(),
   },
+}));
+
+vi.mock('@earendil-works/pi-agent-core', () => ({
+  AgentHarness: piAgentMocks.MockAgentHarness,
+  InMemorySessionRepo: class {
+    async create() {
+      return {};
+    }
+  },
+}));
+
+vi.mock('@earendil-works/pi-agent-core/node', () => ({
+  NodeExecutionEnv: piAgentMocks.MockNodeExecutionEnv,
+}));
+
+vi.mock('@earendil-works/pi-ai', () => ({
+  getModel: (provider: string, modelId: string) => ({
+    id: modelId,
+    name: modelId,
+    provider,
+    input: ['text'],
+  }),
+  getModels: () => [],
 }));
 
 describe('PiAgentBackend', () => {
@@ -25,6 +94,8 @@ describe('PiAgentBackend', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    piAgentMocks.harnesses.length = 0;
+    piAgentMocks.envs.length = 0;
   });
 
   describe('初始化', () => {
@@ -88,6 +159,71 @@ describe('PiAgentBackend', () => {
       const backend = new PiAgentBackend(mockConfig);
       const files = backend.getFiles();
       expect(files).toEqual([]);
+    });
+  });
+
+  describe('子 agent', () => {
+    it('应执行短生命周期子 agent 并汇总写文件变更', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+
+      const result = await (backend as any).runSubagent({ task: '写入结果文件' });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toBe('subagent finished');
+      expect(result.files).toEqual([
+        {
+          path: 'demos/subagent-result.txt',
+          action: 'modified',
+          content: 'done',
+        },
+      ]);
+      expect(backend.getFiles()).toEqual(result.files);
+      expect(piAgentMocks.harnesses[0].options.tools.map((tool: any) => tool.name)).not.toContain('delegateTask');
+      expect(piAgentMocks.envs[0].cleanup).toHaveBeenCalled();
+      expect(piAgentMocks.harnesses[0].abort).toHaveBeenCalled();
+    });
+
+    it('主 agent 的 system prompt 应注入运行时真实工具列表并包含 delegateTask', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+
+      await backend.start();
+      await backend.updateSystemPrompt('# 测试提示');
+
+      const harness = piAgentMocks.harnesses[0];
+      const prompt = await harness.options.systemPrompt({
+        activeTools: harness.options.tools,
+      });
+
+      expect(prompt).toContain('当前实际可用工具');
+      expect(prompt).toContain('delegateTask');
+      expect(prompt).toContain('真正可以调用的工具');
+
+      await backend.destroy();
+    });
+
+    it('禁用子 agent 时应拒绝委派', async () => {
+      const backend = new PiAgentBackend({
+        ...mockConfig,
+        piAgent: {
+          ...mockConfig.piAgent,
+          subagentsEnabled: false,
+        },
+      });
+
+      await expect((backend as any).runSubagent({ task: 'noop' })).rejects.toThrow('Subagents are disabled');
+    });
+
+    it('外部取消时应中止并清理子 agent', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      const controller = new AbortController();
+
+      controller.abort();
+      const result = await (backend as any).runSubagent({ task: '需要取消' }, controller.signal);
+
+      expect(result.success).toBe(false);
+      expect(result.content).toBe('Subagent aborted');
+      expect(piAgentMocks.envs[0].cleanup).toHaveBeenCalled();
+      expect(piAgentMocks.harnesses[0].abort).toHaveBeenCalled();
     });
   });
 
@@ -319,9 +455,15 @@ describe('PiAgent 工具', () => {
   describe('createWorkbenchTools', () => {
     it('应创建所有必要的工具', async () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
-      const tools = createWorkbenchTools(mockConfig);
+      const tools = createWorkbenchTools(mockConfig, undefined, {
+        subagentRunner: async () => ({
+          success: true,
+          content: 'ok',
+          durationMs: 1,
+        }),
+      });
       
-      expect(tools).toHaveLength(14);
+      expect(tools).toHaveLength(17);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -336,8 +478,36 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('captureScreenshot');
       expect(toolNames).toContain('listImages');
       expect(toolNames).toContain('listPages');
+      expect(toolNames).toContain('previewDeletePages');
+      expect(toolNames).toContain('executeDeletePagePlan');
       expect(toolNames).toContain('deletePage');
       expect(toolNames).toContain('deletePages');
+      expect(toolNames).toContain('delegateTask');
+    });
+
+    it('子 agent 工具集不应包含委派工具', async () => {
+      const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+      const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
+
+      expect(tools).toHaveLength(16);
+      expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
+    });
+
+    it('delegateTask 应拒绝空任务', async () => {
+      const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+      const tools = createWorkbenchTools(mockConfig, undefined, {
+        subagentRunner: async () => ({
+          success: true,
+          content: 'ok',
+          durationMs: 1,
+        }),
+      });
+      const delegateTask = tools.find(tool => tool.name === 'delegateTask')!;
+
+      const result = await delegateTask.execute('id', { task: '   ' } as any);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('task must not be empty');
     });
 
     it('每个工具应有 label 和 execute 方法', async () => {
@@ -348,6 +518,18 @@ describe('PiAgent 工具', () => {
         expect(tool.label).toBeDefined();
         expect(typeof tool.execute).toBe('function');
       }
+    });
+
+    it('工具能力应来自真实工具注册列表', async () => {
+      const { getWorkbenchToolCapabilities, WORKBENCH_TOOL_VERSION } = await import('../../src/backends/pi-tools');
+      const capabilities = getWorkbenchToolCapabilities();
+
+      expect(capabilities.toolVersion).toBe(WORKBENCH_TOOL_VERSION);
+      expect(capabilities.toolNames).toContain('listPages');
+      expect(capabilities.toolNames).toContain('previewDeletePages');
+      expect(capabilities.toolNames).toContain('executeDeletePagePlan');
+      expect(capabilities.toolNames).toContain('deletePages');
+      expect(capabilities.toolNames).not.toContain('delegateTask');
     });
   });
 });

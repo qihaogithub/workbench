@@ -12,6 +12,7 @@ import {
 } from "../../../../../components/demo";
 import type {
   PositionableSizeItem,
+  PreviewSize,
   VisualAnnotation,
   VisualEditPatch,
   VisualInlineEditPayload,
@@ -125,6 +126,26 @@ type AiFileChange = {
   content?: string;
 };
 
+function parsePreviewDimension(value: string | number | undefined): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  }
+  if (typeof value !== "string") return undefined;
+
+  const parsed = Number.parseFloat(value.replace(/px$/, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function getScreenshotRequestSize(previewSize?: PreviewSize): {
+  width?: number;
+  height?: number;
+} {
+  return {
+    width: parsePreviewDimension(previewSize?.width),
+    height: parsePreviewDimension(previewSize?.height),
+  };
+}
+
 function createVisualId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -188,6 +209,18 @@ type HistoryEvent =
       savedAt: number;
       version: VersionInfo;
     };
+
+function dedupeHistoryEvents(events: HistoryEvent[]): HistoryEvent[] {
+  const seen = new Set<string>();
+
+  return events.filter((event) => {
+    if (seen.has(event.id)) {
+      return false;
+    }
+    seen.add(event.id);
+    return true;
+  });
+}
 
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
@@ -266,7 +299,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
-    serviceAvailable: isScreenshotServiceAvailable,
     checkServiceHealth,
     startBatchGeneration,
     regeneratePage,
@@ -286,11 +318,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     if (timers[pageId]) clearTimeout(timers[pageId]);
     timers[pageId] = setTimeout(() => {
       const config = configDataMap[pageId] || {};
-      regeneratePage(pageId, pageCode, config);
+      const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[pageId]);
+      regeneratePage(pageId, pageCode, config, width, height);
       delete timers[pageId];
     }, 3000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regeneratePage]);
+  }, [regeneratePage, pagePreviewSizeMap]);
 
   const regenerateCanvasScreenshots = useCallback(async () => {
     const available = await checkServiceHealth();
@@ -298,11 +331,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     const pages = demoPages
       .filter((p) => pageCodes[p.id] || code)
-      .map((p) => ({
-        pageId: p.id,
-        code: pageCodes[p.id] || code,
-        configData: configDataMap[p.id] || {},
-      }));
+      .map((p) => {
+        const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
+        return {
+          pageId: p.id,
+          code: pageCodes[p.id] || code,
+          configData: configDataMap[p.id] || {},
+          width,
+          height,
+        };
+      });
 
     if (pages.length > 0) {
       startBatchGeneration(pages);
@@ -313,6 +351,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     configDataMap,
     demoPages,
     pageCodes,
+    pagePreviewSizeMap,
     startBatchGeneration,
   ]);
 
@@ -321,11 +360,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     if (demoPages.length > 0 && !isScreenshotGenerating) {
       const pages = demoPages
         .filter((p) => pageCodes[p.id] || code)
-        .map((p) => ({
-          pageId: p.id,
-          code: pageCodes[p.id] || code,
-          configData: configDataMap[p.id] || {},
-        }));
+        .map((p) => {
+          const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
+          return {
+            pageId: p.id,
+            code: pageCodes[p.id] || code,
+            configData: configDataMap[p.id] || {},
+            width,
+            height,
+          };
+        });
       if (pages.length > 0) {
         startBatchGeneration(pages);
       }
@@ -1578,11 +1622,10 @@ ${context}
   const activePageName =
     demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
   const projectVersions = versionHistory?.versions ?? [];
-  const projectVersionTotal = versionHistory?.totalVersions ?? 0;
   const pageVersions = Object.values(pageVersionHistories).flatMap(
     (history) => history.versions,
   );
-  const historyEvents: HistoryEvent[] = [
+  const historyEvents: HistoryEvent[] = dedupeHistoryEvents([
     ...projectVersions.map((version, index): HistoryEvent => {
       if (version.sessionId.startsWith("restore-page-")) {
         return {
@@ -1614,8 +1657,8 @@ ${context}
       savedAt: version.savedAt,
       version,
     })),
-  ].sort((a, b) => b.savedAt - a.savedAt);
-  const historyEventTotal = projectVersionTotal + pageVersions.length;
+  ]).sort((a, b) => b.savedAt - a.savedAt);
+  const historyEventTotal = historyEvents.length;
   const historyGroups = historyEvents.reduce<
     Array<{ key: string; label: string; events: HistoryEvent[] }>
   >((groups, event) => {
@@ -2464,18 +2507,6 @@ ${context}
                           .filter(([, s]) => s.screenshotUrl)
                           .map(([id, s]) => [id, s.screenshotUrl!])
                       )}
-                      screenshotStates={pageScreenshots}
-                      screenshotServiceAvailable={isScreenshotServiceAvailable}
-                      onScreenshotServiceRetry={regenerateCanvasScreenshots}
-                      onScreenshotRetry={(pageId) => {
-                        const page = demoPages.find((p) => p.id === pageId);
-                        if (!page) return;
-                        regeneratePage(
-                          pageId,
-                          pageCodes[pageId] || code,
-                          configDataMap[pageId] || {},
-                        );
-                      }}
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
                       onPageConfigEdit={(pageId) => {

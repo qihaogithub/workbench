@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
 import { config } from "../config";
+import { ScreenshotError } from "./errors";
 
 export interface ScreenshotMeta {
   currentHash: string;
@@ -107,19 +108,24 @@ export async function writeScreenshot(
   await ensureDir(dir);
 
   const filePath = getScreenshotPath(projectId, pageId, hash);
-  await fs.writeFile(filePath, buffer);
-
-  // Update current symlink/copy
-  const currentPath = getCurrentScreenshotPath(projectId, pageId);
+  const tempPath = `${filePath}.tmp`;
   try {
-    await fs.unlink(currentPath);
-  } catch {
-    // File may not exist
-  }
-  await fs.copyFile(filePath, currentPath);
+    await fs.writeFile(tempPath, buffer);
+    await fs.rename(tempPath, filePath);
 
-  // Update meta
-  await updateMeta(projectId, pageId, hash, elapsed);
+    // Update current copy only after the hash-addressed file is complete.
+    const currentPath = getCurrentScreenshotPath(projectId, pageId);
+    await fs.copyFile(filePath, currentPath);
+
+    await updateMeta(projectId, pageId, hash, elapsed);
+  } catch (error) {
+    await fs.unlink(tempPath).catch(() => {});
+    throw new ScreenshotError(
+      "SCREENSHOT_WRITE_ERROR",
+      "截图文件写入失败",
+      error,
+    );
+  }
 }
 
 async function readMeta(

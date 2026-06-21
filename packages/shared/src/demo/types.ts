@@ -183,10 +183,6 @@ export interface PreviewCanvasProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   focusPageId?: string;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
-  screenshotStates?: Record<string, CanvasScreenshotState>;
-  onScreenshotRetry?: (pageId: string) => void;
-  screenshotServiceAvailable?: boolean | null;
-  onScreenshotServiceRetry?: () => void;
 }
 
 export interface PreviewState {

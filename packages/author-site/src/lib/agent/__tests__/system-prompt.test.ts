@@ -42,11 +42,43 @@ describe('buildStaticSystemPrompt', () => {
     const b = buildStaticSystemPrompt();
     expect(a).toBe(b);
   });
-  it('delete page rules require exact IDs from listPages', () => {
-    const prompt = buildStaticSystemPrompt();
+  it('delete page rules use transactional tools when available', () => {
+    const prompt = buildStaticSystemPrompt({
+      toolNames: ['listPages', 'previewDeletePages', 'executeDeletePagePlan', 'deletePage', 'deletePages'],
+    });
     expect(prompt).toContain('listPages');
     expect(prompt).toContain('不要根据页面名称、显示顺序或路径片段猜测页面 ID');
-    expect(prompt).toContain('deletePages');
+    expect(prompt).toContain('previewDeletePages');
+    expect(prompt).toContain('executeDeletePagePlan');
+    expect(prompt).toContain('mode: "nameIncludes"');
+    expect(prompt).toContain('目标数量大于 1 时，只能走 `previewDeletePages` → `executeDeletePagePlan`');
+  });
+
+  it('delete page rules fall back to deletePages when transaction tools are unavailable', () => {
+    const prompt = buildStaticSystemPrompt({
+      toolNames: ['listPages', 'deletePage', 'deletePages'],
+    });
+
+    expect(prompt).toContain('当前 Agent Service 尚未提供事务化删除工具');
+    expect(prompt).toContain('deletePages({');
+    expect(prompt).not.toContain('previewDeletePages({');
+  });
+
+  it('delete page rules disable deletion when delete tools are unavailable', () => {
+    const prompt = buildStaticSystemPrompt({
+      toolNames: ['listPages'],
+    });
+
+    expect(prompt).toContain('当前 Agent Service 没有提供页面删除工具');
+    expect(prompt).toContain('你不能删除页面，也不能声称已经删除页面');
+    expect(prompt).not.toContain('executeDeletePagePlan({');
+  });
+
+  it('明确告知创作端 agent 可以委派子 Agent', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('子 Agent 委派');
+    expect(prompt).toContain('delegateTask');
+    expect(prompt).toContain('子 Agent 不能继续创建子 Agent');
   });
 });
 

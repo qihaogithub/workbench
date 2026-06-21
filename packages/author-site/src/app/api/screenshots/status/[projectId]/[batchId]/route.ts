@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 
 import {
   createScreenshotServiceUnavailableResponse,
-  getScreenshotServiceUrl,
+  createScreenshotProxyTimeoutResponse,
+  fetchScreenshotService,
+  isAbortError,
 } from "@/lib/screenshot-service";
 
 export async function GET(
@@ -12,8 +14,8 @@ export async function GET(
   const { projectId, batchId } = params;
 
   try {
-    const response = await fetch(
-      `${getScreenshotServiceUrl()}/api/screenshots/status/${encodeURIComponent(
+    const response = await fetchScreenshotService(
+      `/api/screenshots/status/${encodeURIComponent(
         projectId,
       )}/${encodeURIComponent(batchId)}`,
     );
@@ -25,8 +27,10 @@ export async function GET(
           response.headers.get("Content-Type") || "application/json",
       },
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      return createScreenshotProxyTimeoutResponse();
+    }
     return createScreenshotServiceUnavailableResponse();
   }
 }
-

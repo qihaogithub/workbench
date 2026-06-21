@@ -66,6 +66,8 @@ export interface ServerMessage {
       toolCallId: string;
       title?: string;
       kind?: string;
+      summary?: string;
+      planId?: string;
     };
   };
   models?: Array<{

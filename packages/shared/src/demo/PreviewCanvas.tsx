@@ -247,10 +247,6 @@ export function PreviewCanvas({
   onConsoleEntry,
   focusPageId,
   onPositionableSizes,
-  screenshotStates,
-  onScreenshotRetry,
-  screenshotServiceAvailable,
-  onScreenshotServiceRetry,
 }: PreviewCanvasProps) {
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -446,8 +442,6 @@ export function PreviewCanvas({
           onFitToScreen={handleFitToScreen}
           toolMode={toolMode}
           onToolModeChange={setToolMode}
-          screenshotServiceAvailable={screenshotServiceAvailable}
-          onScreenshotServiceRetry={onScreenshotServiceRetry}
         />
       )}
 
@@ -481,9 +475,6 @@ export function PreviewCanvas({
             visible={visiblePageIds.has(page.id)}
             sessionId={sessionId}
             screenshotUrl={screenshotUrls?.[page.id]}
-            screenshotLoading={screenshotStates?.[page.id]?.loading}
-            screenshotError={screenshotStates?.[page.id]?.error}
-            onScreenshotRetry={onScreenshotRetry}
             onLayoutChange={handleLayoutChange}
             onConfigEdit={onPageConfigEdit}
             onConsoleEntry={onConsoleEntry}
