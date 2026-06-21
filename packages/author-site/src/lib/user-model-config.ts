@@ -159,6 +159,7 @@ export function readUserModelConfig(userId: string): SafeUserModelConfig | null 
 
 export function readUserBackendProvidersConfig(
   userId: string,
+  fallbackConfig?: BackendProvidersConfig | null,
 ): BackendProvidersConfig | null {
   const db = getDb();
   const row = db
@@ -182,8 +183,14 @@ export function readUserBackendProvidersConfig(
     enabled: stored.provider.enabled !== false,
   };
 
+  const fallbackProviders = fallbackConfig?.providers || [];
+  const providers = [
+    provider,
+    ...fallbackProviders.filter((item) => item.id !== provider.id),
+  ];
+
   return {
-    providers: [provider],
+    providers,
     activeProviderId: provider.id,
     activeModelId: provider.defaultModel
       ? `${provider.id}/${provider.defaultModel}`

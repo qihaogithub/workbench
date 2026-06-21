@@ -1,6 +1,22 @@
-import type { ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
+import type {
+  ConsoleLogPayload,
+  PositionableSizeItem,
+  VisualAnnotation,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+} from "./iframe-types";
 
-export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
+export type {
+  IframeOutMessageType,
+  IframeInMessageType,
+  ConsoleLogPayload,
+  PositionableSizeItem,
+  VisualAnnotation,
+  VisualEditPatch,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+  VisualNodeRect,
+} from "./iframe-types";
 
 export interface PreviewSize {
   width?: string | number;
@@ -53,6 +69,13 @@ export interface PreviewPanelProps {
   onContentHeightChange?: (contentHeight: number) => void;
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+  visualEditMode?: boolean;
+  selectedVisualNodeId?: string | null;
+  visualAnnotations?: VisualAnnotation[];
+  onVisualHover?: (node: VisualNodeInfo | null) => void;
+  onVisualSelect?: (node: VisualNodeInfo | null) => void;
+  onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
+  onVisualAnnotationCreate?: (node: VisualNodeInfo) => void;
 }
 
 export interface ConfigFormProps {
@@ -149,5 +172,4 @@ export interface PreviewState {
   mode: PreviewMode;
   activePageId: string;
 }
-
 

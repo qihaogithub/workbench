@@ -101,6 +101,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private currentSystemPrompt: string = '';
   private unsubFns: Array<() => void> = [];
   private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
+  private selectedModel: { provider: string; modelId: string } | null = null;
 
   constructor(config: AgentConfig) {
     this.config = config;
@@ -119,18 +120,21 @@ export class PiAgentBackend implements IBackendAdapter {
 
   private resolveProviderAndModel(): { provider: string; modelId: string } {
     const svc = getServiceConfig();
+    const selected = this.selectedModel;
     const sessionActive = splitFullModelId(getActiveModelId(this.getSessionProvidersConfig()));
     const managerActive = splitFullModelId(getBackendProvidersManager().getActiveModelId());
 
     return {
       provider:
-        this.config.piAgent?.provider ||
+        selected?.provider ||
         sessionActive.provider ||
+        this.config.piAgent?.provider ||
         managerActive.provider ||
         svc.piAgent.provider,
       modelId:
-        this.config.piAgent?.model ||
+        selected?.modelId ||
         sessionActive.model ||
+        this.config.piAgent?.model ||
         managerActive.model ||
         svc.piAgent.model,
     };
@@ -598,6 +602,10 @@ export class PiAgentBackend implements IBackendAdapter {
       ...this.config.piAgent,
       provider: provider || this.config.piAgent?.provider,
       model: id || modelId,
+    };
+    this.selectedModel = {
+      provider: provider || this.config.piAgent.provider || '',
+      modelId: id || modelId,
     };
     // 使用 harness.setModel() 运行时切换，无需重建
     const model = this.getModel();

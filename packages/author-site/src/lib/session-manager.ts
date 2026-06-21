@@ -232,6 +232,56 @@ export function findActiveSession(
   return null;
 }
 
+export function listActiveSessionsForUser(userId: string): string[] {
+  const userSessionsDir = path.join(getSessionsDir(), userId);
+  if (!fs.existsSync(userSessionsDir)) {
+    return [];
+  }
+
+  const sessionIds: string[] = [];
+
+  try {
+    const projectDirs = fs.readdirSync(userSessionsDir, {
+      withFileTypes: true,
+    });
+
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue;
+
+      const projectSessionDir = path.join(userSessionsDir, projectDir.name);
+      const sessionDirs = fs.readdirSync(projectSessionDir, {
+        withFileTypes: true,
+      });
+
+      for (const sessionDir of sessionDirs) {
+        if (!sessionDir.isDirectory()) continue;
+
+        const metaPath = path.join(
+          projectSessionDir,
+          sessionDir.name,
+          ".session.json",
+        );
+        if (!fs.existsSync(metaPath)) continue;
+
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+          if (meta.userId && meta.userId !== userId) continue;
+          if (Date.now() > meta.expiresAt) continue;
+          if ((meta.status || "editing") !== "editing") continue;
+
+          sessionIds.push(sessionDir.name);
+        } catch {
+          continue;
+        }
+      }
+    }
+  } catch {
+    return sessionIds;
+  }
+
+  return sessionIds;
+}
+
 export async function createEditSession(
   userId: string,
   projectId: string,

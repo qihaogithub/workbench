@@ -295,6 +295,13 @@ export function PreviewPanel({
   onContentHeightChange,
   effectiveHeight,
   onPositionableSizes,
+  visualEditMode = false,
+  selectedVisualNodeId,
+  visualAnnotations = [],
+  onVisualHover,
+  onVisualSelect,
+  onVisualInlineEdit,
+  onVisualAnnotationCreate,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -313,6 +320,16 @@ export function PreviewPanel({
   const [contentLoaded, setContentLoaded] = useState(false);
 
   const isUrlMode = !!compiledJsUrl;
+  const visualEditStateRef = useRef({
+    enabled: visualEditMode,
+    selectedNodeId: selectedVisualNodeId ?? null,
+    annotations: visualAnnotations,
+  });
+  visualEditStateRef.current = {
+    enabled: visualEditMode,
+    selectedNodeId: selectedVisualNodeId ?? null,
+    annotations: visualAnnotations,
+  };
 
   const validCode = code ? isValidCode(code) : true;
 
@@ -387,6 +404,23 @@ export function PreviewPanel({
       return;
     }
     iframe.contentWindow.postMessage({ type: "COLLECT_POSITIONABLE_SIZES" }, "*");
+  }, []);
+
+  const sendVisualEditState = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    const state = visualEditStateRef.current;
+    iframe.contentWindow.postMessage(
+      {
+        type: "UPDATE_VISUAL_EDIT_STATE",
+        enabled: state.enabled,
+        selectedNodeId: state.selectedNodeId,
+        annotations: state.annotations,
+      },
+      "*",
+    );
   }, []);
 
   useEffect(() => {
@@ -550,6 +584,7 @@ export function PreviewPanel({
           } else if (lastSuccessfulResult) {
             sendUpdateCode(lastSuccessfulResult, configData || {});
           }
+          sendVisualEditState();
           break;
 
         case "LOADED":
@@ -584,6 +619,26 @@ export function PreviewPanel({
             onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
           }
           break;
+
+        case "VISUAL_HOVER":
+          onVisualHover?.(event.data?.node ?? null);
+          break;
+
+        case "VISUAL_SELECT":
+          onVisualSelect?.(event.data?.node ?? null);
+          break;
+
+        case "VISUAL_INLINE_EDIT":
+          if (event.data?.payload) {
+            onVisualInlineEdit?.(event.data.payload);
+          }
+          break;
+
+        case "VISUAL_ANNOTATION_CREATE":
+          if (event.data?.node) {
+            onVisualAnnotationCreate?.(event.data.node);
+          }
+          break;
       }
     };
 
@@ -603,7 +658,17 @@ export function PreviewPanel({
     sendUpdateCode,
     sendUpdateCodeUrl,
     sendCollectPositionableSizes,
+    sendVisualEditState,
+    onVisualHover,
+    onVisualSelect,
+    onVisualInlineEdit,
+    onVisualAnnotationCreate,
   ]);
+
+  useEffect(() => {
+    if (!iframeReadyRef.current) return;
+    sendVisualEditState();
+  }, [visualEditMode, selectedVisualNodeId, visualAnnotations, sendVisualEditState]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -669,11 +734,16 @@ export function PreviewPanel({
   useEffect(() => {
     const html = generateIframeHtml({ supportUrlMode: isUrlMode, baseOrigin: window.location.origin });
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
+    const canCreateObjectUrl = typeof URL.createObjectURL === "function";
+    const url = canCreateObjectUrl
+      ? URL.createObjectURL(blob)
+      : `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
     setIframeSrcUrl(url);
 
     return () => {
-      URL.revokeObjectURL(url);
+      if (canCreateObjectUrl && typeof URL.revokeObjectURL === "function") {
+        URL.revokeObjectURL(url);
+      }
     };
   }, [isUrlMode]);
 

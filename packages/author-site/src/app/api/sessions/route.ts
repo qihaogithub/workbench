@@ -14,10 +14,15 @@ import {
 import { findActiveSession, createEditSession, archiveActiveSession, enforceSessionLimit } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { pushSessionModelConfigToAgent } from "@/lib/agent-providers";
+import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 
 async function pushUserModelConfig(userId: string, sessionId: string): Promise<void> {
-  const config = readUserBackendProvidersConfig(userId);
+  const globalConfig = await getModelConfig();
+  const config = readUserBackendProvidersConfig(
+    userId,
+    globalConfig.backendProviders,
+  );
   if (!config) return;
 
   const result = await pushSessionModelConfigToAgent(sessionId, config);

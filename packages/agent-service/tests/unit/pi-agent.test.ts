@@ -153,6 +153,47 @@ describe('PiAgentBackend session model config', () => {
       { id: 'custom/model-b', label: 'model-b' },
     ]);
   });
+
+  it('keeps user session model as default while listing admin providers', async () => {
+    const backend = new PiAgentBackend({
+      sessionId: 'test-session',
+      piAgent: {
+        provider: 'admin',
+        model: 'admin-model',
+      },
+      backendProviders: {
+        providers: [
+          {
+            id: 'custom',
+            name: 'Custom',
+            baseURL: 'https://api.example.com/v1',
+            apiKey: 'sk-user',
+            models: ['user-model'],
+            defaultModel: 'user-model',
+            enabled: true,
+          },
+          {
+            id: 'admin',
+            name: 'Admin',
+            baseURL: 'https://admin.example.com/v1',
+            apiKey: 'sk-admin',
+            models: ['admin-model'],
+            defaultModel: 'admin-model',
+            enabled: true,
+          },
+        ],
+        activeProviderId: 'custom',
+        activeModelId: 'custom/user-model',
+      },
+    });
+    const modelInfo = await backend.getModelInfo();
+
+    expect(modelInfo?.currentModelId).toBe('custom/user-model');
+    expect(modelInfo?.availableModels).toEqual([
+      { id: 'custom/user-model', label: 'user-model' },
+      { id: 'admin/admin-model', label: 'admin-model' },
+    ]);
+  });
 });
 
 describe('PiAgent 工具', () => {

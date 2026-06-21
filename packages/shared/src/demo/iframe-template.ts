@@ -41,6 +41,252 @@ const consoleInterceptScript = `
 })();
 `;
 
+const visualEditScript = `
+(function() {
+  var state = { enabled: false, selectedNodeId: null, annotations: [] };
+  var hoverBox = null;
+  var selectedBox = null;
+  var label = null;
+  var annotationLayer = null;
+  var lastHoverId = null;
+
+  function ensureLayer() {
+    if (!hoverBox) {
+      hoverBox = document.createElement('div');
+      hoverBox.setAttribute('data-visual-overlay', 'hover');
+      hoverBox.style.cssText = 'position:fixed;display:none;pointer-events:none;border:1px solid #38bdf8;background:rgba(56,189,248,0.08);z-index:2147483000;';
+      document.body.appendChild(hoverBox);
+    }
+    if (!selectedBox) {
+      selectedBox = document.createElement('div');
+      selectedBox.setAttribute('data-visual-overlay', 'selected');
+      selectedBox.style.cssText = 'position:fixed;display:none;pointer-events:none;border:2px solid #2563eb;background:rgba(37,99,235,0.08);z-index:2147483001;';
+      document.body.appendChild(selectedBox);
+    }
+    if (!label) {
+      label = document.createElement('div');
+      label.setAttribute('data-visual-overlay', 'label');
+      label.style.cssText = 'position:fixed;display:none;pointer-events:none;background:#2563eb;color:white;font:12px/1.2 system-ui,sans-serif;padding:3px 6px;border-radius:4px;z-index:2147483002;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      document.body.appendChild(label);
+    }
+    if (!annotationLayer) {
+      annotationLayer = document.createElement('div');
+      annotationLayer.setAttribute('data-visual-overlay', 'annotations');
+      annotationLayer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483003;';
+      document.body.appendChild(annotationLayer);
+    }
+  }
+
+  function isOverlay(el) {
+    return !!(el && el.closest && el.closest('[data-visual-overlay]'));
+  }
+
+  function isEditableElement(el) {
+    if (!el || el === document.body || el === document.documentElement) return false;
+    if (isOverlay(el)) return false;
+    var rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    return true;
+  }
+
+  function getDomPath(el) {
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && node !== document.body && node !== document.documentElement) {
+      var tag = node.tagName.toLowerCase();
+      var parent = node.parentElement;
+      if (!parent) break;
+      var index = 1;
+      var prev = node.previousElementSibling;
+      while (prev) {
+        if (prev.tagName === node.tagName) index++;
+        prev = prev.previousElementSibling;
+      }
+      parts.unshift(tag + ':nth-of-type(' + index + ')');
+      node = parent;
+    }
+    return parts.join('>');
+  }
+
+  function getElementByPath(path) {
+    if (!path) return null;
+    try {
+      var selector = path.split('>').join(' > ');
+      return document.body.querySelector(selector);
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function getNodeInfo(el) {
+    var rect = el.getBoundingClientRect();
+    var domPath = getDomPath(el);
+    var text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+    if (text.length > 180) text = text.slice(0, 177) + '...';
+    var className = '';
+    if (el instanceof HTMLElement && el.className) {
+      className = typeof el.className === 'string' ? el.className : String(el.className);
+    }
+    var caps = ['annotate'];
+    if (text && el.children.length === 0) caps.push('text');
+    if (className) caps.push('className');
+    caps.push('structure');
+    return {
+      nodeId: el.getAttribute('data-visual-node-id') || domPath,
+      tagName: el.tagName.toLowerCase(),
+      componentName: el.getAttribute('data-component-name') || el.tagName.toLowerCase(),
+      className: className || undefined,
+      textContent: text || undefined,
+      domPath: domPath,
+      parentPath: el.parentElement ? getDomPath(el.parentElement) : undefined,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      sourceFile: el.getAttribute('data-source-file') || undefined,
+      sourceStart: Number(el.getAttribute('data-source-start')) || undefined,
+      sourceEnd: Number(el.getAttribute('data-source-end')) || undefined,
+      sourceLine: Number(el.getAttribute('data-source-line')) || undefined,
+      sourceColumn: Number(el.getAttribute('data-source-column')) || undefined,
+      editCapabilities: caps
+    };
+  }
+
+  function drawBox(box, node) {
+    ensureLayer();
+    if (!box || !node) return;
+    box.style.display = 'block';
+    box.style.left = node.rect.x + 'px';
+    box.style.top = node.rect.y + 'px';
+    box.style.width = node.rect.width + 'px';
+    box.style.height = node.rect.height + 'px';
+  }
+
+  function drawLabel(node) {
+    ensureLayer();
+    if (!label || !node) return;
+    label.style.display = 'block';
+    label.style.left = Math.max(4, node.rect.x) + 'px';
+    label.style.top = Math.max(4, node.rect.y - 24) + 'px';
+    label.textContent = '<' + node.tagName + '>' + (node.className ? ' .' + node.className.split(/\\s+/).slice(0, 2).join('.') : '');
+  }
+
+  function clearHover() {
+    if (hoverBox) hoverBox.style.display = 'none';
+    if (label) label.style.display = 'none';
+    lastHoverId = null;
+    window.parent.postMessage({ type: 'VISUAL_HOVER', node: null }, '*');
+  }
+
+  function redrawSelection() {
+    ensureLayer();
+    if (!state.selectedNodeId) {
+      if (selectedBox) selectedBox.style.display = 'none';
+      return;
+    }
+    var selected = getElementByPath(state.selectedNodeId);
+    if (!selected) selected = document.querySelector('[data-visual-node-id="' + state.selectedNodeId.replace(/"/g, '\\\\"') + '"]');
+    if (!selected || !isEditableElement(selected)) {
+      if (selectedBox) selectedBox.style.display = 'none';
+      return;
+    }
+    drawBox(selectedBox, getNodeInfo(selected));
+  }
+
+  function renderAnnotations() {
+    ensureLayer();
+    if (!annotationLayer) return;
+    annotationLayer.innerHTML = '';
+    (state.annotations || []).forEach(function(annotation) {
+      if (annotation.resolved) return;
+      var el = getElementByPath(annotation.domPath);
+      if (!el) return;
+      var rect = el.getBoundingClientRect();
+      var pin = document.createElement('button');
+      pin.type = 'button';
+      pin.title = annotation.text || '批注';
+      pin.textContent = '●';
+      pin.style.cssText = 'position:absolute;pointer-events:auto;width:18px;height:18px;border-radius:999px;border:2px solid white;background:#f59e0b;color:#f59e0b;box-shadow:0 2px 8px rgba(15,23,42,.25);font-size:0;left:' + Math.max(2, rect.right - 9) + 'px;top:' + Math.max(2, rect.top - 9) + 'px;';
+      pin.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        window.parent.postMessage({ type: 'VISUAL_ANNOTATION_CREATE', node: getNodeInfo(el), annotationId: annotation.id }, '*');
+      });
+      annotationLayer.appendChild(pin);
+    });
+  }
+
+  function setState(next) {
+    state = {
+      enabled: !!next.enabled,
+      selectedNodeId: next.selectedNodeId || null,
+      annotations: Array.isArray(next.annotations) ? next.annotations : []
+    };
+    ensureLayer();
+    if (!state.enabled) {
+      clearHover();
+      if (selectedBox) selectedBox.style.display = 'none';
+    }
+    redrawSelection();
+    renderAnnotations();
+  }
+
+  function closestEditable(target) {
+    var el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    while (el && el !== document.body) {
+      if (isEditableElement(el)) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  document.addEventListener('mousemove', function(event) {
+    if (!state.enabled) return;
+    var el = closestEditable(event.target);
+    if (!el) {
+      clearHover();
+      return;
+    }
+    var node = getNodeInfo(el);
+    if (node.nodeId === lastHoverId) return;
+    lastHoverId = node.nodeId;
+    drawBox(hoverBox, node);
+    drawLabel(node);
+    window.parent.postMessage({ type: 'VISUAL_HOVER', node: node }, '*');
+  }, true);
+
+  document.addEventListener('click', function(event) {
+    if (!state.enabled) return;
+    if (isOverlay(event.target)) return;
+    var el = closestEditable(event.target);
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el) {
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null }, '*');
+      return;
+    }
+    var node = getNodeInfo(el);
+    state.selectedNodeId = node.domPath;
+    redrawSelection();
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+  }, true);
+
+  document.addEventListener('dblclick', function(event) {
+    if (!state.enabled) return;
+    if (isOverlay(event.target)) return;
+    var el = closestEditable(event.target);
+    if (!el) return;
+    var before = (el.innerText || el.textContent || '').trim();
+    if (!before || el.children.length > 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    var after = window.prompt('编辑文本', before);
+    if (after == null || after === before) return;
+    el.textContent = after;
+    window.parent.postMessage({ type: 'VISUAL_INLINE_EDIT', payload: { node: getNodeInfo(el), before: before, after: after } }, '*');
+  }, true);
+
+  window.__VISUAL_EDIT__ = { setState: setState, redrawSelection: redrawSelection, renderAnnotations: renderAnnotations };
+})();
+`;
+
 function generateCssLinks(cssImports: string[], cdnBase: string): string {
   if (!cssImports.length) return "";
   return cssImports
@@ -179,6 +425,7 @@ ${cssLinks}
 
   <script type="module">
     ${consoleInterceptScript}
+    ${visualEditScript}
 
     import React from '${cdnBase}/react@18.3.1';
     import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
@@ -405,6 +652,35 @@ ${cssLinks}
           })();
         } catch (err) {
           window.parent.postMessage({ type: 'THUMBNAIL_LAYOUT_ERROR', error: err.message }, '*');
+        }
+      }
+
+      if (type === 'UPDATE_VISUAL_EDIT_STATE') {
+        if (window.__VISUAL_EDIT__) {
+          window.__VISUAL_EDIT__.setState(event.data || {});
+        }
+      }
+
+      if (type === 'COLLECT_VISUAL_NODE_TREE') {
+        try {
+          var nodes = [];
+          var allVisualNodes = document.body.querySelectorAll('*');
+          for (var vn = 0; vn < allVisualNodes.length; vn++) {
+            var candidate = allVisualNodes[vn];
+            if (candidate && candidate.getBoundingClientRect) {
+              var r = candidate.getBoundingClientRect();
+              if (r.width > 0 && r.height > 0 && candidate !== document.body && candidate !== document.documentElement) {
+                nodes.push({
+                  tagName: candidate.tagName.toLowerCase(),
+                  textContent: (candidate.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80),
+                  className: candidate instanceof HTMLElement ? candidate.className.toString() : undefined
+                });
+              }
+            }
+          }
+          window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: nodes }, '*');
+        } catch (err) {
+          window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: [] }, '*');
         }
       }
     });

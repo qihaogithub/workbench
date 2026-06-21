@@ -77,6 +77,44 @@ describe("user model config", () => {
     expect(backend?.providers[0].models).toEqual(["model-b"]);
   });
 
+  it("merges user provider before admin providers and keeps user default active", async () => {
+    const { upsertUserModelConfig, readUserBackendProvidersConfig } =
+      await import("@/lib/user-model-config");
+    await createUser("u1");
+
+    upsertUserModelConfig("u1", {
+      id: "custom",
+      name: "Custom",
+      baseURL: "https://api.example.com/v1",
+      apiKey: "sk-user",
+      models: ["user-model"],
+      defaultModel: "user-model",
+    });
+
+    const backend = readUserBackendProvidersConfig("u1", {
+      providers: [
+        {
+          id: "admin",
+          name: "Admin",
+          baseURL: "https://admin.example.com/v1",
+          apiKey: "sk-admin",
+          models: ["admin-model"],
+          defaultModel: "admin-model",
+          enabled: true,
+        },
+      ],
+      activeProviderId: "admin",
+      activeModelId: "admin/admin-model",
+    });
+
+    expect(backend?.providers.map((provider) => provider.id)).toEqual([
+      "custom",
+      "admin",
+    ]);
+    expect(backend?.activeProviderId).toBe("custom");
+    expect(backend?.activeModelId).toBe("custom/user-model");
+  });
+
   it("clears config", async () => {
     const {
       upsertUserModelConfig,

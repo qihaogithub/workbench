@@ -8,14 +8,21 @@ export type IframeOutMessageType =
   | 'THUMBNAIL_LAYOUT_RESULT'
   | 'THUMBNAIL_LAYOUT_ERROR'
   | 'POSITIONABLE_SIZES_RESULT'
-  | 'CONSOLE_LOG';
+  | 'CONSOLE_LOG'
+  | 'VISUAL_HOVER'
+  | 'VISUAL_SELECT'
+  | 'VISUAL_INLINE_EDIT'
+  | 'VISUAL_ANNOTATION_CREATE'
+  | 'VISUAL_NODE_TREE_RESULT';
 
 /** 父窗口 → iframe 消息类型 */
 export type IframeInMessageType =
   | 'UPDATE_CODE'
   | 'UPDATE_CONFIG'
   | 'COLLECT_THUMBNAIL_LAYOUT'
-  | 'COLLECT_POSITIONABLE_SIZES';
+  | 'COLLECT_POSITIONABLE_SIZES'
+  | 'UPDATE_VISUAL_EDIT_STATE'
+  | 'COLLECT_VISUAL_NODE_TREE';
 
 /** positionable 元素尺寸数据 */
 export interface PositionableSizeItem {
@@ -28,4 +35,63 @@ export interface ConsoleLogPayload {
   level: 'log' | 'warn' | 'error' | 'info' | 'debug';
   args: string;
   timestamp: number;
+}
+
+export interface VisualNodeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface VisualNodeInfo {
+  nodeId: string;
+  tagName: string;
+  componentName?: string;
+  className?: string;
+  textContent?: string;
+  domPath: string;
+  parentPath?: string;
+  rect: VisualNodeRect;
+  sourceFile?: string;
+  sourceStart?: number;
+  sourceEnd?: number;
+  sourceLine?: number;
+  sourceColumn?: number;
+  editCapabilities: Array<'annotate' | 'text' | 'className' | 'structure'>;
+}
+
+export interface VisualAnnotation {
+  id: string;
+  nodeId: string;
+  domPath: string;
+  text: string;
+  createdAt: number;
+  resolved?: boolean;
+  patchId?: string;
+}
+
+export interface VisualInlineEditPayload {
+  node: VisualNodeInfo;
+  before: string;
+  after: string;
+}
+
+export interface VisualEditPatch {
+  id: string;
+  title: string;
+  file: string;
+  range?: {
+    startOffset: number;
+    endOffset: number;
+    startLine?: number;
+    endLine?: number;
+  };
+  before: string;
+  after: string;
+  kind: 'text' | 'className' | 'structure' | 'listItem' | 'aiSuggestion';
+  status: 'draft' | 'previewed' | 'accepted' | 'rejected' | 'reverted';
+  node?: VisualNodeInfo;
+  annotationId?: string;
+  error?: string;
 }

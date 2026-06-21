@@ -41,6 +41,8 @@ export function useChatModels(options: UseChatModelsOptions) {
 
   const [modelState, setModelState] = useState<ModelState>(INITIAL_MODEL_STATE);
   const modelStreamRef = useRef<AgentStream | null>(null);
+  const modelRetryCountRef = useRef(0);
+  const modelRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!agentSessionId) return;
@@ -50,15 +52,20 @@ export function useChatModels(options: UseChatModelsOptions) {
       const agentClient = getAgentClient();
       const stream = agentClient.stream(agentSessionId);
       modelStreamRef.current = stream;
+      modelRetryCountRef.current = 0;
+
+      const requestModels = () => {
+        const ws = (stream as any).ws;
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "get_models", workingDir }));
+        }
+      };
 
       let connected = false;
       stream.on("status", (event: StreamEvent) => {
         if (event.status === "connected" && !connected) {
           connected = true;
-          const ws = (stream as any).ws;
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "get_models", workingDir }));
-          }
+          requestModels();
         }
       });
 
@@ -79,6 +86,20 @@ export function useChatModels(options: UseChatModelsOptions) {
           canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: false,
         }));
+
+        if (models.length > 0) {
+          modelRetryCountRef.current = 0;
+          if (modelRetryTimerRef.current) {
+            clearTimeout(modelRetryTimerRef.current);
+            modelRetryTimerRef.current = null;
+          }
+        } else if (modelRetryCountRef.current < 5) {
+          modelRetryCountRef.current += 1;
+          if (modelRetryTimerRef.current) {
+            clearTimeout(modelRetryTimerRef.current);
+          }
+          modelRetryTimerRef.current = setTimeout(requestModels, 2000);
+        }
       });
 
       stream.on("error", (event: StreamEvent) => {
@@ -94,6 +115,10 @@ export function useChatModels(options: UseChatModelsOptions) {
     setupModelStream();
 
     return () => {
+      if (modelRetryTimerRef.current) {
+        clearTimeout(modelRetryTimerRef.current);
+        modelRetryTimerRef.current = null;
+      }
       if (modelStreamRef.current) {
         modelStreamRef.current.close();
         modelStreamRef.current = null;
