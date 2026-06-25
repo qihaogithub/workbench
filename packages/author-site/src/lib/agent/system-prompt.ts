@@ -90,6 +90,38 @@ deletePages({
 如果用户要求删除页面，请明确告诉用户：当前 Agent Service 版本过旧或工具未加载，需要重启 agent-service 并刷新创作端页面后再试。不要用 \`bash\`、\`node\`、\`writeFile\` 或 \`editFile\` 手动删除页面目录或修改 \`workspace-tree.json\`。`;
 }
 
+function buildCanvasLayoutRules(toolNames?: string[]): string {
+  const tools = new Set(toolNames || []);
+
+  if (tools.has('arrangeCanvasPages')) {
+    return `## 画布管理
+
+如果用户要求整理画布、排列画布页面、调整画布中页面位置或尺寸，必须使用 \`arrangeCanvasPages\` 工具。不要用 \`writeFile\`、\`editFile\`、\`bash\` 或 \`node\` 直接创建、修改或覆盖 \`.canvas-layout.json\`。
+
+使用方式：
+
+\`\`\`typescript
+arrangeCanvasPages({
+  mode: "preserveGroups",
+  sizeMode: "preserve"
+});
+\`\`\`
+
+注意事项：
+- “页面顺序”如果指左侧页面树顺序，修改 \`workspace-tree.json\` 的 \`order\`
+- “画布页面顺序 / 排列 / 位置 / 大小”指画布布局，使用 \`arrangeCanvasPages\`
+- 默认使用 \`preserveGroups\` 保留当前大致分组；如果用户明确要求重新按顺序排整齐，使用 \`mode: "grid"\`
+- 如果用户明确要求把页面恢复到预览尺寸，使用 \`sizeMode: "preview"\`；否则保留当前画布尺寸
+- 可通过 \`pageIds\` 只整理指定页面，页面 ID 必须来自 \`listPages\``;
+  }
+
+  return `## 画布管理
+
+当前 Agent Service 没有提供画布布局工具。你不能整理、排列或修改画布中的页面位置和尺寸，也不能声称已经完成画布整理。
+
+如果用户要求整理画布，请明确告诉用户：当前 Agent Service 版本过旧或工具未加载，需要重启 agent-service 并刷新创作端页面后再试。不要用 \`writeFile\`、\`editFile\`、\`bash\` 或 \`node\` 直接创建、修改或覆盖 \`.canvas-layout.json\`。`;
+}
+
 /**
  * 构建静态 system prompt（L2 行为约束层）。
  *
@@ -97,8 +129,11 @@ deletePages({
  */
 export function buildStaticSystemPrompt(capabilities?: ToolCapabilitiesForPrompt): string {
   return SYSTEM_PROMPT.replace(
-    /### 删除页面[\s\S]*?(?=\n## 项目级配置管理)/,
+    /### 删除页面[\s\S]*?(?=\n## 画布管理|\n## 项目级配置管理)/,
     buildDeletePageRules(capabilities?.toolNames),
+  ).replace(
+    /## 画布管理[\s\S]*?(?=\n## 项目级配置管理)/,
+    buildCanvasLayoutRules(capabilities?.toolNames),
   );
 }
 

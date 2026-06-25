@@ -100,6 +100,9 @@ describe("多 Demo 页面 — fs-utils", () => {
 
       expect(fs.readdirSync(path.join(ws, "demos"))).toEqual([]);
       expect(fs.existsSync(path.join(ws, "workspace-tree.json"))).toBe(true);
+      const memoryPath = path.join(ws, "memory.md");
+      expect(fs.existsSync(memoryPath)).toBe(true);
+      expect(fs.readFileSync(memoryPath, "utf-8")).toContain("# 项目记忆");
     });
 
     it("已存在 demo 时不重复创建默认页面", () => {
@@ -117,6 +120,17 @@ describe("多 Demo 页面 — fs-utils", () => {
       const result = ensureWorkspaceFiles(ws);
       expect(result.demoIds).toEqual([demoId]);
       expect(result.defaultDemoMeta).toBeUndefined();
+      expect(fs.existsSync(path.join(ws, "memory.md"))).toBe(true);
+    });
+
+    it("已存在 AI 记忆文件时不应覆盖用户内容", () => {
+      const memoryPath = path.join(ws, "memory.md");
+      const content = "# 项目记忆\n\n- 用户已有内容\n";
+      fs.writeFileSync(memoryPath, content, "utf-8");
+
+      ensureWorkspaceFiles(ws);
+
+      expect(fs.readFileSync(memoryPath, "utf-8")).toBe(content);
     });
 
     it("不完整的 demo 子目录（缺少 index.tsx）应被忽略", () => {

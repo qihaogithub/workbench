@@ -886,9 +886,26 @@ export function getDemoDirPath(workspacePath: string, demoId: string): string {
 // ============================================================
 
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
+const MEMORY_FILENAME = "memory.md";
 
 function getWorkspaceTreePath(workspacePath: string): string {
   return path.join(workspacePath, WORKSPACE_TREE_FILENAME);
+}
+
+function buildInitialMemoryContent(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `# 项目记忆
+
+> AI 自动维护 · 最后更新：${today}
+
+## 我的偏好
+
+- （等待用户表达偏好后自动记录）
+
+## 关键决策
+
+- （等待用户做出决策后自动记录）
+`;
 }
 
 /**
@@ -1092,6 +1109,7 @@ export function ensureWorkspaceFiles(workspacePath: string): {
 
   // 确保知识库目录存在（含系统预设条目）
   ensureKnowledgeDir(workspacePath);
+  ensureMemoryFile(workspacePath);
 
   const existing: string[] = [];
   for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
@@ -1150,6 +1168,13 @@ function ensureKnowledgeDir(workspacePath: string): void {
     JSON.stringify({ version: 1, items: [systemDoc] }, null, 2),
     "utf-8"
   );
+}
+
+export function ensureMemoryFile(workspacePath: string): void {
+  const memoryPath = path.join(workspacePath, MEMORY_FILENAME);
+  if (fs.existsSync(memoryPath)) return;
+
+  fs.writeFileSync(memoryPath, buildInitialMemoryContent(), "utf-8");
 }
 
 function createProjectFromTemplate(name: string, templateId: string): DemoMeta {

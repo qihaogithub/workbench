@@ -94,6 +94,9 @@ export interface PermissionRequest {
     kind?: string;
     summary?: string;
     planId?: string;
+    approvalKind?: "delete" | "plan_approval";
+    editable?: boolean;
+    initialContent?: string;
   };
 }
 
@@ -256,7 +259,7 @@ export class StreamService {
     } as any);
   }
 
-  sendPermissionResponse(permissionId: string, optionId: string): void {
+  sendPermissionResponse(permissionId: string, optionId: string, responseContent?: string): void {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(
@@ -264,6 +267,7 @@ export class StreamService {
           type: "permission_response",
           permissionId,
           optionId,
+          responseContent,
         }),
       );
     }

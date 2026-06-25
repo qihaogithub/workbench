@@ -201,6 +201,7 @@ export interface StreamEvent {
   type:
     | "stream"
     | "thought"
+    | "plan"
     | "tool_call"
     | "tool_call_update"
     | "error"
@@ -238,6 +239,9 @@ export interface StreamEvent {
       kind?: string;
       summary?: string;
       planId?: string;
+      approvalKind?: "delete" | "plan_approval";
+      editable?: boolean;
+      initialContent?: string;
     };
   };
   fileOperation?: {

@@ -8,6 +8,7 @@ import {
   StreamService,
   type PermissionRequest,
 } from "../services/stream-service";
+import type { PlanItem, PlanItemStatus, PlanState } from "../chat-plan";
 import {
   updateTextPart,
   addThoughtPart,
@@ -37,6 +38,51 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   content: "",
   parts: [],
 };
+
+const EMPTY_PLAN: PlanState = {
+  items: [],
+  fallbackText: "",
+};
+
+const PLAN_STATUSES: PlanItemStatus[] = [
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+];
+
+function parsePlanContent(content: string): PlanState | null {
+  try {
+    const parsed = JSON.parse(content) as { items?: unknown };
+    if (!Array.isArray(parsed.items)) return null;
+
+    const items: PlanItem[] = [];
+    for (const item of parsed.items) {
+      if (
+        typeof item !== "object" ||
+        item === null ||
+        typeof (item as { id?: unknown }).id !== "string" ||
+        typeof (item as { title?: unknown }).title !== "string" ||
+        typeof (item as { status?: unknown }).status !== "string"
+      ) {
+        return null;
+      }
+
+      const status = (item as { status: string }).status;
+      if (!PLAN_STATUSES.includes(status as PlanItemStatus)) return null;
+
+      items.push({
+        id: (item as { id: string }).id,
+        title: (item as { title: string }).title,
+        status: status as PlanItemStatus,
+      });
+    }
+
+    return { items, fallbackText: "" };
+  } catch {
+    return null;
+  }
+}
 
 function isBulkPageDeletionRequest(message: string): boolean {
   return /删|删除|清理/.test(message) &&
@@ -94,7 +140,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     externalStreamServiceRef,
   } = options;
 
-  const [plan, setPlan] = useState<string>("");
+  const [plan, setPlan] = useState<PlanState>(EMPTY_PLAN);
   const [pendingPermissionRequest, setPendingPermissionRequest] =
     useState<PermissionRequest | null>(null);
   const [silenceSeconds, setSilenceSeconds] = useState<number | null>(null);
@@ -193,7 +239,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         memoryFilePathsRef.current.clear();
         setIsStreaming(true);
         setStreamContent("");
-        setPlan("");
+        setPlan(EMPTY_PLAN);
         setCurrentMessage({
           role: "assistant",
           content: "",
@@ -261,7 +307,15 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onPlan: (content) => {
             markActivity();
-            setPlan((prev) => prev + content);
+            const parsed = parsePlanContent(content);
+            if (parsed) {
+              setPlan(parsed);
+            } else {
+              setPlan((prev) => ({
+                items: [],
+                fallbackText: `${prev.fallbackText}${content}`,
+              }));
+            }
           },
 
           onModels: (event) => {
@@ -643,11 +697,12 @@ export function useChatStream(options: UseChatStreamOptions) {
   );
 
   const handlePermissionResponse = useCallback(
-    (optionId: string) => {
+    (optionId: string, responseContent?: string) => {
       if (pendingPermissionRequest) {
         streamServiceRef.current?.sendPermissionResponse(
           pendingPermissionRequest.toolCall.toolCallId,
           optionId,
+          responseContent,
         );
       }
       setPendingPermissionRequest(null);

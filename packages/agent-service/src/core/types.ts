@@ -93,6 +93,18 @@ export interface FileChange {
   content?: string;
 }
 
+export type PlanItemStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failed";
+
+export interface PlanItem {
+  id: string;
+  title: string;
+  status: PlanItemStatus;
+}
+
 export interface AgentError {
   code: ErrorCode;
   message: string;
@@ -212,6 +224,9 @@ export interface PermissionRequestEvent {
       kind?: string;
       summary?: string;
       planId?: string;
+      approvalKind?: "delete" | "plan_approval";
+      editable?: boolean;
+      initialContent?: string;
     };
   };
 }

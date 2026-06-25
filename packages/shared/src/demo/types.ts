@@ -70,6 +70,8 @@ export interface PreviewPanelProps {
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onContentHeightChange?: (contentHeight: number) => void;
+  onContentLoaded?: () => void;
+  activityState?: "active" | "sleeping";
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
   visualEditMode?: boolean;
@@ -120,6 +122,7 @@ export interface CanvasViewportState {
 export interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
+  nodes?: Record<string, CanvasFreeNode>;
 }
 
 export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -140,6 +143,38 @@ export interface CanvasScreenshotState {
   loading: boolean;
   error?: string;
 }
+
+export type CanvasPageRenderMode =
+  | "screenshot"
+  | "iframe"
+  | "sleeping-iframe"
+  | "loading";
+
+export type CanvasFreeNodeKind = "document" | "image";
+
+export interface CanvasFreeNodeBase {
+  id: string;
+  kind: CanvasFreeNodeKind;
+  title: string;
+  layout: CanvasPageLayout;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CanvasDocumentNode extends CanvasFreeNodeBase {
+  kind: "document";
+  markdown: string;
+}
+
+export interface CanvasImageNode extends CanvasFreeNodeBase {
+  kind: "image";
+  src: string;
+  fileName?: string;
+}
+
+export type CanvasFreeNode =
+  | CanvasDocumentNode
+  | CanvasImageNode;
 
 export interface ScreenshotRenderBox {
   width: number;

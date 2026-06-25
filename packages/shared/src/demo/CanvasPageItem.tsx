@@ -8,6 +8,7 @@ import type {
   CanvasPageData,
   ConsoleLogPayload,
   CanvasToolMode,
+  CanvasPageRenderMode,
   PositionableSizeItem,
   ScreenshotRenderBox,
 } from "./types";
@@ -23,6 +24,7 @@ interface CanvasPageItemProps {
   sessionId?: string;
   screenshotUrl?: string;
   screenshotRenderBox?: ScreenshotRenderBox;
+  renderMode?: CanvasPageRenderMode;
   visible?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
@@ -45,6 +47,10 @@ const MIN_SIZE = 100;
 const MAX_SIZE = 2000;
 const EDGE_HIT_SIZE = 8; // 边框热区宽度（px）
 const CORNER_HIT_SIZE = 16; // 角点判定范围（px）
+const PAGE_LABEL_SCREEN_FONT_SIZE = 12;
+const PAGE_LABEL_MAX_FONT_SIZE = 24;
+const PAGE_LABEL_SCREEN_GAP = 8;
+const PAGE_LABEL_MAX_TOP_OFFSET = 40;
 
 const EDGE_CURSORS: Record<ResizeEdge, string> = {
   n: "ns-resize",
@@ -157,6 +163,7 @@ export function CanvasPageItem({
   sessionId,
   screenshotUrl,
   screenshotRenderBox,
+  renderMode = "iframe",
   visible = true,
   onLayoutChange,
   onConfigEdit,
@@ -176,8 +183,9 @@ export function CanvasPageItem({
     x: number;
     y: number;
   } | null>(null);
-  // 截图加载完成后，标记可以卸载 iframe
+  // 截图加载完成后，静态截图可作为轻量渲染路径。
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
+  const [iframeContentLoaded, setIframeContentLoaded] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef<CanvasPageLayout>({
     x: 0,
@@ -230,6 +238,10 @@ export function CanvasPageItem({
     setScreenshotLoaded(true);
   }, []);
 
+  const handleIframeContentLoaded = useCallback(() => {
+    setIframeContentLoaded(true);
+  }, []);
+
   const effectiveHeight =
     contentHeight != null &&
     page.previewSize?.height != null &&
@@ -241,6 +253,10 @@ export function CanvasPageItem({
   React.useEffect(() => {
     setScreenshotLoaded(false);
   }, [screenshotUrl]);
+
+  React.useEffect(() => {
+    setIframeContentLoaded(false);
+  }, [renderMode, page.code, page.compiledJsUrl, page.configData]);
 
   React.useEffect(() => {
     if (!screenshotRenderBox) return;
@@ -259,16 +275,16 @@ export function CanvasPageItem({
   const showEdgeHandles =
     isHovering && canInteract && !isDragging && !isResizing;
 
-  /**
-   * 三种渲染路径：
-   * 1. 有截图 && 截图已加载 → 仅渲染 img
-   * 2. 有截图 && 截图未加载 → 渲染 iframe(隐藏) + img(加载中)，img onLoad 后卸载 iframe
-   * 3. 无截图 → 渲染 iframe
-   *
-   * isEditing 只表示画布选中态，不代表内容版本变化；不能因为点击页面就强制切到 iframe。
-   */
-  const shouldRenderIframe = !screenshotUrl || !screenshotLoaded;
-  const shouldRenderScreenshot = !!screenshotUrl;
+  const shouldRenderIframe =
+    renderMode === "iframe" || renderMode === "sleeping-iframe";
+  const shouldRenderScreenshot =
+    !!screenshotUrl &&
+    (renderMode === "screenshot" ||
+      renderMode === "iframe" ||
+      renderMode === "sleeping-iframe");
+  const shouldRenderLoading =
+    renderMode === "loading" ||
+    (renderMode === "sleeping-iframe" && !screenshotUrl);
 
   // 根据鼠标位置更新 cursor 和 hoveredEdge
   const updateEdgeFromPointer = useCallback(
@@ -438,8 +454,14 @@ export function CanvasPageItem({
     );
   }
 
-  const showIframe = !screenshotUrl;
-  const showScreenshotOverlay = !!screenshotUrl;
+  const keepScreenshotVisible =
+    shouldRenderScreenshot &&
+    (renderMode === "screenshot" ||
+      renderMode === "sleeping-iframe" ||
+      !iframeContentLoaded ||
+      !screenshotLoaded);
+  const showIframeContent =
+    renderMode === "iframe" && (!screenshotUrl || iframeContentLoaded);
 
   // 当前 cursor
   const activeCursor =
@@ -452,16 +474,23 @@ export function CanvasPageItem({
           : toolMode === "hand" && editable && !isEditing
             ? "default"
             : undefined;
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const pageLabelFontSize = Math.min(
+    PAGE_LABEL_SCREEN_FONT_SIZE / safeZoom,
+    PAGE_LABEL_MAX_FONT_SIZE,
+  );
+  const pageLabelTopOffset = Math.min(
+    (PAGE_LABEL_SCREEN_FONT_SIZE + PAGE_LABEL_SCREEN_GAP) / safeZoom,
+    PAGE_LABEL_MAX_TOP_OFFSET,
+  );
 
   const pageContent = (
     <>
       {shouldRenderIframe && (
         <div
-          className="w-full h-full"
+          className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
           style={{
-            // 过渡期间（截图加载中），iframe 隐藏但仍存在于 DOM
-            visibility: showIframe ? "visible" : "hidden",
-            position: showScreenshotOverlay ? "absolute" : "relative",
+            opacity: showIframeContent ? 1 : 0,
             // hand 模式下禁止 iframe 交互（防止误拖图片），select 模式下也禁止（通过外层容器操作）
             pointerEvents: "none",
           }}
@@ -476,6 +505,10 @@ export function CanvasPageItem({
             fillContainer
             onConsoleEntry={onConsoleEntry}
             onContentHeightChange={handleContentHeightChange}
+            onContentLoaded={handleIframeContentLoaded}
+            activityState={
+              renderMode === "sleeping-iframe" ? "sleeping" : "active"
+            }
             effectiveHeight={effectiveHeight}
             onPositionableSizes={onPositionableSizes}
           />
@@ -483,7 +516,10 @@ export function CanvasPageItem({
       )}
 
       {shouldRenderScreenshot && (
-        <div className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none">
+        <div
+          className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none transition-opacity duration-200 ease-out"
+          style={{ opacity: keepScreenshotVisible ? 1 : 0 }}
+        >
           <img
             src={screenshotUrl}
             alt={page.name}
@@ -492,10 +528,17 @@ export function CanvasPageItem({
             draggable={false}
             onLoad={handleScreenshotLoad}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-            <span className="text-xs text-white font-medium truncate block">
-              {page.name}
-            </span>
+        </div>
+      )}
+
+      {shouldRenderLoading && (
+        <div className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none">
+          <div className="flex h-full w-full items-center justify-center bg-muted/35">
+            <div
+              role="status"
+              aria-label="页面预览加载中"
+              className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/25 border-b-muted-foreground"
+            />
           </div>
         </div>
       )}
@@ -509,7 +552,8 @@ export function CanvasPageItem({
       data-page-id={page.id}
       className={cn(
         "absolute rounded-lg transition-shadow duration-200 select-none",
-        isEditing && "ring-2 ring-blue-500",
+        isEditing &&
+          "ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_14px_34px_rgba(15,23,42,0.28)]",
       )}
       style={{
         left: layout.x,
@@ -538,8 +582,13 @@ export function CanvasPageItem({
       }}
     >
       <div
-        className="absolute left-0 -top-6 max-w-full truncate text-xs font-medium text-muted-foreground"
+        className="absolute left-0 max-w-full truncate font-medium text-muted-foreground pointer-events-none"
         title={page.name}
+        style={{
+          top: -pageLabelTopOffset,
+          fontSize: pageLabelFontSize,
+          lineHeight: 1.2,
+        }}
       >
         {page.name}
       </div>

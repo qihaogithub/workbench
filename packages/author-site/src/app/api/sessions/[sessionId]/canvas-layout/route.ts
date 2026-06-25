@@ -4,12 +4,17 @@ import path from "path";
 import {
   createApiError,
   createApiSuccess,
+  findWorkspacePath,
   getSessionMeta,
   getSessionPath,
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import type { CanvasPageLayout, CanvasState } from "@opencode-workbench/shared/demo";
+import type {
+  CanvasFreeNode,
+  CanvasPageLayout,
+  CanvasState,
+} from "@opencode-workbench/shared/demo";
 
 interface StoredCanvasLayout {
   version: 1;
@@ -52,6 +57,43 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
   };
 }
 
+function readString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" ? value : null;
+}
+
+function parseCanvasNode(value: unknown): CanvasFreeNode | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value, "id");
+  const kind = readString(value, "kind");
+  const title = readString(value, "title");
+  const layout = parseLayout(value.layout);
+  const createdAt = readNumber(value, "createdAt");
+  const updatedAt = readNumber(value, "updatedAt");
+
+  if (!id || !kind || !title || !layout || createdAt === null || updatedAt === null) {
+    return null;
+  }
+
+  const base = { id, title, layout, createdAt, updatedAt };
+
+  if (kind === "document") {
+    const markdown = readString(value, "markdown");
+    if (markdown === null) return null;
+    return { ...base, kind, markdown };
+  }
+
+  if (kind === "image") {
+    const src = readString(value, "src");
+    const fileName = readString(value, "fileName");
+    if (!src) return null;
+    return { ...base, kind, src, ...(fileName ? { fileName } : {}) };
+  }
+
+  return null;
+}
+
 function parseCanvasState(value: unknown): CanvasState | null {
   if (!isRecord(value)) return null;
   if (!isRecord(value.viewport) || !isRecord(value.pages)) return null;
@@ -71,6 +113,19 @@ function parseCanvasState(value: unknown): CanvasState | null {
     pages[pageId] = layout;
   }
 
+  let nodes: Record<string, CanvasFreeNode> | undefined;
+  if (isRecord(value.nodes)) {
+    nodes = {};
+    for (const [nodeId, nodeValue] of Object.entries(value.nodes)) {
+      if (isRecord(nodeValue) && readString(nodeValue, "kind") === "webpage") {
+        continue;
+      }
+      const node = parseCanvasNode(nodeValue);
+      if (!node || node.id !== nodeId) return null;
+      nodes[nodeId] = node;
+    }
+  }
+
   return {
     viewport: {
       x: viewportX,
@@ -78,6 +133,7 @@ function parseCanvasState(value: unknown): CanvasState | null {
       zoom,
     },
     pages,
+    ...(nodes ? { nodes } : {}),
   };
 }
 
@@ -126,11 +182,44 @@ async function validateSessionAccess(sessionId: string) {
     };
   }
 
-  return { sessionPath: getSessionPath(sessionId) };
+  const workspacePath = meta.workspaceId
+    ? findWorkspacePath(meta.workspaceId) ?? undefined
+    : undefined;
+
+  return { sessionPath: getSessionPath(sessionId), workspacePath };
 }
 
 function getCanvasLayoutPath(sessionPath: string): string {
   return path.join(sessionPath, ".canvas-layout.json");
+}
+
+function getCanvasLayoutPaths(access: {
+  sessionPath: string;
+  workspacePath?: string;
+}): string[] {
+  const paths = [
+    access.workspacePath ? getCanvasLayoutPath(access.workspacePath) : null,
+    getCanvasLayoutPath(access.sessionPath),
+  ].filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(paths));
+}
+
+function readStoredCanvasLayout(layoutPath: string): {
+  state: CanvasState;
+  updatedAt?: number;
+} | null {
+  const parsed = JSON.parse(fs.readFileSync(layoutPath, "utf-8")) as unknown;
+  if (!isRecord(parsed)) return null;
+
+  const state = parseCanvasState(parsed.state);
+  if (!state) return null;
+
+  return {
+    state,
+    updatedAt:
+      typeof parsed.updatedAt === "number" ? parsed.updatedAt : undefined,
+  };
 }
 
 export async function GET(
@@ -141,22 +230,24 @@ export async function GET(
     const access = await validateSessionAccess(params.sessionId);
     if (access.response) return access.response;
 
-    const layoutPath = getCanvasLayoutPath(access.sessionPath);
-    if (!fs.existsSync(layoutPath)) {
+    let stored: { state: CanvasState; updatedAt?: number } | null = null;
+    for (const layoutPath of getCanvasLayoutPaths(access)) {
+      if (!fs.existsSync(layoutPath)) continue;
+      const candidate = readStoredCanvasLayout(layoutPath);
+      if (!candidate) continue;
+      if (!stored || (candidate.updatedAt ?? 0) > (stored.updatedAt ?? 0)) {
+        stored = candidate;
+      }
+    }
+
+    if (!stored) {
       return NextResponse.json(createApiSuccess({ state: null }));
     }
 
-    const parsed = JSON.parse(fs.readFileSync(layoutPath, "utf-8")) as unknown;
-    if (!isRecord(parsed)) {
-      return NextResponse.json(createApiSuccess({ state: null }));
-    }
-
-    const state = parseCanvasState(parsed.state);
     return NextResponse.json(
       createApiSuccess({
-        state,
-        updatedAt:
-          typeof parsed.updatedAt === "number" ? parsed.updatedAt : undefined,
+        state: stored.state,
+        updatedAt: stored.updatedAt,
       }),
     );
   } catch (error) {
@@ -202,11 +293,9 @@ export async function POST(
       state,
     };
 
-    fs.writeFileSync(
-      getCanvasLayoutPath(access.sessionPath),
-      JSON.stringify(stored, null, 2),
-      "utf-8",
-    );
+    for (const layoutPath of getCanvasLayoutPaths(access)) {
+      fs.writeFileSync(layoutPath, JSON.stringify(stored, null, 2), "utf-8");
+    }
 
     return NextResponse.json(
       createApiSuccess({

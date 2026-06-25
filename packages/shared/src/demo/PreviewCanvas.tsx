@@ -3,13 +3,24 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem } from "./CanvasPageItem";
+import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
 import { CanvasToolbar } from "./CanvasToolbar";
+import { DocumentEditor } from "./DocumentEditor";
+import {
+  computeCanvasRenderModes,
+  DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
+  DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
+} from "./canvas-render-scheduler";
 import {
   computeAutoCanvasLayout,
   computeFitCanvasViewport,
   computeInitialCanvasLayout,
   resolveCanvasPageSize,
 } from "./canvas-layout";
+import {
+  getPreviewPageResourceDescriptor,
+  prewarmPreviewImageUrls,
+} from "./preview-resource-cache";
 import { cn } from "./utils";
 import type {
   PreviewCanvasProps,
@@ -18,6 +29,7 @@ import type {
   CanvasViewportState,
   AlignmentGuide,
   CanvasToolMode,
+  CanvasFreeNode,
 } from "./types";
 
 function getVisiblePageIds(
@@ -212,14 +224,26 @@ export function PreviewCanvas({
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: computeInitialCanvasLayout(pages),
+    nodes: {},
   });
 
   // 对齐辅助线状态
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
-  const [activeDragPageId, setActiveDragPageId] = useState<string | null>(null);
+  const [activeDragItemId, setActiveDragItemId] = useState<string | null>(null);
+  const [documentDraft, setDocumentDraft] = useState<{
+    nodeId?: string;
+    markdown: string;
+  } | null>(null);
+  const [draggingImageOver, setDraggingImageOver] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // 工具模式状态
   const [toolMode, setToolMode] = useState<CanvasToolMode>("hand");
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const recentIframeAccessRef = useRef<Map<string, number>>(new Map());
+  const prewarmedResourceFingerprintsRef = useRef<Set<string>>(new Set());
 
   const canvasState = externalState || internalState;
 
@@ -227,6 +251,26 @@ export function PreviewCanvas({
     const baseLayout = computeInitialCanvasLayout(pages);
     return { ...baseLayout, ...canvasState.pages };
   }, [canvasState.pages, pages]);
+
+  const pageIds = useMemo(() => new Set(pages.map((page) => page.id)), [pages]);
+
+  const effectiveNodes = canvasState.nodes ?? {};
+
+  const pageResourceDescriptors = useMemo(() => {
+    return Object.fromEntries(
+      pages.map((page) => [
+        page.id,
+        getPreviewPageResourceDescriptor(page, { sessionId }),
+      ]),
+    );
+  }, [pages, sessionId]);
+
+  const allItemLayouts = useMemo(() => {
+    const nodeLayouts = Object.fromEntries(
+      Object.entries(effectiveNodes).map(([id, node]) => [id, node.layout]),
+    );
+    return { ...effectivePages, ...nodeLayouts };
+  }, [effectiveNodes, effectivePages]);
 
   const updateState = useCallback(
     (updater: (prev: CanvasState) => CanvasState) => {
@@ -241,6 +285,7 @@ export function PreviewCanvas({
   );
 
   const handleCanvasClick = useCallback(() => {
+    setSelectedNodeId(null);
     onCanvasClick?.();
   }, [onCanvasClick]);
 
@@ -254,10 +299,94 @@ export function PreviewCanvas({
     [updateState],
   );
 
+  const handleNodeLayoutChange = useCallback(
+    (nodeId: string, layout: CanvasPageLayout) => {
+      updateState((prev) => {
+        const node = prev.nodes?.[nodeId];
+        if (!node) return prev;
+        return {
+          ...prev,
+          nodes: {
+            ...(prev.nodes ?? {}),
+            [nodeId]: { ...node, layout, updatedAt: Date.now() },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const getViewportCenterLayout = useCallback(
+    (width: number, height: number): CanvasPageLayout => {
+      const zoom = canvasState.viewport.zoom || 1;
+      const centerX = (-canvasState.viewport.x + containerSize.width / 2) / zoom;
+      const centerY = (-canvasState.viewport.y + containerSize.height / 2) / zoom;
+      const maxZ = Math.max(
+        0,
+        ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
+      );
+      return {
+        x: centerX - width / 2,
+        y: centerY - height / 2,
+        width,
+        height,
+        zIndex: maxZ + 1,
+      };
+    },
+    [allItemLayouts, canvasState.viewport, containerSize.height, containerSize.width],
+  );
+
+  const addOrUpdateNode = useCallback(
+    (node: CanvasFreeNode) => {
+      updateState((prev) => ({
+        ...prev,
+        nodes: {
+          ...(prev.nodes ?? {}),
+          [node.id]: node,
+        },
+      }));
+    },
+    [updateState],
+  );
+
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      updateState((prev) => {
+        const nextNodes = { ...(prev.nodes ?? {}) };
+        delete nextNodes[nodeId];
+        return { ...prev, nodes: nextNodes };
+      });
+      setSelectedNodeId((current) => (current === nodeId ? null : current));
+    },
+    [updateState],
+  );
+
+  useEffect(() => {
+    if (!editable || !selectedNodeId || documentDraft) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("input,textarea") ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteNode(selectedNodeId);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deleteNode, documentDraft, editable, selectedNodeId]);
+
   // 开始拖拽/缩放时，清空辅助线
   const handleDragStart = useCallback(
-    (pageId: string) => {
-      setActiveDragPageId(pageId);
+    (itemId: string) => {
+      setActiveDragItemId(itemId);
       setAlignmentGuides([]);
     },
     [],
@@ -265,12 +394,11 @@ export function PreviewCanvas({
 
   // 拖拽/缩放过程中计算对齐
   const handleDragMove = useCallback(
-    (pageId: string, layout: CanvasPageLayout, edge?: string) => {
-      if (!activeDragPageId || activeDragPageId !== pageId) return;
+    (itemId: string, layout: CanvasPageLayout, edge?: string) => {
+      if (!activeDragItemId || activeDragItemId !== itemId) return;
 
-      // 获取其他页面的布局
-      const otherLayouts = Object.entries(effectivePages)
-        .filter(([id]) => id !== pageId)
+      const otherLayouts = Object.entries(allItemLayouts)
+        .filter(([id]) => id !== itemId)
         .map(([, l]) => l);
 
       const { layout: alignedLayout, guides } = computeAlignment(
@@ -281,22 +409,32 @@ export function PreviewCanvas({
       );
 
       setAlignmentGuides(guides);
+      const isPageItem = pageIds.has(itemId);
       updateState((prev) => ({
         ...prev,
-        pages: { ...prev.pages, [pageId]: alignedLayout },
+        pages: isPageItem
+          ? { ...prev.pages, [itemId]: alignedLayout }
+          : prev.pages,
+        nodes: prev.nodes?.[itemId]
+          ? {
+              ...prev.nodes,
+              [itemId]: {
+                ...prev.nodes[itemId],
+                layout: alignedLayout,
+                updatedAt: Date.now(),
+              },
+            }
+          : prev.nodes,
       }));
     },
-    [activeDragPageId, effectivePages, updateState],
+    [activeDragItemId, allItemLayouts, pageIds, updateState],
   );
 
   // 结束拖拽/缩放时，清空辅助线
   const handleDragEnd = useCallback(() => {
-    setActiveDragPageId(null);
+    setActiveDragItemId(null);
     setAlignmentGuides([]);
   }, []);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -326,6 +464,81 @@ export function PreviewCanvas({
     [effectivePages, canvasState.viewport, containerSize],
   );
 
+  const pageRenderPlan = useMemo(
+    () =>
+      computeCanvasRenderModes({
+        pages,
+        layouts: effectivePages,
+        visiblePageIds,
+        viewport: canvasState.viewport,
+        containerWidth: containerSize.width,
+        containerHeight: containerSize.height,
+        editingPageId,
+        screenshotUrls,
+        recentIframeAccess: recentIframeAccessRef.current,
+        maxActiveIframes: DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
+        maxSleepingIframes: DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
+      }),
+    [
+      canvasState.viewport,
+      containerSize.height,
+      containerSize.width,
+      editingPageId,
+      effectivePages,
+      pages,
+      screenshotUrls,
+      visiblePageIds,
+    ],
+  );
+  const pageRenderModes = pageRenderPlan.modes;
+
+  useEffect(() => {
+    const currentTime = Date.now();
+    for (const pageId of pageRenderPlan.activePageIds) {
+      recentIframeAccessRef.current.set(pageId, currentTime);
+    }
+
+    const retainedPageIds = new Set([
+      ...pageRenderPlan.activePageIds,
+      ...pageRenderPlan.sleepingPageIds,
+    ]);
+    for (const pageId of Array.from(recentIframeAccessRef.current.keys())) {
+      if (!retainedPageIds.has(pageId) && !visiblePageIds.has(pageId)) {
+        recentIframeAccessRef.current.delete(pageId);
+      }
+    }
+  }, [
+    pageRenderPlan.activePageIds,
+    pageRenderPlan.sleepingPageIds,
+    visiblePageIds,
+  ]);
+
+  useEffect(() => {
+    const warmPageIds = [
+      ...pageRenderPlan.activePageIds,
+      ...pageRenderPlan.sleepingPageIds,
+    ];
+    const urls: string[] = [];
+
+    for (const pageId of warmPageIds) {
+      const descriptor = pageResourceDescriptors[pageId];
+      if (!descriptor) continue;
+      if (prewarmedResourceFingerprintsRef.current.has(descriptor.fingerprint)) {
+        continue;
+      }
+      prewarmedResourceFingerprintsRef.current.add(descriptor.fingerprint);
+      urls.push(...descriptor.imageUrls);
+    }
+
+    if (urls.length > 0) {
+      void prewarmPreviewImageUrls(urls);
+    }
+  }, [
+    pageRenderPlan.activePageIds,
+    pageRenderPlan.sleepingPageIds,
+    pageResourceDescriptors,
+  ]);
+
   useEffect(() => {
     if (!focusPageId) return;
     const pageLayout = effectivePages[focusPageId];
@@ -344,7 +557,7 @@ export function PreviewCanvas({
   }, [focusPageId]);
 
   const handleFitToScreen = useCallback(() => {
-    const viewport = computeFitCanvasViewport(effectivePages, {
+    const viewport = computeFitCanvasViewport(allItemLayouts, {
       containerWidth: containerSize.width,
       containerHeight: containerSize.height,
     });
@@ -354,7 +567,7 @@ export function PreviewCanvas({
       ...prev,
       viewport,
     }));
-  }, [effectivePages, containerSize, updateState]);
+  }, [allItemLayouts, containerSize, updateState]);
 
   const handleAutoLayout = useCallback(() => {
     const arrangedPages = computeAutoCanvasLayout(pages, {
@@ -373,10 +586,221 @@ export function PreviewCanvas({
     }));
   }, [canvasState.viewport, containerSize, effectivePages, pages, updateState]);
 
+  const createNodeId = useCallback((prefix: string) => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }, []);
+
+  const getDocumentTitleFromMarkdown = useCallback((markdown: string) => {
+    const firstLine = markdown
+      .split(/\r?\n/)
+      .find((line) => line.trim().length > 0);
+    const title = (firstLine ?? "")
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/^[-*+]\s+/, "")
+      .replace(/^\d+\.\s+/, "")
+      .replace(/^\[[ xX]\]\s+/, "")
+      .replace(/^>\s+/, "")
+      .replace(/[*_`~]/g, "")
+      .trim();
+
+    return title || "文档";
+  }, []);
+
+  const handleSaveDocument = useCallback(() => {
+    if (!documentDraft) return;
+    const now = Date.now();
+    const existing = documentDraft.nodeId
+      ? effectiveNodes[documentDraft.nodeId]
+      : undefined;
+    const id = existing?.id ?? createNodeId("doc");
+    addOrUpdateNode({
+      id,
+      kind: "document",
+      title: getDocumentTitleFromMarkdown(documentDraft.markdown),
+      markdown: documentDraft.markdown,
+      layout: existing?.layout ?? getViewportCenterLayout(420, 360),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+    setDocumentDraft(null);
+  }, [
+    addOrUpdateNode,
+    createNodeId,
+    documentDraft,
+    effectiveNodes,
+    getDocumentTitleFromMarkdown,
+    getViewportCenterLayout,
+  ]);
+
+  const addImageFile = useCallback(
+    async (file: File, index: number = 0) => {
+      if (!file.type.startsWith("image/")) return;
+      const src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          typeof reader.result === "string"
+            ? resolve(reader.result)
+            : reject(new Error("图片读取失败"));
+        reader.onerror = () => reject(new Error("图片读取失败"));
+        reader.readAsDataURL(file);
+      });
+
+      const size = await new Promise<{ width: number; height: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 560;
+          const maxHeight = 420;
+          const ratio = Math.min(
+            maxWidth / img.naturalWidth,
+            maxHeight / img.naturalHeight,
+            1,
+          );
+          resolve({
+            width: Math.max(180, Math.round(img.naturalWidth * ratio)),
+            height: Math.max(120, Math.round(img.naturalHeight * ratio)),
+          });
+        };
+        img.onerror = () => resolve({ width: 360, height: 240 });
+        img.src = src;
+      });
+
+      const now = Date.now();
+      const layout = getViewportCenterLayout(size.width, size.height);
+      const id = createNodeId("img");
+      addOrUpdateNode({
+        id,
+        kind: "image",
+        title: file.name || "图片",
+        fileName: file.name,
+        src,
+        layout: {
+          ...layout,
+          x: layout.x + index * 24,
+          y: layout.y + index * 24,
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+    },
+    [addOrUpdateNode, createNodeId, getViewportCenterLayout],
+  );
+
+  const handleAddImageFiles = useCallback(
+    (files: File[]) => {
+      files.forEach((file, index) => {
+        void addImageFile(file, index);
+      });
+    },
+    [addImageFile],
+  );
+
+  const handleEditNode = useCallback((node: CanvasFreeNode) => {
+    if (node.kind === "document") {
+      setDocumentDraft({
+        nodeId: node.id,
+        markdown: node.markdown,
+      });
+      return;
+    }
+  }, []);
+
+  const extractImageFiles = useCallback((files: FileList | File[]) => {
+    return Array.from(files).filter((file) => file.type.startsWith("image/"));
+  }, []);
+
+  const extractImageFilesFromItems = useCallback(
+    (items: DataTransferItemList | undefined) => {
+      if (!items) return [];
+      return Array.from(items)
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+    },
+    [],
+  );
+
+  const extractImageFilesFromTransfer = useCallback(
+    (
+      files: FileList | File[],
+      items: DataTransferItemList | undefined,
+    ) => {
+      const imageFiles = extractImageFiles(files);
+      return imageFiles.length > 0
+        ? imageFiles
+        : extractImageFilesFromItems(items);
+    },
+    [extractImageFiles, extractImageFilesFromItems],
+  );
+
+  const focusCanvasForClipboard = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      if (
+        target.closest("button,input,textarea,select,a") ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      containerRef.current?.focus({ preventScroll: true });
+    },
+    [],
+  );
+
   return (
     <div
       ref={containerRef}
-      className={cn("w-full h-full relative overflow-hidden bg-muted/30", className)}
+      tabIndex={editable ? 0 : undefined}
+      aria-label="画布工作区"
+      className={cn(
+        "w-full h-full relative overflow-hidden bg-muted/30 outline-none",
+        className,
+      )}
+      onPointerDownCapture={focusCanvasForClipboard}
+      onDragOver={(event) => {
+        if (documentDraft) return;
+        const files = extractImageFilesFromTransfer(
+          event.dataTransfer.files,
+          event.dataTransfer.items,
+        );
+        if (files.length === 0) return;
+        event.preventDefault();
+        setDraggingImageOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setDraggingImageOver(false);
+      }}
+      onDrop={(event) => {
+        if (documentDraft) return;
+        const files = extractImageFilesFromTransfer(
+          event.dataTransfer.files,
+          event.dataTransfer.items,
+        );
+        if (files.length === 0) return;
+        event.preventDefault();
+        setDraggingImageOver(false);
+        handleAddImageFiles(files);
+      }}
+      onPaste={(event) => {
+        const target = event.target as HTMLElement;
+        if (
+          target.closest("input,textarea") ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        if (documentDraft) return;
+        const files = extractImageFilesFromTransfer(
+          event.clipboardData.files,
+          event.clipboardData.items,
+        );
+        if (files.length === 0) return;
+        event.preventDefault();
+        handleAddImageFiles(files);
+      }}
     >
       {editable && (
         <CanvasToolbar
@@ -391,13 +815,23 @@ export function PreviewCanvas({
             updateState((prev) => ({
               pages: computeInitialCanvasLayout(pages),
               viewport: { x: 40, y: 40, zoom: 0.5 },
+              nodes: prev.nodes,
             }))
           }
           onFitToScreen={handleFitToScreen}
           onAutoLayout={handleAutoLayout}
+          onAddDocument={() =>
+            setDocumentDraft({
+              markdown: "# 文档\n\n在这里记录说明、参考或待办。",
+            })
+          }
           toolMode={toolMode}
           onToolModeChange={setToolMode}
         />
+      )}
+
+      {draggingImageOver && (
+        <div className="pointer-events-none absolute inset-3 z-30 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
       )}
 
       <CanvasViewport
@@ -407,41 +841,106 @@ export function PreviewCanvas({
         }
         editable={editable}
         onCanvasClick={handleCanvasClick}
-        onPageClick={(pageId) => onPageConfigEdit?.(pageId)}
+        onPageClick={(pageId) => {
+          setSelectedNodeId(null);
+          onPageConfigEdit?.(pageId);
+        }}
+        onNodeClick={setSelectedNodeId}
         onFitToScreen={handleFitToScreen}
         onToolModeChange={setToolMode}
         alignmentGuides={alignmentGuides}
         toolMode={toolMode}
       >
-        {pages.map((page) => (
-          <CanvasPageItem
-            key={page.id}
-            page={page}
-            layout={
-              effectivePages[page.id] ||
-              (() => {
-                const size = resolveCanvasPageSize(page.previewSize);
-                return { x: 0, y: 0, width: size.width, height: size.height };
-              })()
-            }
+        {pages.map((page) => {
+          const renderMode = pageRenderModes[page.id] ?? "loading";
+          return (
+            <CanvasPageItem
+              key={page.id}
+              page={page}
+              layout={
+                effectivePages[page.id] ||
+                (() => {
+                  const size = resolveCanvasPageSize(page.previewSize);
+                  return { x: 0, y: 0, width: size.width, height: size.height };
+                })()
+              }
+              editable={editable}
+              isEditing={editingPageId === page.id}
+              zoom={canvasState.viewport.zoom}
+              visible={
+                visiblePageIds.has(page.id) || renderMode === "sleeping-iframe"
+              }
+              sessionId={sessionId}
+              screenshotUrl={screenshotUrls?.[page.id]}
+              screenshotRenderBox={screenshotRenderBoxes?.[page.id]}
+              renderMode={renderMode}
+              onLayoutChange={handleLayoutChange}
+              onConfigEdit={onPageConfigEdit}
+              onConsoleEntry={onConsoleEntry}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+              toolMode={toolMode}
+              onPositionableSizes={onPositionableSizes}
+            />
+          );
+        })}
+        {Object.values(effectiveNodes).map((node) => (
+          <CanvasFreeNodeItem
+            key={node.id}
+            node={node}
             editable={editable}
-            isEditing={editingPageId === page.id}
             zoom={canvasState.viewport.zoom}
-            visible={visiblePageIds.has(page.id)}
-            sessionId={sessionId}
-            screenshotUrl={screenshotUrls?.[page.id]}
-            screenshotRenderBox={screenshotRenderBoxes?.[page.id]}
-            onLayoutChange={handleLayoutChange}
-            onConfigEdit={onPageConfigEdit}
-            onConsoleEntry={onConsoleEntry}
+            toolMode={toolMode}
+            selected={selectedNodeId === node.id}
+            onLayoutChange={handleNodeLayoutChange}
+            onEdit={handleEditNode}
+            onSelect={setSelectedNodeId}
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
-            toolMode={toolMode}
-            onPositionableSizes={onPositionableSizes}
           />
         ))}
       </CanvasViewport>
+
+      {documentDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex h-[78vh] w-full max-w-5xl flex-col rounded-lg border bg-background shadow-xl">
+            <div className="border-b px-4 py-3">
+              <div className="text-sm font-semibold">编辑文档</div>
+            </div>
+            <div className="min-h-0 flex-1 p-4">
+              <DocumentEditor
+                value={documentDraft.markdown}
+                onChange={(markdown) =>
+                  setDocumentDraft((prev) =>
+                    prev ? { ...prev, markdown } : prev,
+                  )
+                }
+                format="markdown"
+                placeholder="文档标题"
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t px-4 py-3">
+              <button
+                type="button"
+                className="h-9 rounded-md border px-3 text-sm hover:bg-muted"
+                onClick={() => setDocumentDraft(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="h-9 rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90"
+                onClick={handleSaveDocument}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

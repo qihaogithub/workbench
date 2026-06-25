@@ -54,6 +54,7 @@ interface ClientMessage {
   /** permission_response: 权限确认响应 */
   permissionId?: string;
   optionId?: string;
+  responseContent?: string;
 }
 
 interface ActiveConnection {
@@ -629,6 +630,9 @@ export async function registerWebSocketRoutes(
           case "permission_response": {
             const permissionId = message.permissionId;
             const optionId = message.optionId;
+            const responseContent = typeof message.responseContent === "string"
+              ? message.responseContent
+              : undefined;
             if (!permissionId || !optionId) {
               sendMessage({
                 type: "error",
@@ -650,7 +654,7 @@ export async function registerWebSocketRoutes(
             try {
               const agent = manager.get(sessionId);
               if (agent && agent instanceof BackendAgent) {
-                agent.resolvePermission(permissionId, approved);
+                agent.resolvePermission(permissionId, approved, responseContent);
               } else {
                 logger.warn({ sessionId }, "No agent found for permission_response");
               }

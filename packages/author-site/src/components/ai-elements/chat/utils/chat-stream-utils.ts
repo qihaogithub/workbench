@@ -55,6 +55,15 @@ export interface ToolCallEvent {
   timestamp?: number;
 }
 
+type MessageToolStatus = Extract<MessagePart, { type: "tool" }>["status"];
+
+function normalizeToolStatus(status?: string): MessageToolStatus {
+  if (status === "completed" || status === "success") return "completed";
+  if (status === "failed" || status === "error") return "error";
+  if (status === "awaiting-approval") return "awaiting-approval";
+  return "running";
+}
+
 export function addToolPart(
   parts: MessagePart[],
   toolCall: ToolCallEvent,
@@ -65,7 +74,7 @@ export function addToolPart(
       type: "tool" as const,
       toolCallId: toolCall.toolCallId,
       toolName: toolCall.toolName,
-      status: toolCall.status as "running" | "completed" | "error",
+      status: normalizeToolStatus(toolCall.status),
       parameters: toolCall.parameters,
       startedAt: toolCall.timestamp || Date.now(),
     },
@@ -92,14 +101,9 @@ export function updateToolPart(
 
   return parts.map((part) => {
     if (part.type === "tool" && part.toolCallId === toolCallId) {
-      const newStatus =
-        update.toolCallStatus === "completed"
-          ? ("completed" as const)
-          : update.toolCallStatus === "failed"
-            ? ("error" as const)
-            : update.toolCallStatus === "in_progress"
-              ? ("running" as const)
-              : part.status;
+      const newStatus = update.toolCallStatus
+        ? normalizeToolStatus(update.toolCallStatus)
+        : part.status;
 
       let result = update.result ?? part.result;
       if (update.details !== undefined) {

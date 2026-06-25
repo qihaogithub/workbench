@@ -77,6 +77,9 @@ export interface ServerMessage {
       kind?: string;
       summary?: string;
       planId?: string;
+      approvalKind?: "delete" | "plan_approval";
+      editable?: boolean;
+      initialContent?: string;
     };
   };
   models?: Array<{

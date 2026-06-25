@@ -294,6 +294,8 @@ export function PreviewPanel({
   fillContainer = false,
   onConsoleEntry,
   onContentHeightChange,
+  onContentLoaded,
+  activityState = "active",
   effectiveHeight,
   onPositionableSizes,
   visualEditMode = false,
@@ -340,11 +342,24 @@ export function PreviewPanel({
 
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
+  const activityStateRef = useRef(activityState);
+  activityStateRef.current = activityState;
+
+  const isSleeping = activityState === "sleeping";
+
+  const sendLifecycleMessage = useCallback((type: "SLEEP" | "WAKE") => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage({ type }, "*");
+  }, []);
 
   const sendUpdateCode = useCallback(
     (result: CompileResult, config: Record<string, unknown> = {}) => {
       const iframe = iframeRef.current;
       if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+      if (activityStateRef.current === "sleeping") {
         return;
       }
 
@@ -369,6 +384,9 @@ export function PreviewPanel({
       if (!iframe || !iframe.contentWindow) {
         return;
       }
+      if (activityStateRef.current === "sleeping") {
+        return;
+      }
 
       const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
 
@@ -383,12 +401,15 @@ export function PreviewPanel({
         "*",
       );
     },
-    [],
+    [sessionId, demoId],
   );
 
   const sendUpdateConfig = useCallback((config: Record<string, unknown>) => {
     const iframe = iframeRef.current;
     if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    if (activityStateRef.current === "sleeping") {
       return;
     }
 
@@ -401,11 +422,14 @@ export function PreviewPanel({
       },
       "*",
     );
-  }, []);
+  }, [sessionId, demoId]);
 
   const sendCollectPositionableSizes = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    if (activityStateRef.current === "sleeping") {
       return;
     }
     iframe.contentWindow.postMessage({ type: "COLLECT_POSITIONABLE_SIZES" }, "*");
@@ -414,6 +438,9 @@ export function PreviewPanel({
   const sendVisualEditState = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    if (activityStateRef.current === "sleeping") {
       return;
     }
     const state = visualEditStateRef.current;
@@ -449,12 +476,16 @@ export function PreviewPanel({
       setIsCompiling(false);
       setCompileError(null);
       setRuntimeError(null);
+      setPendingCompileResult(null);
+      setLastSuccessfulResult(null);
       return;
     }
 
     if (!sessionId && (!code || !validCode)) {
       setIsCompiling(false);
       setCompileError(null);
+      setPendingCompileResult(null);
+      setLastSuccessfulResult(null);
       return;
     }
 
@@ -502,6 +533,8 @@ export function PreviewPanel({
 
         if (!result.success) {
           setCompileError(result.error?.message || "编译失败");
+          setPendingCompileResult(null);
+          setLastSuccessfulResult(null);
           setIsCompiling(false);
           return;
         }
@@ -525,6 +558,8 @@ export function PreviewPanel({
       } catch (err) {
         if (cancelled) return;
         setCompileError(err instanceof Error ? err.message : "编译失败");
+        setPendingCompileResult(null);
+        setLastSuccessfulResult(null);
         setIsCompiling(false);
       }
     };
@@ -581,6 +616,47 @@ export function PreviewPanel({
   ]);
 
   useEffect(() => {
+    if (!iframeReady) return;
+
+    if (isSleeping) {
+      sendLifecycleMessage("SLEEP");
+      return;
+    }
+
+    sendLifecycleMessage("WAKE");
+
+    const currentConfig = configDataRef.current || {};
+    if (isUrlMode && compiledJsUrl) {
+      sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], currentConfig);
+    } else if (pendingCompileResult) {
+      sendUpdateCode(pendingCompileResult, currentConfig);
+      setPendingCompileResult(null);
+    } else if (lastSuccessfulResult) {
+      sendUpdateCode(lastSuccessfulResult, currentConfig);
+    } else {
+      sendUpdateConfig(currentConfig);
+    }
+    sendVisualEditState();
+
+    const timer = setTimeout(sendCollectPositionableSizes, 0);
+    return () => clearTimeout(timer);
+  }, [
+    compiledJsUrl,
+    externalCssImports,
+    iframeReady,
+    isSleeping,
+    isUrlMode,
+    lastSuccessfulResult,
+    pendingCompileResult,
+    sendCollectPositionableSizes,
+    sendLifecycleMessage,
+    sendUpdateCode,
+    sendUpdateCodeUrl,
+    sendUpdateConfig,
+    sendVisualEditState,
+  ]);
+
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const iframe = iframeRef.current;
       if (!iframe || event.source !== iframe.contentWindow) return;
@@ -605,6 +681,7 @@ export function PreviewPanel({
         case "LOADED":
           setRuntimeError(null);
           setContentLoaded(true);
+          onContentLoaded?.();
           sendCollectPositionableSizes();
           break;
 
@@ -674,6 +751,7 @@ export function PreviewPanel({
     onError,
     onConsoleEntry,
     onContentHeightChange,
+    onContentLoaded,
     onPositionableSizes,
     sendUpdateCode,
     sendUpdateCodeUrl,

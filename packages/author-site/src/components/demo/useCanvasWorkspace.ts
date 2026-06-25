@@ -14,6 +14,7 @@ import {
 const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
   pages: {},
+  nodes: {},
 };
 
 const SAVE_DELAY = 700;
@@ -133,6 +134,37 @@ export function useCanvasWorkspace({
     };
   }, [canvasState, projectId, sessionId]);
 
+  const flushCanvasState = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    if (!sessionId || !projectId) return;
+
+    const serialized = JSON.stringify(canvasState);
+    if (serialized === lastPersistedRef.current && !dirtyRef.current) return;
+
+    setSaveStatus("saving");
+    setSaveError(undefined);
+
+    try {
+      await saveCanvasLayout(sessionId, projectId, canvasState);
+      lastPersistedRef.current = serialized;
+      dirtyRef.current = false;
+      setSaveStatus("saved");
+    } catch (error) {
+      console.warn("[canvas] 保存画布布局失败", {
+        sessionId,
+        projectId,
+        error,
+      });
+      setSaveStatus("error");
+      setSaveError(error instanceof Error ? error.message : "保存画布布局失败");
+      throw error;
+    }
+  }, [canvasState, projectId, sessionId]);
+
   const updateCanvasState = useCallback((nextState: CanvasState) => {
     dirtyRef.current = true;
     setCanvasState(nextState);
@@ -158,6 +190,7 @@ export function useCanvasWorkspace({
     setFocusCanvasPageId,
     focusCanvasPage,
     clearCanvasSelection,
+    flushCanvasState,
     saveStatus,
     saveError,
   };

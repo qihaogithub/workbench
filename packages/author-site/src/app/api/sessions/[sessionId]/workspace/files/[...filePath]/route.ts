@@ -8,6 +8,7 @@ import {
   createApiSuccess,
   createApiError,
   findWorkspacePath,
+  ensureMemoryFile,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isFileEditable } from "@/lib/workspace-file-utils";
@@ -87,6 +88,10 @@ export async function GET(
         createApiError("FORBIDDEN", "禁止访问工作空间外的文件"),
         { status: 403 },
       );
+    }
+
+    if (relativePath === "memory.md") {
+      ensureMemoryFile(wsPath);
     }
 
     if (!fs.existsSync(resolvedPath)) {

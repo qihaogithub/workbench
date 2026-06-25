@@ -39,9 +39,10 @@ describe('isPathAllowed', () => {
     expect(isPathAllowed('packages/author-site/src/bar.tsx', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
-  it('拒绝黑名单中的 .workspace.json 和 .session.json', () => {
+  it('拒绝黑名单中的隐藏工作区状态文件', () => {
     expect(isPathAllowed('.workspace.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
     expect(isPathAllowed('.session.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isPathAllowed('.canvas-layout.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
   it('拒绝 workingDir 越界访问（..）', () => {

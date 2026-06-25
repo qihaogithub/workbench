@@ -40,7 +40,6 @@ import { type MessagePart } from "./message";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -228,42 +227,13 @@ function getFilePath(file: unknown): string | undefined {
   return typeof path === "string" ? path : undefined;
 }
 
-function maskSensitivePayload(value: unknown, depth = 0): unknown {
-  if (depth > 6) return "[MaxDepth]";
-  if (typeof value === "string") {
-    return value.length > 4000 ? `${value.slice(0, 4000)}\n...[truncated]` : value;
+function getPageCountFromPaths(paths: string[]): number {
+  const pageIds = new Set<string>();
+  for (const item of paths) {
+    const match = item.replace(/\\/g, "/").match(/(?:^|\/)demos\/([^/]+)/);
+    if (match?.[1]) pageIds.add(match[1]);
   }
-  if (Array.isArray(value)) {
-    return value.map((item) => maskSensitivePayload(item, depth + 1));
-  }
-  if (!isRecord(value)) return value;
-
-  const masked: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) {
-    const lower = key.toLowerCase();
-    if (
-      lower.includes("apikey") ||
-      lower.includes("api_key") ||
-      lower.includes("token") ||
-      lower.includes("authorization") ||
-      lower.includes("password") ||
-      lower.includes("secret")
-    ) {
-      masked[key] = "[REDACTED]";
-    } else {
-      masked[key] = maskSensitivePayload(item, depth + 1);
-    }
-  }
-  return masked;
-}
-
-function formatPayload(payload: unknown): string {
-  if (payload === undefined) return "";
-  try {
-    return JSON.stringify(maskSensitivePayload(payload), null, 2);
-  } catch {
-    return String(payload);
-  }
+  return pageIds.size;
 }
 
 type SubagentDisplayStatus =
@@ -299,17 +269,25 @@ function getSubagentDisplay(part: ToolPart, isMessageStreaming = false) {
         ? part.duration
         : undefined;
   const lowerFailure = `${error ?? ""} ${content ?? ""}`.toLowerCase();
+  const rawStatus = String(part.status);
+  const isRunningStatus =
+    rawStatus === "running" ||
+    rawStatus === "in_progress" ||
+    rawStatus === "pending" ||
+    rawStatus === "awaiting-approval";
 
   let status: SubagentDisplayStatus = "completed";
-  if (part.status === "running") status = "running";
-  else if (part.status === "completed" && isMessageStreaming) status = "returned";
+  if (isRunningStatus) status = "running";
+  else if (rawStatus === "completed" && isMessageStreaming) status = "returned";
   else if (success === true) status = "completed";
   else if (lowerFailure.includes("timed out") || lowerFailure.includes("timeout")) {
     status = "timeout";
   } else if (lowerFailure.includes("aborted") || lowerFailure.includes("abort")) {
     status = "aborted";
-  } else if (part.status === "error" || success === false) {
+  } else if (rawStatus === "error" || rawStatus === "failed" || success === false) {
     status = "error";
+  } else if (isMessageStreaming) {
+    status = "running";
   }
 
   return {
@@ -773,12 +751,19 @@ function SubagentTaskBlock({
   const display = getSubagentDisplay(part, isMessageStreaming);
   const statusText = getSubagentStatusText(display.status);
   const filePaths = display.files.map(getFilePath).filter(Boolean) as string[];
+  const pageCount = getPageCountFromPaths(filePaths);
   const isRunning = display.status === "running";
   const isReturned = display.status === "returned";
   const isFailed =
     display.status === "error" ||
     display.status === "timeout" ||
     display.status === "aborted";
+  const resultMessage =
+    display.content ||
+    display.error ||
+    (isRunning
+      ? "子 Agent 正在处理，还没有返回消息。"
+      : "子 Agent 没有返回文本消息。");
   const summaryParts = [statusText];
 
   if (display.durationText) summaryParts.push(display.durationText);
@@ -820,88 +805,148 @@ function SubagentTaskBlock({
           <ChevronDown className="h-3 w-3 -rotate-90 text-muted-foreground/40 flex-shrink-0" />
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[82vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base">子 Agent 任务详情</DialogTitle>
-          <DialogDescription className="text-xs">
-            查看委派任务、输出摘要、文件变更和原始事件详情。
-          </DialogDescription>
+      <DialogContent
+        aria-describedby={undefined}
+        className="flex max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden"
+      >
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-base">子 Agent 对话记录</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-xs">
-          <SubagentDetail label="委派任务" value={display.task} />
-          {display.context && (
-            <SubagentDetail label="补充上下文" value={display.context} />
-          )}
-          <SubagentDetail
-            label="状态"
-            value={[
-              statusText,
-              display.durationText,
-              filePaths.length > 0 ? `修改 ${filePaths.length} 个文件` : undefined,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+        <div className="scrollbar-thin mx-auto flex min-h-0 w-full max-w-[620px] flex-1 flex-col gap-3 overflow-y-auto pr-1 text-xs">
+          <SubagentReadonlyMessage
+            role="user"
+            title="主 Agent"
+            content={display.task}
           />
-          {display.content && (
-            <SubagentDetail
-              label={isFailed ? "失败信息" : "子 Agent 摘要"}
-              value={display.content}
-              markdown
-            />
-          )}
-          {!display.content && display.error && (
-            <SubagentDetail label="失败原因" value={display.error} />
-          )}
-          {filePaths.length > 0 && (
-            <div>
-              <div className="mb-1 text-[10px] font-medium text-muted-foreground">
-                文件变更
-              </div>
-              <ul className="space-y-1">
-                {filePaths.map((path, index) => (
-                  <li
-                    key={`${path}-${index}`}
-                    className="truncate rounded bg-background/50 px-2 py-1 font-mono text-[11px] text-muted-foreground"
-                    title={path}
-                  >
-                    {path}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <SubagentDetail
-            label="原始详情"
-            value={formatPayload(part.details ?? part.result ?? {})}
+          <SubagentReadonlyMessage
+            role="assistant"
+            title="子 Agent"
+            content={resultMessage}
           />
         </div>
+        <SubagentStatusBar
+          statusText={statusText}
+          statusTone={
+            isFailed ? "danger" : isRunning ? "warning" : isReturned ? "info" : "success"
+          }
+          durationText={display.durationText || (isRunning ? "进行中" : "未记录")}
+          pageText={pageCount > 0 ? `${pageCount} 个页面` : "页面未识别"}
+          fileText={filePaths.length > 0 ? `${filePaths.length} 个文件` : "无文件变更"}
+        />
       </DialogContent>
     </Dialog>
   );
 }
 
-function SubagentDetail({
-  label,
-  value,
-  markdown = false,
+function SubagentReadonlyMessage({
+  role,
+  title,
+  content,
 }: {
-  label: string;
-  value: string;
-  markdown?: boolean;
+  role: "user" | "assistant";
+  title: string;
+  content: string;
+}) {
+  const isUser = role === "user";
+  const [expanded, setExpanded] = useState(false);
+  const shouldFold =
+    isUser && (content.length > 420 || content.split(/\r?\n/).length > 8);
+
+  return (
+    <div className={cn("flex min-w-0", isUser ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "leading-relaxed",
+          isUser
+            ? "max-w-[86%] rounded-lg border border-border/40 bg-muted/60 px-3 py-2 text-foreground"
+            : "w-full max-w-full px-0 py-0 text-foreground/85",
+        )}
+      >
+        <div
+          className="mb-1 text-[10px] font-medium text-muted-foreground"
+        >
+          {title}
+        </div>
+        <div className="relative">
+          <div
+            className={cn(
+              "break-words text-[12px]",
+              shouldFold && !expanded && "max-h-32 overflow-hidden",
+            )}
+          >
+            <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+              {content}
+            </Streamdown>
+          </div>
+          {shouldFold && !expanded && (
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-x-0 bottom-0 h-8",
+                isUser
+                  ? "bg-gradient-to-t from-muted to-muted/0"
+                  : "bg-gradient-to-t from-background to-background/0",
+              )}
+            />
+          )}
+        </div>
+        {shouldFold && (
+          <button
+            type="button"
+            className={cn(
+              "mt-2 inline-flex items-center gap-1 text-[11px] transition-colors",
+              isUser
+                ? "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? "收起消息" : "展开完整消息"}
+            <ChevronDown
+              className={cn(
+                "h-3 w-3 transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubagentStatusBar({
+  statusText,
+  statusTone,
+  durationText,
+  pageText,
+  fileText,
+}: {
+  statusText: string;
+  statusTone: "success" | "warning" | "danger" | "info";
+  durationText: string;
+  pageText: string;
+  fileText: string;
 }) {
   return (
-    <div>
-      <div className="mb-1 text-[10px] font-medium text-muted-foreground">
-        {label}
-      </div>
-      <div className="min-w-0 rounded bg-background/50 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
-        {markdown ? (
-          <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
-            {value}
-          </Streamdown>
-        ) : (
-          <span className="break-words">{value}</span>
-        )}
+    <div className="-mx-6 -mb-6 mt-2 shrink-0 border-t border-border/30 bg-background/95 px-6 py-3">
+      <div className="mx-auto flex w-full max-w-[620px] flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        <span>状态</span>
+        <span
+          className={cn(
+            "font-medium",
+            statusTone === "success" && "text-green-600",
+            statusTone === "warning" && "text-yellow-600",
+            statusTone === "danger" && "text-red-600",
+            statusTone === "info" && "text-blue-600",
+          )}
+        >
+          {statusText}
+        </span>
+      </span>
+      <span>耗时 {durationText}</span>
+      <span>{pageText}</span>
+      <span>{fileText}</span>
       </div>
     </div>
   );
