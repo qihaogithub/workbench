@@ -10,6 +10,20 @@ const initialState: CanvasState = {
   },
 };
 
+const mockCanvasSize = { width: 1000, height: 800 };
+
+function getExpectedFitViewport() {
+  const page = initialState.pages.page_1;
+  const zoom =
+    Math.min(mockCanvasSize.width / page.width, mockCanvasSize.height / page.height) *
+    0.9;
+  return {
+    x: mockCanvasSize.width / 2 - (page.x + page.width / 2) * zoom,
+    y: mockCanvasSize.height / 2 - (page.y + page.height / 2) * zoom,
+    zoom,
+  };
+}
+
 function TestCanvas() {
   const [state, setState] = useState<CanvasState>(initialState);
 
@@ -67,6 +81,47 @@ describe("PreviewCanvas viewer 交互模式", () => {
       writable: true,
       value: (id: number) => window.clearTimeout(id),
     });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return mockCanvasSize.width;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get() {
+        return mockCanvasSize.height;
+      },
+    });
+    Object.defineProperty(window, "ResizeObserver", {
+      writable: true,
+      value: class MockResizeObserver {
+        private callback: ResizeObserverCallback;
+
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+        }
+
+        observe(target: Element) {
+          this.callback(
+            [
+              {
+                target,
+                contentRect: {
+                  width: mockCanvasSize.width,
+                  height: mockCanvasSize.height,
+                },
+              } as ResizeObserverEntry,
+            ],
+            this as ResizeObserver,
+          );
+        }
+
+        unobserve() {}
+
+        disconnect() {}
+      },
+    });
     Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
       configurable: true,
       value: jest.fn(),
@@ -91,13 +146,31 @@ describe("PreviewCanvas viewer 交互模式", () => {
     expect(screen.queryByLabelText("自动排版")).not.toBeInTheDocument();
   });
 
+  it("初始加载后自动适应屏幕", async () => {
+    render(<TestCanvas />);
+
+    const expected = getExpectedFitViewport();
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.viewport.zoom).toBeCloseTo(expected.zoom, 5);
+      expect(state.viewport.x).toBeCloseTo(expected.x, 5);
+      expect(state.viewport.y).toBeCloseTo(expected.y, 5);
+      expect(state.pages.page_1).toEqual(initialState.pages.page_1);
+    });
+  });
+
   it("支持缩放和重置视图且不重置页面布局", async () => {
     render(<TestCanvas />);
+
+    const expected = getExpectedFitViewport();
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeCloseTo(expected.zoom, 5);
+    });
 
     fireEvent.click(screen.getByLabelText("放大"));
 
     await waitFor(() => {
-      expect(getCanvasState().viewport.zoom).toBeGreaterThan(0.5);
+      expect(getCanvasState().viewport.zoom).toBeGreaterThan(expected.zoom);
     });
 
     fireEvent.click(screen.getByLabelText("重置布局"));
@@ -112,6 +185,11 @@ describe("PreviewCanvas viewer 交互模式", () => {
   it("拖动画布时只更新视口不移动页面", async () => {
     const { container } = render(<TestCanvas />);
     const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+    const expected = getExpectedFitViewport();
+
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeCloseTo(expected.zoom, 5);
+    });
 
     fireEvent.pointerDown(root, {
       button: 0,
@@ -132,7 +210,9 @@ describe("PreviewCanvas viewer 交互模式", () => {
 
     await waitFor(() => {
       const state = getCanvasState();
-      expect(state.viewport).toEqual({ x: 65, y: 75, zoom: 0.5 });
+      expect(state.viewport.zoom).toBeCloseTo(expected.zoom, 5);
+      expect(state.viewport.x).toBeCloseTo(expected.x + 25, 5);
+      expect(state.viewport.y).toBeCloseTo(expected.y + 35, 5);
       expect(state.pages.page_1).toEqual(initialState.pages.page_1);
     });
   });
