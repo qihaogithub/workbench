@@ -1,6 +1,8 @@
 # Agent 沙箱观测工具方案（控制台数据 + 截图）
 
-> **状态**：Phase 1 已实施 | **日期**：2026-06-04 | **前置**：`预览区画布模式Puppeteer截图方案.md`（共享 Puppeteer 基础设施）
+> **状态**：继续推进 | **日期**：2026-06-04 | **前置**：`预览区画布模式Puppeteer截图方案.md`（共享 Puppeteer 基础设施）
+
+> **2026-06-21 校正进度**：控制台观测链路已经落地，`getConsoleLogs` 工具已注册；截图基础设施不是原方案中的 `screenshot-renderer.ts` / `screenshot-compile-cache.ts`，而是当前已存在的独立 `screenshot-service`。本轮已新增 `captureScreenshot` Pi Agent 工具，扩展 `screenshot-service` 支持 `fullPage` 参数，并补充截图工具单元测试。剩余重点是端到端验证与多模态消费验证。
 
 ---
 
@@ -28,7 +30,7 @@
 - **`预览区画布模式Puppeteer截图方案.md`**：为画布模式 UI 缩略图设计，批量异步生成，面向前端展示
 - **本方案**：为 Agent 调试设计，按需单次捕获，面向 LLM 消费
 
-两者共享 Puppeteer Browser 单例和截图渲染基础设施，但 API 层和调用模式独立。
+两者共享 `screenshot-service` 的 Puppeteer Browser 池、编译缓存和截图文件读取能力；Agent 侧只新增工具编排层，不在 `agent-service` 内重复维护 Puppeteer。
 
 ---
 
@@ -73,8 +75,8 @@
 │  ConsoleBuffer (per session, 内存)                              │
 │  → getConsoleLogs 工具读取                                      │
 │                                                                 │
-│  Puppeteer Browser 单例 (与画布截图方案共享)                    │
-│  → captureScreenshot 工具调用                                   │
+│  captureScreenshot 工具                                         │
+│  → 调用 screenshot-service 生成/读取 PNG                        │
 │                                                                 │
 │  Agent Tools                                                    │
 │  ┌──────────────────┐  ┌────────────────────────────┐           │
@@ -590,7 +592,7 @@ config.workingDir  →  工作空间根目录
 配置文件路径: path.join(workingDir, demoId, 'config.schema.json')
 ```
 
-**多页面场景**：当前 Agent 会话仅关联一个 `demoId`，截图工具截取该 demo 对应的页面。如果 Agent 需要截取其他页面，可先用 `listFiles` 查看文件结构。
+**projectId 获取**：`workingDir` 可能是正式空间 `data/projects/{projectId}/workspace`，也可能是编辑会话空间 `data/sessions/{projectId}/{sessionId}`。工具从路径片段中的 `projects/{projectId}` 或 `sessions/{projectId}` 反推项目 ID。
 
 **configData 获取**：从工作空间中的 `config.schema.json` 读取各属性的 `default` 值组装默认 configData，与 iframe 路由的行为一致。
 
@@ -741,7 +743,7 @@ export interface ConsoleLogPayload {
 
 ## 八、文件变更清单
 
-### 8.1 新增文件（4 个，已实施）
+### 8.1 新增文件（5 个，已实施）
 
 | 文件                  | 位置                                            | 说明                                 | 状态 |
 | --------------------- | ----------------------------------------------- | ------------------------------------ | ---- |
@@ -750,7 +752,7 @@ export interface ConsoleLogPayload {
 | `iframe-types.ts`     | `packages/shared/src/demo/`                     | iframe postMessage 消息类型定义      | ✅   |
 | `useConsoleBuffer.ts` | `packages/author-site/src/components/demo/`     | 控制台缓冲 React Hook（限流 + 转发） | ✅   |
 
-### 8.2 待新增文件（1 个，Phase 2）
+### 8.2 待新增文件
 
 | 文件                 | 位置                                            | 说明                         | 状态   |
 | -------------------- | ----------------------------------------------- | ---------------------------- | ------ |
@@ -823,7 +825,7 @@ agent-service 仅需新增 `SCREENSHOT_SERVICE_URL` 环境变量（默认 `http:
 - `ClientMessage.entries` 字段类型使用 `'log' | 'warn' | 'error' | 'info' | 'debug'` 字面量联合类型，确保与 `ConsoleEntry.level` 类型一致
 - `console_data` 消息在 switch 之前处理并 return，不走 Agent sendMessage 流程
 - `externalStreamServiceRef` 通过 `useChatStream` → `AIChat` → 编辑页面的链路传递，使 `useConsoleBuffer` 能访问 StreamService 的底层 WebSocket
-- vitest 测试待补充
+- `getConsoleLogs` 已随 Pi Agent 工具注册测试覆盖；控制台链路的更细粒度 vitest 仍可继续补充
 
 ### Phase 2：截图捕获 ✅ 已实施
 
@@ -838,11 +840,19 @@ agent-service 仅需新增 `SCREENSHOT_SERVICE_URL` 环境变量（默认 `http:
 6. ✅ 更新 `agent-service/AGENTS.md`，新增工具到列表
 7. ⬜ 编写 vitest 测试（mock fetch + 工具测试）
 
-### Phase 3：System Prompt 与集成测试
+1. ✅ 校正基础设施：复用现有 `screenshot-service`，不再新增 `screenshot-renderer.ts`
+2. ✅ 新增 `screenshot-tool.ts`（`captureScreenshot` 工具）
+3. ✅ 实现截图逻辑：定位页面代码 → 提取 schema 默认配置 → 调用 screenshot-service → 读取 PNG → base64 返回
+4. ✅ 注册工具到 `pi-tools/index.ts`
+5. ✅ 扩展 screenshot-service：`fullPage` 参数进入渲染与缓存 hash
+6. ✅ 更新 Pi Agent 工具注册测试
+7. ✅ 补充 `captureScreenshot` 成功返回图片与缺少代码文件错误路径单元测试
 
-1. 更新 `buildStaticSystemPrompt()`，追加观测工具使用指引
-2. 端到端验证：Agent 对话 → 调用 getConsoleLogs → 调用 captureScreenshot → 修复代码
-3. 验证多模态模型能否正确消费 `ImageContent` 返回
+### Phase 3：System Prompt 与集成测试（部分完成）
+
+1. ✅ 更新静态 system prompt，追加 `captureScreenshot` 使用指引
+2. ⏳ 端到端验证：Agent 对话 → 调用 getConsoleLogs → 调用 captureScreenshot → 修复代码
+3. ⏳ 验证多模态模型能否正确消费 `ImageContent` 返回
 
 ---
 

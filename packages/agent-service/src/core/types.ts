@@ -1,3 +1,5 @@
+import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+
 // ============================================================
 // 基础类型
 // ============================================================
@@ -36,8 +38,10 @@ export interface AgentConfig {
   workingDir?: string;
   demoId?: string;
   model?: string;
+  toolVersion?: number;
   timeout?: number;
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
+  backendProviders?: BackendProvidersConfig;
 
   piAgent?: PiAgentConfig;
 }
@@ -48,6 +52,8 @@ export interface PiAgentConfig {
   provider?: string;  // "anthropic" | "openai" | "google"
   baseUrl?: string;   // 自定义 API 基础地址（OpenAI 兼容格式）
   timeout?: number;
+  subagentsEnabled?: boolean;
+  subagentTimeout?: number;
   thinkingLevel?: string;  // "off" | "low" | "medium" | "high" — AgentHarness 思考级别
 }
 
@@ -96,6 +102,7 @@ export interface AgentError {
 
 export interface ResultMetadata {
   model?: string;
+  emptyResponseDebug?: unknown;
   tokens?: {
     prompt: number;
     completion: number;
@@ -139,6 +146,7 @@ export interface ToolCallEvent {
   status: "pending" | "in_progress" | "completed" | "failed";
   title: string;
   kind: "read" | "edit" | "execute";
+  parameters?: Record<string, unknown>;
 }
 
 export interface ToolCallUpdateEvent {
@@ -146,6 +154,13 @@ export interface ToolCallUpdateEvent {
   sessionId: string;
   toolCallId: string;
   status: "completed" | "failed";
+  content?: string;
+  result?: unknown;
+  details?: unknown;
+  durationMs?: number;
+  error?: {
+    message?: string;
+  };
 }
 
 export interface ErrorEvent {
@@ -195,6 +210,8 @@ export interface PermissionRequestEvent {
       toolCallId: string;
       title?: string;
       kind?: string;
+      summary?: string;
+      planId?: string;
     };
   };
 }

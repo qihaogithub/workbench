@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently -n author,agent,viewer,snapshot,sshot -c blue,green,cyan,magenta,yellow \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/agent-service dev\" \"pnpm --filter @opencode-workbench/viewer-site dev\" \"pnpm --filter @opencode-workbench/snapshot-service dev\" \"pnpm --filter @opencode-workbench/screenshot-service dev\"",
     "dev:author": "pnpm --filter @opencode-workbench/author-site dev",
+    "dev:preview": "concurrently -n author,sshot -c blue,yellow \"pnpm --filter @opencode-workbench/author-site dev\" \"pnpm --filter @opencode-workbench/screenshot-service dev\"",
     "dev:agent": "pnpm --filter @opencode-workbench/agent-service dev",
     "dev:viewer": "pnpm --filter @opencode-workbench/viewer-site dev",
     "dev:snapshot": "pnpm --filter @opencode-workbench/snapshot-service dev",
@@ -16,7 +17,8 @@
     "typecheck:viewer": "pnpm --filter @opencode-workbench/viewer-site typecheck",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:ai-workspace-refresh": "node scripts/development/test-ai-workspace-refresh.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",

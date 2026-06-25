@@ -1,0 +1,283 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e8]:
+      - button [ref=e9] [cursor=pointer]:
+        - img [ref=e10]
+      - iframe [ref=e16]:
+        - generic [ref=f1e3]:
+          - heading "位置与排序" [level=1] [ref=f1e4]
+          - generic [ref=f1e5]:
+            - generic [ref=f1e6]: orderableHorizontal · 横向排序
+            - generic [ref=f1e8]:
+              - generic [ref=f1e9]: 首页
+              - generic [ref=f1e10]: 产品
+              - generic [ref=f1e11]: 关于
+              - generic [ref=f1e12]: 联系我们
+          - generic [ref=f1e13]:
+            - generic [ref=f1e14]: orderable · 纵向排序
+            - generic [ref=f1e15]:
+              - generic [ref=f1e16]:
+                - text: 欢迎来到我们的平台
+                - generic [ref=f1e17]: "#1"
+              - generic [ref=f1e18]:
+                - text: 核心功能展示
+                - generic [ref=f1e19]: "#2"
+              - generic [ref=f1e20]:
+                - text: 用户评价
+                - generic [ref=f1e21]: "#3"
+          - generic [ref=f1e22]:
+            - generic [ref=f1e23]: positionable · 自由坐标
+            - generic [ref=f1e25]:
+              - generic [ref=f1e26]:
+                - text: NEW
+                - generic [ref=f1e27]: (80,60)
+              - generic [ref=f1e28]:
+                - text: HOT
+                - generic [ref=f1e29]: (260,60)
+              - generic [ref=f1e30]:
+                - text: PRO
+                - generic [ref=f1e31]: (440,60)
+              - generic [ref=f1e32]:
+                - text: BETA
+                - generic [ref=f1e33]: (170,180)
+    - generic [ref=e17]:
+      - heading "配置面板" [level=2] [ref=e19]
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - img [ref=e26]
+            - generic [ref=e29]: 全局配置
+          - generic [ref=e35]:
+            - generic [ref=e38]:
+              - generic [ref=e39] [cursor=pointer]:
+                - img [ref=e41]
+                - heading "基础配置" [level=3] [ref=e43]
+                - generic [ref=e44]: "3"
+              - generic [ref=e46]:
+                - generic [ref=e47]:
+                  - generic [ref=e49]: 品牌名称
+                  - textbox "请输入品牌名称" [ref=e51]: OpenCode Workbench
+                - generic [ref=e52]:
+                  - generic [ref=e54]: 深色模式
+                  - switch [ref=e57] [cursor=pointer]
+                - generic [ref=e58]:
+                  - generic [ref=e60]: 公司标语
+                  - textbox "请输入公司标语" [ref=e62]: 用配置驱动一切
+            - generic [ref=e65]:
+              - generic [ref=e66] [cursor=pointer]:
+                - img [ref=e68]
+                - heading "颜色配置" [level=3] [ref=e70]
+                - generic [ref=e71]: "1"
+              - generic [ref=e74]:
+                - generic [ref=e76]: 主题色
+                - generic [ref=e78]:
+                  - textbox [ref=e79] [cursor=pointer]: "#6366f1"
+                  - textbox "#000000" [ref=e80]: "#6366f1"
+        - generic [ref=e82]:
+          - generic [ref=e83]:
+            - img [ref=e84]
+            - generic [ref=e87]: 位置与排序
+          - generic [ref=e93]:
+            - generic [ref=e95]:
+              - generic [ref=e96] [cursor=pointer]:
+                - img [ref=e98]
+                - heading "组件排序" [level=3] [ref=e100]
+                - generic [ref=e101]: "3"
+              - generic [ref=e103]:
+                - generic [ref=e104]:
+                  - img [ref=e105]
+                  - generic [ref=e107]: 从上到下排列
+                - generic [ref=e108]:
+                  - generic [ref=e109]:
+                    - button [ref=e110]:
+                      - img [ref=e111]
+                    - generic [ref=e118]: "1"
+                    - generic [ref=e119]: 首屏区域
+                    - generic [ref=e120]:
+                      - button [disabled]:
+                        - img
+                      - button [ref=e121] [cursor=pointer]:
+                        - img [ref=e122]
+                  - generic [ref=e124]:
+                    - button [ref=e125]:
+                      - img [ref=e126]
+                    - generic [ref=e133]: "2"
+                    - generic [ref=e134]: 功能区域
+                    - generic [ref=e135]:
+                      - button [ref=e136] [cursor=pointer]:
+                        - img [ref=e137]
+                      - button [ref=e139] [cursor=pointer]:
+                        - img [ref=e140]
+                  - generic [ref=e142]:
+                    - button [ref=e143]:
+                      - img [ref=e144]
+                    - generic [ref=e151]: "3"
+                    - generic [ref=e152]: 评价区域
+                    - generic [ref=e153]:
+                      - button [ref=e154] [cursor=pointer]:
+                        - img [ref=e155]
+                      - button [disabled]:
+                        - img
+                - status [ref=e157]
+            - generic [ref=e159]:
+              - generic [ref=e160] [cursor=pointer]:
+                - img [ref=e162]
+                - heading "横向排序" [level=3] [ref=e164]
+                - generic [ref=e165]: "4"
+              - generic [ref=e167]:
+                - generic [ref=e168]:
+                  - img [ref=e169]
+                  - generic [ref=e171]: 从左到右排列
+                - generic [ref=e172]:
+                  - generic [ref=e174]:
+                    - button [ref=e175]:
+                      - img [ref=e176]
+                    - generic [ref=e183]: 首页导航
+                    - generic [ref=e184]:
+                      - button [disabled]:
+                        - img
+                      - button [ref=e185] [cursor=pointer]:
+                        - img [ref=e186]
+                  - generic [ref=e188]:
+                    - generic [ref=e189]: →
+                    - generic [ref=e190]:
+                      - button [ref=e191]:
+                        - img [ref=e192]
+                      - generic [ref=e199]: 产品导航
+                      - generic [ref=e200]:
+                        - button [ref=e201] [cursor=pointer]:
+                          - img [ref=e202]
+                        - button [ref=e204] [cursor=pointer]:
+                          - img [ref=e205]
+                  - generic [ref=e207]:
+                    - generic [ref=e208]: →
+                    - generic [ref=e209]:
+                      - button [ref=e210]:
+                        - img [ref=e211]
+                      - generic [ref=e218]: 关于导航
+                      - generic [ref=e219]:
+                        - button [ref=e220] [cursor=pointer]:
+                          - img [ref=e221]
+                        - button [ref=e223] [cursor=pointer]:
+                          - img [ref=e224]
+                  - generic [ref=e226]:
+                    - generic [ref=e227]: →
+                    - generic [ref=e228]:
+                      - button [ref=e229]:
+                        - img [ref=e230]
+                      - generic [ref=e237]: 联系导航
+                      - generic [ref=e238]:
+                        - button [ref=e239] [cursor=pointer]:
+                          - img [ref=e240]
+                        - button [disabled]:
+                          - img
+                - status [ref=e242]
+            - generic [ref=e244]:
+              - generic [ref=e245] [cursor=pointer]:
+                - img [ref=e247]
+                - heading "元素定位" [level=3] [ref=e249]
+                - generic [ref=e250]: "5"
+              - generic [ref=e252]:
+                - generic [ref=e253]:
+                  - generic [ref=e254]: "容器: 686 × 220 px"
+                  - generic [ref=e255]: 坐标相对于容器左上角
+                - generic [ref=e256]:
+                  - img
+                  - generic [ref=e258]: 徽章1
+                  - generic [ref=e260]: 徽章2
+                  - generic [ref=e262]: 徽章3
+                  - generic [ref=e264]: 徽章4
+                  - generic [ref=e266]: Logo图片
+                - generic [ref=e267]:
+                  - generic [ref=e268]:
+                    - generic "徽章1" [ref=e269]
+                    - generic [ref=e270]:
+                      - generic [ref=e271]: X
+                      - spinbutton [ref=e272]: "80"
+                    - generic [ref=e273]:
+                      - generic [ref=e274]: "Y"
+                      - spinbutton [ref=e275]: "60"
+                  - generic [ref=e276]:
+                    - generic "徽章2" [ref=e277]
+                    - generic [ref=e278]:
+                      - generic [ref=e279]: X
+                      - spinbutton [ref=e280]: "260"
+                    - generic [ref=e281]:
+                      - generic [ref=e282]: "Y"
+                      - spinbutton [ref=e283]: "60"
+                  - generic [ref=e284]:
+                    - generic "徽章3" [ref=e285]
+                    - generic [ref=e286]:
+                      - generic [ref=e287]: X
+                      - spinbutton [ref=e288]: "440"
+                    - generic [ref=e289]:
+                      - generic [ref=e290]: "Y"
+                      - spinbutton [ref=e291]: "60"
+                  - generic [ref=e292]:
+                    - generic "徽章4" [ref=e293]
+                    - generic [ref=e294]:
+                      - generic [ref=e295]: X
+                      - spinbutton [ref=e296]: "170"
+                    - generic [ref=e297]:
+                      - generic [ref=e298]: "Y"
+                      - spinbutton [ref=e299]: "180"
+                  - generic [ref=e300]:
+                    - generic "Logo图片" [ref=e301]
+                    - generic [ref=e302]:
+                      - generic [ref=e303]: X
+                      - spinbutton [ref=e304]: "500"
+                    - generic [ref=e305]:
+                      - generic [ref=e306]: "Y"
+                      - spinbutton [ref=e307]: "130"
+            - generic [ref=e310]:
+              - generic [ref=e311] [cursor=pointer]:
+                - img [ref=e313]
+                - heading "基础配置" [level=3] [ref=e315]
+                - generic [ref=e316]: "11"
+              - generic [ref=e318]:
+                - generic [ref=e319]:
+                  - generic [ref=e321]: 首屏区域
+                  - textbox "请输入首屏区域" [ref=e323]: 欢迎来到我们的平台
+                - generic [ref=e324]:
+                  - generic [ref=e326]: 功能区域
+                  - textbox "请输入功能区域" [ref=e328]: 核心功能展示
+                - generic [ref=e329]:
+                  - generic [ref=e331]: 评价区域
+                  - textbox "请输入评价区域" [ref=e333]: 用户评价
+                - generic [ref=e334]:
+                  - generic [ref=e336]: 首页导航
+                  - textbox "请输入首页导航" [ref=e338]: 首页
+                - generic [ref=e339]:
+                  - generic [ref=e341]: 产品导航
+                  - textbox "请输入产品导航" [ref=e343]: 产品
+                - generic [ref=e344]:
+                  - generic [ref=e346]: 关于导航
+                  - textbox "请输入关于导航" [ref=e348]: 关于
+                - generic [ref=e349]:
+                  - generic [ref=e351]: 联系导航
+                  - textbox "请输入联系导航" [ref=e353]: 联系我们
+                - generic [ref=e354]:
+                  - generic [ref=e356]: 徽章1
+                  - textbox "请输入徽章1" [ref=e358]: NEW
+                - generic [ref=e359]:
+                  - generic [ref=e361]: 徽章2
+                  - textbox "请输入徽章2" [ref=e363]: HOT
+                - generic [ref=e364]:
+                  - generic [ref=e366]: 徽章3
+                  - textbox "请输入徽章3" [ref=e368]: PRO
+                - generic [ref=e369]:
+                  - generic [ref=e371]: 徽章4
+                  - textbox "请输入徽章4" [ref=e373]: BETA
+            - generic [ref=e376]:
+              - generic [ref=e377] [cursor=pointer]:
+                - img [ref=e379]
+                - heading "图片资源" [level=3] [ref=e381]
+                - generic [ref=e382]: "1"
+              - generic [ref=e385]:
+                - generic [ref=e387]: Logo图片
+                - generic [ref=e392] [cursor=pointer]:
+                  - img [ref=e394]
+                  - generic [ref=e397]: Upload
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e7]

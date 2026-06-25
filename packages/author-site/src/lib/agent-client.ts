@@ -30,4 +30,5 @@ export type {
   AgentStatus,
   ErrorCode,
   StreamEvent,
+  ToolCapabilities,
 } from '@opencode-workbench/agent-client';

@@ -52,6 +52,7 @@ export interface ToolCallEvent {
   toolName: string;
   status: string;
   parameters: Record<string, unknown>;
+  timestamp?: number;
 }
 
 export function addToolPart(
@@ -66,6 +67,7 @@ export function addToolPart(
       toolName: toolCall.toolName,
       status: toolCall.status as "running" | "completed" | "error",
       parameters: toolCall.parameters,
+      startedAt: toolCall.timestamp || Date.now(),
     },
   ];
 }
@@ -74,7 +76,11 @@ export interface ToolUpdateEvent {
   toolCallId: string;
   toolCallStatus?: string;
   content?: string;
+  result?: unknown;
+  details?: unknown;
+  durationMs?: number;
   error?: { message?: string };
+  timestamp?: number;
 }
 
 export function updateToolPart(
@@ -95,8 +101,15 @@ export function updateToolPart(
               ? ("running" as const)
               : part.status;
 
-      let result = part.result;
-      if (update.content) {
+      let result = update.result ?? part.result;
+      if (update.details !== undefined) {
+        if (result && typeof result === "object" && !Array.isArray(result)) {
+          result = { ...result, details: update.details };
+        } else {
+          result = { details: update.details, content: result };
+        }
+      }
+      if (update.content && result === undefined) {
         try {
           result = JSON.parse(update.content);
         } catch {
@@ -115,6 +128,12 @@ export function updateToolPart(
         ...part,
         status: newStatus,
         result,
+        details: update.details ?? part.details,
+        duration: update.durationMs ?? part.duration,
+        endedAt:
+          newStatus === "completed" || newStatus === "error"
+            ? update.timestamp || Date.now()
+            : part.endedAt,
       };
     }
     return part;
@@ -148,5 +167,6 @@ export function parseToolCallFromEvent(event: any): ToolCallEvent {
       ...parameters,
       path: extractedPath || parameters.path || parameters.file_path,
     },
+    timestamp: event.timestamp,
   };
 }

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { MoreVertical, Trash2, FileText } from "lucide-react";
+import { FileText, MoreVertical, Save, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import type { DemoMeta } from "@opencode-workbench/shared";
 interface DemoCardProps {
   demo: DemoMeta;
   onDelete: (id: string) => void;
+  onSaveAsTemplate: (demo: DemoMeta) => void;
 }
 
 /**
@@ -142,7 +143,9 @@ function PlaceholderIcon() {
   );
 }
 
-export function DemoCard({ demo, onDelete }: DemoCardProps) {
+export function DemoCard({ demo, onDelete, onSaveAsTemplate }: DemoCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <Link href={`/demo/${demo.id}/edit`}>
       <Card className="group overflow-hidden transition-all duration-300 hover:border-border/80 cursor-pointer bg-card border border-border/50">
@@ -173,20 +176,37 @@ export function DemoCard({ demo, onDelete }: DemoCardProps) {
                 更新于 {formatDate(demo.updatedAt)}
               </p>
             </div>
-            <DropdownMenu>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                   className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-accent transition-colors duration-200 shrink-0 opacity-0 group-hover:opacity-100"
                 >
                   <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onSaveAsTemplate(demo);
+                  }}
+                >
+                  <Save className="h-3.5 w-3.5 mr-2" />
+                  保存为模板
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive text-xs"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
+                    setMenuOpen(false);
                     onDelete(demo.id);
                   }}
                 >

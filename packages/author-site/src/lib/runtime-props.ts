@@ -11,7 +11,7 @@
  * 详见 docs/plans/进行中/项目多Demo页面支持方案.md §2.3 / §2.6 / §4.6
  */
 
-import { parseSchemaString, type JsonSchema } from "./schema-validator";
+import { getDefaultValues } from "@opencode-workbench/shared/demo";
 
 /**
  * 字段冲突错误：项目级 Schema 与页面级 Schema 出现同名字段。
@@ -26,26 +26,46 @@ export class SchemaConflictError extends Error {
   }
 }
 
-/**
- * 从 Schema 的 properties 中提取 default 值，组装为对象。
- * 没有 default 的字段不会出现在结果中，与现有 `getDefaultValues()` 行为一致。
- */
-function extractDefaultsFromSchema(
-  schema: JsonSchema | null,
+const RESERVED_CONFIG_KEYS = new Set(["__order", "__orderH", "__positions"]);
+
+function isReservedConfigKey(key: string): boolean {
+  return RESERVED_CONFIG_KEYS.has(key);
+}
+
+function readSchemaDefaults(schema: string | undefined): Record<string, unknown> {
+  return schema ? getDefaultValues(schema) : {};
+}
+
+function mergeRuntimeDefaults(
+  projectDefaults: Record<string, unknown>,
+  pageDefaults: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (!schema || !schema.properties || typeof schema.properties !== "object") {
-    return {};
+  const merged: Record<string, unknown> = {
+    ...projectDefaults,
+    ...pageDefaults,
+  };
+
+  const projectPositions = projectDefaults.__positions;
+  const pagePositions = pageDefaults.__positions;
+  if (
+    projectPositions &&
+    typeof projectPositions === "object" &&
+    !Array.isArray(projectPositions)
+  ) {
+    merged.__positions = { ...(projectPositions as Record<string, unknown>) };
   }
-  const defaults: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(schema.properties)) {
-    if (value && typeof value === "object" && "default" in (value as object)) {
-      const def = (value as { default?: unknown }).default;
-      if (def !== undefined) {
-        defaults[key] = def;
-      }
-    }
+  if (
+    pagePositions &&
+    typeof pagePositions === "object" &&
+    !Array.isArray(pagePositions)
+  ) {
+    merged.__positions = {
+      ...((merged.__positions as Record<string, unknown> | undefined) ?? {}),
+      ...(pagePositions as Record<string, unknown>),
+    };
   }
-  return defaults;
+
+  return merged;
 }
 
 /**
@@ -59,19 +79,18 @@ export function mergeConfigToProps(
   projectSchema: string | undefined,
   pageSchema: string,
 ): Record<string, unknown> {
-  const project = parseSchemaString(projectSchema);
-  const page = parseSchemaString(pageSchema);
-
-  const projectDefaults = extractDefaultsFromSchema(project);
-  const pageDefaults = extractDefaultsFromSchema(page);
+  const projectDefaults = readSchemaDefaults(projectSchema);
+  const pageDefaults = readSchemaDefaults(pageSchema);
 
   const projectKeys = new Set(Object.keys(projectDefaults));
-  const overlapping = Object.keys(pageDefaults).filter((k) => projectKeys.has(k));
+  const overlapping = Object.keys(pageDefaults).filter(
+    (k) => projectKeys.has(k) && !isReservedConfigKey(k),
+  );
   if (overlapping.length > 0) {
     throw new SchemaConflictError(overlapping);
   }
 
-  return { ...projectDefaults, ...pageDefaults };
+  return mergeRuntimeDefaults(projectDefaults, pageDefaults);
 }
 
 /**
@@ -118,11 +137,8 @@ export function mergeConfigWithUserValues(
   newSchema: string,
   oldSchema?: string,
 ): Record<string, unknown> {
-  const newSchemaObj = parseSchemaString(newSchema);
-  const oldSchemaObj = oldSchema ? parseSchemaString(oldSchema) : null;
-
-  const newDefaults = extractDefaultsFromSchema(newSchemaObj);
-  const oldDefaults = extractDefaultsFromSchema(oldSchemaObj);
+  const newDefaults = readSchemaDefaults(newSchema);
+  const oldDefaults = oldSchema ? readSchemaDefaults(oldSchema) : {};
 
   const result: Record<string, unknown> = {};
 
@@ -143,19 +159,11 @@ export function mergeConfigWithUserValues(
     }
   }
 
-  // 处理 __order 元数据
-  if (currentConfig.__order) {
-    result.__order = currentConfig.__order;
-  }
-
-  // 处理 __orderH 元数据
-  if (currentConfig.__orderH) {
-    result.__orderH = currentConfig.__orderH;
-  }
-
-  // 处理 __positions 元数据
-  if (currentConfig.__positions) {
-    result.__positions = currentConfig.__positions;
+  for (const key of RESERVED_CONFIG_KEYS) {
+    if (newDefaults[key] === undefined && currentConfig[key] === undefined) {
+      continue;
+    }
+    result[key] = currentConfig[key] ?? newDefaults[key];
   }
 
   return result;

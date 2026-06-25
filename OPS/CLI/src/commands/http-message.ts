@@ -15,8 +15,7 @@ export async function testHttpMessage(
   options: HttpMessageOptions,
   jsonMode: boolean = false,
 ): Promise<void> {
-  const { sessionId, message, demoId, workingDir, backend, model, timeout } =
-    options;
+  const { sessionId, message, demoId, workingDir, model, timeout } = options;
 
   if (!jsonMode) {
     console.log(chalk.cyan("\n=== HTTP 消息测试 ===\n"));
@@ -28,7 +27,7 @@ export async function testHttpMessage(
     );
     if (workingDir) console.log(chalk.gray(`工作目录: ${workingDir}`));
     if (demoId) console.log(chalk.gray(`Demo ID: ${demoId}`));
-    console.log(chalk.gray(`后端类型: ${backend || "pi-agent"}`));
+    console.log(chalk.gray("Agent 引擎: pi-agent"));
     if (model) console.log(chalk.gray(`模型: ${model}`));
     console.log(chalk.gray(`超时时间: ${timeout || 120000}ms`));
     console.log("");
@@ -46,7 +45,6 @@ export async function testHttpMessage(
         body: {
           content: message,
           demoId,
-          backend,
           model,
           workingDir,
           options: {

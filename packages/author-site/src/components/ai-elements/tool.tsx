@@ -11,12 +11,13 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 
 export interface ToolEntry {
   name: string;
-  kind?: "read" | "edit" | "execute";
+  kind?: "read" | "edit" | "execute" | "delegate";
   status: "running" | "completed" | "error" | "awaiting-approval";
   parameters?: Record<string, unknown>;
   result?: unknown;
@@ -35,7 +36,68 @@ const getToolIcon = (kind?: string) => {
   if (kind === "read") return FileText;
   if (kind === "edit") return Edit3;
   if (kind === "execute") return Terminal;
+  if (kind === "delegate") return Sparkles;
   return Code;
+};
+
+const isDelegateTask = (entry: ToolEntry) =>
+  entry.name === "delegateTask" || entry.kind === "delegate";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getDelegateTaskTitle = (entry: ToolEntry) => {
+  const task = entry.parameters?.task;
+  return typeof task === "string" && task.trim()
+    ? `委派子 Agent：${task.trim()}`
+    : "委派子 Agent";
+};
+
+const getDelegateTaskDetails = (entry: ToolEntry) => {
+  const result = isRecord(entry.result) ? entry.result : undefined;
+  const details = isRecord(result?.details)
+    ? result.details
+    : result && ("success" in result || "durationMs" in result || "files" in result)
+      ? result
+      : undefined;
+  const success = typeof details?.success === "boolean" ? details.success : undefined;
+  const content =
+    (typeof details?.content === "string" && details.content) ||
+    (typeof result?.content === "string" ? result.content : undefined);
+  const error =
+    (typeof details?.error === "string" && details.error) ||
+    (entry.status === "error" ? content : undefined);
+  const files = Array.isArray(details?.files) ? details.files : [];
+  const durationMs =
+    typeof details?.durationMs === "number" ? details.durationMs : undefined;
+  const lowerFailure = `${error ?? ""} ${content ?? ""}`.toLowerCase();
+  const status =
+    entry.status === "running"
+      ? "运行中"
+      : success === true
+        ? "已完成"
+        : lowerFailure.includes("timed out") || lowerFailure.includes("timeout")
+          ? "超时未完成"
+          : lowerFailure.includes("aborted") || lowerFailure.includes("abort")
+            ? "已取消"
+            : entry.status === "error" || success === false
+              ? "执行失败"
+              : "已完成";
+
+  const durationText =
+    typeof durationMs === "number"
+      ? durationMs < 60000
+        ? `${Math.round(durationMs / 1000)}s`
+        : `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
+      : undefined;
+
+  return {
+    status,
+    content,
+    error,
+    files,
+    durationText,
+  };
 };
 
 // 根据条目确定整体状态和图标
@@ -45,11 +107,14 @@ const getAggregateInfo = (entries: ToolEntry[]) => {
 
   const hasRunning = entries.some((e) => e.status === "running");
   const hasError = entries.some((e) => e.status === "error");
+  const hasDelegateTask = entries.some(isDelegateTask);
 
   // 优先显示编辑图标（写操作），其次读取
   const mainKind =
-    entries.find((e) => e.kind === "edit")?.kind || entries[0].kind;
-  const icon = getToolIcon(mainKind);
+    entries.find((e) => e.kind === "delegate")?.kind ||
+    entries.find((e) => e.kind === "edit")?.kind ||
+    entries[0].kind;
+  const icon = hasDelegateTask ? Sparkles : getToolIcon(mainKind);
 
   // 状态优先级：running > error > completed
   let status: "running" | "completed" | "error" = "completed";
@@ -57,8 +122,9 @@ const getAggregateInfo = (entries: ToolEntry[]) => {
   else if (hasError) status = "error";
 
   // 标签
-  const label =
-    mainKind === "read"
+  const label = hasDelegateTask
+    ? "委派子 Agent"
+    : mainKind === "read"
       ? "读取文件"
       : mainKind === "edit"
         ? "写入文件"
@@ -81,6 +147,8 @@ const formatJSON = (data: unknown): string => {
 export function Tool({ path, entries, className }: ToolProps) {
   const { icon: ToolIcon, status, label } = getAggregateInfo(entries);
   const [expanded, setExpanded] = useState(false);
+  const primaryEntry = entries[0];
+  const isSingleDelegate = entries.length === 1 && primaryEntry && isDelegateTask(primaryEntry);
 
   // 提取文件路径
   let resolvedPath = path;
@@ -132,7 +200,11 @@ export function Tool({ path, entries, className }: ToolProps) {
 
         {/* 工具名称 */}
         <span className="text-sm font-medium flex-shrink-0">
-          {entries.length === 1 ? entries[0].name : label}
+          {isSingleDelegate
+            ? getDelegateTaskTitle(primaryEntry)
+            : entries.length === 1
+              ? entries[0].name
+              : label}
         </span>
 
         {/* 文件路径 */}
@@ -181,8 +253,12 @@ export function Tool({ path, entries, className }: ToolProps) {
                 </div>
               )}
 
+              {isDelegateTask(entry) && (
+                <DelegateTaskResult entry={entry} />
+              )}
+
               {/* 执行结果 */}
-              {entry.result !== undefined && entry.result !== null && (
+              {!isDelegateTask(entry) && entry.result !== undefined && entry.result !== null && (
                 <div>
                   <div className="text-[10px] font-medium text-muted-foreground mb-1">
                     结果
@@ -199,6 +275,66 @@ export function Tool({ path, entries, className }: ToolProps) {
               )}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DelegateTaskResult({ entry }: { entry: ToolEntry }) {
+  const details = getDelegateTaskDetails(entry);
+  const filePaths = details.files
+    .map((file) => {
+      if (typeof file === "string") return file;
+      if (!isRecord(file)) return undefined;
+      const path = file.path ?? file.filePath ?? file.name;
+      return typeof path === "string" ? path : undefined;
+    })
+    .filter(Boolean) as string[];
+  const summary = [
+    details.status,
+    details.durationText,
+    filePaths.length > 0 ? `修改 ${filePaths.length} 个文件` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <div className="text-[10px] font-medium text-muted-foreground mb-1">
+          状态
+        </div>
+        <div className="text-xs bg-background/50 rounded-md p-2">
+          {summary || details.status}
+        </div>
+      </div>
+      {(details.content || details.error) && (
+        <div>
+          <div className="text-[10px] font-medium text-muted-foreground mb-1">
+            {details.status === "已完成" ? "子 Agent 摘要" : "失败信息"}
+          </div>
+          <pre className="text-xs bg-background/50 rounded-md p-2 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
+            {details.content || details.error}
+          </pre>
+        </div>
+      )}
+      {filePaths.length > 0 && (
+        <div>
+          <div className="text-[10px] font-medium text-muted-foreground mb-1">
+            文件变更
+          </div>
+          <ul className="space-y-1">
+            {filePaths.map((path, index) => (
+              <li
+                key={`${path}-${index}`}
+                className="text-xs bg-background/50 rounded-md px-2 py-1 font-mono truncate"
+                title={path}
+              >
+                {path}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

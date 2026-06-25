@@ -41,7 +41,7 @@ export async function listModels(
 
     if (models.length === 0) {
       console.log(chalk.gray("没有可用的模型"));
-      console.log(chalk.gray("请确保 OpenCode Server 正在运行 (默认端口 4096)"));
+      console.log(chalk.gray("请检查 Pi Agent 模型供应商配置和 agent-service 日志"));
       console.log("");
       return;
     }

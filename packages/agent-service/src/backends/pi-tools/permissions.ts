@@ -32,7 +32,7 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
     "**/.workspace.json",
     "**/.session.json",
   ],
-  allowedCommands: ["npm", "node", "npx", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo"],
+  allowedCommands: ["node", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo"],
   deniedCommands: ["rm", "rmdir", "mv", "cp", "mkdir", "sudo", "chmod", "chown"],
 };
 
@@ -53,16 +53,17 @@ export function isPathAllowed(
     return false;
   }
 
-  const relativePath = path.relative(workDirResolved, resolved);
+  const relativePath = path.relative(workDirResolved, resolved).replace(/\\/g, "/");
+  const normalizedResolved = resolved.replace(/\\/g, "/");
 
   for (const pattern of config.deniedPatterns) {
-    if (matchGlob(relativePath, pattern) || matchGlob(resolved, pattern)) {
+    if (matchGlob(relativePath, pattern) || matchGlob(normalizedResolved, pattern)) {
       return false;
     }
   }
 
   for (const pattern of config.allowedPaths) {
-    if (matchGlob(relativePath, pattern) || matchGlob(resolved, pattern)) {
+    if (matchGlob(relativePath, pattern) || matchGlob(normalizedResolved, pattern)) {
       return true;
     }
   }
@@ -80,6 +81,12 @@ export function isCommandAllowed(
   if (config.deniedCommands.includes(baseCmd)) {
     return false;
   }
+  if (baseCmd === "npm" || baseCmd === "npx") {
+    return false;
+  }
+  if (baseCmd === "node" && /\s(?:-e|--eval)(?:\s|=|$)/.test(` ${trimmed}`)) {
+    return false;
+  }
   if (!config.allowedCommands.includes(baseCmd)) {
     return false;
   }
@@ -87,6 +94,10 @@ export function isCommandAllowed(
 }
 
 function matchGlob(filePath: string, pattern: string): boolean {
+  if (pattern.startsWith("**/") && matchGlob(filePath, pattern.slice(3))) {
+    return true;
+  }
+
   const regex = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*\*/g, "{{DOUBLE_STAR}}")

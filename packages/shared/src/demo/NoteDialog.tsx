@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,13 @@ export function NoteDialog({
   const hasExistingNote = !!stripHtml(noteHtml);
   const hasContentChanged = editContent !== noteHtml;
 
+  useEffect(() => {
+    if (open) {
+      setEditContent(noteHtml);
+      setConfirmDelete(false);
+    }
+  }, [open, noteHtml]);
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
@@ -68,7 +75,7 @@ export function NoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[480px] flex flex-col">
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{fieldTitle} - 备注</DialogTitle>
           <DialogDescription className="sr-only">
@@ -76,14 +83,14 @@ export function NoteDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {readonly ? (
             <div
-              className="prose prose-sm max-w-none px-1 text-sm overflow-y-auto max-h-[300px]"
+              className="markdown-editor-content px-3 py-2 text-sm overflow-y-auto h-full rounded-md border"
               dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(noteHtml) }}
             />
           ) : (
-            <RichTextEditor content={noteHtml} onChange={setEditContent} />
+            <RichTextEditor content={editContent} onChange={setEditContent} />
           )}
         </div>
 

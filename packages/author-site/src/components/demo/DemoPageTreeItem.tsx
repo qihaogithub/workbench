@@ -41,6 +41,7 @@ interface DemoPageTreeItemProps {
   folders: DemoFolderMeta[];
   pages: DemoPageMeta[];
   isExpanded: boolean;
+  activeDragId: string | null;
   onToggleFolder: (folderId: string) => void;
   onPageSelect: (pageId: string) => void;
   onPageRename: (pageId: string, name: string) => void;
@@ -60,6 +61,7 @@ export function DemoPageTreeItem({
   folders,
   pages,
   isExpanded,
+  activeDragId,
   onToggleFolder,
   onPageSelect,
   onPageRename,
@@ -72,6 +74,8 @@ export function DemoPageTreeItem({
 }: DemoPageTreeItemProps) {
   const { item, depth, hasChildren } = flatItem;
   const isFolder = item.id.startsWith("folder_");
+  const isDraggingPage = activeDragId !== null && !activeDragId.startsWith("folder_");
+  const shouldHoldFolderPosition = isFolder && isDraggingPage;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
@@ -108,8 +112,10 @@ export function DemoPageTreeItem({
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transform: shouldHoldFolderPosition
+          ? undefined
+          : CSS.Transform.toString(transform),
+        transition: shouldHoldFolderPosition ? undefined : transition,
         paddingLeft: `${depth * 20 + 8}px`,
       }}
       className={cn(

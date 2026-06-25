@@ -74,6 +74,71 @@ export function reorderSiblings<T extends { id: string; order: number; parentId:
   return [...nonSiblings, ...withNewOrders];
 }
 
+export function moveItemWithinParentAtIndex<
+  T extends { id: string; order: number; parentId: string | null },
+>(
+  items: T[],
+  activeId: string,
+  targetParentId: string | null,
+  targetIndex: number,
+): T[] {
+  const activeItem = items.find((item) => item.id === activeId);
+  if (!activeItem) return items;
+
+  const sourceParentId = activeItem.parentId ?? null;
+  const normalizedTargetParentId = targetParentId ?? null;
+
+  if (sourceParentId === normalizedTargetParentId) {
+    const siblings = items
+      .filter((item) => (item.parentId ?? null) === normalizedTargetParentId)
+      .sort((a, b) => a.order - b.order);
+    const withoutActive = siblings.filter((item) => item.id !== activeId);
+    const clampedIndex = Math.max(0, Math.min(targetIndex, withoutActive.length));
+    const reordered = [
+      ...withoutActive.slice(0, clampedIndex),
+      activeItem,
+      ...withoutActive.slice(clampedIndex),
+    ].map((item, order) => ({ ...item, order }));
+    const nonSiblings = items.filter(
+      (item) => (item.parentId ?? null) !== normalizedTargetParentId,
+    );
+
+    return [...nonSiblings, ...reordered];
+  }
+
+  const sourceSiblings = items
+    .filter(
+      (item) =>
+        item.id !== activeId && (item.parentId ?? null) === sourceParentId,
+    )
+    .sort((a, b) => a.order - b.order)
+    .map((item, order) => ({ ...item, order }));
+  const targetSiblings = items
+    .filter(
+      (item) =>
+        item.id !== activeId &&
+        (item.parentId ?? null) === normalizedTargetParentId,
+    )
+    .sort((a, b) => a.order - b.order);
+  const clampedIndex = Math.max(0, Math.min(targetIndex, targetSiblings.length));
+  const movedItem = { ...activeItem, parentId: normalizedTargetParentId };
+  const reorderedTargetSiblings = [
+    ...targetSiblings.slice(0, clampedIndex),
+    movedItem,
+    ...targetSiblings.slice(clampedIndex),
+  ].map((item, order) => ({ ...item, order }));
+  const unaffected = items.filter((item) => {
+    const parentId = item.parentId ?? null;
+    return (
+      item.id !== activeId &&
+      parentId !== sourceParentId &&
+      parentId !== normalizedTargetParentId
+    );
+  });
+
+  return [...unaffected, ...sourceSiblings, ...reorderedTargetSiblings];
+}
+
 function arrayMoveImmutable<T>(array: T[], from: number, to: number): T[] {
   const result = [...array];
   const [removed] = result.splice(from, 1);

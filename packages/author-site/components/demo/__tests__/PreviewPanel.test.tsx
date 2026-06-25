@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PreviewPanel } from "@opencode-workbench/shared/demo";
 
 global.fetch = jest.fn();
@@ -26,7 +26,7 @@ describe("PreviewPanel", () => {
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
-    expect(screen.getByRole("status", { name: "编译中" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "预览加载中" })).toBeInTheDocument();
   });
 
   it("应处理编译错误", async () => {
@@ -120,6 +120,78 @@ describe("PreviewPanel", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("有截图占位时应直接渲染截图并隐藏 loading", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        placeholderScreenshotUrl="http://localhost/screenshot.png"
+      />,
+    );
+
+    const image = await screen.findByAltText("preview placeholder");
+    expect(image).toHaveAttribute("src", "http://localhost/screenshot.png");
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("status", { name: "预览加载中" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("传入空 code 时应暂停编译，避免切页时用旧代码编译", () => {
+    render(
+      <PreviewPanel
+        code=""
+        sessionId="test-session"
+        demoId="target-page"
+        configData={{ title: "Test" }}
+        placeholderScreenshotUrl="http://localhost/screenshot.png"
+      />,
+    );
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByAltText("preview placeholder")).toBeInTheDocument();
+  });
+
+  it("收到 LOADED 后应从截图占位切换到真实 iframe", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    } as Response);
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        placeholderScreenshotUrl="http://localhost/screenshot.png"
+      />,
+    );
+
+    const image = await screen.findByAltText("preview placeholder");
+    fireEvent.load(image);
+
+    const iframe = screen.getByTitle("预览") as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "LOADED" },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByAltText("preview placeholder"),
+      ).not.toBeInTheDocument();
+    });
+  });
   it("应支持 sessionId 模式", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

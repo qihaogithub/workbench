@@ -1,22 +1,41 @@
-import { debounce } from "./utils";
+import type { CanvasState } from "./types";
 
-const SAVE_DELAY = 500;
+interface CanvasLayoutApiResponse {
+  success: boolean;
+  data?: {
+    state?: CanvasState | null;
+  };
+  error?: {
+    message?: string;
+  };
+}
 
-export const saveCanvasLayout = debounce(
-  async (
-    sessionId: string,
-    projectId: string,
-    layout: Record<string, { x: number; y: number; width: number; height: number }>,
-  ) => {
-    try {
-      await fetch(`/api/sessions/${sessionId}/canvas-layout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, layout }),
-      });
-    } catch (error) {
-      console.error("保存画布布局失败:", error);
-    }
-  },
-  SAVE_DELAY,
-);
+export async function loadCanvasLayout(
+  sessionId: string,
+): Promise<CanvasState | null> {
+  const response = await fetch(`/api/sessions/${sessionId}/canvas-layout`);
+  const result = (await response.json()) as CanvasLayoutApiResponse;
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || "加载画布布局失败");
+  }
+
+  return result.data?.state ?? null;
+}
+
+export async function saveCanvasLayout(
+  sessionId: string,
+  projectId: string,
+  state: CanvasState,
+): Promise<void> {
+  const response = await fetch(`/api/sessions/${sessionId}/canvas-layout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId, version: 1, state }),
+  });
+  const result = (await response.json()) as CanvasLayoutApiResponse;
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || "保存画布布局失败");
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "id": "proj_1782286923644",
+  "name": "测试",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782286923644/workspace",
+  "demoPages": [
+    {
+      "id": "default-page_r9mr",
+      "name": "默认页面",
+      "order": 0,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v2",
+      "savedAt": 1782287069989,
+      "savedBy": "qihao",
+      "sessionId": "session-1782286927857-ynjtzovve",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/v2",
+      "fileCount": 5
+    }
+  ],
+  "createdAt": 1782286923647,
+  "updatedAt": 1782287069990,
+  "pageVersions": {
+    "default-page_r9mr": [
+      {
+        "versionId": "v1",
+        "demoId": "default-page_r9mr",
+        "demoName": "默认页面",
+        "savedAt": 1782287069160,
+        "savedBy": "qihao",
+        "sessionId": "page-default-page_r9mr",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/pages/default-page_r9mr/v1",
+        "fileCount": 2,
+        "note": "修改了默认页面"
+      }
+    ]
+  }
+}

@@ -60,7 +60,7 @@ export async function healthCheck(
     console.log(chalk.gray(`  活跃 Agent 数量: ${data.agents}`));
     console.log(chalk.gray(`  时间戳: ${data.timestamp}`));
     if (data.backends) {
-      console.log(chalk.gray(`  支持后端: ${(data.backends as string[]).join(", ")}`));
+      console.log(chalk.gray(`  Agent 引擎: ${(data.backends as string[]).join(", ")}`));
     }
     console.log(chalk.gray(`\n服务地址: ${baseUrl}`));
   } catch (error) {

@@ -113,7 +113,7 @@ describe('createSaveImageTool', () => {
       expect(result.details.sha256).toHaveLength(12);
       expect(fs.promises.writeFile).toHaveBeenCalled();
       const writeCall = (fs.promises.writeFile as any).mock.calls[0];
-      expect(writeCall[0]).toMatch(/images\/[a-f0-9]{12}-test-image\.png$/);
+      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/images\/[a-f0-9]{12}-test-image\.png$/);
     });
 
     it('空 Base64 数据应被拒绝', async () => {
@@ -142,7 +142,7 @@ describe('createSaveImageTool', () => {
 
       expect(result.isError).toBeFalsy();
       const writeCall = (fs.promises.writeFile as any).mock.calls[0];
-      expect(writeCall[0]).toMatch(/images\/[a-f0-9]{12}-hero\.png$/);
+      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/images\/[a-f0-9]{12}-hero\.png$/);
     });
   });
 

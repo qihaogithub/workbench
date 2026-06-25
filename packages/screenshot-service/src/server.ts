@@ -9,6 +9,7 @@ import cors from "@fastify/cors";
 import { config } from "./config";
 import { registerRoutes } from "./routes";
 import { getBrowserPool } from "./utils/browser-pool";
+import { getCompileCache } from "./utils/compile-cache";
 
 async function start() {
   const fastify = Fastify({
@@ -39,13 +40,31 @@ async function start() {
 
   await registerRoutes(fastify);
 
-  fastify.get("/health", async () => {
+  fastify.get<{
+    Querystring: { deep?: string };
+  }>("/health", async (request) => {
     const pool = getBrowserPool();
+    const browser = pool.getStatus();
+    const shouldRunDeepCheck =
+      config.screenshotDeepHealth || request.query.deep === "1";
+    const deepCheck = shouldRunDeepCheck
+      ? await pool.runDeepHealthCheck()
+      : undefined;
+
     return {
       status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      browser: pool.getStatus(),
+      browser,
+      queue: {
+        pending: browser.queuedTasks,
+        running: browser.runningTasks,
+      },
+      cache: {
+        compileEntries: getCompileCache().size,
+      },
+      lastError: browser.lastError,
+      ...(deepCheck ? { deepCheck } : {}),
     };
   });
 

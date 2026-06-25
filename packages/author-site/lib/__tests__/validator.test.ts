@@ -4,6 +4,8 @@ import {
   validateAll,
   isValidJson,
   getDefaultValues,
+  getOrderableHorizontal,
+  getPositionable,
   getPreviewSize,
 } from "../validator";
 
@@ -402,6 +404,67 @@ describe("getDefaultValues", () => {
     const defaults = getDefaultValues(schema);
 
     expect(defaults).toEqual({});
+  });
+
+  it("应生成横向排序和定位默认元数据", () => {
+    const schema = JSON.stringify({
+      $demo: {
+        orderableHorizontal: ["navA", "navB"],
+        positionable: {
+          items: ["badgeA", "badgeB"],
+          defaults: {
+            badgeA: { x: 10, y: 20 },
+          },
+        },
+      },
+      properties: {
+        navA: { type: "string", default: "A" },
+        navB: { type: "string", default: "B" },
+        badgeA: { type: "string", default: "NEW" },
+        badgeB: { type: "string", default: "HOT" },
+      },
+    });
+
+    const defaults = getDefaultValues(schema);
+
+    expect(defaults.__orderH).toEqual(["navA", "navB"]);
+    expect(defaults.__positions).toEqual({
+      badgeA: { x: 10, y: 20 },
+      badgeB: { x: 0, y: 0 },
+    });
+  });
+});
+
+describe("getOrderableHorizontal", () => {
+  it("应提取横向排序声明", () => {
+    const schema = JSON.stringify({
+      $demo: { orderableHorizontal: ["navA", "navB"] },
+      properties: {},
+    });
+
+    expect(getOrderableHorizontal(schema)).toEqual(["navA", "navB"]);
+  });
+});
+
+describe("getPositionable", () => {
+  it("应提取自由定位声明", () => {
+    const schema = JSON.stringify({
+      $demo: {
+        positionable: {
+          items: ["badge"],
+          defaults: {
+            badge: { x: 10, y: 20 },
+          },
+        },
+      },
+      properties: {},
+    });
+
+    expect(getPositionable(schema)).toEqual({
+      items: ["badge"],
+      defaults: { badge: { x: 10, y: 20 } },
+      size: undefined,
+    });
   });
 });
 

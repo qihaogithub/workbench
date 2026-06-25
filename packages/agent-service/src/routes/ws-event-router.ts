@@ -1,5 +1,10 @@
 import { BaseAgent } from "../core/agent";
-import { AgentEvent, AgentStatus } from "../core/types";
+import { AgentError, AgentEvent, AgentResult, AgentStatus } from "../core/types";
+import {
+  AgentRunLog,
+  AgentRunLogStartOptions,
+  createAgentRunLog,
+} from "../session/run-log-store";
 import { logger } from "../utils/logger";
 
 const AGENT_EVENT_TYPES = [
@@ -34,8 +39,8 @@ export interface ServerMessage {
   done?: boolean;
   status?: AgentStatus;
   error?: {
-    code: string;
-    message: string;
+    code?: string;
+    message?: string;
     details?: unknown;
   };
   files?: Array<{
@@ -55,6 +60,10 @@ export interface ServerMessage {
   title?: string;
   kind?: "read" | "edit" | "execute";
   toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
+  parameters?: Record<string, unknown>;
+  result?: unknown;
+  details?: unknown;
+  durationMs?: number;
   timestamp?: number;
   permissionRequest?: {
     sessionId: string;
@@ -66,6 +75,8 @@ export interface ServerMessage {
       toolCallId: string;
       title?: string;
       kind?: string;
+      summary?: string;
+      planId?: string;
     };
   };
   models?: Array<{
@@ -92,12 +103,15 @@ export class WebSocketEventRouter {
   private sendMessage: SendMessageFn;
   private sessionId: string;
   private activeMessage: ActiveMessage | null = null;
+  private runLog: AgentRunLog | null = null;
   private agent: BaseAgent | null = null;
   private boundHandler: (event: AgentEvent) => void;
+  private onActivity?: (event: AgentEvent) => void;
 
-  constructor(sessionId: string, sendMessage: SendMessageFn) {
+  constructor(sessionId: string, sendMessage: SendMessageFn, onActivity?: (event: AgentEvent) => void) {
     this.sessionId = sessionId;
     this.sendMessage = sendMessage;
+    this.onActivity = onActivity;
     this.boundHandler = this.handleEvent.bind(this);
   }
 
@@ -121,18 +135,38 @@ export class WebSocketEventRouter {
     this.agent = null;
   }
 
-  startMessage(messageId: string): void {
+  startMessage(
+    messageId: string,
+    logOptions?: Omit<AgentRunLogStartOptions, "sessionId" | "messageId">,
+  ): void {
     this.activeMessage = { id: messageId, isCancelled: false };
+    this.runLog = logOptions
+      ? createAgentRunLog({
+          sessionId: this.sessionId,
+          messageId,
+          ...logOptions,
+        })
+      : null;
   }
 
   cancelMessage(): void {
     if (this.activeMessage) {
       this.activeMessage.isCancelled = true;
+      this.runLog?.recordCancel();
     }
   }
 
   finishMessage(): void {
     this.activeMessage = null;
+    this.runLog = null;
+  }
+
+  recordFinish(result: AgentResult): void {
+    this.runLog?.recordFinish(result);
+  }
+
+  recordError(error: AgentError | { code?: string; message?: string; details?: unknown }): void {
+    this.runLog?.recordError(error);
   }
 
   isActive(): boolean {
@@ -146,6 +180,7 @@ export class WebSocketEventRouter {
   destroy(): void {
     this.unbindAgent();
     this.activeMessage = null;
+    this.runLog = null;
   }
 
   private handleEvent(event: AgentEvent): void {
@@ -160,6 +195,8 @@ export class WebSocketEventRouter {
     }
 
     const messageId = this.activeMessage?.id;
+    this.onActivity?.(event);
+    this.runLog?.recordAgentEvent(event);
 
     switch (event.type) {
       case "stream":
@@ -191,6 +228,7 @@ export class WebSocketEventRouter {
           title: event.title,
           kind: event.kind,
           toolCallStatus: event.status,
+          parameters: event.parameters,
         });
         break;
 
@@ -201,6 +239,11 @@ export class WebSocketEventRouter {
           sessionId: this.sessionId,
           toolCallId: event.toolCallId,
           toolCallStatus: event.status,
+          content: event.content,
+          result: event.result,
+          details: event.details,
+          durationMs: event.durationMs,
+          error: event.error,
         });
         break;
 

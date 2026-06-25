@@ -104,6 +104,11 @@ function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
   const multimodalModels: string[] = Array.isArray(dbConfig.multimodalModels)
     ? dbConfig.multimodalModels
     : [];
+  const backendProviders: BackendProvidersConfig | undefined =
+    dbConfig.backendProviders &&
+    Array.isArray(dbConfig.backendProviders.providers)
+      ? (dbConfig.backendProviders as BackendProvidersConfig)
+      : undefined;
 
   // 读取新结构
   const enabledModels: string[] | undefined = Array.isArray(
@@ -165,6 +170,7 @@ function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
       nameFilters,
     },
     multimodalModels,
+    backendProviders,
   };
 }
 

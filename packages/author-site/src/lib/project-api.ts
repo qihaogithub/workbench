@@ -1,5 +1,8 @@
 import type {
   VersionHistoryResponse,
+  PageVersionHistoryResponse,
+  PageVersionInfo,
+  RestorePageVersionResponse,
   RestoreVersionResponse,
   RestoreVersionRequest,
   DemoPageMeta,
@@ -85,6 +88,70 @@ export class ProjectApiClient {
       throw new Error(response.error?.message || '恢复版本失败');
     }
 
+    return response.data;
+  }
+
+  async getPageVersionHistory(
+    projectId: string,
+    demoId: string,
+  ): Promise<PageVersionHistoryResponse> {
+    const response = await this.localRequest<PageVersionHistoryResponse>(
+      `/api/projects/${projectId}/demos/${demoId}/versions`,
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '获取页面版本历史失败');
+    }
+    return response.data;
+  }
+
+  async createPageVersion(
+    projectId: string,
+    demoId: string,
+    request?: { sessionId?: string; note?: string },
+  ): Promise<PageVersionInfo> {
+    const response = await this.localRequest<PageVersionInfo>(
+      `/api/projects/${projectId}/demos/${demoId}/versions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request ?? {}),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '创建页面版本失败');
+    }
+    return response.data;
+  }
+
+  async getPageVersionFiles(
+    projectId: string,
+    demoId: string,
+    versionId: string,
+  ): Promise<DemoFiles> {
+    const response = await this.localRequest<DemoFiles>(
+      `/api/projects/${projectId}/demos/${demoId}/versions/${versionId}`,
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '读取页面版本失败');
+    }
+    return response.data;
+  }
+
+  async restorePageVersion(
+    projectId: string,
+    demoId: string,
+    versionId: string,
+    request?: { sessionId?: string },
+  ): Promise<RestorePageVersionResponse> {
+    const response = await this.localRequest<RestorePageVersionResponse>(
+      `/api/projects/${projectId}/demos/${demoId}/versions/${versionId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request ?? {}),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '恢复页面版本失败');
+    }
     return response.data;
   }
 

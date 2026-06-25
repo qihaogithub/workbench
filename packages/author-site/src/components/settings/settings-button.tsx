@@ -14,14 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
-import { Settings, KeyRound, ArrowLeft, LogOut, User } from "lucide-react";
+import { Settings, KeyRound, ArrowLeft, LogOut, User, Bot } from "lucide-react";
 
 interface UserInfo {
   id: string;
   username: string;
 }
 
-type View = "main" | "change-password";
+type View = "main" | "change-password" | "model-config";
 
 export function SettingsButton() {
   const router = useRouter();
@@ -33,6 +33,14 @@ export function SettingsButton() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [providerId, setProviderId] = useState("custom");
+  const [providerName, setProviderName] = useState("自定义模型");
+  const [baseURL, setBaseURL] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [modelsText, setModelsText] = useState("");
+  const [defaultModel, setDefaultModel] = useState("");
+  const [loadingModelConfig, setLoadingModelConfig] = useState(false);
 
   // 获取当前登录用户信息
   const fetchUser = async (): Promise<UserInfo | null> => {
@@ -68,6 +76,126 @@ export function SettingsButton() {
     setView("main");
     setNewPassword("");
     setConfirmPassword("");
+    setApiKey("");
+  };
+
+  const loadModelConfig = async () => {
+    setLoadingModelConfig(true);
+    try {
+      const res = await fetch("/api/user/model-config");
+      const data = await res.json();
+      if (data.success && data.data?.provider) {
+        const provider = data.data.provider;
+        setProviderId(provider.id || "custom");
+        setProviderName(provider.name || "自定义模型");
+        setBaseURL(provider.baseURL || "");
+        setHasApiKey(Boolean(provider.hasApiKey));
+        setModelsText(Array.isArray(provider.models) ? provider.models.join("\n") : "");
+        setDefaultModel(provider.defaultModel || "");
+      }
+    } catch {
+      toast({
+        title: "读取失败",
+        description: "无法读取 AI 模型配置",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingModelConfig(false);
+    }
+  };
+
+  const handleOpenModelConfig = async () => {
+    setView("model-config");
+    await loadModelConfig();
+  };
+
+  const handleSaveModelConfig = async () => {
+    const models = modelsText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!baseURL.trim() || models.length === 0) {
+      toast({
+        title: "配置不完整",
+        description: "请填写 baseURL 和至少一个模型",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/user/model-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: providerId,
+          name: providerName,
+          baseURL,
+          apiKey,
+          keepExistingApiKey: !apiKey,
+          models,
+          defaultModel: defaultModel || undefined,
+          enabled: true,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApiKey("");
+        setHasApiKey(Boolean(data.data?.provider?.hasApiKey));
+        toast({
+          title: "AI 模型配置已保存",
+          description: "刷新或新打开编辑页后生效",
+        });
+        setView("main");
+      } else {
+        toast({
+          title: "保存失败",
+          description: data.error?.message || "请检查配置",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "保存 AI 模型配置失败",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClearModelConfig = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/user/model-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearConfig: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProviderId("custom");
+        setProviderName("自定义模型");
+        setBaseURL("");
+        setApiKey("");
+        setHasApiKey(false);
+        setModelsText("");
+        setDefaultModel("");
+        toast({ title: "AI 模型配置已清空" });
+        setView("main");
+      } else {
+        toast({
+          title: "清空失败",
+          description: data.error?.message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // 登出：通过服务端 API 清除 httpOnly Cookie
@@ -185,6 +313,19 @@ export function SettingsButton() {
                   </div>
                 </button>
 
+                <button
+                  onClick={handleOpenModelConfig}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors text-left"
+                >
+                  <Bot className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">AI 模型配置</p>
+                    <p className="text-xs text-muted-foreground">
+                      配置 OpenAI 兼容 API
+                    </p>
+                  </div>
+                </button>
+
                 {/* 登出 */}
                 <button
                   onClick={handleLogout}
@@ -199,6 +340,101 @@ export function SettingsButton() {
                   </div>
                 </button>
               </div>
+            </>
+          ) : view === "model-config" ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setView("main");
+                      setApiKey("");
+                    }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <DialogTitle>AI 模型配置</DialogTitle>
+                </div>
+                <DialogDescription>
+                  保存 OpenAI 兼容 API 配置，刷新或新打开编辑页后生效。
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>供应商 ID</Label>
+                    <Input
+                      value={providerId}
+                      onChange={(e) => setProviderId(e.target.value)}
+                      placeholder="custom"
+                      disabled={submitting || loadingModelConfig}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>供应商名称</Label>
+                    <Input
+                      value={providerName}
+                      onChange={(e) => setProviderName(e.target.value)}
+                      placeholder="自定义模型"
+                      disabled={submitting || loadingModelConfig}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>baseURL</Label>
+                  <Input
+                    value={baseURL}
+                    onChange={(e) => setBaseURL(e.target.value)}
+                    placeholder="https://api.example.com/v1"
+                    disabled={submitting || loadingModelConfig}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>API Key</Label>
+                  <Input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={hasApiKey ? "已保存，留空则保持不变" : "sk-..."}
+                    disabled={submitting || loadingModelConfig}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>模型列表（每行一个）</Label>
+                  <textarea
+                    value={modelsText}
+                    onChange={(e) => setModelsText(e.target.value)}
+                    placeholder={"gpt-4o\ngpt-4o-mini"}
+                    disabled={submitting || loadingModelConfig}
+                    className="min-h-[112px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>默认模型</Label>
+                  <Input
+                    value={defaultModel}
+                    onChange={(e) => setDefaultModel(e.target.value)}
+                    placeholder="留空则使用列表第一项"
+                    disabled={submitting || loadingModelConfig}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={handleClearModelConfig}
+                  disabled={submitting || loadingModelConfig}
+                >
+                  清空配置
+                </Button>
+                <Button
+                  onClick={handleSaveModelConfig}
+                  disabled={submitting || loadingModelConfig}
+                >
+                  {submitting ? "保存中..." : "保存配置"}
+                </Button>
+              </DialogFooter>
             </>
           ) : (
             <>

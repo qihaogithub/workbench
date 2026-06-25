@@ -1,0 +1,179 @@
+{
+  "generatedAt": "2026-06-25T02:16:03.195Z",
+  "staticChecks": [
+    {
+      "name": "system prompt uses workspace-tree.json from workspace root",
+      "ok": true
+    },
+    {
+      "name": "AI file changes under demos trigger workspace refresh",
+      "ok": true
+    }
+  ],
+  "testRun": {
+    "command": "pnpm --filter @opencode-workbench/agent-service test -- tests/unit/pi-agent.test.ts tests/unit/ws-event-router.test.ts",
+    "status": 0,
+    "stdoutTail": "\n> @opencode-workbench/agent-service@1.0.0 test /Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/agent-service\n> vitest run \"tests/unit/pi-agent.test.ts\" \"tests/unit/ws-event-router.test.ts\"\n\n\n RUN  v2.1.9 /Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/agent-service\n\n ✓ tests/unit/ws-event-router.test.ts (2 tests) 7ms\n[2026-06-25 10:16:03.123 +0800] \u001b[32mINFO\u001b[39m (agent-service/45329): \u001b[36mNo PI_AGENT_PROVIDERS in .env, waiting for author-site push\u001b[39m\n[2026-06-25 10:16:03.124 +0800] \u001b[32mINFO\u001b[39m (agent-service/45329): \u001b[36mUsing synthetic model from config (last-resort fallback)\u001b[39m\n    provider: \"anthropic\"\n    modelId: \"claude-sonnet-4-20250514\"\n[2026-06-25 10:16:03.124 +0800] \u001b[32mINFO\u001b[39m (agent-service/45329): \u001b[36mUsing synthetic model from config (last-resort fallback)\u001b[39m\n    provider: \"anthropic\"\n    modelId: \"claude-sonnet-4-20250514\"\n[2026-06-25 10:16:03.125 +0800] \u001b[32mINFO\u001b[39m (agent-service/45329): \u001b[36mInitializing Pi Agent backend (AgentHarness)\u001b[39m\n[2026-06-25 10:16:03.127 +0800] \u001b[32mINFO\u001b[39m (agent-service/45329): \u001b[36mPi Agent getModel\u001b[39m\n    modelId: \"claude-sonnet-4-20250514\"\n    provider: \"anthropic\"\n    baseUrl: \"\"\n    hasProviderConfig: false\n ✓ tests/unit/pi-agent.test.ts (34 tests) 24ms\n\n Test Files  2 passed (2)\n      Tests  36 passed (36)\n   Start at  10:16:02\n   Duration  802ms (transform 268ms, setup 0ms, collect 546ms, tests 30ms, environment 0ms, prepare 173ms)\n\n",
+    "stderrTail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n"
+  },
+  "latestRunLogs": [
+    {
+      "filePath": "data/agent-run-logs/session-1782295754063-4mliiv81a/msg-1782295831089.jsonl",
+      "counts": {
+        "run_start": 1,
+        "status": 2,
+        "finish": 1
+      },
+      "finish": {
+        "success": true,
+        "finishContentLength": 0,
+        "accumulatedStreamLength": 0,
+        "toolResultCount": 0,
+        "subagentResultCount": 0,
+        "fileOperationCount": 0,
+        "fileCount": 0,
+        "metadata": {
+          "emptyResponseDebug": {
+            "keys": [
+              "role",
+              "content",
+              "api",
+              "provider",
+              "model",
+              "usage",
+              "stopReason",
+              "timestamp",
+              "errorMessage"
+            ],
+            "contentType": "array",
+            "contentLength": 0,
+            "contentItemTypes": []
+          }
+        }
+      },
+      "recentWriteResults": []
+    },
+    {
+      "filePath": "data/agent-run-logs/session-1782351903120-039haollu/msg-1782351923235.jsonl",
+      "counts": {
+        "run_start": 1,
+        "status": 2,
+        "finish": 1
+      },
+      "finish": {
+        "success": false,
+        "finishContentLength": 0,
+        "accumulatedStreamLength": 0,
+        "toolResultCount": 0,
+        "subagentResultCount": 0,
+        "fileOperationCount": 0,
+        "fileCount": 0,
+        "error": {
+          "code": "MESSAGE_SEND_ERROR",
+          "message": "400 Invalid schema for function 'previewDeletePages': schema must be a JSON Schema of 'type: \"object\"', got 'type: null'.",
+          "retryable": true
+        },
+        "metadata": {
+          "emptyResponseDebug": {
+            "keys": [
+              "role",
+              "content",
+              "api",
+              "provider",
+              "model",
+              "usage",
+              "stopReason",
+              "timestamp",
+              "errorMessage"
+            ],
+            "contentType": "array",
+            "contentLength": 0,
+            "contentItemTypes": [],
+            "provider": "deepseek",
+            "model": "deepseek-v4-pro",
+            "stopReason": "error",
+            "errorMessage": "400 Invalid schema for function 'previewDeletePages': schema must be a JSON Schema of 'type: \"object\"', got 'type: null'."
+          }
+        }
+      },
+      "recentWriteResults": []
+    },
+    {
+      "filePath": "data/agent-run-logs/session-1782352064983-nss8n7bgy/msg-1782352296553.jsonl",
+      "counts": {
+        "run_start": 1,
+        "status": 1,
+        "thought": 2217,
+        "stream_start": 1,
+        "tool_call": 26,
+        "tool_call_update": 26,
+        "cancel": 2,
+        "finish": 1
+      },
+      "finish": {
+        "success": false,
+        "finishContentLength": 0,
+        "accumulatedStreamLength": 396,
+        "toolResultCount": 26,
+        "subagentResultCount": 2,
+        "fileOperationCount": 0,
+        "fileCount": 0,
+        "error": {
+          "code": "MESSAGE_TIMEOUT",
+          "message": "消息处理超时（300s 无响应），已自动取消",
+          "retryable": true
+        }
+      },
+      "recentWriteResults": [
+        {
+          "time": "2026-06-25T01:54:37.124Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/settlement-page_m3p7/index.tsx",
+          "path": "demos/settlement-page_m3p7/index.tsx"
+        },
+        {
+          "time": "2026-06-25T01:54:46.529Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/level-list_b2v6/config.schema.json",
+          "path": "demos/level-list_b2v6/config.schema.json"
+        },
+        {
+          "time": "2026-06-25T01:55:00.503Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/level-list_b2v6/index.tsx",
+          "path": "demos/level-list_b2v6/index.tsx"
+        },
+        {
+          "time": "2026-06-25T01:55:09.359Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/task-detail_f8n1/config.schema.json",
+          "path": "demos/task-detail_f8n1/config.schema.json"
+        },
+        {
+          "time": "2026-06-25T01:55:27.270Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/task-detail_f8n1/index.tsx",
+          "path": "demos/task-detail_f8n1/index.tsx"
+        },
+        {
+          "time": "2026-06-25T01:55:38.951Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/leaderboard_h5j0/config.schema.json",
+          "path": "demos/leaderboard_h5j0/config.schema.json"
+        },
+        {
+          "time": "2026-06-25T01:55:56.360Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/leaderboard_h5j0/index.tsx",
+          "path": "demos/leaderboard_h5j0/index.tsx"
+        },
+        {
+          "time": "2026-06-25T01:56:06.701Z",
+          "status": "completed",
+          "summary": "Successfully wrote to demos/prize-center_w2q8/config.schema.json",
+          "path": "demos/prize-center_w2q8/config.schema.json"
+        }
+      ]
+    }
+  ]
+}

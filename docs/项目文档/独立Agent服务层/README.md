@@ -21,6 +21,7 @@
 | [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        | 已更新 |
 | [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        | 已完成 |
 | [05-快照服务.md](./05-快照服务.md)           | 双模式架构、变更比较、丢弃回滚、Session 生命周期   | 5        | 已完成 |
+| [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 内部任务委派、子 Agent 生命周期与权限边界 | 6        | 已完成 |
 
 ---
 
@@ -62,6 +63,13 @@
 - [丢弃变更与回滚](./05-快照服务.md#33-丢弃变更流程)
 - [API 方法一览](./05-快照服务.md#五api-方法一览)
 - [与 Session 生命周期关系](./05-快照服务.md#十与-session-生命周期的关系)
+
+### Pi Agent 子 Agent
+
+- [定位](./06-Pi-Agent子Agent.md#一定位)
+- [协作关系](./06-Pi-Agent子Agent.md#二协作关系)
+- [权限与变更边界](./06-Pi-Agent子Agent.md#三权限与变更边界)
+- [生命周期](./06-Pi-Agent子Agent.md#四生命周期)
 
 ---
 
@@ -190,3 +198,4 @@ Electron 生命周期           →      Fastify 生命周期
 | 2026-04-05 | v1.1 | 添加 AionUi 参考指南               |
 | 2026-05-29 | v2.0 | 根据代码实现全面更新文档，对齐现状 |
 | 2026-06-04 | v2.1 | 新增 05-快照服务文档 |
+| 2026-06-21 | v2.2 | 新增 Pi Agent 子 Agent 实现文档 |

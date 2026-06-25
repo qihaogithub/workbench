@@ -83,6 +83,71 @@ describe("运行时 Props 合并", () => {
     const props = mergeConfigToProps(undefined, pageSchema);
     expect(props).toEqual({ flag: false, count: 0, text: "" });
   });
+
+  it("应注入横向排序和定位默认元数据", () => {
+    const pageSchema = JSON.stringify({
+      $demo: {
+        orderableHorizontal: ["navHome", "navAbout"],
+        positionable: {
+          items: ["badgeA", "badgeB"],
+          defaults: {
+            badgeA: { x: 12, y: 24 },
+          },
+        },
+      },
+      properties: {
+        navHome: { type: "string", default: "首页" },
+        navAbout: { type: "string", default: "关于" },
+        badgeA: { type: "string", default: "A" },
+        badgeB: { type: "string", default: "B" },
+      },
+    });
+
+    const props = mergeConfigToProps(undefined, pageSchema);
+
+    expect(props.__orderH).toEqual(["navHome", "navAbout"]);
+    expect(props.__positions).toEqual({
+      badgeA: { x: 12, y: 24 },
+      badgeB: { x: 0, y: 0 },
+    });
+  });
+
+  it("项目级与页面级隐藏定位元数据应合并且不触发字段冲突", () => {
+    const projectSchema = JSON.stringify({
+      $demo: {
+        positionable: {
+          items: ["globalBadge"],
+          defaults: {
+            globalBadge: { x: 10, y: 20 },
+          },
+        },
+      },
+      properties: {
+        theme: { type: "string", default: "dark" },
+      },
+    });
+    const pageSchema = JSON.stringify({
+      $demo: {
+        positionable: {
+          items: ["pageBadge"],
+          defaults: {
+            pageBadge: { x: 30, y: 40 },
+          },
+        },
+      },
+      properties: {
+        title: { type: "string", default: "Hello" },
+      },
+    });
+
+    const props = mergeConfigToProps(projectSchema, pageSchema);
+
+    expect(props).toMatchObject({ theme: "dark", title: "Hello" });
+    expect(props.__positions).toEqual({
+      globalBadge: { x: 10, y: 20 },
+      pageBadge: { x: 30, y: 40 },
+    });
+  });
 });
 
 describe("mergeConfigWithUserValues", () => {
@@ -138,6 +203,31 @@ describe("mergeConfigWithUserValues", () => {
 
     const result = mergeConfigWithUserValues(currentConfig, newSchema);
     expect(result.__order).toEqual(["title", "description"]);
+  });
+
+  it("应从新 schema 生成 __orderH 和 __positions 元数据", () => {
+    const currentConfig = {};
+    const newSchema = JSON.stringify({
+      $demo: {
+        orderableHorizontal: ["navA", "navB"],
+        positionable: {
+          items: ["badge"],
+          defaults: {
+            badge: { x: 8, y: 16 },
+          },
+        },
+      },
+      properties: {
+        navA: { type: "string", default: "A" },
+        navB: { type: "string", default: "B" },
+        badge: { type: "string", default: "NEW" },
+      },
+    });
+
+    const result = mergeConfigWithUserValues(currentConfig, newSchema);
+
+    expect(result.__orderH).toEqual(["navA", "navB"]);
+    expect(result.__positions).toEqual({ badge: { x: 8, y: 16 } });
   });
 
   it("应处理空配置", () => {

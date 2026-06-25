@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { ConfigForm } from '@opencode-workbench/shared/demo';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const mockSchema = JSON.stringify({
   type: 'object',
@@ -41,9 +43,41 @@ const mockSchema = JSON.stringify({
   required: ['title', 'themeColor'],
 });
 
+const positionSchema = JSON.stringify({
+  type: 'object',
+  $demo: {
+    orderable: ['header', 'content'],
+    orderableHorizontal: ['navHome', 'navAbout'],
+    previewSize: { width: 320, height: 240 },
+    positionable: {
+      items: ['badgeA', 'badgeB'],
+      defaults: {
+        badgeA: { x: 10, y: 20 },
+        badgeB: { x: 60, y: 80 },
+      },
+    },
+  },
+  properties: {
+    header: { type: 'string', title: '页头', default: 'Header' },
+    content: { type: 'string', title: '内容', default: 'Content' },
+    navHome: { type: 'string', title: '首页', default: '首页' },
+    navAbout: { type: 'string', title: '关于', default: '关于' },
+    badgeA: { type: 'string', title: '徽章A', default: 'A' },
+    badgeB: { type: 'string', title: '徽章B', default: 'B' },
+  },
+});
+
+function renderConfigForm(ui: ReactElement) {
+  return render(
+    <TooltipProvider>
+      {ui}
+    </TooltipProvider>,
+  );
+}
+
 describe('ConfigFormNew', () => {
   it('应正确渲染配置表单', () => {
-    render(
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={jest.fn()}
@@ -58,7 +92,7 @@ describe('ConfigFormNew', () => {
   });
 
   it('应显示字段标题和必填标记', () => {
-    render(
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={jest.fn()}
@@ -74,7 +108,7 @@ describe('ConfigFormNew', () => {
 
   it('应处理配置变更', () => {
     const handleChange = jest.fn();
-    render(
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={handleChange}
@@ -94,7 +128,7 @@ describe('ConfigFormNew', () => {
   });
 
   it('应在 schema 无效时显示空状态', () => {
-    render(
+    renderConfigForm(
       <ConfigForm
         schema="invalid json"
         onChange={jest.fn()}
@@ -105,8 +139,8 @@ describe('ConfigFormNew', () => {
     expect(screen.getByText('暂无配置项')).toBeInTheDocument();
   });
 
-  it('应使用卡片样式显示分组', () => {
-    render(
+  it('应显示分组和字段数量徽标', () => {
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={jest.fn()}
@@ -114,17 +148,13 @@ describe('ConfigFormNew', () => {
       />
     );
 
-    // 验证分组标题显示字段数量（可能有多个分组，使用 getAllByText）
-    const fieldCounts = screen.getAllByText(/\d+ 字段/);
-    expect(fieldCounts.length).toBeGreaterThan(0);
-    
-    // 验证分组使用卡片样式（通过检查 Card 组件的类名）
-    const cards = document.querySelectorAll('.rounded-lg.border.bg-card');
-    expect(cards.length).toBeGreaterThan(0);
+    expect(screen.getByText('基础配置')).toBeInTheDocument();
+    const countBadges = screen.getAllByText('1');
+    expect(countBadges.length).toBeGreaterThan(0);
   });
 
   it('应显示滑块数值', () => {
-    render(
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={jest.fn()}
@@ -137,7 +167,7 @@ describe('ConfigFormNew', () => {
   });
 
   it('应渲染开关组件而不显示开启/关闭文字', () => {
-    render(
+    renderConfigForm(
       <ConfigForm
         schema={mockSchema}
         onChange={jest.fn()}
@@ -152,5 +182,40 @@ describe('ConfigFormNew', () => {
     // 但应该有 Switch 组件（role="switch"）
     const switches = screen.getAllByRole('switch');
     expect(switches.length).toBeGreaterThan(0);
+  });
+
+  it('应渲染横向排序和元素定位控件，并同步位置输入变更', () => {
+    const handleChange = jest.fn();
+
+    renderConfigForm(
+      <ConfigForm
+        schema={positionSchema}
+        onChange={handleChange}
+        initialData={{
+          __order: ['header', 'content'],
+          __orderH: ['navHome', 'navAbout'],
+          __positions: {
+            badgeA: { x: 10, y: 20 },
+            badgeB: { x: 60, y: 80 },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('组件排序')).toBeInTheDocument();
+    expect(screen.getByText('横向排序')).toBeInTheDocument();
+    expect(screen.getByText('元素定位')).toBeInTheDocument();
+    expect(screen.getAllByText('首页').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('徽章A').length).toBeGreaterThan(0);
+
+    const xInputs = screen.getAllByDisplayValue('10');
+    fireEvent.change(xInputs[0], { target: { value: '35' } });
+
+    expect(handleChange).toHaveBeenCalledWith({
+      __positions: {
+        badgeA: { x: 35, y: 20 },
+        badgeB: { x: 60, y: 80 },
+      },
+    });
   });
 });

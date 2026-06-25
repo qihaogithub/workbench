@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ZoomIn, ZoomOut, RotateCcw, Maximize, Hand, MousePointer2 } from "lucide-react";
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Maximize,
+  Hand,
+  MousePointer2,
+  LayoutGrid,
+} from "lucide-react";
 import type { CanvasToolMode } from "./types";
 
 interface CanvasToolbarProps {
@@ -9,13 +17,22 @@ interface CanvasToolbarProps {
   onZoomChange: (zoom: number) => void;
   onReset: () => void;
   onFitToScreen?: () => void;
+  onAutoLayout?: () => void;
   toolMode?: CanvasToolMode;
   onToolModeChange?: (mode: CanvasToolMode) => void;
 }
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
-export function CanvasToolbar({ zoom, onZoomChange, onReset, onFitToScreen, toolMode = "hand", onToolModeChange }: CanvasToolbarProps) {
+export function CanvasToolbar({
+  zoom,
+  onZoomChange,
+  onReset,
+  onFitToScreen,
+  onAutoLayout,
+  toolMode = "hand",
+  onToolModeChange,
+}: CanvasToolbarProps) {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +84,17 @@ export function CanvasToolbar({ zoom, onZoomChange, onReset, onFitToScreen, tool
           title="适应屏幕"
         >
           <Maximize className="h-4 w-4" />
+        </button>
+      )}
+
+      {onAutoLayout && (
+        <button
+          type="button"
+          onClick={onAutoLayout}
+          className="p-1.5 hover:bg-muted rounded"
+          title="自动排版"
+        >
+          <LayoutGrid className="h-4 w-4" />
         </button>
       )}
 

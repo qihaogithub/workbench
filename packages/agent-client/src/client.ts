@@ -187,6 +187,10 @@ export class AgentClient {
     }>("/health");
   }
 
+  async getToolCapabilities(): Promise<ApiResponse<ToolCapabilities>> {
+    return this.request<ToolCapabilities>("/api/tools/capabilities");
+  }
+
   stream(sessionId: string): AgentStream {
     const wsUrl = this.baseUrl.replace(/^http/, "ws");
     return new AgentStream(`${wsUrl}/api/agent/${sessionId}/stream`);
@@ -218,6 +222,10 @@ export interface StreamEvent {
   title?: string;
   kind?: "read" | "edit" | "execute";
   toolCallStatus?: "pending" | "in_progress" | "completed" | "failed";
+  parameters?: Record<string, unknown>;
+  result?: unknown;
+  details?: unknown;
+  durationMs?: number;
   permissionRequest?: {
     sessionId: string;
     options: Array<{
@@ -228,6 +236,8 @@ export interface StreamEvent {
       toolCallId: string;
       title?: string;
       kind?: string;
+      summary?: string;
+      planId?: string;
     };
   };
   fileOperation?: {
@@ -241,6 +251,11 @@ export interface StreamEvent {
   }>;
   currentModelId?: string;
   canSwitch?: boolean;
+}
+
+export interface ToolCapabilities {
+  toolVersion: number;
+  toolNames: string[];
 }
 
 export class AgentStream {

@@ -11,11 +11,43 @@
  */
 
 import { NextResponse } from "next/server";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { getModelConfig } from "@/lib/model-config";
+import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 
 export async function GET() {
   try {
-    const config = await getModelConfig();
+    const config = JSON.parse(JSON.stringify(await getModelConfig())) as Awaited<
+      ReturnType<typeof getModelConfig>
+    >;
+    const token = getAuthCookie();
+    const payload = token ? await verifyToken(token) : null;
+    const userProviders = payload
+      ? readUserBackendProvidersConfig(payload.userId)
+      : null;
+
+    if (userProviders?.providers.length) {
+      const providerPrefixes = userProviders.providers
+        .filter((provider) => provider.enabled !== false)
+        .map((provider) => `${provider.id}/`);
+      const existingRules = config.frontend.autoEnableRules || [];
+      const existingPrefixValues = new Set(
+        existingRules
+          .filter((rule) => rule.type === "prefix")
+          .map((rule) => rule.value),
+      );
+      const newRules = providerPrefixes
+        .filter((prefix) => !existingPrefixValues.has(prefix))
+        .map((prefix) => ({ type: "prefix" as const, value: prefix }));
+
+      config.frontend = {
+        ...config.frontend,
+        autoEnableRules: [...existingRules, ...newRules],
+        allowedPrefixes: Array.from(
+          new Set([...(config.frontend.allowedPrefixes || []), ...providerPrefixes]),
+        ),
+      };
+    }
 
     return NextResponse.json({
       success: true,

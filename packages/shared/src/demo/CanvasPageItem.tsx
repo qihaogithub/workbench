@@ -9,6 +9,7 @@ import type {
   ConsoleLogPayload,
   CanvasToolMode,
   PositionableSizeItem,
+  ScreenshotRenderBox,
 } from "./types";
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -21,7 +22,7 @@ interface CanvasPageItemProps {
   zoom?: number;
   sessionId?: string;
   screenshotUrl?: string;
-  screenshotLoading?: boolean;
+  screenshotRenderBox?: ScreenshotRenderBox;
   visible?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
@@ -155,7 +156,7 @@ export function CanvasPageItem({
   zoom = 1,
   sessionId,
   screenshotUrl,
-  screenshotLoading: _screenshotLoading,
+  screenshotRenderBox,
   visible = true,
   onLayoutChange,
   onConfigEdit,
@@ -189,11 +190,10 @@ export function CanvasPageItem({
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const containerRef = useRef<HTMLDivElement>(null);
-
   const [contentHeight, setContentHeight] = useState<number | null>(null);
 
   const handleContentHeightChange = useCallback(
-    (newContentHeight: number) => {
+    (newContentHeight: number, measuredWidth?: number) => {
       const designHeight =
         page.previewSize?.height != null
           ? Number(page.previewSize.height)
@@ -209,7 +209,11 @@ export function CanvasPageItem({
       setContentHeight(newContentHeight);
 
       const currentLayout = layoutRef.current;
-      const scale = currentLayout.width / designWidth;
+      const sourceWidth =
+        measuredWidth && Number.isFinite(measuredWidth) && measuredWidth > 0
+          ? measuredWidth
+          : designWidth;
+      const scale = currentLayout.width / sourceWidth;
       const newHeight = newContentHeight * scale;
 
       if (Math.abs(newHeight - currentLayout.height) < 1) return;
@@ -221,6 +225,10 @@ export function CanvasPageItem({
     },
     [page.id, page.previewSize, onLayoutChange, contentHeight],
   );
+
+  const handleScreenshotLoad = useCallback(() => {
+    setScreenshotLoaded(true);
+  }, []);
 
   const effectiveHeight =
     contentHeight != null &&
@@ -234,6 +242,14 @@ export function CanvasPageItem({
     setScreenshotLoaded(false);
   }, [screenshotUrl]);
 
+  React.useEffect(() => {
+    if (!screenshotRenderBox) return;
+    handleContentHeightChange(
+      screenshotRenderBox.height,
+      screenshotRenderBox.width,
+    );
+  }, [screenshotRenderBox, handleContentHeightChange]);
+
   // 当 previewSize 变化时重置内容高度
   React.useEffect(() => {
     setContentHeight(null);
@@ -244,14 +260,15 @@ export function CanvasPageItem({
     isHovering && canInteract && !isDragging && !isResizing;
 
   /**
-   * 四种渲染路径：
-   * 1. isEditing → 始终渲染 iframe
-   * 2. !isEditing && 有截图 && 截图已加载 → 仅渲染 img
-   * 3. !isEditing && 有截图 && 截图未加载 → 渲染 iframe(隐藏) + img(加载中)，img onLoad 后卸载 iframe
-   * 4. !isEditing && 无截图 → 渲染 iframe
+   * 三种渲染路径：
+   * 1. 有截图 && 截图已加载 → 仅渲染 img
+   * 2. 有截图 && 截图未加载 → 渲染 iframe(隐藏) + img(加载中)，img onLoad 后卸载 iframe
+   * 3. 无截图 → 渲染 iframe
+   *
+   * isEditing 只表示画布选中态，不代表内容版本变化；不能因为点击页面就强制切到 iframe。
    */
-  const shouldRenderIframe = isEditing || !screenshotUrl || !screenshotLoaded;
-  const shouldRenderScreenshot = !isEditing && !!screenshotUrl;
+  const shouldRenderIframe = !screenshotUrl || !screenshotLoaded;
+  const shouldRenderScreenshot = !!screenshotUrl;
 
   // 根据鼠标位置更新 cursor 和 hoveredEdge
   const updateEdgeFromPointer = useCallback(
@@ -421,8 +438,8 @@ export function CanvasPageItem({
     );
   }
 
-  const showIframe = isEditing || !screenshotUrl;
-  const showScreenshotOverlay = !isEditing && !!screenshotUrl;
+  const showIframe = !screenshotUrl;
+  const showScreenshotOverlay = !!screenshotUrl;
 
   // 当前 cursor
   const activeCursor =
@@ -466,14 +483,14 @@ export function CanvasPageItem({
       )}
 
       {shouldRenderScreenshot && (
-        <div className="absolute inset-0 shadow-md flex items-center justify-center bg-black/5 pointer-events-none">
+        <div className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none">
           <img
             src={screenshotUrl}
             alt={page.name}
-            className="max-w-full max-h-full object-contain pointer-events-none"
+            className="block w-full h-auto pointer-events-none"
             loading="lazy"
             draggable={false}
-            onLoad={() => setScreenshotLoaded(true)}
+            onLoad={handleScreenshotLoad}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
             <span className="text-xs text-white font-medium truncate block">
@@ -482,6 +499,7 @@ export function CanvasPageItem({
           </div>
         </div>
       )}
+
     </>
   );
 
@@ -490,7 +508,7 @@ export function CanvasPageItem({
       ref={containerRef}
       data-page-id={page.id}
       className={cn(
-        "absolute rounded-lg overflow-hidden transition-shadow duration-200 select-none",
+        "absolute rounded-lg transition-shadow duration-200 select-none",
         isEditing && "ring-2 ring-blue-500",
       )}
       style={{
@@ -519,7 +537,16 @@ export function CanvasPageItem({
         setContextMenu({ x: e.clientX, y: e.clientY });
       }}
     >
-      {pageContent}
+      <div
+        className="absolute left-0 -top-6 max-w-full truncate text-xs font-medium text-muted-foreground"
+        title={page.name}
+      >
+        {page.name}
+      </div>
+
+      <div className="absolute inset-0 rounded-lg overflow-hidden">
+        {pageContent}
+      </div>
 
       {/* 边框热区 — 四条边 */}
       {showEdgeHandles && (

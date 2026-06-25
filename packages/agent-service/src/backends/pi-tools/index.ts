@@ -15,16 +15,32 @@ import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
 import {
   createDeletePageTool,
+  createDeletePagesTool,
+  createDeletionPlanStore,
+  createExecuteDeletePagePlanTool,
+  createListPagesTool,
+  createPreviewDeletePagesTool,
   type PermissionHandler,
 } from "./delete-page-tool";
+import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
+
+export const WORKBENCH_TOOL_VERSION = 3;
 
 export type { PermissionHandler };
+export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
+
+export interface WorkbenchToolsOptions {
+  includeDelegateTask?: boolean;
+  subagentRunner?: SubagentRunner;
+}
 
 export function createWorkbenchTools(
   config: AgentConfig,
   permissionHandler?: PermissionHandler,
+  options: WorkbenchToolsOptions = {},
 ): AgentTool[] {
-  return [
+  const deletionPlanStore = createDeletionPlanStore();
+  const tools: AgentTool[] = [
     createReadFileTool(config),
     createReadFileLinesTool(config),
     createEditFileTool(config),
@@ -36,6 +52,33 @@ export function createWorkbenchTools(
     createGetConsoleLogsTool(config),
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
+    createListPagesTool(config),
+    createPreviewDeletePagesTool(config, deletionPlanStore),
+    createExecuteDeletePagePlanTool(
+      config,
+      deletionPlanStore,
+      permissionHandler,
+    ),
     createDeletePageTool(config, permissionHandler),
+    createDeletePagesTool(config, permissionHandler),
   ];
+
+  if (options.includeDelegateTask !== false && options.subagentRunner) {
+    tools.push(createDelegateTaskTool(options.subagentRunner));
+  }
+
+  return tools;
+}
+
+export function getWorkbenchToolCapabilities(): {
+  toolVersion: number;
+  toolNames: string[];
+} {
+  const tools = createWorkbenchTools({ sessionId: "capabilities" }, undefined, {
+    includeDelegateTask: false,
+  });
+  return {
+    toolVersion: WORKBENCH_TOOL_VERSION,
+    toolNames: tools.map((tool) => tool.name),
+  };
 }

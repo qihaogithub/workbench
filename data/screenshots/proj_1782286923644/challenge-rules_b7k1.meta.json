@@ -1,0 +1,21 @@
+{
+  "currentHash": "6e8a02ba8e685b92",
+  "generatedAt": "2026-06-25T02:37:07.642Z",
+  "elapsed": 8816,
+  "history": [
+    "6e8a02ba8e685b92"
+  ],
+  "renderBoxes": {
+    "6e8a02ba8e685b92": {
+      "width": 375,
+      "height": 936,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 936,
+      "documentWidth": 375,
+      "documentHeight": 936,
+      "fullPage": true
+    }
+  }
+}

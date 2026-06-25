@@ -34,6 +34,6 @@ RUN npm install --no-save fastify @fastify/cors pino pino-pretty puppeteer-core
 EXPOSE 3202
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3202/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:3202/health?deep=1').then(async r=>{const j=await r.json();process.exit(r.ok&&j.deepCheck?.ok?0:1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]
