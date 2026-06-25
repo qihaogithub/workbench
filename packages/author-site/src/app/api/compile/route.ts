@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
 import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
+import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
 
 export async function POST(request: NextRequest) {
   try {
@@ -90,6 +91,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(createApiSuccess(result));
   } catch (error) {
     console.error('编译错误:', error);
+
+    if (error instanceof PreviewRuntimeContractError) {
+      return NextResponse.json(
+        createApiError('VALIDATION_ERROR', error.message, {
+          issues: error.issues,
+        }),
+        { status: 422 },
+      );
+    }
 
     const message = error instanceof Error ? error.message : '编译失败';
     return NextResponse.json(

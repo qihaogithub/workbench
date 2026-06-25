@@ -16,6 +16,8 @@ export interface ProjectTemplateMeta {
   name: string;
   description: string;
   thumbnail?: string;
+  scope?: "personal" | "team" | "official";
+  official?: boolean;
   demoCount: number;
   demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
   createdAt: number;

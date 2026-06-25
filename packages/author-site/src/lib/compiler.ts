@@ -3,24 +3,21 @@ import { createHash } from 'crypto';
 import {
   readProjectMeta,
   getSessionMeta,
-  findWorkspacePath,
   getWorkspaceDemoPageFiles,
 } from './fs-utils';
-import { getCdnBaseUrl } from './cdn-config';
+import {
+  PREVIEW_DEPENDENCY_POLICY,
+  PREVIEW_DEPENDENCY_POLICY_VERSION,
+  assertPreviewRuntimeContract,
+  getPreviewDependencyUrl,
+  isNpmPackage,
+} from './preview-dependency-policy';
 
 export interface CompileResult {
   compiledCode: string;
   dependencies: string[];
   cssImports: string[];
 }
-
-const ESM_SH_BASE = getCdnBaseUrl();
-
-// 核心依赖固定版本，确保 iframe 内外一致
-const CORE_DEPENDENCY_VERSIONS: Record<string, string> = {
-  'react': '18.3.1',
-  'react-dom': '18.3.1',
-};
 
 // 服务端编译缓存
 const compileCache = new Map<string, CompileResult>();
@@ -74,38 +71,11 @@ function isCssImport(moduleName: string): boolean {
 }
 
 /**
- * 判断一个 import 是否是 npm 包（而非相对路径或绝对路径）
- */
-function isNpmPackage(moduleName: string): boolean {
-  return !moduleName.startsWith('.') && !moduleName.startsWith('/');
-}
-
-/**
  * 将 npm 包名映射到 esm.sh CDN URL
- * 优先使用锁定版本，其次使用核心依赖固定版本
+ * 只允许使用 previewDependencyPolicy 中登记的固定版本或虚拟模块
  */
-function toCdnUrl(packageName: string, lockedUrl?: string): string {
-  if (lockedUrl) {
-    return lockedUrl;
-  }
-
-  const coreVersion = CORE_DEPENDENCY_VERSIONS[packageName];
-  if (coreVersion) {
-    return `${ESM_SH_BASE}/${packageName}@${coreVersion}`;
-  }
-
-  if (packageName.startsWith('react/')) {
-    const version = CORE_DEPENDENCY_VERSIONS['react'];
-    return `${ESM_SH_BASE}/react@${version}${packageName.slice('react'.length)}`;
-  }
-  if (packageName.startsWith('react-dom/')) {
-    const version = CORE_DEPENDENCY_VERSIONS['react-dom'];
-    return `${ESM_SH_BASE}/react-dom@${version}${packageName.slice('react-dom'.length)}`;
-  }
-
-  const reactVer = CORE_DEPENDENCY_VERSIONS['react'];
-  const reactDomVer = CORE_DEPENDENCY_VERSIONS['react-dom'];
-  return `${ESM_SH_BASE}/${packageName}?deps=react@${reactVer},react-dom@${reactDomVer}`;
+function toCdnUrl(packageName: string): string {
+  return getPreviewDependencyUrl(packageName);
 }
 
 /**
@@ -122,14 +92,14 @@ function escapeRegex(str: string): string {
 export function rewriteImportsToCdn(
   compiledCode: string,
   dependencies: string[],
-  lockedDependencies?: Record<string, string>,
+  _lockedDependencies?: Record<string, string>,
 ): string {
   let result = compiledCode;
 
   for (const dep of dependencies) {
     if (!isNpmPackage(dep) || isCssImport(dep)) continue;
 
-    const cdnUrl = toCdnUrl(dep, lockedDependencies?.[dep]);
+    const cdnUrl = toCdnUrl(dep);
     
     // 替换 from 'package' 和 from "package"
     const fromPattern = new RegExp(
@@ -182,8 +152,13 @@ export function compileCode(
   lockedDependencies?: Record<string, string>,
 ): CompileResult {
   const wrappedCode = autoWrapIfNoDefaultExport(code);
+  assertPreviewRuntimeContract(wrappedCode);
 
-  const cacheKey = getCodeHash(wrappedCode + JSON.stringify(lockedDependencies || {}));
+  const cacheKey = getCodeHash(
+    wrappedCode +
+      PREVIEW_DEPENDENCY_POLICY_VERSION +
+      JSON.stringify(lockedDependencies || {}),
+  );
   const cached = compileCache.get(cacheKey);
   if (cached) {
     return cached;
@@ -234,26 +209,9 @@ export async function resolveDependencyVersion(
     return null;
   }
 
-  // 核心依赖已有固定版本，不需要解析
-  if (CORE_DEPENDENCY_VERSIONS[packageName]) {
+  // 预览依赖策略已有固定版本，不需要通过 CDN 重定向解析。
+  if (PREVIEW_DEPENDENCY_POLICY[packageName]) {
     return null;
-  }
-
-  try {
-    const url = `${ESM_SH_BASE}/${packageName}`;
-    const response = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'manual',
-    });
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (location) {
-        return location;
-      }
-    }
-  } catch {
-    // 网络请求失败时忽略
   }
 
   return null;

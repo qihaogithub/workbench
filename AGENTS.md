@@ -120,8 +120,9 @@
 | `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
 | `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
 | `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
-| `@opencode-workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 MCP 复用 | - | Vitest |
-| `@opencode-workbench/project-admin-mcp` | `packages/project-admin-mcp/` | 项目管理 MCP stdio 服务 | - | Vitest |
+| `@opencode-workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 CLI 复用 | - | Vitest |
+| `@opencode-workbench/project-scaffold` | `packages/project-scaffold/` | 本地项目包协议与脚手架转换器 | - | Node/tsx 命令 |
+| `@opencode-workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
 | `@opencode-workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
 
 历史或非 workspace 目录：
@@ -152,7 +153,8 @@ pnpm check:author
 pnpm check:agent
 pnpm check:screenshot
 pnpm check:project-core
-pnpm check:project-admin-mcp
+pnpm check:project-scaffold
+pnpm check:project-cli
 pnpm check:viewer
 pnpm check:all
 pnpm test:e2e
@@ -190,9 +192,13 @@ pnpm --filter @opencode-workbench/viewer-site build
 pnpm --filter @opencode-workbench/project-core typecheck
 pnpm --filter @opencode-workbench/project-core test
 
-# project-admin-mcp
-pnpm --filter @opencode-workbench/project-admin-mcp typecheck
-pnpm --filter @opencode-workbench/project-admin-mcp test
+# project-scaffold
+pnpm --filter @opencode-workbench/project-scaffold typecheck
+pnpm --filter @opencode-workbench/project-scaffold test
+
+# project-cli
+pnpm --filter @opencode-workbench/project-cli typecheck
+pnpm --filter @opencode-workbench/project-cli test
 ```
 
 `test:smoke` 需要 `ACP_SMOKE_REAL=1`，只在明确需要真实集成冒烟时运行。
@@ -291,8 +297,9 @@ Docker：
 - agent-service：`pnpm check:agent`。
 - screenshot-service：`pnpm check:screenshot`。
 - project-core：`pnpm check:project-core`。
-- project-admin-mcp：`pnpm check:project-admin-mcp`。
-- shared：至少运行 `pnpm check:author`、`pnpm check:agent`、`pnpm check:screenshot`、`pnpm check:viewer`；如果改动影响项目读写类型，也运行 `pnpm check:project-core`。
+- project-scaffold：`pnpm check:project-scaffold`。
+- project-cli：`pnpm check:project-cli`。
+- shared：至少运行 `pnpm check:author`、`pnpm check:agent`、`pnpm check:screenshot`、`pnpm check:viewer`；如果改动影响项目读写类型，也运行 `pnpm check:project-core` 和 `pnpm check:project-scaffold`。
 - 跨页面关键流程：确认服务运行后执行 `pnpm test:e2e`。
 - 全仓轻量验证：`pnpm check:all`。该命令不包含真实 LLM、OSS、Docker 或浏览器 E2E。
 

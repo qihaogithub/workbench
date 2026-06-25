@@ -338,7 +338,7 @@ async function handleGenerate(
 
     request.log.warn({ requestId, projectId, pageId, code, message }, "screenshot failed");
 
-    if (code === "COMPILE_ERROR") {
+    if (code === "COMPILE_ERROR" || code === "RUNTIME_ERROR") {
       return reply.status(422).send({
         success: false,
         error: { code, message },

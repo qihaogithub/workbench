@@ -1,3 +1,3 @@
-export { createCodexInstallPrompt, createMcpClientConfigSnippet } from "./install-prompt";
+export { createProjectCliQuickReference, createProjectCliUsagePrompt } from "./cli-prompt";
 export { ProjectAdminService } from "./service";
 export type * from "./types";

@@ -1,5 +1,6 @@
 export type ScreenshotErrorCode =
   | "COMPILE_ERROR"
+  | "RUNTIME_ERROR"
   | "BROWSER_LAUNCH_ERROR"
   | "RENDER_TIMEOUT"
   | "SELECTOR_TIMEOUT"

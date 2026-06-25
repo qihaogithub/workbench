@@ -220,6 +220,7 @@
     if (text && el.children.length === 0) caps.push('text');
     if (className) caps.push('className');
     caps.push('structure');
+    var style = window.getComputedStyle ? window.getComputedStyle(el) : null;
     return {
       nodeId: el.getAttribute('data-visual-node-id') || domPath,
       tagName: el.tagName.toLowerCase(),
@@ -229,6 +230,19 @@
       domPath: domPath,
       parentPath: el.parentElement ? getDomPath(el.parentElement) : undefined,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      attrs: {
+        src: el.getAttribute('src') || undefined,
+        currentSrc: el instanceof HTMLImageElement ? (el.currentSrc || el.src || undefined) : undefined,
+        alt: el.getAttribute('alt') || undefined,
+        href: el.getAttribute('href') || undefined,
+        role: el.getAttribute('role') || undefined,
+        ariaLabel: el.getAttribute('aria-label') || undefined
+      },
+      computedStyle: style ? {
+        color: style.color || undefined,
+        backgroundColor: style.backgroundColor || undefined,
+        borderColor: style.borderColor || undefined
+      } : undefined,
       sourceFile: el.getAttribute('data-source-file') || undefined,
       sourceStart: Number(el.getAttribute('data-source-start')) || undefined,
       sourceEnd: Number(el.getAttribute('data-source-end')) || undefined,
@@ -909,6 +923,7 @@
     let currentConfig = {"bigBannerForeground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png","bigBannerBackground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png","miniBanners":["https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png"]};
     let currentComponent = null;
     let updateVersion = 0;
+    let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
 
@@ -923,30 +938,29 @@
       }
 
       componentDidCatch(error, errorInfo) {
-        window.parent.postMessage({ type: 'RUNTIME_ERROR', error: error.message, stack: error.stack }, '*');
+        reportRuntimeError({ stage: 'render', error: error.message, stack: error.stack });
       }
 
       render() {
         if (this.state.hasError) {
           return React.createElement('div', {
             style: {
+              minHeight: '100vh',
               padding: '16px',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '8px',
+              background: '#f8fafc',
               fontFamily: 'system-ui, sans-serif'
             }
           },
-            React.createElement('p', { style: { color: '#991b1b', fontWeight: 500, margin: '0 0 4px 0' } }, '渲染出错'),
-            React.createElement('pre', {
+            React.createElement('div', {
               style: {
-                color: '#dc2626',
-                fontSize: '13px',
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word'
+                minHeight: '160px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#475569',
+                fontSize: '14px'
               }
-            }, this.state.error?.message || '组件运行时发生错误')
+            }, '预览生成中')
           );
         }
         return this.props.children;
@@ -979,6 +993,21 @@
     }
 
     
+    function reportRuntimeError(payload) {
+      const safePayload = payload || {};
+      try {
+        document.documentElement.setAttribute('data-preview-runtime-error', JSON.stringify({
+          stage: safePayload.stage || 'runtime',
+          error: safePayload.error || '组件运行时发生错误',
+          stack: safePayload.stack,
+          source: safePayload.source,
+          line: safePayload.line,
+          timestamp: Date.now()
+        }));
+      } catch (_err) {}
+      window.parent.postMessage({ type: 'RUNTIME_ERROR', ...safePayload }, '*');
+    }
+
     function loadModuleFromCode(code, thisVersion) {
       const blob = new Blob([code], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
@@ -991,12 +1020,12 @@
           if (module.default) {
             window.parent.postMessage({ type: 'LOADED' }, '*');
           } else {
-            window.parent.postMessage({ type: 'RUNTIME_ERROR', error: '模块没有默认导出（export default）' }, '*');
+            reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
         })
         .catch((err) => {
           if (thisVersion !== updateVersion) return;
-          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message, stack: err.stack }, '*');
+          reportRuntimeError({ stage: 'dependency_import', error: err.message, stack: err.stack });
         });
     }
 
@@ -1004,6 +1033,19 @@
       if (event.source !== window.parent) return;
 
       const { type, code, configData: newConfigData, cssImports: newCssImports, isUrl } = event.data;
+
+      if (type === 'SLEEP') {
+        isSleeping = true;
+        return;
+      }
+
+      if (type === 'WAKE') {
+        isSleeping = false;
+        requestAnimationFrame(function() {
+          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height }, '*');
+        });
+        return;
+      }
 
       
       if (type === 'UPDATE_CODE') {
@@ -1025,7 +1067,7 @@
             })
             .catch((err) => {
               if (thisVersion !== updateVersion) return;
-              window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+              reportRuntimeError({ stage: 'dependency_import', error: err.message });
             });
         } else {
           loadModuleFromCode(code, thisVersion);
@@ -1041,6 +1083,7 @@
       }
 
       if (type === 'COLLECT_POSITIONABLE_SIZES') {
+        if (isSleeping) return;
         // 使用 requestAnimationFrame 等待 React 渲染完成后再测量 DOM
         requestAnimationFrame(function() {
           try {
@@ -1105,6 +1148,7 @@
       }
 
       if (type === 'COLLECT_THUMBNAIL_LAYOUT') {
+        if (isSleeping) return;
         try {
           (function() {
             function getCleanText(el) {
@@ -1182,6 +1226,7 @@
       }
 
       if (type === 'COLLECT_VISUAL_NODE_TREE') {
+        if (isSleeping) return;
         try {
           var nodes = [];
           var allVisualNodes = document.body.querySelectorAll('*');
@@ -1206,6 +1251,7 @@
     });
 
     const resizeObserver = new ResizeObserver((entries) => {
+      if (isSleeping) return;
       for (const entry of entries) {
         const height = entry.contentRect.height;
         window.parent.postMessage({ type: 'RESIZE', height }, '*');
@@ -1214,19 +1260,19 @@
     resizeObserver.observe(document.body);
 
     window.addEventListener('error', (event) => {
-      window.parent.postMessage({
-        type: 'RUNTIME_ERROR',
+      reportRuntimeError({
+        stage: 'runtime',
         error: event.message,
         source: event.filename,
         line: event.lineno
-      }, '*');
+      });
     });
 
     window.addEventListener('unhandledrejection', (event) => {
-      window.parent.postMessage({
-        type: 'RUNTIME_ERROR',
+      reportRuntimeError({
+        stage: 'runtime',
         error: event.reason?.message || String(event.reason)
-      }, '*');
+      });
     });
 
     window.parent.postMessage({ type: 'READY' }, '*');
@@ -1244,7 +1290,7 @@
           window.parent.postMessage({ type: 'COMPONENT_READY' }, '*');
         })
         .catch((err) => {
-          window.parent.postMessage({ type: 'RUNTIME_ERROR', error: err.message }, '*');
+          reportRuntimeError({ stage: 'dependency_import', error: err.message });
         });
     }
   </script>

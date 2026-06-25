@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, PreviewCanvas, ConfigScopeWrapper, isSchemaEmpty } from "../../../../components/demo";
+import { PreviewPanel, PreviewCanvas, PageConfigPanel, isSchemaEmpty } from "../../../../components/demo";
 import type { PreviewMode, PreviewSize, CanvasState } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
@@ -114,6 +114,7 @@ export default function ViewerProjectPage() {
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
+  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
   // 画布模式按需显示：选中页面 ID（仅 canvasConfig=onclick 模式使用）
   const [canvasSelectedPageId, setCanvasSelectedPageId] = useState<string | null>(null);
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
@@ -233,6 +234,7 @@ export default function ViewerProjectPage() {
         case "VIEWER_SET_PAGE":
           if (typeof msg.pageId === "string") {
             setActiveDemoId(msg.pageId);
+            setConfigPanelDetailPageId(msg.pageId);
             // 按需显示模式下同步选中状态
             if (canvasConfigMode === "onclick" && previewMode === "canvas") {
               setCanvasSelectedPageId(msg.pageId);
@@ -257,6 +259,20 @@ export default function ViewerProjectPage() {
     }));
   }, [activeDemoId]);
 
+  const handlePageConfigChange = useCallback((pageId: string, newData: Record<string, unknown>) => {
+    setConfigData((prev) => {
+      const merged = activeDemoId === pageId ? { ...prev, ...newData } : prev;
+      if (activeDemoId === pageId) {
+        postOutgoing({ type: "VIEWER_CONFIG_CHANGE", configData: merged });
+      }
+      return merged;
+    });
+    setConfigDataMap((prev) => ({
+      ...prev,
+      [pageId]: { ...(prev[pageId] ?? {}), ...newData },
+    }));
+  }, [activeDemoId]);
+
   const handleProjectConfigChange = useCallback((newData: Record<string, unknown>) => {
     setConfigData((prev) => {
       const merged = { ...prev, ...newData };
@@ -276,6 +292,7 @@ export default function ViewerProjectPage() {
     (pageId: string) => {
       if (!data) return;
       setActiveDemoId(pageId);
+      setConfigPanelDetailPageId(pageId);
       postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
       const page = data.demoPages.find((p) => p.id === pageId);
       if (page?.schema) {
@@ -417,6 +434,7 @@ export default function ViewerProjectPage() {
               editingPageId={canvasConfigMode === "onclick" ? canvasSelectedPageId ?? undefined : undefined}
               onPageConfigEdit={(pageId) => {
                 handlePageChange(pageId);
+                setConfigPanelDetailPageId(pageId);
                 if (canvasConfigMode === "onclick") {
                   setCanvasSelectedPageId(pageId);
                 }
@@ -454,44 +472,26 @@ export default function ViewerProjectPage() {
             className="border-l shrink-0 flex flex-col"
             style={{ width: configWidth }}
           >
-            <div className="px-4 py-3 border-b">
-              <h2 className="text-sm font-medium">配置面板</h2>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-4 flex flex-col">
-                {hasAnyConfig && (
-                  <>
-                    {showProjectConfig && (
-                      <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
-                        <ConfigForm
-                          key={`project-${data.projectConfigSchema}`}
-                          schema={data.projectConfigSchema!}
-                          onChange={handleProjectConfigChange}
-                          initialData={configData}
-                          readonly
-                        />
-                      </ConfigScopeWrapper>
-                    )}
-
-                    {showProjectConfig && showPageConfig && (
-                      <div className="h-[2px] bg-border my-3" />
-                    )}
-
-                    {showPageConfig && (
-                      <ConfigScopeWrapper scope="page" pageName={activePage?.name} hideHeader={!hasBothScopes}>
-                        <ConfigForm
-                          key={`page-${activeDemoId}`}
-                          schema={activePageSchema!}
-                          onChange={handleConfigChange}
-                          initialData={configData}
-                          readonly
-                        />
-                      </ConfigScopeWrapper>
-                    )}
-                  </>
-                )}
-              </div>
-            </ScrollArea>
+            <PageConfigPanel
+              pages={data.demoPages.map((page) => ({
+                id: page.id,
+                name: page.name,
+                order: page.order,
+                schema: page.schema,
+                configData: configDataMap[page.id],
+              }))}
+              activePageId={activeDemoId}
+              detailPageId={
+                previewMode === "single" ? activeDemoId : configPanelDetailPageId
+              }
+              onDetailPageIdChange={setConfigPanelDetailPageId}
+              onPageSelect={handlePageChange}
+              projectConfigSchema={data.projectConfigSchema}
+              onProjectConfigChange={handleProjectConfigChange}
+              onPageConfigChange={handlePageConfigChange}
+              readonly
+              hideDetailHeader={previewMode === "single"}
+            />
           </div>
         )}
       </div>

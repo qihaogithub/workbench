@@ -6,8 +6,8 @@ import {
   PreviewPanel,
   ConfigForm,
   PreviewCanvas,
+  PageConfigPanel,
   invalidateCompileCache,
-  ConfigScopeWrapper,
   isSchemaEmpty,
 } from "../../../../../components/demo";
 import type {
@@ -134,6 +134,10 @@ type AiFileChange = {
   action: "created" | "modified" | "deleted";
   content?: string;
 };
+
+type PreviewRuntimeErrorContext = NonNullable<
+  ActiveViewContext["previewRuntimeError"]
+>;
 
 function parsePreviewDimension(value: string | number | undefined): number | undefined {
   if (typeof value === "number") {
@@ -276,6 +280,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [configDataMap, setConfigDataMap] = useState<
     Record<string, Record<string, unknown>>
   >({});
+  const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>({});
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
@@ -318,6 +323,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [projectConfigSchema, setProjectConfigSchema] = useState<
     string | undefined
   >(undefined);
+  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
 
   const {
     previewMode,
@@ -336,8 +342,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     projectId: demoId,
   });
 
-  // 画布模式下配置面板按需显示：选中页面时显示，无选中时隐藏
-  const isConfigPanelVisible = previewMode !== "canvas" || !!canvasEditingPageId;
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
@@ -523,6 +527,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
+  const autoPreviewRepairPageIdsRef = useRef<Set<string>>(new Set());
   const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
   const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
@@ -543,6 +548,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>('');
+  const [previewRuntimeError, setPreviewRuntimeError] =
+    useState<PreviewRuntimeErrorContext | null>(null);
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -581,8 +588,51 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             schema: `demos/${focusedPageId}/config.schema.json`,
           }
         : undefined,
+      previewRuntimeError:
+        previewRuntimeError &&
+        (!previewRuntimeError.pageId ||
+          previewRuntimeError.pageId === focusedPageId)
+          ? previewRuntimeError
+          : undefined,
     };
-  }, [activeDemoId, canvasEditingPageId, demoPages, previewMode]);
+  }, [activeDemoId, canvasEditingPageId, demoPages, previewMode, previewRuntimeError]);
+
+  const handlePreviewError = useCallback(
+    (error: Error) => {
+      const pageId =
+        previewMode === "canvas"
+          ? (canvasEditingPageId ?? activeDemoId)
+          : activeDemoId;
+      setPreviewRuntimeError({
+        stage: "runtime",
+        pageId: pageId || undefined,
+        file: pageId ? `demos/${pageId}/index.tsx` : undefined,
+        message: error.message || "组件运行时发生错误",
+        instruction:
+          "请优先检查当前页面的 import、默认导出和渲染逻辑；图标和基础能力优先使用 @preview/sdk。",
+      });
+
+      if (pageId && !autoPreviewRepairPageIdsRef.current.has(pageId)) {
+        autoPreviewRepairPageIdsRef.current.add(pageId);
+        setTabValue("ai");
+        setTriggerAutoSend(`当前页面预览运行失败，请自动修复一次。
+
+页面: ${pageId}
+文件: demos/${pageId}/index.tsx
+错误: ${error.message || "组件运行时发生错误"}
+
+要求:
+- 保持页面原有产品意图、视觉结构和配置字段不变。
+- 优先使用 @preview/sdk 的受控能力，避免未登记依赖和不存在的 named import。
+- 修复后不要新增无关文件。`);
+      }
+    },
+    [activeDemoId, canvasEditingPageId, previewMode],
+  );
+
+  useEffect(() => {
+    setPreviewRuntimeError(null);
+  }, [activeDemoId]);
 
   /**
    * Unified snapshot application entry.
@@ -616,6 +666,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         const oldSchema = schemaRef.current;
         setSchema(newSchema);
         schemaRef.current = newSchema;
+        if (targetPageId) {
+          setPageSchemaMap((prev) => ({ ...prev, [targetPageId]: newSchema }));
+        }
         const size = getPreviewSize(newSchema);
         setPreviewSize(size);
         setPagePreviewSizeMap((prev) => {
@@ -856,21 +909,25 @@ ${context.details}
 
         const allDefaults: Record<string, Record<string, unknown>> = {};
         const codes: Record<string, string> = {};
+        const schemas: Record<string, string> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
             { code: string; schema: string },
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            schemas[pageId] = demo.schema;
             if (demo.code) {
               codes[pageId] = demo.code;
             }
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
+          schemas[initialDemoId] = loadedSchema;
         }
         setConfigDataMap(allDefaults);
         setPageCodes(codes);
+        setPageSchemaMap(schemas);
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -950,6 +1007,10 @@ ${context.details}
 
     const size = getPreviewSize(parsed.schema);
     setPreviewSize(size);
+    setPageSchemaMap((prev) => ({
+      ...prev,
+      [currentPageId]: parsed.schema,
+    }));
 
     const nextConfig = {
       ...defaults,
@@ -982,9 +1043,72 @@ ${context.details}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handlePageConfigPanelChange = useCallback(
+    (pageId: string, data: Record<string, unknown>) => {
+      invalidatePageScreenshot(pageId);
+      setConfigDataMap((prev) => {
+        const nextPageConfig = {
+          ...(prev[pageId] ?? {}),
+          ...data,
+        };
+        const next = {
+          ...prev,
+          [pageId]: nextPageConfig,
+        };
+        const currentCode =
+          pageCodes[pageId] || (pageId === activeDemoIdRef.current ? codeRef.current : "");
+        if (currentCode) {
+          scheduleScreenshotRegenerate(pageId, currentCode, nextPageConfig);
+        }
+        return next;
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pageCodes],
+  );
+
+  const handleProjectConfigPanelChange = useCallback(
+    (data: Record<string, unknown>) => {
+      const affectedPageIds = demoPages.map((page) => page.id);
+      invalidatePageScreenshots(affectedPageIds);
+      setConfigDataMap((prev) => {
+        const next = { ...prev };
+        for (const pageId of Object.keys(next)) {
+          next[pageId] = { ...next[pageId], ...data };
+        }
+        for (const page of demoPages) {
+          if (!next[page.id]) {
+            next[page.id] = { ...data };
+          }
+        }
+        for (const page of demoPages) {
+          const pageCode = pageCodes[page.id] || code;
+          if (!pageCode) continue;
+          scheduleScreenshotRegenerate(
+            page.id,
+            pageCode,
+            next[page.id],
+          );
+        }
+        return next;
+      });
+    },
+    [
+      code,
+      demoPages,
+      invalidatePageScreenshots,
+      pageCodes,
+      scheduleScreenshotRegenerate,
+    ],
+  );
+
   const handleSchemaChange = useCallback(
     (newSchema: string) => {
       setSchema(newSchema);
+      const currentPageId = activeDemoIdRef.current;
+      if (currentPageId) {
+        setPageSchemaMap((prev) => ({ ...prev, [currentPageId]: newSchema }));
+      }
       setEditorContent((prev) => {
         const currentCode = extractCodeFromFigma(prev) || code;
         return buildFigmaText(currentCode, newSchema);
@@ -1014,6 +1138,55 @@ ${context.details}
       }
     },
     [projectConfigSchema],
+  );
+
+  const handleConfigPanelPageSelect = useCallback(
+    async (pageId: string) => {
+      setActiveDemoId(pageId);
+      activeDemoIdRef.current = pageId;
+      if (pagePreviewSizeMap[pageId]) {
+        setPreviewSize(pagePreviewSizeMap[pageId]);
+      }
+      if (previewMode === "canvas") {
+        focusCanvasPage(pageId);
+        setCanvasEditingPageId(pageId);
+      }
+      if (!sessionId) return;
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
+        const data = await res.json();
+        if (data.success) {
+          setPageCodes((prev) => ({
+            ...prev,
+            [pageId]: data.data.code,
+          }));
+          setCode(data.data.code);
+          setSchema(data.data.schema);
+          setPageSchemaMap((prev) => ({
+            ...prev,
+            [pageId]: data.data.schema,
+          }));
+          setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+          setConfigDataMap((prev) => {
+            if (prev[pageId]) return prev;
+            const defaults = getSafeMergedDefaults(data.data.schema);
+            return { ...prev, [pageId]: defaults };
+          });
+          const size = getPreviewSize(data.data.schema);
+          setPreviewSize(size);
+        }
+      } catch (err) {
+        console.error("加载页面失败:", err);
+      }
+    },
+    [
+      focusCanvasPage,
+      getSafeMergedDefaults,
+      pagePreviewSizeMap,
+      previewMode,
+      sessionId,
+      setCanvasEditingPageId,
+    ],
   );
 
   const handleAiFilesChange = useCallback(
@@ -1064,6 +1237,7 @@ ${context.details}
 
         const codes: Record<string, string> = {};
         const allDefaults: Record<string, Record<string, unknown>> = {};
+        const schemas: Record<string, string> = {};
         const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
@@ -1072,6 +1246,7 @@ ${context.details}
           ][]) {
             codes[pageId] = demo.code;
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            schemas[pageId] = demo.schema;
             const pagePreviewSize = getPreviewSize(demo.schema);
             if (pagePreviewSize) {
               previewSizeMap[pageId] = pagePreviewSize;
@@ -1081,6 +1256,7 @@ ${context.details}
 
         setPageCodes(codes);
         setConfigDataMap(allDefaults);
+        setPageSchemaMap(schemas);
         setPagePreviewSizeMap(previewSizeMap);
 
         if (nextActiveId && multi.demos?.[nextActiveId]) {
@@ -1089,6 +1265,10 @@ ${context.details}
           activeDemoIdRef.current = nextActiveId;
           setCode(target.code || "");
           setSchema(target.schema || "");
+          setPageSchemaMap((prev) => ({
+            ...prev,
+            [nextActiveId]: target.schema || "",
+          }));
           setEditorContent(buildFigmaText(target.code || "", target.schema || ""));
           setPreviewSize(getPreviewSize(target.schema || ""));
         } else {
@@ -1951,6 +2131,7 @@ ${context}
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
   const hasAnyConfig = showProjectConfig || showPageConfig;
+  const isConfigPanelVisible = hasAnyConfig;
   const activePageName =
     demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
   const projectVersions = versionHistory?.versions ?? [];
@@ -2253,6 +2434,12 @@ ${context}
                       if (!existingWorkspaceId) {
                         setCode(data.data.code || "");
                         setSchema(data.data.schema || "");
+                        if (activeDemoIdRef.current) {
+                          setPageSchemaMap((prev) => ({
+                            ...prev,
+                            [activeDemoIdRef.current]: data.data.schema || "",
+                          }));
+                        }
                         setEditorContent(
                           buildFigmaText(
                             data.data.code || "",
@@ -2490,6 +2677,10 @@ ${context}
                           }));
                           setCode(data.data.code);
                           setSchema(data.data.schema);
+                          setPageSchemaMap((prev) => ({
+                            ...prev,
+                            [pageId]: data.data.schema,
+                          }));
                           setEditorContent(
                             buildFigmaText(data.data.code, data.data.schema),
                           );
@@ -2635,6 +2826,10 @@ ${context}
                               }));
                               setCode(fileData.data.code);
                               setSchema(fileData.data.schema);
+                              setPageSchemaMap((prev) => ({
+                                ...prev,
+                                [nextPage.id]: fileData.data.schema,
+                              }));
                               setEditorContent(
                                 buildFigmaText(
                                   fileData.data.code,
@@ -2857,10 +3052,13 @@ ${context}
                       screenshotUrls={canvasScreenshotUrls}
                       screenshotRenderBoxes={canvasScreenshotRenderBoxes}
                       onConsoleEntry={handleConsoleEntry}
+                      onError={handlePreviewError}
                       onPositionableSizes={setPositionableItemSizes}
                       onPageConfigEdit={(pageId) => {
                         setCanvasEditingPageId(pageId);
+                        setConfigPanelDetailPageId(pageId);
                         setActiveDemoId(pageId);
+                        activeDemoIdRef.current = pageId;
                         if (sessionId) {
                           fetch(`/api/sessions/${sessionId}/files/${pageId}`)
                             .then((res) => res.json())
@@ -2872,6 +3070,10 @@ ${context}
                                 }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
+                                setPageSchemaMap((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.schema,
+                                }));
                                 setEditorContent(
                                   buildFigmaText(data.data.code, data.data.schema),
                                 );
@@ -2972,6 +3174,10 @@ ${context}
                                 }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
+                                setPageSchemaMap((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.schema,
+                                }));
                                 setEditorContent(
                                   buildFigmaText(data.data.code, data.data.schema),
                                 );
@@ -3086,89 +3292,36 @@ ${context}
 
           {isConfigPanelVisible && (
             <ResizablePanel className="border-l bg-card flex flex-col">
-              <div className="px-4 py-3 border-b">
-                <h2 className="text-sm font-medium">配置面板</h2>
-                {previewMode === "canvas" && canvasEditingPageId ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {demoPages.find((p) => p.id === canvasEditingPageId)?.name}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    修改配置项，预览区将实时更新
-                  </p>
-                )}
-              </div>
-              <ScrollArea className="flex-1">
-                <div className="p-4 flex flex-col">
-                  {hasAnyConfig && (
-                    <>
-                      {showProjectConfig && (
-                        <ConfigScopeWrapper
-                          scope="project"
-                          hideHeader={!hasBothScopes}
-                        >
-                          <ConfigForm
-                            key={`project-${projectConfigSchema}`}
-                            schema={projectConfigSchema!}
-                            onChange={(data) => {
-                              const affectedPageIds = demoPages.map(
-                                (page) => page.id,
-                              );
-                              invalidatePageScreenshots(affectedPageIds);
-                              setConfigDataMap((prev) => {
-                                const next = { ...prev };
-                                for (const pageId of Object.keys(next)) {
-                                  next[pageId] = { ...next[pageId], ...data };
-                                }
-                                for (const page of demoPages) {
-                                  if (!next[page.id]) {
-                                    next[page.id] = { ...data };
-                                  }
-                                }
-                                for (const page of demoPages) {
-                                  const pageCode = pageCodes[page.id] || code;
-                                  if (!pageCode) continue;
-                                  scheduleScreenshotRegenerate(
-                                    page.id,
-                                    pageCode,
-                                    next[page.id],
-                                  );
-                                }
-                                return next;
-                              });
-                            }}
-                            onSchemaChange={handleProjectSchemaChange}
-                            initialData={configData}
-                            sessionId={sessionId}
-                          />
-                        </ConfigScopeWrapper>
-                      )}
-
-                      {showProjectConfig && showPageConfig && (
-                        <div className="h-[2px] bg-border my-3" />
-                      )}
-
-                      {showPageConfig && (
-                        <ConfigScopeWrapper
-                          scope="page"
-                          pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
-                          hideHeader={!hasBothScopes}
-                        >
-                          <ConfigForm
-                            key={activeDemoId}
-                            schema={schema}
-                            onChange={handleConfigChange}
-                            onSchemaChange={handleSchemaChange}
-                            initialData={configData}
-                            sessionId={sessionId}
-                            positionableItemSizes={positionableItemSizes}
-                          />
-                        </ConfigScopeWrapper>
-                      )}
-                    </>
-                  )}
-                </div>
-              </ScrollArea>
+              <PageConfigPanel
+                pages={demoPages.map((page) => ({
+                  id: page.id,
+                  name: page.name,
+                  order: page.order,
+                  schema: pageSchemaMap[page.id],
+                  configData: configDataMap[page.id],
+                }))}
+                activePageId={activeDemoId}
+                detailPageId={
+                  previewMode === "single" ? activeDemoId : configPanelDetailPageId
+                }
+                onDetailPageIdChange={(pageId) => {
+                  setConfigPanelDetailPageId(pageId);
+                  if (pageId === null && previewMode === "canvas") {
+                    clearCanvasSelection();
+                  }
+                }}
+                onPageSelect={handleConfigPanelPageSelect}
+                projectConfigSchema={projectConfigSchema}
+                onProjectConfigChange={handleProjectConfigPanelChange}
+                onProjectSchemaChange={handleProjectSchemaChange}
+                onPageConfigChange={handlePageConfigPanelChange}
+                onPageSchemaChange={(_pageId, nextSchema) =>
+                  handleSchemaChange(nextSchema)
+                }
+                sessionId={sessionId}
+                positionableItemSizes={positionableItemSizes}
+                hideDetailHeader={previewMode === "single"}
+              />
             </ResizablePanel>
           )}
         </ResizablePanelGroup>

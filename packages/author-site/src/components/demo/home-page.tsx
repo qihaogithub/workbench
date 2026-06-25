@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Cable, Plus, Search } from "lucide-react";
+import { Plus, Search, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DemoCard } from "@/components/demo/demo-card";
@@ -194,9 +194,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
           <div className="ml-auto flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link href="/mcp">
-                <Cable className="h-4 w-4" />
-                MCP
+              <Link href="/cli">
+                <Terminal className="h-4 w-4" />
+                CLI
               </Link>
             </Button>
             <Button

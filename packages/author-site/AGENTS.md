@@ -21,7 +21,7 @@
 ## 改动边界
 
 - API route 返回值使用 `{ success: true, data }` 或 `{ success: false, error }`，优先复用 `src/lib/fs-utils.ts` 中的 `createApiSuccess`、`createApiError`。
-- 项目读写能力正在向 `@opencode-workbench/project-core` 收敛；新增项目管理能力时，优先确认是否应该进入 `project-core`，避免 Web API 与 MCP 行为分叉。
+- 项目读写能力正在向 `@opencode-workbench/project-core` 收敛；新增项目管理能力时，优先确认是否应该进入 `project-core`，避免 Web API 与 CLI 行为分叉。
 - 改登录、鉴权或 session 时，同步检查 `src/middleware.ts`、`src/lib/auth/`、`src/app/api/auth/` 和前端调用。
 - 改 AI 对话时，同步检查 `src/lib/agent-client.ts`、`src/components/ai-elements/`、session API 与 agent-service 事件结构。
 - 改截图或预览时，同步检查 `src/lib/screenshot-service.ts`、`src/components/demo/useScreenshotGeneration.ts`、`packages/screenshot-service/` 和相关测试。
@@ -62,4 +62,3 @@ pnpm --filter @opencode-workbench/author-site test -- --testPathPattern="screens
 ```bash
 pnpm test:e2e
 ```
-

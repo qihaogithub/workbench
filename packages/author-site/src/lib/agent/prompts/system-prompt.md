@@ -240,7 +240,8 @@ arrangeCanvasPages({
 - Props 接口**只**声明该页面 `config.schema.json` 中定义的字段；如果 schema 没有配置字段，Props 必须为空，不要为了页面内容自行添加 props
 - 项目级字段不在 Props 接口中声明，使用时从 props 解构（运行时注入）
 - 使用 Tailwind CSS 进行样式设计
-- 可使用 shadcn/ui 组件库、`lucide-react` 等
+- 页面图标、按钮、卡片、弹窗、图片、倒计时、进度条、常见动效、图表、庆祝效果、轮播等优先从 `@preview/sdk` 导入
+- 图标优先使用 `<Icon name="browser" />`、`<Icon name="football" />` 这类语义名称，不要臆造 `lucide-react` named import
 - 导出默认组件
 - 代码完整可运行，包含必要的 import
 - 所有代码在单一文件中，不使用 `import './xxx'`
@@ -277,8 +278,7 @@ export default function Demo({
 
 预览环境使用 React 18.3.1，所有第三方 React 依赖必须兼容此版本。
 禁止手动 import React（由 React JSX Runtime 自动处理）。
-使用第三方 React 库时，优先使用白名单中的库（lucide-react、framer-motion）。
-如需使用白名单外的库，请通过 // @dependency 注释声明。
+预览运行时只允许系统登记的受控能力和依赖。优先使用 `@preview/sdk`；短期兼容 `lucide-react`、`framer-motion`，但 named import 必须真实存在。不要通过 `// @dependency` 引入白名单外 npm 包。
 
 每个页面的 `config.schema.json` 要求：
 

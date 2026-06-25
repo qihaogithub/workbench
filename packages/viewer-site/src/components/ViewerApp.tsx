@@ -26,18 +26,15 @@ import type {
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
-import { PreviewPanel } from "@/components/demo";
+import { PreviewPanel, PageConfigPanel } from "@/components/demo";
 import { PreviewCanvas } from "@/components/demo";
 import type { PreviewMode, CanvasState } from "@/components/demo";
 import {
-  ConfigForm,
-  ConfigScopeWrapper,
   isSchemaEmpty,
 } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 
 type SortOption = "newest" | "oldest" | "name";
 
@@ -362,6 +359,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
+  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -470,6 +468,20 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       }));
     },
     [projectId, activePageId],
+  );
+
+  const handlePageConfigChange = useCallback(
+    (pageId: string, newData: Record<string, unknown>) => {
+      if (pageId === activePageId) {
+        handleConfigChange(newData);
+        return;
+      }
+      setConfigDataMap((prev) => ({
+        ...prev,
+        [pageId]: { ...(prev[pageId] ?? {}), ...newData },
+      }));
+    },
+    [activePageId, handleConfigChange],
   );
 
   const handleProjectConfigChange = useCallback(
@@ -620,7 +632,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   }))}
                   canvasState={canvasState}
                   onCanvasStateChange={setCanvasState}
-                  onPageConfigEdit={handlePageChange}
+                  onPageConfigEdit={(pageId) => {
+                    handlePageChange(pageId);
+                    setConfigPanelDetailPageId(pageId);
+                  }}
                 />
               </div>
             ) : (
@@ -645,42 +660,26 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
         {hasSchema && (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
-            <div className="px-4 py-2.5 border-b border-border">
-              <h2 className="text-sm font-medium">配置面板</h2>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-4 space-y-4">
-                {hasProjectConfig && (
-                  <ConfigScopeWrapper
-                    scope="project"
-                    hideHeader={!hasBothScopes}
-                  >
-                    <ConfigForm
-                      schema={project.projectConfigSchema!}
-                      onChange={handleProjectConfigChange}
-                      initialData={configData}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
-                )}
-                {hasProjectConfig && hasPageConfig && <Separator />}
-                {hasPageConfig && (
-                  <ConfigScopeWrapper
-                    scope="page"
-                    pageName={activePage?.name}
-                    hideHeader={!hasBothScopes}
-                  >
-                    <ConfigForm
-                      key={`page-${activePageId}`}
-                      schema={activePageSchema!}
-                      onChange={handleConfigChange}
-                      initialData={configData}
-                      readonly
-                    />
-                  </ConfigScopeWrapper>
-                )}
-              </div>
-            </ScrollArea>
+            <PageConfigPanel
+              pages={project.demoPages.map((page) => ({
+                id: page.id,
+                name: page.name,
+                order: page.order,
+                schema: pageSchemaMap[page.id],
+                configData: configDataMap[page.id],
+              }))}
+              activePageId={activePageId}
+              detailPageId={
+                previewMode === "single" ? activePageId : configPanelDetailPageId
+              }
+              onDetailPageIdChange={setConfigPanelDetailPageId}
+              onPageSelect={handlePageChange}
+              projectConfigSchema={project.projectConfigSchema}
+              onProjectConfigChange={handleProjectConfigChange}
+              onPageConfigChange={handlePageConfigChange}
+              readonly
+              hideDetailHeader={previewMode === "single"}
+            />
           </div>
         )}
       </div>

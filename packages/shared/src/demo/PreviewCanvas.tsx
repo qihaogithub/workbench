@@ -219,6 +219,7 @@ export function PreviewCanvas({
   screenshotUrls,
   screenshotRenderBoxes,
   onConsoleEntry,
+  onError,
   focusPageId,
   onPositionableSizes,
 }: PreviewCanvasProps) {
@@ -893,6 +894,7 @@ export function PreviewCanvas({
               onLayoutChange={handleLayoutChange}
               onConfigEdit={onPageConfigEdit}
               onConsoleEntry={onConsoleEntry}
+              onError={onError}
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}

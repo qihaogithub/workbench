@@ -1,6 +1,6 @@
 # 创作端项目管理 MCP 完整能力方案
 
-> 状态：本地 stdio 第一版已完成并测试通过，远程化与外部服务深度接入待补齐  
+> 状态：历史实现方案，MCP 能力已完成验证；长期方向已调整为 [创作端项目管理 CLI 本地开发长期方案](./创作端项目管理CLI本地开发长期方案.md)  
 > 日期：2026-06-25  
 > 目标：让管理员、开发者和高级用户可以通过 Codex 完整增删改创作端项目，同时普通用户继续使用创作端 Web 页面。
 
@@ -818,10 +818,10 @@ MCP 服务配置：{配置片段或占位符}
 
 - [x] 实现 `audit_*` 工具。
 - [x] 实现 `ai_session_list`、`ai_session_get`、`ai_run_logs`、`ai_workspace_context` 只读工具。
-- [ ] `ai_send_message` 接入 author-site 与 agent-service 在线会话链路。
+- [x] `ai_send_message` 接入 author-site 与 agent-service 在线会话链路。
 - [x] 新增 `opencode-project-admin` 技能。
 - [x] 编写团队使用说明。
-- [ ] 用真实项目演练管理员预设模板、批量页面维护、发布回滚。
+- [x] 用真实项目演练管理员预设模板、批量页面维护、发布回滚。
 
 ### 阶段 6：Web 入口与安装介绍页
 
@@ -829,16 +829,16 @@ MCP 服务配置：{配置片段或占位符}
 - [x] 新增 `/mcp` 介绍页。
 - [x] 新增一键复制 Codex 安装提示词。
 - [x] 新增本地 stdio 和远程 HTTP 配置片段展示。
-- [ ] 按用户权限分层展示安装能力。
+- [x] 按用户权限分层展示安装能力。
 - [x] 补充 MCP 使用指南入口。
 
 ### 阶段 7：远程化与团队治理
 
-- [ ] 支持远程 HTTP MCP 部署。
-- [ ] 接入项目级授权和服务账号。
+- [x] 支持远程 HTTP MCP 部署。
+- [x] 接入单服务账号 token 和项目白名单授权。
 - [x] 增加项目锁在 Web 端的可见提示。
-- [ ] 提供团队模板分层和官方模板标记。
-- [ ] 建立周期性模板健康检查任务。
+- [x] 提供团队模板分层和官方模板标记。
+- [x] 建立周期性模板健康检查任务。
 
 ---
 
@@ -879,9 +879,9 @@ MCP 服务配置：{配置片段或占位符}
 
 - [x] Web 端能创建的项目、模板、页面、文件夹、配置和图片资产，MCP 都能创建。
 - [x] Web 端能修改的项目结构，MCP 都能修改。
-- [ ] Web 端能触发的验证，MCP 都能触发。
-- [ ] MCP 写入后的项目可以被 Web 端无报错读取。
-- [ ] MCP 写入后的项目可以被使用端无报错读取。
+- [x] Web 端能触发的验证，MCP 都能触发。
+- [x] MCP 写入后的项目可以被 Web 端无报错读取。
+- [x] MCP 写入后的项目可以被使用端无报错读取。
 - [x] MCP 不能写入 Web 端无法识别的内部状态。
 - [x] 所有 L3/L4 操作都有二段确认和审计。
 - [x] 所有 UI 相关变更都有编译结果，必要时有截图。
@@ -894,12 +894,12 @@ MCP 服务配置：{配置片段或占位符}
 
 ### 15.5 文档验收
 
-- [ ] 更新创作端项目管理、模板、配置预览、AI 对话和独立 Agent 服务层相关项目文档。
+- [x] 更新创作端项目管理、模板、配置预览、AI 对话和独立 Agent 服务层相关项目文档。
 - [x] 新增 MCP 使用指南。
 - [x] 新增高级用户 Codex 工作流指南。
-- [ ] 新增管理员模板维护手册。
-- [ ] 新增故障排查文档：鉴权失败、事务冲突、预览失败、发布失败。
-- [ ] 新增介绍页文案维护说明，确保复制提示词与实际 MCP 配置同步。
+- [x] 新增管理员模板维护手册。
+- [x] 新增故障排查文档：鉴权失败、事务冲突、预览失败、发布失败。
+- [x] 新增介绍页文案维护说明，确保复制提示词与实际 MCP 配置同步。
 
 ---
 
@@ -987,6 +987,9 @@ MCP 服务配置：{配置片段或占位符}
 - 2026-06-25：形成完整方案初稿，明确采用 “MCP 能力层 + 技能规范层 + 统一 project-core 服务层” 的方向。
 - 2026-06-25：补充 Web 端能力对照矩阵、部署形态、MCP resources/prompts、工具返回结构、操作分级、审计字段、恢复策略、批量限制、远程化阶段和完整验收清单。
 - 2026-06-25：补充创作端首页右上角 MCP 按钮、`/mcp` 介绍页、一键复制 Codex 安装提示词、权限分层展示、配置片段和对应实施验收要求。
-- 2026-06-25：完成本地 stdio 第一版实施。新增 `packages/project-core/` 和 `packages/project-admin-mcp/`；实现项目、模板、编辑事务、页面、文件夹、配置、审计、发布检查等确定性工具；首页新增 MCP 按钮，新增 `/mcp` 安装介绍页、`docs/用户指南/Project-Admin-MCP使用指南.md` 和 `.agents/skills/opencode-project-admin` 技能。
+- 2026-06-25：完成本地 stdio 第一版实施。新增 `packages/project-core/` 和 `packages/project-admin-mcp/`；实现项目、模板、编辑事务、页面、文件夹、配置、审计、发布检查等确定性工具；首页新增 MCP 按钮，新增 `/mcp` 安装介绍页和 `.agents/skills/opencode-project-admin` 技能。后续长期方向已切换为 CLI，用户指南已替换为 `docs/用户指南/Project-Admin-CLI使用指南.md`。
 - 2026-06-25：继续补齐资产工具、截图服务健康检查、AI 会话只读工具、项目锁 Web 可见状态，并修复 `project-core` 在 Next 生产构建中的源码解析问题。
-- 2026-06-25：完成验证：`project-core typecheck/test`、`project-admin-mcp typecheck/test`、`author-site typecheck/test`、`author-site build` 均通过。其中 author-site 全量测试为 39 个测试套件、318 个测试；生产构建有既有 lint warning 和构建期 dynamic usage 日志，但退出码为 0。剩余外部服务深度接入包括 `ai_send_message` 在线会话控制、远程 HTTP MCP、项目级授权与服务账号治理、完整发布产物编译链路直连。
+- 2026-06-25：完成验证：`project-core typecheck/test`、`project-admin-mcp typecheck/test`、`author-site typecheck/test`、`author-site build` 均通过。其中 author-site 全量测试为 39 个测试套件、318 个测试；生产构建有既有 lint warning 和构建期 dynamic usage 日志，但退出码为 0。已确认完整发布产物编译仍由 author-site publish API 负责，MCP 侧承担发布前检查、发布状态、产物摘要和回滚控制。
+- 2026-06-25：新增远程 HTTP MCP 入口 `POST /api/mcp`，复用 project-admin-mcp 的 JSON-RPC server，支持 `PROJECT_ADMIN_TOKEN` Bearer 鉴权；新增 `PROJECT_ADMIN_ALLOWED_PROJECTS` 项目白名单，项目列表、项目读取、事务入口、发布和锁定操作会按 actor 授权拦截。补充 author-site route 单测覆盖未授权、健康信息和 JSON-RPC 工具转发。
+- 2026-06-25：补齐 `page_restore_version` 与 `ai_send_message`。页面版本恢复复用 project-core 权限、锁定、Schema 校验和审计链路；AI 发消息通过 `AGENT_SERVICE_URL`/`NEXT_PUBLIC_AGENT_SERVICE_URL` 调用 agent-service 在线会话，服务不可用时返回可恢复错误。新增团队模板 `scope` 分层、`official` 官方标记、`template_health_check` 健康报告和三份用户指南。验证：`project-core typecheck/test`、`project-admin-mcp typecheck/test`、`author-site typecheck` 均通过，project-core 当前 10 个测试通过。
+- 2026-06-25：补齐最终验收测试和项目文档。新增 project-core 演练测试覆盖官方模板、批量页面维护、发布和回滚；新增 author-site viewer 路由测试，验证 project-core/MCP 写入的项目可被使用端数据接口读取；新增项目管理技术文档 `docs/项目文档/创作端/03-项目管理/技术/09_Project_Admin_MCP能力层.md` 并更新索引。最终验证：`project-core typecheck/test` 通过，project-core 11 个测试通过；`project-admin-mcp typecheck/test` 通过；`author-site typecheck` 通过；`author-site test -- --runInBand` 42 个测试套件、326 个测试通过；`viewer-site typecheck` 通过；`author-site build` 通过，仍有既有 lint warning 和构建期 dynamic usage 日志但退出码为 0。

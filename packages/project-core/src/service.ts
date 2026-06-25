@@ -15,6 +15,8 @@ import type {
 import type {
   AuditEvent,
   AuditLevel,
+  AiSendMessageInput,
+  AiSendMessageResult,
   AiSessionSummary,
   AssetReplaceInput,
   AssetSummary,
@@ -28,6 +30,8 @@ import type {
   FolderUpdateInput,
   PageCreateInput,
   PageDetail,
+  PageRestoreResult,
+  ProjectPackageExport,
   PageUpdateInput,
   PreviewPlan,
   ProjectAdminActor,
@@ -37,6 +41,8 @@ import type {
   ProjectDetail,
   ProjectSummary,
   PublishStatus,
+  TemplateHealthReport,
+  TemplateListFilter,
   TemplateMetaInput,
   ValidationResult,
 } from "./types.js";
@@ -252,7 +258,7 @@ export class ProjectAdminService {
     return ok({
       actor,
       mode:
-        process.env.PROJECT_ADMIN_MCP_MODE === "http" ? "http" : writable ? "stdio" : "readonly",
+        process.env.PROJECT_ADMIN_CLI_MODE === "local" ? "local" : writable ? "cli" : "readonly",
       writable,
       maxBatchSize: this.maxBatchSize,
       tools: [
@@ -274,19 +280,25 @@ export class ProjectAdminService {
 
   defaultActor(): ProjectAdminActor {
     const role = (process.env.PROJECT_ADMIN_ROLE ?? "admin") as ProjectAdminActor["role"];
+    const allowedProjectIds = (process.env.PROJECT_ADMIN_ALLOWED_PROJECTS ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
     return {
       id: process.env.USER ?? "local-codex",
       name: process.env.USER ?? "Local Codex",
       role: ["admin", "creator", "readonly"].includes(role) ? role : "admin",
-      source: "project-admin-mcp",
+      source: "project-admin-core",
+      allowedProjectIds: allowedProjectIds.length > 0 ? allowedProjectIds : undefined,
     };
   }
 
-  listProjects(): ProjectAdminResult<ProjectSummary[]> {
+  listProjects(actor = this.defaultActor()): ProjectAdminResult<ProjectSummary[]> {
     this.ensureDirs();
     const projects: ProjectSummary[] = [];
     for (const entry of fs.readdirSync(this.projectsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+      if (!this.canAccessProject(entry.name, actor)) continue;
       const projectPath = this.getProjectPath(entry.name);
       const stats = fs.statSync(projectPath);
       const project = this.readProject(entry.name);
@@ -307,7 +319,9 @@ export class ProjectAdminService {
     return ok(projects.sort((a, b) => b.updatedAt - a.updatedAt));
   }
 
-  getProject(projectId: string): ProjectAdminResult<ProjectDetail> {
+  getProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<ProjectDetail> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const workspacePath = this.projectWorkspacePath(projectId);
@@ -323,6 +337,46 @@ export class ProjectAdminService {
       versions: [...project.versions].reverse(),
       projectConfigSchema: this.readProjectConfig(workspacePath) ?? undefined,
       locked: this.isProjectLocked(projectId),
+    });
+  }
+
+  exportProjectPackage(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectPackageExport> {
+    const detail = this.getProject(projectId, actor);
+    if (!detail.ok || !detail.data) {
+      return fail(detail.error?.code ?? "PROJECT_NOT_FOUND", detail.error?.message ?? "项目不存在");
+    }
+    const workspacePath = this.projectWorkspacePath(projectId);
+    const pages: PageDetail[] = [];
+    for (const page of detail.data.pages) {
+      const files = this.readPageFiles(workspacePath, page.id);
+      if (!files) {
+        return fail("FILE_READ_ERROR", `页面文件不存在: ${page.id}`);
+      }
+      pages.push({ meta: page, files });
+    }
+    const assets = this.walkFiles(path.join(workspacePath, "assets"))
+      .filter((file) => fs.statSync(file).isFile())
+      .map((file) => {
+        const relativePath = path.join("assets", path.relative(path.join(workspacePath, "assets"), file));
+        const buffer = fs.readFileSync(file);
+        return {
+          path: relativePath,
+          dataBase64: buffer.toString("base64"),
+          size: buffer.length,
+        };
+      });
+    const baseVersion = detail.data.versions[0]?.versionId ?? "v0";
+    return ok({
+      project: detail.data.project,
+      pages,
+      folders: detail.data.folders,
+      versions: detail.data.versions,
+      projectConfigSchema: detail.data.projectConfigSchema,
+      assets,
+      baseVersion,
     });
   }
 
@@ -407,6 +461,8 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<Project> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const diff: DiffSummary = { updated: [] };
@@ -437,6 +493,8 @@ export class ProjectAdminService {
     name?: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const source = this.readProject(projectId);
     if (!source) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const templateId = this.createTemplateSnapshot(projectId, {
@@ -452,7 +510,9 @@ export class ProjectAdminService {
     return created;
   }
 
-  deleteProjectPreview(projectId: string): ProjectAdminResult<PreviewPlan> {
+  deleteProjectPreview(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PreviewPlan> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const plan = this.createPlan("project_delete", projectId, [
@@ -479,6 +539,8 @@ export class ProjectAdminService {
     if (plan.confirmToken !== confirmToken) {
       return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
     }
+    const access = this.requireProjectAccess(plan.resourceId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     fs.rmSync(this.getProjectPath(plan.resourceId), { recursive: true, force: true });
     const auditId = this.audit("project_delete_execute", actor, "L3", true, {
       projectId: plan.resourceId,
@@ -501,7 +563,7 @@ export class ProjectAdminService {
       : fail("PROJECT_NOT_FOUND", "项目不存在");
   }
 
-  listTemplates(): ProjectAdminResult<ProjectTemplateMeta[]> {
+  listTemplates(filter: TemplateListFilter = {}): ProjectAdminResult<ProjectTemplateMeta[]> {
     this.ensureDirs();
     const templates: ProjectTemplateMeta[] = [];
     for (const entry of fs.readdirSync(this.templatesDir, { withFileTypes: true })) {
@@ -509,7 +571,19 @@ export class ProjectAdminService {
       const meta = this.readTemplate(entry.name);
       if (meta) templates.push(meta);
     }
-    return ok(templates.sort((a, b) => b.updatedAt - a.updatedAt));
+    const filtered = templates.filter((template) => {
+      if (filter.scope && template.scope !== filter.scope) return false;
+      if (filter.official !== undefined && Boolean(template.official) !== filter.official) {
+        return false;
+      }
+      return true;
+    });
+    return ok(
+      filtered.sort((a, b) => {
+        if (Boolean(a.official) !== Boolean(b.official)) return a.official ? -1 : 1;
+        return b.updatedAt - a.updatedAt;
+      }),
+    );
   }
 
   getTemplate(templateId: string): ProjectAdminResult<ProjectTemplateMeta> {
@@ -524,6 +598,8 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectTemplateMeta> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
       return fail("PROJECT_LOCKED", "项目已被管理员锁定，当前不能打开编辑事务");
     }
@@ -557,6 +633,8 @@ export class ProjectAdminService {
       name: input.name?.trim() || template.name,
       description: input.description?.trim() || template.description,
       thumbnail: input.thumbnail ?? template.thumbnail,
+      scope: input.scope ?? template.scope,
+      official: input.official ?? template.official,
       updatedAt: Date.now(),
     };
     this.writeTemplate(templateId, updated);
@@ -565,6 +643,69 @@ export class ProjectAdminService {
       diffSummary: { updated: [`template:${templateId}`] },
     });
     return ok(updated, { auditId, diffSummary: { updated: [`template:${templateId}`] } });
+  }
+
+  checkTemplateHealth(templateId?: string): ProjectAdminResult<TemplateHealthReport> {
+    this.ensureDirs();
+    const templateIds = templateId
+      ? [templateId]
+      : fs.readdirSync(this.templatesDir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name);
+    const items = templateIds.map((id) => {
+      const template = this.readTemplate(id);
+      const issues: ValidationResult["issues"] = [];
+      const workspacePath = path.join(this.getTemplatePath(id), "workspace");
+      if (!template) {
+        issues.push({
+          code: "TEMPLATE_META_INVALID",
+          message: "模板元数据缺失或不完整",
+          resourceId: id,
+          severity: "blocking",
+        });
+      }
+      if (!fs.existsSync(workspacePath)) {
+        issues.push({
+          code: "TEMPLATE_WORKSPACE_MISSING",
+          message: "模板 workspace 不存在",
+          resourceId: id,
+          severity: "blocking",
+        });
+      } else {
+        const validation = this.validateWorkspace(workspacePath);
+        issues.push(...validation.issues);
+        if (template && template.demoCount !== this.readWorkspaceTree(workspacePath).pages.length) {
+          issues.push({
+            code: "TEMPLATE_DEMO_COUNT_MISMATCH",
+            message: "模板页面数量与 workspace-tree 不一致",
+            resourceId: id,
+            severity: "warning",
+          });
+        }
+      }
+      return {
+        templateId: id,
+        name: template?.name,
+        scope: template?.scope,
+        official: template?.official,
+        ok: issues.every((issue) => issue.severity !== "blocking"),
+        issues,
+      };
+    });
+    const report: TemplateHealthReport = {
+      checkedAt: Date.now(),
+      total: items.length,
+      ok: items.every((item) => item.ok),
+      items,
+    };
+    writeJsonFile(path.join(this.internalDir, "template-health", "latest.json"), report);
+    return ok(report, {
+      validation: {
+        ok: report.ok,
+        issues: items.flatMap((item) => item.issues),
+      },
+      nextActions: ["template_list", "template_get"],
+    });
   }
 
   deleteTemplatePreview(templateId: string): ProjectAdminResult<PreviewPlan> {
@@ -646,6 +787,8 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<EditTransaction> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
       return fail("PROJECT_LOCKED", "项目已被管理员锁定，当前不能打开编辑事务");
     }
@@ -655,7 +798,8 @@ export class ProjectAdminService {
     if (!fs.existsSync(source)) return fail("WORKSPACE_NOT_FOUND", "项目工作空间不存在");
 
     const editId = nowId("edit");
-    const workspaceId = `mcp_${editId}`;
+    const workspacePrefix = actor.source === "project-admin-cli" ? "cli" : "core";
+    const workspaceId = `${workspacePrefix}_${editId}`;
     const workspacePath = path.join(this.workspacesDir, actor.id, projectId, workspaceId);
     ensureDir(path.dirname(workspacePath));
     copyWorkspace(source, workspacePath);
@@ -826,11 +970,16 @@ export class ProjectAdminService {
     if (parentId && !tree.folders.some((folder) => folder.id === parentId)) {
       return fail("FOLDER_NOT_FOUND", "父文件夹不存在");
     }
-    const pageId = `${generatePageSlug(input.name)}_${Math.random().toString(36).slice(2, 6)}`;
+    const pageId = input.pageId
+      ? safeId(input.pageId, "page")
+      : `${generatePageSlug(input.name)}_${Math.random().toString(36).slice(2, 6)}`;
+    if (tree.pages.some((page) => page.id === pageId)) {
+      return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
+    }
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
-      order: tree.pages.length,
+      order: input.order ?? tree.pages.length,
       parentId,
     };
     if (input.dryRun) {
@@ -859,7 +1008,12 @@ export class ProjectAdminService {
     );
   }
 
-  duplicatePage(editId: string, pageId: string, name?: string): ProjectAdminResult<PageDetail> {
+  duplicatePage(
+    editId: string,
+    pageId: string,
+    name?: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageDetail> {
     const page = this.getPage(editId, pageId);
     if (!page.ok || !page.data) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
     return this.createPage({
@@ -868,7 +1022,7 @@ export class ProjectAdminService {
       parentId: page.data.meta.parentId,
       code: page.data.files.code,
       schema: page.data.files.schema,
-    });
+    }, actor);
   }
 
   updatePage(input: PageUpdateInput, actor = this.defaultActor()): ProjectAdminResult<PageDetail> {
@@ -1007,24 +1161,106 @@ export class ProjectAdminService {
     return ok({ pages: sortPages(pages), folders }, { auditId, diffSummary: { updated: ["workspace-tree"] }, validation });
   }
 
+  restorePageVersion(
+    projectId: string,
+    pageId: string,
+    versionId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageRestoreResult> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (this.isProjectLocked(projectId) && actor.role !== "admin") {
+      return fail("PROJECT_LOCKED", "项目已被管理员锁定，当前不能恢复页面版本");
+    }
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const workspacePath = this.projectWorkspacePath(projectId);
+    const page = this.findPage(workspacePath, pageId);
+    if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+
+    const targetVersion = project.pageVersions?.[pageId]?.find((version) => version.versionId === versionId);
+    if (!targetVersion) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
+    const files = this.readPageVersionFiles(project, pageId, versionId);
+    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本快照已丢失: ${versionId}`);
+
+    const validation = this.validateSchemaPair(this.readProjectConfig(workspacePath), files.schema);
+    if (!validation.ok) return fail("VALIDATION_BLOCKED", "恢复版本的页面 Schema 校验失败", { validation });
+
+    const demoDir = this.pageDir(workspacePath, pageId);
+    fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+    fs.writeFileSync(path.join(demoDir, "config.schema.json"), files.schema, "utf-8");
+
+    const restoredAt = Date.now();
+    const version = this.createProjectVersion(
+      project,
+      workspacePath,
+      actor.name,
+      `restore-page-${pageId}-${versionId}`,
+      `从页面 ${page.name} 的历史版本 ${versionId} 恢复`,
+    );
+    const tree = this.readWorkspaceTree(workspacePath);
+    const updatedProject: Project = {
+      ...project,
+      workspacePath,
+      demoPages: sortPages(tree.pages),
+      demoFolders: tree.folders,
+      versions: [...project.versions, version].slice(-MAX_VERSIONS_KEEP),
+      updatedAt: restoredAt,
+    };
+    this.writeProject(projectId, updatedProject);
+    const auditId = this.audit("page_restore_version", actor, "L2", true, {
+      projectId,
+      resourceId: pageId,
+      diffSummary: {
+        updated: [`demos/${pageId}/index.tsx`, `demos/${pageId}/config.schema.json`],
+        notes: [`生成版本 ${version.versionId}`],
+      },
+      validation,
+    });
+    return ok(
+      {
+        success: true,
+        newVersionId: version.versionId,
+        restoredAt,
+        files,
+      },
+      {
+        auditId,
+        diffSummary: {
+          updated: [`demos/${pageId}/index.tsx`, `demos/${pageId}/config.schema.json`],
+          notes: [`生成版本 ${version.versionId}`],
+        },
+        validation,
+        nextActions: ["project_get"],
+      },
+    );
+  }
+
   createFolder(
     editId: string,
     name: string,
     parentId: string | null = null,
     actor = this.defaultActor(),
+    options: { folderId?: string; order?: number; dryRun?: boolean } = {},
   ): ProjectAdminResult<DemoFolderMeta> {
     const transaction = this.requireEditable(editId);
     if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
+    const folderId = options.folderId ? safeId(options.folderId, "folder") : nowId("folder");
+    if (tree.folders.some((folder) => folder.id === folderId)) {
+      return fail("FOLDER_ID_CONFLICT", `文件夹 id 已存在: ${folderId}`);
+    }
     const folder: DemoFolderMeta = {
-      id: nowId("folder"),
+      id: folderId,
       name: name.trim() || "未命名文件夹",
       parentId,
-      order: tree.folders.length,
+      order: options.order ?? tree.folders.length,
     };
     const nextTree = { ...tree, folders: [...tree.folders, folder] };
     const validation = this.validateTree(nextTree);
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "文件夹层级校验失败", { validation });
+    if (options.dryRun) return ok(folder, { diffSummary: { created: [`folder:${folder.id}`] }, validation });
     this.writeWorkspaceTree(transaction.data.workspacePath, nextTree);
     const auditId = this.audit("folder_create", actor, "L2", true, {
       projectId: transaction.data.projectId,
@@ -1202,7 +1438,7 @@ export class ProjectAdminService {
     if (!page.ok) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
     return ok(
       { patch, applied: false },
-      { warnings: ["当前 MCP 仅返回可视化补丁候选；实际配置值写入仍由 Web 配置面板处理"] },
+      { warnings: ["当前服务仅返回可视化补丁候选；实际配置值写入仍由 Web 配置面板处理"] },
     );
   }
 
@@ -1230,25 +1466,31 @@ export class ProjectAdminService {
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "资产校验失败", { validation });
     const buffer = Buffer.from(input.dataBase64, "base64");
     const filename = this.generateAssetFilename(input.filename);
-    const relativePath = path.join("assets", "images", filename);
+    const relativePath = input.targetPath
+      ? this.safeRelativeAssetPath(input.targetPath)
+      : path.join("assets", "images", filename);
+    if (input.targetPath && relativePath.split(path.sep)[0] !== "assets") {
+      return fail("INVALID_ASSET_PATH", "targetPath 必须位于 assets/ 目录下");
+    }
     const targetPath = path.join(transaction.data.workspacePath, relativePath);
+    const existed = fs.existsSync(targetPath);
     const summary: AssetSummary = {
       path: relativePath,
       size: buffer.length,
       references: [],
     };
     if (input.dryRun) {
-      return ok(summary, { diffSummary: { created: [relativePath] }, validation });
+      return ok(summary, { diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] }, validation });
     }
     ensureDir(path.dirname(targetPath));
     fs.writeFileSync(targetPath, buffer);
     const auditId = this.audit("asset_upload", actor, "L2", true, {
       projectId: transaction.data.projectId,
       resourceId: relativePath,
-      diffSummary: { created: [relativePath] },
+      diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] },
       validation,
     });
-    return ok(summary, { auditId, diffSummary: { created: [relativePath] }, validation });
+    return ok(summary, { auditId, diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] }, validation });
   }
 
   deleteAssetPreview(editId: string, assetPath: string): ProjectAdminResult<PreviewPlan> {
@@ -1316,11 +1558,13 @@ export class ProjectAdminService {
         },
       );
     }
-    const updatedReferences = this.replaceReferences(
-      transaction.data.workspacePath,
-      oldPath,
-      upload.data.path,
-    );
+    const updatedReferences = oldPath === upload.data.path
+      ? []
+      : this.replaceReferences(
+          transaction.data.workspacePath,
+          oldPath,
+          upload.data.path,
+        );
     const auditId = this.audit("asset_replace", actor, "L2", true, {
       projectId: transaction.data.projectId,
       resourceId: oldPath,
@@ -1340,7 +1584,7 @@ export class ProjectAdminService {
       : this.validateWorkspace(transaction.workspacePath);
     return ok(validation, {
       validation,
-      warnings: ["MCP 本地骨架执行静态校验；完整编译仍通过 author-site /api/compile 或 screenshot-service 完成"],
+      warnings: ["CLI 本地骨架执行静态校验；完整编译仍通过 author-site /api/compile 或 screenshot-service 完成"],
     });
   }
 
@@ -1353,7 +1597,7 @@ export class ProjectAdminService {
       {
         url: `/demo/${transaction.projectId}/edit?page=${encodeURIComponent(pageId)}`,
       },
-      { warnings: ["返回 Web 编辑页预览入口；MCP 不直接启动 author-site"] },
+      { warnings: ["返回 Web 编辑页预览入口；CLI 不直接启动 author-site"] },
     );
   }
 
@@ -1397,8 +1641,8 @@ export class ProjectAdminService {
     return ok({ core: true, screenshotService, authorSite: "not_checked", serviceUrl });
   }
 
-  publishCheck(projectId: string): ProjectAdminResult<ValidationResult> {
-    const detail = this.getProject(projectId);
+  publishCheck(projectId: string, actor = this.defaultActor()): ProjectAdminResult<ValidationResult> {
+    const detail = this.getProject(projectId, actor);
     if (!detail.ok || !detail.data) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const validation = this.validateWorkspace(this.projectWorkspacePath(projectId));
     const issues = [...validation.issues];
@@ -1409,21 +1653,83 @@ export class ProjectAdminService {
     return ok(result, { validation: result });
   }
 
+  private viewerBaseUrl(): string {
+    return (process.env.VIEWER_CLOUDFLARE_URL || process.env.VIEWER_LAN_URL || "").replace(/\/+$/, "");
+  }
+
+  private buildPublishStatus(
+    projectId: string,
+    input: {
+      published: boolean;
+      publishedVersion?: string;
+      publishedAt?: number;
+      artifactPath?: string;
+    },
+  ): PublishStatus {
+    const project = this.readProject(projectId);
+    const pages = project?.demoPages ?? [];
+    const artifactPath = input.artifactPath ?? path.join(this.publishedDir, projectId);
+    const artifactExists = fs.existsSync(artifactPath);
+    const publishedProjectPath = path.join(artifactPath, "project.json");
+    const statusPath = path.join(artifactPath, "project-admin-status.json");
+    const publishedProject = fs.existsSync(publishedProjectPath)
+      ? readJsonFile<{ demoPages?: Array<{ id: string; compiledJsPath?: string; schemaPath?: string; iframeHtmlPath?: string }> }>(publishedProjectPath)
+      : null;
+    const publishedPages = publishedProject?.demoPages ?? [];
+    const hasStatusArtifact = fs.existsSync(statusPath) || (input.published && Boolean(input.artifactPath));
+    const entryPaths = publishedPages.length > 0
+      ? [
+          "project.json",
+          ...publishedPages.flatMap((page) => [
+            page.compiledJsPath,
+            page.iframeHtmlPath,
+            page.schemaPath,
+          ].filter((entryPath): entryPath is string => Boolean(entryPath))),
+        ]
+      : hasStatusArtifact
+        ? ["project-admin-status.json"]
+        : [];
+    const viewerBaseUrl = this.viewerBaseUrl();
+    const dataBase = viewerBaseUrl ? `${viewerBaseUrl}/data/${projectId}` : `/data/${projectId}`;
+    const viewerUrl = viewerBaseUrl ? `${viewerBaseUrl}/projects/${projectId}` : `/projects/${projectId}`;
+    const hasFormalArtifact = Boolean(publishedProject);
+    return {
+      projectId,
+      published: input.published,
+      publishedVersion: input.publishedVersion,
+      publishedAt: input.publishedAt,
+      artifactPath: artifactExists ? artifactPath : input.artifactPath,
+      artifactSummary: {
+        demoCount: publishedPages.length || pages.length,
+        projectJsonPath: hasFormalArtifact ? "project.json" : undefined,
+        indexJsonPath: fs.existsSync(path.join(this.publishedDir, "projects-index.json")) ? "../projects-index.json" : undefined,
+        entryPaths,
+      },
+      accessUrls: {
+        viewerUrl,
+        dataUrl: hasFormalArtifact ? `${dataBase}/project.json` : undefined,
+        embedUrls: (publishedPages.length > 0 ? publishedPages : pages).map((page) => ({
+          pageId: page.id,
+          url: `${dataBase}/demos/${page.id}/iframe.html`,
+        })),
+      },
+    };
+  }
+
   publishProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有发布权限");
-    const check = this.publishCheck(projectId);
+    const check = this.publishCheck(projectId, actor);
     if (!check.ok || !check.data?.ok) {
       return fail("VALIDATION_BLOCKED", "发布前检查未通过", { validation: check.data });
     }
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const status: PublishStatus = {
-      projectId,
+    const status = this.buildPublishStatus(projectId, {
       published: true,
       publishedVersion: project.versions.at(-1)?.versionId ?? "v0",
       publishedAt: Date.now(),
       artifactPath: path.join(this.publishedDir, projectId),
-    };
+    });
     const updated = { ...project, publishedVersion: status.publishedVersion, publishedAt: status.publishedAt };
     this.writeProject(projectId, updated);
     ensureDir(status.artifactPath ?? "");
@@ -1432,24 +1738,31 @@ export class ProjectAdminService {
       projectId,
       diffSummary: { updated: ["publishedVersion", "publishedAt"] },
     });
-    return ok(status, { auditId, warnings: ["当前 MCP 发布只更新发布状态；完整产物编译仍使用 author-site publish API"] });
+    return ok(status, {
+      auditId,
+      warnings: ["当前 CLI 发布只更新发布状态；完整产物编译需配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后使用 author-site publish API"],
+      nextActions: ["配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后运行 ow publish project <projectId> --json"],
+    });
   }
 
-  publishStatus(projectId: string): ProjectAdminResult<PublishStatus> {
+  publishStatus(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    return ok({
-      projectId,
+    return ok(this.buildPublishStatus(projectId, {
       published: Boolean(project.publishedVersion),
       publishedVersion: project.publishedVersion,
       publishedAt: project.publishedAt,
       artifactPath: fs.existsSync(path.join(this.publishedDir, projectId))
         ? path.join(this.publishedDir, projectId)
         : undefined,
-    });
+    }));
   }
 
-  publishRollback(projectId: string): ProjectAdminResult<PublishStatus> {
+  publishRollback(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     if (project.versions.length < 2) return fail("VERSION_NOT_FOUND", "没有可回滚的上一版本");
@@ -1460,7 +1773,7 @@ export class ProjectAdminService {
       publishedAt: Date.now(),
     };
     this.writeProject(projectId, updated);
-    return this.publishStatus(projectId);
+    return this.publishStatus(projectId, actor);
   }
 
   auditList(projectId?: string): ProjectAdminResult<AuditEvent[]> {
@@ -1523,8 +1836,76 @@ export class ProjectAdminService {
     });
   }
 
+  async sendAiMessage(
+    input: AiSendMessageInput,
+    actor = this.defaultActor(),
+  ): Promise<ProjectAdminResult<AiSendMessageResult>> {
+    const sessionId = input.sessionId.trim();
+    const content = input.content.trim();
+    if (!sessionId) return fail("INVALID_REQUEST", "sessionId 不能为空");
+    if (!content) return fail("INVALID_REQUEST", "消息内容不能为空");
+
+    const session = this.aiSessionGet(sessionId);
+    if (!session.ok || !session.data) return fail("SESSION_NOT_FOUND", "AI 会话不存在");
+    const projectId = input.projectId ?? session.data.projectId;
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+
+    const workspacePath =
+      input.workingDir ??
+      (session.data.workspaceId ? this.findWorkspacePathById(session.data.workspaceId) : undefined);
+    const body = {
+      content,
+      demoId: projectId,
+      workingDir: workspacePath,
+      customWorkspace: Boolean(workspacePath),
+      model: input.model,
+      options: {
+        stream: input.stream ?? false,
+        timeout: input.timeout,
+      },
+    };
+
+    try {
+      const response = await fetch(
+        `${this.getAgentServiceUrl()}/api/agent/${encodeURIComponent(sessionId)}/message`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; data?: AiSendMessageResult; error?: { code?: string; message?: string } }
+        | null;
+      if (!response.ok || payload?.success === false || !payload?.data) {
+        return fail(
+          payload?.error?.code ?? "AGENT_SERVICE_ERROR",
+          payload?.error?.message ?? `agent-service 响应 ${response.status}`,
+        );
+      }
+      const auditId = this.audit("ai_send_message", actor, "L2", true, {
+        projectId,
+        resourceId: sessionId,
+        inputSummary: { contentLength: content.length, model: input.model },
+      });
+      return ok(payload.data, {
+        auditId,
+        nextActions: ["ai_session_get", "ai_run_logs", "ai_workspace_context"],
+      });
+    } catch (error) {
+      return fail(
+        "AGENT_SERVICE_UNAVAILABLE",
+        error instanceof Error ? error.message : "agent-service 不可用",
+        { warnings: [`请确认 agent-service 已启动: ${this.getAgentServiceUrl()}`] },
+      );
+    }
+  }
+
   lockProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<{ locked: true; projectId: string }> {
     if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以锁定项目");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     writeJsonFile(this.projectLockPath(projectId), {
@@ -1537,6 +1918,8 @@ export class ProjectAdminService {
 
   unlockProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<{ unlocked: true; projectId: string }> {
     if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以解锁项目");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     fs.rmSync(this.projectLockPath(projectId), { force: true });
     return ok({ unlocked: true, projectId });
   }
@@ -1602,6 +1985,8 @@ export class ProjectAdminService {
       name: parsed.name,
       description: parsed.description,
       thumbnail: parsed.thumbnail,
+      scope: parsed.scope,
+      official: parsed.official,
       demoCount: parsed.demoCount ?? parsed.demoPages?.length ?? 0,
       demoPages: parsed.demoPages,
       createdAt: parsed.createdAt ?? Date.now(),
@@ -1630,6 +2015,8 @@ export class ProjectAdminService {
       name: input.name.trim(),
       description: input.description.trim(),
       thumbnail: input.thumbnail ?? project.thumbnail,
+      scope: input.scope ?? (input.official ? "official" : "team"),
+      official: input.official ?? false,
       demoCount: tree.pages.length,
       demoPages: sortPages(tree.pages),
       createdAt: now,
@@ -1713,6 +2100,18 @@ export class ProjectAdminService {
     const demoDir = this.pageDir(workspacePath, pageId);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
+    if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+    return {
+      code: fs.readFileSync(codePath, "utf-8"),
+      schema: fs.readFileSync(schemaPath, "utf-8"),
+    };
+  }
+
+  private readPageVersionFiles(project: Project, pageId: string, versionId: string): DemoFiles | null {
+    const version = project.pageVersions?.[pageId]?.find((item) => item.versionId === versionId);
+    if (!version || !fs.existsSync(version.snapshotPath)) return null;
+    const codePath = path.join(version.snapshotPath, "index.tsx");
+    const schemaPath = path.join(version.snapshotPath, "config.schema.json");
     if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
     return {
       code: fs.readFileSync(codePath, "utf-8"),
@@ -1936,6 +2335,16 @@ export class ProjectAdminService {
     return fs.existsSync(this.projectLockPath(projectId));
   }
 
+  private canAccessProject(projectId: string, actor: ProjectAdminActor): boolean {
+    return !actor.allowedProjectIds || actor.allowedProjectIds.includes(projectId);
+  }
+
+  private requireProjectAccess(projectId: string, actor: ProjectAdminActor): ProjectAdminResult<true> {
+    return this.canAccessProject(projectId, actor)
+      ? ok(true)
+      : fail("FORBIDDEN", "当前操作者无权访问该项目");
+  }
+
   private scanAiSessions(projectId?: string): AiSessionSummary[] {
     if (!fs.existsSync(this.sessionsDir)) return [];
     const sessions: AiSessionSummary[] = [];
@@ -2111,6 +2520,14 @@ export class ProjectAdminService {
       process.env.SCREENSHOT_SERVICE_URL ||
       process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL ||
       "http://localhost:3202"
+    ).replace(/\/+$/, "");
+  }
+
+  private getAgentServiceUrl(): string {
+    return (
+      process.env.AGENT_SERVICE_URL ||
+      process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ||
+      "http://localhost:3201"
     ).replace(/\/+$/, "");
   }
 }

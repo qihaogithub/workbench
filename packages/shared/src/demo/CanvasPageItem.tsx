@@ -30,6 +30,7 @@ interface CanvasPageItemProps {
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onError?: (error: Error) => void;
   // 拖拽/缩放回调（用于对齐辅助线）
   onDragStart?: (pageId: string) => void;
   onDragMove?: (
@@ -168,6 +169,7 @@ export function CanvasPageItem({
   onLayoutChange,
   onConfigEdit,
   onConsoleEntry,
+  onError,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -504,6 +506,7 @@ export function CanvasPageItem({
             previewSize={page.previewSize}
             fillContainer
             onConsoleEntry={onConsoleEntry}
+            onError={onError}
             onContentHeightChange={handleContentHeightChange}
             onContentLoaded={handleIframeContentLoaded}
             activityState={

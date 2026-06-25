@@ -8,6 +8,13 @@ export interface ActiveViewContext {
     index?: string;
     schema?: string;
   };
+  previewRuntimeError?: {
+    stage?: string;
+    pageId?: string;
+    file?: string;
+    message: string;
+    instruction?: string;
+  };
 }
 
 export function buildActiveViewContextPrefix(
@@ -41,6 +48,22 @@ export function buildActiveViewContextPrefix(
   }
   if (context.focusedPagePaths?.schema) {
     lines.push(`- 当前焦点页面配置路径: ${context.focusedPagePaths.schema}`);
+  }
+
+  if (context.previewRuntimeError) {
+    lines.push(
+      "",
+      "## 最近一次预览运行错误（系统内部回流给 AI）",
+      "",
+      "用户侧不会展示技术错误；以下信息用于你自动修复当前页面。优先修改对应页面代码，并避免再次使用未登记依赖或不存在的导出。",
+      `- 错误阶段: ${context.previewRuntimeError.stage ?? "runtime"}`,
+      `- 页面: ${context.previewRuntimeError.pageId ?? context.focusedPageId ?? "unknown"}`,
+      `- 文件: ${context.previewRuntimeError.file ?? context.focusedPagePaths?.index ?? "unknown"}`,
+      `- 错误信息: ${context.previewRuntimeError.message}`,
+    );
+    if (context.previewRuntimeError.instruction) {
+      lines.push(`- 修复指引: ${context.previewRuntimeError.instruction}`);
+    }
   }
 
   return `${lines.join("\n")}\n\n`;

@@ -160,12 +160,12 @@ importers:
       '@opencode-workbench/agent-client':
         specifier: workspace:*
         version: link:../agent-client
-      '@opencode-workbench/project-admin-mcp':
-        specifier: workspace:*
-        version: link:../project-admin-mcp
       '@opencode-workbench/project-core':
         specifier: workspace:*
         version: link:../project-core
+      '@opencode-workbench/project-scaffold':
+        specifier: workspace:*
+        version: link:../project-scaffold
       '@opencode-workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -423,14 +423,14 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
-  packages/project-admin-mcp:
+  packages/project-cli:
     dependencies:
       '@opencode-workbench/project-core':
         specifier: workspace:*
         version: link:../project-core
-      '@opencode-workbench/shared':
+      '@opencode-workbench/project-scaffold':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../project-scaffold
     devDependencies:
       '@types/node':
         specifier: ^20.11.16
@@ -441,9 +441,6 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
-      vitest:
-        specifier: ^2.1.9
-        version: 2.1.9(@types/node@20.19.37)
 
   packages/project-core:
     dependencies:
@@ -460,6 +457,22 @@ importers:
       vitest:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@20.19.37)
+
+  packages/project-scaffold:
+    dependencies:
+      '@opencode-workbench/project-core':
+        specifier: workspace:*
+        version: link:../project-core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.16
+        version: 20.19.37
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
 
   packages/screenshot-service:
     dependencies:

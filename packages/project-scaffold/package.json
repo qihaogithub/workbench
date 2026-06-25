@@ -1,0 +1,20 @@
+{
+  "name": "@opencode-workbench/project-scaffold",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx src/scaffold.test.ts"
+  },
+  "dependencies": {
+    "@opencode-workbench/project-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3"
+  }
+}

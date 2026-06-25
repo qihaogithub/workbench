@@ -234,6 +234,7 @@ export interface PreviewCanvasProps {
   screenshotUrls?: Record<string, string>;
   screenshotRenderBoxes?: Record<string, ScreenshotRenderBox>;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onError?: (error: Error) => void;
   focusPageId?: string;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
 }
