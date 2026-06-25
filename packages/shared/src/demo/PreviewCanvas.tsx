@@ -63,6 +63,24 @@ function getVisiblePageIds(
   return visible;
 }
 
+function getCanvasLayoutSignature(
+  layouts: Record<string, CanvasPageLayout>,
+): string {
+  return Object.entries(layouts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, layout]) =>
+      [
+        id,
+        layout.x,
+        layout.y,
+        layout.width,
+        layout.height,
+        layout.zIndex ?? "",
+      ].join(":"),
+    )
+    .join("|");
+}
+
 const SNAP_THRESHOLD = 8; // 吸附阈值（px）
 
 interface AlignmentPoint {
@@ -250,6 +268,7 @@ export function PreviewCanvas({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const recentIframeAccessRef = useRef<Map<string, number>>(new Map());
   const prewarmedResourceFingerprintsRef = useRef<Set<string>>(new Set());
+  const initialViewerFitSignatureRef = useRef<string | null>(null);
 
   const canvasState = externalState || internalState;
 
@@ -277,6 +296,11 @@ export function PreviewCanvas({
     );
     return { ...effectivePages, ...nodeLayouts };
   }, [effectiveNodes, effectivePages]);
+
+  const allItemLayoutSignature = useMemo(
+    () => getCanvasLayoutSignature(allItemLayouts),
+    [allItemLayouts],
+  );
 
   const updateState = useCallback(
     (updater: (prev: CanvasState) => CanvasState) => {
@@ -574,6 +598,39 @@ export function PreviewCanvas({
       viewport,
     }));
   }, [allItemLayouts, containerSize, updateState]);
+
+  useEffect(() => {
+    if (resolvedInteractionMode !== "viewer") {
+      return;
+    }
+    if (!allItemLayoutSignature) {
+      return;
+    }
+    if (initialViewerFitSignatureRef.current === allItemLayoutSignature) {
+      return;
+    }
+
+    const viewport = computeFitCanvasViewport(allItemLayouts, {
+      containerWidth: containerSize.width,
+      containerHeight: containerSize.height,
+    });
+    if (!viewport) {
+      return;
+    }
+
+    initialViewerFitSignatureRef.current = allItemLayoutSignature;
+    updateState((prev) => ({
+      ...prev,
+      viewport,
+    }));
+  }, [
+    allItemLayoutSignature,
+    allItemLayouts,
+    containerSize.height,
+    containerSize.width,
+    resolvedInteractionMode,
+    updateState,
+  ]);
 
   const handleAutoLayout = useCallback(() => {
     const arrangedPages = computeAutoCanvasLayout(pages, {
