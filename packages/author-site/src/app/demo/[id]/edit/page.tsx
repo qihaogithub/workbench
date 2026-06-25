@@ -337,6 +337,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     focusCanvasPage,
     clearCanvasSelection,
     flushCanvasState,
+    hasUnsavedCanvasChanges,
+    markCanvasChangesSaved,
   } = useCanvasWorkspace({
     sessionId,
     projectId: demoId,
@@ -1642,6 +1644,7 @@ ${context.details}
       });
 
       setHasUnsavedChanges(false);
+      markCanvasChangesSaved();
       setPublishStatus('unpublished_changes');
 
       loadVersionHistory();
@@ -1659,13 +1662,15 @@ ${context.details}
     }
   };
 
+  const hasPendingChanges = hasUnsavedChanges || hasUnsavedCanvasChanges;
+
   const handleBackClick = useCallback(() => {
-    if (hasUnsavedChanges) {
+    if (hasPendingChanges) {
       setShowExitDialog(true);
     } else {
       router.push("/");
     }
-  }, [hasUnsavedChanges, router]);
+  }, [hasPendingChanges, router]);
 
   const handleSaveAndExit = async () => {
     setShowExitDialog(false);
@@ -2192,12 +2197,12 @@ ${context}
   const hasPublishableChanges =
     publishStatus === "never_published" ||
     publishStatus === "unpublished_changes";
-  const shouldSaveBeforePublish = hasUnsavedChanges;
+  const shouldSaveBeforePublish = hasPendingChanges;
   const publishButtonDisabled =
     isSaving ||
     publishing ||
     publishStatus === null ||
-    (!hasUnsavedChanges && !hasPublishableChanges);
+    (!hasPendingChanges && !hasPublishableChanges);
   const publishButtonText = shouldSaveBeforePublish ? "保存并发布" : "发布";
   const publishingButtonText = shouldSaveBeforePublish
     ? "保存并发布中..."
@@ -2245,7 +2250,7 @@ ${context}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+          <Button onClick={handleSave} disabled={isSaving || !hasPendingChanges}>
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

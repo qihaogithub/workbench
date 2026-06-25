@@ -13,7 +13,7 @@
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx src/cli.test.ts"
+    "test": "node --import tsx src/cli.test.ts && node --import tsx src/cli-all-commands.test.ts"
   },
   "dependencies": {
     "@opencode-workbench/project-core": "workspace:*",

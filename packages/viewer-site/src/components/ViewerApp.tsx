@@ -369,6 +369,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     getProjectData(projectId)
       .then(async (data) => {
         setProject(data);
+        setCanvasState(
+          data.canvasState ?? {
+            viewport: { x: 40, y: 40, zoom: 0.5 },
+            pages: {},
+          },
+        );
 
         if (data.demoFolders.length > 0) {
           setExpandedFolders(new Set(data.demoFolders.map((f) => f.id)));

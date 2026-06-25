@@ -13,11 +13,13 @@ import {
   getDataDir,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
+import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 import type {
   Project,
   DemoPageMeta,
   DemoFolderMeta,
 } from "@opencode-workbench/shared";
+import type { CanvasState } from "@opencode-workbench/shared/demo";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
 import { processImagesForPublish } from "@/lib/publish/image-processor";
@@ -48,6 +50,7 @@ export interface PublishedProject {
   demoPages: PublishedDemoPage[];
   demoFolders: DemoFolderMeta[];
   projectConfigSchema?: string;
+  canvasState?: CanvasState;
 }
 
 export interface ProjectsIndex {
@@ -164,6 +167,7 @@ export async function publishProject(
   const projectConfigData = projectConfigSchema
     ? extractSchemaDefaults(projectConfigSchema)
     : {};
+  const canvasState = readCanvasStateFromWorkspace(workspacePath);
 
   const viewerBaseUrl = getViewerBaseUrl();
   const totalPages = demoPages.length;
@@ -276,6 +280,7 @@ export async function publishProject(
     demoPages: publishedDemoPages,
     demoFolders: project.demoFolders,
     projectConfigSchema: projectConfigSchema ?? undefined,
+    canvasState,
   };
 
   fs.writeFileSync(

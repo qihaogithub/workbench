@@ -37,10 +37,15 @@ export function useCanvasWorkspace({
   const [focusCanvasPageId, setFocusCanvasPageId] = useState<string>();
   const [saveStatus, setSaveStatus] = useState<CanvasSaveStatus>("idle");
   const [saveError, setSaveError] = useState<string>();
+  const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
   const lastPersistedRef = useRef("");
+
+  const setCanvasPersistenceDirty = useCallback((dirty: boolean) => {
+    dirtyRef.current = dirty;
+  }, []);
 
   useEffect(() => {
     if (focusCanvasPageId) {
@@ -75,7 +80,8 @@ export function useCanvasWorkspace({
           setCanvasState(DEFAULT_CANVAS_STATE);
           lastPersistedRef.current = "";
         }
-        dirtyRef.current = false;
+        setCanvasPersistenceDirty(false);
+        setHasUnsavedCanvasChanges(false);
         setSaveStatus("idle");
       } catch (error) {
         if (cancelled) return;
@@ -93,7 +99,7 @@ export function useCanvasWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, setCanvasPersistenceDirty]);
 
   useEffect(() => {
     if (!sessionId || !projectId || !dirtyRef.current) return;
@@ -101,7 +107,10 @@ export function useCanvasWorkspace({
     const currentSessionId = sessionId;
     const currentProjectId = projectId;
     const serialized = JSON.stringify(canvasState);
-    if (serialized === lastPersistedRef.current) return;
+    if (serialized === lastPersistedRef.current) {
+      setCanvasPersistenceDirty(false);
+      return;
+    }
 
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
@@ -114,7 +123,7 @@ export function useCanvasWorkspace({
       try {
         await saveCanvasLayout(currentSessionId, currentProjectId, canvasState);
         lastPersistedRef.current = serialized;
-        dirtyRef.current = false;
+        setCanvasPersistenceDirty(false);
         setSaveStatus("saved");
       } catch (error) {
         console.warn("[canvas] 保存画布布局失败", {
@@ -132,7 +141,7 @@ export function useCanvasWorkspace({
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [canvasState, projectId, sessionId]);
+  }, [canvasState, projectId, sessionId, setCanvasPersistenceDirty]);
 
   const flushCanvasState = useCallback(async () => {
     if (saveTimerRef.current) {
@@ -143,7 +152,10 @@ export function useCanvasWorkspace({
     if (!sessionId || !projectId) return;
 
     const serialized = JSON.stringify(canvasState);
-    if (serialized === lastPersistedRef.current && !dirtyRef.current) return;
+    if (serialized === lastPersistedRef.current && !dirtyRef.current) {
+      setCanvasPersistenceDirty(false);
+      return;
+    }
 
     setSaveStatus("saving");
     setSaveError(undefined);
@@ -151,7 +163,7 @@ export function useCanvasWorkspace({
     try {
       await saveCanvasLayout(sessionId, projectId, canvasState);
       lastPersistedRef.current = serialized;
-      dirtyRef.current = false;
+      setCanvasPersistenceDirty(false);
       setSaveStatus("saved");
     } catch (error) {
       console.warn("[canvas] 保存画布布局失败", {
@@ -163,11 +175,16 @@ export function useCanvasWorkspace({
       setSaveError(error instanceof Error ? error.message : "保存画布布局失败");
       throw error;
     }
-  }, [canvasState, projectId, sessionId]);
+  }, [canvasState, projectId, sessionId, setCanvasPersistenceDirty]);
 
   const updateCanvasState = useCallback((nextState: CanvasState) => {
-    dirtyRef.current = true;
+    setCanvasPersistenceDirty(true);
+    setHasUnsavedCanvasChanges(true);
     setCanvasState(nextState);
+  }, [setCanvasPersistenceDirty]);
+
+  const markCanvasChangesSaved = useCallback(() => {
+    setHasUnsavedCanvasChanges(false);
   }, []);
 
   const focusCanvasPage = useCallback((pageId: string) => {
@@ -193,5 +210,7 @@ export function useCanvasWorkspace({
     flushCanvasState,
     saveStatus,
     saveError,
+    hasUnsavedCanvasChanges,
+    markCanvasChangesSaved,
   };
 }

@@ -34,6 +34,7 @@ interface ViewerData {
   project: { id: string; name: string; description?: string } | null;
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
+  canvasState?: CanvasState;
 }
 
 type ViewerIncomingMessage =
@@ -158,6 +159,12 @@ export default function ViewerProjectPage() {
           return;
         }
         setData(result.data);
+        setCanvasState(
+          result.data.canvasState ?? {
+            viewport: { x: 40, y: 40, zoom: 0.5 },
+            pages: {},
+          },
+        );
 
         const pages = result.data.demoPages as ViewerDemoPage[];
         const initialConfigDataMap: Record<string, Record<string, unknown>> = {};

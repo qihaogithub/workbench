@@ -12,6 +12,7 @@ import {
   getProjectConfigSchema,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
+import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 
 export async function GET(
   _request: NextRequest,
@@ -56,6 +57,7 @@ export async function GET(
     });
 
     const projectConfigSchema = getProjectConfigSchema(workspacePath) ?? undefined;
+    const canvasState = readCanvasStateFromWorkspace(workspacePath);
 
     return NextResponse.json(
       createApiSuccess({
@@ -64,6 +66,7 @@ export async function GET(
           : null,
         demoPages: pages,
         projectConfigSchema,
+        canvasState,
       }),
     );
   } catch (error) {
