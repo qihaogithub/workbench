@@ -9,7 +9,9 @@ import type { BackendProvidersConfig } from "@opencode-workbench/shared";
 
 const AGENT_SERVICE_URL =
   process.env.AGENT_SERVICE_URL || "http://localhost:3201";
-const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN || "";
+const INTERNAL_TOKEN =
+  process.env.INTERNAL_API_TOKEN ||
+  (process.env.NODE_ENV === "production" ? "" : "dev-internal-token");
 
 export interface PushResult {
   ok: boolean;
@@ -101,6 +103,64 @@ export async function fetchBackendProvidersFromAgent(): Promise<{
     return {
       ok: false,
       message: `拉取失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function pushSessionModelConfigToAgent(
+  sessionId: string,
+  config: BackendProvidersConfig,
+): Promise<PushResult> {
+  if (!INTERNAL_TOKEN) {
+    return {
+      ok: false,
+      message:
+        "INTERNAL_API_TOKEN 未配置（.env），无法推送用户模型配置到 agent-service",
+    };
+  }
+
+  try {
+    const res = await fetch(
+      `${AGENT_SERVICE_URL}/internal/sessions/${encodeURIComponent(sessionId)}/model-config`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": INTERNAL_TOKEN,
+        },
+        body: JSON.stringify(config),
+      },
+    );
+
+    const text = await res.text();
+    let body: unknown = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { raw: text };
+    }
+
+    if (!res.ok) {
+      const message =
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof (body as { error?: { message?: unknown } }).error?.message ===
+          "string"
+          ? (body as { error: { message: string } }).error.message
+          : `agent-service 响应 ${res.status}`;
+      return { ok: false, message, data: body };
+    }
+
+    return {
+      ok: true,
+      message: "已推送用户模型配置到 agent-service session",
+      data: body,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `推送失败: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }

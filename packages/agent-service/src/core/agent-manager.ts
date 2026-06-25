@@ -51,6 +51,28 @@ export class AgentManager implements IAgentManager {
     const existingAgent = this.agents.get(sessionId);
 
     if (existingAgent) {
+      const currentVersion = existingAgent.getConfig().toolVersion;
+      if (
+        config.toolVersion !== undefined &&
+        currentVersion !== config.toolVersion
+      ) {
+        if (existingAgent.status === 'processing') {
+          logger.warn(
+            { sessionId, currentVersion, newVersion: config.toolVersion },
+            'Agent tool version changed while processing; keeping current agent until next turn',
+          );
+          return existingAgent;
+        }
+
+        logger.info(
+          { sessionId, currentVersion, newVersion: config.toolVersion },
+          'Agent tool version changed, rebuilding agent',
+        );
+        void existingAgent.kill().catch((error) => {
+          logger.warn({ sessionId, error }, 'Failed to cleanly kill outdated agent');
+        });
+        this.agents.delete(sessionId);
+      } else {
       if (this.hasConfigChanged(existingAgent, config)) {
         logger.info(
           { sessionId, oldConfig: existingAgent.getConfig(), newConfig: config },
@@ -59,6 +81,7 @@ export class AgentManager implements IAgentManager {
         existingAgent.updateConfig(config);
       }
       return existingAgent;
+      }
     }
 
     logger.info({ workingDir: config.workingDir }, 'Agent getOrCreate')
@@ -74,7 +97,9 @@ export class AgentManager implements IAgentManager {
     // 模型变化不再需要重建（可用 harness.setModel() 运行时切换）
     return (
       current.workingDir !== newConfig.workingDir ||
-      current.demoId !== newConfig.demoId
+      current.demoId !== newConfig.demoId ||
+      JSON.stringify(current.backendProviders ?? null) !==
+        JSON.stringify(newConfig.backendProviders ?? null)
     );
   }
 

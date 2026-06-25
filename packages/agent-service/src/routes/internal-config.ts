@@ -11,13 +11,17 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getBackendProvidersManager } from "../config/backend-providers";
+import { getSessionModelConfigs } from "../config/session-model-configs";
+import { getAgentManager } from "../core/agent-manager";
 import { logger } from "../utils/logger";
 import type { BackendProvidersConfig } from "@opencode-workbench/shared";
 
 const TOKEN_HEADER = "x-internal-token";
 
 function checkToken(request: FastifyRequest, reply: FastifyReply): boolean {
-  const expected = process.env.INTERNAL_API_TOKEN;
+  const expected =
+    process.env.INTERNAL_API_TOKEN ||
+    (process.env.NODE_ENV === "production" ? "" : "dev-internal-token");
   if (!expected) {
     reply.code(503).send({
       success: false,
@@ -100,6 +104,79 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
       return reply.send({
         success: true,
         data: {
+          providerCount: config.providers.length,
+          activeProviderId: config.activeProviderId,
+        },
+      });
+    },
+  );
+
+  fastify.post(
+    "/internal/sessions/:sessionId/model-config",
+    async (
+      request: FastifyRequest<{ Params: { sessionId: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const body = request.body as Partial<BackendProvidersConfig> | null;
+      if (!body || !Array.isArray(body.providers)) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: "INVALID_BODY",
+            message: "请求体必须包含 providers 数组",
+          },
+        });
+      }
+
+      const errors: string[] = [];
+      for (let i = 0; i < body.providers.length; i++) {
+        const provider = body.providers[i];
+        if (!provider.id) errors.push(`providers[${i}].id 必填`);
+        if (!provider.baseURL) errors.push(`providers[${i}].baseURL 必填`);
+        if (!Array.isArray(provider.models)) {
+          errors.push(`providers[${i}].models 必须是数组`);
+        }
+      }
+      if (errors.length > 0) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: errors.join("; "),
+          },
+        });
+      }
+
+      const config: BackendProvidersConfig = {
+        providers: body.providers,
+        activeProviderId: body.activeProviderId,
+        activeModelId: body.activeModelId,
+      };
+
+      getSessionModelConfigs().set(request.params.sessionId, config);
+      const existingAgent = getAgentManager().get(request.params.sessionId);
+      if (existingAgent) {
+        existingAgent.updateConfig({
+          ...existingAgent.getConfig(),
+          backendProviders: config,
+        });
+      }
+
+      logger.info(
+        {
+          sessionId: request.params.sessionId,
+          providerCount: config.providers.length,
+          activeProviderId: config.activeProviderId,
+        },
+        "Session model config pushed from author-site",
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          sessionId: request.params.sessionId,
           providerCount: config.providers.length,
           activeProviderId: config.activeProviderId,
         },

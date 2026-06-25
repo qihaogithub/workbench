@@ -58,4 +58,26 @@ describe('BackendAgent - updateSystemPrompt 委托', () => {
     const agent = new BackendAgent(mockConfig, mockBackend);
     await expect(agent.updateSystemPrompt('new prompt')).rejects.toThrow('updateSystemPrompt not supported');
   });
+
+  it('sendMessage 失败时应带上后端响应调试信息', async () => {
+    const mockBackend = {
+      onStream: vi.fn(),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      sendMessage: vi.fn().mockRejectedValue(new Error('provider error')),
+      getLastResponseDebug: vi.fn().mockReturnValue({
+        contentLength: 0,
+        errorMessage: 'provider error',
+      }),
+    } as any;
+    const agent = new BackendAgent(mockConfig, mockBackend);
+
+    const result = await agent.sendMessage('hello');
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toBe('provider error');
+    expect(result.metadata?.emptyResponseDebug).toEqual({
+      contentLength: 0,
+      errorMessage: 'provider error',
+    });
+  });
 });

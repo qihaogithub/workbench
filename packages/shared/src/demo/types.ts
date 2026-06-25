@@ -1,10 +1,23 @@
-import type { ConsoleLogPayload, PositionableSizeItem } from "./iframe-types";
+import type {
+  ConsoleLogPayload,
+  PositionableSizeItem,
+  VisualAnnotation,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+  VisualStyleChange,
+} from "./iframe-types";
 
 export type {
   IframeOutMessageType,
   IframeInMessageType,
   ConsoleLogPayload,
   PositionableSizeItem,
+  VisualAnnotation,
+  VisualEditPatch,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+  VisualNodeRect,
+  VisualStyleChange,
 } from "./iframe-types";
 
 export interface PreviewSize {
@@ -53,11 +66,25 @@ export interface PreviewPanelProps {
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
+  placeholderScreenshotUrl?: string;
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onContentHeightChange?: (contentHeight: number) => void;
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+  visualEditMode?: boolean;
+  selectedVisualNodeId?: string | null;
+  visualAnnotations?: VisualAnnotation[];
+  onVisualHover?: (node: VisualNodeInfo | null) => void;
+  onVisualSelect?: (node: VisualNodeInfo | null) => void;
+  onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
+  visualAnnotationMode?: boolean;
+  onVisualAnnotationCreate?: (
+    node: VisualNodeInfo,
+    text?: string,
+    annotationId?: string,
+    styleChanges?: VisualStyleChange[],
+  ) => void;
 }
 
 export interface ConfigFormProps {
@@ -95,6 +122,8 @@ export interface CanvasState {
   viewport: CanvasViewportState;
 }
 
+export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
+
 export interface CanvasPageData {
   id: string;
   name: string;
@@ -103,6 +132,25 @@ export interface CanvasPageData {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
+}
+
+export interface CanvasScreenshotState {
+  screenshotUrl?: string;
+  renderBox?: ScreenshotRenderBox;
+  loading: boolean;
+  error?: string;
+}
+
+export interface ScreenshotRenderBox {
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  bodyWidth: number;
+  bodyHeight: number;
+  documentWidth: number;
+  documentHeight: number;
+  fullPage: boolean;
 }
 
 export interface AlignmentGuide {
@@ -146,6 +194,7 @@ export interface PreviewCanvasProps {
   className?: string;
   editingPageId?: string;
   screenshotUrls?: Record<string, string>;
+  screenshotRenderBoxes?: Record<string, ScreenshotRenderBox>;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   focusPageId?: string;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;

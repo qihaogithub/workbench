@@ -12,6 +12,7 @@ import {
   ThumbsDown,
   Pencil,
   X,
+  MessageSquareText,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,10 @@ export type MessagePart =
       status: "running" | "completed" | "error" | "awaiting-approval";
       parameters?: Record<string, unknown>;
       result?: unknown;
+      details?: unknown;
       duration?: number;
+      startedAt?: number;
+      endedAt?: number;
     }
   | {
       type: "image";
@@ -122,6 +126,17 @@ export function Message({
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const visualAnnotationMarker = "<!-- VISUAL_ANNOTATION_CONTEXT";
+  const isVisualAnnotationMessage =
+    isUser && message.content.includes(visualAnnotationMarker);
+  const visualAnnotationSummary = isVisualAnnotationMessage
+    ? message.content.split(visualAnnotationMarker)[0].trim()
+    : "";
+  const visualAnnotationCount =
+    visualAnnotationSummary.match(/(\d+)\s*条页面批注/)?.[1] ?? "";
+  const visualStyleChangeCount = isVisualAnnotationMessage
+    ? (message.content.match(/- 样式修改：/g) ?? []).length
+    : 0;
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -233,10 +248,32 @@ export function Message({
             ))}
           </div>
         )}
-        {message.content && (
-          <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
-            <div className="whitespace-pre-wrap break-words">
-              {message.content}
+        {isVisualAnnotationMessage && (
+          <div className="max-w-[80%] rounded-2xl rounded-tr-sm border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-foreground">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-blue-500/20 p-1.5 text-blue-400">
+                <MessageSquareText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium">页面批注已发送给 AI</p>
+                <p className="text-xs text-muted-foreground">
+                  {visualAnnotationCount
+                    ? `包含 ${visualAnnotationCount} 条批注${visualStyleChangeCount > 0 ? `，其中 ${visualStyleChangeCount} 条包含样式修改` : ""}，AI 将根据页面上下文处理。`
+                    : visualAnnotationSummary}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {message.content && !isVisualAnnotationMessage && (
+          <div className="max-w-[80%] min-w-0 rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
+            <div
+              data-testid="user-message-markdown"
+              className="min-w-0 max-w-none break-words [&_*]:break-words [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto"
+            >
+              <Streamdown controls={{ table: false, code: true }}>
+                {message.content}
+              </Streamdown>
             </div>
             {!isStreaming && onEditResend && message.id && (
               <button

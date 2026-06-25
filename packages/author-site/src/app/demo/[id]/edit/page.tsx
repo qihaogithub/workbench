@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
@@ -11,11 +11,17 @@ import {
   isSchemaEmpty,
 } from "../../../../../components/demo";
 import type {
-  PreviewMode,
-  CanvasState,
   PositionableSizeItem,
+  PreviewSize,
+  ScreenshotRenderBox,
+  VisualAnnotation,
+  VisualEditPatch,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+  VisualStyleChange,
 } from "../../../../../components/demo";
 import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
+import { useCanvasWorkspace } from "@/components/demo/useCanvasWorkspace";
 import {
   parseFigmaText,
   buildFigmaText,
@@ -50,7 +56,6 @@ import {
   FileCode2,
   Loader2,
   ImageIcon,
-  Pencil,
   Trash2,
   MoreVertical,
   Eye,
@@ -66,6 +71,8 @@ import {
   RefreshCw,
   FolderOpen,
   ArrowLeft,
+  MessageSquarePlus,
+  Settings2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -89,23 +96,30 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
-import {
-  KnowledgeDocDialog,
-  type KnowledgeItem,
-  type KnowledgeDocDialogMode,
-} from "@/components/demo/KnowledgeDocDialog";
+import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
 import type {
+  DemoFiles,
   DemoPageMeta,
   DemoFolderMeta,
+  PageVersionHistoryResponse,
+  PageVersionInfo,
   VersionHistoryResponse,
   VersionInfo,
 } from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import type { ActiveViewContext } from "@/lib/agent/active-view-context";
+import {
+  buildVisualConfigCandidates,
+  suggestVisualConfigFieldKey,
+  type VisualConfigCandidate,
+  type VisualConfigureResult,
+} from "@/lib/visual-configurator";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -113,6 +127,136 @@ interface DemoEditPageProps {
   params: {
     id: string;
   };
+}
+
+type AiFileChange = {
+  path: string;
+  action: "created" | "modified" | "deleted";
+  content?: string;
+};
+
+function parsePreviewDimension(value: string | number | undefined): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  }
+  if (typeof value !== "string") return undefined;
+
+  const parsed = Number.parseFloat(value.replace(/px$/, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function getScreenshotRequestSize(previewSize?: PreviewSize): {
+  width?: number;
+  height?: number;
+} {
+  return {
+    width: parsePreviewDimension(previewSize?.width),
+    height: parsePreviewDimension(previewSize?.height),
+  };
+}
+
+function isCanvasScreenshotRenderBoxCompatible(
+  renderBox: ScreenshotRenderBox | undefined,
+  previewSize?: PreviewSize,
+): renderBox is ScreenshotRenderBox {
+  if (!renderBox || !renderBox.fullPage) return false;
+  const expectedWidth = parsePreviewDimension(previewSize?.width);
+  if (!expectedWidth) return true;
+  return Math.abs(renderBox.width - expectedWidth) < 1;
+}
+
+const CANVAS_SCREENSHOT_FULL_PAGE = true;
+
+function createVisualId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function replaceUniqueText(
+  source: string,
+  before: string,
+  after: string,
+): { code?: string; error?: string } {
+  const first = source.indexOf(before);
+  if (first === -1) {
+    return { error: "当前代码中找不到原始文本，可能来自动态数据或已被修改" };
+  }
+  const second = source.indexOf(before, first + before.length);
+  if (second !== -1) {
+    return { error: "原始文本在代码中出现多次，请跳转代码后手动确认修改位置" };
+  }
+  return {
+    code: `${source.slice(0, first)}${after}${source.slice(first + before.length)}`,
+  };
+}
+
+function getSchemaPropertyKeys(...schemas: Array<string | undefined | null>): string[] {
+  const keys = new Set<string>();
+  for (const schema of schemas) {
+    if (!schema) continue;
+    try {
+      const parsed = JSON.parse(schema) as { properties?: Record<string, unknown> };
+      for (const key of Object.keys(parsed.properties || {})) {
+        keys.add(key);
+      }
+    } catch {
+      // 忽略坏 schema，保存入口仍会做完整校验。
+    }
+  }
+  return Array.from(keys);
+}
+
+const uuidLikePattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function getVersionSavedBy(savedBy?: string): string {
+  if (!savedBy || uuidLikePattern.test(savedBy)) {
+    return "未知用户";
+  }
+  return savedBy;
+}
+
+function getRestoredPageTitle(version: VersionInfo): string {
+  const noteMatch = /从页面\s+(.+?)\s+的历史版本/.exec(version.note ?? "");
+  const sessionMatch = /^restore-page-(.+)-v\d+$/.exec(version.sessionId);
+  const pageName = noteMatch?.[1] || sessionMatch?.[1] || "页面";
+  return `恢复了${pageName}`;
+}
+
+type HistoryEvent =
+  | {
+      id: string;
+      kind: "project";
+      title: "保存项目" | "恢复项目";
+      savedAt: number;
+      savedBy: string;
+      version: VersionInfo;
+      isLatestProject: boolean;
+    }
+  | {
+      id: string;
+      kind: "page";
+      title: string;
+      savedAt: number;
+      version: PageVersionInfo;
+    }
+  | {
+      id: string;
+      kind: "page-restore";
+      title: string;
+      savedAt: number;
+      version: VersionInfo;
+    };
+
+function dedupeHistoryEvents(events: HistoryEvent[]): HistoryEvent[] {
+  const seen = new Set<string>();
+
+  return events.filter((event) => {
+    if (seen.has(event.id)) {
+      return false;
+    }
+    seen.add(event.id);
+    return true;
+  });
 }
 
 export default function DemoEditPage({ params }: DemoEditPageProps) {
@@ -133,12 +277,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     Record<string, Record<string, unknown>>
   >({});
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
-  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<
-    Record<string, import("@opencode-workbench/shared/demo").PreviewSize>
-  >({});
-  const [positionableItemSizes, setPositionableItemSizes] = useState<
-    Record<string, PositionableSizeItem>
-  >({});
+  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
+  const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -165,6 +305,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
   );
+  const markWorkspaceChanged = useCallback(() => {
+    setHasUnsavedChanges(true);
+  }, []);
 
   // 多页面状态
   const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
@@ -176,96 +319,154 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     string | undefined
   >(undefined);
 
-  // 预览模式状态
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
-
-  // 画布模式状态
-  const [canvasState, setCanvasState] = useState<CanvasState>({
-    viewport: { x: 40, y: 40, zoom: 0.5 },
-    pages: {},
+  const {
+    previewMode,
+    setPreviewMode,
+    canvasState,
+    setCanvasState,
+    canvasEditingPageId,
+    setCanvasEditingPageId,
+    focusCanvasPageId,
+    setFocusCanvasPageId,
+    focusCanvasPage,
+    clearCanvasSelection,
+  } = useCanvasWorkspace({
+    sessionId,
+    projectId: demoId,
   });
-  const [canvasEditingPageId, setCanvasEditingPageId] = useState<string | null>(
-    null,
-  );
-  const [focusCanvasPageId, setFocusCanvasPageId] = useState<
-    string | undefined
-  >(undefined);
 
   // 画布模式下配置面板按需显示：选中页面时显示，无选中时隐藏
-  const isConfigPanelVisible =
-    previewMode !== "canvas" || !!canvasEditingPageId;
-
-  // 页面定位完成后清除 focusPageId，以便再次点击同一页面时重新触发
-  useEffect(() => {
-    if (focusCanvasPageId) {
-      const timer = setTimeout(() => setFocusCanvasPageId(undefined), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [focusCanvasPageId]);
-
-  // 切换到画布模式时清除选中状态，配置面板隐藏
-  useEffect(() => {
-    if (previewMode === "canvas") {
-      setCanvasEditingPageId(null);
-    }
-  }, [previewMode]);
+  const isConfigPanelVisible = previewMode !== "canvas" || !!canvasEditingPageId;
   const {
     pageScreenshots,
     isGenerating: isScreenshotGenerating,
+    checkServiceHealth,
     startBatchGeneration,
     regeneratePage,
+    invalidatePageScreenshot,
+    invalidatePageScreenshots,
     getScreenshotUrl,
   } = useScreenshotGeneration({
     projectId: demoId,
     sessionId,
     enabled: true, // 截图常驻生成，不再仅限画布模式
   });
-
-  // 截图 debounce 再生定时器
-  const screenshotRegenerateTimerRef = useRef<
-    Record<string, ReturnType<typeof setTimeout>>
-  >({});
-
-  // 标记数据加载完成后是否已触发过首次批量截图
-  const initialBatchTriggeredRef = useRef(false);
-
-  // debounce 3s 触发单页截图再生
-  const scheduleScreenshotRegenerate = useCallback(
-    (pageId: string, pageCode: string) => {
-      const timers = screenshotRegenerateTimerRef.current;
-      if (timers[pageId]) clearTimeout(timers[pageId]);
-      timers[pageId] = setTimeout(() => {
-        const config = configDataMap[pageId] || {};
-        regeneratePage(pageId, pageCode, config);
-        delete timers[pageId];
-      }, 3000);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    },
-    [regeneratePage],
+  const canvasScreenshotUrls = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(pageScreenshots)
+          .filter(([id, state]) => {
+            if (!state.screenshotUrl || state.loading) return false;
+            if (!state.hash || !state.expectedHash) return false;
+            if (state.hash !== state.expectedHash) return false;
+            return isCanvasScreenshotRenderBoxCompatible(
+              state.renderBox,
+              pagePreviewSizeMap[id],
+            );
+          })
+          .map(([id, state]) => [id, state.screenshotUrl!]),
+      ),
+    [pageScreenshots, pagePreviewSizeMap],
+  );
+  const canvasScreenshotRenderBoxes = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(pageScreenshots)
+          .filter(([id, state]) => {
+            if (!state.screenshotUrl || state.loading) return false;
+            if (!state.hash || !state.expectedHash) return false;
+            if (state.hash !== state.expectedHash) return false;
+            return isCanvasScreenshotRenderBoxCompatible(
+              state.renderBox,
+              pagePreviewSizeMap[id],
+            );
+          })
+          .map(([id, state]) => [id, state.renderBox!]),
+      ),
+    [pageScreenshots, pagePreviewSizeMap],
   );
 
-  // 数据加载完成后触发首次批量截图，或切换到画布模式时重新生成
-  useEffect(() => {
-    // 守卫：数据未加载完成或正在生成中
-    if (isLoading || demoPages.length === 0 || isScreenshotGenerating) return;
+  // 截图 debounce 再生定时器
+  const configDataMapRef = useRef(configDataMap);
+  configDataMapRef.current = configDataMap;
+  const screenshotRegenerateTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-    // 首次数据就绪 或 切换预览模式时触发
-    if (!initialBatchTriggeredRef.current || previewMode === "canvas") {
-      initialBatchTriggeredRef.current = true;
+  // debounce 3s 触发单页截图再生
+  const scheduleScreenshotRegenerate = useCallback((
+    pageId: string,
+    pageCode: string,
+    configOverride?: Record<string, unknown>,
+  ) => {
+    const timers = screenshotRegenerateTimerRef.current;
+    if (timers[pageId]) clearTimeout(timers[pageId]);
+    timers[pageId] = setTimeout(() => {
+      const config = configOverride ?? configDataMapRef.current[pageId] ?? {};
+      const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[pageId]);
+      regeneratePage(
+        pageId,
+        pageCode,
+        config,
+        width,
+        height,
+        CANVAS_SCREENSHOT_FULL_PAGE,
+      );
+      delete timers[pageId];
+    }, 3000);
+  }, [regeneratePage, pagePreviewSizeMap]);
 
-      const pages = demoPages
-        .filter((p) => pageCodes[p.id] || code)
-        .map((p) => ({
+  const regenerateCanvasScreenshots = useCallback(async () => {
+    const available = await checkServiceHealth();
+    if (!available || demoPages.length === 0) return;
+
+    const pages = demoPages
+      .filter((p) => pageCodes[p.id] || code)
+      .map((p) => {
+        const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
+        return {
           pageId: p.id,
           code: pageCodes[p.id] || code,
           configData: configDataMap[p.id] || {},
-        }));
+          width,
+          height,
+          fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
+        };
+      });
+
+    if (pages.length > 0) {
+      startBatchGeneration(pages);
+    }
+  }, [
+    checkServiceHealth,
+    code,
+    configDataMap,
+    demoPages,
+    pageCodes,
+    pagePreviewSizeMap,
+    startBatchGeneration,
+  ]);
+
+  // 切换到画布模式时触发批量截图，或首次加载时生成截图
+  useEffect(() => {
+    if (demoPages.length > 0 && !isScreenshotGenerating) {
+      const pages = demoPages
+        .filter((p) => pageCodes[p.id] || code)
+        .map((p) => {
+          const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
+          return {
+            pageId: p.id,
+            code: pageCodes[p.id] || code,
+            configData: configDataMap[p.id] || {},
+            width,
+            height,
+            fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
+          };
+        });
       if (pages.length > 0) {
         startBatchGeneration(pages);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, previewMode]);
+  }, [previewMode]);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -281,11 +482,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 知识库文档弹窗状态
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
-  const [kbDocDialogMode, setKbDocDialogMode] =
-    useState<KnowledgeDocDialogMode>("read");
-  const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(
-    null,
-  );
+  const [kbDocDialogMode, setKbDocDialogMode] = useState<KnowledgeDocDialogMode>("read");
+  const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(null);
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -300,27 +498,90 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [tabValue, setTabValue] = useState("ai");
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
+  const [visualEditMode, setVisualEditMode] = useState(false);
+  const [visualAnnotationMode, setVisualAnnotationMode] = useState(false);
+  const [hoveredVisualNode, setHoveredVisualNode] =
+    useState<VisualNodeInfo | null>(null);
+  const [selectedVisualNode, setSelectedVisualNode] =
+    useState<VisualNodeInfo | null>(null);
+  const [visualAnnotations, setVisualAnnotations] = useState<
+    VisualAnnotation[]
+  >([]);
+  const [visualPatches, setVisualPatches] = useState<VisualEditPatch[]>([]);
+  const [visualConfigMode, setVisualConfigMode] = useState(false);
+  const [visualConfigNode, setVisualConfigNode] =
+    useState<VisualNodeInfo | null>(null);
+  const [visualConfigCandidateId, setVisualConfigCandidateId] = useState("");
+  const [visualConfigTitle, setVisualConfigTitle] = useState("");
+  const [visualConfigFieldKey, setVisualConfigFieldKey] = useState("");
+  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState("");
+  const [visualConfigError, setVisualConfigError] = useState<string | null>(
+    null,
+  );
+  const [visualConfigApplying, setVisualConfigApplying] = useState(false);
 
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
   const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
-  const [publishStatus, setPublishStatus] = useState<
-    "never_published" | "published" | "unpublished_changes" | null
-  >(null);
+  const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
   const [publishing, setPublishing] = useState(false);
 
-  const [versionHistory, setVersionHistory] =
-    useState<VersionHistoryResponse | null>(null);
+  const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
+  const [pageVersionHistories, setPageVersionHistories] = useState<
+    Record<string, PageVersionHistoryResponse>
+  >({});
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [previewVersion, setPreviewVersion] = useState<
+    | {
+        scope: "page";
+        version: PageVersionInfo;
+        files: DemoFiles;
+      }
+    | null
+  >(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
-  const [currentUsername, setCurrentUsername] = useState<string>("");
+  const [currentUsername, setCurrentUsername] = useState<string>('');
 
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
+  const visualConfigCandidates = useMemo(
+    () => buildVisualConfigCandidates(visualConfigNode),
+    [visualConfigNode],
+  );
+  const selectedVisualConfigCandidate = useMemo(
+    () =>
+      visualConfigCandidates.find(
+        (candidate) => candidate.id === visualConfigCandidateId,
+      ) ?? visualConfigCandidates[0],
+    [visualConfigCandidateId, visualConfigCandidates],
+  );
+  const activeViewContext = useMemo<ActiveViewContext>(() => {
+    const focusedPageId =
+      previewMode === "canvas"
+        ? (canvasEditingPageId ?? undefined)
+        : (activeDemoId || undefined);
+    const activePage = demoPages.find((page) => page.id === activeDemoId);
+    const focusedPage = focusedPageId
+      ? demoPages.find((page) => page.id === focusedPageId)
+      : undefined;
+    return {
+      previewMode,
+      activePageId: activeDemoId || undefined,
+      activePageName: activePage?.name,
+      focusedPageId,
+      focusedPageName: focusedPage?.name,
+      focusedPagePaths: focusedPageId
+        ? {
+            index: `demos/${focusedPageId}/index.tsx`,
+            schema: `demos/${focusedPageId}/config.schema.json`,
+          }
+        : undefined,
+    };
+  }, [activeDemoId, canvasEditingPageId, demoPages, previewMode]);
 
   /**
    * Unified snapshot application entry.
@@ -333,35 +594,44 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch";
     }) => {
       const { code: newCode, schema: newSchema, source } = params;
+      const targetPageId = activeDemoIdRef.current;
 
       if (newCode !== undefined) {
         setCode((prev) => (prev === newCode ? prev : newCode));
         codeRef.current = newCode;
-        if (sessionId && activeDemoId) {
-          invalidateCompileCache(sessionId, activeDemoId);
+        if (targetPageId) {
+          setPageCodes((prev) =>
+            prev[targetPageId] === newCode
+              ? prev
+              : { ...prev, [targetPageId]: newCode },
+          );
+        }
+        if (sessionId && targetPageId) {
+          invalidateCompileCache(sessionId, targetPageId);
         }
       }
 
       if (newSchema !== undefined) {
+        const oldSchema = schemaRef.current;
         setSchema(newSchema);
         schemaRef.current = newSchema;
         const size = getPreviewSize(newSchema);
         setPreviewSize(size);
         setPagePreviewSizeMap((prev) => {
-          const id = activeDemoIdRef.current;
-          if (!id || !size) return prev;
-          return { ...prev, [id]: size };
+          if (!targetPageId || !size) return prev;
+          return { ...prev, [targetPageId]: size };
         });
 
         try {
           setConfigDataMap((prev) => {
-            const current = prev[activeDemoIdRef.current] ?? {};
+            if (!targetPageId) return prev;
+            const current = prev[targetPageId] ?? {};
             const merged = mergeConfigWithUserValues(
               current,
               newSchema,
-              schemaRef.current,
+              oldSchema,
             );
-            return { ...prev, [activeDemoIdRef.current]: merged };
+            return { ...prev, [targetPageId]: merged };
           });
         } catch (e) {
           console.warn("[DemoEditPage] Failed to merge schema defaults:", e);
@@ -369,10 +639,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       setEditorContent((prev) => {
-        const currentCode =
-          newCode ?? extractCodeFromFigma(prev) ?? codeRef.current;
-        const currentSchema =
-          newSchema ?? extractSchemaFromFigma(prev) ?? schemaRef.current;
+        const currentCode = newCode ?? extractCodeFromFigma(prev) ?? codeRef.current;
+        const currentSchema = newSchema ?? extractSchemaFromFigma(prev) ?? schemaRef.current;
         return buildFigmaText(currentCode, currentSchema);
       });
 
@@ -497,7 +765,7 @@ ${context.details}
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demoId }),
+          body: JSON.stringify({ demoId, forceNew: true }),
         });
 
         if (!sessionRes.ok) {
@@ -547,10 +815,7 @@ ${context.details}
         setProjectConfigSchema(multi.projectConfigSchema);
 
         // 记录每个页面的 previewSize
-        const previewSizeMap: Record<
-          string,
-          import("@opencode-workbench/shared/demo").PreviewSize
-        > = {};
+        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
         for (const page of pagesWithSize) {
           if (page.previewSize) {
             previewSizeMap[page.id] = page.previewSize;
@@ -610,10 +875,7 @@ ${context.details}
         setPreviewSize(size);
 
         // 初始化 Agent 会话
-        const { getAgentClient } = await import("@/lib/agent-client");
-        const agentClient = getAgentClient();
-        const newAgentSessionId = `demo-${demoId}-${Date.now()}`;
-        setAgentSessionId(newAgentSessionId);
+        setAgentSessionId(sessionData.data.sessionId);
       } catch (error) {
         toast({
           title: "加载失败",
@@ -629,13 +891,14 @@ ${context.details}
   }, [demoId, toast]);
 
   useEffect(() => {
-    if (activeDemoId && code) {
+    const pageId = activeDemoIdRef.current;
+    if (pageId && code) {
       setPageCodes((prev) => {
-        if (prev[activeDemoId] === code) return prev;
-        return { ...prev, [activeDemoId]: code };
+        if (prev[pageId] === code) return prev;
+        return { ...prev, [pageId]: code };
       });
     }
-  }, [code, activeDemoId]);
+  }, [code]);
 
   // 组件卸载时清理 Schema 自动重新生成定时器
   useEffect(() => {
@@ -673,36 +936,45 @@ ${context.details}
     setCode(parsed.code);
     setSchema(parsed.schema);
 
+    const currentPageId = activeDemoIdRef.current;
+    invalidatePageScreenshot(currentPageId);
     const defaults = getSafeMergedDefaults(parsed.schema);
     setConfigDataMap((prev) => ({
       ...prev,
-      [activeDemoIdRef.current]: {
+      [currentPageId]: {
         ...defaults,
-        ...(prev[activeDemoIdRef.current] ?? {}),
+        ...(prev[currentPageId] ?? {}),
       },
     }));
 
     const size = getPreviewSize(parsed.schema);
     setPreviewSize(size);
 
-    // 代码变更后 debounce 3s 触发截图再生
-    scheduleScreenshotRegenerate(activeDemoIdRef.current, parsed.code);
+    const nextConfig = {
+      ...defaults,
+      ...(configDataMapRef.current[currentPageId] ?? {}),
+    };
+    // 代码变更后立即失效旧截图，并 debounce 3s 触发截图再生
+    scheduleScreenshotRegenerate(currentPageId, parsed.code, nextConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleConfigChange = useCallback((data: Record<string, unknown>) => {
+    const currentPageId = activeDemoIdRef.current;
+    invalidatePageScreenshot(currentPageId);
     setConfigDataMap((prev) => {
+      const nextPageConfig = {
+        ...(prev[currentPageId] ?? {}),
+        ...data,
+      };
       const next = {
         ...prev,
-        [activeDemoIdRef.current]: {
-          ...(prev[activeDemoIdRef.current] ?? {}),
-          ...data,
-        },
+        [currentPageId]: nextPageConfig,
       };
-      // 配置变更后 debounce 3s 触发截图再生
+      // 配置变更后立即失效旧截图，并 debounce 3s 触发截图再生
       const currentCode = codeRef.current;
       if (currentCode) {
-        scheduleScreenshotRegenerate(activeDemoIdRef.current, currentCode);
+        scheduleScreenshotRegenerate(currentPageId, currentCode, nextPageConfig);
       }
       return next;
     });
@@ -743,22 +1015,130 @@ ${context.details}
     [projectConfigSchema],
   );
 
-  useEffect(() => {
-    projectApiClient
-      .getPublishStatus(demoId)
-      .then((result) => {
-        setPublishStatus(result.status);
-        setPublishedVersion(result.publishedVersion);
-      })
-      .catch(() => {
-        setPublishStatus(null);
+  const handleAiFilesChange = useCallback(
+    async (files: AiFileChange[]) => {
+      const hasWorkspaceStructureChange = files.some((file) => {
+        const normalizedPath = file.path.replace(/\\/g, "/");
+        return (
+          normalizedPath === "workspace-tree.json" ||
+          normalizedPath.startsWith("demos/")
+        );
       });
+      if (!hasWorkspaceStructureChange || !sessionId) return;
+
+      markWorkspaceChanged();
+
+      const previousPageIds = new Set(demoPages.map((page) => page.id));
+      const previousActiveId = activeDemoIdRef.current;
+
+      try {
+        const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+        if (!filesRes.ok) {
+          throw new Error("刷新页面列表失败");
+        }
+        const filesData = await filesRes.json();
+        if (!filesData.success) {
+          throw new Error(filesData.error?.message || "刷新页面列表失败");
+        }
+
+        const multi = filesData.data;
+        const rawPages = multi.demoPages || [];
+        const pagesWithSize = rawPages.map(
+          (page: DemoPageMeta) => ({
+            ...page,
+            previewSize: multi.demos?.[page.id]?.schema
+              ? getPreviewSize(multi.demos[page.id].schema)
+              : undefined,
+          }),
+        );
+        setDemoPages(pagesWithSize);
+        setDemoFolders(multi.demoFolders || []);
+        setProjectConfigSchema(multi.projectConfigSchema);
+
+        const pageIds = rawPages.map((page: DemoPageMeta) => page.id);
+        const newPageIds = pageIds.filter((pageId: string) => !previousPageIds.has(pageId));
+        const nextActiveId = pageIds.includes(previousActiveId)
+          ? previousActiveId
+          : pageIds[0];
+
+        const codes: Record<string, string> = {};
+        const allDefaults: Record<string, Record<string, unknown>> = {};
+        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        if (multi.demos) {
+          for (const [pageId, demo] of Object.entries(multi.demos) as [
+            string,
+            { code: string; schema: string },
+          ][]) {
+            codes[pageId] = demo.code;
+            allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            const pagePreviewSize = getPreviewSize(demo.schema);
+            if (pagePreviewSize) {
+              previewSizeMap[pageId] = pagePreviewSize;
+            }
+          }
+        }
+
+        setPageCodes(codes);
+        setConfigDataMap(allDefaults);
+        setPagePreviewSizeMap(previewSizeMap);
+
+        if (nextActiveId && multi.demos?.[nextActiveId]) {
+          const target = multi.demos[nextActiveId];
+          setActiveDemoId(nextActiveId);
+          activeDemoIdRef.current = nextActiveId;
+          setCode(target.code || "");
+          setSchema(target.schema || "");
+          setEditorContent(buildFigmaText(target.code || "", target.schema || ""));
+          setPreviewSize(getPreviewSize(target.schema || ""));
+        } else {
+          setActiveDemoId("");
+          activeDemoIdRef.current = "";
+          setCode("");
+          setSchema("");
+          setEditorContent(buildFigmaText("", ""));
+          setPreviewSize(undefined);
+        }
+
+        if (previewMode === "canvas" && newPageIds.length > 0) {
+          setFocusCanvasPageId(newPageIds[0]);
+        }
+
+        const pageCountChanged = pageIds.length !== previousPageIds.size;
+        const pageIdentityChanged =
+          pageCountChanged || pageIds.some((pageId: string) => !previousPageIds.has(pageId));
+        toast({ title: pageIdentityChanged ? "页面列表已刷新" : "页面结构已更新" });
+      } catch (error) {
+        toast({
+          title: "刷新页面列表失败",
+          description: error instanceof Error ? error.message : "未知错误",
+          variant: "destructive",
+        });
+      }
+    },
+    [
+      demoPages,
+      getSafeMergedDefaults,
+      markWorkspaceChanged,
+      previewMode,
+      sessionId,
+      setFocusCanvasPageId,
+      toast,
+    ],
+  );
+
+  useEffect(() => {
+    projectApiClient.getPublishStatus(demoId).then((result) => {
+      setPublishStatus(result.status);
+      setPublishedVersion(result.publishedVersion);
+    }).catch(() => {
+      setPublishStatus(null);
+    });
   }, [demoId]);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
         if (data?.success && data.data?.username) {
           setCurrentUsername(data.data.username);
         }
@@ -775,26 +1155,54 @@ ${context.details}
     }
   }, [demoId]);
 
+  const loadPageVersionHistories = useCallback(async () => {
+    if (demoPages.length === 0) {
+      setPageVersionHistories({});
+      return;
+    }
+
+    const entries = await Promise.all(
+      demoPages.map(async (page) => {
+        try {
+          const history = await projectApiClient.getPageVersionHistory(
+            demoId,
+            page.id,
+          );
+          return [page.id, history] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setPageVersionHistories(
+      Object.fromEntries(entries.filter((entry): entry is NonNullable<typeof entry> => !!entry)),
+    );
+  }, [demoId, demoPages]);
+
   useEffect(() => {
     loadVersionHistory();
   }, [loadVersionHistory]);
+
+  useEffect(() => {
+    loadPageVersionHistories();
+  }, [loadPageVersionHistories]);
 
   const handlePublish = async () => {
     setPublishing(true);
     try {
       const publishResult = await projectApiClient.publishProject(demoId);
-      setPublishStatus("published");
+      setPublishStatus('published');
       setPublishedVersion(publishResult.publishedVersion);
       toast({
-        title: "发布成功",
+        title: '发布成功',
         description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
       });
     } catch (publishErr) {
       toast({
-        title: "发布失败",
-        description:
-          publishErr instanceof Error ? publishErr.message : "发布失败",
-        variant: "destructive",
+        title: '发布失败',
+        description: publishErr instanceof Error ? publishErr.message : '发布失败',
+        variant: 'destructive',
       });
     } finally {
       setPublishing(false);
@@ -802,11 +1210,7 @@ ${context.details}
   };
 
   const handleRestoreVersion = async (version: VersionInfo) => {
-    if (
-      !confirm(
-        `确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`,
-      )
-    ) {
+    if (!confirm(`确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`)) {
       return;
     }
 
@@ -814,14 +1218,14 @@ ${context.details}
     try {
       const result = await projectApiClient.restoreVersion(demoId, {
         versionId: version.versionId,
-        username: currentUsername || "未知用户",
+        username: currentUsername || '未知用户',
       });
 
       const syncRes = await fetch(`/api/sessions/${sessionId}/sync-project`, {
-        method: "POST",
+        method: 'POST',
       });
       if (!syncRes.ok) {
-        throw new Error("同步会话工作区失败");
+        throw new Error('同步会话工作区失败');
       }
 
       const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
@@ -838,13 +1242,22 @@ ${context.details}
 
         if (newActiveId && newActiveId !== activeDemoId) {
           setActiveDemoId(newActiveId);
+          activeDemoIdRef.current = newActiveId;
         }
 
         if (targetDemo) {
           applyDemoSnapshot({
-            code: targetDemo.code ?? "",
-            schema: targetDemo.schema ?? "",
-            source: "manual-load",
+            code: targetDemo.code ?? '',
+            schema: targetDemo.schema ?? '',
+            source: 'manual-load',
+          });
+        } else {
+          setActiveDemoId("");
+          activeDemoIdRef.current = "";
+          applyDemoSnapshot({
+            code: '',
+            schema: '',
+            source: 'manual-load',
           });
         }
 
@@ -852,8 +1265,9 @@ ${context.details}
           pageIds.map((id: string) => ({
             id,
             name:
-              multi.demoPages.find((p: { id: string }) => p.id === id)?.name ||
-              id,
+              multi.demoPages.find(
+                (p: { id: string }) => p.id === id,
+              )?.name || id,
             order: 0,
             parentId: null,
           })),
@@ -863,7 +1277,7 @@ ${context.details}
       }
 
       toast({
-        title: "恢复成功",
+        title: '恢复成功',
         description: `已恢复到新版本 ${result.newVersionId}`,
       });
       await loadVersionHistory();
@@ -872,8 +1286,92 @@ ${context.details}
       setPublishedVersion(statusResult.publishedVersion);
     } catch (err) {
       toast({
-        title: "恢复失败",
-        description: err instanceof Error ? err.message : "恢复版本失败",
+        title: '恢复失败',
+        description: err instanceof Error ? err.message : '恢复版本失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  const persistActivePageToSession = async () => {
+    if (!sessionId || !activeDemoId) {
+      throw new Error("未选中页面或 Session 未创建");
+    }
+
+    const saveRes = await fetch(
+      `/api/sessions/${sessionId}/files/${activeDemoId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, schema }),
+      },
+    );
+
+    if (!saveRes.ok) {
+      throw new Error("保存当前页面到临时工作区失败");
+    }
+  };
+
+  const handlePreviewPageVersion = async (version: PageVersionInfo) => {
+    try {
+      const files = await projectApiClient.getPageVersionFiles(
+        demoId,
+        version.demoId,
+        version.versionId,
+      );
+      setPreviewVersion({ scope: "page", version, files });
+    } catch (err) {
+      toast({
+        title: "预览失败",
+        description: err instanceof Error ? err.message : "读取页面版本失败",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestorePageVersion = async (version: PageVersionInfo) => {
+    const pageName =
+      version.demoName ||
+      demoPages.find((page) => page.id === version.demoId)?.name ||
+      version.demoId;
+    if (!confirm(`确定要将页面「${pageName}」恢复到 ${version.versionId} 吗？`)) {
+      return;
+    }
+
+    setRestoring(version.versionId);
+    try {
+      const result = await projectApiClient.restorePageVersion(
+        demoId,
+        version.demoId,
+        version.versionId,
+        { sessionId },
+      );
+
+      if (activeDemoId !== version.demoId) {
+        setActiveDemoId(version.demoId);
+        activeDemoIdRef.current = version.demoId;
+      }
+      applyDemoSnapshot({
+        code: result.files.code,
+        schema: result.files.schema,
+        source: "manual-load",
+      });
+      setPageCodes((prev) => ({ ...prev, [version.demoId]: result.files.code }));
+      setHasUnsavedChanges(false);
+      setPublishStatus("unpublished_changes");
+      setPreviewVersion(null);
+
+      toast({
+        title: "页面恢复成功",
+        description: `已生成项目版本 ${result.newVersionId}`,
+      });
+      await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
+    } catch (err) {
+      toast({
+        title: "页面恢复失败",
+        description: err instanceof Error ? err.message : "恢复页面版本失败",
         variant: "destructive",
       });
     } finally {
@@ -881,7 +1379,7 @@ ${context.details}
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     if (!sessionId) {
       console.error("[handleSave] sessionId 为空!");
       toast({
@@ -889,7 +1387,7 @@ ${context.details}
         description: "Session 未创建，请刷新页面重试",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     if (!activeDemoId) {
@@ -899,7 +1397,7 @@ ${context.details}
         description: "未选中页面，请先选择要保存的页面",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     if (!validationResult.isValid) {
@@ -940,6 +1438,12 @@ ${context.details}
         throw new Error("保存文件失败");
       }
 
+      const activePage = demoPages.find((page) => page.id === activeDemoId);
+      await projectApiClient.createPageVersion(demoId, activeDemoId, {
+        sessionId,
+        note: activePage ? `修改了${activePage.name}` : "修改了页面",
+      });
+
       const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -956,15 +1460,18 @@ ${context.details}
       });
 
       setHasUnsavedChanges(false);
-      setPublishStatus("unpublished_changes");
+      setPublishStatus('unpublished_changes');
 
       loadVersionHistory();
+      loadPageVersionHistories();
+      return true;
     } catch (error) {
       toast({
         title: "保存失败",
         description: error instanceof Error ? error.message : "未知错误",
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -1015,14 +1522,389 @@ ${context.details}
 
   // 处理 AI Schema 更新 — 通过 applyDemoSnapshot 统一应用
   const handleSchemaUpdate = useCallback(
-    (
-      newSchema: string,
-      source: "ai-realtime" | "ai-finish" = "ai-realtime",
-    ) => {
+    (newSchema: string, source: "ai-realtime" | "ai-finish" = "ai-realtime") => {
       applyDemoSnapshot({ schema: newSchema, source });
     },
     [applyDemoSnapshot],
   );
+
+  const initializeVisualConfigDialog = useCallback(
+    (node: VisualNodeInfo, preferredCandidate?: VisualConfigCandidate) => {
+      const candidates = buildVisualConfigCandidates(node);
+      const candidate = preferredCandidate ?? candidates[0];
+      if (!candidate) {
+        toast({
+          title: "这个元素暂时不能自动配置化",
+          description: "请选择文本、图片或带颜色样式的元素。",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
+      setVisualConfigNode(node);
+      setVisualConfigCandidateId(candidate.id);
+      setVisualConfigTitle(candidate.fieldTitle);
+      setVisualConfigFieldKey(
+        suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
+      );
+      setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigError(null);
+    },
+    [projectConfigSchema, toast],
+  );
+
+  const handleVisualConfigCandidateChange = useCallback(
+    (candidateId: string) => {
+      const candidate = visualConfigCandidates.find(
+        (item) => item.id === candidateId,
+      );
+      if (!candidate) return;
+      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
+      setVisualConfigCandidateId(candidate.id);
+      setVisualConfigTitle(candidate.fieldTitle);
+      setVisualConfigFieldKey(
+        suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
+      );
+      setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigError(null);
+    },
+    [projectConfigSchema, visualConfigCandidates],
+  );
+
+  const handleVisualSelect = useCallback(
+    (node: VisualNodeInfo | null) => {
+      setSelectedVisualNode(node);
+      if (!node) return;
+
+      if (visualConfigMode) {
+        initializeVisualConfigDialog(node);
+      }
+    },
+    [initializeVisualConfigDialog, visualConfigMode],
+  );
+
+  const handleStartVisualConfig = useCallback(() => {
+    if (visualConfigMode) {
+      setVisualConfigMode(false);
+      setVisualEditMode(false);
+      setVisualConfigNode(null);
+      setSelectedVisualNode(null);
+      setHoveredVisualNode(null);
+      return;
+    }
+
+    setVisualConfigMode(true);
+    setVisualAnnotationMode(false);
+    setVisualEditMode(true);
+    setSelectedVisualNode(null);
+    setHoveredVisualNode(null);
+    setVisualConfigError(null);
+  }, [visualConfigMode]);
+
+  const handleApplyVisualConfig = useCallback(async () => {
+    if (!visualConfigNode || !selectedVisualConfigCandidate) return;
+
+    setVisualConfigApplying(true);
+    setVisualConfigError(null);
+    try {
+      const response = await fetch("/api/visual-configure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: codeRef.current,
+          schema: schemaRef.current,
+          projectConfigSchema,
+          demoId: activeDemoIdRef.current,
+          node: visualConfigNode,
+          target: {
+            kind: selectedVisualConfigCandidate.kind,
+            fieldKey: visualConfigFieldKey.trim(),
+            title: visualConfigTitle.trim(),
+            defaultValue: visualConfigDefaultValue,
+            colorProperty: selectedVisualConfigCandidate.colorProperty,
+          },
+        }),
+      });
+      const data = (await response.json()) as
+        | {
+            success: true;
+            data: Extract<VisualConfigureResult, { ok: true }>;
+          }
+        | { success: false; error?: { message?: string } };
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.success ? "添加配置项失败" : data.error?.message || "添加配置项失败",
+        );
+      }
+
+      applyDemoSnapshot({
+        code: data.data.code,
+        schema: data.data.schema,
+        source: "manual-load",
+      });
+      setConfigDataMap((prev) => {
+        const pageId = activeDemoIdRef.current;
+        return {
+          ...prev,
+          [pageId]: {
+            ...(prev[pageId] ?? {}),
+            ...data.data.configPatch,
+          },
+        };
+      });
+      markWorkspaceChanged();
+      setVisualConfigNode(null);
+      setSelectedVisualNode(null);
+      toast({ title: "配置项已添加" });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "添加配置项失败";
+      setVisualConfigError(message);
+      toast({
+        title: "无法添加配置项",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setVisualConfigApplying(false);
+    }
+  }, [
+    applyDemoSnapshot,
+    markWorkspaceChanged,
+    projectConfigSchema,
+    selectedVisualConfigCandidate,
+    toast,
+    visualConfigDefaultValue,
+    visualConfigFieldKey,
+    visualConfigNode,
+    visualConfigTitle,
+  ]);
+
+  const handleCloseVisualConfigDialog = useCallback(() => {
+    setVisualConfigNode(null);
+    setVisualConfigError(null);
+  }, []);
+
+  const visualConfigDialogOpen = !!visualConfigNode;
+
+  const handleVisualConfigTitleChange = useCallback(
+    (value: string) => {
+      setVisualConfigTitle(value);
+      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
+      setVisualConfigFieldKey(suggestVisualConfigFieldKey(value, usedKeys));
+    },
+    [projectConfigSchema],
+  );
+
+  const handleStartVisualAnnotation = useCallback(() => {
+    if (visualAnnotationMode) {
+      const pendingCount = visualAnnotations.filter((item) => !item.resolved).length;
+      if (
+        pendingCount > 0 &&
+        !window.confirm(`当前有 ${pendingCount} 条未发送批注，确定取消并丢弃吗？`)
+      ) {
+        return;
+      }
+      setVisualAnnotationMode(false);
+      setVisualEditMode(false);
+      setVisualConfigMode(false);
+      setVisualConfigNode(null);
+      setSelectedVisualNode(null);
+      setHoveredVisualNode(null);
+      setVisualAnnotations((prev) => prev.filter((item) => item.resolved));
+      return;
+    }
+
+    const next = !visualAnnotationMode;
+    setVisualAnnotationMode(next);
+    setVisualConfigMode(false);
+    setVisualConfigNode(null);
+    setVisualEditMode(next);
+    setSelectedVisualNode(null);
+    setHoveredVisualNode(null);
+  }, [visualAnnotationMode, visualAnnotations]);
+
+  const handleSendVisualAnnotationsToAI = useCallback(() => {
+    const activeAnnotations = visualAnnotations.filter((item) => !item.resolved);
+    if (activeAnnotations.length === 0) {
+      return;
+    }
+
+    const summary = `请根据 ${activeAnnotations.length} 条页面批注修改当前页面。`;
+    const context = activeAnnotations
+      .map((annotation, index) => {
+        const styleLines =
+          annotation.styleChanges && annotation.styleChanges.length > 0
+            ? [
+                "- 样式修改：",
+                ...annotation.styleChanges.map(
+                  (change) =>
+                    `  - ${change.label}（${change.property}）：${change.previousValue ?? "未设置"} -> ${change.value}`,
+                ),
+              ]
+            : [];
+        return [
+          `批注 ${index + 1}`,
+          `- 评论：${annotation.text}`,
+          ...styleLines,
+          `- DOM 路径：${annotation.domPath}`,
+          `- 节点 ID：${annotation.nodeId}`,
+        ].join("\n");
+      })
+      .join("\n\n");
+
+    const prompt = `${summary}
+
+请优先读取并修改 demos/${activeDemoIdRef.current}/index.tsx。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。
+
+<!-- VISUAL_ANNOTATION_CONTEXT
+${context}
+-->`;
+
+    setTabValue("ai");
+    setTriggerAutoSend(prompt);
+    setVisualAnnotationMode(false);
+    setVisualEditMode(false);
+    setSelectedVisualNode(null);
+    setVisualAnnotations((prev) =>
+      prev.map((item) =>
+        item.resolved ? item : { ...item, resolved: true },
+      ),
+    );
+  }, [visualAnnotations]);
+
+  const handleVisualInlineEdit = useCallback(
+    (payload: VisualInlineEditPayload) => {
+      const patch: VisualEditPatch = {
+        id: createVisualId("patch"),
+        title: `修改 <${payload.node.tagName}> 文本`,
+        file: `demos/${activeDemoIdRef.current}/index.tsx`,
+        before: payload.before,
+        after: payload.after,
+        kind: "text",
+        status: "previewed",
+        node: payload.node,
+      };
+      setSelectedVisualNode(payload.node);
+      setVisualPatches((prev) => [patch, ...prev]);
+      setTabValue("ai");
+      toast({
+        title: "已生成文本修改建议",
+        description: "请在批注面板中接受或拒绝该修改。",
+      });
+    },
+    [toast],
+  );
+
+  const handleCreateVisualAnnotation = useCallback(
+    (
+      text?: string,
+      targetNode?: VisualNodeInfo,
+      styleChanges?: VisualStyleChange[],
+    ) => {
+      const node = targetNode ?? selectedVisualNode;
+      if (!node) {
+        return;
+      }
+      const annotationText =
+        text?.trim() ||
+        (styleChanges && styleChanges.length > 0 ? "样式修改" : "待处理的页面批注");
+      const annotation: VisualAnnotation = {
+        id: createVisualId("note"),
+        nodeId: node.nodeId,
+        domPath: node.domPath,
+        text: annotationText,
+        styleChanges,
+        createdAt: Date.now(),
+      };
+      setVisualAnnotations((prev) => [annotation, ...prev]);
+    },
+    [selectedVisualNode],
+  );
+
+  const handleAcceptVisualPatch = useCallback(
+    (patch: VisualEditPatch) => {
+      if (patch.status === "accepted") return;
+      if (patch.kind !== "text") {
+        setVisualPatches((prev) =>
+          prev.map((item) =>
+            item.id === patch.id
+              ? { ...item, error: "该类型的写回尚未实现" }
+              : item,
+          ),
+        );
+        return;
+      }
+
+      const result = replaceUniqueText(
+        codeRef.current,
+        patch.before,
+        patch.after,
+      );
+      if (result.error || !result.code) {
+        setVisualPatches((prev) =>
+          prev.map((item) =>
+            item.id === patch.id
+              ? { ...item, status: "draft", error: result.error }
+              : item,
+          ),
+        );
+        toast({
+          title: "无法安全写回",
+          description: result.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      applyDemoSnapshot({ code: result.code, source: "ai-finish" });
+      setVisualPatches((prev) =>
+        prev.map((item) =>
+          item.id === patch.id
+            ? { ...item, status: "accepted", error: undefined }
+            : item,
+        ),
+      );
+      toast({ title: "修改已写回代码" });
+    },
+    [applyDemoSnapshot, toast],
+  );
+
+  const handleRejectVisualPatch = useCallback(
+    (patchId: string) => {
+      setVisualPatches((prev) =>
+        prev.map((item) =>
+          item.id === patchId ? { ...item, status: "rejected" } : item,
+        ),
+      );
+      if (sessionId && activeDemoId) {
+        invalidateCompileCache(sessionId, activeDemoId);
+      }
+      toast({ title: "已拒绝该修改" });
+    },
+    [activeDemoId, sessionId, toast],
+  );
+
+  const handleSendSelectionToAI = useCallback(() => {
+    if (!selectedVisualNode) {
+      toast({ title: "请先在预览区选择一个元素" });
+      return;
+    }
+    const prompt = `请只针对当前可视化选区提出修改建议，不要静默扩大范围。
+
+【当前选区】
+- 元素：<${selectedVisualNode.tagName}>
+- DOM 路径：${selectedVisualNode.domPath}
+- className：${selectedVisualNode.className || "无"}
+- 文本：${selectedVisualNode.textContent || "无"}
+- 页面文件：demos/${activeDemoIdRef.current}/index.tsx
+
+请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+    setTabValue("ai");
+    setTriggerAutoSend(prompt);
+  }, [selectedVisualNode, toast]);
 
   // 从工作空间文件路径提取 demoId
   function extractDemoIdFromPath(normalizedPath: string): string | null {
@@ -1043,8 +1925,9 @@ ${context.details}
           source: "manual-load",
         });
       }
+      markWorkspaceChanged();
     },
-    [activeDemoId, applyDemoSnapshot],
+    [activeDemoId, applyDemoSnapshot, markWorkspaceChanged],
   );
 
   if (isLoading) {
@@ -1066,6 +1949,76 @@ ${context.details}
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
   const hasAnyConfig = showProjectConfig || showPageConfig;
+  const activePageName =
+    demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
+  const projectVersions = versionHistory?.versions ?? [];
+  const pageVersions = Object.values(pageVersionHistories).flatMap(
+    (history) => history.versions,
+  );
+  const historyEvents: HistoryEvent[] = dedupeHistoryEvents([
+    ...projectVersions.map((version, index): HistoryEvent => {
+      if (version.sessionId.startsWith("restore-page-")) {
+        return {
+          id: `project-page-restore-${version.versionId}`,
+          kind: "page-restore",
+          title: getRestoredPageTitle(version),
+          savedAt: version.savedAt,
+          version,
+        };
+      }
+
+      return {
+        id: `project-${version.versionId}`,
+        kind: "project",
+        title:
+          version.sessionId === "restore" || version.note?.includes("恢复")
+            ? "恢复项目"
+            : "保存项目",
+        savedAt: version.savedAt,
+        savedBy: getVersionSavedBy(version.savedBy),
+        version,
+        isLatestProject: index === 0,
+      };
+    }),
+    ...pageVersions.map((version): HistoryEvent => ({
+      id: `page-${version.demoId}-${version.versionId}`,
+      kind: "page",
+      title: `修改了${version.demoName || version.demoId}`,
+      savedAt: version.savedAt,
+      version,
+    })),
+  ]).sort((a, b) => b.savedAt - a.savedAt);
+  const historyEventTotal = historyEvents.length;
+  const historyGroups = historyEvents.reduce<
+    Array<{ key: string; label: string; events: HistoryEvent[] }>
+  >((groups, event) => {
+    const key = format(event.savedAt, "yyyy-MM-dd");
+    const existing = groups.find((group) => group.key === key);
+    if (existing) {
+      existing.events.push(event);
+      return groups;
+    }
+
+    groups.push({
+      key,
+      label: format(event.savedAt, "MM月dd日", { locale: zhCN }),
+      events: [event],
+    });
+    return groups;
+  }, []);
+  const hasPublishableChanges =
+    publishStatus === "never_published" ||
+    publishStatus === "unpublished_changes";
+  const shouldSaveBeforePublish = hasUnsavedChanges;
+  const publishButtonDisabled =
+    isSaving ||
+    publishing ||
+    publishStatus === null ||
+    (!hasUnsavedChanges && !hasPublishableChanges);
+  const publishButtonText = shouldSaveBeforePublish ? "保存并发布" : "发布";
+  const publishingButtonText = shouldSaveBeforePublish
+    ? "保存并发布中..."
+    : "发布中...";
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -1109,7 +2062,7 @@ ${context.details}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1121,26 +2074,24 @@ ${context.details}
           </Button>
           <Button
             onClick={async () => {
-              await handleSave();
+              if (shouldSaveBeforePublish) {
+                const saved = await handleSave();
+                if (!saved) {
+                  return;
+                }
+              }
               await handlePublish();
             }}
-            disabled={
-              isSaving ||
-              publishing ||
-              publishStatus === "published" ||
-              publishStatus === null
-            }
-            variant={
-              publishStatus === "unpublished_changes" ? "default" : "outline"
-            }
+            disabled={publishButtonDisabled}
+            variant={!publishButtonDisabled ? 'default' : 'outline'}
             className="gap-2"
           >
             {publishing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                保存并发布中...
+                {publishingButtonText}
               </>
-            ) : publishStatus === "published" ? (
+            ) : publishStatus === 'published' ? (
               <>
                 <CheckCircle className="h-4 w-4" />
                 已发布
@@ -1148,7 +2099,7 @@ ${context.details}
             ) : (
               <>
                 <Upload className="h-4 w-4" />
-                保存并发布
+                {publishButtonText}
               </>
             )}
           </Button>
@@ -1169,15 +2120,23 @@ ${context.details}
               onValueChange={setTabValue}
               className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
             >
-              <TabsList className="w-full justify-start rounded-none border-b px-2 h-12 bg-transparent">
-                <TabsTrigger value="ai" className="gap-2">
+              <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                <TabsTrigger
+                  value="ai"
+                  title="AI 对话"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <Bot className="h-4 w-4" />
-                  AI 对话
+                  {tabValue === "ai" && <span>AI 对话</span>}
                 </TabsTrigger>
-                <TabsTrigger value="pages" className="gap-2">
+                <TabsTrigger
+                  value="pages"
+                  title="页面"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <Layers className="h-4 w-4" />
-                  页面
-                  {demoPages.length > 0 && (
+                  {tabValue === "pages" && <span>页面</span>}
+                  {tabValue === "pages" && demoPages.length > 0 && (
                     <Badge
                       variant="secondary"
                       className="ml-1 text-[10px] h-4 px-1"
@@ -1186,13 +2145,21 @@ ${context.details}
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="code" className="gap-2">
+                <TabsTrigger
+                  value="code"
+                  title="文件"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <FolderOpen className="h-4 w-4" />
-                  文件
+                  {tabValue === "code" && <span>文件</span>}
                 </TabsTrigger>
-                <TabsTrigger value="history" className="gap-2">
+                <TabsTrigger
+                  value="history"
+                  title="版本"
+                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                >
                   <History className="h-4 w-4" />
-                  版本
+                  {tabValue === "history" && <span>版本</span>}
                 </TabsTrigger>
               </TabsList>
 
@@ -1206,9 +2173,11 @@ ${context.details}
                   workingDir={tempWorkspace || undefined}
                   projectId={demoId}
                   demoId={activeDemoId}
+                  activeViewContext={activeViewContext}
                   workspaceId={workspaceId || undefined}
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
+                  onFilesChange={handleAiFilesChange}
                   onMemoryUpdate={async (filePath) => {
                     try {
                       const res = await fetch(
@@ -1270,7 +2239,7 @@ ${context.details}
                       setSessionId(data.data.sessionId);
                       setWorkspaceId(data.data.workspaceId || "");
                       setTempWorkspace(data.data.tempWorkspace || "");
-                      setAgentSessionId(`demo-${demoId}-${Date.now()}`);
+                      setAgentSessionId(data.data.sessionId);
                       setAiMessages([]);
                       setAiCurrentMessage({
                         role: "assistant",
@@ -1351,15 +2320,7 @@ ${context.details}
                       });
                       setAiIsStreaming(false);
                       setAiStreamContent("");
-                      const { getAgentClient } =
-                        await import("@/lib/agent-client");
-                      const agentClient = getAgentClient();
-                      try {
-                        await agentClient.getSession(newSessionId);
-                        setAgentSessionId(newSessionId);
-                      } catch {
-                        setAgentSessionId(`demo-${demoId}-${Date.now()}`);
-                      }
+                      setAgentSessionId(newSessionId);
                       setSessionId(newSessionId);
                       toast({ title: "已切换会话" });
                     } catch (error) {
@@ -1502,6 +2463,7 @@ ${context.details}
                   folders={demoFolders}
                   onPagesChange={setDemoPages}
                   onFoldersChange={setDemoFolders}
+                  onWorkspaceChange={markWorkspaceChanged}
                   activeDemoId={activeDemoId}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
@@ -1511,8 +2473,7 @@ ${context.details}
                       setPreviewSize(pagePreviewSizeMap[pageId]);
                     }
                     if (previewMode === "canvas") {
-                      setFocusCanvasPageId(pageId);
-                      setCanvasEditingPageId(pageId);
+                      focusCanvasPage(pageId);
                     }
                     if (sessionId) {
                       try {
@@ -1521,6 +2482,10 @@ ${context.details}
                         );
                         const data = await res.json();
                         if (data.success) {
+                          setPageCodes((prev) => ({
+                            ...prev,
+                            [pageId]: data.data.code,
+                          }));
                           setCode(data.data.code);
                           setSchema(data.data.schema);
                           setEditorContent(
@@ -1559,6 +2524,7 @@ ${context.details}
                             p.id === pageId ? { ...p, name } : p,
                           ),
                         );
+                        markWorkspaceChanged();
                         toast({ title: "名称已更新" });
                       } else {
                         toast({
@@ -1598,6 +2564,7 @@ ${context.details}
                             (a, b) => a.order - b.order,
                           ),
                         );
+                        markWorkspaceChanged();
                         toast({ title: "页面复制成功" });
                       } else {
                         toast({
@@ -1618,14 +2585,6 @@ ${context.details}
                       });
                       return;
                     }
-                    if (demoPages.length <= 1) {
-                      toast({
-                        title: "无法删除",
-                        description: "至少需要保留一个页面",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
                     const page = demoPages.find((p) => p.id === pageId);
                     if (!page || !confirm(`确定要删除页面「${page.name}」吗？`))
                       return;
@@ -1636,9 +2595,25 @@ ${context.details}
                       );
                       const data = await res.json();
                       if (data.success) {
+                        markWorkspaceChanged();
                         setDemoPages((prev) =>
                           prev.filter((p) => p.id !== pageId),
                         );
+                        setPageCodes((prev) => {
+                          const rest = { ...prev };
+                          delete rest[pageId];
+                          return rest;
+                        });
+                        setConfigDataMap((prev) => {
+                          const rest = { ...prev };
+                          delete rest[pageId];
+                          return rest;
+                        });
+                        setPagePreviewSizeMap((prev) => {
+                          const rest = { ...prev };
+                          delete rest[pageId];
+                          return rest;
+                        });
                         if (activeDemoId === pageId) {
                           const remaining = demoPages.filter(
                             (p) => p.id !== pageId,
@@ -1646,11 +2621,16 @@ ${context.details}
                           const nextPage = remaining[0];
                           if (nextPage) {
                             setActiveDemoId(nextPage.id);
+                            activeDemoIdRef.current = nextPage.id;
                             const fileRes = await fetch(
                               `/api/sessions/${sessionId}/files/${nextPage.id}`,
                             );
                             const fileData = await fileRes.json();
                             if (fileData.success) {
+                              setPageCodes((prev) => ({
+                                ...prev,
+                                [nextPage.id]: fileData.data.code,
+                              }));
                               setCode(fileData.data.code);
                               setSchema(fileData.data.schema);
                               setEditorContent(
@@ -1660,19 +2640,27 @@ ${context.details}
                                 ),
                               );
                               setConfigDataMap((prev) => {
-                                const rest = { ...prev };
-                                delete rest[pageId];
-                                if (!rest[nextPage.id]) {
+                                if (!prev[nextPage.id]) {
                                   const defaults = getSafeMergedDefaults(
                                     fileData.data.schema,
                                   );
-                                  rest[nextPage.id] = defaults;
+                                  return {
+                                    ...prev,
+                                    [nextPage.id]: defaults,
+                                  };
                                 }
-                                return rest;
+                                return prev;
                               });
                               const size = getPreviewSize(fileData.data.schema);
                               setPreviewSize(size);
                             }
+                          } else {
+                            setActiveDemoId("");
+                            activeDemoIdRef.current = "";
+                            setCode("");
+                            setSchema("");
+                            setEditorContent(buildFigmaText("", ""));
+                            setPreviewSize(undefined);
                           }
                         }
                         toast({ title: "页面已删除" });
@@ -1697,31 +2685,23 @@ ${context.details}
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">当前版本</span>
-                      {versionHistory && (
-                        <Badge variant="default">
-                          {versionHistory.currentVersion}
-                        </Badge>
-                      )}
+                      <span className="text-sm font-medium">历史</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {publishStatus && (
                         <Badge
                           variant={
-                            publishStatus === "published"
-                              ? "secondary"
-                              : publishStatus === "unpublished_changes"
-                                ? "default"
-                                : "outline"
+                            publishStatus === 'published' ? 'secondary' :
+                            publishStatus === 'unpublished_changes' ? 'default' :
+                            'outline'
                           }
                         >
-                          {publishStatus === "published" && "已发布"}
-                          {publishStatus === "unpublished_changes" &&
-                            "有未发布变更"}
-                          {publishStatus === "never_published" && "未发布"}
+                          {publishStatus === 'published' && '已发布'}
+                          {publishStatus === 'unpublished_changes' && '有未发布变更'}
+                          {publishStatus === 'never_published' && '未发布'}
                         </Badge>
                       )}
-                      {publishedVersion && publishStatus === "published" && (
+                      {publishedVersion && publishStatus === 'published' && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <RefreshCw className="h-3 w-3" />
                           {publishedVersion}
@@ -1730,90 +2710,107 @@ ${context.details}
                     </div>
                   </div>
 
-                  {!versionHistory || versionHistory.versions.length === 0 ? (
+                  {historyEvents.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
                       <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>暂无版本历史</p>
-                      <p className="text-xs mt-1">保存编辑后会创建版本记录</p>
+                      <p className="text-xs mt-1">保存编辑后会记录历史</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {versionHistory.versions.map((version, index) => {
-                        const isLatest = index === 0;
-                        return (
-                          <div
-                            key={version.versionId}
-                            className={`p-3 rounded-lg border ${isLatest ? "border-primary/30 bg-primary/5" : "border-border"}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">
-                                  {version.versionId}
-                                </span>
-                                {isLatest && (
-                                  <Badge
-                                    variant="default"
-                                    className="text-[10px] h-4 px-1"
-                                  >
-                                    最新
-                                  </Badge>
-                                )}
-                                {version.sessionId === "restore" && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] h-4 px-1"
-                                  >
-                                    恢复
-                                  </Badge>
-                                )}
-                              </div>
-                              <Button
-                                variant={isLatest ? "ghost" : "ghost"}
-                                size="sm"
-                                onClick={() => handleRestoreVersion(version)}
-                                disabled={
-                                  restoring === version.versionId || isLatest
-                                }
-                                className="h-7 gap-1 text-xs"
-                              >
-                                {restoring === version.versionId ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <RotateCcw className="h-3 w-3" />
-                                )}
-                                {isLatest ? "当前" : "恢复"}
-                              </Button>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {format(version.savedAt, "MM-dd HH:mm", {
-                                  locale: zhCN,
-                                })}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {version.savedBy}
-                              </span>
-                            </div>
-                            {version.note && (
-                              <p className="mt-1 text-xs text-muted-foreground truncate">
-                                {version.note}
-                              </p>
-                            )}
+                    <div className="space-y-4">
+                      {historyGroups.map((group) => (
+                        <div key={group.key} className="space-y-1">
+                          <div className="pl-2 text-xs font-medium text-muted-foreground">
+                            {group.label}
                           </div>
-                        );
-                      })}
-                      <p className="text-center text-xs text-muted-foreground pt-2">
-                        共 {versionHistory.totalVersions} 个版本
+                          <div className="space-y-1">
+                            {group.events.map((event) => {
+                              const isProjectLike =
+                                event.kind === "project" || event.kind === "page-restore";
+                              const restoreVersion =
+                                event.kind === "project" || event.kind === "page-restore"
+                                  ? event.version
+                                  : null;
+                              return (
+                                <div
+                                  key={event.id}
+                                  className="group flex min-h-10 items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40 focus-within:bg-muted/40"
+                                >
+                                  <span className="w-10 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                                    {format(event.savedAt, 'HH:mm', { locale: zhCN })}
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                    {event.title}
+                                    {event.kind === "project" && (
+                                      <span className="ml-3 inline-flex max-w-[110px] align-middle items-center gap-1 truncate text-xs font-normal text-muted-foreground">
+                                        <User className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{event.savedBy}</span>
+                                      </span>
+                                    )}
+                                  </span>
+                                  <div className="flex w-[96px] shrink-0 items-center justify-end gap-1">
+                                    {event.kind === "page" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handlePreviewPageVersion(event.version)}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        <Eye className="h-3 w-3" />
+                                        查看
+                                      </Button>
+                                    )}
+                                    {event.kind === "page" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestorePageVersion(event.version)}
+                                        disabled={restoring === event.version.versionId}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        {restoring === event.version.versionId ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="h-3 w-3" />
+                                        )}
+                                        恢复
+                                      </Button>
+                                    )}
+                                    {isProjectLike &&
+                                      restoreVersion &&
+                                      !(event.kind === "project" && event.isLatestProject) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestoreVersion(restoreVersion)}
+                                        disabled={restoring === restoreVersion.versionId}
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        {restoring === restoreVersion.versionId ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="h-3 w-3" />
+                                        )}
+                                        恢复
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="pt-2 pl-4 text-xs text-muted-foreground">
+                        共 {historyEventTotal} 条历史
                       </p>
                     </div>
                   )}
                 </div>
               </TabsContent>
+
             </Tabs>
           </ResizablePanel>
-
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
               {previewMode === "canvas" ? (
@@ -1855,11 +2852,8 @@ ${context.details}
                       onCanvasStateChange={setCanvasState}
                       focusPageId={focusCanvasPageId}
                       editingPageId={canvasEditingPageId ?? undefined}
-                      screenshotUrls={Object.fromEntries(
-                        Object.entries(pageScreenshots)
-                          .filter(([, s]) => s.screenshotUrl)
-                          .map(([id, s]) => [id, s.screenshotUrl!]),
-                      )}
+                      screenshotUrls={canvasScreenshotUrls}
+                      screenshotRenderBoxes={canvasScreenshotRenderBoxes}
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
                       onPageConfigEdit={(pageId) => {
@@ -1870,13 +2864,14 @@ ${context.details}
                             .then((res) => res.json())
                             .then((data) => {
                               if (data.success) {
+                                setPageCodes((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.code,
+                                }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
-                                  buildFigmaText(
-                                    data.data.code,
-                                    data.data.schema,
-                                  ),
+                                  buildFigmaText(data.data.code, data.data.schema),
                                 );
                                 setConfigDataMap((prev) => {
                                   if (prev[pageId]) return prev;
@@ -1889,13 +2884,11 @@ ${context.details}
                                 setPreviewSize(size);
                               }
                             })
-                            .catch((err) =>
-                              console.error("加载页面失败:", err),
-                            );
+                            .catch((err) => console.error("加载页面失败:", err));
                         }
                       }}
                       onCanvasClick={() => {
-                        setCanvasEditingPageId(null);
+                        clearCanvasSelection();
                       }}
                     />
                   </div>
@@ -1921,6 +2914,40 @@ ${context.details}
                       </button>
                     </div>
                     <div className="flex-1" />
+                    <Button
+                      type="button"
+                      variant={visualConfigMode ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={handleStartVisualConfig}
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      {visualConfigMode ? "退出配置化" : "配置化"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={visualAnnotationMode ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={handleStartVisualAnnotation}
+                    >
+                      <MessageSquarePlus className="h-3.5 w-3.5" />
+                      {visualAnnotationMode ? "取消批注" : "批注"}
+                    </Button>
+                    {visualAnnotationMode && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8"
+                        disabled={visualAnnotations.filter((item) => !item.resolved).length === 0}
+                        onClick={handleSendVisualAnnotationsToAI}
+                      >
+                        发送批注
+                        {visualAnnotations.filter((item) => !item.resolved).length > 0
+                          ? ` (${visualAnnotations.filter((item) => !item.resolved).length})`
+                          : ""}
+                      </Button>
+                    )}
                     {demoPages.length > 1 && (
                       <Select
                         value={activeDemoId}
@@ -1937,13 +2964,14 @@ ${context.details}
                               );
                               const data = await res.json();
                               if (data.success) {
+                                setPageCodes((prev) => ({
+                                  ...prev,
+                                  [pageId]: data.data.code,
+                                }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 setEditorContent(
-                                  buildFigmaText(
-                                    data.data.code,
-                                    data.data.schema,
-                                  ),
+                                  buildFigmaText(data.data.code, data.data.schema),
                                 );
                                 setConfigDataMap((prev) => {
                                   if (prev[pageId]) return prev;
@@ -1975,7 +3003,7 @@ ${context.details}
                     )}
                   </div>
                   <div
-                    className="flex-1 overflow-y-auto p-4 preview-single-scroll"
+                    className="relative flex-1 overflow-y-auto p-4 preview-single-scroll"
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                   >
                     <style>{`
@@ -1984,13 +3012,69 @@ ${context.details}
                       }
                     `}</style>
                     <PreviewPanel
-                      code={code}
+                      code={
+                        activeDemoId ? (pageCodes[activeDemoId] ?? "") : code
+                      }
                       sessionId={sessionId}
                       demoId={activeDemoId}
                       configData={configData}
                       previewSize={previewSize}
+                      placeholderScreenshotUrl={
+                        pageScreenshots[activeDemoId]?.screenshotUrl
+                      }
                       onConsoleEntry={handleConsoleEntry}
                       onPositionableSizes={setPositionableItemSizes}
+                      visualEditMode={visualEditMode}
+                      selectedVisualNodeId={
+                        selectedVisualNode?.domPath ||
+                        selectedVisualNode?.nodeId ||
+                        null
+                      }
+                      visualAnnotations={visualAnnotations}
+                      onVisualHover={setHoveredVisualNode}
+                      onVisualSelect={handleVisualSelect}
+                      onVisualInlineEdit={handleVisualInlineEdit}
+                      visualAnnotationMode={visualAnnotationMode}
+                      onVisualAnnotationCreate={(
+                        node,
+                        text,
+                        annotationId,
+                        styleChanges,
+                      ) => {
+                        setSelectedVisualNode(node);
+                        const trimmedText = text?.trim() ?? "";
+                        const hasStyleChanges =
+                          !!styleChanges && styleChanges.length > 0;
+                        if (annotationId && !trimmedText && !hasStyleChanges) {
+                          setVisualAnnotations((prev) =>
+                            prev.filter((annotation) => annotation.id !== annotationId),
+                          );
+                          return;
+                        }
+                        if (trimmedText || hasStyleChanges) {
+                          if (annotationId) {
+                            setVisualAnnotations((prev) =>
+                              prev.map((annotation) =>
+                                annotation.id === annotationId
+                                  ? {
+                                      ...annotation,
+                                      nodeId: node.nodeId,
+                                      domPath: node.domPath,
+                                      text: trimmedText || "样式修改",
+                                      styleChanges,
+                                    }
+                                  : annotation,
+                              ),
+                            );
+                          } else {
+                            handleCreateVisualAnnotation(
+                              trimmedText,
+                              node,
+                              styleChanges,
+                            );
+                          }
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -2025,6 +3109,10 @@ ${context.details}
                             key={`project-${projectConfigSchema}`}
                             schema={projectConfigSchema!}
                             onChange={(data) => {
+                              const affectedPageIds = demoPages.map(
+                                (page) => page.id,
+                              );
+                              invalidatePageScreenshots(affectedPageIds);
                               setConfigDataMap((prev) => {
                                 const next = { ...prev };
                                 for (const pageId of Object.keys(next)) {
@@ -2034,6 +3122,15 @@ ${context.details}
                                   if (!next[page.id]) {
                                     next[page.id] = { ...data };
                                   }
+                                }
+                                for (const page of demoPages) {
+                                  const pageCode = pageCodes[page.id] || code;
+                                  if (!pageCode) continue;
+                                  scheduleScreenshotRegenerate(
+                                    page.id,
+                                    pageCode,
+                                    next[page.id],
+                                  );
                                 }
                                 return next;
                               });
@@ -2052,9 +3149,7 @@ ${context.details}
                       {showPageConfig && (
                         <ConfigScopeWrapper
                           scope="page"
-                          pageName={
-                            demoPages.find((p) => p.id === activeDemoId)?.name
-                          }
+                          pageName={demoPages.find((p) => p.id === activeDemoId)?.name}
                           hideHeader={!hasBothScopes}
                         >
                           <ConfigForm
@@ -2076,6 +3171,136 @@ ${context.details}
           )}
         </ResizablePanelGroup>
       </div>
+
+      <Dialog
+        open={visualConfigDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseVisualConfigDialog();
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>添加配置项</DialogTitle>
+            <DialogDescription>
+              将当前选中的页面元素转换为配置面板中的可编辑字段。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="visual-config-kind">配置内容</Label>
+              <Select
+                value={visualConfigCandidateId}
+                onValueChange={handleVisualConfigCandidateChange}
+              >
+                <SelectTrigger id="visual-config-kind">
+                  <SelectValue placeholder="选择配置内容" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visualConfigCandidates.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="visual-config-title">显示名称</Label>
+                <Input
+                  id="visual-config-title"
+                  value={visualConfigTitle}
+                  onChange={(event) =>
+                    handleVisualConfigTitleChange(event.target.value)
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="visual-config-key">字段 key</Label>
+                <Input
+                  id="visual-config-key"
+                  value={visualConfigFieldKey}
+                  onChange={(event) =>
+                    setVisualConfigFieldKey(event.target.value)
+                  }
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="visual-config-default">默认值</Label>
+              <div className="flex items-center gap-2">
+                {selectedVisualConfigCandidate?.kind === "color" && (
+                  <span
+                    className="h-8 w-8 rounded-md border"
+                    style={{ backgroundColor: visualConfigDefaultValue }}
+                  />
+                )}
+                <Input
+                  id="visual-config-default"
+                  value={visualConfigDefaultValue}
+                  onChange={(event) =>
+                    setVisualConfigDefaultValue(event.target.value)
+                  }
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            {visualConfigNode && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                <div className="truncate">
+                  元素：&lt;{visualConfigNode.tagName}&gt;
+                  {visualConfigNode.className
+                    ? ` .${visualConfigNode.className.split(/\s+/).slice(0, 2).join(".")}`
+                    : ""}
+                </div>
+                {visualConfigNode.textContent && (
+                  <div className="mt-1 truncate">
+                    文本：{visualConfigNode.textContent}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {visualConfigError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {visualConfigError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseVisualConfigDialog}
+              disabled={visualConfigApplying}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={handleApplyVisualConfig}
+              disabled={
+                visualConfigApplying ||
+                !selectedVisualConfigCandidate ||
+                !visualConfigFieldKey.trim() ||
+                !visualConfigTitle.trim()
+              }
+              className="gap-2"
+            >
+              {visualConfigApplying && (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              )}
+              添加
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CoverImageDialog
         open={coverDialogOpen}
@@ -2123,6 +3348,66 @@ ${context.details}
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
+
+      <Dialog
+        open={!!previewVersion}
+        onOpenChange={(open) => {
+          if (!open) setPreviewVersion(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[82vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              页面版本预览
+              {previewVersion ? ` ${previewVersion.version.versionId}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {previewVersion?.version.demoName || activePageName} 的只读历史内容
+            </DialogDescription>
+          </DialogHeader>
+          {previewVersion && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+              <div className="min-h-0">
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  index.tsx
+                </div>
+                <ScrollArea className="h-[46vh] rounded-md border bg-muted/30">
+                  <pre className="p-3 text-xs leading-relaxed whitespace-pre-wrap break-words">
+                    {previewVersion.files.code}
+                  </pre>
+                </ScrollArea>
+              </div>
+              <div className="min-h-0">
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  config.schema.json
+                </div>
+                <ScrollArea className="h-[46vh] rounded-md border bg-muted/30">
+                  <pre className="p-3 text-xs leading-relaxed whitespace-pre-wrap break-words">
+                    {previewVersion.files.schema}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPreviewVersion(null)}>
+              关闭
+            </Button>
+            {previewVersion && (
+              <Button
+                onClick={() => handleRestorePageVersion(previewVersion.version)}
+                disabled={restoring === previewVersion.version.versionId}
+                className="gap-2"
+              >
+                {restoring === previewVersion.version.versionId && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                恢复到此版本
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <DialogContent>

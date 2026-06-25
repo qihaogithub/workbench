@@ -8,6 +8,19 @@ export interface DemoMeta {
   demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
 }
 
+export interface ProjectTemplateMeta {
+  id: string;
+  sourceProjectId: string;
+  category: string;
+  name: string;
+  description: string;
+  thumbnail?: string;
+  demoCount: number;
+  demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DemoFiles {
   code: string;
   schema: string;

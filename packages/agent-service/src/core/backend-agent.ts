@@ -24,8 +24,10 @@ interface BackendWithModelSupport extends IBackendAdapter {
     action: "created" | "modified" | "deleted";
     content?: string;
   }>;
+  getLastResponseDebug?: () => unknown;
   cancelPrompt?: () => void;
   resolvePermission?: (toolCallId: string, approved: boolean) => void;
+  updateConfig?: (config: Partial<AgentConfig>) => void;
 }
 
 export class BackendAgent extends BaseAgent {
@@ -85,10 +87,14 @@ export class BackendAgent extends BaseAgent {
         success: true,
         content: resultContent,
         files: files.length > 0 ? files : undefined,
+        metadata: resultContent
+          ? undefined
+          : { emptyResponseDebug: this.backend.getLastResponseDebug?.() },
       };
     } catch (error) {
       this.busy = false;
       this.setStatus("error");
+      const responseDebug = this.backend.getLastResponseDebug?.();
       return {
         success: false,
         error: {
@@ -96,6 +102,7 @@ export class BackendAgent extends BaseAgent {
           message: error instanceof Error ? error.message : "Unknown error",
           retryable: true,
         },
+        metadata: responseDebug ? { emptyResponseDebug: responseDebug } : undefined,
       };
     }
   }
@@ -143,6 +150,14 @@ export class BackendAgent extends BaseAgent {
     return null;
   }
 
+  getFiles(): Array<{
+    path: string;
+    action: "created" | "modified" | "deleted";
+    content?: string;
+  }> {
+    return this.backend.getFiles?.() || [];
+  }
+
   async updateSystemPrompt(newPrompt: string): Promise<void> {
     if (this.backend.updateSystemPrompt) {
       await this.backend.updateSystemPrompt(newPrompt);
@@ -177,7 +192,13 @@ export class BackendAgent extends BaseAgent {
       changed = true;
     }
 
+    if (config.backendProviders !== undefined) {
+      this.config.backendProviders = config.backendProviders;
+      changed = true;
+    }
+
     if (changed) {
+      this.backend.updateConfig?.(this.config);
       this.lastActivityAt = new Date();
       this.emit("config_updated", {
         type: "config_updated",

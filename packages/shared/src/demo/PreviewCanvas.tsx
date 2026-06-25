@@ -4,6 +4,12 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem } from "./CanvasPageItem";
 import { CanvasToolbar } from "./CanvasToolbar";
+import {
+  computeAutoCanvasLayout,
+  computeFitCanvasViewport,
+  computeInitialCanvasLayout,
+  resolveCanvasPageSize,
+} from "./canvas-layout";
 import { cn } from "./utils";
 import type {
   PreviewCanvasProps,
@@ -13,52 +19,6 @@ import type {
   AlignmentGuide,
   CanvasToolMode,
 } from "./types";
-
-const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
-
-function resolvePageSize(
-  previewSize?: { width?: string | number; height?: string | number },
-): { width: number; height: number } {
-  const w =
-    previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
-  const h =
-    previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
-  return {
-    width: Number.isFinite(w) && w > 0 ? w : DEFAULT_PAGE_SIZE.width,
-    height: Number.isFinite(h) && h > 0 ? h : DEFAULT_PAGE_SIZE.height,
-  };
-}
-
-function computeInitialLayout(
-  pages: PreviewCanvasProps["pages"],
-): Record<string, CanvasPageLayout> {
-  const layout: Record<string, CanvasPageLayout> = {};
-  const cols = 3;
-  const gap = 40;
-
-  let maxColWidth = 0;
-  const pageSizes = pages.map((page) => {
-    const size = resolvePageSize(page.previewSize);
-    if (size.width > maxColWidth) maxColWidth = size.width;
-    return size;
-  });
-
-  pages.forEach((page, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const size = pageSizes[i];
-
-    layout[page.id] = {
-      x: col * (maxColWidth + gap),
-      y: row * (DEFAULT_PAGE_SIZE.height + gap),
-      width: size.width,
-      height: size.height,
-      zIndex: i,
-    };
-  });
-
-  return layout;
-}
 
 function getVisiblePageIds(
   pages: Record<string, CanvasPageLayout>,
@@ -244,13 +204,14 @@ export function PreviewCanvas({
   className,
   editingPageId,
   screenshotUrls,
+  screenshotRenderBoxes,
   onConsoleEntry,
   focusPageId,
   onPositionableSizes,
 }: PreviewCanvasProps) {
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
-    pages: computeInitialLayout(pages),
+    pages: computeInitialCanvasLayout(pages),
   });
 
   // 对齐辅助线状态
@@ -263,7 +224,7 @@ export function PreviewCanvas({
   const canvasState = externalState || internalState;
 
   const effectivePages = useMemo(() => {
-    const baseLayout = computeInitialLayout(pages);
+    const baseLayout = computeInitialCanvasLayout(pages);
     return { ...baseLayout, ...canvasState.pages };
   }, [canvasState.pages, pages]);
 
@@ -382,42 +343,35 @@ export function PreviewCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPageId]);
 
-  // 适应屏幕：计算所有页面的包围盒，调整 zoom 和 pan 使所有页面完整显示
   const handleFitToScreen = useCallback(() => {
-    const pageLayouts = Object.values(effectivePages);
-    if (pageLayouts.length === 0) return;
-    const cw = containerSize.width;
-    const ch = containerSize.height;
-    if (cw === 0 || ch === 0) return;
+    const viewport = computeFitCanvasViewport(effectivePages, {
+      containerWidth: containerSize.width,
+      containerHeight: containerSize.height,
+    });
+    if (!viewport) return;
 
-    // 计算包围盒
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const p of pageLayouts) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x + p.width);
-      maxY = Math.max(maxY, p.y + p.height);
-    }
-    const bboxW = maxX - minX;
-    const bboxH = maxY - minY;
-    if (bboxW === 0 || bboxH === 0) return;
-
-    // 留 10% 边距
-    const zoom = Math.min(cw / bboxW, ch / bboxH) * 0.9;
-    const clampedZoom = Math.min(Math.max(zoom, 0.05), 3);
-
-    // 居中
-    const cx = minX + bboxW / 2;
-    const cy = minY + bboxH / 2;
     updateState((prev) => ({
       ...prev,
-      viewport: {
-        x: cw / 2 - cx * clampedZoom,
-        y: ch / 2 - cy * clampedZoom,
-        zoom: clampedZoom,
-      },
+      viewport,
     }));
   }, [effectivePages, containerSize, updateState]);
+
+  const handleAutoLayout = useCallback(() => {
+    const arrangedPages = computeAutoCanvasLayout(pages, {
+      currentLayout: effectivePages,
+    });
+    const nextViewport =
+      computeFitCanvasViewport(arrangedPages, {
+        containerWidth: containerSize.width,
+        containerHeight: containerSize.height,
+      }) ?? canvasState.viewport;
+
+    updateState((prev) => ({
+      ...prev,
+      pages: arrangedPages,
+      viewport: nextViewport,
+    }));
+  }, [canvasState.viewport, containerSize, effectivePages, pages, updateState]);
 
   return (
     <div
@@ -435,11 +389,12 @@ export function PreviewCanvas({
           }
           onReset={() =>
             updateState((prev) => ({
-              pages: computeInitialLayout(pages),
+              pages: computeInitialCanvasLayout(pages),
               viewport: { x: 40, y: 40, zoom: 0.5 },
             }))
           }
           onFitToScreen={handleFitToScreen}
+          onAutoLayout={handleAutoLayout}
           toolMode={toolMode}
           onToolModeChange={setToolMode}
         />
@@ -465,7 +420,7 @@ export function PreviewCanvas({
             layout={
               effectivePages[page.id] ||
               (() => {
-                const size = resolvePageSize(page.previewSize);
+                const size = resolveCanvasPageSize(page.previewSize);
                 return { x: 0, y: 0, width: size.width, height: size.height };
               })()
             }
@@ -475,6 +430,7 @@ export function PreviewCanvas({
             visible={visiblePageIds.has(page.id)}
             sessionId={sessionId}
             screenshotUrl={screenshotUrls?.[page.id]}
+            screenshotRenderBox={screenshotRenderBoxes?.[page.id]}
             onLayoutChange={handleLayoutChange}
             onConfigEdit={onPageConfigEdit}
             onConsoleEntry={onConsoleEntry}

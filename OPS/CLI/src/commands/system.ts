@@ -15,7 +15,9 @@ import type { SystemCheckResult, HealthStatus } from "../types.js";
 
 const BACKENDS: string[] = []; // Pi Agent 已内置，无需检查外部 CLI
 const PROJECT_ROOT = join(import.meta.dirname, "../../../../");
-const CHECK_PORTS = [3101, 3000];
+const AGENT_SERVICE_PORT = 3201;
+const AUTHOR_SITE_PORT = 3200;
+const CHECK_PORTS = [AGENT_SERVICE_PORT, AUTHOR_SITE_PORT];
 
 export async function systemCheck(
   baseUrl: string,
@@ -32,7 +34,7 @@ export async function systemCheck(
     },
     agentService: {
       running: false,
-      port: 3101,
+      port: AGENT_SERVICE_PORT,
       pid: null,
       processCommand: null,
       healthOk: null,
@@ -58,13 +60,15 @@ export async function systemCheck(
 
   // Pi Agent 已内置于 agent-service，无需检查外部 CLI
 
-  const port3101 = await checkPortInUse(3101);
-  const process3101 = port3101 ? await getProcessOnPort(3101) : null;
-  result.agentService.running = port3101;
-  result.agentService.pid = process3101?.pid || null;
-  result.agentService.processCommand = process3101?.command || null;
+  const agentServiceInUse = await checkPortInUse(AGENT_SERVICE_PORT);
+  const agentServiceProcess = agentServiceInUse
+    ? await getProcessOnPort(AGENT_SERVICE_PORT)
+    : null;
+  result.agentService.running = agentServiceInUse;
+  result.agentService.pid = agentServiceProcess?.pid || null;
+  result.agentService.processCommand = agentServiceProcess?.command || null;
 
-  if (port3101) {
+  if (agentServiceInUse) {
     try {
       const healthResp = await fetch(`${baseUrl.replace(/\/+$/, "")}/health`);
       if (healthResp.ok) {
@@ -234,7 +238,7 @@ function detectIssues(result: SystemCheckResult): string[] {
     issues.push("Node.js 未安装或不在 PATH 中");
   if (!result.runtime.pnpm.available) issues.push("pnpm 未安装或不在 PATH 中");
   if (!result.agentService.running)
-    issues.push("Agent Service 未运行 (端口 3101 未监听)");
+    issues.push(`Agent Service 未运行 (端口 ${AGENT_SERVICE_PORT} 未监听)`);
   if (result.agentService.running && !result.agentService.healthOk)
     issues.push("Agent Service 运行中但健康检查失败");
   if (!result.project.packageJsonExists)

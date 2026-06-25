@@ -15,7 +15,7 @@ pnpm dev:agent
 
 等待服务启动,应该看到类似输出:
 ```
-Agent Service running on http://localhost:3101
+Agent Service running on http://localhost:3201
 ```
 
 ### 步骤 2: 检查服务状态
@@ -39,7 +39,7 @@ npx tsx src/index.ts health
   运行时间: 2m 15s
   活跃 Agent 数量: 0
 
-服务地址: http://localhost:3101
+服务地址: http://localhost:3201
 ```
 
 ### 步骤 3: 发送测试消息
@@ -197,17 +197,17 @@ npx tsx src/index.ts diagnose "your-session-id" -m "测试"
 npx tsx src/index.ts stream "new-session-$(date +%s)" "测试消息"
 ```
 
-### 可能原因 2: Agent 后端不可用
+### 可能原因 2: Pi Agent 配置不可用
 
-**检查 opencode CLI 是否可用:**
+**检查模型供应商配置是否可用:**
 ```bash
-# 在终端运行
-opencode --help
+# 检查 agent-service 配置和模型列表
+npx tsx src/index.ts models
 ```
 
 **如果不可用:**
-- 安装 opencode CLI
-- 或在 agent-service 配置中使用其他后端(claude, codex 等)
+- 检查 `PI_AGENT_PROVIDER` / `PI_AGENT_MODEL` / `PI_AGENT_API_KEY`
+- 查看 agent-service 日志确认模型供应商错误
 
 ### 可能原因 3: 工作目录问题
 

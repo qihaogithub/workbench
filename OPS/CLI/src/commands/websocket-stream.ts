@@ -16,7 +16,7 @@ export async function testWebSocketStream(
   baseUrl: string,
   options: WebSocketStreamOptions,
 ): Promise<void> {
-  const { sessionId, message, workingDir, backend, model, timeout, wait = true } = options;
+  const { sessionId, message, workingDir, model, timeout, wait = true } = options;
 
   console.log(chalk.cyan("\n=== WebSocket 流式测试 ===\n"));
   console.log(chalk.gray(`会话 ID: ${sessionId}`));
@@ -26,7 +26,7 @@ export async function testWebSocketStream(
     ),
   );
   if (workingDir) console.log(chalk.gray(`工作目录: ${workingDir}`));
-  if (backend) console.log(chalk.gray(`后端类型: ${backend}`));
+  console.log(chalk.gray("Agent 引擎: pi-agent"));
   if (model) console.log(chalk.gray(`模型: ${model}`));
   console.log(chalk.gray(`超时时间: ${timeout || 120000}ms`));
   console.log(chalk.gray(`等待完成: ${wait}`));
@@ -63,7 +63,6 @@ export async function testWebSocketStream(
         id: `cli-msg-${Date.now()}`,
         content: message,
         workingDir,
-        backend,
         model,
         options: {
           timeout,
@@ -195,7 +194,6 @@ export async function testWebSocketStream(
             console.log(chalk.yellow("\n可能的原因:"));
             if (event.error?.message?.includes("No active session")) {
               console.log(chalk.yellow("  - Session 未正确初始化"));
-              console.log(chalk.yellow("  - ACP 连接可能已断开"));
               console.log(chalk.yellow("  - 尝试使用新的 sessionId 重试"));
             } else if (event.error?.message?.includes("INTERNAL_ERROR")) {
               console.log(chalk.yellow("  - 服务器内部错误"));

@@ -290,11 +290,20 @@ export function PreviewPanel({
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
+  placeholderScreenshotUrl,
   fillContainer = false,
   onConsoleEntry,
   onContentHeightChange,
   effectiveHeight,
   onPositionableSizes,
+  visualEditMode = false,
+  visualAnnotationMode = false,
+  selectedVisualNodeId,
+  visualAnnotations = [],
+  onVisualHover,
+  onVisualSelect,
+  onVisualInlineEdit,
+  onVisualAnnotationCreate,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -311,8 +320,21 @@ export function PreviewPanel({
     useState<CompileResult | null>(null);
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
   const [contentLoaded, setContentLoaded] = useState(false);
+  const [placeholderFailed, setPlaceholderFailed] = useState(false);
 
   const isUrlMode = !!compiledJsUrl;
+  const visualEditStateRef = useRef({
+    enabled: visualEditMode,
+    annotationMode: visualAnnotationMode,
+    selectedNodeId: selectedVisualNodeId ?? null,
+    annotations: visualAnnotations,
+  });
+  visualEditStateRef.current = {
+    enabled: visualEditMode,
+    annotationMode: visualAnnotationMode,
+    selectedNodeId: selectedVisualNodeId ?? null,
+    annotations: visualAnnotations,
+  };
 
   const validCode = code ? isValidCode(code) : true;
 
@@ -389,6 +411,24 @@ export function PreviewPanel({
     iframe.contentWindow.postMessage({ type: "COLLECT_POSITIONABLE_SIZES" }, "*");
   }, []);
 
+  const sendVisualEditState = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    const state = visualEditStateRef.current;
+    iframe.contentWindow.postMessage(
+      {
+        type: "UPDATE_VISUAL_EDIT_STATE",
+        enabled: state.enabled,
+        annotationMode: state.annotationMode,
+        selectedNodeId: state.selectedNodeId,
+        annotations: state.annotations,
+      },
+      "*",
+    );
+  }, []);
+
   useEffect(() => {
     if (isUrlMode) {
       if (!compiledJsUrl) return;
@@ -404,6 +444,14 @@ export function PreviewPanel({
       return;
     }
 
+    if (code !== undefined && !code) {
+      setContentLoaded(false);
+      setIsCompiling(false);
+      setCompileError(null);
+      setRuntimeError(null);
+      return;
+    }
+
     if (!sessionId && (!code || !validCode)) {
       setIsCompiling(false);
       setCompileError(null);
@@ -411,6 +459,7 @@ export function PreviewPanel({
     }
 
     let cancelled = false;
+    setContentLoaded(false);
     setIsCompiling(true);
     setCompileError(null);
     setRuntimeError(null);
@@ -419,7 +468,7 @@ export function PreviewPanel({
       try {
         // 先检查编译缓存
         if (sessionId && demoId) {
-          const cached = getCachedCompile(sessionId, demoId);
+          const cached = getCachedCompile(sessionId, demoId, code);
           if (cached) {
             const compileResult: CompileResult = cached;
             setLastSuccessfulResult(compileResult);
@@ -462,7 +511,7 @@ export function PreviewPanel({
 
         // 写入编译缓存
         if (sessionId && demoId) {
-          setCachedCompile(sessionId, demoId, compileResult);
+          setCachedCompile(sessionId, demoId, compileResult, code);
         }
 
         const currentConfig = configDataRef.current || {};
@@ -550,6 +599,7 @@ export function PreviewPanel({
           } else if (lastSuccessfulResult) {
             sendUpdateCode(lastSuccessfulResult, configData || {});
           }
+          sendVisualEditState();
           break;
 
         case "LOADED":
@@ -584,6 +634,31 @@ export function PreviewPanel({
             onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
           }
           break;
+
+        case "VISUAL_HOVER":
+          onVisualHover?.(event.data?.node ?? null);
+          break;
+
+        case "VISUAL_SELECT":
+          onVisualSelect?.(event.data?.node ?? null);
+          break;
+
+        case "VISUAL_INLINE_EDIT":
+          if (event.data?.payload) {
+            onVisualInlineEdit?.(event.data.payload);
+          }
+          break;
+
+        case "VISUAL_ANNOTATION_CREATE":
+          if (event.data?.node) {
+            onVisualAnnotationCreate?.(
+              event.data.node,
+              event.data.text,
+              event.data.annotationId,
+              event.data.styleChanges,
+            );
+          }
+          break;
       }
     };
 
@@ -603,7 +678,17 @@ export function PreviewPanel({
     sendUpdateCode,
     sendUpdateCodeUrl,
     sendCollectPositionableSizes,
+    sendVisualEditState,
+    onVisualHover,
+    onVisualSelect,
+    onVisualInlineEdit,
+    onVisualAnnotationCreate,
   ]);
+
+  useEffect(() => {
+    if (!iframeReadyRef.current) return;
+    sendVisualEditState();
+  }, [visualEditMode, visualAnnotationMode, selectedVisualNodeId, visualAnnotations, sendVisualEditState]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -644,7 +729,7 @@ export function PreviewPanel({
       }
       parent = parent.parentElement;
     }
-  }, [previewSize]);
+  }, [previewSize, demoId]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -665,21 +750,35 @@ export function PreviewPanel({
     fillContainer,
     effectiveHeight,
   );
+  const showPreviewLoading = isCompiling || !contentLoaded;
+  const showPlaceholder =
+    !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;
+  const showLoadingOverlay =
+    showPreviewLoading && !showPlaceholder;
 
   useEffect(() => {
     const html = generateIframeHtml({ supportUrlMode: isUrlMode, baseOrigin: window.location.origin });
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
+    const canCreateObjectUrl = typeof URL.createObjectURL === "function";
+    const url = canCreateObjectUrl
+      ? URL.createObjectURL(blob)
+      : `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
     setIframeSrcUrl(url);
 
     return () => {
-      URL.revokeObjectURL(url);
+      if (canCreateObjectUrl && typeof URL.revokeObjectURL === "function") {
+        URL.revokeObjectURL(url);
+      }
     };
   }, [isUrlMode]);
 
   useEffect(() => {
     setContentLoaded(false);
   }, [iframeSrcUrl]);
+
+  useEffect(() => {
+    setPlaceholderFailed(false);
+  }, [placeholderScreenshotUrl]);
 
   return (
     <>
@@ -692,7 +791,7 @@ export function PreviewPanel({
         </div>
       )}
 
-      {isCompiling && (
+      {isCompiling && !iframeSrcUrl && (
         <div
           className="flex items-center justify-center p-8"
           style={wrapperStyle}
@@ -707,7 +806,7 @@ export function PreviewPanel({
 
       {compileError && !isCompiling && (
         <div
-          className="absolute inset-0 z-10 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
+          className="absolute inset-0 z-30 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
           style={{ maxHeight: "200px", overflow: "auto" }}
         >
           <p className="text-red-800 font-medium">编译错误</p>
@@ -719,7 +818,7 @@ export function PreviewPanel({
 
       {runtimeError && !isCompiling && (
         <div
-          className="absolute inset-0 z-10 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
+          className="absolute inset-0 z-30 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
           style={{ maxHeight: "200px", overflow: "auto" }}
         >
           <p className="text-red-800 font-medium">运行时错误</p>
@@ -735,9 +834,24 @@ export function PreviewPanel({
       >
         {iframeSrcUrl && (
           <div style={{ ...wrapperStyle, marginTop: 0, marginBottom: 0 }} className={fillContainer ? "relative" : "rounded-lg border border-border relative"}>
-            {!contentLoaded && !isCompiling && (
-              <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg">
-                <div className="animate-pulse rounded-full h-8 w-8 border-2 border-muted-foreground/30" />
+            {showPlaceholder && (
+              <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg pointer-events-none overflow-hidden">
+                <img
+                  src={placeholderScreenshotUrl}
+                  alt="preview placeholder"
+                  className="max-w-full max-h-full object-contain"
+                  draggable={false}
+                  onError={() => setPlaceholderFailed(true)}
+                />
+              </div>
+            )}
+            {showLoadingOverlay && (
+              <div className="absolute inset-0 z-20 bg-muted/30 flex items-center justify-center rounded-lg">
+                <div
+                  role="status"
+                  aria-label="预览加载中"
+                  className="animate-spin rounded-full h-8 w-8 border-2 border-muted-foreground/30 border-b-muted-foreground"
+                />
               </div>
             )}
             <iframe

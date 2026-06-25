@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { CodeEditor } from "./CodeEditor";
-import { MemoryMarkdownEditor } from "./MemoryMarkdownEditor";
+import { DocumentEditor } from "@opencode-workbench/shared/demo";
 import { getFileLanguage, getFileEditorType } from "@/lib/workspace-file-utils";
 
 interface WorkspaceCodeDialogProps {
@@ -113,10 +113,11 @@ export function WorkspaceCodeDialog({
 
         <div className="flex-1 min-h-0 flex flex-col border rounded-md overflow-hidden">
           {editorType === "markdown" ? (
-            <MemoryMarkdownEditor
+            <DocumentEditor
               key={filePath}
               value={editContent}
               onChange={handleChange}
+              format="markdown"
               readOnly={!editable}
             />
           ) : (

@@ -2,12 +2,15 @@ import fs from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
 import { config } from "../config";
+import { ScreenshotError } from "./errors";
+import type { ScreenshotRenderBox } from "./browser-pool";
 
 export interface ScreenshotMeta {
   currentHash: string;
   generatedAt: string;
   elapsed: number;
   history: string[];
+  renderBoxes?: Record<string, ScreenshotRenderBox>;
 }
 
 export function computeScreenshotHash(
@@ -15,13 +18,16 @@ export function computeScreenshotHash(
   configData: Record<string, unknown>,
   width: number,
   height: number,
+  fullPage = false,
 ): string {
   const input = [
     code,
     JSON.stringify(configData),
     String(width),
     String(height),
+    String(fullPage),
     String(config.snapshotVersion),
+    "render-box-v2",
   ].join(":");
 
   return createHash("sha256").update(input).digest("hex").slice(0, 16);
@@ -100,24 +106,39 @@ export async function writeScreenshot(
   hash: string,
   buffer: Buffer,
   elapsed: number,
+  renderBox: ScreenshotRenderBox,
 ): Promise<void> {
   const dir = getProjectDir(projectId);
   await ensureDir(dir);
 
   const filePath = getScreenshotPath(projectId, pageId, hash);
-  await fs.writeFile(filePath, buffer);
-
-  // Update current symlink/copy
-  const currentPath = getCurrentScreenshotPath(projectId, pageId);
+  const tempPath = `${filePath}.tmp`;
   try {
-    await fs.unlink(currentPath);
-  } catch {
-    // File may not exist
-  }
-  await fs.copyFile(filePath, currentPath);
+    await fs.writeFile(tempPath, buffer);
+    await fs.rename(tempPath, filePath);
 
-  // Update meta
-  await updateMeta(projectId, pageId, hash, elapsed);
+    // Update current copy only after the hash-addressed file is complete.
+    const currentPath = getCurrentScreenshotPath(projectId, pageId);
+    await fs.copyFile(filePath, currentPath);
+
+    await updateMeta(projectId, pageId, hash, elapsed, renderBox);
+  } catch (error) {
+    await fs.unlink(tempPath).catch(() => {});
+    throw new ScreenshotError(
+      "SCREENSHOT_WRITE_ERROR",
+      "截图文件写入失败",
+      error,
+    );
+  }
+}
+
+export async function readScreenshotRenderBox(
+  projectId: string,
+  pageId: string,
+  hash: string,
+): Promise<ScreenshotRenderBox | undefined> {
+  const meta = await readMeta(projectId, pageId);
+  return meta?.renderBoxes?.[hash];
 }
 
 async function readMeta(
@@ -138,6 +159,7 @@ async function updateMeta(
   pageId: string,
   hash: string,
   elapsed: number,
+  renderBox: ScreenshotRenderBox,
 ): Promise<void> {
   const metaPath = getMetaPath(projectId, pageId);
   const dir = getProjectDir(projectId);
@@ -153,12 +175,21 @@ async function updateMeta(
 
   // Keep only the most recent N entries
   const trimmedHistory = history.slice(0, config.maxHistoryFiles);
+  const renderBoxes = Object.fromEntries(
+    trimmedHistory
+      .map((itemHash) => {
+        const box = itemHash === hash ? renderBox : existing?.renderBoxes?.[itemHash];
+        return box ? [itemHash, box] : undefined;
+      })
+      .filter((entry): entry is [string, ScreenshotRenderBox] => Boolean(entry)),
+  );
 
   const meta: ScreenshotMeta = {
     currentHash: hash,
     generatedAt: new Date().toISOString(),
     elapsed,
     history: trimmedHistory,
+    renderBoxes,
   };
 
   await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));

@@ -15,6 +15,7 @@ export interface IBackendAdapter {
   getModelInfo?(): { currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null | Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null>;
   getCurrentSessionId?(): string | null;
   getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
+  getLastResponseDebug?(): unknown;
   setPromptTimeout?(seconds: number): void;
   cancelPrompt?(): void;
   getWorkingDir?(): string | null;

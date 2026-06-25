@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { config } from "../config";
 import type { CompileResult } from "./compile-client";
 
 interface CacheEntry {
@@ -10,16 +11,21 @@ class CompileCache {
   private cache = new Map<string, CacheEntry>();
   private maxEntries: number;
 
-  constructor(maxEntries: number = 200) {
+  constructor(maxEntries: number = config.compileCacheMaxEntries) {
     this.maxEntries = maxEntries;
   }
 
-  private hash(code: string): string {
-    return createHash("sha256").update(code).digest("hex").slice(0, 16);
+  private hash(code: string, cacheScope = "default"): string {
+    return createHash("sha256")
+      .update(cacheScope)
+      .update(":")
+      .update(code)
+      .digest("hex")
+      .slice(0, 16);
   }
 
-  get(code: string): CompileResult | null {
-    const key = this.hash(code);
+  get(code: string, cacheScope?: string): CompileResult | null {
+    const key = this.hash(code, cacheScope);
     const entry = this.cache.get(key);
     if (entry) {
       // Move to end (LRU)
@@ -30,8 +36,8 @@ class CompileCache {
     return null;
   }
 
-  set(code: string, result: CompileResult): void {
-    const key = this.hash(code);
+  set(code: string, result: CompileResult, cacheScope?: string): void {
+    const key = this.hash(code, cacheScope);
 
     // Evict oldest if at capacity
     if (this.cache.size >= this.maxEntries && !this.cache.has(key)) {

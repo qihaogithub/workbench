@@ -1,7 +1,14 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+  type ComponentType,
+} from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
@@ -20,6 +27,7 @@ import {
   Sparkles,
   RotateCcw,
   Undo2,
+  ListChecks,
 } from "lucide-react";
 import {
   Collapsible,
@@ -29,6 +37,14 @@ import {
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
 import { SplitContentRenderer } from "./split-content-renderer";
 import { type MessagePart } from "./message";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface AssistantMessageProps {
   content?: string;
@@ -56,9 +72,10 @@ interface AssistantMessageProps {
   onRollback?: (targetAssistantId: string) => void;
 }
 
-function getToolKind(toolName?: string): "read" | "edit" | "execute" | "other" {
+function getToolKind(toolName?: string): "read" | "edit" | "execute" | "delegate" | "other" {
   if (!toolName) return "other";
   const name = toolName.toLowerCase();
+  if (name.includes("delegatetask") || name.includes("subagent")) return "delegate";
   if (
     name.includes("read") ||
     name.includes("get") ||
@@ -100,6 +117,7 @@ function getToolIcon(toolKind: string) {
   if (toolKind === "read") return Eye;
   if (toolKind === "edit") return Edit3;
   if (toolKind === "execute") return Terminal;
+  if (toolKind === "delegate") return Sparkles;
   return Wrench;
 }
 
@@ -107,14 +125,21 @@ function getToolGroupLabel(toolKind: string): string {
   if (toolKind === "read") return "读取文件";
   if (toolKind === "edit") return "编辑文件";
   if (toolKind === "execute") return "执行命令";
+  if (toolKind === "delegate") return "子 Agent";
   return "工具操作";
 }
 
 function getToolActionText(part: ToolPart): string {
   const name = (part.toolName || "").toLowerCase();
+  const task = part.parameters?.task;
   const path = (part.parameters?.path || part.parameters?.file_path) as
     | string
     | undefined;
+  if (name.includes("delegatetask") || name.includes("subagent")) {
+    return typeof task === "string" && task.trim()
+      ? `委派子 Agent：${task.trim()}`
+      : "委派子 Agent";
+  }
   if (
     name.includes("read") ||
     name.includes("search") ||
@@ -140,6 +165,171 @@ function getToolActionText(part: ToolPart): string {
     return "执行命令";
   }
   return part.toolName || "未知操作";
+}
+
+function isDelegateTask(part: ToolPart): boolean {
+  return getToolKind(part.toolName) === "delegate";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractResultText(result: unknown): string | undefined {
+  if (typeof result === "string") return result;
+  if (!isRecord(result)) return undefined;
+
+  const content = result.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const text = content
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (isRecord(item) && typeof item.text === "string") return item.text;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    return text || undefined;
+  }
+
+  return undefined;
+}
+
+function getSubagentDetails(part: ToolPart): Record<string, unknown> | undefined {
+  const directDetails = isRecord(part.details) ? part.details : undefined;
+  if (!isRecord(part.result)) return directDetails;
+  if (isRecord(part.result.details)) return part.result.details;
+  if (
+    "success" in part.result ||
+    "durationMs" in part.result ||
+    "files" in part.result
+  ) {
+    return part.result;
+  }
+  return directDetails;
+}
+
+function formatDuration(durationMs?: number): string | undefined {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+    return undefined;
+  }
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
+function getFilePath(file: unknown): string | undefined {
+  if (typeof file === "string") return file;
+  if (!isRecord(file)) return undefined;
+  const path = file.path ?? file.filePath ?? file.name;
+  return typeof path === "string" ? path : undefined;
+}
+
+function maskSensitivePayload(value: unknown, depth = 0): unknown {
+  if (depth > 6) return "[MaxDepth]";
+  if (typeof value === "string") {
+    return value.length > 4000 ? `${value.slice(0, 4000)}\n...[truncated]` : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => maskSensitivePayload(item, depth + 1));
+  }
+  if (!isRecord(value)) return value;
+
+  const masked: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    const lower = key.toLowerCase();
+    if (
+      lower.includes("apikey") ||
+      lower.includes("api_key") ||
+      lower.includes("token") ||
+      lower.includes("authorization") ||
+      lower.includes("password") ||
+      lower.includes("secret")
+    ) {
+      masked[key] = "[REDACTED]";
+    } else {
+      masked[key] = maskSensitivePayload(item, depth + 1);
+    }
+  }
+  return masked;
+}
+
+function formatPayload(payload: unknown): string {
+  if (payload === undefined) return "";
+  try {
+    return JSON.stringify(maskSensitivePayload(payload), null, 2);
+  } catch {
+    return String(payload);
+  }
+}
+
+type SubagentDisplayStatus =
+  | "running"
+  | "returned"
+  | "completed"
+  | "error"
+  | "aborted"
+  | "timeout";
+
+function getSubagentDisplay(part: ToolPart, isMessageStreaming = false) {
+  const details = getSubagentDetails(part);
+  const task =
+    typeof part.parameters?.task === "string" && part.parameters.task.trim()
+      ? part.parameters.task.trim()
+      : "子 Agent 任务";
+  const context =
+    typeof part.parameters?.context === "string" && part.parameters.context.trim()
+      ? part.parameters.context.trim()
+      : undefined;
+  const success = typeof details?.success === "boolean" ? details.success : undefined;
+  const content =
+    (typeof details?.content === "string" && details.content) ||
+    extractResultText(part.result);
+  const error =
+    (typeof details?.error === "string" && details.error) ||
+    (part.status === "error" ? content : undefined);
+  const files = Array.isArray(details?.files) ? details.files : [];
+  const durationMs =
+    typeof details?.durationMs === "number"
+      ? details.durationMs
+      : typeof part.duration === "number"
+        ? part.duration
+        : undefined;
+  const lowerFailure = `${error ?? ""} ${content ?? ""}`.toLowerCase();
+
+  let status: SubagentDisplayStatus = "completed";
+  if (part.status === "running") status = "running";
+  else if (part.status === "completed" && isMessageStreaming) status = "returned";
+  else if (success === true) status = "completed";
+  else if (lowerFailure.includes("timed out") || lowerFailure.includes("timeout")) {
+    status = "timeout";
+  } else if (lowerFailure.includes("aborted") || lowerFailure.includes("abort")) {
+    status = "aborted";
+  } else if (part.status === "error" || success === false) {
+    status = "error";
+  }
+
+  return {
+    task,
+    context,
+    status,
+    content,
+    error,
+    files,
+    durationText: formatDuration(durationMs),
+  };
+}
+
+function getSubagentStatusText(status: SubagentDisplayStatus): string {
+  if (status === "running") return "运行中";
+  if (status === "returned") return "待主 Agent 汇总";
+  if (status === "completed") return "已完成";
+  if (status === "timeout") return "超时未完成";
+  if (status === "aborted") return "已取消";
+  return "执行失败";
 }
 
 export function AssistantMessage({
@@ -393,6 +583,16 @@ export function AssistantMessage({
 
         if (block.type === "tool-single") {
           const part = block.part;
+          if (isDelegateTask(part)) {
+            return (
+              <SubagentTaskBlock
+                key={`tool-single-${index}`}
+                part={part}
+                isMessageStreaming={isStreaming}
+              />
+            );
+          }
+
           const toolKind = getToolKind(part.toolName);
           const Icon = getToolIcon(toolKind);
           const actionText = getToolActionText(part);
@@ -412,6 +612,20 @@ export function AssistantMessage({
         }
 
         if (block.type === "tool-group") {
+          if (block.toolKind === "delegate") {
+            return (
+              <div key={`tool-group-${index}`} className="space-y-1">
+                {block.parts.map((part, partIndex) => (
+                  <SubagentTaskBlock
+                    key={`delegate-${part.toolCallId || partIndex}`}
+                    part={part}
+                    isMessageStreaming={isStreaming}
+                  />
+                ))}
+              </div>
+            );
+          }
+
           const Icon = getToolIcon(block.toolKind);
           const label = getToolGroupLabel(block.toolKind);
           const hasRunning = block.parts.some((p) => p.status === "running");
@@ -454,15 +668,10 @@ export function AssistantMessage({
         return null;
       })}
 
-      {isStreaming && renderBlocks.length > 0 && (
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5">
-          <span className="inline-flex items-center gap-0.5">
-            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="h-1 w-1 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-          </span>
-          <span>AI 工作中</span>
-        </div>
+      {isStreaming && (
+        <RunProgressPanel
+          isStreaming={isStreaming}
+        />
       )}
 
       {allTextContent && (
@@ -510,7 +719,7 @@ function ToolCallGroup({
   parts,
   isRunning,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   count: number;
   parts: ToolPart[];
@@ -551,6 +760,170 @@ function ToolCallGroup({
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function SubagentTaskBlock({
+  part,
+  isMessageStreaming = false,
+}: {
+  part: ToolPart;
+  isMessageStreaming?: boolean;
+}) {
+  const display = getSubagentDisplay(part, isMessageStreaming);
+  const statusText = getSubagentStatusText(display.status);
+  const filePaths = display.files.map(getFilePath).filter(Boolean) as string[];
+  const isRunning = display.status === "running";
+  const isReturned = display.status === "returned";
+  const isFailed =
+    display.status === "error" ||
+    display.status === "timeout" ||
+    display.status === "aborted";
+  const summaryParts = [statusText];
+
+  if (display.durationText) summaryParts.push(display.durationText);
+  if (filePaths.length > 0) summaryParts.push(`修改 ${filePaths.length} 个文件`);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button className="flex w-full items-center gap-2 rounded-md border border-border/30 bg-muted/20 px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted/40 min-w-0">
+          <Sparkles
+            className={cn(
+              "h-3.5 w-3.5 flex-shrink-0",
+              isRunning && "animate-pulse text-yellow-500",
+              isReturned && "text-blue-500",
+              !isRunning && !isReturned && !isFailed && "text-green-500",
+              isFailed && "text-red-500",
+            )}
+          />
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            <span className="font-medium text-foreground/80">
+              {isRunning ? "子 Agent 正在处理" : "委派子 Agent"}
+            </span>
+            ：{display.task}
+          </span>
+          <span
+            className={cn(
+              "hidden flex-shrink-0 text-[11px] sm:inline",
+              isRunning && "text-yellow-600",
+              isReturned && "text-blue-600",
+              !isRunning && !isReturned && !isFailed && "text-green-600",
+              isFailed && "text-red-600",
+            )}
+          >
+            {summaryParts.join(" · ")}
+          </span>
+          {isRunning && (
+            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/60" />
+          )}
+          <ChevronDown className="h-3 w-3 -rotate-90 text-muted-foreground/40 flex-shrink-0" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[82vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">子 Agent 任务详情</DialogTitle>
+          <DialogDescription className="text-xs">
+            查看委派任务、输出摘要、文件变更和原始事件详情。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-xs">
+          <SubagentDetail label="委派任务" value={display.task} />
+          {display.context && (
+            <SubagentDetail label="补充上下文" value={display.context} />
+          )}
+          <SubagentDetail
+            label="状态"
+            value={[
+              statusText,
+              display.durationText,
+              filePaths.length > 0 ? `修改 ${filePaths.length} 个文件` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          />
+          {display.content && (
+            <SubagentDetail
+              label={isFailed ? "失败信息" : "子 Agent 摘要"}
+              value={display.content}
+              markdown
+            />
+          )}
+          {!display.content && display.error && (
+            <SubagentDetail label="失败原因" value={display.error} />
+          )}
+          {filePaths.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10px] font-medium text-muted-foreground">
+                文件变更
+              </div>
+              <ul className="space-y-1">
+                {filePaths.map((path, index) => (
+                  <li
+                    key={`${path}-${index}`}
+                    className="truncate rounded bg-background/50 px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                    title={path}
+                  >
+                    {path}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <SubagentDetail
+            label="原始详情"
+            value={formatPayload(part.details ?? part.result ?? {})}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SubagentDetail({
+  label,
+  value,
+  markdown = false,
+}: {
+  label: string;
+  value: string;
+  markdown?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-medium text-muted-foreground">
+        {label}
+      </div>
+      <div className="min-w-0 rounded bg-background/50 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
+        {markdown ? (
+          <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
+            {value}
+          </Streamdown>
+        ) : (
+          <span className="break-words">{value}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RunProgressPanel({
+  isStreaming,
+}: {
+  isStreaming: boolean;
+}) {
+  if (!isStreaming) return null;
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-border/35 bg-muted/15 px-3 py-2 text-xs">
+      <ListChecks className="h-3.5 w-3.5 flex-shrink-0 animate-pulse text-muted-foreground" />
+      <span className="font-medium text-foreground/80">AI 正在处理</span>
+      <span className="inline-flex items-center gap-1 text-muted-foreground/60">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+      </span>
+    </div>
   );
 }
 
@@ -602,10 +975,16 @@ function ExecutionPhase({
   }, [isStreaming, isComplete]);
 
   const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
-  const toolCount = parts.filter((p) => p.type === "tool").length;
+  const delegateCount = parts.filter(
+    (p) => p.type === "tool" && isDelegateTask(p),
+  ).length;
+  const toolCount = parts.filter(
+    (p) => p.type === "tool" && !isDelegateTask(p),
+  ).length;
 
   const summaryParts: string[] = [];
   if (reasoningCount > 0) summaryParts.push(`${reasoningCount} 次思考`);
+  if (delegateCount > 0) summaryParts.push(`${delegateCount} 个子 Agent`);
   if (toolCount > 0) summaryParts.push(`${toolCount} 次工具调用`);
 
   const hasRunning = parts.some(
@@ -614,21 +993,25 @@ function ExecutionPhase({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1.5 py-1.5 text-xs transition-colors select-none min-w-0 group/phase">
-        <Wrench className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
-        <span className="text-muted-foreground/60 truncate">
-          执行过程（{summaryParts.join("、")}）
-        </span>
-        {hasRunning && (
-          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/50" />
-        )}
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/phase:text-muted-foreground/50",
-            open && "rotate-180",
-          )}
-        />
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-1.5 py-1.5 text-xs">
+        <CollapsibleTrigger asChild>
+          <button className="group/phase flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors select-none">
+            <Wrench className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+            <span className="text-muted-foreground/60 truncate">
+              执行过程（{summaryParts.join("、")}）
+            </span>
+            {hasRunning && (
+              <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-muted-foreground/50" />
+            )}
+            <ChevronDown
+              className={cn(
+                "h-3 w-3 text-muted-foreground/30 transition-transform duration-200 flex-shrink-0 group-hover/phase:text-muted-foreground/50",
+                open && "rotate-180",
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
+      </div>
       <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
         <div className="relative">
           <div
@@ -657,6 +1040,16 @@ function ExecutionPhase({
               }
 
               if (part.type === "tool") {
+                if (isDelegateTask(part)) {
+                  return (
+                    <SubagentTaskBlock
+                      key={`exec-subagent-${i}`}
+                      part={part}
+                      isMessageStreaming={isStreaming}
+                    />
+                  );
+                }
+
                 const toolKind = getToolKind(part.toolName);
                 const Icon = getToolIcon(toolKind);
                 const actionText = getToolActionText(part);

@@ -8,9 +8,17 @@ import { Input } from "@/components/ui/input";
 import { DemoCard } from "@/components/demo/demo-card";
 import { CreateDemoDialog } from "@/components/demo/create-demo-dialog";
 import { DeleteConfirmDialog } from "@/components/demo/delete-confirm-dialog";
-import { useDemos, createDemo, deleteDemo } from "@/lib/api";
-import { useToast } from "@/components/ui/toast-provider";
+import { SaveTemplateDialog } from "@/components/demo/save-template-dialog";
 import { SettingsButton } from "@/components/settings/settings-button";
+import { useToast } from "@/components/ui/toast-provider";
+import {
+  createDemo,
+  deleteDemo,
+  recommendProjectTemplate,
+  saveDemoAsTemplate,
+  useDemos,
+  useProjectTemplates,
+} from "@/lib/api";
 import type { DemoMeta } from "@opencode-workbench/shared";
 
 export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
@@ -18,11 +26,13 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const { demos, error, revalidate } = useDemos({
     fallbackData: initialDemos,
   });
+  const { templates, revalidate: revalidateTemplates } = useProjectTemplates();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null);
+  const [templateTarget, setTemplateTarget] = useState<DemoMeta | null>(null);
 
   const filteredDemos = useMemo(() => {
     if (!searchQuery) return demos;
@@ -72,12 +82,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demos]);
 
-  const handleCreate = async (name: string) => {
-    const response = await createDemo(name);
+  const handleCreate = async (input: { name: string; templateId?: string }) => {
+    const response = await createDemo(input.name, input.templateId);
     if (response.success) {
       toast({
         title: "创建成功",
-        description: `Demo「${name}」已创建`,
+        description: `项目「${input.name}」已创建`,
       });
       router.push(`/demo/${response.data.id}/edit`);
     } else {
@@ -89,6 +99,37 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     }
   };
 
+  const handleSaveTemplate = async (input: {
+    category: string;
+    name: string;
+    description: string;
+  }) => {
+    if (!templateTarget) return;
+
+    const response = await saveDemoAsTemplate(templateTarget.id, input);
+    if (response.success) {
+      toast({
+        title: "保存成功",
+        description: `模板「${input.name}」已创建`,
+      });
+      revalidateTemplates();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "保存失败",
+        description: response.error.message,
+      });
+    }
+    setTemplateTarget(null);
+  };
+
+  const handleRecommendTemplate = async (description: string) => {
+    const response = await recommendProjectTemplate(description);
+    if (response.success) return response.data;
+
+    throw new Error(response.error.message);
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
@@ -96,7 +137,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     if (response.success) {
       toast({
         title: "删除成功",
-        description: `Demo「${deleteTarget.name}」已删除`,
+        description: `项目「${deleteTarget.name}」已删除`,
       });
       revalidate();
     } else {
@@ -111,10 +152,10 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
-          <p className="text-destructive text-lg">加载失败</p>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-lg text-destructive">加载失败</p>
+          <p className="mt-2 text-muted-foreground">
             {error instanceof Error ? error.message : "未知错误"}
           </p>
           <Button onClick={() => revalidate()} className="mt-4">
@@ -129,9 +170,8 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center px-4">
-          {/* 左侧品牌标识 */}
-          <div className="flex items-center gap-2 mr-8">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-sm">
+          <div className="mr-8 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 shadow-sm">
               <span className="text-sm font-bold text-primary-foreground">
                 UI
               </span>
@@ -141,19 +181,17 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
             </span>
           </div>
 
-          {/* 搜索框 - 居中 */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="搜索项目..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 h-10 bg-muted/50 border-0 rounded-lg focus-visible:ring-2 focus-visible:ring-ring transition-all"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="h-10 rounded-lg border-0 bg-muted/50 pl-9 pr-4 transition-all focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
-          {/* 右侧操作区 */}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Button
               onClick={() => setIsCreateDialogOpen(true)}
               size="sm"
@@ -167,16 +205,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         </div>
       </header>
 
-      <main className="container py-8 px-4 space-y-8">
+      <main className="container space-y-8 px-4 py-8">
         {filteredDemos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
               <Plus className="h-8 w-8 text-muted-foreground" />
             </div>
-            <div className="text-muted-foreground text-lg">
+            <div className="text-lg text-muted-foreground">
               {searchQuery ? "没有找到匹配的项目" : "暂无项目"}
             </div>
-            <div className="text-muted-foreground/70 text-sm mt-1">
+            <div className="mt-1 text-sm text-muted-foreground/70">
               {searchQuery ? "尝试其他关键词" : "点击「添加项目」开始创建"}
             </div>
             {!searchQuery && (
@@ -190,12 +228,13 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredDemos.map((demo) => (
               <DemoCard
                 key={demo.id}
                 demo={demo}
                 onDelete={() => setDeleteTarget(demo)}
+                onSaveAsTemplate={() => setTemplateTarget(demo)}
               />
             ))}
           </div>
@@ -204,7 +243,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         <CreateDemoDialog
           open={isCreateDialogOpen}
           onOpenChange={setIsCreateDialogOpen}
+          templates={templates}
           onCreate={handleCreate}
+          onRecommendTemplate={handleRecommendTemplate}
+        />
+
+        <SaveTemplateDialog
+          open={!!templateTarget}
+          onOpenChange={(open) => !open && setTemplateTarget(null)}
+          demo={templateTarget}
+          onSave={handleSaveTemplate}
         />
 
         <DeleteConfirmDialog

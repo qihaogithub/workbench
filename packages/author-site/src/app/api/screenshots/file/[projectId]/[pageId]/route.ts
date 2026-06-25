@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+
 import { findProjectRoot } from "@/lib/fs-utils";
+import { fetchScreenshotService } from "@/lib/screenshot-service";
 
 const DATA_DIR =
   process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
@@ -9,6 +11,11 @@ const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
 
 interface ScreenshotMeta {
   currentHash: string;
+}
+
+function normalizeHash(hash?: string | null): string | null {
+  if (!hash) return null;
+  return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
 }
 
 function readScreenshotMeta(
@@ -24,50 +31,94 @@ function readScreenshotMeta(
   }
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { projectId: string; pageId: string } },
-) {
-  const { projectId, pageId } = params;
-
-  const projectDir = path.join(SCREENSHOTS_DIR, projectId);
-  if (!fs.existsSync(projectDir)) {
-    return NextResponse.json(
-      { success: false, error: { code: "NOT_FOUND", message: "截图目录不存在" } },
-      { status: 404 },
-    );
-  }
-
-  // 优先通过 meta.json 读取当前版本
-  const meta = readScreenshotMeta(projectId, pageId);
-  let filePath: string;
-
-  if (meta?.currentHash) {
-    filePath = path.join(projectDir, `${pageId}.${meta.currentHash}.png`);
-  } else {
-    // 回退：直接读取当前版本文件
-    filePath = path.join(projectDir, `${pageId}.png`);
-  }
-
-  if (!fs.existsSync(filePath)) {
-    return NextResponse.json(
-      { success: false, error: { code: "NOT_FOUND", message: "截图文件不存在" } },
-      { status: 404 },
-    );
-  }
-
+async function proxyScreenshotFile(
+  projectId: string,
+  pageId: string,
+  search: string,
+): Promise<Response | null> {
   try {
-    const buffer = fs.readFileSync(filePath);
-    return new NextResponse(buffer, {
+    const response = await fetchScreenshotService(
+      `/api/screenshots/file/${encodeURIComponent(
+        projectId,
+      )}/${encodeURIComponent(pageId)}${search}`,
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
       headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600",
+        "Content-Type":
+          response.headers.get("Content-Type") || "application/json",
+        "Cache-Control":
+          response.headers.get("Cache-Control") || "public, max-age=3600",
       },
     });
   } catch {
+    return null;
+  }
+}
+
+function readLocalScreenshot(
+  projectId: string,
+  pageId: string,
+  hash?: string | null,
+): Buffer | null {
+  const projectDir = path.join(SCREENSHOTS_DIR, projectId);
+  if (!fs.existsSync(projectDir)) return null;
+
+  const normalizedHash = normalizeHash(hash);
+  if (hash && !normalizedHash) return null;
+
+  const filePath = normalizedHash
+    ? path.join(projectDir, `${pageId}.${normalizedHash}.png`)
+    : (() => {
+        const meta = readScreenshotMeta(projectId, pageId);
+        return meta?.currentHash
+          ? path.join(projectDir, `${pageId}.${meta.currentHash}.png`)
+          : path.join(projectDir, `${pageId}.png`);
+      })();
+
+  try {
+    return fs.readFileSync(filePath);
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { projectId: string; pageId: string } },
+) {
+  const { projectId, pageId } = params;
+  const proxied = await proxyScreenshotFile(
+    projectId,
+    pageId,
+    request.nextUrl.search,
+  );
+  if (proxied) return proxied;
+
+  const rawHash = request.nextUrl.searchParams.get("hash");
+  const hash = normalizeHash(rawHash);
+  const buffer = readLocalScreenshot(projectId, pageId, rawHash);
+  if (!buffer) {
     return NextResponse.json(
-      { success: false, error: { code: "FILE_READ_ERROR", message: "截图文件读取失败" } },
-      { status: 500 },
+      {
+        success: false,
+        error: { code: "NOT_FOUND", message: "Screenshot file not found" },
+      },
+      { status: 404 },
     );
   }
+
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": hash
+        ? "public, max-age=31536000, immutable"
+        : "no-store",
+    },
+  });
 }

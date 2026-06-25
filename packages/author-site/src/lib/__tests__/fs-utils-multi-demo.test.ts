@@ -93,31 +93,30 @@ describe("多 Demo 页面 — fs-utils", () => {
     });
     afterEach(() => cleanup(ws));
 
-    it("空目录时应创建默认页面，返回 demoIds 与 defaultDemoMeta", () => {
+    it("空目录时只初始化 workspace 清单，不创建默认页面", () => {
       const result = ensureWorkspaceFiles(ws);
-      expect(result.demoIds).toHaveLength(1);
-      expect(result.defaultDemoMeta).toBeDefined();
-      expect(result.defaultDemoMeta?.name).toBe("默认页面");
-      expect(result.defaultDemoMeta?.order).toBe(0);
+      expect(result.demoIds).toEqual([]);
+      expect(result.defaultDemoMeta).toBeUndefined();
 
-      const demoId = result.demoIds[0];
-      const demoDir = path.join(ws, "demos", demoId);
-      expect(fs.existsSync(path.join(demoDir, "index.tsx"))).toBe(true);
-      expect(fs.existsSync(path.join(demoDir, "config.schema.json"))).toBe(
-        true,
-      );
+      expect(fs.readdirSync(path.join(ws, "demos"))).toEqual([]);
       expect(fs.existsSync(path.join(ws, "workspace-tree.json"))).toBe(true);
     });
 
     it("已存在 demo 时不重复创建默认页面", () => {
-      // 第一次创建默认页面
-      const first = ensureWorkspaceFiles(ws);
-      const firstId = first.demoIds[0];
+      const demoId = "existing_page";
+      const demoDir = path.join(ws, "demos", demoId);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(demoDir, "index.tsx"),
+        "export default function Page() { return null; }",
+        "utf-8",
+      );
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      writeDemoPageMeta(ws, demoId, { name: "已有页面", order: 0 });
 
-      // 再次调用：返回现有 demoIds，无 defaultDemoMeta
-      const second = ensureWorkspaceFiles(ws);
-      expect(second.demoIds).toEqual([firstId]);
-      expect(second.defaultDemoMeta).toBeUndefined();
+      const result = ensureWorkspaceFiles(ws);
+      expect(result.demoIds).toEqual([demoId]);
+      expect(result.defaultDemoMeta).toBeUndefined();
     });
 
     it("不完整的 demo 子目录（缺少 index.tsx）应被忽略", () => {
@@ -133,9 +132,9 @@ describe("多 Demo 页面 — fs-utils", () => {
       );
 
       const result = ensureWorkspaceFiles(ws);
-      expect(result.demoIds).toHaveLength(1);
+      expect(result.demoIds).toEqual([]);
       expect(result.demoIds).not.toContain(brokenId);
-      expect(result.defaultDemoMeta).toBeDefined();
+      expect(result.defaultDemoMeta).toBeUndefined();
     });
   });
 

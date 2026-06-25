@@ -14,6 +14,8 @@ interface PermissionRequestData {
     toolCallId: string
     title?: string
     kind?: string
+    summary?: string
+    planId?: string
   }
 }
 
@@ -22,6 +24,7 @@ interface PermissionDialogProps {
   onRespond: (optionId: string) => void
   onCancel: () => void
   className?: string
+  variant?: 'modal' | 'inline'
 }
 
 export function PermissionDialog({
@@ -29,6 +32,7 @@ export function PermissionDialog({
   onRespond,
   onCancel,
   className,
+  variant = 'modal',
 }: PermissionDialogProps) {
   const getToolKindLabel = (kind?: string) => {
     const kindMap: Record<string, string> = {
@@ -41,13 +45,19 @@ export function PermissionDialog({
 
   const toolLabel = getToolKindLabel(request.toolCall.kind)
   const toolTitle = request.toolCall.title || request.toolCall.toolCallId
+  const isInline = variant === 'inline'
 
   return (
     <div className={cn(
-      'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm',
+      isInline
+        ? 'px-4 py-2'
+        : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm',
       className
     )}>
-      <div className="bg-background rounded-lg shadow-xl max-w-md w-full mx-4 border">
+      <div className={cn(
+        'bg-background rounded-lg border',
+        isInline ? 'w-full shadow-sm' : 'shadow-xl max-w-md w-full mx-4',
+      )}>
         {/* 头部 */}
         <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/50">
           <div className="p-2 rounded-full bg-yellow-500/10">
@@ -72,8 +82,21 @@ export function PermissionDialog({
               <p className="text-xs text-muted-foreground">
                 工具调用 ID: {request.toolCall.toolCallId}
               </p>
+              {request.toolCall.planId && (
+                <p className="text-xs text-muted-foreground">
+                  删除计划: {request.toolCall.planId}
+                </p>
+              )}
             </div>
           </div>
+
+          {request.toolCall.summary && (
+            <div className="max-h-48 overflow-auto rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground font-sans">
+                {request.toolCall.summary}
+              </pre>
+            </div>
+          )}
 
           <div className="space-y-2">
             <p className="text-xs font-medium">请选择操作:</p>

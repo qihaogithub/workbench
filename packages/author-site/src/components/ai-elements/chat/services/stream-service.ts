@@ -6,9 +6,48 @@ import {
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
 import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix, buildKnowledgeIndexPrefix } from "@/lib/agent/system-prompt";
+import {
+  buildActiveViewContextPrefix,
+  type ActiveViewContext,
+} from "@/lib/agent/active-view-context";
 
-// v3.2: 静态 system prompt 缓存在 module 顶部
-const STATIC_SYSTEM_PROMPT = buildStaticSystemPrompt();
+export interface ToolCapabilities {
+  toolVersion: number;
+  toolNames: string[];
+}
+
+export class MissingTransactionalDeleteToolsError extends Error {
+  constructor() {
+    super("Agent Service 版本过旧或当前会话未加载事务化删除工具。请重启 agent-service 并刷新创作端页面后再试。");
+    this.name = "MissingTransactionalDeleteToolsError";
+  }
+}
+
+function isBulkPageDeletionRequest(message: string): boolean {
+  return /删|删除|清理/.test(message) &&
+    /页面|页/.test(message) &&
+    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message);
+}
+
+function hasTransactionalDeleteTools(capabilities: ToolCapabilities | null): boolean {
+  const tools = new Set(capabilities?.toolNames || []);
+  return tools.has("previewDeletePages") && tools.has("executeDeletePagePlan");
+}
+
+async function fetchToolCapabilities(): Promise<ToolCapabilities | null> {
+  try {
+    const { getAgentClient } = await import("@/lib/agent-client");
+    const response = await getAgentClient().getToolCapabilities();
+    if (!response.success || !response.data) {
+      console.warn("[StreamService] getToolCapabilities 返回失败:", response);
+      return null;
+    }
+    return response.data;
+  } catch (error) {
+    console.warn("[StreamService] getToolCapabilities 失败:", error);
+    return null;
+  }
+}
 
 /**
  * 异步获取 L3 上下文前缀和 L4 记忆内容（通过服务端 API 避免客户端打包 fs）
@@ -53,6 +92,8 @@ export interface PermissionRequest {
     toolCallId: string;
     title?: string;
     kind?: string;
+    summary?: string;
+    planId?: string;
   };
 }
 
@@ -81,7 +122,15 @@ export interface StreamEventHandlers {
   onPermission?: (request: PermissionRequest) => void;
   onFileOperation?: (operation: FileOperation) => void;
   onFinish?: (result: StreamResult) => void;
-  onError?: (error: { message: string; code?: string }) => void;
+  onError?: (error: {
+    message: string;
+    code?: string;
+    files?: Array<{
+      path: string;
+      action: "created" | "modified" | "deleted";
+      content?: string;
+    }>;
+  }) => void;
   onConnectionError?: () => void;
 }
 
@@ -154,15 +203,25 @@ export class StreamService {
     workingDir?: string,
     images?: ImageAttachment[],
     demoId?: string,
+    activeViewContext?: ActiveViewContext,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
     }
 
+    const toolCapabilities = await fetchToolCapabilities();
+    if (isBulkPageDeletionRequest(message) && !hasTransactionalDeleteTools(toolCapabilities)) {
+      throw new MissingTransactionalDeleteToolsError();
+    }
+    const systemPrompt = buildStaticSystemPrompt({
+      toolNames: toolCapabilities?.toolNames || [],
+    });
+
     // v3.2: 异步获取 L3 上下文 + L4 记忆（通过服务端 API）→ 拼到 user content 前面
     // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
     // L4 记忆仅在首条消息注入
-    let finalContent = message;
+    const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
+    let finalContent = activeViewPrefix ? `${activeViewPrefix}${message}` : message;
     if (workingDir) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
       let ctx = await fetchContextPrefix(workingDir);
@@ -180,7 +239,7 @@ export class StreamService {
         if (memoryPrefix) {
           this.hasInjectedMemory = true;
         }
-        finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${message}`;
+        finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${activeViewPrefix}${message}`;
       } else {
         console.warn(
           "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态"
@@ -193,7 +252,7 @@ export class StreamService {
       workingDir,
       demoId,
       images,
-      systemPrompt: STATIC_SYSTEM_PROMPT,
+      systemPrompt,
     } as any);
   }
 
@@ -306,7 +365,11 @@ export class StreamService {
         toolCallId: event.toolCallId || "",
         toolCallStatus: event.toolCallStatus,
         content: event.content,
+        result: event.result,
+        details: event.details,
+        durationMs: event.durationMs,
         error: event.error,
+        timestamp: event.timestamp,
       };
       this.handlers.onToolUpdate?.(update);
     });
@@ -350,6 +413,7 @@ export class StreamService {
         this.handlers.onError?.({
           message: event.error?.message || "Model error",
           code: event.error?.code,
+          files: event.files,
         });
         return;
       }
@@ -365,6 +429,7 @@ export class StreamService {
         this.handlers.onError?.({
           message: errorMessage,
           code: event.error?.code,
+          files: event.files,
         });
         this.close();
         return;
@@ -373,6 +438,7 @@ export class StreamService {
       this.handlers.onError?.({
         message: errorMessage,
         code: event.error?.code,
+        files: event.files,
       });
     });
   }

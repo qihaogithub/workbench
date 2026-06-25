@@ -21,7 +21,7 @@ program
   .name("ops-cli")
   .description("CLI 诊断工具 - 测试与诊断 AI Agent 服务")
   .version("2.1.0")
-  .option("-u, --url <url>", "Agent Service 地址", "http://localhost:3101")
+  .option("-u, --url <url>", "Agent Service 地址", "http://localhost:3201")
   .option("--json", "以 JSON 格式输出（供 Agent 程序化解析）");
 
 function getJsonMode(): boolean {
@@ -56,7 +56,6 @@ program
   .description("通过 HTTP API 发送消息(非流式)")
   .option("-d, --demo-id <demoId>", "Demo ID")
   .option("-w, --working-dir <dir>", "工作目录路径")
-  .option("-b, --backend <backend>", "Agent 后端类型", "pi-agent")
   .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .action(async (sessionId, message, options) => {
@@ -67,7 +66,6 @@ program
         message,
         demoId: options.demoId,
         workingDir: options.workingDir,
-        backend: options.backend,
         model: options.model,
         timeout: parseInt(options.timeout),
       },
@@ -82,7 +80,6 @@ program
   .command("stream <sessionId> [message]")
   .description("通过 WebSocket 测试流式响应")
   .option("-w, --working-dir <dir>", "工作目录路径")
-  .option("-b, --backend <backend>", "Agent 后端类型", "pi-agent")
   .option("-m, --model <modelId>", "模型 ID")
   .option("-t, --timeout <ms>", "超时时间(毫秒)", "120000")
   .option("--no-wait", "发送消息后立即退出,不等待响应完成")
@@ -91,7 +88,6 @@ program
       sessionId,
       message: message || "你好",
       workingDir: options.workingDir,
-      backend: options.backend,
       model: options.model,
       timeout: parseInt(options.timeout),
       wait: options.wait,

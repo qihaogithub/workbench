@@ -52,6 +52,16 @@ export interface VersionInfo {
 }
 
 /**
+ * 页面级版本信息。
+ *
+ * 页面级快照只包含单个 Demo 页面的 index.tsx 与 config.schema.json。
+ */
+export interface PageVersionInfo extends VersionInfo {
+  demoId: string;
+  demoName?: string;
+}
+
+/**
  * Demo 页面元数据
  *
  * 持久化在 workspace/workspace-tree.json 的 pages 数组中。
@@ -109,6 +119,7 @@ export interface Project {
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
   demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
   versions: VersionInfo[];     // 版本历史（最多 50 个）
+  pageVersions?: Record<string, PageVersionInfo[]>; // demoId -> 页面级版本历史
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
@@ -282,6 +293,34 @@ export interface VersionHistoryResponse {
   currentVersion: string;      // 当前最新版本
   versions: VersionInfo[];     // 版本列表（倒序）
   totalVersions: number;       // 总版本数
+}
+
+export interface PageVersionHistoryResponse {
+  projectId: string;
+  demoId: string;
+  currentVersion: string;
+  versions: PageVersionInfo[];
+  totalVersions: number;
+}
+
+export interface CreatePageVersionRequest {
+  sessionId?: string;
+  note?: string;
+}
+
+export interface RestorePageVersionRequest {
+  versionId: string;
+  sessionId?: string;
+}
+
+export interface RestorePageVersionResponse {
+  success: boolean;
+  newVersionId: string;
+  restoredAt: number;
+  files: {
+    code: string;
+    schema: string;
+  };
 }
 
 /**

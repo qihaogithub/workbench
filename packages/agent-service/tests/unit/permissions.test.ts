@@ -91,7 +91,7 @@ describe('isPathAllowed', () => {
 
 describe('isCommandAllowed', () => {
   it('允许白名单内的命令', () => {
-    expect(isCommandAllowed('npm install foo', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+    expect(isCommandAllowed('node scripts/check.js', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
     expect(isCommandAllowed('ls -la', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
     expect(isCommandAllowed('cat README.md', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
     expect(isCommandAllowed('echo hello', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
@@ -119,8 +119,14 @@ describe('isCommandAllowed', () => {
     expect(isCommandAllowed('wget https://evil.com', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
-  it('允许 npx（白名单内）', () => {
-    expect(isCommandAllowed('npx tsc --noEmit', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+  it('拒绝 npm/npx，避免绕过专用文件工具修改工作区', () => {
+    expect(isCommandAllowed('npm install foo', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isCommandAllowed('npx tsc --noEmit', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+
+  it('拒绝 node eval，避免用脚本绕过专用删除工具', () => {
+    expect(isCommandAllowed('node -e "require(\\"fs\\").rmSync(\\"demos/a\\", { recursive: true })"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isCommandAllowed('node --eval "console.log(1)"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
   it('拒绝空命令', () => {
@@ -133,11 +139,13 @@ describe('isCommandAllowed', () => {
 });
 
 describe('DEFAULT_WORKSPACE_PERMISSIONS', () => {
-  it('包含与 bash-tool.ts 现有 11 个命令一致的白名单', () => {
-    const expectedCommands = ['npm', 'node', 'npx', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo'];
+  it('包含受限 bash 命令白名单', () => {
+    const expectedCommands = ['node', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo'];
     for (const cmd of expectedCommands) {
       expect(DEFAULT_WORKSPACE_PERMISSIONS.allowedCommands).toContain(cmd);
     }
+    expect(DEFAULT_WORKSPACE_PERMISSIONS.allowedCommands).not.toContain('npm');
+    expect(DEFAULT_WORKSPACE_PERMISSIONS.allowedCommands).not.toContain('npx');
   });
 
   it('包含危险命令黑名单（rm/mv/cp/mkdir/sudo/chmod/chown）', () => {

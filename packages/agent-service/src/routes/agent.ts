@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
+import { getSessionModelConfigs } from '../config/session-model-configs';
 import { getSessionStore } from '../session/session-store';
 import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
@@ -10,6 +11,7 @@ import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig } from '../core/types';
 import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@opencode-workbench/shared';
+import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
 
 interface SessionParams {
   sessionId: string;
@@ -64,6 +66,13 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
   const sessionStore = getSessionStore();
 
+  fastify.get('/api/tools/capabilities', async (_request, reply: FastifyReply) => {
+    return reply.send({
+      success: true,
+      data: getWorkbenchToolCapabilities(),
+    });
+  });
+
   fastify.post<{ Params: SessionParams; Body: SendMessageBody }>(
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
@@ -100,6 +109,8 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: request.body.model,
+          toolVersion: getWorkbenchToolCapabilities().toolVersion,
+          backendProviders: getSessionModelConfigs().get(sessionId),
         };
 
         const agent = manager.getOrCreate(sessionId, config);
@@ -198,6 +209,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       consoleBuffer.clear(sessionId);
 
       await manager.destroy(sessionId);
+      getSessionModelConfigs().delete(sessionId);
       sessionStore.delete(sessionId);
 
       return reply.send({

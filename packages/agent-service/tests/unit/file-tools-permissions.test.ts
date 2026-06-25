@@ -61,6 +61,12 @@ describe('createWriteFileTool - 权限感知', () => {
     expect(result.isError).toBeFalsy();
   });
 
+  it('node -e 搴旇鎷掔粷', async () => {
+    const tool = createBashTool(mockConfig);
+    const result = await tool.execute('id', { command: 'node -e "console.log(1)"' } as any);
+    expect(result.isError).toBe(true);
+  });
+
   it('.workspace.json 黑名单应被拒', async () => {
     const tool = createWriteFileTool(mockConfig);
     const result = await tool.execute('id', { path: '.workspace.json', content: '{}' } as any);
@@ -99,7 +105,7 @@ describe('createBashTool - 权限感知', () => {
     vi.clearAllMocks();
   });
 
-  it('白名单命令 npm 应放行', async () => {
+  it('npm 应被拒绝，避免绕过专用工具写入工作区', async () => {
     const { exec } = await import('child_process');
     const execMock = exec as any;
     execMock.mockImplementation((cmd: string, opts: any, cb: any) => {
@@ -107,7 +113,7 @@ describe('createBashTool - 权限感知', () => {
     });
     const tool = createBashTool(mockConfig);
     const result = await tool.execute('id', { command: 'npm install foo' } as any);
-    expect(result.isError).toBeFalsy();
+    expect(result.isError).toBe(true);
   });
 
   it('黑名单命令 rm 应被拒', async () => {
@@ -136,8 +142,14 @@ describe('createWorkbenchTools - permissions 透传', () => {
       },
     };
     const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
-    const tools = createWorkbenchTools(customConfig);
-    expect(tools).toHaveLength(11);
+    const tools = createWorkbenchTools(customConfig, undefined, {
+      subagentRunner: async () => ({
+        success: true,
+        content: 'ok',
+        durationMs: 1,
+      }),
+    });
+    expect(tools).toHaveLength(17);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);

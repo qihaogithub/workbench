@@ -14,9 +14,12 @@ import {
   ServerMessage,
 } from "./ws-event-router";
 import { getSessionStore } from "../session/session-store";
+import { getSessionModelConfigs } from "../config/session-model-configs";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
+import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
+import type { BaseAgent } from "../core/agent";
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
@@ -65,6 +68,22 @@ const connections = new Map<string, ActiveConnection>();
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
 const MESSAGE_TIMEOUT_MS = 300000;
+const MESSAGE_TIMEOUT_CHECK_INTERVAL_MS = 5000;
+
+async function resolveCurrentModelId(agent: BaseAgent | undefined): Promise<string | null> {
+  if (!agent || !("getModelInfo" in agent)) return null;
+
+  const modelInfo = await (
+    agent as {
+      getModelInfo: () =>
+        | { currentModelId: string | null }
+        | null
+        | Promise<{ currentModelId: string | null } | null>;
+    }
+  ).getModelInfo();
+
+  return modelInfo?.currentModelId ?? null;
+}
 
 function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -112,7 +131,10 @@ export async function registerWebSocketRoutes(
         }
       };
 
-      const eventRouter = new WebSocketEventRouter(sessionId, sendMessage);
+      let lastAgentActivityAt = Date.now();
+      const eventRouter = new WebSocketEventRouter(sessionId, sendMessage, () => {
+        lastAgentActivityAt = Date.now();
+      });
 
       const connection: ActiveConnection = {
         socket,
@@ -169,15 +191,15 @@ export async function registerWebSocketRoutes(
 
             try {
               const existingAgent = manager.get(sessionId);
-              const currentModelId = existingAgent && "getModelInfo" in existingAgent
-                ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
-                : null;
+              const currentModelId = await resolveCurrentModelId(existingAgent);
 
               const config: AgentConfig = {
                 sessionId,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                toolVersion: getWorkbenchToolCapabilities().toolVersion,
+                backendProviders: getSessionModelConfigs().get(sessionId),
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -246,11 +268,17 @@ export async function registerWebSocketRoutes(
               });
 
               const messageId = message.id || generateMessageId();
-              eventRouter.startMessage(messageId);
+              eventRouter.startMessage(messageId, {
+                contentLength: message.content.length,
+                workingDir: message.workingDir,
+                demoId: message.demoId,
+                model: config.model,
+              });
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
               try {
+                lastAgentActivityAt = Date.now();
                 const sendPromise = agent.sendMessage(
                   message.content,
                   {
@@ -259,24 +287,41 @@ export async function registerWebSocketRoutes(
                   },
                 );
                 const timeoutPromise = new Promise<AgentResult>((resolve) => {
-                  timeoutHandle = setTimeout(() => {
-                    logger.warn(
-                      { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS },
-                      "Agent sendMessage timed out, cancelling",
+                  const checkTimeout = () => {
+                    const idleMs = Date.now() - lastAgentActivityAt;
+                    if (idleMs >= MESSAGE_TIMEOUT_MS) {
+                      logger.warn(
+                        { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS, idleMs },
+                        "Agent sendMessage idle timed out, cancelling",
+                      );
+                      eventRouter.cancelMessage();
+                      agent.cancel();
+                      const partialFiles =
+                        agent instanceof BackendAgent ? agent.getFiles() : [];
+                      resolve({
+                        success: false,
+                        files: partialFiles.length > 0 ? partialFiles : undefined,
+                        error: {
+                          code: "MESSAGE_TIMEOUT",
+                          message: `消息处理超时（连续 ${Math.round(
+                            MESSAGE_TIMEOUT_MS / 1000,
+                          )}s 无响应），已自动取消`,
+                          retryable: true,
+                        },
+                      });
+                      return;
+                    }
+
+                    timeoutHandle = setTimeout(
+                      checkTimeout,
+                      Math.min(
+                        MESSAGE_TIMEOUT_CHECK_INTERVAL_MS,
+                        Math.max(1000, MESSAGE_TIMEOUT_MS - idleMs),
+                      ),
                     );
-                    eventRouter.cancelMessage();
-                    agent.cancel();
-                    resolve({
-                      success: false,
-                      error: {
-                        code: "MESSAGE_TIMEOUT",
-                        message: `消息处理超时（${Math.round(
-                          MESSAGE_TIMEOUT_MS / 1000,
-                        )}s 无响应），已自动取消`,
-                        retryable: true,
-                      },
-                    });
-                  }, MESSAGE_TIMEOUT_MS);
+                  };
+
+                  timeoutHandle = setTimeout(checkTimeout, MESSAGE_TIMEOUT_MS);
                 });
 
                 const result: AgentResult = await Promise.race([
@@ -288,11 +333,14 @@ export async function registerWebSocketRoutes(
                   eventRouter.cancelMessage();
                 }
 
+                eventRouter.recordFinish(result);
+
                 if (result.success) {
                   sendMessage({
                     type: "finish",
                     id: messageId,
                     sessionId,
+                    content: result.content,
                     files: result.files,
                     metadata: result.metadata,
                   });
@@ -301,6 +349,7 @@ export async function registerWebSocketRoutes(
                     type: "error",
                     id: messageId,
                     sessionId,
+                    files: result.files,
                     error: result.error || {
                       code: "INTERNAL_ERROR",
                       message: "Unknown error",
@@ -318,11 +367,23 @@ export async function registerWebSocketRoutes(
                 getSessionStore().update(sessionId, {
                   status: result.success ? "ready" : "error",
                 });
+              } catch (error) {
+                eventRouter.recordError({
+                  code: "MESSAGE_SEND_ERROR",
+                  message:
+                    error instanceof Error ? error.message : "Unknown error",
+                });
+                throw error;
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
                 eventRouter.finishMessage();
               }
             } catch (error) {
+              eventRouter.recordError({
+                code: "MESSAGE_SEND_ERROR",
+                message:
+                  error instanceof Error ? error.message : "Unknown error",
+              });
               sendMessage({
                 type: "error",
                 id: message.id || "unknown",
@@ -354,15 +415,15 @@ export async function registerWebSocketRoutes(
 
             try {
               const existingAgent = manager.get(resumeSessionId);
-              const currentModelId = existingAgent && "getModelInfo" in existingAgent
-                ? (existingAgent as { getModelInfo: () => { currentModelId: string | null } | null }).getModelInfo()?.currentModelId
-                : null;
+              const currentModelId = await resolveCurrentModelId(existingAgent);
 
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
+                toolVersion: getWorkbenchToolCapabilities().toolVersion,
+                backendProviders: getSessionModelConfigs().get(resumeSessionId),
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -474,12 +535,15 @@ export async function registerWebSocketRoutes(
           case "get_models": {
             try {
               let agent = manager.get(sessionId);
+              const sessionBackendProviders = getSessionModelConfigs().get(sessionId);
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
                   workingDir: message.workingDir || process.cwd(),
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
+                  toolVersion: getWorkbenchToolCapabilities().toolVersion,
+                  backendProviders: sessionBackendProviders,
                 };
                 agent = manager.getOrCreate(sessionId, config);
 
@@ -493,6 +557,14 @@ export async function registerWebSocketRoutes(
                   });
                   await agent.start();
                 }
+              } else if (sessionBackendProviders) {
+                agent = manager.getOrCreate(sessionId, {
+                  ...agent.getConfig(),
+                  workingDir: message.workingDir || agent.getConfig().workingDir,
+                  demoId: message.demoId || agent.getConfig().demoId,
+                  toolVersion: getWorkbenchToolCapabilities().toolVersion,
+                  backendProviders: sessionBackendProviders,
+                });
               }
               if (agent && "getModelInfo" in agent) {
                 const modelInfo = await (
@@ -630,6 +702,7 @@ export async function registerWebSocketRoutes(
               snapshotService.clearSnapshot(session.workingDir);
             }
             consoleBuffer.clear(sessionId);
+            getSessionModelConfigs().delete(sessionId);
             sessionStore.delete(sessionId);
           }
         }

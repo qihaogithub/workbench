@@ -41,6 +41,7 @@ function formatPageList(pages: PageInfo[]): string {
     .map((p) => {
       const lines = [
         `- ${p.name}`,
+        `  - id: \`${p.id}\``,
         `  - index.tsx: \`${p.indexPath}\``,
         `  - config.schema.json: \`${p.schemaPath}\``,
       ];

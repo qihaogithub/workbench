@@ -3,6 +3,7 @@ import fs from "fs";
 import {
   DemoMeta,
   DemoFiles,
+  ProjectTemplateMeta,
   SessionMeta,
   ErrorCodeType,
   ERROR_MESSAGES,
@@ -10,6 +11,7 @@ import {
 import type {
   Project,
   VersionInfo,
+  PageVersionInfo,
   DemoPageMeta,
   DemoFolderMeta,
   MultiDemoFiles,
@@ -32,6 +34,8 @@ const DATA_DIR =
   process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
 const PROJECTS_DIR =
   process.env.PROJECTS_DIR || path.join(DATA_DIR, "projects");
+const TEMPLATES_DIR =
+  process.env.TEMPLATES_DIR || path.join(DATA_DIR, "templates");
 const SESSIONS_DIR =
   process.env.SESSIONS_DIR || path.join(DATA_DIR, "sessions");
 const WORKSPACES_DIR =
@@ -46,6 +50,10 @@ export function getDataDir(): string {
 
 export function getProjectsDir(): string {
   return PROJECTS_DIR;
+}
+
+export function getTemplatesDir(): string {
+  return TEMPLATES_DIR;
 }
 
 export function getSnapshotsDir(): string {
@@ -67,6 +75,9 @@ export function ensureDirsExist(): void {
   if (!fs.existsSync(PROJECTS_DIR)) {
     fs.mkdirSync(PROJECTS_DIR, { recursive: true });
   }
+  if (!fs.existsSync(TEMPLATES_DIR)) {
+    fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
+  }
   if (!fs.existsSync(SESSIONS_DIR)) {
     fs.mkdirSync(SESSIONS_DIR, { recursive: true });
   }
@@ -82,8 +93,20 @@ export function getProjectPath(projectId: string): string {
   return path.join(PROJECTS_DIR, projectId);
 }
 
+export function getTemplatePath(templateId: string): string {
+  return path.join(TEMPLATES_DIR, templateId);
+}
+
 export function getSnapshotPath(projectId: string, versionId: string): string {
   return path.join(SNAPSHOTS_DIR, projectId, versionId);
+}
+
+export function getPageSnapshotPath(
+  projectId: string,
+  demoId: string,
+  versionId: string,
+): string {
+  return path.join(SNAPSHOTS_DIR, projectId, "pages", demoId, versionId);
 }
 
 export function getSessionPath(sessionId: string, projectId?: string): string {
@@ -216,6 +239,153 @@ export function listProjects(): DemoMeta[] {
   }
 
   return projects.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function generateTemplateId(): string {
+  return `tmpl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readTemplateMeta(templateId: string): ProjectTemplateMeta | null {
+  const templateJsonPath = path.join(getTemplatePath(templateId), "template.json");
+  if (!fs.existsSync(templateJsonPath)) return null;
+
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(templateJsonPath, "utf-8"),
+    ) as Partial<ProjectTemplateMeta>;
+    if (
+      !parsed.id ||
+      !parsed.sourceProjectId ||
+      !parsed.category ||
+      !parsed.name ||
+      !parsed.description ||
+      typeof parsed.createdAt !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      id: parsed.id,
+      sourceProjectId: parsed.sourceProjectId,
+      category: parsed.category,
+      name: parsed.name,
+      description: parsed.description,
+      thumbnail: parsed.thumbnail,
+      demoCount: parsed.demoCount ?? parsed.demoPages?.length ?? 0,
+      demoPages: parsed.demoPages,
+      createdAt: parsed.createdAt,
+      updatedAt: parsed.updatedAt ?? parsed.createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function listProjectTemplates(): ProjectTemplateMeta[] {
+  ensureDirsExist();
+
+  const templates: ProjectTemplateMeta[] = [];
+  const entries = fs.readdirSync(TEMPLATES_DIR, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const meta = readTemplateMeta(entry.name);
+    if (meta) templates.push(meta);
+  }
+
+  return templates.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function resolveProjectWorkspacePath(projectId: string, workspacePath?: string): string | null {
+  const candidates = [
+    workspacePath,
+    path.join(getProjectPath(projectId), "workspace"),
+    workspacePath ? findWorkspacePath(workspacePath) : null,
+  ].filter((item): item is string => Boolean(item));
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function shouldCopyWorkspaceEntry(sourceRoot: string, sourcePath: string): boolean {
+  const relative = path.relative(sourceRoot, sourcePath);
+  if (!relative) return true;
+
+  const segments = relative.split(path.sep);
+  return !segments.some((segment) =>
+    segment === "node_modules" ||
+    segment === ".next" ||
+    segment === ".opencode" ||
+    segment === ".git"
+  );
+}
+
+function copyWorkspaceSnapshot(sourcePath: string, targetPath: string): void {
+  fs.cpSync(sourcePath, targetPath, {
+    recursive: true,
+    filter: (source) => shouldCopyWorkspaceEntry(sourcePath, source),
+  });
+}
+
+export function saveProjectAsTemplate(
+  projectId: string,
+  input: { category: string; name: string; description: string },
+): ProjectTemplateMeta {
+  ensureDirsExist();
+
+  const project = readProjectMeta(projectId);
+  if (!project || !projectExists(projectId)) {
+    throw new Error("PROJECT_NOT_FOUND");
+  }
+
+  const category = input.category.trim();
+  const name = input.name.trim();
+  const description = input.description.trim();
+  if (!category || !name || !description) {
+    throw new Error("INVALID_REQUEST");
+  }
+
+  const sourceWorkspacePath = resolveProjectWorkspacePath(
+    projectId,
+    project.workspacePath,
+  );
+  if (!sourceWorkspacePath) {
+    throw new Error("FILE_READ_ERROR");
+  }
+
+  const templateId = generateTemplateId();
+  const templatePath = getTemplatePath(templateId);
+  const templateWorkspacePath = path.join(templatePath, "workspace");
+  fs.mkdirSync(templatePath, { recursive: true });
+  copyWorkspaceSnapshot(sourceWorkspacePath, templateWorkspacePath);
+
+  const now = Date.now();
+  const demoPages = listDemoPages(templateWorkspacePath);
+  const template: ProjectTemplateMeta = {
+    id: templateId,
+    sourceProjectId: projectId,
+    category,
+    name,
+    description,
+    thumbnail: project.thumbnail,
+    demoCount: demoPages.length,
+    demoPages,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  fs.writeFileSync(
+    path.join(templatePath, "template.json"),
+    JSON.stringify(template, null, 2),
+    "utf-8",
+  );
+
+  return template;
 }
 
 const DEFAULT_DEMO_CODE = `import React from 'react';
@@ -941,27 +1111,10 @@ export function ensureWorkspaceFiles(workspacePath: string): {
     return { demoIds: existing };
   }
 
-  // 仓库为空：创建默认页面
-  const demoId = generateDemoPageId("Default Page");
-  const demoDir = path.join(demosDir, demoId);
-  fs.mkdirSync(demoDir, { recursive: true });
-  fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
-  fs.writeFileSync(
-    path.join(demoDir, "config.schema.json"),
-    DEFAULT_DEMO_SCHEMA,
-    "utf-8",
-  );
+  // 空项目只初始化目录与清单，不再自动创建默认页面。
+  readWorkspaceTree(workspacePath);
 
-  const meta: DemoPageMeta = {
-    id: demoId,
-    name: "默认页面",
-    order: 0,
-    parentId: null,
-  };
-
-  writeWorkspaceTree(workspacePath, { folders: [], pages: [meta] });
-
-  return { demoIds: [demoId], defaultDemoMeta: meta };
+  return { demoIds: [] };
 }
 
 /**
@@ -999,7 +1152,63 @@ function ensureKnowledgeDir(workspacePath: string): void {
   );
 }
 
-export function createProject(name: string): DemoMeta {
+function createProjectFromTemplate(name: string, templateId: string): DemoMeta {
+  ensureDirsExist();
+
+  const template = readTemplateMeta(templateId);
+  const templatePath = getTemplatePath(templateId);
+  const templateWorkspacePath = path.join(templatePath, "workspace");
+  if (!template || !fs.existsSync(templateWorkspacePath)) {
+    throw new Error("TEMPLATE_NOT_FOUND");
+  }
+
+  const projectId = `proj_${Date.now()}`;
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, "workspace");
+  fs.mkdirSync(projectPath, { recursive: true });
+  copyWorkspaceSnapshot(templateWorkspacePath, workspacePath);
+
+  ensureWorkspaceFiles(workspacePath);
+
+  const now = Date.now();
+  const demoPages = listDemoPages(workspacePath);
+  const project: Project = {
+    id: projectId,
+    name: name || template.name || projectId,
+    description: template.description,
+    workspacePath,
+    demoPages,
+    demoFolders: readWorkspaceTree(workspacePath).folders,
+    versions: [],
+    createdAt: now,
+    updatedAt: now,
+    thumbnail: template.thumbnail,
+  };
+
+  fs.writeFileSync(
+    path.join(projectPath, "project.json"),
+    JSON.stringify(project, null, 2),
+    "utf-8",
+  );
+
+  const stats = fs.statSync(projectPath);
+
+  return {
+    id: projectId,
+    name: project.name,
+    createdAt: stats.birthtimeMs,
+    updatedAt: stats.mtimeMs,
+    thumbnail: project.thumbnail,
+    demoCount: demoPages.length,
+    demoPages,
+  };
+}
+
+export function createProject(name: string, templateId?: string): DemoMeta {
+  if (templateId) {
+    return createProjectFromTemplate(name, templateId);
+  }
+
   ensureDirsExist();
 
   const projectId = `proj_${Date.now()}`;
@@ -1207,6 +1416,12 @@ export function readProjectMeta(projectId: string): Project | null {
       demoPages,
       demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
+      pageVersions:
+        parsed.pageVersions &&
+        typeof parsed.pageVersions === "object" &&
+        !Array.isArray(parsed.pageVersions)
+          ? parsed.pageVersions
+          : {},
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
     } as Project;
@@ -1243,7 +1458,15 @@ export function countFiles(dir: string): number {
 }
 
 export function generateVersionId(project: Project): string {
-  return `v${project.versions.length + 1}`;
+  const pageVersions = Object.values(project.pageVersions ?? {}).flat();
+  const maxVersion = [...project.versions, ...pageVersions].reduce(
+    (max, version) => {
+      const match = /^v(\d+)$/.exec(version.versionId);
+      return match ? Math.max(max, Number(match[1])) : max;
+    },
+    0,
+  );
+  return `v${maxVersion + 1}`;
 }
 
 export function cleanupOldVersions(project: Project): void {
@@ -1277,6 +1500,180 @@ export function getLatestVersion(projectId: string): VersionInfo | null {
   const project = readProjectMeta(projectId);
   if (!project || project.versions.length === 0) return null;
   return project.versions[project.versions.length - 1];
+}
+
+export function getPageVersionHistory(
+  projectId: string,
+  demoId: string,
+): PageVersionInfo[] {
+  const project = readProjectMeta(projectId);
+  if (!project) return [];
+  return [...(project.pageVersions?.[demoId] ?? [])].reverse();
+}
+
+export function readPageVersionFiles(
+  projectId: string,
+  demoId: string,
+  versionId: string,
+): DemoFiles | null {
+  const project = readProjectMeta(projectId);
+  const version = project?.pageVersions?.[demoId]?.find(
+    (item) => item.versionId === versionId,
+  );
+  if (!version || !fs.existsSync(version.snapshotPath)) return null;
+
+  const codePath = path.join(version.snapshotPath, "index.tsx");
+  const schemaPath = path.join(version.snapshotPath, "config.schema.json");
+  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+
+  return {
+    code: fs.readFileSync(codePath, "utf-8"),
+    schema: fs.readFileSync(schemaPath, "utf-8"),
+  };
+}
+
+export function createPageVersionSnapshot(
+  projectId: string,
+  demoId: string,
+  username?: string,
+  note?: string,
+  sourceWorkspacePath?: string,
+): { success: boolean; version?: PageVersionInfo; error?: string } {
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: "项目不存在" };
+  }
+
+  const workspacePath = path.join(getProjectPath(projectId), "workspace");
+  const snapshotSourceWorkspace = sourceWorkspacePath || workspacePath;
+  const demoDir = getDemoDirPath(snapshotSourceWorkspace, demoId);
+  const codePath = path.join(demoDir, "index.tsx");
+  const schemaPath = path.join(demoDir, "config.schema.json");
+
+  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) {
+    return { success: false, error: "页面文件不存在" };
+  }
+
+  const versionId = generateVersionId(project);
+  const snapshotPath = getPageSnapshotPath(projectId, demoId, versionId);
+  fs.mkdirSync(snapshotPath, { recursive: true });
+  fs.copyFileSync(codePath, path.join(snapshotPath, "index.tsx"));
+  fs.copyFileSync(schemaPath, path.join(snapshotPath, "config.schema.json"));
+
+  const demoMeta =
+    readDemoPageMeta(snapshotSourceWorkspace, demoId) ??
+    readDemoPageMeta(workspacePath, demoId) ??
+    project.demoPages.find((page) => page.id === demoId);
+  const versionInfo: PageVersionInfo = {
+    versionId,
+    demoId,
+    demoName: demoMeta?.name,
+    savedAt: Date.now(),
+    savedBy: username || "未知用户",
+    sessionId: `page-${demoId}`,
+    snapshotPath,
+    fileCount: 2,
+    note,
+  };
+
+  project.pageVersions = project.pageVersions ?? {};
+  project.pageVersions[demoId] = [
+    ...(project.pageVersions[demoId] ?? []),
+    versionInfo,
+  ];
+
+  if (project.pageVersions[demoId].length > MAX_VERSIONS_KEEP) {
+    const toDelete = project.pageVersions[demoId].slice(
+      0,
+      project.pageVersions[demoId].length - MAX_VERSIONS_KEEP,
+    );
+    for (const version of toDelete) {
+      if (fs.existsSync(version.snapshotPath)) {
+        fs.rmSync(version.snapshotPath, { recursive: true, force: true });
+      }
+    }
+    project.pageVersions[demoId] = project.pageVersions[demoId].slice(
+      -MAX_VERSIONS_KEEP,
+    );
+  }
+
+  project.updatedAt = Date.now();
+  writeProjectMeta(projectId, project);
+  return { success: true, version: versionInfo };
+}
+
+export function restorePageVersion(
+  projectId: string,
+  demoId: string,
+  versionId: string,
+  username?: string,
+): {
+  success: boolean;
+  newVersionId?: string;
+  restoredAt?: number;
+  files?: DemoFiles;
+  error?: string;
+} {
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: "项目不存在" };
+  }
+
+  const targetVersion = project.pageVersions?.[demoId]?.find(
+    (version) => version.versionId === versionId,
+  );
+  if (!targetVersion) {
+    return { success: false, error: `页面版本 ${versionId} 不存在` };
+  }
+
+  const files = readPageVersionFiles(projectId, demoId, versionId);
+  if (!files) {
+    return { success: false, error: `页面版本快照已丢失: ${versionId}` };
+  }
+
+  const workspacePath = path.join(getProjectPath(projectId), "workspace");
+  const demoDir = getDemoDirPath(workspacePath, demoId);
+  if (!fs.existsSync(demoDir)) {
+    return { success: false, error: "目标页面不存在" };
+  }
+
+  fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+  fs.writeFileSync(
+    path.join(demoDir, "config.schema.json"),
+    files.schema,
+    "utf-8",
+  );
+
+  const newVersionId = generateVersionId(project);
+  const snapshotPath = getSnapshotPath(projectId, newVersionId);
+  fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+  fs.cpSync(workspacePath, snapshotPath, {
+    recursive: true,
+    filter: (src: string) => !src.includes("node_modules"),
+  });
+
+  const restoredAt = Date.now();
+  const projectVersion: VersionInfo = {
+    versionId: newVersionId,
+    savedAt: restoredAt,
+    savedBy: username || "未知用户",
+    sessionId: `restore-page-${demoId}-${versionId}`,
+    snapshotPath,
+    fileCount: countFiles(workspacePath),
+    note: `从页面 ${targetVersion.demoName || demoId} 的历史版本 ${versionId} 恢复`,
+  };
+
+  project.versions.push(projectVersion);
+  project.updatedAt = restoredAt;
+  cleanupOldVersions(project);
+  writeProjectMeta(projectId, project);
+
+  return {
+    success: true,
+    newVersionId,
+    restoredAt,
+    files,
+  };
 }
 
 // ========================================

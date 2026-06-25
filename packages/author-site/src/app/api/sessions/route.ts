@@ -11,8 +11,30 @@ import {
   getWorkspaceMultiDemoFiles,
   getWorkspaceFiles,
 } from "@/lib/fs-utils";
-import { findActiveSession, createEditSession, archiveActiveSession, enforceSessionLimit } from "@/lib/session-manager";
+import {
+  archiveActiveSession,
+  createEditSession,
+  enforceSessionLimit,
+  findActiveSession,
+} from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { pushSessionModelConfigToAgent } from "@/lib/agent-providers";
+import { getModelConfig } from "@/lib/model-config";
+import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
+
+async function pushUserModelConfig(userId: string, sessionId: string): Promise<void> {
+  const globalConfig = await getModelConfig();
+  const config = readUserBackendProvidersConfig(
+    userId,
+    globalConfig.backendProviders,
+  );
+  if (!config) return;
+
+  const result = await pushSessionModelConfigToAgent(sessionId, config);
+  if (!result.ok) {
+    console.warn("[sessions] Failed to push user model config:", result.message);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +69,8 @@ export async function POST(request: NextRequest) {
 
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
+      await pushUserModelConfig(userId, activeSessionId);
+
       const meta = getSessionMeta(activeSessionId);
       let code = "";
       let schema = "";
@@ -90,6 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createEditSession(userId, projectId, workspaceId);
+    await pushUserModelConfig(userId, result.sessionId);
     enforceSessionLimit(userId, projectId, 5);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {

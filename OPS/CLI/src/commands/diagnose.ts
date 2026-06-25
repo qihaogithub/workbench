@@ -299,7 +299,7 @@ function analyzeError(
     return {
       problem: "Session 未正确初始化",
       possibleCauses: [
-        "ACP 连接建立但 createSession 失败",
+        "Pi Agent 会话初始化失败",
         "Session 超时或失效",
         "Pi Agent 未正确响应",
       ],
@@ -317,7 +317,7 @@ function analyzeError(
       problem: "服务器内部错误",
       possibleCauses: [
         "Agent 处理消息时抛出异常",
-        "子进程崩溃",
+        "Pi Agent 运行时异常",
         "资源不足 (内存/磁盘)",
       ],
       solutions: [
@@ -332,8 +332,8 @@ function analyzeError(
   if (message?.includes("ECONNREFUSED")) {
     return {
       problem: "连接被拒绝",
-      possibleCauses: ["CLI 子进程未启动", "端口被占用", "防火墙阻止"],
-      solutions: ["确认相关 CLI 已安装", "检查端口占用情况", "检查防火墙设置"],
+      possibleCauses: ["Agent Service 未启动", "端口被占用", "防火墙阻止"],
+      solutions: ["启动 agent-service", "检查端口占用情况", "检查防火墙设置"],
     };
   }
 

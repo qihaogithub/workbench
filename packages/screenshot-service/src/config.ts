@@ -20,6 +20,19 @@ export const config = {
   },
   maxConcurrentPages: 3,
   screenshotTimeout: 15000,
+  screenshotQueueTimeout: parseInt(
+    process.env.SCREENSHOT_QUEUE_TIMEOUT_MS || "30000",
+    10,
+  ),
+  screenshotTaskTimeout: parseInt(
+    process.env.SCREENSHOT_TASK_TIMEOUT_MS || "20000",
+    10,
+  ),
+  screenshotBatchTtlMs: parseInt(
+    process.env.SCREENSHOT_BATCH_TTL_MS || "300000",
+    10,
+  ),
+  screenshotDeepHealth: process.env.SCREENSHOT_DEEP_HEALTH === "true",
   waitForSelector: "#root",
   waitForNetworkIdleTimeout: 10000,
 

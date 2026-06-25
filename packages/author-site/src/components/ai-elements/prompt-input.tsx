@@ -327,13 +327,23 @@ export function PromptInputTextarea({
     }
   }
 
-  React.useEffect(() => {
+  const syncTextareaHeight = React.useCallback(() => {
     const textarea = textareaRef.current
-    if (textarea) {
-      textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
-    }
-  }, [value, maxHeight])
+    if (!textarea) return
+
+    textarea.style.height = 'auto'
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, minHeight),
+      maxHeight,
+    )
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.overflowY =
+      textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [minHeight, maxHeight])
+
+  React.useLayoutEffect(() => {
+    syncTextareaHeight()
+  }, [syncTextareaHeight, value])
 
   return (
     <Textarea
@@ -345,7 +355,7 @@ export function PromptInputTextarea({
       placeholder={placeholder}
       disabled={context.status !== 'idle'}
       className={cn(
-        'min-h-[60px] max-h-[240px] resize-none pr-20 rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50',
+        'resize-none overflow-hidden rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50',
         className,
       )}
       style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}

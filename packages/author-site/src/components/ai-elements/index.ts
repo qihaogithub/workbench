@@ -5,7 +5,11 @@ export {
   ConversationScrollButton,
 } from "./conversation";
 
-export { Message, type ChatMessage, type MessagePart } from "./message";
+export {
+  Message,
+  type ChatMessage,
+  type MessagePart,
+} from "./message";
 
 export { AssistantMessage } from "./assistant-message";
 

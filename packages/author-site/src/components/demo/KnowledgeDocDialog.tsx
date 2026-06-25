@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Pencil, Lock } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import { MemoryMarkdownEditor } from "./MemoryMarkdownEditor";
+import { DocumentEditor } from "@opencode-workbench/shared/demo";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
@@ -254,9 +254,10 @@ export function KnowledgeDocDialog({
               内容（Markdown）
             </label>
             <div className="mt-1 h-[300px]">
-              <MemoryMarkdownEditor
+              <DocumentEditor
                 value={addContent}
                 onChange={setAddContent}
+                format="markdown"
               />
             </div>
           </div>
@@ -278,9 +279,10 @@ export function KnowledgeDocDialog({
             />
           </div>
           <div className="flex-1 min-h-0">
-            <MemoryMarkdownEditor
+            <DocumentEditor
               value={editContent}
               onChange={setEditContent}
+              format="markdown"
             />
           </div>
         </div>
