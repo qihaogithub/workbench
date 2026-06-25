@@ -1,9 +1,10 @@
 import { HomePage } from "@/components/demo/home-page";
-import { listProjects } from "@/lib/fs-utils";
+import { getProjectAdminService } from "@/lib/project-admin-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const initialDemos = listProjects();
+  const result = getProjectAdminService().listProjects();
+  const initialDemos = result.ok ? (result.data ?? []) : [];
   return <HomePage initialDemos={initialDemos} />;
 }

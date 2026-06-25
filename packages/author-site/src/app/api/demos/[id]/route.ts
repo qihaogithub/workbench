@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { deleteProject, projectExists, readProjectMeta, writeProjectMeta, createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { getProjectAdminService, projectAdminResponse } from '@/lib/project-admin-service';
 
 export async function PATCH(
   request: Request,
@@ -17,19 +18,13 @@ export async function PATCH(
       );
     }
 
-    const project = readProjectMeta(id);
-    if (!project) {
-      return NextResponse.json(
-        createApiError('PROJECT_NOT_FOUND', '项目不存在'),
-        { status: 404 }
-      );
-    }
+    const result = getProjectAdminService().updateProject({
+      projectId: id,
+      name: name.trim(),
+    });
+    if (!result.ok) return projectAdminResponse(result);
 
-    project.name = name.trim();
-    project.updatedAt = Date.now();
-    writeProjectMeta(id, project);
-
-    return NextResponse.json(createApiSuccess({ id, name: project.name }));
+    return NextResponse.json(createApiSuccess({ id, name: result.data?.name }));
   } catch (error) {
     console.error('Error updating project:', error);
     return NextResponse.json(
@@ -46,21 +41,15 @@ export async function DELETE(
   try {
     const { id } = params;
 
-    if (!projectExists(id)) {
-      return NextResponse.json(
-        createApiError('PROJECT_NOT_FOUND'),
-        { status: 404 }
-      );
-    }
+    const service = getProjectAdminService();
+    const preview = service.deleteProjectPreview(id);
+    if (!preview.ok || !preview.data) return projectAdminResponse(preview);
 
-    const success = deleteProject(id);
-
-    if (!success) {
-      return NextResponse.json(
-        createApiError('FILE_WRITE_ERROR', '删除项目失败'),
-        { status: 500 }
-      );
-    }
+    const result = service.deleteProjectExecute(
+      preview.data.planId,
+      preview.data.confirmToken,
+    );
+    if (!result.ok) return projectAdminResponse(result);
 
     return NextResponse.json(createApiSuccess(null));
   } catch (error) {

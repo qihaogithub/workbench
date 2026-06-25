@@ -20,7 +20,7 @@ test/新建-编辑-保存项目测试/
 3. **打开编辑页** - 进入项目编辑页面
 4. **粘贴代码** - 将预设模板代码粘贴到代码编辑区
 5. **保存** - 点击保存按钮
-6. **生成日志** - 在 `test-logs/` 目录生成完整测试日志
+6. **生成日志** - 在 `test/新建-编辑-保存项目测试/test-outputs/` 目录生成完整测试日志和截图
 
 ## 运行测试
 
@@ -29,13 +29,20 @@ test/新建-编辑-保存项目测试/
 1. 确保开发服务器已启动：
    ```bash
    pnpm dev
-   # 或仅启动 web 服务
-   pnpm dev:web
+   # 或按需启动 author-site
+   pnpm dev:author
    ```
 
 2. 安装 Playwright 浏览器（首次运行）：
    ```bash
    pnpm playwright install chromium
+   ```
+
+3. 可选环境变量：
+   ```bash
+   E2E_BASE_URL=http://localhost:3200
+   E2E_USER=qihao
+   E2E_PASSWORD=130015
    ```
 
 ### 执行命令
@@ -45,26 +52,26 @@ test/新建-编辑-保存项目测试/
 pnpm install
 
 # 运行测试（无头模式）
-pnpm playwright test
+pnpm test:e2e
 
 # 有头模式运行（可见浏览器）
-pnpm playwright test --headed
+pnpm test:e2e:headed
 
 # UI 模式运行（交互式调试）
-pnpm playwright test --ui
+pnpm test:e2e:ui
 
 # 运行特定测试文件
-pnpm playwright test test/新建-编辑-保存项目测试/e2e-test-project-flow.spec.ts
+pnpm test:e2e -- e2e-test-project-flow.spec.ts
 
 # 运行特定测试用例
-pnpm playwright test -t "完整流程"
+pnpm test:e2e -- -t "完整流程"
 ```
 
 ## 日志与报告
 
 ### 测试日志
 
-日志文件保存在项目根目录的 `test-logs/` 目录：
+日志文件保存在 `test/新建-编辑-保存项目测试/test-outputs/` 目录：
 
 | 文件 | 说明 |
 |------|------|
@@ -77,11 +84,11 @@ pnpm playwright test -t "完整流程"
 
 ### HTML 报告
 
-测试报告生成在 `test-reports/` 目录：
+测试报告生成在 `test/新建-编辑-保存项目测试/test-outputs/test-reports/` 目录：
 
 ```bash
 # 查看 HTML 报告
-# 报告文件：test-reports/index.html
+# 报告文件：test/新建-编辑-保存项目测试/test-outputs/test-reports/index.html
 ```
 
 ## 调试测试
@@ -152,4 +159,4 @@ expect: {
 
 ### 截图目录不存在
 
-日志目录 `test-logs/` 会在首次运行时自动创建，无需手动创建。
+日志目录 `test-outputs/` 会在首次运行时自动创建，无需手动创建。

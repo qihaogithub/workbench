@@ -2,6 +2,8 @@ export type {
   PreviewMode,
   PreviewState,
   PreviewSize,
+  CanvasToolMode,
+  CanvasInteractionMode,
   CanvasState,
   CanvasPageData,
   CanvasViewportState,

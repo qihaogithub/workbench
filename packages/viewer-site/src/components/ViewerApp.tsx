@@ -361,7 +361,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   );
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("single");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -538,7 +538,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     <div className="flex flex-col h-full">
       <Header name={project.name} onBack={() => router.push("/")} />
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {project.demoPages.length > 1 && (
+        {previewMode !== "canvas" && project.demoPages.length > 1 && (
           <div className="w-56 border-r border-border shrink-0 flex flex-col">
             <style>{`
               @keyframes dir-flash {
@@ -605,7 +605,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             {previewMode === "canvas" ? (
               <div className="flex-1 overflow-hidden">
                 <PreviewCanvas
-                  editable={false}
+                  interactionMode="viewer"
                   projectId={projectId}
                   pages={project.demoPages.map((p) => ({
                     id: p.id,
@@ -620,6 +620,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   }))}
                   canvasState={canvasState}
                   onCanvasStateChange={setCanvasState}
+                  onPageConfigEdit={handlePageChange}
                 />
               </div>
             ) : (
@@ -642,7 +643,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           </div>
         </div>
 
-        {hasSchema && previewMode !== "canvas" && (
+        {hasSchema && (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
             <div className="px-4 py-2.5 border-b border-border">
               <h2 className="text-sm font-medium">配置面板</h2>

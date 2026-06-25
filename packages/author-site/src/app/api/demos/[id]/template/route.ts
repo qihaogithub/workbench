@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createApiError } from "@/lib/fs-utils";
 import {
-  createApiError,
-  createApiSuccess,
-  saveProjectAsTemplate,
-} from "@/lib/fs-utils";
+  getProjectAdminService,
+  projectAdminResponse,
+} from "@/lib/project-admin-service";
 
 export async function POST(
   request: NextRequest,
@@ -31,13 +31,13 @@ export async function POST(
       );
     }
 
-    const template = saveProjectAsTemplate(params.id, {
+    const result = getProjectAdminService().createTemplateFromProject(params.id, {
       category,
       name,
       description,
     });
 
-    return NextResponse.json(createApiSuccess(template), { status: 201 });
+    return projectAdminResponse(result, 201);
   } catch (error) {
     console.error("Error saving project as template:", error);
     if (error instanceof Error && error.message === "PROJECT_NOT_FOUND") {

@@ -206,6 +206,7 @@ function computeAlignment(
 
 export function PreviewCanvas({
   editable = false,
+  interactionMode,
   sessionId,
   projectId,
   pages,
@@ -221,6 +222,9 @@ export function PreviewCanvas({
   focusPageId,
   onPositionableSizes,
 }: PreviewCanvasProps) {
+  const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
+  const isEditorMode = resolvedInteractionMode === "editor";
+  const canInteractWithViewport = resolvedInteractionMode !== "readonly";
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: computeInitialCanvasLayout(pages),
@@ -239,6 +243,7 @@ export function PreviewCanvas({
 
   // 工具模式状态
   const [toolMode, setToolMode] = useState<CanvasToolMode>("hand");
+  const effectiveToolMode: CanvasToolMode = isEditorMode ? toolMode : "hand";
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -362,7 +367,7 @@ export function PreviewCanvas({
   );
 
   useEffect(() => {
-    if (!editable || !selectedNodeId || documentDraft) return;
+    if (!isEditorMode || !selectedNodeId || documentDraft) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
@@ -381,7 +386,7 @@ export function PreviewCanvas({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteNode, documentDraft, editable, selectedNodeId]);
+  }, [deleteNode, documentDraft, isEditorMode, selectedNodeId]);
 
   // 开始拖拽/缩放时，清空辅助线
   const handleDragStart = useCallback(
@@ -737,6 +742,7 @@ export function PreviewCanvas({
 
   const focusCanvasForClipboard = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isEditorMode) return;
       const target = event.target as HTMLElement;
       if (
         target.closest("button,input,textarea,select,a") ||
@@ -746,13 +752,13 @@ export function PreviewCanvas({
       }
       containerRef.current?.focus({ preventScroll: true });
     },
-    [],
+    [isEditorMode],
   );
 
   return (
     <div
       ref={containerRef}
-      tabIndex={editable ? 0 : undefined}
+      tabIndex={isEditorMode ? 0 : undefined}
       aria-label="画布工作区"
       className={cn(
         "w-full h-full relative overflow-hidden bg-muted/30 outline-none",
@@ -760,6 +766,7 @@ export function PreviewCanvas({
       )}
       onPointerDownCapture={focusCanvasForClipboard}
       onDragOver={(event) => {
+        if (!isEditorMode) return;
         if (documentDraft) return;
         const files = extractImageFilesFromTransfer(
           event.dataTransfer.files,
@@ -770,10 +777,12 @@ export function PreviewCanvas({
         setDraggingImageOver(true);
       }}
       onDragLeave={(event) => {
+        if (!isEditorMode) return;
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
         setDraggingImageOver(false);
       }}
       onDrop={(event) => {
+        if (!isEditorMode) return;
         if (documentDraft) return;
         const files = extractImageFilesFromTransfer(
           event.dataTransfer.files,
@@ -785,6 +794,7 @@ export function PreviewCanvas({
         handleAddImageFiles(files);
       }}
       onPaste={(event) => {
+        if (!isEditorMode) return;
         const target = event.target as HTMLElement;
         if (
           target.closest("input,textarea") ||
@@ -802,7 +812,7 @@ export function PreviewCanvas({
         handleAddImageFiles(files);
       }}
     >
-      {editable && (
+      {canInteractWithViewport && (
         <CanvasToolbar
           zoom={canvasState.viewport.zoom}
           onZoomChange={(zoom) =>
@@ -813,19 +823,24 @@ export function PreviewCanvas({
           }
           onReset={() =>
             updateState((prev) => ({
-              pages: computeInitialCanvasLayout(pages),
+              ...prev,
+              pages: isEditorMode ? computeInitialCanvasLayout(pages) : prev.pages,
               viewport: { x: 40, y: 40, zoom: 0.5 },
               nodes: prev.nodes,
             }))
           }
+          interactionMode={isEditorMode ? "editor" : "viewer"}
           onFitToScreen={handleFitToScreen}
-          onAutoLayout={handleAutoLayout}
-          onAddDocument={() =>
-            setDocumentDraft({
-              markdown: "# 文档\n\n在这里记录说明、参考或待办。",
-            })
+          onAutoLayout={isEditorMode ? handleAutoLayout : undefined}
+          onAddDocument={
+            isEditorMode
+              ? () =>
+                  setDocumentDraft({
+                    markdown: "# 文档\n\n在这里记录说明、参考或待办。",
+                  })
+              : undefined
           }
-          toolMode={toolMode}
+          toolMode={effectiveToolMode}
           onToolModeChange={setToolMode}
         />
       )}
@@ -839,17 +854,18 @@ export function PreviewCanvas({
         onViewportChange={(viewport) =>
           updateState((prev) => ({ ...prev, viewport }))
         }
-        editable={editable}
+        editable={isEditorMode}
+        interactionMode={resolvedInteractionMode}
         onCanvasClick={handleCanvasClick}
         onPageClick={(pageId) => {
           setSelectedNodeId(null);
           onPageConfigEdit?.(pageId);
         }}
-        onNodeClick={setSelectedNodeId}
+        onNodeClick={isEditorMode ? setSelectedNodeId : undefined}
         onFitToScreen={handleFitToScreen}
-        onToolModeChange={setToolMode}
+        onToolModeChange={isEditorMode ? setToolMode : undefined}
         alignmentGuides={alignmentGuides}
-        toolMode={toolMode}
+        toolMode={effectiveToolMode}
       >
         {pages.map((page) => {
           const renderMode = pageRenderModes[page.id] ?? "loading";
@@ -864,7 +880,7 @@ export function PreviewCanvas({
                   return { x: 0, y: 0, width: size.width, height: size.height };
                 })()
               }
-              editable={editable}
+              editable={isEditorMode}
               isEditing={editingPageId === page.id}
               zoom={canvasState.viewport.zoom}
               visible={
@@ -880,7 +896,7 @@ export function PreviewCanvas({
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
-              toolMode={toolMode}
+              toolMode={effectiveToolMode}
               onPositionableSizes={onPositionableSizes}
             />
           );
@@ -889,9 +905,9 @@ export function PreviewCanvas({
           <CanvasFreeNodeItem
             key={node.id}
             node={node}
-            editable={editable}
+            editable={isEditorMode}
             zoom={canvasState.viewport.zoom}
-            toolMode={toolMode}
+            toolMode={effectiveToolMode}
             selected={selectedNodeId === node.id}
             onLayoutChange={handleNodeLayoutChange}
             onEdit={handleEditNode}

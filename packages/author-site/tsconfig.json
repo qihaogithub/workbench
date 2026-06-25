@@ -21,6 +21,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@opencode-workbench/project-admin-mcp": ["../project-admin-mcp/src/server.ts"],
+      "@opencode-workbench/project-admin-mcp/protocol": ["../project-admin-mcp/src/protocol.ts"],
+      "@opencode-workbench/project-core": ["../project-core/src"],
       "@opencode-workbench/shared": ["../shared/src"],
       "@opencode-workbench/shared/agent-prompts": ["../shared/src/agent-prompts/index.ts"],
       "@opencode-workbench/agent-client": ["../agent-client/src"]

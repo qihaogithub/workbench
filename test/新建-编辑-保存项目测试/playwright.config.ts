@@ -2,10 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const outputDir = path.join(__dirname, 'test-outputs');
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir, { recursive: true });
+const outputRoot = path.join(__dirname, 'test-outputs');
+const artifactDir = path.join(outputRoot, 'artifacts');
+const reportDir = path.join(outputRoot, 'test-reports');
+if (!fs.existsSync(outputRoot)) {
+  fs.mkdirSync(outputRoot, { recursive: true });
 }
+
+const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
 
 export default defineConfig({
   testDir: './',
@@ -15,16 +19,16 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: [
-    ['html', { outputFolder: path.join(outputDir, 'test-reports'), open: 'never' }],
+    ['html', { outputFolder: reportDir, open: 'never' }],
     ['list']
   ],
   use: {
-    baseURL: 'http://localhost:3200',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  outputDir,
+  outputDir: artifactDir,
   projects: [
     {
       name: 'chromium',

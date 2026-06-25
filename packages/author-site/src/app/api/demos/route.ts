@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import {
-  createApiError,
-  createApiSuccess,
-  createProject,
-  listProjects,
-} from "@/lib/fs-utils";
+  getProjectAdminService,
+  projectAdminResponse,
+} from "@/lib/project-admin-service";
 
 export async function GET() {
   try {
-    const projects = listProjects();
+    const result = getProjectAdminService().listProjects();
+    if (!result.ok) return projectAdminResponse(result);
+    const projects = result.data ?? [];
     return NextResponse.json(createApiSuccess(projects));
   } catch (error) {
     console.error("Error listing projects:", error);
@@ -41,8 +42,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const project = createProject(name, templateId);
-    return NextResponse.json(createApiSuccess(project), { status: 201 });
+    const result = getProjectAdminService().createProject({
+      name,
+      templateId,
+    });
+    return projectAdminResponse(result, 201);
   } catch (error) {
     console.error("Error creating project:", error);
     if (error instanceof Error && error.message === "TEMPLATE_NOT_FOUND") {

@@ -18,12 +18,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "./utils";
-import type { CanvasToolMode } from "./types";
+import type { CanvasToolMode, CanvasInteractionMode } from "./types";
 
 interface CanvasToolbarProps {
   zoom: number;
   onZoomChange: (zoom: number) => void;
   onReset: () => void;
+  interactionMode?: Exclude<CanvasInteractionMode, "readonly">;
   onFitToScreen?: () => void;
   onAutoLayout?: () => void;
   onAddDocument?: () => void;
@@ -80,6 +81,7 @@ export function CanvasToolbar({
   zoom,
   onZoomChange,
   onReset,
+  interactionMode = "editor",
   onFitToScreen,
   onAutoLayout,
   onAddDocument,
@@ -88,6 +90,7 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isEditorMode = interactionMode === "editor";
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -127,25 +130,27 @@ export function CanvasToolbar({
                   <Hand className="h-4 w-4" />
                 </button>
               </ToolbarTooltip>
-              <ToolbarTooltip label="选择、移动和缩放节点">
-                <button
-                  type="button"
-                  onClick={() => onToolModeChange("select")}
-                  className={cn(
-                    toolbarToggleButtonClass,
-                    toolMode === "select" && activeToggleButtonClass,
-                  )}
-                  aria-label="选择工具"
-                  aria-pressed={toolMode === "select"}
-                >
-                  <MousePointer2 className="h-4 w-4" />
-                </button>
-              </ToolbarTooltip>
+              {isEditorMode && (
+                <ToolbarTooltip label="选择、移动和缩放节点">
+                  <button
+                    type="button"
+                    onClick={() => onToolModeChange("select")}
+                    className={cn(
+                      toolbarToggleButtonClass,
+                      toolMode === "select" && activeToggleButtonClass,
+                    )}
+                    aria-label="选择工具"
+                    aria-pressed={toolMode === "select"}
+                  >
+                    <MousePointer2 className="h-4 w-4" />
+                  </button>
+                </ToolbarTooltip>
+              )}
             </div>
           </ToolbarGroup>
         )}
 
-        {onAddDocument && (
+        {isEditorMode && onAddDocument && (
           <ToolbarGroup>
             <ToolbarTooltip label="添加 Markdown 文档">
               <button
@@ -175,7 +180,7 @@ export function CanvasToolbar({
               </ToolbarTooltip>
             )}
 
-            {onAutoLayout && (
+            {isEditorMode && onAutoLayout && (
               <ToolbarTooltip label="自动整理画布">
                 <button
                   type="button"

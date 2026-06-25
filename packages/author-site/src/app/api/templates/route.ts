@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
+import { createApiError } from "@/lib/fs-utils";
 import {
-  createApiError,
-  createApiSuccess,
-  listProjectTemplates,
-} from "@/lib/fs-utils";
+  getProjectAdminService,
+  projectAdminResponse,
+} from "@/lib/project-admin-service";
 
 export async function GET() {
   try {
-    return NextResponse.json(createApiSuccess(listProjectTemplates()));
+    return projectAdminResponse(getProjectAdminService().listTemplates());
   } catch (error) {
     console.error("Error listing templates:", error);
     return NextResponse.json(

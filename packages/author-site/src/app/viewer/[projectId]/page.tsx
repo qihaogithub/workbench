@@ -104,7 +104,7 @@ export default function ViewerProjectPage() {
 
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>(
-    modeParam === "canvas" ? "canvas" : "single"
+    modeParam === "single" ? "single" : "canvas"
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
@@ -334,7 +334,7 @@ export default function ViewerProjectPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex flex-1 overflow-hidden">
-        {showPageList && hasMultiplePages && (
+        {showPageList && previewMode !== "canvas" && hasMultiplePages && (
           <div className="w-48 border-r shrink-0 flex flex-col">
             <div className="px-3 py-3 border-b">
               <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
@@ -402,7 +402,7 @@ export default function ViewerProjectPage() {
 
           {previewMode === "canvas" ? (
             <PreviewCanvas
-              editable={false}
+              interactionMode="viewer"
               projectId={projectId}
               pages={gridPages.map((p) => ({
                 id: p.id,
@@ -449,11 +449,7 @@ export default function ViewerProjectPage() {
           )}
         </div>
 
-        {showConfig && (
-          previewMode !== "canvas" ||
-          canvasConfigMode === "always" ||
-          !!canvasSelectedPageId
-        ) && (
+        {showConfig && hasAnyConfig && (
           <div
             className="border-l shrink-0 flex flex-col"
             style={{ width: configWidth }}

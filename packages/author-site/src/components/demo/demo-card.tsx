@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { FileText, MoreVertical, Save, Trash2 } from "lucide-react";
+import { FileText, Lock, MoreVertical, Save, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -169,9 +170,17 @@ export function DemoCard({ demo, onDelete, onSaveAsTemplate }: DemoCardProps) {
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-base truncate text-foreground">
-                {demo.name}
-              </h3>
+              <div className="flex min-w-0 items-center gap-2">
+                <h3 className="truncate text-base font-medium text-foreground">
+                  {demo.name}
+                </h3>
+                {demo.locked && (
+                  <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 py-0 text-[10px]">
+                    <Lock className="h-3 w-3" />
+                    锁定
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-1.5">
                 更新于 {formatDate(demo.updatedAt)}
               </p>

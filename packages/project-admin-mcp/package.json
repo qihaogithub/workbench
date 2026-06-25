@@ -1,0 +1,29 @@
+{
+  "name": "@opencode-workbench/project-admin-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "bin": {
+    "opencode-project-admin-mcp": "./src/server.ts"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opencode-workbench/project-core": "workspace:*",
+    "@opencode-workbench/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
+  }
+}

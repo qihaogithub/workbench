@@ -105,6 +105,8 @@ export type PreviewMode = "single" | "canvas";
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
 export type CanvasToolMode = "hand" | "select";
 
+export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
+
 export interface CanvasPageLayout {
   x: number;
   y: number;
@@ -218,6 +220,7 @@ export type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export interface PreviewCanvasProps {
   editable?: boolean;
+  interactionMode?: CanvasInteractionMode;
   sessionId?: string;
   projectId?: string;
   pages: CanvasPageData[];
