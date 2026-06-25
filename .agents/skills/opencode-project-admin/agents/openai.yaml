@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenCode Project Admin"
+  short_description: "Project MCP workflows for safe edits."
+  default_prompt: "Use $opencode-project-admin to safely inspect a project, open an edit transaction, validate changes, and commit."

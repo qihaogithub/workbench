@@ -53,7 +53,7 @@
 4. 涉及产品行为、业务流程、架构边界或接口契约时，按需读取 `docs/项目文档/` 中的相关模块文档。
 5. 保持改动局部化，遵循现有模块边界和导入风格。
 6. 修改过程中同步更新任务文档的任务清单、进度、关键决策和验证结果。
-7. 修改后运行与改动范围匹配的验证命令。
+7. 修改后运行与改动范围匹配的验证命令。优先使用根目录 `check:*` 脚本，无法覆盖时再使用包级命令。
 8. 不要回滚或整理与当前任务无关的用户改动。
 
 ## 复杂任务计划文档
@@ -102,10 +102,11 @@
 维护规则：
 
 - 修改 `docs/` 下文档时使用 `doc-maintainer` 技能。
-- 需求文档只写“做什么”和“为什么”，修改前按技能要求创建备份。
+- 需求文档只写“做什么”和“为什么”。
 - 技术文档只写“怎么做”，避免粘贴大段源码。
 - 更新模块文档时同步更新对应 `INDEX.md`。
-- 当前项目文档入口是 `docs/项目文档/INDEX.md`；如果将来创建 `docs/INDEX.md`，需要同步更新本节说明。
+- 当前项目文档入口是 `docs/项目文档/INDEX.md`；`doc-maintainer` 技能里提到的 `docs/INDEX.md` 在本项目中映射为 `docs/项目文档/INDEX.md`，除非后续专门建立全局 `docs/INDEX.md`。
+- `docs/plans/进行中/` 是任务追踪区，新增或更新计划文档不需要同步 `docs/项目文档/INDEX.md`；任务完成后按 `docs/plans/已完成/AGENTS.md` 的归档规则移动。
 
 ## Monorepo 结构
 
@@ -119,12 +120,15 @@
 | `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
 | `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
 | `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
+| `@opencode-workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 MCP 复用 | - | Vitest |
+| `@opencode-workbench/project-admin-mcp` | `packages/project-admin-mcp/` | 项目管理 MCP stdio 服务 | - | Vitest |
 | `@opencode-workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
 
 历史或非 workspace 目录：
 
 - `packages/web/` 存在于文件系统，但没有 `package.json`，不要引入或修改，除非用户明确要求。
-- `packages/snapshot-service/` 当前没有 `package.json`。根脚本里仍引用了 `@opencode-workbench/snapshot-service`，处理开发启动问题时要先核实这个历史引用。
+- `packages/snapshot-service/` 当前没有 `package.json`。根脚本只保留 `dev:snapshot:legacy` 作为历史排查入口，不参与默认 `pnpm dev`。
+- `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
 `packages/shared/src/index.ts` 是共享类型入口。`@opencode-workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
 
@@ -138,17 +142,25 @@ pnpm dev:author
 pnpm dev:agent
 pnpm dev:viewer
 pnpm dev:screenshot
+pnpm dev:preview
 pnpm build
 pnpm build:viewer
 pnpm lint
 pnpm typecheck
 pnpm typecheck:viewer
+pnpm check:author
+pnpm check:agent
+pnpm check:screenshot
+pnpm check:project-core
+pnpm check:project-admin-mcp
+pnpm check:viewer
+pnpm check:all
 pnpm test:e2e
 pnpm test:e2e:ui
 pnpm test:e2e:headed
 ```
 
-注意：`pnpm dev` 会并行启动 author、agent、viewer、snapshot、screenshot。其中 snapshot 对应包当前不存在；如果启动失败，优先使用单服务命令定位。
+注意：`pnpm dev` 会并行启动 author、agent、viewer、screenshot。`snapshot-service` 是历史包，默认不启动；如果需要调查旧截图方案，只使用 `pnpm dev:snapshot:legacy` 核实历史引用。
 
 包级验证：
 
@@ -173,6 +185,14 @@ pnpm --filter @opencode-workbench/screenshot-service typecheck
 # viewer-site
 pnpm --filter @opencode-workbench/viewer-site typecheck
 pnpm --filter @opencode-workbench/viewer-site build
+
+# project-core
+pnpm --filter @opencode-workbench/project-core typecheck
+pnpm --filter @opencode-workbench/project-core test
+
+# project-admin-mcp
+pnpm --filter @opencode-workbench/project-admin-mcp typecheck
+pnpm --filter @opencode-workbench/project-admin-mcp test
 ```
 
 `test:smoke` 需要 `ACP_SMOKE_REAL=1`，只在明确需要真实集成冒烟时运行。
@@ -182,7 +202,7 @@ pnpm --filter @opencode-workbench/viewer-site build
 - 配置文件在 `test/新建-编辑-保存项目测试/playwright.config.ts`，不是根目录默认配置。
 - baseURL 是 `http://localhost:3200`。
 - 前置条件：author-site 等相关服务已启动；首次运行需要 `pnpm playwright install chromium`。
-- 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。
+- 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。根脚本已显式指定 Playwright 配置文件。
 
 ## 关键架构
 
@@ -227,8 +247,8 @@ Screenshot 服务：
 
 Docker：
 
-- `docker-compose.yml` 包含 agent-service、author-site、viewer-site。
-- viewer-site 需要 `--profile viewer`。
+- `docker-compose.yml` 包含 agent-service、author-site、screenshot-service、viewer-site。
+- viewer-site 当前没有配置 profile，默认随 compose 一起启动。
 - 部署脚本：`scripts/deploy.sh`。
 
 ## 代码约定
@@ -266,11 +286,15 @@ Docker：
 
 选择最小但足够的验证：
 
-- author-site UI 或 API：`pnpm --filter @opencode-workbench/author-site test`，必要时加 `pnpm typecheck`。
-- viewer-site：`pnpm typecheck:viewer`，必要时 `pnpm build:viewer`。
-- agent-service：`pnpm --filter @opencode-workbench/agent-service test` 和 `typecheck`。
-- screenshot-service：`pnpm --filter @opencode-workbench/screenshot-service test` 和 `typecheck`。
+- author-site UI 或 API：`pnpm check:author`；只需要类型检查时可用 `pnpm typecheck`。
+- viewer-site：`pnpm check:viewer`，必要时 `pnpm build:viewer`。
+- agent-service：`pnpm check:agent`。
+- screenshot-service：`pnpm check:screenshot`。
+- project-core：`pnpm check:project-core`。
+- project-admin-mcp：`pnpm check:project-admin-mcp`。
+- shared：至少运行 `pnpm check:author`、`pnpm check:agent`、`pnpm check:screenshot`、`pnpm check:viewer`；如果改动影响项目读写类型，也运行 `pnpm check:project-core`。
 - 跨页面关键流程：确认服务运行后执行 `pnpm test:e2e`。
+- 全仓轻量验证：`pnpm check:all`。该命令不包含真实 LLM、OSS、Docker 或浏览器 E2E。
 
 如果没有运行测试，在最终回复中说明原因和剩余风险。
 

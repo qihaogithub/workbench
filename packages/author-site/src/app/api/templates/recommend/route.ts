@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentClient } from "@/lib/agent-client";
-import {
-  createApiError,
-  createApiSuccess,
-  listProjectTemplates,
-} from "@/lib/fs-utils";
+import { createApiError, createApiSuccess } from "@/lib/fs-utils";
+import { getProjectAdminService } from "@/lib/project-admin-service";
 
 interface TemplateRecommendation {
   templateId: string;
@@ -52,6 +49,7 @@ function normalizeRecommendation(
 }
 
 export async function POST(request: NextRequest) {
+  let requestDescription = "";
   try {
     const body = await request.json();
     const { description } = body as { description?: unknown };
@@ -62,8 +60,17 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    requestDescription = description.trim();
 
-    const templates = listProjectTemplates();
+    const service = getProjectAdminService();
+    const templatesResult = service.listTemplates();
+    if (!templatesResult.ok) {
+      return NextResponse.json(
+        createApiError("FILE_READ_ERROR", "读取模板列表失败"),
+        { status: 500 },
+      );
+    }
+    const templates = templatesResult.data ?? [];
     if (templates.length === 0) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "暂无可推荐的模板"),
@@ -85,7 +92,7 @@ export async function POST(request: NextRequest) {
       "你是项目模板推荐助手。只能从给定模板中选择一个最匹配的模板。",
       "必须只输出 JSON，不要输出 Markdown。",
       'JSON 格式：{"templateId":"模板 id","reason":"简短中文理由","confidence":0 到 1 的数字}',
-      `用户描述：${description.trim()}`,
+      `用户描述：${requestDescription}`,
       `模板列表：${JSON.stringify(compactTemplates)}`,
     ].join("\n");
 
@@ -101,6 +108,10 @@ export async function POST(request: NextRequest) {
     );
 
     if (!result.success) {
+      const fallback = service.recommendTemplate(requestDescription);
+      if (fallback.ok && fallback.data?.templateId) {
+        return NextResponse.json(createApiSuccess(fallback.data));
+      }
       return NextResponse.json(
         createApiError(
           "AGENT_SERVICE_ERROR",
@@ -125,6 +136,14 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error recommending template:", error);
+    if (requestDescription) {
+      const fallback = getProjectAdminService().recommendTemplate(
+        requestDescription,
+      );
+      if (fallback.ok && fallback.data?.templateId) {
+        return NextResponse.json(createApiSuccess(fallback.data));
+      }
+    }
     return NextResponse.json(
       createApiError("AGENT_SERVICE_ERROR", "AI 推荐服务不可用"),
       { status: 503 },

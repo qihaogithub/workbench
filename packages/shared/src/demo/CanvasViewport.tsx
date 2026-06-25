@@ -2,12 +2,18 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "./utils";
-import type { CanvasViewportState, AlignmentGuide, CanvasToolMode } from "./types";
+import type {
+  CanvasViewportState,
+  AlignmentGuide,
+  CanvasToolMode,
+  CanvasInteractionMode,
+} from "./types";
 
 interface CanvasViewportProps {
   viewport: CanvasViewportState;
   onViewportChange: (viewport: CanvasViewportState) => void;
   editable?: boolean;
+  interactionMode?: CanvasInteractionMode;
   onCanvasClick?: () => void;
   onPageClick?: (pageId: string) => void;
   onNodeClick?: (nodeId: string) => void;
@@ -27,6 +33,7 @@ export function CanvasViewport({
   viewport,
   onViewportChange,
   editable = false,
+  interactionMode,
   onCanvasClick,
   onPageClick,
   onNodeClick,
@@ -37,8 +44,11 @@ export function CanvasViewport({
   alignmentGuides = [],
   toolMode = "hand",
 }: CanvasViewportProps) {
+  const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
+  const canInteractWithViewport = resolvedInteractionMode !== "readonly";
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const viewportStartRef = useRef({ x: 0, y: 0 });
@@ -79,7 +89,7 @@ export function CanvasViewport({
 
   // 键盘快捷键
   useEffect(() => {
-    if (!editable) return;
+    if (!canInteractWithViewport) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Space 键：切换为平移模式
@@ -175,17 +185,24 @@ export function CanvasViewport({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [editable, onFitToScreen, scheduleUpdate, onToolModeChange, onCanvasClick]);
+  }, [
+    canInteractWithViewport,
+    onFitToScreen,
+    scheduleUpdate,
+    onToolModeChange,
+    onCanvasClick,
+  ]);
 
   // capture phase：拦截需要优先处理的平移
   const handlePointerDownCapture = useCallback(
     (e: React.PointerEvent) => {
-      if (!editable) return;
+      if (!canInteractWithViewport) return;
 
+      const isPrimaryButton = e.button === 0 || e.button === undefined;
       const isMiddleButton = e.button === 1;
-      const isSpaceLeftClick = e.button === 0 && spaceHeld;
+      const isSpaceLeftClick = isPrimaryButton && spaceHeld;
       // hand 模式下，左键点击任何区域都触发平移（包括页面）
-      const isHandModeLeftClick = toolMode === "hand" && e.button === 0;
+      const isHandModeLeftClick = toolMode === "hand" && isPrimaryButton;
 
       if (isHandModeLeftClick || isSpaceLeftClick || isMiddleButton) {
         // 阻止事件到达 CanvasPageItem，防止其开始拖拽或捕获指针
@@ -200,6 +217,7 @@ export function CanvasViewport({
           ? nodeEl.getAttribute("data-canvas-node-id")
           : null;
 
+        isPanningRef.current = true;
         setIsPanning(true);
         startPosRef.current = { x: e.clientX, y: e.clientY };
         viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
@@ -207,17 +225,18 @@ export function CanvasViewport({
         markInteracting();
       }
     },
-    [editable, toolMode, spaceHeld, markInteracting],
+    [canInteractWithViewport, toolMode, spaceHeld, markInteracting],
   );
 
   // bubble phase：处理 select 模式下点击画布空白区域的平移
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       // hand 模式、空格+左键、中键已在 capture phase 处理
-      if (toolMode === "hand" || e.button === 1 || (e.button === 0 && spaceHeld)) return;
+      const isPrimaryButton = e.button === 0 || e.button === undefined;
+      if (toolMode === "hand" || e.button === 1 || (isPrimaryButton && spaceHeld)) return;
 
       // select 模式下，点击画布空白区域触发平移
-      if (toolMode === "select" && e.button === 0) {
+      if (toolMode === "select" && isPrimaryButton) {
         const target = e.target as HTMLElement;
         const isCanvasBackground =
           target === containerRef.current || target === containerRef.current?.firstElementChild;
@@ -225,6 +244,7 @@ export function CanvasViewport({
         if (isCanvasBackground) {
           clickedPageIdRef.current = null;
           clickedNodeIdRef.current = null;
+          isPanningRef.current = true;
           setIsPanning(true);
           startPosRef.current = { x: e.clientX, y: e.clientY };
           viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
@@ -238,7 +258,7 @@ export function CanvasViewport({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isPanning) return;
+      if (!isPanningRef.current) return;
       const dx = e.clientX - startPosRef.current.x;
       const dy = e.clientY - startPosRef.current.y;
       scheduleUpdate({
@@ -247,13 +267,15 @@ export function CanvasViewport({
         zoom: viewportRef.current.zoom,
       });
     },
-    [isPanning, scheduleUpdate],
+    [scheduleUpdate],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      if (!isPanning) return;
+      if (!isPanningRef.current) return;
+      isPanningRef.current = false;
       setIsPanning(false);
+      flushUpdate();
       markInteractingEnd();
       containerRef.current?.releasePointerCapture(e.pointerId);
       const dx = e.clientX - startPosRef.current.x;
@@ -273,12 +295,12 @@ export function CanvasViewport({
       clickedPageIdRef.current = null;
       clickedNodeIdRef.current = null;
     },
-    [isPanning, onCanvasClick, onNodeClick, onPageClick, markInteractingEnd],
+    [flushUpdate, onCanvasClick, onNodeClick, onPageClick, markInteractingEnd],
   );
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      if (!editable) return;
+      if (!canInteractWithViewport) return;
       e.preventDefault();
       markInteracting();
 
@@ -300,7 +322,7 @@ export function CanvasViewport({
 
       markInteractingEnd();
     },
-    [editable, scheduleUpdate, markInteracting, markInteractingEnd],
+    [canInteractWithViewport, scheduleUpdate, markInteracting, markInteractingEnd],
   );
 
   useEffect(() => {
@@ -311,7 +333,7 @@ export function CanvasViewport({
   }, []);
 
   // 光标样式：hand 模式显示抓手，select 模式默认光标（空格时显示抓手）
-  const cursorClass = editable
+  const cursorClass = canInteractWithViewport
     ? toolMode === "hand"
       ? isPanning
         ? "cursor-grabbing"

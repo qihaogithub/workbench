@@ -6,6 +6,7 @@ export interface DemoMeta {
   thumbnail?: string;
   demoCount?: number;
   demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
+  locked?: boolean;
 }
 
 export interface ProjectTemplateMeta {

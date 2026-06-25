@@ -11,12 +11,14 @@
 ┌──────────────────────────────────────────────────────────────┐
 │                  Docker Compose（OrbStack）                    │
 │                                                              │
-│  ┌─────────────┐   ┌─────────────┐       │
-│  │author-site  │   │agent-service│       │
-│  │  :3200      │──▶│  :3201      │       │
-│  │Next.js SSR  │   │  Fastify +  │       │
-│  │             │   │  Pi Agent   │       │
-│  └─────────────┘   └─────────────┘       │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐       │
+│  │author-site  │   │agent-service│   │screenshot   │       │
+│  │  :3200      │──▶│  :3201      │   │  :3202      │       │
+│  │Next.js SSR  │   │  Fastify +  │   │Puppeteer    │       │
+│  │             │   │  Pi Agent   │   │Core         │       │
+│  └─────────────┘   └─────────────┘   └─────────────┘       │
+│          │                                                  │
+│          └──────────────────────────▶ viewer-site(:3300)    │
 │                                                              │
 │  局域网用户通过 http://<IP>:3200 访问                        │
 └──────────────────────────────────────────────────────────────┘
@@ -28,7 +30,8 @@
 | --------------- | ---- | ------------------------------------- | ---- |
 | `author-site`   | 3200 | 创作端前端 + 用户认证 API             | 是   |
 | `agent-service` | 3201 | Agent 管理、消息路由（内置 Pi Agent） | 是   |
-| `viewer-site`   | 3300 | 预览端（可选）                        | 否   |
+| `screenshot-service` | 3202 | 页面截图与缩略图生成             | 是   |
+| `viewer-site`   | 3300 | 使用端/预览端                         | 是   |
 
 ### 1.3 数据流
 
@@ -132,8 +135,10 @@ docker compose up -d
 docker compose ps
 
 # 验证
-curl http://localhost:3200           # author-site
-curl http://localhost:3201/health    # agent-service
+curl http://localhost:3200                # author-site
+curl http://localhost:3201/health         # agent-service
+curl http://localhost:3202/health         # screenshot-service
+curl http://localhost:3300                # viewer-site
 ```
 
 ### 5.2 常见错误排查
@@ -161,9 +166,11 @@ docker compose logs --tail=50 agent-service
 
 | 文件路径                                          | 说明                                                            |
 | ------------------------------------------------- | --------------------------------------------------------------- |
-| `docker-compose.yml`                              | 容器编排配置（3 服务：agent-service、author-site、viewer-site） |
+| `docker-compose.yml`                              | 容器编排配置（agent-service、author-site、screenshot-service、viewer-site） |
 | `docker/agent-service/Dockerfile`                 | agent-service 容器镜像（含 esbuild 打包）                       |
 | `docker/author-site/Dockerfile`                   | author-site 容器镜像（Next.js standalone）                      |
+| `docker/screenshot-service/Dockerfile`            | screenshot-service 容器镜像（Chromium + Puppeteer Core）        |
+| `docker/viewer-site/Dockerfile`                   | viewer-site 容器镜像                                            |
 | `packages/agent-service/src/backends/pi-agent.ts` | Pi Agent 后端实现                                               |
 | `packages/agent-service/src/backends/pi-tools/`   | Pi Agent 工具集                                                 |
 | `.env.docker`                                     | 环境变量配置模板                                                |

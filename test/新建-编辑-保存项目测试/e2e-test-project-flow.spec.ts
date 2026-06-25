@@ -3,6 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
+const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
+const E2E_USER = process.env.E2E_USER ?? 'qihao';
+const E2E_PASSWORD = process.env.E2E_PASSWORD ?? '130015';
+
 const TEMPLATE_CODE = `=== DEMO CODE ===
 
 import React from 'react';
@@ -148,14 +152,14 @@ async function doLogin(page: any, logger: TestLogger): Promise<boolean> {
 
     const accountInput = page.getByPlaceholder(/账号|邮箱|用户名/i).first();
     if (await accountInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await accountInput.fill('qihao');
+      await accountInput.fill(E2E_USER);
       logger.log('已填写账号');
       await page.waitForTimeout(500);
     }
 
     const passwordInput = page.getByPlaceholder(/密码/i).or(page.locator('input[type="password"]')).first();
     if (await passwordInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await passwordInput.fill('130015');
+      await passwordInput.fill(E2E_PASSWORD);
       logger.log('已填写密码');
       await page.waitForTimeout(500);
     }
@@ -198,8 +202,8 @@ test.describe('项目创建和代码编辑完整流程', () => {
 
     try {
       // ========== 步骤 1: 打开项目首页 ==========
-      logger.step('1', '打开项目首页 http://localhost:3200');
-      await page.goto('http://localhost:3200', { waitUntil: 'domcontentloaded' });
+      logger.step('1', `打开项目首页 ${E2E_BASE_URL}`);
+      await page.goto(E2E_BASE_URL, { waitUntil: 'domcontentloaded' });
 
       await doLogin(page, logger);
 
