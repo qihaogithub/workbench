@@ -4,32 +4,29 @@ import { useState } from "react";
 import {
   Check,
   Clipboard,
+  FileJson,
   FileText,
-  KeyRound,
-  Server,
   ShieldCheck,
   Terminal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-interface McpInstallPageProps {
-  installPrompt: string;
-  localConfig: string;
-  remoteConfig: string;
+interface ProjectCliPageProps {
+  usagePrompt: string;
+  quickReference: string;
   updatedAt: string;
   version: string;
 }
 
-type CopyTarget = "prompt" | "local" | "remote";
+type CopyTarget = "prompt" | "reference";
 
-export function McpInstallPage({
-  installPrompt,
-  localConfig,
-  remoteConfig,
+export function ProjectCliPage({
+  usagePrompt,
+  quickReference,
   updatedAt,
   version,
-}: McpInstallPageProps) {
+}: ProjectCliPageProps) {
   const [copied, setCopied] = useState<CopyTarget | null>(null);
 
   const copyText = async (target: CopyTarget, text: string) => {
@@ -47,14 +44,14 @@ export function McpInstallPage({
         <div className="container px-4 py-10">
           <div className="max-w-3xl space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Server className="h-4 w-4" />
-              Project Admin MCP
+              <Terminal className="h-4 w-4" />
+              Project Admin CLI
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">
-              用 Codex 管理创作端项目
+              用 CLI 管理创作端项目
             </h1>
             <p className="text-base leading-7 text-muted-foreground">
-              面向管理员、开发者和高级创作者的确定性项目管理入口。项目、模板、页面、配置、事务、发布检查和审计都通过 MCP 工具执行，普通创作流程仍保留在 Web 页面中。
+              面向编码代理的本地 shell 入口。项目、模板、页面、配置、事务、资产、发布检查和审计都通过 JSON-first 命令执行，业务规则统一由 project-core 校验。
             </p>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>版本 {version}</span>
@@ -71,12 +68,12 @@ export function McpInstallPage({
             <h2 className="text-xl font-semibold">能力范围</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ["项目与模板", "创建、复制、删除预览、模板快照和推荐。"],
+                ["项目与模板", "创建、复制、删除预览、模板快照、推荐和健康检查。"],
                 ["页面与文件夹", "事务内创建、重命名、排序、移动和批量删除。"],
                 ["配置与校验", "项目级 Schema、页面 Schema、冲突检查和候选生成。"],
-                ["预览与发布", "编译预检、发布检查、发布状态和回滚入口。"],
-                ["审计与权限", "记录写操作、操作者、差异摘要和确认计划。"],
-                ["安装分发", "Codex 提示词、本地 stdio 与远程 HTTP 配置片段。"],
+                ["资产与预览", "图片上传、替换、引用扫描、预览入口和健康检查。"],
+                ["发布与审计", "发布前检查、发布状态、回滚和操作记录。"],
+                ["Agent 输入", "支持 --json、--stdin、--input-json、@file 和资产 --file。"],
               ].map(([title, body]) => (
                 <div key={title} className="rounded-lg border border-border bg-card p-4">
                   <div className="font-medium">{title}</div>
@@ -89,7 +86,7 @@ export function McpInstallPage({
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold">复制到 Codex</h2>
+                <h2 className="text-xl font-semibold">复制到 Agent</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   粘贴后先做只读自检，再执行项目写操作。
                 </p>
@@ -98,34 +95,38 @@ export function McpInstallPage({
                 type="button"
                 variant="outline"
                 className="gap-2"
-                onClick={() => copyText("prompt", installPrompt)}
+                onClick={() => copyText("prompt", usagePrompt)}
               >
                 {copyIcon("prompt")}
                 复制提示词
               </Button>
             </div>
             <pre className="max-h-[420px] overflow-auto rounded-lg border border-border bg-muted/40 p-4 text-sm leading-6">
-              {installPrompt}
+              {usagePrompt}
             </pre>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2">
-            <ConfigBlock
-              title="本地 stdio"
-              description="适合管理员和本地开发者，直接访问本机 DATA_DIR。"
-              icon={<Terminal className="h-4 w-4" />}
-              text={localConfig}
-              copied={copied === "local"}
-              onCopy={() => copyText("local", localConfig)}
-            />
-            <ConfigBlock
-              title="远程 HTTP"
-              description="适合团队高级用户，通过服务地址和 token 访问授权项目。"
-              icon={<KeyRound className="h-4 w-4" />}
-              text={remoteConfig}
-              copied={copied === "remote"}
-              onCopy={() => copyText("remote", remoteConfig)}
-            />
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold">常用命令</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  所有关键命令都可追加 --json 供 Agent 稳定解析。
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={() => copyText("reference", quickReference)}
+              >
+                {copyIcon("reference")}
+                复制命令
+              </Button>
+            </div>
+            <pre className="overflow-auto rounded-lg border border-border bg-card p-4 text-sm leading-6">
+              {quickReference}
+            </pre>
           </section>
         </div>
 
@@ -144,52 +145,26 @@ export function McpInstallPage({
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="flex items-center gap-2 font-medium">
+              <FileJson className="h-4 w-4" />
+              JSON 约定
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              成功响应包含 ok 和 data，失败响应包含 error.code、error.message 和 nextActions。Agent 不需要解析人类可读文本。
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-2 font-medium">
               <FileText className="h-4 w-4" />
               常见问题
             </div>
             <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>无权限时，只能读取介绍和只读资源，请联系管理员授权项目。</p>
-              <p>连接失败时，先检查 MCP 命令、DATA_DIR、服务地址和 token 是否配置。</p>
+              <p>无权限时，只能读取允许项目，请检查 PROJECT_ADMIN_ALLOWED_PROJECTS。</p>
               <p>事务冲突时，重新打开编辑事务并基于最新项目修改。</p>
+              <p>截图和完整发布产物仍按各服务健康状态返回明确降级原因。</p>
             </div>
           </div>
         </aside>
       </div>
     </main>
-  );
-}
-
-function ConfigBlock({
-  title,
-  description,
-  icon,
-  text,
-  copied,
-  onCopy,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  text: string;
-  copied: boolean;
-  onCopy: () => void;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card">
-      <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-        <div>
-          <div className="flex items-center gap-2 font-medium">
-            {icon}
-            {title}
-          </div>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={onCopy}>
-          {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
-          复制
-        </Button>
-      </div>
-      <pre className="max-h-[320px] overflow-auto p-4 text-xs leading-5">{text}</pre>
-    </div>
   );
 }

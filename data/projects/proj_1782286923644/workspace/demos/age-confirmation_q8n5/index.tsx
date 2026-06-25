@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Soccer, Lock, CheckCircle } from "lucide-react";
+import { Icon } from "@preview/sdk";
+import { Lock, CheckCircle } from "lucide-react";
 
 interface DemoProps {}
 
@@ -10,7 +11,7 @@ function AgeConfirmation({ onConfirm, onDeny }: { onConfirm: () => void; onDeny:
         {/* 弹窗顶部 */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 pt-8 pb-6 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
-            <Soccer className="w-8 h-8 text-white" />
+            <Icon name="football" className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-white text-xl font-bold">年龄确认</h2>
         </div>

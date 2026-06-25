@@ -14,6 +14,7 @@ export {
   PreviewPanel,
   ConfigForm,
   ConfigScopeWrapper,
+  PageConfigPanel,
   NoteButton,
   NoteDialog,
   NotePreview,
@@ -47,6 +48,7 @@ export {
 export type {
   PreviewPanelProps,
   ConfigFormProps,
+  PageConfigPanelPage,
   DocumentEditorFormat,
   DocumentEditorProps,
   ImageItem,

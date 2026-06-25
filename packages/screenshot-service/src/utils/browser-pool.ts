@@ -38,6 +38,14 @@ interface PageMeasurement {
   documentHeight: number;
 }
 
+interface PreviewRuntimeErrorPayload {
+  stage?: string;
+  error?: string;
+  stack?: string;
+  source?: string;
+  line?: number;
+}
+
 interface RenderTask {
   html: string;
   width: number;
@@ -285,6 +293,16 @@ class BrowserPool {
         // Network idle timeout is acceptable — page may have ongoing requests
       }
 
+      const runtimeError = await this.readPreviewRuntimeError(page);
+      if (runtimeError) {
+        const stage = runtimeError.stage ? `${runtimeError.stage}: ` : "";
+        throw new ScreenshotError(
+          "RUNTIME_ERROR",
+          `页面运行时错误: ${stage}${runtimeError.error || "组件运行时发生错误"}`,
+          runtimeError,
+        );
+      }
+
       const measurement = await this.waitForStableMeasurement(page);
       const captureWidth = viewportWidth;
       const captureHeight = fullPage
@@ -331,6 +349,33 @@ class BrowserPool {
       }
       throw new ScreenshotError("SCREENSHOT_ERROR", getErrorMessage(error), error);
     }
+  }
+
+  private async readPreviewRuntimeError(
+    page: Page,
+  ): Promise<PreviewRuntimeErrorPayload | null> {
+    const raw = await page.evaluate(() => {
+      return document.documentElement.getAttribute("data-preview-runtime-error");
+    });
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object") {
+        const payload = parsed as Record<string, unknown>;
+        return {
+          stage: typeof payload.stage === "string" ? payload.stage : undefined,
+          error: typeof payload.error === "string" ? payload.error : undefined,
+          stack: typeof payload.stack === "string" ? payload.stack : undefined,
+          source: typeof payload.source === "string" ? payload.source : undefined,
+          line: typeof payload.line === "number" ? payload.line : undefined,
+        };
+      }
+    } catch {
+      return { error: raw };
+    }
+
+    return { error: raw };
   }
 
   private async waitForStableMeasurement(page: Page): Promise<PageMeasurement> {

@@ -15,6 +15,7 @@ export interface ProjectAdminActor {
   name: string;
   role: ProjectAdminRole;
   source?: string;
+  allowedProjectIds?: string[];
 }
 
 export interface ProjectAdminError {
@@ -82,6 +83,29 @@ export interface PageDetail {
   files: DemoFiles;
 }
 
+export interface ExportedAsset {
+  path: string;
+  dataBase64: string;
+  size: number;
+}
+
+export interface ProjectPackageExport {
+  project: Project;
+  pages: PageDetail[];
+  folders: DemoFolderMeta[];
+  versions: VersionInfo[];
+  projectConfigSchema?: string;
+  assets: ExportedAsset[];
+  baseVersion: string;
+}
+
+export interface PageRestoreResult {
+  success: true;
+  newVersionId: string;
+  restoredAt: number;
+  files: DemoFiles;
+}
+
 export interface PreviewPlan {
   planId: string;
   operation: string;
@@ -114,6 +138,17 @@ export interface PublishStatus {
   publishedVersion?: string;
   publishedAt?: number;
   artifactPath?: string;
+  artifactSummary?: {
+    demoCount: number;
+    projectJsonPath?: string;
+    indexJsonPath?: string;
+    entryPaths: string[];
+  };
+  accessUrls?: {
+    viewerUrl?: string;
+    dataUrl?: string;
+    embedUrls?: Array<{ pageId: string; url: string }>;
+  };
 }
 
 export interface AssetSummary {
@@ -127,6 +162,7 @@ export interface AssetUploadInput {
   filename: string;
   dataBase64: string;
   mimeType?: string;
+  targetPath?: string;
   dryRun?: boolean;
 }
 
@@ -136,7 +172,7 @@ export interface AssetReplaceInput extends AssetUploadInput {
 
 export interface CapabilitySummary {
   actor: ProjectAdminActor;
-  mode: "stdio" | "http" | "readonly";
+  mode: "cli" | "local" | "readonly";
   writable: boolean;
   maxBatchSize: number;
   tools: string[];
@@ -151,6 +187,46 @@ export interface AiSessionSummary {
   createdAt?: number;
   expiresAt?: number;
   path: string;
+}
+
+export interface AiSendMessageInput {
+  sessionId: string;
+  content: string;
+  projectId?: string;
+  workingDir?: string;
+  model?: string;
+  stream?: boolean;
+  timeout?: number;
+}
+
+export interface AiSendMessageResult {
+  sessionId: string;
+  content: string;
+  files?: unknown;
+  metadata?: unknown;
+}
+
+export type TemplateScope = "personal" | "team" | "official";
+
+export interface TemplateListFilter {
+  scope?: TemplateScope;
+  official?: boolean;
+}
+
+export interface TemplateHealthItem {
+  templateId: string;
+  name?: string;
+  scope?: TemplateScope;
+  official?: boolean;
+  ok: boolean;
+  issues: ValidationIssue[];
+}
+
+export interface TemplateHealthReport {
+  checkedAt: number;
+  total: number;
+  ok: boolean;
+  items: TemplateHealthItem[];
 }
 
 export type AuditLevel = "L0" | "L1" | "L2" | "L3" | "L4";
@@ -187,7 +263,9 @@ export interface UpdateProjectInput {
 export interface PageCreateInput {
   editId: string;
   name: string;
+  pageId?: string;
   parentId?: string | null;
+  order?: number;
   code?: string;
   schema?: string;
   dryRun?: boolean;
@@ -224,4 +302,6 @@ export type TemplateMetaInput = Pick<
   "category" | "name" | "description"
 > & {
   thumbnail?: string;
+  scope?: TemplateScope;
+  official?: boolean;
 };

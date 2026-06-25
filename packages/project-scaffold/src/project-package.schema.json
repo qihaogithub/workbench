@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencode-workbench.local/schemas/opencode-project-package.schema.json",
+  "title": "OpenCode Workbench Project Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scaffoldVersion",
+    "projectId",
+    "baseVersion",
+    "name",
+    "pages",
+    "folders",
+    "projectConfig",
+    "assetsDir"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "scaffoldVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    },
+    "folders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/folder"
+      }
+    },
+    "projectConfig": {
+      "type": ["string", "null"]
+    },
+    "assetsDir": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "nodeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "entry", "schema", "parentId", "order"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parentId": {
+          "anyOf": [
+            { "$ref": "#/$defs/nodeId" },
+            { "type": "null" }
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "folder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "parentId", "order"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            { "$ref": "#/$defs/nodeId" },
+            { "type": "null" }
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

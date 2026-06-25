@@ -17,6 +17,7 @@ beforeEach(() => {
 
 afterEach(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
+  delete process.env.AGENT_SERVICE_URL;
 });
 
 describe("ProjectAdminService", () => {
@@ -51,6 +52,71 @@ describe("ProjectAdminService", () => {
     const detail = service.getProject(created.data?.id ?? "");
     expect(detail.data?.pages).toHaveLength(1);
     expect(detail.data?.versions).toHaveLength(1);
+  });
+
+  it("恢复页面历史版本并生成新的项目版本", () => {
+    const created = service.createProject({ name: "页面恢复项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "首页",
+      code: "export default function Demo(){ return <div>current</div>; }",
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+    const committed = service.commitEdit(editId, "当前版本");
+    expect(committed.ok).toBe(true);
+
+    const snapshotPath = path.join(tempDir, "snapshots", projectId, "pages", pageId, "pv1");
+    fs.mkdirSync(snapshotPath, { recursive: true });
+    fs.writeFileSync(
+      path.join(snapshotPath, "index.tsx"),
+      "export default function Demo(){ return <div>restored</div>; }",
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(snapshotPath, "config.schema.json"),
+      JSON.stringify({ type: "object", properties: {} }, null, 2),
+      "utf-8",
+    );
+    const projectPath = path.join(tempDir, "projects", projectId, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    project.pageVersions = {
+      [pageId]: [
+        {
+          versionId: "pv1",
+          demoId: pageId,
+          demoName: "首页",
+          savedAt: Date.now(),
+          savedBy: "tester",
+          sessionId: "page-test",
+          snapshotPath,
+          fileCount: 2,
+          note: "页面旧版本",
+        },
+      ],
+    };
+    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2), "utf-8");
+
+    const restored = service.restorePageVersion(projectId, pageId, "pv1", {
+      id: "admin",
+      name: "Admin",
+      role: "admin",
+    });
+    expect(restored.ok).toBe(true);
+    expect(restored.data?.newVersionId).toBe("v2");
+    expect(restored.data?.files.code).toContain("restored");
+
+    const workspaceCode = fs.readFileSync(
+      path.join(tempDir, "projects", projectId, "workspace", "demos", pageId, "index.tsx"),
+      "utf-8",
+    );
+    expect(workspaceCode).toContain("restored");
+
+    const detail = service.getProject(projectId);
+    expect(detail.data?.versions[0]?.versionId).toBe("v2");
+    expect(detail.data?.versions).toHaveLength(2);
   });
 
   it("阻止项目级 Schema 与页面 Schema 字段冲突", () => {
@@ -162,5 +228,184 @@ describe("ProjectAdminService", () => {
       role: "admin",
     });
     expect(adminEdit.ok).toBe(true);
+  });
+
+  it("按操作者项目白名单过滤列表并拒绝越权读取", () => {
+    const first = service.createProject({ name: "可访问项目" });
+    const second = service.createProject({ name: "不可访问项目" });
+    const allowedProjectId = first.data?.id ?? "";
+    const deniedProjectId = second.data?.id ?? "";
+    const actor = {
+      id: "svc",
+      name: "Service Account",
+      role: "creator" as const,
+      allowedProjectIds: [allowedProjectId],
+    };
+
+    const list = service.listProjects(actor);
+    expect(list.data?.map((project) => project.id)).toEqual([allowedProjectId]);
+
+    const allowed = service.getProject(allowedProjectId, actor);
+    expect(allowed.ok).toBe(true);
+
+    const denied = service.getProject(deniedProjectId, actor);
+    expect(denied.ok).toBe(false);
+    expect(denied.error?.code).toBe("FORBIDDEN");
+  });
+
+  it("通过 agent-service HTTP API 发送 AI 会话消息", async () => {
+    const created = service.createProject({ name: "AI 项目" });
+    const projectId = created.data?.id ?? "";
+    const sessionId = "session_ai_test";
+    const sessionDir = path.join(tempDir, "sessions", projectId, sessionId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionDir, ".session.json"),
+      JSON.stringify(
+        {
+          sessionId,
+          demoId: projectId,
+          status: "editing",
+          createdAt: Date.now(),
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const originalFetch = globalThis.fetch;
+    let receivedUrl = "";
+    let receivedBody: Record<string, unknown> | undefined;
+    process.env.AGENT_SERVICE_URL = "http://agent-service.test";
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      receivedUrl = input.toString();
+      receivedBody = JSON.parse(String(init?.body ?? "{}"));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            sessionId,
+            content: "收到",
+            files: [],
+            metadata: { ok: true },
+          },
+        }),
+      } as Response;
+    }) as typeof fetch;
+    try {
+      const result = await service.sendAiMessage({ sessionId, content: "请更新首页" });
+
+      expect(result.ok).toBe(true);
+      expect(result.data?.content).toBe("收到");
+      expect(receivedUrl).toBe(`http://agent-service.test/api/agent/${sessionId}/message`);
+      expect(receivedBody).toMatchObject({
+        content: "请更新首页",
+        demoId: projectId,
+        customWorkspace: false,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("支持团队模板分层、官方标记和健康检查报告", () => {
+    const created = service.createProject({ name: "模板源项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+    service.createPage({ editId, name: "首页" });
+    service.commitEdit(editId, "模板页面");
+
+    const template = service.createTemplateFromProject(created.data?.id ?? "", {
+      category: "营销活动",
+      name: "官方模板",
+      description: "用于团队复用",
+      scope: "official",
+      official: true,
+    });
+    expect(template.ok).toBe(true);
+    expect(template.data?.scope).toBe("official");
+    expect(template.data?.official).toBe(true);
+
+    const officialList = service.listTemplates({ scope: "official", official: true });
+    expect(officialList.data?.map((item) => item.id)).toEqual([template.data?.id]);
+
+    const updated = service.updateTemplateMeta(template.data?.id ?? "", {
+      scope: "team",
+      official: false,
+    });
+    expect(updated.data?.scope).toBe("team");
+    expect(updated.data?.official).toBe(false);
+
+    const report = service.checkTemplateHealth(template.data?.id);
+    expect(report.ok).toBe(true);
+    expect(report.data?.ok).toBe(true);
+    expect(report.data?.items[0]?.templateId).toBe(template.data?.id);
+    expect(
+      fs.existsSync(path.join(tempDir, ".project-admin", "template-health", "latest.json")),
+    ).toBe(true);
+  });
+
+  it("演练管理员预设模板、批量页面维护、发布和回滚", () => {
+    const source = service.createProject({ name: "官方模板源" });
+    const sourceEdit = service.beginEdit(source.data?.id ?? "");
+    const sourceEditId = (sourceEdit.data as EditTransaction).editId;
+    service.createPage({ editId: sourceEditId, name: "首页" });
+    service.createPage({ editId: sourceEditId, name: "规则页" });
+    service.commitEdit(sourceEditId, "模板基础页面");
+
+    const template = service.createTemplateFromProject(source.data?.id ?? "", {
+      category: "活动模板",
+      name: "官方活动模板",
+      description: "官方模板演练",
+      scope: "official",
+      official: true,
+    });
+    expect(template.ok).toBe(true);
+
+    const project = service.instantiateTemplate(template.data?.id ?? "", "从官方模板创建");
+    const projectId = project.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const pageList = service.listPages(editId);
+    const pages = pageList.data?.pages ?? [];
+    expect(pages).toHaveLength(2);
+
+    const extra = service.createPage({ editId, name: "领奖页" });
+    const extraPageId = (extra.data as PageDetail).meta.id;
+    const reordered = service.reorderPages(
+      editId,
+      {
+        pages: [
+          ...pages.map((page, index) => ({ id: page.id, order: index + 1, parentId: page.parentId })),
+          { id: extraPageId, order: 0, parentId: null },
+        ],
+      },
+    );
+    expect(reordered.ok).toBe(true);
+
+    const firstCommit = service.commitEdit(editId, "批量维护页面");
+    expect(firstCommit.ok).toBe(true);
+    const published = service.publishProject(projectId);
+    expect(published.ok).toBe(true);
+    expect(published.data?.publishedVersion).toBe("v1");
+    expect(published.data?.artifactSummary?.demoCount).toBe(3);
+    expect(published.data?.artifactSummary?.entryPaths).toContain("project-admin-status.json");
+    expect(published.data?.accessUrls?.viewerUrl).toBe(`/projects/${projectId}`);
+    expect(published.data?.accessUrls?.embedUrls?.map((item) => item.pageId)).toContain(extraPageId);
+
+    const secondEdit = service.beginEdit(projectId);
+    const secondEditId = (secondEdit.data as EditTransaction).editId;
+    service.createPage({ editId: secondEditId, name: "二次调整页" });
+    expect(service.commitEdit(secondEditId, "发布后调整").ok).toBe(true);
+
+    const republished = service.publishProject(projectId);
+    expect(republished.data?.publishedVersion).toBe("v2");
+
+    const rolledBack = service.publishRollback(projectId);
+    expect(rolledBack.ok).toBe(true);
+    expect(rolledBack.data?.publishedVersion).toBe("v1");
   });
 });

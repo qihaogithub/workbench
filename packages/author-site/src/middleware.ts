@@ -8,7 +8,7 @@ import {
   getAdminSecret,
 } from "@/lib/admin-auth";
 
-const PROTECTED_PAGE_ROUTES = ["/demo", "/mcp"];
+const PROTECTED_PAGE_ROUTES = ["/demo", "/cli"];
 const PROTECTED_API_ROUTES = ["/api/sessions"];
 const AUTH_ROUTES = ["/login", "/register"];
 const ADMIN_ROUTES = ["/admin"];

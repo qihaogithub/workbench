@@ -5,6 +5,8 @@ export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './co
 export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES } from './canvas-render-scheduler';
 export { buildPreviewResourceFingerprint, clearPreviewResourceCacheForTests, extractPreviewImageUrls, getPreviewPageResourceDescriptor, getPreviewResourceCacheStats, normalizePreviewImageUrl, prewarmPreviewImageUrls, resolvePreviewRelativePath } from './preview-resource-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
+export { PageConfigPanel } from './PageConfigPanel';
+export type { PageConfigPanelPage } from './PageConfigPanel';
 export { ConfigForm } from './ConfigForm';
 export { PreviewPanel } from './PreviewPanel';
 export { NoteButton } from './NoteButton';

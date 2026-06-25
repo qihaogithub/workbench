@@ -96,4 +96,55 @@ describe("BrowserPool", () => {
     await expect(tasks[3]).rejects.toMatchObject({ code: "QUEUE_TIMEOUT" });
     await Promise.allSettled(tasks.slice(0, 3));
   });
+
+  it("页面写入运行时错误标记时返回 RUNTIME_ERROR", async () => {
+    const counters = { active: 0, max: 0 };
+    const screenshot = vi.fn(() => Buffer.from("png"));
+
+    vi.doMock("puppeteer-core", () => ({
+      default: {
+        launch: vi.fn(async () => ({
+          connected: true,
+          on: vi.fn(),
+          newPage: vi.fn(() => {
+            counters.active++;
+            counters.max = Math.max(counters.max, counters.active);
+            return {
+              setViewport: vi.fn(),
+              setContent: vi.fn(),
+              waitForSelector: vi.fn(),
+              waitForNetworkIdle: vi.fn(),
+              evaluate: vi.fn(async (fn: () => unknown) => {
+                if (String(fn).includes("data-preview-runtime-error")) {
+                  return JSON.stringify({
+                    stage: "dependency_import",
+                    error: "lucide-react does not export Soccer",
+                  });
+                }
+                return {
+                  bodyWidth: 100,
+                  bodyHeight: 180,
+                  documentWidth: 100,
+                  documentHeight: 180,
+                };
+              }),
+              screenshot,
+              close: vi.fn(() => {
+                counters.active--;
+                return Promise.resolve();
+              }),
+            };
+          }),
+          close: vi.fn(),
+        })),
+      },
+    }));
+
+    const { getBrowserPool } = await import("../src/utils/browser-pool");
+    const pool = getBrowserPool();
+
+    await expect(pool.renderPage("<div id=\"root\"></div>", 100, 100, false))
+      .rejects.toMatchObject({ code: "RUNTIME_ERROR" });
+    expect(screenshot).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,5 @@
-import { Smartphone, Download, QrCode, Chrome, Trophy } from "lucide-react";
+import { Icon } from "@preview/sdk";
+import { Smartphone, Download, QrCode, Trophy } from "lucide-react";
 
 interface DemoProps {}
 
@@ -83,7 +84,7 @@ export default function Demo(_props: DemoProps) {
             {/* 微信环境 */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3">
-                <Chrome className="w-6 h-6 text-yellow-600" />
+                <Icon name="browser" className="w-6 h-6 text-yellow-600" />
                 <p className="text-sm text-yellow-800 font-medium">
                   点击右上角 <span className="font-bold">···</span> → 在浏览器中打开
                 </p>

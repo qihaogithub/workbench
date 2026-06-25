@@ -9,10 +9,9 @@ const config: Config = {
   coverageProvider: 'v8',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@opencode-workbench/project-admin-mcp$': '<rootDir>/../project-admin-mcp/src/server.ts',
-    '^@opencode-workbench/project-admin-mcp/protocol$': '<rootDir>/../project-admin-mcp/src/protocol.ts',
     '^@opencode-workbench/project-core$': '<rootDir>/../project-core/src/index.ts',
     '^@opencode-workbench/shared$': '<rootDir>/../shared/src/index.ts',
   },

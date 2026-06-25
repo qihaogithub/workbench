@@ -1,8 +1,8 @@
 {
   "id": "proj_1779608460378",
   "name": "广场页面",
-  "publishedVersion": "v57",
-  "publishedAt": 1782190633325,
+  "publishedVersion": "v59",
+  "publishedAt": 1782402146798,
   "demoPages": [
     {
       "id": "demo_1779608460379_a1b2c3",
@@ -19,20 +19,6 @@
       "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     },
     {
-      "id": "page_b31r",
-      "name": "广场页面-平板 - 副本",
-      "order": 0,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_b31r/compiled.js",
-      "schemaPath": "demos/page_b31r/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_b31r/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_b31r/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
       "id": "demo_1779608460380_d4e5f6",
       "name": "广场页面-平板",
       "order": 1,
@@ -45,197 +31,8 @@
       },
       "iframeHtmlPath": "demos/demo_1779608460380_d4e5f6/iframe.html",
       "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_2vpk",
-      "name": "广场页面-平板 - 副本 - 副本",
-      "order": 1,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_2vpk/compiled.js",
-      "schemaPath": "demos/page_2vpk/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_2vpk/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_2vpk/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "demo_1780550141175_a79047",
-      "name": "科技感首页",
-      "order": 2,
-      "parentId": null,
-      "compiledJsPath": "demos/demo_1780550141175_a79047/compiled.js",
-      "schemaPath": "demos/demo_1780550141175_a79047/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/demo_1780550141175_a79047/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1780550141175_a79047/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_q3yo",
-      "name": "广场页面-手机 - 副本",
-      "order": 2,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_q3yo/compiled.js",
-      "schemaPath": "demos/page_q3yo/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/page_q3yo/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_q3yo/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_gwdv",
-      "name": "广场页面-手机 - 副本",
-      "order": 3,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_gwdv/compiled.js",
-      "schemaPath": "demos/page_gwdv/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/page_gwdv/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_gwdv/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_b9db",
-      "name": "广场页面-平板 - 副本",
-      "order": 4,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_b9db/compiled.js",
-      "schemaPath": "demos/page_b9db/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_b9db/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_b9db/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_qza9",
-      "name": "广场页面-手机 - 副本",
-      "order": 5,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_qza9/compiled.js",
-      "schemaPath": "demos/page_qza9/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/page_qza9/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_qza9/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_8hcu",
-      "name": "广场页面-手机 - 副本",
-      "order": 6,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_8hcu/compiled.js",
-      "schemaPath": "demos/page_8hcu/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/page_8hcu/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_8hcu/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_ugfv",
-      "name": "广场页面-手机 - 副本",
-      "order": 7,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_ugfv/compiled.js",
-      "schemaPath": "demos/page_ugfv/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      },
-      "iframeHtmlPath": "demos/page_ugfv/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_ugfv/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_ihtj",
-      "name": "广场页面-平板 - 副本",
-      "order": 8,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_ihtj/compiled.js",
-      "schemaPath": "demos/page_ihtj/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_ihtj/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_ihtj/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_bv0k",
-      "name": "广场页面-平板 - 副本",
-      "order": 9,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_bv0k/compiled.js",
-      "schemaPath": "demos/page_bv0k/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_bv0k/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_bv0k/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_e2j6",
-      "name": "广场页面-平板 - 副本",
-      "order": 10,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_e2j6/compiled.js",
-      "schemaPath": "demos/page_e2j6/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_e2j6/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_e2j6/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_c99m",
-      "name": "广场页面-平板 - 副本",
-      "order": 11,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_c99m/compiled.js",
-      "schemaPath": "demos/page_c99m/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_c99m/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_c99m/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
-    },
-    {
-      "id": "page_brjd",
-      "name": "广场页面-平板 - 副本",
-      "order": 12,
-      "parentId": "folder_1782045243460_8dtpmd",
-      "compiledJsPath": "demos/page_brjd/compiled.js",
-      "schemaPath": "demos/page_brjd/schema.json",
-      "previewSize": {
-        "width": 1024,
-        "height": 768
-      },
-      "iframeHtmlPath": "demos/page_brjd/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/page_brjd/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     }
   ],
-  "demoFolders": [
-    {
-      "id": "folder_1782045243460_8dtpmd",
-      "name": "副本",
-      "parentId": null,
-      "order": 0
-    }
-  ],
+  "demoFolders": [],
   "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"广场页面 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"bigBannerForeground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner前景图\",\n      \"description\": \"手机和平板共用的大Banner前景图片，推荐尺寸 1248×384\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 384,\n        \"maxHeight\": 384\n      }\n    },\n    \"bigBannerBackground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner背景图\",\n      \"description\": \"手机和平板共用的大Banner背景图片，推荐尺寸 1248×344\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 344,\n        \"maxHeight\": 344\n      }\n    },\n    \"miniBanners\": {\n      \"type\": \"array\",\n      \"title\": \"小Banner图片列表\",\n      \"description\": \"小Banner滚动区域的图片列表，每张推荐尺寸 480×270\",\n      \"ui:widget\": \"imageList\",\n      \"ui:options\": {\n        \"maxItems\": 10,\n        \"minWidth\": 480,\n        \"maxWidth\": 480,\n        \"minHeight\": 270,\n        \"maxHeight\": 270\n      },\n      \"items\": {\n        \"type\": \"string\",\n        \"format\": \"image\"\n      },\n      \"default\": [\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png\",\n        \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png\"\n      ]\n    }\n  }\n}"
 }

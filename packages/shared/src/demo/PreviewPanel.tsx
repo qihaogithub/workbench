@@ -532,7 +532,9 @@ export function PreviewPanel({
         if (cancelled) return;
 
         if (!result.success) {
-          setCompileError(result.error?.message || "编译失败");
+          const message = result.error?.message || "编译失败";
+          setCompileError(message);
+          onError?.(new Error(message));
           setPendingCompileResult(null);
           setLastSuccessfulResult(null);
           setIsCompiling(false);
@@ -557,7 +559,9 @@ export function PreviewPanel({
         setIsCompiling(false);
       } catch (err) {
         if (cancelled) return;
-        setCompileError(err instanceof Error ? err.message : "编译失败");
+        const message = err instanceof Error ? err.message : "编译失败";
+        setCompileError(message);
+        onError?.(new Error(message));
         setPendingCompileResult(null);
         setLastSuccessfulResult(null);
         setIsCompiling(false);
@@ -579,6 +583,7 @@ export function PreviewPanel({
     validCode,
     sendUpdateCode,
     sendUpdateCodeUrl,
+    onError,
   ]);
 
   useEffect(() => {
@@ -884,25 +889,18 @@ export function PreviewPanel({
 
       {compileError && !isCompiling && (
         <div
-          className="absolute inset-0 z-30 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
-          style={{ maxHeight: "200px", overflow: "auto" }}
+          className="absolute inset-0 z-30 m-2 flex flex-col items-center justify-center rounded-lg border border-destructive/40 bg-background/95 p-4 text-center"
         >
-          <p className="text-red-800 font-medium">编译错误</p>
-          <pre className="text-red-600 text-sm mt-2 whitespace-pre-wrap">
-            {compileError}
-          </pre>
+          <p className="text-sm font-medium text-destructive">编译错误</p>
+          <p className="mt-1 text-xs text-muted-foreground">{compileError}</p>
         </div>
       )}
 
       {runtimeError && !isCompiling && (
         <div
-          className="absolute inset-0 z-30 p-4 bg-red-50/95 border border-red-200 rounded-lg m-2"
-          style={{ maxHeight: "200px", overflow: "auto" }}
+          className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
         >
-          <p className="text-red-800 font-medium">运行时错误</p>
-          <pre className="text-red-600 text-sm mt-2 whitespace-pre-wrap">
-            {runtimeError}
-          </pre>
+          <p className="text-sm font-medium text-muted-foreground">正在修复预览</p>
         </div>
       )}
 

@@ -271,6 +271,8 @@ function readTemplateMeta(templateId: string): ProjectTemplateMeta | null {
       name: parsed.name,
       description: parsed.description,
       thumbnail: parsed.thumbnail,
+      scope: parsed.scope,
+      official: parsed.official,
       demoCount: parsed.demoCount ?? parsed.demoPages?.length ?? 0,
       demoPages: parsed.demoPages,
       createdAt: parsed.createdAt,
