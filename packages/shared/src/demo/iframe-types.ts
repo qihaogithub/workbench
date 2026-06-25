@@ -19,6 +19,8 @@ export type IframeOutMessageType =
 export type IframeInMessageType =
   | 'UPDATE_CODE'
   | 'UPDATE_CONFIG'
+  | 'SLEEP'
+  | 'WAKE'
   | 'COLLECT_THUMBNAIL_LAYOUT'
   | 'COLLECT_POSITIONABLE_SIZES'
   | 'UPDATE_VISUAL_EDIT_STATE'

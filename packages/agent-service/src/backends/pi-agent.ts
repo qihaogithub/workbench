@@ -1,7 +1,8 @@
 import { IBackendAdapter, BackendStatus } from './base';
-import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
+import { AgentConfig, AgentEvent, FileChange, ImageAttachment, PlanItem } from '../core/types';
 import { createWorkbenchTools, type PermissionHandler, type SubagentRunResult } from './pi-tools';
 import { PERMISSION_TIMEOUT } from './pi-tools/delete-page-tool';
+import type { PlanApprovalRequest, PlanApprovalResult } from './pi-tools/plan-approval-tool';
 import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
@@ -27,6 +28,8 @@ function isKnowledgeBasePath(filePath: string, workingDir: string): boolean {
 // 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
 // (ES Module 中 import 在顶层代码前执行,直接 const serviceConfig = loadConfig() 会读到默认值)
 let _serviceConfig: ServiceConfig | null = null;
+const PLAN_APPROVAL_TIMEOUT_MS = 10 * 60_000;
+
 function getServiceConfig(): ServiceConfig {
   if (!_serviceConfig) {
     _serviceConfig = loadConfig();
@@ -263,13 +266,14 @@ export class PiAgentBackend implements IBackendAdapter {
   private status: BackendStatus = "idle";
   private eventCallback?: (event: AgentEvent) => void;
   private files: FileChange[] = [];
+  private planItems: PlanItem[] = [];
   private emittedFileOperationKeys = new Set<string>();
   private readKnowledgeFiles: Set<string> = new Set();
   private timeout?: number;
   private sessionId: string | null = null;
   private currentSystemPrompt: string = '';
   private unsubFns: Array<() => void> = [];
-  private pendingPermissions: Map<string, { resolve: (approved: boolean) => void; reject: (error: Error) => void }> = new Map();
+  private pendingPermissions: Map<string, { resolve: (result: { approved: boolean; responseContent?: string }) => void; reject: (error: Error) => void }> = new Map();
   private selectedModel: { provider: string; modelId: string } | null = null;
   private imageDescriber: ImageDescriber;
   private activeSubagents: Set<any> = new Set();
@@ -351,6 +355,7 @@ export class PiAgentBackend implements IBackendAdapter {
         {
           includeDelegateTask: this.areSubagentsEnabled(),
           subagentRunner: (params, signal) => this.runSubagent(params, signal),
+          planApprovalHandler: (toolCallId, request) => this.requestPlanApproval(toolCallId, request),
         },
       );
 
@@ -712,6 +717,35 @@ export class PiAgentBackend implements IBackendAdapter {
     }
   }
 
+  private updatePlanFromToolResult(toolName: string | undefined, isError: boolean, event: any, sessionId: string): void {
+    if (toolName !== 'updatePlan' || isError || !this.eventCallback) return;
+
+    const details = getToolResultDetails(event);
+    const items = details?.items;
+    if (!Array.isArray(items)) return;
+
+    const normalized = items
+      .filter((item: any) =>
+        typeof item?.id === 'string' &&
+        typeof item?.title === 'string' &&
+        ['pending', 'in_progress', 'completed', 'failed'].includes(item?.status),
+      )
+      .map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+      }));
+
+    if (normalized.length !== items.length || normalized.length === 0) return;
+
+    this.planItems = normalized;
+    this.eventCallback({
+      type: 'plan',
+      sessionId,
+      content: JSON.stringify({ items: this.planItems }),
+    });
+  }
+
   private setupToolHooks(
     harness: any,
     unsubStore: Array<() => void>,
@@ -937,16 +971,68 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
     // 等待用户确认或超时
     return new Promise<boolean>((resolve) => {
-      this.pendingPermissions.set(toolCallId, { resolve, reject: (err: Error) => resolve(false) });
+      this.pendingPermissions.set(toolCallId, {
+        resolve: (result) => resolve(result.approved),
+        reject: (_err: Error) => resolve(false),
+      });
 
       // 超时自动拒绝
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (this.pendingPermissions.has(toolCallId)) {
           this.pendingPermissions.delete(toolCallId);
           logger.warn({ toolCallId }, 'deletePage: permission request timed out');
           resolve(false);
         }
       }, PERMISSION_TIMEOUT);
+      timeoutId.unref?.();
+    });
+  }
+
+  private requestPlanApproval(toolCallId: string, request: PlanApprovalRequest): Promise<PlanApprovalResult> {
+    const sessionId = this.sessionId ?? this.config.sessionId;
+
+    logger.info({ toolCallId, title: request.title }, 'planApproval: requesting user approval');
+
+    if (this.eventCallback) {
+      this.eventCallback({
+        type: 'permission_request',
+        sessionId,
+        permissionRequest: {
+          sessionId,
+          options: [
+            { optionId: 'allow_once', name: '批准执行' },
+            { optionId: 'reject_once', name: '取消' },
+          ],
+          toolCall: {
+            toolCallId,
+            title: request.title || '执行计划',
+            kind: 'execute',
+            summary: request.planMarkdown,
+            approvalKind: 'plan_approval',
+            editable: true,
+            initialContent: request.planMarkdown,
+          },
+        },
+      });
+    }
+
+    return new Promise<PlanApprovalResult>((resolve) => {
+      this.pendingPermissions.set(toolCallId, {
+        resolve: (result) => resolve({
+          approved: result.approved,
+          planMarkdown: result.responseContent,
+        }),
+        reject: (_err: Error) => resolve({ approved: false }),
+      });
+
+      const timeoutId = setTimeout(() => {
+        if (this.pendingPermissions.has(toolCallId)) {
+          this.pendingPermissions.delete(toolCallId);
+          logger.warn({ toolCallId }, 'planApproval: permission request timed out');
+          resolve({ approved: false });
+        }
+      }, PLAN_APPROVAL_TIMEOUT_MS);
+      timeoutId.unref?.();
     });
   }
 
@@ -1013,6 +1099,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
           const details = getToolResultDetails(event);
           this.recordToolFileChange(event.toolName, input, event.isError, event);
           this.emitFileOperationsForTool(event.toolName, input, event.isError, event, sessionId);
+          this.updatePlanFromToolResult(event.toolName, event.isError, event, sessionId);
           this.eventCallback({
             type: 'tool_call_update',
             sessionId,
@@ -1050,6 +1137,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
         // 工具结果（来自 AgentHarness 自有事件）
         case 'tool_result':
           const details = getToolResultDetails(event);
+          this.updatePlanFromToolResult(event.toolName, event.isError, event, sessionId);
           this.eventCallback({
             type: 'tool_call_update',
             sessionId,
@@ -1133,7 +1221,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       const tools = createWorkbenchTools(
         this.config,
         (toolCallId, pageName) => this.requestPermission(toolCallId, pageName),
-        { includeDelegateTask: false },
+        { includeDelegateTask: false, includePlanApproval: false },
       );
       const model = this.getModel();
 
@@ -1518,11 +1606,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
   /**
    * 解除权限等待：前端用户确认或取消后调用
    */
-  resolvePermission(toolCallId: string, approved: boolean): void {
+  resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
     const pending = this.pendingPermissions.get(toolCallId);
     if (pending) {
       this.pendingPermissions.delete(toolCallId);
-      pending.resolve(approved);
+      pending.resolve({ approved, responseContent });
       logger.info({ toolCallId, approved }, 'deletePage: permission resolved');
     } else {
       logger.warn({ toolCallId }, 'deletePage: no pending permission found for toolCallId');

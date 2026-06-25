@@ -13,6 +13,9 @@ import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
+import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
+import { createRequestPlanApprovalTool, type PlanApprovalHandler } from "./plan-approval-tool";
+import { createUpdatePlanTool } from "./plan-tool";
 import {
   createDeletePageTool,
   createDeletePagesTool,
@@ -24,7 +27,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 3;
+export const WORKBENCH_TOOL_VERSION = 6;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -32,6 +35,8 @@ export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
 export interface WorkbenchToolsOptions {
   includeDelegateTask?: boolean;
   subagentRunner?: SubagentRunner;
+  includePlanApproval?: boolean;
+  planApprovalHandler?: PlanApprovalHandler;
 }
 
 export function createWorkbenchTools(
@@ -52,6 +57,11 @@ export function createWorkbenchTools(
     createGetConsoleLogsTool(config),
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
+    createArrangeCanvasPagesTool(config),
+    ...(options.includePlanApproval === false
+      ? []
+      : [createRequestPlanApprovalTool(options.planApprovalHandler)]),
+    createUpdatePlanTool(),
     createListPagesTool(config),
     createPreviewDeletePagesTool(config, deletionPlanStore),
     createExecuteDeletePagePlanTool(

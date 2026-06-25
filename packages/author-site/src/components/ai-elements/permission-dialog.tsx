@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Shield, AlertTriangle } from 'lucide-react'
+import { Shield, AlertTriangle, FileText, X } from 'lucide-react'
+import { DocumentEditor } from '@opencode-workbench/shared/demo'
 
 interface PermissionRequestData {
   sessionId: string
@@ -16,12 +18,15 @@ interface PermissionRequestData {
     kind?: string
     summary?: string
     planId?: string
+    approvalKind?: 'delete' | 'plan_approval'
+    editable?: boolean
+    initialContent?: string
   }
 }
 
 interface PermissionDialogProps {
   request: PermissionRequestData
-  onRespond: (optionId: string) => void
+  onRespond: (optionId: string, responseContent?: string) => void
   onCancel: () => void
   className?: string
   variant?: 'modal' | 'inline'
@@ -46,6 +51,88 @@ export function PermissionDialog({
   const toolLabel = getToolKindLabel(request.toolCall.kind)
   const toolTitle = request.toolCall.title || request.toolCall.toolCallId
   const isInline = variant === 'inline'
+  const isPlanApproval = request.toolCall.approvalKind === 'plan_approval'
+  const initialPlan = request.toolCall.initialContent || request.toolCall.summary || ''
+  const [isPlanOpen, setIsPlanOpen] = useState(false)
+  const [editablePlan, setEditablePlan] = useState(initialPlan)
+
+  if (isPlanApproval) {
+    return (
+      <>
+        <div className={cn(isInline ? 'px-4 py-2' : '', className)}>
+          <div className="w-full rounded-lg border bg-background shadow-sm">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="p-2 rounded-full bg-blue-500/10">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium">执行计划待确认</h3>
+                <p className="text-xs text-muted-foreground">
+                  Agent 已制定计划，批准后才会继续执行
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setIsPlanOpen(true)}>
+                查看计划
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {isPlanOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="mx-4 flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl">
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                  <h3 className="font-medium">{toolTitle}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    可编辑计划内容，批准后 Agent 将按最终版本继续执行
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPlanOpen(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-hidden p-4">
+                <DocumentEditor
+                  value={editablePlan}
+                  onChange={setEditablePlan}
+                  format="markdown"
+                  placeholder="编辑执行计划..."
+                  className="min-h-[420px]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-4 py-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setIsPlanOpen(false)
+                    onRespond('reject_once')
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsPlanOpen(false)
+                    onRespond('allow_once', editablePlan)
+                  }}
+                >
+                  批准执行
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   return (
     <div className={cn(

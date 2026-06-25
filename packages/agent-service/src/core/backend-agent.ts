@@ -26,7 +26,7 @@ interface BackendWithModelSupport extends IBackendAdapter {
   }>;
   getLastResponseDebug?: () => unknown;
   cancelPrompt?: () => void;
-  resolvePermission?: (toolCallId: string, approved: boolean) => void;
+  resolvePermission?: (toolCallId: string, approved: boolean, responseContent?: string) => void;
   updateConfig?: (config: Partial<AgentConfig>) => void;
 }
 
@@ -211,9 +211,9 @@ export class BackendAgent extends BaseAgent {
   /**
    * 解除权限等待：前端用户确认或取消后调用
    */
-  resolvePermission(toolCallId: string, approved: boolean): void {
+  resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
     if (this.backend.resolvePermission) {
-      this.backend.resolvePermission(toolCallId, approved);
+      this.backend.resolvePermission(toolCallId, approved, responseContent);
     } else {
       logger.warn({ toolCallId }, 'Backend does not support resolvePermission');
     }

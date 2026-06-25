@@ -1045,6 +1045,7 @@ ${cssLinks}
     let currentConfig = ${initialConfig};
     let currentComponent = null;
     let updateVersion = 0;
+    let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
 
@@ -1121,6 +1122,19 @@ ${cssLinks}
 
       const { type, code, configData: newConfigData, cssImports: newCssImports${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
+      if (type === 'SLEEP') {
+        isSleeping = true;
+        return;
+      }
+
+      if (type === 'WAKE') {
+        isSleeping = false;
+        requestAnimationFrame(function() {
+          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height }, '*');
+        });
+        return;
+      }
+
       ${updateCodeHandler}
 
       if (type === 'UPDATE_CONFIG') {
@@ -1132,6 +1146,7 @@ ${cssLinks}
       }
 
       if (type === 'COLLECT_POSITIONABLE_SIZES') {
+        if (isSleeping) return;
         // 使用 requestAnimationFrame 等待 React 渲染完成后再测量 DOM
         requestAnimationFrame(function() {
           try {
@@ -1196,6 +1211,7 @@ ${cssLinks}
       }
 
       if (type === 'COLLECT_THUMBNAIL_LAYOUT') {
+        if (isSleeping) return;
         try {
           (function() {
             function getCleanText(el) {
@@ -1273,6 +1289,7 @@ ${cssLinks}
       }
 
       if (type === 'COLLECT_VISUAL_NODE_TREE') {
+        if (isSleeping) return;
         try {
           var nodes = [];
           var allVisualNodes = document.body.querySelectorAll('*');
@@ -1297,6 +1314,7 @@ ${cssLinks}
     });
 
     const resizeObserver = new ResizeObserver((entries) => {
+      if (isSleeping) return;
       for (const entry of entries) {
         const height = entry.contentRect.height;
         window.parent.postMessage({ type: 'RESIZE', height }, '*');

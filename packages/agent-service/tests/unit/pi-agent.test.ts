@@ -393,6 +393,97 @@ describe('PiAgentBackend', () => {
       );
     });
 
+    it('应在 updatePlan 成功后发出结构化 plan 事件，失败时不覆盖', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      const events: any[] = [];
+
+      backend.onStream((event) => events.push(event));
+      await backend.start();
+
+      const harness = piAgentMocks.harnesses[0];
+      harness.subscriber?.({
+        type: 'tool_result',
+        toolCallId: 'plan-1',
+        toolName: 'updatePlan',
+        isError: false,
+        result: {
+          content: [{ type: 'text', text: 'Plan updated: 1/2 completed.' }],
+          details: {
+            success: true,
+            items: [
+              { id: 'inspect', title: '检查现状', status: 'completed' },
+              { id: 'implement', title: '实现功能', status: 'in_progress' },
+            ],
+          },
+        },
+      });
+      harness.subscriber?.({
+        type: 'tool_result',
+        toolCallId: 'plan-2',
+        toolName: 'updatePlan',
+        isError: true,
+        result: {
+          content: [{ type: 'text', text: 'Error updating plan' }],
+          details: {
+            success: false,
+            items: [
+              { id: 'failed', title: '失败计划', status: 'failed' },
+            ],
+          },
+        },
+      });
+
+      const planEvents = events.filter((event) => event.type === 'plan');
+      expect(planEvents).toHaveLength(1);
+      expect(JSON.parse(planEvents[0].content)).toEqual({
+        items: [
+          { id: 'inspect', title: '检查现状', status: 'completed' },
+          { id: 'implement', title: '实现功能', status: 'in_progress' },
+        ],
+      });
+    });
+
+    it('requestPlanApproval 应发出可编辑权限请求并返回用户编辑后的计划', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      const events: any[] = [];
+
+      backend.onStream((event) => events.push(event));
+      await backend.start();
+
+      const requestPlanApproval = piAgentMocks.harnesses[0].options.tools.find(
+        (tool: any) => tool.name === 'requestPlanApproval',
+      );
+      const resultPromise = requestPlanApproval.execute('approval-1', {
+        title: '执行计划',
+        planMarkdown: '## 原计划',
+      });
+
+      await vi.waitFor(() => {
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: 'permission_request',
+            permissionRequest: expect.objectContaining({
+              toolCall: expect.objectContaining({
+                toolCallId: 'approval-1',
+                approvalKind: 'plan_approval',
+                editable: true,
+                initialContent: '## 原计划',
+              }),
+            }),
+          }),
+        );
+      });
+
+      backend.resolvePermission('approval-1', true, '## 编辑后的计划');
+      const result = await resultPromise;
+
+      expect(result.isError).toBeFalsy();
+      expect(result.details).toEqual({
+        success: true,
+        planMarkdown: '## 编辑后的计划',
+      });
+    });
+
     it('应从底层 writeFile tool_execution_end 捕获文件变更并发出文件事件', async () => {
       const backend = new PiAgentBackend(mockConfig);
       const events: any[] = [];
@@ -817,7 +908,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(17);
+      expect(tools).toHaveLength(20);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -831,6 +922,9 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('getConsoleLogs');
       expect(toolNames).toContain('captureScreenshot');
       expect(toolNames).toContain('listImages');
+      expect(toolNames).toContain('arrangeCanvasPages');
+      expect(toolNames).toContain('requestPlanApproval');
+      expect(toolNames).toContain('updatePlan');
       expect(toolNames).toContain('listPages');
       expect(toolNames).toContain('previewDeletePages');
       expect(toolNames).toContain('executeDeletePagePlan');
@@ -843,7 +937,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(16);
+      expect(tools).toHaveLength(19);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
     });
 
@@ -894,6 +988,9 @@ describe('PiAgent 工具', () => {
 
       expect(capabilities.toolVersion).toBe(WORKBENCH_TOOL_VERSION);
       expect(capabilities.toolNames).toContain('listPages');
+      expect(capabilities.toolNames).toContain('requestPlanApproval');
+      expect(capabilities.toolNames).toContain('updatePlan');
+      expect(capabilities.toolNames).toContain('arrangeCanvasPages');
       expect(capabilities.toolNames).toContain('previewDeletePages');
       expect(capabilities.toolNames).toContain('executeDeletePagePlan');
       expect(capabilities.toolNames).toContain('deletePages');

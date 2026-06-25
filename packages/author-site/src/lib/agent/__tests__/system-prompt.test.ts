@@ -78,11 +78,39 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).not.toContain('executeDeletePagePlan({');
   });
 
+  it('canvas layout rules use arrangeCanvasPages when available', () => {
+    const prompt = buildStaticSystemPrompt({
+      toolNames: ['arrangeCanvasPages', 'listPages'],
+    });
+
+    expect(prompt).toContain('画布管理');
+    expect(prompt).toContain('arrangeCanvasPages({');
+    expect(prompt).toContain('不要用 `writeFile`、`editFile`、`bash` 或 `node` 直接创建、修改或覆盖 `.canvas-layout.json`');
+    expect(prompt).toContain('页面 ID 必须来自 `listPages`');
+  });
+
+  it('canvas layout rules disable canvas changes when tool is unavailable', () => {
+    const prompt = buildStaticSystemPrompt({
+      toolNames: ['listPages'],
+    });
+
+    expect(prompt).toContain('当前 Agent Service 没有提供画布布局工具');
+    expect(prompt).toContain('你不能整理、排列或修改画布中的页面位置和尺寸');
+    expect(prompt).not.toContain('arrangeCanvasPages({');
+  });
+
   it('明确告知创作端 agent 可以委派子 Agent', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('子 Agent 委派');
     expect(prompt).toContain('delegateTask');
     expect(prompt).toContain('子 Agent 不能继续创建子 Agent');
+  });
+
+  it('复杂任务审批计划前应先澄清关键问题', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('审批计划前的澄清规则');
+    expect(prompt).toContain('先用普通回复向用户提出澄清问题');
+    expect(prompt).toContain('未完成必要澄清前，不要调用 `requestPlanApproval`');
   });
 
   it('约束新建页面时不得自行添加配置项', () => {

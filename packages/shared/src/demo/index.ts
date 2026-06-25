@@ -1,7 +1,9 @@
-export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, ScreenshotRenderBox, PreviewCanvasProps, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeRect, VisualStyleChange } from './types';
+export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasImageNode, CanvasFreeNode, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeRect, VisualStyleChange } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
+export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES } from './canvas-render-scheduler';
+export { buildPreviewResourceFingerprint, clearPreviewResourceCacheForTests, extractPreviewImageUrls, getPreviewPageResourceDescriptor, getPreviewResourceCacheStats, normalizePreviewImageUrl, prewarmPreviewImageUrls, resolvePreviewRelativePath } from './preview-resource-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
 export { ConfigForm } from './ConfigForm';
 export { PreviewPanel } from './PreviewPanel';
@@ -19,6 +21,7 @@ export { generateIframeHtml, buildIframeHtml } from './iframe-template';
 export { PreviewCanvas } from './PreviewCanvas';
 export { CanvasViewport } from './CanvasViewport';
 export { CanvasPageItem } from './CanvasPageItem';
+export { CanvasFreeNodeItem } from './CanvasFreeNodeItem';
 export { CanvasToolbar } from './CanvasToolbar';
 export { PageSkeleton } from './PageSkeleton';
 export { loadCanvasLayout, saveCanvasLayout } from './canvas-utils';

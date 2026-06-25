@@ -330,6 +330,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setFocusCanvasPageId,
     focusCanvasPage,
     clearCanvasSelection,
+    flushCanvasState,
   } = useCanvasWorkspace({
     sessionId,
     projectId: demoId,
@@ -1424,6 +1425,7 @@ ${context.details}
 
     try {
       setIsSaving(true);
+      await flushCanvasState();
 
       const saveRes = await fetch(
         `/api/sessions/${sessionId}/files/${activeDemoId}`,

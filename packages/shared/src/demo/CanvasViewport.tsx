@@ -10,6 +10,7 @@ interface CanvasViewportProps {
   editable?: boolean;
   onCanvasClick?: () => void;
   onPageClick?: (pageId: string) => void;
+  onNodeClick?: (nodeId: string) => void;
   onFitToScreen?: () => void;
   onToolModeChange?: (mode: CanvasToolMode) => void;
   children?: React.ReactNode;
@@ -28,6 +29,7 @@ export function CanvasViewport({
   editable = false,
   onCanvasClick,
   onPageClick,
+  onNodeClick,
   onFitToScreen,
   onToolModeChange,
   children,
@@ -42,8 +44,9 @@ export function CanvasViewport({
   const viewportStartRef = useRef({ x: 0, y: 0 });
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
-  // 记录 pointerDown 时的目标页面 ID（用于 hand 模式下点击页面触发配置面板）
+  // 记录 pointerDown 时的目标对象 ID（用于 hand 模式下点击后触发选择）
   const clickedPageIdRef = useRef<string | null>(null);
+  const clickedNodeIdRef = useRef<string | null>(null);
 
   const rafIdRef = useRef(0);
   const pendingViewportRef = useRef<CanvasViewportState | null>(null);
@@ -191,7 +194,11 @@ export function CanvasViewport({
         // 记录点击的页面 ID（用于 pointerUp 时判断是否触发配置面板）
         const target = e.target as HTMLElement;
         const pageEl = target.closest("[data-page-id]");
+        const nodeEl = target.closest("[data-canvas-node-id]");
         clickedPageIdRef.current = pageEl ? pageEl.getAttribute("data-page-id") : null;
+        clickedNodeIdRef.current = nodeEl
+          ? nodeEl.getAttribute("data-canvas-node-id")
+          : null;
 
         setIsPanning(true);
         startPosRef.current = { x: e.clientX, y: e.clientY };
@@ -217,6 +224,7 @@ export function CanvasViewport({
 
         if (isCanvasBackground) {
           clickedPageIdRef.current = null;
+          clickedNodeIdRef.current = null;
           setIsPanning(true);
           startPosRef.current = { x: e.clientX, y: e.clientY };
           viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
@@ -255,14 +263,17 @@ export function CanvasViewport({
         if (clickedPageIdRef.current) {
           // hand 模式下点击页面 → 触发配置面板
           onPageClick?.(clickedPageIdRef.current);
+        } else if (clickedNodeIdRef.current) {
+          onNodeClick?.(clickedNodeIdRef.current);
         } else {
           // 点击画布空白区域 → 取消选中
           onCanvasClick?.();
         }
       }
       clickedPageIdRef.current = null;
+      clickedNodeIdRef.current = null;
     },
-    [isPanning, onCanvasClick, onPageClick, markInteractingEnd],
+    [isPanning, onCanvasClick, onNodeClick, onPageClick, markInteractingEnd],
   );
 
   const handleWheel = useCallback(
