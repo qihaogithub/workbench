@@ -1,4 +1,5 @@
 import type { DemoFolderMeta } from "@opencode-workbench/shared";
+import type { CanvasState } from "@opencode-workbench/shared/demo";
 
 export interface PreviewSize {
   width?: string | number;
@@ -28,6 +29,7 @@ export interface PublishedProject {
   demoPages: PublishedDemoPage[];
   demoFolders: DemoFolderMeta[];
   projectConfigSchema?: string;
+  canvasState?: CanvasState;
 }
 
 export interface ProjectsIndex {
@@ -46,7 +48,7 @@ export interface ProjectsIndex {
 const DATA_BASE = process.env.NEXT_PUBLIC_DATA_BASE || "";
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${DATA_BASE}${path}`);
+  const res = await fetch(`${DATA_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`数据加载失败: ${res.status} ${res.statusText}`);
   }

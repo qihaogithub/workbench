@@ -66,7 +66,9 @@ export async function GET(
     "Cache-Control":
       ext === ".js"
         ? "public, immutable, max-age=2592000"
-        : "public, must-revalidate, max-age=3600",
+        : ext === ".json"
+          ? "no-store"
+          : "public, must-revalidate, max-age=3600",
   };
 
   const origin = request.headers.get("origin");

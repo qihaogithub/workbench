@@ -19,30 +19,6 @@
   "demoFolders": [],
   "versions": [
     {
-      "versionId": "v12",
-      "savedAt": 1780390538409,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780390101574-1p5odcup5",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v12",
-      "fileCount": 6
-    },
-    {
-      "versionId": "v13",
-      "savedAt": 1780450210671,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780449923856-n0qy67uyu",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v13",
-      "fileCount": 7
-    },
-    {
-      "versionId": "v14",
-      "savedAt": 1780455019821,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780450215188-eh6ej4qj4",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v14",
-      "fileCount": 7
-    },
-    {
       "versionId": "v15",
       "savedAt": 1780455443343,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
@@ -422,12 +398,36 @@
       "sessionId": "session-1782193269136-swnag25c6",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v59",
       "fileCount": 9
+    },
+    {
+      "versionId": "v61",
+      "savedAt": 1782404228716,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404072077-lrzfea106",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v61",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v63",
+      "savedAt": 1782404782662,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404674680-a51lrebl5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v63",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v65",
+      "savedAt": 1782405320642,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404806357-yb3dw1b6s",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/v65",
+      "fileCount": 9
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1782193292675,
-  "publishedVersion": "v59",
-  "publishedAt": 1782402146798,
+  "updatedAt": 1782405320646,
+  "publishedVersion": "v65",
+  "publishedAt": 1782405323927,
   "pageVersions": {
     "demo_1780550141175_a79047": [
       {
@@ -473,6 +473,39 @@
         "savedBy": "qihao",
         "sessionId": "page-demo_1779608460379_a1b2c3",
         "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/pages/demo_1779608460379_a1b2c3/v58",
+        "fileCount": 2,
+        "note": "修改了广场页面-手机"
+      },
+      {
+        "versionId": "v60",
+        "demoId": "demo_1779608460379_a1b2c3",
+        "demoName": "广场页面-手机",
+        "savedAt": 1782404227516,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460379_a1b2c3",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/pages/demo_1779608460379_a1b2c3/v60",
+        "fileCount": 2,
+        "note": "修改了广场页面-手机"
+      },
+      {
+        "versionId": "v62",
+        "demoId": "demo_1779608460379_a1b2c3",
+        "demoName": "广场页面-手机",
+        "savedAt": 1782404781469,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460379_a1b2c3",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/pages/demo_1779608460379_a1b2c3/v62",
+        "fileCount": 2,
+        "note": "修改了广场页面-手机"
+      },
+      {
+        "versionId": "v64",
+        "demoId": "demo_1779608460379_a1b2c3",
+        "demoName": "广场页面-手机",
+        "savedAt": 1782405319013,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460379_a1b2c3",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460378/pages/demo_1779608460379_a1b2c3/v64",
         "fileCount": 2,
         "note": "修改了广场页面-手机"
       }

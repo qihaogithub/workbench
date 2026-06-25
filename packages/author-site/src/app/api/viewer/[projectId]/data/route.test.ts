@@ -2,6 +2,7 @@ import fs from "fs";
 import type { NextRequest } from "next/server";
 import os from "os";
 import path from "path";
+import type { CanvasState } from "@opencode-workbench/shared/demo";
 
 class TestResponse {
   status: number;
@@ -10,18 +11,20 @@ class TestResponse {
 
   constructor(body?: BodyInit | null, init?: ResponseInit) {
     this.status = init?.status ?? 200;
+    const headerStore = new Headers(init?.headers);
     this.headers = {
       getSetCookie: () => [],
-      get: () => null,
-      set: () => undefined,
-      append: () => undefined,
-      delete: () => undefined,
-      has: () => false,
-      forEach: () => undefined,
-      entries: function* () {},
-      keys: function* () {},
-      values: function* () {},
-      [Symbol.iterator]: function* () {},
+      get: (name: string) => headerStore.get(name),
+      set: (name: string, value: string) => headerStore.set(name, value),
+      append: (name: string, value: string) => headerStore.append(name, value),
+      delete: (name: string) => headerStore.delete(name),
+      has: (name: string) => headerStore.has(name),
+      forEach: (callbackfn: (value: string, key: string, parent: Headers) => void, thisArg?: unknown) =>
+        headerStore.forEach(callbackfn, thisArg),
+      entries: () => headerStore.entries(),
+      keys: () => headerStore.keys(),
+      values: () => headerStore.values(),
+      [Symbol.iterator]: () => headerStore[Symbol.iterator](),
     } as Headers & { getSetCookie: () => string[] };
     this.body = typeof body === "string"
       ? body
@@ -79,6 +82,7 @@ describe("viewer project data route", () => {
       schema: JSON.stringify({ type: "object", properties: {} }, null, 2),
     });
     expect(page.ok).toBe(true);
+    const pageId = page.data?.meta.id ?? "";
     expect(service.commitEdit(editId, "viewer 兼容性测试").ok).toBe(true);
 
     const projectDir = path.join(tempDir, "local-project");
@@ -98,6 +102,19 @@ describe("viewer project data route", () => {
     });
     expect(submitted.ok).toBe(true);
 
+    const canvasState: CanvasState = {
+      viewport: { x: -120, y: 80, zoom: 0.44 },
+      pages: {
+        [pageId]: { x: 180, y: 220, width: 375, height: 812 },
+      },
+      nodes: {},
+    };
+    fs.writeFileSync(
+      path.join(tempDir, "projects", projectId, "workspace", ".canvas-layout.json"),
+      JSON.stringify({ version: 1, projectId, updatedAt: Date.now(), state: canvasState }, null, 2),
+      "utf-8",
+    );
+
     const { GET } = await import("./route");
     const response = await GET({} as NextRequest, { params: { projectId } });
     const body = await response.json() as {
@@ -105,6 +122,7 @@ describe("viewer project data route", () => {
       data?: {
         project: { id: string; name: string } | null;
         demoPages: Array<{ id: string; code: string; schema?: string }>;
+        canvasState?: CanvasState;
       };
     };
 
@@ -113,6 +131,7 @@ describe("viewer project data route", () => {
     expect(body.data?.project?.name).toBe("CLI 写入项目");
     expect(body.data?.demoPages).toHaveLength(1);
     expect(body.data?.demoPages[0]?.code).toContain("CLI submitted page");
+    expect(body.data?.canvasState?.pages[pageId]).toEqual(canvasState.pages[pageId]);
 
     const published = await publishProject(projectId);
     expect(published.demoCount).toBe(1);
@@ -123,13 +142,16 @@ describe("viewer project data route", () => {
       { params: { path: [projectId, "project.json"] } },
     );
     expect(publishedResponse.status).toBe(200);
+    expect(publishedResponse.headers.get("Cache-Control")).toBe("no-store");
     const publishedProject = JSON.parse(
       fs.readFileSync(path.join(tempDir, "published", projectId, "project.json"), "utf-8"),
     ) as {
       id: string;
       demoPages: Array<{ compiledJsPath: string; iframeHtmlPath?: string }>;
+      canvasState?: CanvasState;
     };
     expect(publishedProject.id).toBe(projectId);
+    expect(publishedProject.canvasState?.pages[pageId]).toEqual(canvasState.pages[pageId]);
     expect(publishedProject.demoPages[0]?.compiledJsPath).toBe(
       `demos/${body.data?.demoPages[0]?.id}/compiled.js`,
     );
