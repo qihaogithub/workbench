@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Icon } from "@preview/sdk";
+import { useEffect, useState } from "react";
+import { Icon, trigger } from "@preview/sdk";
 import { Lock, CheckCircle } from "lucide-react";
 
 interface DemoProps {}
@@ -90,6 +90,18 @@ function AccessDenied({ onBack }: { onBack: () => void }) {
 
 export default function Demo(_props: DemoProps) {
   const [page, setPage] = useState<"confirm" | "loading" | "denied">("confirm");
+
+  useEffect(() => {
+    if (page !== "loading") {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      trigger("ageConfirmed", { confirmed: true });
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [page]);
 
   if (page === "loading") {
     return (

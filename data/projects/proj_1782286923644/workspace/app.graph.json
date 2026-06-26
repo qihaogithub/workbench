@@ -39,6 +39,45 @@
       "title": "冠军确认表彰页"
     }
   },
-  "actions": [],
-  "state": {}
+  "actions": [
+    {
+      "from": "page",
+      "event": "openApp",
+      "to": "page-2",
+      "params": [
+        "source"
+      ],
+      "setState": {
+        "entrySource": "$params.source"
+      }
+    },
+    {
+      "from": "page-2",
+      "event": "loadingComplete",
+      "to": "page-3",
+      "params": [
+        "next"
+      ],
+      "setState": {
+        "lastStep": "$params.next"
+      }
+    },
+    {
+      "from": "page-3",
+      "event": "ageConfirmed",
+      "to": "page-4",
+      "params": [
+        "confirmed"
+      ],
+      "setState": {
+        "ageConfirmed": "$params.confirmed",
+        "lastStep": "preheat-home"
+      }
+    }
+  ],
+  "state": {
+    "entrySource": null,
+    "lastStep": null,
+    "ageConfirmed": null
+  }
 }
