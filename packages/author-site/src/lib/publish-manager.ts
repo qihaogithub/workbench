@@ -11,6 +11,7 @@ import {
   getProjectPath,
   projectExists,
   getDataDir,
+  readAppGraph,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
@@ -18,6 +19,7 @@ import type {
   Project,
   DemoPageMeta,
   DemoFolderMeta,
+  AppGraph,
 } from "@opencode-workbench/shared";
 import type { CanvasState } from "@opencode-workbench/shared/demo";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
@@ -31,6 +33,7 @@ const PUBLISHED_DIR = path.join(getDataDir(), "published");
 export interface PublishedDemoPage {
   id: string;
   name: string;
+  routeKey?: string;
   order: number;
   parentId: string | null;
   compiledJsPath: string;
@@ -49,6 +52,7 @@ export interface PublishedProject {
   publishedAt: number;
   demoPages: PublishedDemoPage[];
   demoFolders: DemoFolderMeta[];
+  appGraph?: AppGraph;
   projectConfigSchema?: string;
   canvasState?: CanvasState;
 }
@@ -168,6 +172,7 @@ export async function publishProject(
     ? extractSchemaDefaults(projectConfigSchema)
     : {};
   const canvasState = readCanvasStateFromWorkspace(workspacePath);
+  const appGraph = readAppGraph(workspacePath);
 
   const viewerBaseUrl = getViewerBaseUrl();
   const totalPages = demoPages.length;
@@ -223,6 +228,7 @@ export async function publishProject(
     publishedDemoPages.push({
       id: page.id,
       name: page.name,
+      routeKey: page.routeKey,
       order: page.order,
       parentId: page.parentId,
       compiledJsPath: `demos/${page.id}/compiled.js`,
@@ -248,6 +254,11 @@ export async function publishProject(
       projectConfigSchema,
     );
   }
+
+  fs.writeFileSync(
+    path.join(publishedProjectDir, "app.graph.json"),
+    JSON.stringify(appGraph, null, 2),
+  );
 
   let thumbnailCopied = false;
   let thumbnailExt = "";
@@ -279,6 +290,7 @@ export async function publishProject(
     publishedAt: Date.now(),
     demoPages: publishedDemoPages,
     demoFolders: project.demoFolders,
+    appGraph,
     projectConfigSchema: projectConfigSchema ?? undefined,
     canvasState,
   };

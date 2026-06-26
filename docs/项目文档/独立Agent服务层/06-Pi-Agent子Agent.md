@@ -33,7 +33,7 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 
 - 路径访问继续走工作空间白名单、黑名单和越界检查。
 - 知识库文件只允许读取，不允许由 Agent 写入。
-- 修改 `config.schema.json` 前仍要求先读取配置系统参考文档。
+- 修改 `config.schema.json` 仍受工作空间路径权限和 L2 配置规则约束。
 - `deletePage` 和 `deletePages` 继续复用现有权限确认流程。
 
 文件变更收集由 `PiAgentBackend` 统一处理。主 Agent 和子 Agent 的 `writeFile`、`editFile`、`deletePage`、`deletePages` 工具结果都会进入同一套变更汇总逻辑，因此 `/files` 查询和消息完成结果可以看到子 Agent 产生的变更。

@@ -18,7 +18,11 @@ import {
   findActiveSession,
 } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { pushSessionModelConfigToAgent } from "@/lib/agent-providers";
+import {
+  pushSessionExternalAuthToAgent,
+  pushSessionModelConfigToAgent,
+} from "@/lib/agent-providers";
+import { readExternalAuthSessionConfigWithRefresh } from "@/lib/external-auth";
 import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 
@@ -33,6 +37,14 @@ async function pushUserModelConfig(userId: string, sessionId: string): Promise<v
   const result = await pushSessionModelConfigToAgent(sessionId, config);
   if (!result.ok) {
     console.warn("[sessions] Failed to push user model config:", result.message);
+  }
+}
+
+async function pushUserExternalAuth(userId: string, sessionId: string): Promise<void> {
+  const config = await readExternalAuthSessionConfigWithRefresh(userId);
+  const result = await pushSessionExternalAuthToAgent(sessionId, config);
+  if (!result.ok) {
+    console.warn("[sessions] Failed to push external auth config:", result.message);
   }
 }
 
@@ -70,6 +82,7 @@ export async function POST(request: NextRequest) {
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
       await pushUserModelConfig(userId, activeSessionId);
+      await pushUserExternalAuth(userId, activeSessionId);
 
       const meta = getSessionMeta(activeSessionId);
       let code = "";
@@ -115,6 +128,7 @@ export async function POST(request: NextRequest) {
 
     const result = await createEditSession(userId, projectId, workspaceId);
     await pushUserModelConfig(userId, result.sessionId);
+    await pushUserExternalAuth(userId, result.sessionId);
     enforceSessionLimit(userId, projectId, 5);
     return NextResponse.json(createApiSuccess(result), { status: 201 });
   } catch (error) {

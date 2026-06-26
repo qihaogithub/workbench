@@ -1,11 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  KnowledgeFileStore,
+  indexTemplateSnapshot,
+} from "@opencode-workbench/knowledge-service";
 import type {
   DemoFiles,
   DemoFolderMeta,
   DemoMeta,
   DemoPageMeta,
+  AppGraph,
   Project,
   ProjectTemplateMeta,
   VersionInfo,
@@ -84,6 +89,7 @@ const DEFAULT_DEMO_SCHEMA = JSON.stringify(
 );
 
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
+const APP_GRAPH_FILENAME = "app.graph.json";
 const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
 const EDIT_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_VERSIONS_KEEP = 50;
@@ -171,6 +177,37 @@ function generatePageSlug(name: string): string {
     .slice(0, 20)
     .replace(/-$/, "");
   return slug || "page";
+}
+
+function isValidRouteKey(routeKey: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(routeKey);
+}
+
+function makeUniqueRouteKey(base: string, used: Set<string>): string {
+  const normalizedBase = isValidRouteKey(base) ? base : generatePageSlug(base);
+  let candidate = normalizedBase || "page";
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${normalizedBase || "page"}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+function normalizePagesRouteKeys(pages: DemoPageMeta[]): DemoPageMeta[] {
+  const used = new Set<string>();
+  return pages.map((page) => {
+    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
+    if (current && isValidRouteKey(current) && !used.has(current)) {
+      used.add(current);
+      return page;
+    }
+    return {
+      ...page,
+      routeKey: makeUniqueRouteKey(current || page.name || page.id, used),
+    };
+  });
 }
 
 function sortPages(pages: DemoPageMeta[]): DemoPageMeta[] {
@@ -375,6 +412,7 @@ export class ProjectAdminService {
       folders: detail.data.folders,
       versions: detail.data.versions,
       projectConfigSchema: detail.data.projectConfigSchema,
+      appGraph: this.readAppGraph(workspacePath),
       assets,
       baseVersion,
     });
@@ -979,6 +1017,10 @@ export class ProjectAdminService {
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
+      routeKey: makeUniqueRouteKey(
+        input.routeKey ?? input.name,
+        new Set(tree.pages.map((page) => page.routeKey).filter(Boolean) as string[]),
+      ),
       order: input.order ?? tree.pages.length,
       parentId,
     };
@@ -1033,9 +1075,18 @@ export class ProjectAdminService {
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
     if (pageIndex === -1) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
     const current = tree.pages[pageIndex];
+    const usedRouteKeys = new Set(
+      tree.pages
+        .filter((page) => page.id !== input.pageId)
+        .map((page) => page.routeKey)
+        .filter(Boolean) as string[],
+    );
     const nextMeta: DemoPageMeta = {
       ...current,
       name: input.name?.trim() || current.name,
+      routeKey: input.routeKey
+        ? makeUniqueRouteKey(input.routeKey, usedRouteKeys)
+        : current.routeKey ?? makeUniqueRouteKey(input.name ?? current.name, usedRouteKeys),
       parentId: input.parentId !== undefined ? input.parentId : current.parentId,
       order: input.order ?? current.order,
     };
@@ -1050,7 +1101,7 @@ export class ProjectAdminService {
     const diff: DiffSummary = { updated: [] };
     if (input.code !== undefined) diff.updated?.push(`page:${input.pageId}:code`);
     if (input.schema !== undefined) diff.updated?.push(`page:${input.pageId}:schema`);
-    if (input.name !== undefined || input.parentId !== undefined || input.order !== undefined) {
+    if (input.name !== undefined || input.routeKey !== undefined || input.parentId !== undefined || input.order !== undefined) {
       diff.updated?.push(`page:${input.pageId}:meta`);
     }
     if (!input.dryRun) {
@@ -2023,6 +2074,12 @@ export class ProjectAdminService {
       updatedAt: now,
     };
     this.writeTemplate(templateId, template);
+    indexTemplateSnapshot(new KnowledgeFileStore({ dataDir: this.dataDir }), {
+      templateId,
+      templateName: template.name,
+      templateDescription: template.description,
+      workspacePath: templateWorkspacePath,
+    });
     return templateId;
   }
 
@@ -2031,7 +2088,7 @@ export class ProjectAdminService {
     if (parsed) {
       return {
         folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-        pages: Array.isArray(parsed.pages) ? parsed.pages : [],
+        pages: Array.isArray(parsed.pages) ? normalizePagesRouteKeys(parsed.pages) : [],
       };
     }
     const pages: DemoPageMeta[] = [];
@@ -2043,6 +2100,7 @@ export class ProjectAdminService {
           pages.push({
             id: entry.name,
             name: entry.name.split("_")[0].replace(/-/g, " "),
+            routeKey: makeUniqueRouteKey(entry.name, new Set(pages.map((page) => page.routeKey).filter(Boolean) as string[])),
             order: pages.length,
             parentId: null,
           });
@@ -2058,7 +2116,7 @@ export class ProjectAdminService {
     ensureDir(workspacePath);
     writeJsonFile(path.join(workspacePath, WORKSPACE_TREE_FILENAME), {
       folders: tree.folders,
-      pages: sortPages(tree.pages),
+      pages: sortPages(normalizePagesRouteKeys(tree.pages)),
     });
   }
 
@@ -2122,6 +2180,37 @@ export class ProjectAdminService {
   private readProjectConfig(workspacePath: string): string | null {
     const configPath = path.join(workspacePath, PROJECT_CONFIG_FILENAME);
     return fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : null;
+  }
+
+  private readAppGraph(workspacePath: string): AppGraph {
+    const tree = this.readWorkspaceTree(workspacePath);
+    const graphPath = path.join(workspacePath, APP_GRAPH_FILENAME);
+    const parsed = readJsonFile<Partial<AppGraph>>(graphPath);
+    const pages: AppGraph["pages"] = {};
+    for (const page of sortPages(tree.pages)) {
+      if (!page.routeKey) continue;
+      pages[page.routeKey] = {
+        pageId: page.id,
+        title: page.name,
+      };
+    }
+    const pageKeys = new Set(Object.keys(pages));
+    const entry =
+      parsed?.entry && pageKeys.has(parsed.entry)
+        ? parsed.entry
+        : Object.keys(pages)[0] ?? "";
+    const actions = Array.isArray(parsed?.actions) ? parsed.actions : [];
+    const state =
+      parsed?.state && typeof parsed.state === "object" && !Array.isArray(parsed.state)
+        ? parsed.state
+        : {};
+    return {
+      version: 1,
+      entry,
+      pages,
+      actions,
+      state,
+    };
   }
 
   private createProjectVersion(

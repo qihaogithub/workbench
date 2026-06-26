@@ -264,7 +264,9 @@ export function AIChat({
             isUserScrolling={isUserScrolling}
             onScrollToBottom={scrollToBottom}
             onRegenerate={handleRegenerate}
+            onExternalAuthConnected={handleRegenerate}
             onRollback={handleRollback}
+            externalAuthSessionId={agentSessionId}
             onEditResend={handleEditResend}
             messagesRef={messagesRef}
             setMessages={setMessages}

@@ -3,7 +3,7 @@
  */
 
 import Link from "next/link";
-import { ArrowRight, Users, Bot, BookOpen } from "lucide-react";
+import { ArrowRight, Users, Bot } from "lucide-react";
 
 export default function AdminDashboard() {
   return (
@@ -14,7 +14,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 快捷操作卡片 */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Link
           href="/admin/models"
           className="block p-6 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
@@ -53,27 +53,6 @@ export default function AdminDashboard() {
           </div>
           <div className="mt-4 flex items-center gap-2 text-sm text-primary">
             <Users className="h-4 w-4" />
-            <span>进入管理</span>
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/knowledge"
-          className="block p-6 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                内置知识库
-              </h3>
-              <p className="text-sm text-gray-600">
-                管理 AI 可查阅的全局系统知识、摘要索引和启用状态
-              </p>
-            </div>
-            <ArrowRight className="h-5 w-5 text-gray-400" />
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm text-primary">
-            <BookOpen className="h-4 w-4" />
             <span>进入管理</span>
           </div>
         </Link>

@@ -8,10 +8,17 @@ import { mergeConfigToProps } from "@/lib/runtime-props";
 import { getDefaultValues, getPreviewSize } from "../../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings, Loader2 } from "lucide-react";
+import type {
+  AppGraph,
+  AppGraphAction,
+  AppGraphValidationResult,
+} from "@opencode-workbench/shared";
+import type { AppActionPayload } from "@opencode-workbench/shared/demo";
 
 interface ViewerDemoPage {
   id: string;
   name: string;
+  routeKey?: string;
   order: number;
   parentId: string | null;
   code: string;
@@ -23,6 +30,8 @@ interface ViewerData {
   project: { id: string; name: string; description?: string } | null;
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
+  appGraph?: AppGraph;
+  appGraphValidation?: AppGraphValidationResult;
 }
 
 type ViewerIncomingMessage =
@@ -71,6 +80,7 @@ export default function ViewerDemoPage() {
   const backgroundParam = searchParams.get("background");
   const configDataParam = searchParams.get("configData");
   const pageListParam = searchParams.get("pageList");
+  const routeParam = searchParams.get("route") || searchParams.get("routeKey");
 
   const showConfig = configParam !== "false";
   const configWidth = configWidthParam ? parseInt(configWidthParam, 10) : 320;
@@ -84,6 +94,8 @@ export default function ViewerDemoPage() {
   const [configVisible, setConfigVisible] = useState(showConfig);
   const [activeDemoId, setActiveDemoId] = useState(demoId);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
+  const [appState, setAppState] = useState<Record<string, unknown>>({});
+  const [routeParams, setRouteParams] = useState<Record<string, unknown>>({});
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [sessionId, setSessionId] = useState<string | undefined>();
 
@@ -126,9 +138,19 @@ export default function ViewerDemoPage() {
         }
         setData(result.data);
 
-        const page = (result.data.demoPages as ViewerDemoPage[]).find(
+        const pages = result.data.demoPages as ViewerDemoPage[];
+        const pageByRoute = routeParam
+          ? pages.find((p: ViewerDemoPage) => p.routeKey === routeParam)
+          : undefined;
+        const page = pageByRoute ?? pages.find(
           (p: ViewerDemoPage) => p.id === demoId
         );
+        if (page) {
+          setActiveDemoId(page.id);
+        }
+        if (result.data.appGraph?.state) {
+          setAppState(result.data.appGraph.state);
+        }
         if (page?.schema) {
           const defaults = getSafeMergedDefaults(
             result.data.projectConfigSchema,
@@ -163,7 +185,7 @@ export default function ViewerDemoPage() {
       }
     };
     loadData();
-  }, [projectId, demoId, getSafeMergedDefaults]);
+  }, [projectId, demoId, routeParam, getSafeMergedDefaults]);
 
   const isReadyRef = useRef(false);
   useEffect(() => {
@@ -200,17 +222,98 @@ export default function ViewerDemoPage() {
     });
   }, []);
 
+  const syncBrowserUrl = useCallback((page: ViewerDemoPage) => {
+    const query = new URLSearchParams(window.location.search);
+    if (page.routeKey) {
+      query.set("route", page.routeKey);
+    }
+    const search = query.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `/viewer/${projectId}/${page.id}${search ? `?${search}` : ""}`,
+    );
+  }, [projectId]);
+
   const handlePageSwitch = useCallback((pageId: string) => {
     if (!data) return;
-    setActiveDemoId(pageId);
-    postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
     const page = data.demoPages.find((p) => p.id === pageId);
+    if (!page) return;
+    setActiveDemoId(pageId);
+    syncBrowserUrl(page);
+    postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
     if (page?.schema) {
       const defaults = getSafeMergedDefaults(data.projectConfigSchema, page.schema);
       setConfigData(defaults);
       setPreviewSize(getPreviewSize(page.schema));
     }
-  }, [data, getSafeMergedDefaults]);
+  }, [data, getSafeMergedDefaults, syncBrowserUrl]);
+
+  const resolveStateValue = useCallback((
+    expression: string,
+    payload: Record<string, unknown>,
+    previousState: Record<string, unknown>,
+  ): unknown => {
+    if (expression.startsWith("$params.")) {
+      return payload[expression.slice("$params.".length)];
+    }
+    if (expression.startsWith("$state.")) {
+      return previousState[expression.slice("$state.".length)];
+    }
+    return expression;
+  }, []);
+
+  const pickRouteParams = useCallback((
+    action: AppGraphAction,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    if (!action.params?.length) return payload;
+    return Object.fromEntries(
+      action.params
+        .filter((param) => Object.prototype.hasOwnProperty.call(payload, param))
+        .map((param) => [param, payload[param]]),
+    );
+  }, []);
+
+  const handleAppAction = useCallback((message: AppActionPayload & { pageId?: string }) => {
+    if (!data?.appGraph || !message.pageId) return;
+    const fromPage = data.demoPages.find((page) => page.id === message.pageId);
+    const fromRouteKey = fromPage?.routeKey;
+    if (!fromRouteKey) return;
+
+    const action = data.appGraph.actions.find(
+      (item) => item.from === fromRouteKey && item.event === message.event,
+    );
+    if (!action) {
+      console.warn(`[viewer] 未声明的页面动作: ${fromRouteKey}.${message.event}`);
+      return;
+    }
+
+    const payload = message.payload ?? {};
+    if (action.setState) {
+      setAppState((previousState) => ({
+        ...previousState,
+        ...Object.fromEntries(
+          Object.entries(action.setState ?? {}).map(([key, expression]) => [
+            key,
+            resolveStateValue(expression, payload, previousState),
+          ]),
+        ),
+      }));
+    }
+
+    const targetRouteKey = action.to ?? action.fallback;
+    if (!targetRouteKey) return;
+    const targetNode =
+      data.appGraph.pages[targetRouteKey] ??
+      (action.fallback ? data.appGraph.pages[action.fallback] : undefined);
+    if (!targetNode) {
+      console.warn(`[viewer] 动作目标页面不存在: ${targetRouteKey}`);
+      return;
+    }
+    setRouteParams(pickRouteParams(action, payload));
+    handlePageSwitch(targetNode.pageId);
+  }, [data, handlePageSwitch, pickRouteParams, resolveStateValue]);
 
   const handlePageSwitchRef = useRef(handlePageSwitch);
   handlePageSwitchRef.current = handlePageSwitch;
@@ -302,7 +405,10 @@ export default function ViewerDemoPage() {
                 code={currentPage.code}
                 demoId={currentPage.id}
                 configData={configData}
+                appState={appState}
+                routeParams={routeParams}
                 previewSize={previewSize}
+                onAppAction={handleAppAction}
               />
             )}
           </div>

@@ -1,4 +1,7 @@
-import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+import type {
+  BackendProvidersConfig,
+  ExternalAuthSessionConfig,
+} from "@opencode-workbench/shared";
 
 // ============================================================
 // 基础类型
@@ -43,6 +46,7 @@ export interface AgentConfig {
   timeout?: number;
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
   backendProviders?: BackendProvidersConfig;
+  externalAuth?: ExternalAuthSessionConfig;
 
   piAgent?: PiAgentConfig;
 }

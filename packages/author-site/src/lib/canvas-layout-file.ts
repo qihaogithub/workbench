@@ -70,8 +70,18 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   if (kind === "image") {
     const src = readString(value, "src");
     const fileName = readString(value, "fileName");
+    const intrinsicWidth = readNumber(value, "intrinsicWidth");
+    const intrinsicHeight = readNumber(value, "intrinsicHeight");
     if (!src) return null;
-    return { ...base, kind, src, ...(fileName ? { fileName } : {}) };
+    return {
+      ...base,
+      kind,
+      src,
+      ...(fileName ? { fileName } : {}),
+      ...(intrinsicWidth !== null && intrinsicHeight !== null
+        ? { intrinsicWidth, intrinsicHeight }
+        : {}),
+    };
   }
 
   return null;

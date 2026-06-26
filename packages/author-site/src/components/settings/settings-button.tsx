@@ -14,14 +14,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
-import { Settings, KeyRound, ArrowLeft, LogOut, User, Bot } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  ExternalLink,
+  KeyRound,
+  Link2,
+  LogOut,
+  RefreshCw,
+  Settings,
+  User,
+} from "lucide-react";
 
 interface UserInfo {
   id: string;
   username: string;
 }
 
-type View = "main" | "change-password" | "model-config";
+type View = "main" | "change-password" | "model-config" | "external-auth";
+
+type ExternalProviderStatus = {
+  provider: "figma" | "dingtalk";
+  status: "connected" | "pending" | "needs_reauth" | "unsupported" | "disconnected";
+  accountLabel?: string;
+  expiresAt?: number;
+  message?: string;
+};
+
+type ExternalAuthStartResponse = {
+  provider: "figma" | "dingtalk";
+  status: ExternalProviderStatus["status"];
+  authUrl?: string;
+  userCode?: string;
+  verificationUrl?: string;
+  message?: string;
+};
 
 export function SettingsButton() {
   const router = useRouter();
@@ -41,6 +68,9 @@ export function SettingsButton() {
   const [modelsText, setModelsText] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
   const [loadingModelConfig, setLoadingModelConfig] = useState(false);
+  const [externalProviders, setExternalProviders] = useState<ExternalProviderStatus[]>([]);
+  const [externalMessage, setExternalMessage] = useState("");
+  const [loadingExternalAuth, setLoadingExternalAuth] = useState(false);
 
   // 获取当前登录用户信息
   const fetchUser = async (): Promise<UserInfo | null> => {
@@ -77,6 +107,7 @@ export function SettingsButton() {
     setNewPassword("");
     setConfirmPassword("");
     setApiKey("");
+    setExternalMessage("");
   };
 
   const loadModelConfig = async () => {
@@ -107,6 +138,106 @@ export function SettingsButton() {
   const handleOpenModelConfig = async () => {
     setView("model-config");
     await loadModelConfig();
+  };
+
+  const loadExternalAuth = async () => {
+    setLoadingExternalAuth(true);
+    try {
+      const res = await fetch("/api/user/external-auth");
+      const data = await res.json();
+      if (data.success) {
+        setExternalProviders(data.data?.providers || []);
+      } else {
+        toast({
+          title: "读取失败",
+          description: data.error?.message || "无法读取外部授权状态",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "无法读取外部授权状态",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingExternalAuth(false);
+    }
+  };
+
+  const handleOpenExternalAuth = async () => {
+    setExternalMessage("");
+    setView("external-auth");
+    await loadExternalAuth();
+  };
+
+  const handleConnectExternal = async (provider: "figma" | "dingtalk") => {
+    setLoadingExternalAuth(true);
+    setExternalMessage("");
+    try {
+      const res = await fetch(`/api/user/external-auth/${provider}/start`);
+      const data = await res.json();
+      if (!data.success) {
+        toast({
+          title: "授权启动失败",
+          description: data.error?.message || "请稍后重试",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const result = data.data as ExternalAuthStartResponse;
+      if (result.authUrl) {
+        window.open(result.authUrl, "_blank", "noopener,noreferrer");
+      }
+      if (result.userCode || result.verificationUrl || result.message) {
+        setExternalMessage(
+          [
+            result.message,
+            result.verificationUrl ? `授权地址：${result.verificationUrl}` : "",
+            result.userCode ? `设备码：${result.userCode}` : "",
+          ].filter(Boolean).join("\n"),
+        );
+      }
+      await loadExternalAuth();
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "无法启动外部授权",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingExternalAuth(false);
+    }
+  };
+
+  const handleDisconnectExternal = async (provider: "figma" | "dingtalk") => {
+    setLoadingExternalAuth(true);
+    setExternalMessage("");
+    try {
+      const res = await fetch(`/api/user/external-auth/${provider}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "已断开外部授权" });
+        await loadExternalAuth();
+      } else {
+        toast({
+          title: "断开失败",
+          description: data.error?.message || "请稍后重试",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "无法断开外部授权",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingExternalAuth(false);
+    }
   };
 
   const handleSaveModelConfig = async () => {
@@ -326,6 +457,19 @@ export function SettingsButton() {
                   </div>
                 </button>
 
+                <button
+                  onClick={handleOpenExternalAuth}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors text-left"
+                >
+                  <Link2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">外部账号授权</p>
+                    <p className="text-xs text-muted-foreground">
+                      连接 Figma 和钉钉
+                    </p>
+                  </div>
+                </button>
+
                 {/* 登出 */}
                 <button
                   onClick={handleLogout}
@@ -433,6 +577,88 @@ export function SettingsButton() {
                   disabled={submitting || loadingModelConfig}
                 >
                   {submitting ? "保存中..." : "保存配置"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : view === "external-auth" ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setView("main");
+                      setExternalMessage("");
+                    }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <DialogTitle>外部账号授权</DialogTitle>
+                </div>
+                <DialogDescription>
+                  AI 只会使用当前账号自己的 Figma 和钉钉权限。
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                {(["figma", "dingtalk"] as const).map((provider) => {
+                  const item = externalProviders.find((p) => p.provider === provider);
+                  const status = item?.status || "disconnected";
+                  const connected = status === "connected";
+                  const title = provider === "figma" ? "Figma" : "钉钉";
+                  const description = connected
+                    ? item?.accountLabel || "已连接"
+                    : item?.message || (status === "unsupported" ? "当前部署未启用" : "未连接");
+                  return (
+                    <div
+                      key={provider}
+                      className="rounded-lg border border-border px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{title}</p>
+                          <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+                            {description}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          {connected ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDisconnectExternal(provider)}
+                              disabled={loadingExternalAuth}
+                            >
+                              断开
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => handleConnectExternal(provider)}
+                              disabled={loadingExternalAuth}
+                            >
+                              {status === "needs_reauth" ? "重新授权" : "连接"}
+                              <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {externalMessage && (
+                  <pre className="whitespace-pre-wrap rounded-md border border-border bg-accent/50 p-3 text-xs text-muted-foreground">
+                    {externalMessage}
+                  </pre>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={loadExternalAuth}
+                  disabled={loadingExternalAuth}
+                >
+                  <RefreshCw className={`mr-1 h-4 w-4 ${loadingExternalAuth ? "animate-spin" : ""}`} />
+                  刷新状态
                 </Button>
               </DialogFooter>
             </>

@@ -18,6 +18,7 @@ const REMOTE_FILE = path.join(".opencode", "remote.json");
 interface LocalProjectPage {
   id: string;
   name: string;
+  routeKey?: string;
   entry: string;
   schema: string;
   parentId: string | null;
@@ -39,6 +40,7 @@ interface LocalProjectManifest {
   name: string;
   pages: LocalProjectPage[];
   folders: LocalProjectFolder[];
+  appGraph: string | null;
   projectConfig: string | null;
   assetsDir: string;
 }
@@ -156,6 +158,7 @@ function managedFiles(projectDir: string, manifest: LocalProjectManifest): strin
   const files = [
     PROJECT_FILE,
     ...manifest.pages.flatMap((page) => [page.entry, page.schema]),
+    ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...walkFiles(path.join(projectDir, manifest.assetsDir)).map((file) => relativeTo(projectDir, file)),
   ];
@@ -181,6 +184,7 @@ function computeSyncStateFromEntries(entries: ProjectScaffoldEntry[], manifest: 
   const managedPaths = [
     PROJECT_FILE,
     ...manifest.pages.flatMap((page) => [page.entry, page.schema]),
+    ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...entries
       .map((entry) => entry.path)
@@ -237,6 +241,9 @@ function validateManifestShape(manifest: LocalProjectManifest | null): Validatio
   }
   if (!Array.isArray(manifest.folders)) {
     issues.push({ code: "FOLDERS_INVALID", message: "folders 必须是数组", severity: "blocking" });
+  }
+  if (manifest.appGraph !== null && typeof manifest.appGraph !== "string") {
+    issues.push({ code: "APP_GRAPH_INVALID", message: "appGraph 必须是字符串或 null", severity: "blocking" });
   }
   if (!manifest.assetsDir || typeof manifest.assetsDir !== "string") {
     issues.push({ code: "ASSETS_DIR_INVALID", message: "assetsDir 必须是字符串", severity: "blocking" });
@@ -357,6 +364,9 @@ function loadProject() {
   const projectSchemaText = manifest.projectConfig
     ? readTextIfExists(path.join(root, manifest.projectConfig))
     : "";
+  const appGraphText = manifest.appGraph
+    ? readTextIfExists(path.join(root, manifest.appGraph))
+    : "";
   const projectDefaults = schemaDefaults(projectSchemaText);
   const pages = manifest.pages.map((page) => {
     const pageSchemaText = readTextIfExists(path.join(root, page.schema));
@@ -373,6 +383,7 @@ function loadProject() {
   return {
     manifest,
     projectSchema: projectSchemaText,
+    appGraph: appGraphText ? JSON.parse(appGraphText) : null,
     pages,
   };
 }
@@ -433,6 +444,7 @@ function renderHtml(project) {
           <div class="panel"><h2>Merged Config Defaults</h2><pre><code id="config"></code></pre></div>
           <div class="panel"><h2>Page Schema</h2><pre><code id="schema"></code></pre></div>
           <div class="panel"><h2>Project Schema</h2><pre><code id="project-schema"></code></pre></div>
+          <div class="panel"><h2>App Graph</h2><pre><code id="app-graph"></code></pre></div>
         </div>
       </section>
     </main>
@@ -449,6 +461,7 @@ function renderHtml(project) {
         document.getElementById("config").textContent = JSON.stringify(page.configData || {}, null, 2);
         document.getElementById("schema").textContent = page.schema || "";
         document.getElementById("project-schema").textContent = project.projectSchema || "";
+        document.getElementById("app-graph").textContent = JSON.stringify(project.appGraph || {}, null, 2);
       }
       for (const button of buttons) button.addEventListener("click", () => selectPage(button.dataset.pageId));
       selectPage(\${JSON.stringify(firstPage?.id || "")});
@@ -463,6 +476,9 @@ function checkProject() {
   for (const page of project.manifest.pages || []) {
     if (!fs.existsSync(path.join(root, page.entry))) throw new Error("missing page entry: " + page.entry);
     if (!fs.existsSync(path.join(root, page.schema))) throw new Error("missing page schema: " + page.schema);
+  }
+  if (project.manifest.appGraph && !fs.existsSync(path.join(root, project.manifest.appGraph))) {
+    throw new Error("missing app graph: " + project.manifest.appGraph);
   }
   return project;
 }
@@ -594,6 +610,7 @@ export function exportProjectScaffoldEntries(
     pages: projectPackage.data.pages.map((page) => ({
       id: page.meta.id,
       name: page.meta.name,
+      routeKey: page.meta.routeKey,
       parentId: page.meta.parentId,
       order: page.meta.order,
       entry: `src/pages/${page.meta.id}/index.tsx`,
@@ -605,6 +622,7 @@ export function exportProjectScaffoldEntries(
       parentId: folder.parentId,
       order: folder.order,
     })),
+    appGraph: projectPackage.data.appGraph ? "src/app.graph.json" : null,
     projectConfig: projectPackage.data.projectConfigSchema ? "src/project.config.schema.json" : null,
     assetsDir: "src/assets",
   };
@@ -635,6 +653,12 @@ export function exportProjectScaffoldEntries(
     entries.push({
       path: manifest.projectConfig,
       data: Buffer.from(projectPackage.data.projectConfigSchema, "utf-8"),
+    });
+  }
+  if (manifest.appGraph && projectPackage.data.appGraph) {
+    entries.push({
+      path: manifest.appGraph,
+      data: jsonBuffer(projectPackage.data.appGraph),
     });
   }
   for (const asset of projectPackage.data.assets) {
@@ -956,6 +980,7 @@ export function submitProjectScaffold(
       editId,
       pageId: page.id,
       name: page.name,
+      routeKey: page.routeKey,
       parentId: page.parentId,
       order: page.order,
       code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
@@ -998,6 +1023,7 @@ export function submitProjectScaffold(
       code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
       schema: fs.readFileSync(path.join(resolvedDir, page.schema), "utf-8"),
       name: page.name,
+      routeKey: page.routeKey,
       parentId: page.parentId,
       order: page.order,
     }, actor);

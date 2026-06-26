@@ -33,6 +33,40 @@ import type {
   CanvasFreeNode,
 } from "./types";
 
+type CanvasImportFileKind = "document" | "image";
+
+interface CanvasImportFile {
+  kind: CanvasImportFileKind;
+  file: File;
+}
+
+interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+const MARKDOWN_FILE_EXTENSIONS = [".md", ".markdown", ".mdown"];
+const MARKDOWN_MIME_TYPES = new Set(["text/markdown", "text/x-markdown"]);
+
+function getLowerFileName(file: File): string {
+  return file.name.toLowerCase();
+}
+
+function getFileNameWithoutExtension(fileName: string): string {
+  const lastDotIndex = fileName.lastIndexOf(".");
+  return lastDotIndex > 0 ? fileName.slice(0, lastDotIndex) : fileName;
+}
+
+function isMarkdownFile(file: File): boolean {
+  const lowerName = getLowerFileName(file);
+  return (
+    MARKDOWN_MIME_TYPES.has(file.type) ||
+    MARKDOWN_FILE_EXTENSIONS.some((extension) =>
+      lowerName.endsWith(extension),
+    )
+  );
+}
+
 function getVisiblePageIds(
   pages: Record<string, CanvasPageLayout>,
   viewport: CanvasViewportState,
@@ -258,7 +292,7 @@ export function PreviewCanvas({
     nodeId?: string;
     markdown: string;
   } | null>(null);
-  const [draggingImageOver, setDraggingImageOver] = useState(false);
+  const [draggingFileOver, setDraggingFileOver] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // 工具模式状态
@@ -272,6 +306,8 @@ export function PreviewCanvas({
   const initialViewerFitSignatureRef = useRef<string | null>(null);
 
   const canvasState = externalState || internalState;
+  const canvasStateRef = useRef(canvasState);
+  canvasStateRef.current = canvasState;
 
   const effectivePages = useMemo(() => {
     const baseLayout = computeInitialCanvasLayout(pages);
@@ -305,14 +341,15 @@ export function PreviewCanvas({
 
   const updateState = useCallback(
     (updater: (prev: CanvasState) => CanvasState) => {
-      const newState = updater(canvasState);
+      const newState = updater(canvasStateRef.current);
+      canvasStateRef.current = newState;
       if (externalState) {
         onCanvasStateChange(newState);
       } else {
         setInternalState(newState);
       }
     },
-    [canvasState, externalState, onCanvasStateChange],
+    [externalState, onCanvasStateChange],
   );
 
   const handleCanvasClick = useCallback(() => {
@@ -347,11 +384,19 @@ export function PreviewCanvas({
     [updateState],
   );
 
-  const getViewportCenterLayout = useCallback(
-    (width: number, height: number): CanvasPageLayout => {
+  const getNodeLayout = useCallback(
+    (
+      width: number,
+      height: number,
+      canvasPoint?: CanvasPoint,
+    ): CanvasPageLayout => {
       const zoom = canvasState.viewport.zoom || 1;
-      const centerX = (-canvasState.viewport.x + containerSize.width / 2) / zoom;
-      const centerY = (-canvasState.viewport.y + containerSize.height / 2) / zoom;
+      const centerX =
+        canvasPoint?.x ??
+        (-canvasState.viewport.x + containerSize.width / 2) / zoom;
+      const centerY =
+        canvasPoint?.y ??
+        (-canvasState.viewport.y + containerSize.height / 2) / zoom;
       const maxZ = Math.max(
         0,
         ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
@@ -365,6 +410,23 @@ export function PreviewCanvas({
       };
     },
     [allItemLayouts, canvasState.viewport, containerSize.height, containerSize.width],
+  );
+
+  const getCanvasPointFromClient = useCallback(
+    (clientX: number, clientY: number): CanvasPoint | undefined => {
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+        return undefined;
+      }
+      const container = containerRef.current;
+      if (!container) return undefined;
+      const rect = container.getBoundingClientRect();
+      const zoom = canvasState.viewport.zoom || 1;
+      return {
+        x: (clientX - rect.left - canvasState.viewport.x) / zoom,
+        y: (clientY - rect.top - canvasState.viewport.y) / zoom,
+      };
+    },
+    [canvasState.viewport],
   );
 
   const addOrUpdateNode = useCallback(
@@ -584,7 +646,11 @@ export function PreviewCanvas({
     const cy = pageLayout.y + pageLayout.height / 2;
     updateState((prev) => ({
       ...prev,
-      viewport: { ...prev.viewport, x: cw / 2 - cx * zoom, y: ch / 2 - cy * zoom },
+      viewport: {
+        ...prev.viewport,
+        x: cw / 2 - cx * zoom,
+        y: ch / 2 - cy * zoom,
+      },
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPageId]);
@@ -659,21 +725,24 @@ export function PreviewCanvas({
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }, []);
 
-  const getDocumentTitleFromMarkdown = useCallback((markdown: string) => {
-    const firstLine = markdown
-      .split(/\r?\n/)
-      .find((line) => line.trim().length > 0);
-    const title = (firstLine ?? "")
-      .replace(/^#{1,6}\s+/, "")
-      .replace(/^[-*+]\s+/, "")
-      .replace(/^\d+\.\s+/, "")
-      .replace(/^\[[ xX]\]\s+/, "")
-      .replace(/^>\s+/, "")
-      .replace(/[*_`~]/g, "")
-      .trim();
+  const getDocumentTitleFromMarkdown = useCallback(
+    (markdown: string, fallback = "文档") => {
+      const firstLine = markdown
+        .split(/\r?\n/)
+        .find((line) => line.trim().length > 0);
+      const title = (firstLine ?? "")
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^[-*+]\s+/, "")
+        .replace(/^\d+\.\s+/, "")
+        .replace(/^\[[ xX]\]\s+/, "")
+        .replace(/^>\s+/, "")
+        .replace(/[*_`~]/g, "")
+        .trim();
 
-    return title || "文档";
-  }, []);
+      return title || fallback;
+    },
+    [],
+  );
 
   const handleSaveDocument = useCallback(() => {
     if (!documentDraft) return;
@@ -687,7 +756,7 @@ export function PreviewCanvas({
       kind: "document",
       title: getDocumentTitleFromMarkdown(documentDraft.markdown),
       markdown: documentDraft.markdown,
-      layout: existing?.layout ?? getViewportCenterLayout(420, 360),
+      layout: existing?.layout ?? getNodeLayout(420, 360),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
@@ -698,11 +767,15 @@ export function PreviewCanvas({
     documentDraft,
     effectiveNodes,
     getDocumentTitleFromMarkdown,
-    getViewportCenterLayout,
+    getNodeLayout,
   ]);
 
   const addImageFile = useCallback(
-    async (file: File, index: number = 0) => {
+    async (
+      file: File,
+      index: number = 0,
+      canvasPoint?: CanvasPoint,
+    ) => {
       if (!file.type.startsWith("image/")) return;
       const src = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -714,7 +787,12 @@ export function PreviewCanvas({
         reader.readAsDataURL(file);
       });
 
-      const size = await new Promise<{ width: number; height: number }>((resolve) => {
+      const size = await new Promise<{
+        width: number;
+        height: number;
+        intrinsicWidth?: number;
+        intrinsicHeight?: number;
+      }>((resolve) => {
         const img = new Image();
         img.onload = () => {
           const maxWidth = 560;
@@ -727,6 +805,8 @@ export function PreviewCanvas({
           resolve({
             width: Math.max(180, Math.round(img.naturalWidth * ratio)),
             height: Math.max(120, Math.round(img.naturalHeight * ratio)),
+            intrinsicWidth: img.naturalWidth,
+            intrinsicHeight: img.naturalHeight,
           });
         };
         img.onerror = () => resolve({ width: 360, height: 240 });
@@ -734,7 +814,7 @@ export function PreviewCanvas({
       });
 
       const now = Date.now();
-      const layout = getViewportCenterLayout(size.width, size.height);
+      const layout = getNodeLayout(size.width, size.height, canvasPoint);
       const id = createNodeId("img");
       addOrUpdateNode({
         id,
@@ -742,6 +822,12 @@ export function PreviewCanvas({
         title: file.name || "图片",
         fileName: file.name,
         src,
+        ...(size.intrinsicWidth && size.intrinsicHeight
+          ? {
+              intrinsicWidth: size.intrinsicWidth,
+              intrinsicHeight: size.intrinsicHeight,
+            }
+          : {}),
         layout: {
           ...layout,
           x: layout.x + index * 24,
@@ -751,16 +837,60 @@ export function PreviewCanvas({
         updatedAt: now,
       });
     },
-    [addOrUpdateNode, createNodeId, getViewportCenterLayout],
+    [addOrUpdateNode, createNodeId, getNodeLayout],
   );
 
-  const handleAddImageFiles = useCallback(
-    (files: File[]) => {
-      files.forEach((file, index) => {
-        void addImageFile(file, index);
+  const addMarkdownFile = useCallback(
+    async (
+      file: File,
+      index: number = 0,
+      canvasPoint?: CanvasPoint,
+    ) => {
+      if (!isMarkdownFile(file)) return;
+      const markdown = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          typeof reader.result === "string"
+            ? resolve(reader.result)
+            : reject(new Error("文档读取失败"));
+        reader.onerror = () => reject(new Error("文档读取失败"));
+        reader.readAsText(file);
+      });
+
+      const now = Date.now();
+      const fallbackTitle = file.name
+        ? getFileNameWithoutExtension(file.name)
+        : "文档";
+      const layout = getNodeLayout(420, 360, canvasPoint);
+      const id = createNodeId("doc");
+      addOrUpdateNode({
+        id,
+        kind: "document",
+        title: getDocumentTitleFromMarkdown(markdown, fallbackTitle),
+        markdown,
+        layout: {
+          ...layout,
+          x: layout.x + index * 24,
+          y: layout.y + index * 24,
+        },
+        createdAt: now,
+        updatedAt: now,
       });
     },
-    [addImageFile],
+    [addOrUpdateNode, createNodeId, getDocumentTitleFromMarkdown, getNodeLayout],
+  );
+
+  const handleAddImportFiles = useCallback(
+    (files: CanvasImportFile[], canvasPoint?: CanvasPoint) => {
+      files.forEach(({ kind, file }, index) => {
+        if (kind === "image") {
+          void addImageFile(file, index, canvasPoint);
+          return;
+        }
+        void addMarkdownFile(file, index, canvasPoint);
+      });
+    },
+    [addImageFile, addMarkdownFile],
   );
 
   const handleEditNode = useCallback((node: CanvasFreeNode) => {
@@ -773,32 +903,63 @@ export function PreviewCanvas({
     }
   }, []);
 
-  const extractImageFiles = useCallback((files: FileList | File[]) => {
-    return Array.from(files).filter((file) => file.type.startsWith("image/"));
-  }, []);
+  const classifyImportFile = useCallback(
+    (file: File): CanvasImportFile | null => {
+      if (file.type.startsWith("image/")) {
+        return { kind: "image", file };
+      }
+      if (isMarkdownFile(file)) {
+        return { kind: "document", file };
+      }
+      return null;
+    },
+    [],
+  );
 
-  const extractImageFilesFromItems = useCallback(
+  const extractImportFiles = useCallback(
+    (files: FileList | File[]) => {
+      return Array.from(files)
+        .map(classifyImportFile)
+        .filter((file): file is CanvasImportFile => Boolean(file));
+    },
+    [classifyImportFile],
+  );
+
+  const extractImportFilesFromItems = useCallback(
     (items: DataTransferItemList | undefined) => {
       if (!items) return [];
       return Array.from(items)
-        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .filter((item) => item.kind === "file")
         .map((item) => item.getAsFile())
         .filter((file): file is File => Boolean(file));
     },
     [],
   );
 
-  const extractImageFilesFromTransfer = useCallback(
+  const extractImportFilesFromTransfer = useCallback(
     (
       files: FileList | File[],
       items: DataTransferItemList | undefined,
     ) => {
-      const imageFiles = extractImageFiles(files);
-      return imageFiles.length > 0
-        ? imageFiles
-        : extractImageFilesFromItems(items);
+      const importFiles = extractImportFiles(files);
+      if (importFiles.length > 0) {
+        return importFiles;
+      }
+
+      return extractImportFilesFromItems(items)
+        .map(classifyImportFile)
+        .filter((file): file is CanvasImportFile => Boolean(file));
     },
-    [extractImageFiles, extractImageFilesFromItems],
+    [classifyImportFile, extractImportFiles, extractImportFilesFromItems],
+  );
+
+  const hasPotentialImportItems = useCallback(
+    (files: FileList | File[], items: DataTransferItemList | undefined) => {
+      if (files.length > 0) return true;
+      if (!items) return false;
+      return Array.from(items).some((item) => item.kind === "file");
+    },
+    [],
   );
 
   const focusCanvasForClipboard = useCallback(
@@ -829,30 +990,41 @@ export function PreviewCanvas({
       onDragOver={(event) => {
         if (!isEditorMode) return;
         if (documentDraft) return;
-        const files = extractImageFilesFromTransfer(
+        const files = extractImportFilesFromTransfer(
           event.dataTransfer.files,
           event.dataTransfer.items,
         );
-        if (files.length === 0) return;
+        if (
+          files.length === 0 &&
+          !hasPotentialImportItems(
+            event.dataTransfer.files,
+            event.dataTransfer.items,
+          )
+        ) {
+          return;
+        }
         event.preventDefault();
-        setDraggingImageOver(true);
+        setDraggingFileOver(true);
       }}
       onDragLeave={(event) => {
         if (!isEditorMode) return;
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-        setDraggingImageOver(false);
+        setDraggingFileOver(false);
       }}
       onDrop={(event) => {
         if (!isEditorMode) return;
         if (documentDraft) return;
-        const files = extractImageFilesFromTransfer(
+        const files = extractImportFilesFromTransfer(
           event.dataTransfer.files,
           event.dataTransfer.items,
         );
         if (files.length === 0) return;
         event.preventDefault();
-        setDraggingImageOver(false);
-        handleAddImageFiles(files);
+        setDraggingFileOver(false);
+        handleAddImportFiles(
+          files,
+          getCanvasPointFromClient(event.clientX, event.clientY),
+        );
       }}
       onPaste={(event) => {
         if (!isEditorMode) return;
@@ -864,13 +1036,13 @@ export function PreviewCanvas({
           return;
         }
         if (documentDraft) return;
-        const files = extractImageFilesFromTransfer(
+        const files = extractImportFilesFromTransfer(
           event.clipboardData.files,
           event.clipboardData.items,
         );
         if (files.length === 0) return;
         event.preventDefault();
-        handleAddImageFiles(files);
+        handleAddImportFiles(files);
       }}
     >
       {canInteractWithViewport && (
@@ -906,7 +1078,7 @@ export function PreviewCanvas({
         />
       )}
 
-      {draggingImageOver && (
+      {draggingFileOver && (
         <div className="pointer-events-none absolute inset-3 z-30 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
       )}
 

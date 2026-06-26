@@ -5,55 +5,64 @@
       "id": "external-guide_k7m2",
       "name": "站外引导页",
       "order": 0,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page"
     },
     {
       "id": "activity-loading_x4p1",
       "name": "活动加载页",
       "order": 1,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-2"
     },
     {
       "id": "age-confirmation_q8n5",
       "name": "年龄确认弹窗",
       "order": 2,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-3"
     },
     {
       "id": "preheat-home_m4kq",
       "name": "预热期首页",
       "order": 3,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-4"
     },
     {
       "id": "active-home_r7yt",
       "name": "进行中首页",
       "order": 4,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-5"
     },
     {
       "id": "voted-lottery_p2wx",
       "name": "已投票待抽奖",
       "order": 5,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-6"
     },
     {
       "id": "chances-used_a3f2",
       "name": "机会用完已有奖品",
       "order": 6,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-7"
     },
     {
       "id": "ended-pending_k8m2",
       "name": "已截止冠军待揭晓",
       "order": 7,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-8"
     },
     {
       "id": "champion-awards_x7z1",
       "name": "冠军确认表彰页",
       "order": 8,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-9"
     }
   ]
 }

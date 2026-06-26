@@ -13,7 +13,12 @@ import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
+import { createKnowledgeReportTool } from "./knowledge-report-tool";
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
+import { createDingtalkTool } from "./dingtalk-tool";
+import { createFigmaMcpTool } from "./figma-mcp-tool";
+import { createWebSearchTool, isWebSearchEnabled } from "./web-search-tool";
+import { createWebReadTool, isWebReadEnabled } from "./web-read-tool";
 import { createRequestPlanApprovalTool, type PlanApprovalHandler } from "./plan-approval-tool";
 import { createUpdatePlanTool } from "./plan-tool";
 import {
@@ -27,7 +32,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 6;
+export const WORKBENCH_TOOL_VERSION = 10;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -50,6 +55,7 @@ export function createWorkbenchTools(
       createReadFileTool(config),
       createReadFileLinesTool(config),
       createListFilesTool(config),
+      createKnowledgeReportTool(config, { mode: "viewer-readonly" }),
     ];
   }
 
@@ -66,7 +72,12 @@ export function createWorkbenchTools(
     createGetConsoleLogsTool(config),
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
+    createKnowledgeReportTool(config),
     createArrangeCanvasPagesTool(config),
+    ...(isWebReadEnabled() ? [createWebReadTool()] : []),
+    ...(isWebSearchEnabled() ? [createWebSearchTool()] : []),
+    createFigmaMcpTool(config, permissionHandler),
+    createDingtalkTool(config, permissionHandler),
     ...(options.includePlanApproval === false
       ? []
       : [createRequestPlanApprovalTool(options.planApprovalHandler)]),

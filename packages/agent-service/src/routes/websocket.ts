@@ -15,6 +15,7 @@ import {
 } from "./ws-event-router";
 import { getSessionStore } from "../session/session-store";
 import { getSessionModelConfigs } from "../config/session-model-configs";
+import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
@@ -201,6 +202,7 @@ export async function registerWebSocketRoutes(
                 model: currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
+                externalAuth: getSessionExternalAuthConfigs().get(sessionId),
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -425,6 +427,7 @@ export async function registerWebSocketRoutes(
                 model: currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),
+                externalAuth: getSessionExternalAuthConfigs().get(resumeSessionId),
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -545,6 +548,7 @@ export async function registerWebSocketRoutes(
                   model: DEFAULT_MODEL_ID,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
+                  externalAuth: getSessionExternalAuthConfigs().get(sessionId),
                 };
                 agent = manager.getOrCreate(sessionId, config);
 
@@ -565,6 +569,7 @@ export async function registerWebSocketRoutes(
                   demoId: message.demoId || agent.getConfig().demoId,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
+                  externalAuth: getSessionExternalAuthConfigs().get(sessionId),
                 });
               }
               if (agent && "getModelInfo" in agent) {
@@ -707,6 +712,7 @@ export async function registerWebSocketRoutes(
             }
             consoleBuffer.clear(sessionId);
             getSessionModelConfigs().delete(sessionId);
+            getSessionExternalAuthConfigs().delete(sessionId);
             sessionStore.delete(sessionId);
           }
         }

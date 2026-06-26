@@ -967,6 +967,7 @@ export function generateIframeHtml(
       if (type === 'UPDATE_CODE') {
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
+        updateAppRuntime(appState, routeParams);
         updateCssLinks(newCssImports || []);
 
         const thisVersion = ++updateVersion;
@@ -993,6 +994,7 @@ export function generateIframeHtml(
       if (type === 'UPDATE_CODE') {
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
+        updateAppRuntime(appState, routeParams);
         updateCssLinks(newCssImports || []);
 
         const thisVersion = ++updateVersion;
@@ -1058,11 +1060,25 @@ ${cssLinks}
 
     let currentRoot = null;
     let currentConfig = ${initialConfig};
+    let currentAppState = {};
+    let currentRouteParams = {};
     let currentComponent = null;
     let updateVersion = 0;
     let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
+    window.__APP_STATE__ = currentAppState;
+    window.__ROUTE_PARAMS__ = currentRouteParams;
+
+    function updateAppRuntime(appState, routeParams) {
+      currentAppState = appState && typeof appState === 'object' && !Array.isArray(appState) ? appState : {};
+      currentRouteParams = routeParams && typeof routeParams === 'object' && !Array.isArray(routeParams) ? routeParams : {};
+      window.__APP_STATE__ = currentAppState;
+      window.__ROUTE_PARAMS__ = currentRouteParams;
+      window.dispatchEvent(new CustomEvent('PREVIEW_APP_RUNTIME_UPDATE', {
+        detail: { appState: currentAppState, routeParams: currentRouteParams }
+      }));
+    }
 
     class ErrorBoundary extends React.Component {
       constructor(props) {
@@ -1134,7 +1150,7 @@ ${cssLinks}
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, configData: newConfigData, cssImports: newCssImports${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -1154,6 +1170,7 @@ ${cssLinks}
       if (type === 'UPDATE_CONFIG') {
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
+        updateAppRuntime(appState, routeParams);
         if (currentComponent) {
           renderComponent();
         }

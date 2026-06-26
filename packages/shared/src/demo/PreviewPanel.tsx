@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { PreviewPanelProps, PreviewSize, PositionableSizeItem } from "./types";
-import type { ConsoleLogPayload } from "./iframe-types";
+import type { AppActionPayload, ConsoleLogPayload } from "./iframe-types";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
 
@@ -287,12 +287,15 @@ export function PreviewPanel({
   compiledJsUrl,
   cssImports: externalCssImports,
   configData,
+  appState,
+  routeParams,
   sdkFiles: _sdkFiles,
   onError,
   previewSize,
   placeholderScreenshotUrl,
   fillContainer = false,
   onConsoleEntry,
+  onAppAction,
   onContentHeightChange,
   onContentLoaded,
   activityState = "active",
@@ -342,6 +345,10 @@ export function PreviewPanel({
 
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
+  const appStateRef = useRef(appState);
+  appStateRef.current = appState;
+  const routeParamsRef = useRef(routeParams);
+  routeParamsRef.current = routeParams;
   const activityStateRef = useRef(activityState);
   activityStateRef.current = activityState;
 
@@ -370,6 +377,8 @@ export function PreviewPanel({
           type: "UPDATE_CODE",
           code: result.compiledCode,
           configData: resolvedConfig,
+          appState: appStateRef.current || {},
+          routeParams: routeParamsRef.current || {},
           cssImports: result.cssImports,
         },
         "*",
@@ -396,6 +405,8 @@ export function PreviewPanel({
           code: url,
           isUrl: true,
           configData: resolvedConfig,
+          appState: appStateRef.current || {},
+          routeParams: routeParamsRef.current || {},
           cssImports: cssList,
         },
         "*",
@@ -419,6 +430,8 @@ export function PreviewPanel({
       {
         type: "UPDATE_CONFIG",
         configData: resolvedConfig,
+        appState: appStateRef.current || {},
+        routeParams: routeParamsRef.current || {},
       },
       "*",
     );
@@ -609,6 +622,8 @@ export function PreviewPanel({
     }
   }, [
     configData,
+    appState,
+    routeParams,
     iframeReady,
     isUrlMode,
     compiledJsUrl,
@@ -711,6 +726,22 @@ export function PreviewPanel({
           }
           break;
 
+        case "APP_ACTION":
+          if (typeof event.data?.event === "string") {
+            const payload =
+              event.data.payload &&
+              typeof event.data.payload === "object" &&
+              !Array.isArray(event.data.payload)
+                ? (event.data.payload as Record<string, unknown>)
+                : undefined;
+            onAppAction?.({
+              event: event.data.event,
+              payload,
+              pageId: demoId,
+            } satisfies AppActionPayload & { pageId?: string });
+          }
+          break;
+
         case "POSITIONABLE_SIZES_RESULT":
           if (event.data?.sizes) {
             onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
@@ -755,6 +786,7 @@ export function PreviewPanel({
     configData,
     onError,
     onConsoleEntry,
+    onAppAction,
     onContentHeightChange,
     onContentLoaded,
     onPositionableSizes,
@@ -766,6 +798,7 @@ export function PreviewPanel({
     onVisualSelect,
     onVisualInlineEdit,
     onVisualAnnotationCreate,
+    demoId,
   ]);
 
   useEffect(() => {

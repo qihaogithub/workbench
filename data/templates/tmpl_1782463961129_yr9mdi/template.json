@@ -1,0 +1,27 @@
+{
+  "id": "tmpl_1782463961129_yr9mdi",
+  "sourceProjectId": "proj_1779608460377",
+  "category": "弹窗",
+  "name": "App通用广告弹窗",
+  "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
+  "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
+  "scope": "team",
+  "official": false,
+  "demoCount": 2,
+  "demoPages": [
+    {
+      "id": "pad-popup_a3f2",
+      "name": "通用弹窗 - 平板版",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "name": "通用弹窗 - 手机版",
+      "order": 1,
+      "parentId": null
+    }
+  ],
+  "createdAt": 1782463961135,
+  "updatedAt": 1782463961135
+}

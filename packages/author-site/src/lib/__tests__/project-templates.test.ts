@@ -96,6 +96,11 @@ describe("项目模板", () => {
     expect(template.category).toBe("营销活动");
     expect(template.demoCount).toBeGreaterThanOrEqual(1);
     expect(template.demoPages?.length).toBe(template.demoCount);
+    expect(
+      fs.existsSync(
+        path.join(dataDir, "knowledge", "templates", template.id, "reading-map.json"),
+      ),
+    ).toBe(true);
   });
 
   it("保存模板会在历史 workspacePath 失效时回退到项目目录", () => {

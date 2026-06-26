@@ -12,6 +12,7 @@
     "name",
     "pages",
     "folders",
+    "appGraph",
     "projectConfig",
     "assetsDir"
   ],
@@ -49,6 +50,9 @@
     "projectConfig": {
       "type": ["string", "null"]
     },
+    "appGraph": {
+      "type": ["string", "null"]
+    },
     "assetsDir": {
       "type": "string",
       "minLength": 1
@@ -69,6 +73,10 @@
         },
         "name": {
           "type": "string"
+        },
+        "routeKey": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         },
         "entry": {
           "type": "string",

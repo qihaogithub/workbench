@@ -5,6 +5,7 @@ import type {
   VisualInlineEditPayload,
   VisualNodeInfo,
   VisualStyleChange,
+  AppActionPayload,
 } from "./iframe-types";
 
 export type {
@@ -18,6 +19,7 @@ export type {
   VisualNodeInfo,
   VisualNodeRect,
   VisualStyleChange,
+  AppActionPayload,
 } from "./iframe-types";
 
 export interface PreviewSize {
@@ -63,12 +65,15 @@ export interface PreviewPanelProps {
   compiledJsUrl?: string;
   cssImports?: string[];
   configData?: Record<string, unknown>;
+  appState?: Record<string, unknown>;
+  routeParams?: Record<string, unknown>;
   sdkFiles?: Record<string, string>;
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
   placeholderScreenshotUrl?: string;
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onAppAction?: (action: AppActionPayload & { pageId?: string }) => void;
   onContentHeightChange?: (contentHeight: number) => void;
   onContentLoaded?: () => void;
   activityState?: "active" | "sleeping";
@@ -172,6 +177,8 @@ export interface CanvasImageNode extends CanvasFreeNodeBase {
   kind: "image";
   src: string;
   fileName?: string;
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
 }
 
 export type CanvasFreeNode =

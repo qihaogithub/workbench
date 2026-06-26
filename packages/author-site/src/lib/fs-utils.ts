@@ -1,6 +1,10 @@
 import path from "path";
 import fs from "fs";
 import {
+  KnowledgeFileStore,
+  indexTemplateSnapshot,
+} from "@opencode-workbench/knowledge-service";
+import {
   DemoMeta,
   DemoFiles,
   ProjectTemplateMeta,
@@ -16,6 +20,10 @@ import type {
   DemoFolderMeta,
   MultiDemoFiles,
   WorkspaceTree,
+  AppGraph,
+  AppGraphAction,
+  AppGraphValidationIssue,
+  AppGraphValidationResult,
 } from "@opencode-workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
 import { syncBuiltinKnowledge } from "./knowledge/builtin-documents";
@@ -387,6 +395,12 @@ export function saveProjectAsTemplate(
     JSON.stringify(template, null, 2),
     "utf-8",
   );
+  indexTemplateSnapshot(new KnowledgeFileStore({ dataDir: DATA_DIR }), {
+    templateId,
+    templateName: template.name,
+    templateDescription: template.description,
+    workspacePath: templateWorkspacePath,
+  });
 
   return template;
 }
@@ -469,6 +483,50 @@ export function generatePageSlug(name: string): string {
   return slug || "page";
 }
 
+export function isValidRouteKey(routeKey: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(routeKey);
+}
+
+function makeUniqueRouteKey(base: string, used: Set<string>): string {
+  const normalizedBase = isValidRouteKey(base) ? base : generatePageSlug(base);
+  let candidate = normalizedBase || "page";
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${normalizedBase || "page"}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+export function generateRouteKey(
+  name: string,
+  existingRouteKeys: string[] = [],
+): string {
+  return makeUniqueRouteKey(generatePageSlug(name), new Set(existingRouteKeys));
+}
+
+function normalizeWorkspacePagesRouteKeys(
+  pages: DemoPageMeta[],
+): { pages: DemoPageMeta[]; changed: boolean } {
+  const used = new Set<string>();
+  let changed = false;
+  const normalizedPages = pages.map((page) => {
+    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
+    if (current && isValidRouteKey(current) && !used.has(current)) {
+      used.add(current);
+      return page;
+    }
+
+    changed = true;
+    return {
+      ...page,
+      routeKey: makeUniqueRouteKey(current || page.name || page.id, used),
+    };
+  });
+  return { pages: normalizedPages, changed };
+}
+
 /**
  * 生成 Demo 页面 ID。
  * 格式 `{slug}_{4位随机}`，如 `product-detail_a3f2`。
@@ -492,10 +550,15 @@ export function getDemoDirPath(workspacePath: string, demoId: string): string {
 // ============================================================
 
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
+const APP_GRAPH_FILENAME = "app.graph.json";
 const MEMORY_FILENAME = "memory.md";
 
 function getWorkspaceTreePath(workspacePath: string): string {
   return path.join(workspacePath, WORKSPACE_TREE_FILENAME);
+}
+
+export function getAppGraphPath(workspacePath: string): string {
+  return path.join(workspacePath, APP_GRAPH_FILENAME);
 }
 
 function buildInitialMemoryContent(): string {
@@ -573,7 +636,10 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
     }
   }
 
-  const tree: WorkspaceTree = { folders, pages };
+  const tree: WorkspaceTree = {
+    folders,
+    pages: normalizeWorkspacePagesRouteKeys(pages).pages,
+  };
   writeWorkspaceTree(workspacePath, tree);
   return tree;
 }
@@ -587,9 +653,20 @@ function readWorkspaceTree(workspacePath: string): WorkspaceTree {
   if (fs.existsSync(treePath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(treePath, "utf-8"));
-      return {
+      const tree = {
         folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
         pages: Array.isArray(parsed?.pages) ? parsed.pages : [],
+      };
+      const normalized = normalizeWorkspacePagesRouteKeys(tree.pages);
+      if (normalized.changed) {
+        writeWorkspaceTree(workspacePath, {
+          folders: tree.folders,
+          pages: normalized.pages,
+        });
+      }
+      return {
+        folders: tree.folders,
+        pages: normalized.pages,
       };
     } catch {
       /* fall through to migration */
@@ -637,9 +714,23 @@ export function writeDemoPageMeta(
   const tree = readWorkspaceTree(workspacePath);
   const existingIdx = tree.pages.findIndex((p) => p.id === demoId);
   const existing = existingIdx !== -1 ? tree.pages[existingIdx] : null;
+  const usedRouteKeys = new Set(
+    tree.pages
+      .filter((page) => page.id !== demoId && page.routeKey)
+      .map((page) => page.routeKey as string),
+  );
+  const requestedRouteKey =
+    typeof patch.routeKey === "string" ? patch.routeKey.trim() : undefined;
+  const nextRouteKey =
+    requestedRouteKey !== undefined
+      ? makeUniqueRouteKey(requestedRouteKey, usedRouteKeys)
+      : existing?.routeKey && isValidRouteKey(existing.routeKey)
+        ? makeUniqueRouteKey(existing.routeKey, usedRouteKeys)
+        : makeUniqueRouteKey(patch.name ?? existing?.name ?? demoId, usedRouteKeys);
   const merged: DemoPageMeta = {
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
+    routeKey: nextRouteKey,
     order: patch.order ?? existing?.order ?? 0,
     parentId:
       patch.parentId !== undefined
@@ -677,6 +768,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
   }
 
   // 同时发现磁盘上有但 tree 中缺失的页面（如 AI Agent 创建后未更新 tree）
+  const routeKeys = new Set(result.map((page) => page.routeKey).filter(Boolean) as string[]);
   for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (result.some((p) => p.id === entry.name)) continue;
@@ -688,6 +780,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
+        routeKey: makeUniqueRouteKey(entry.name, routeKeys),
         order: result.length,
         parentId: null,
       });
@@ -697,6 +790,213 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
   return result.sort((a, b) => {
     if (a.order !== b.order) return a.order - b.order;
     return a.id.localeCompare(b.id);
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeAppGraphAction(value: unknown): AppGraphAction | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.from !== "string" || typeof value.event !== "string") {
+    return null;
+  }
+  const action: AppGraphAction = {
+    from: value.from,
+    event: value.event,
+  };
+  if (typeof value.to === "string" && value.to.trim()) {
+    action.to = value.to;
+  }
+  if (Array.isArray(value.params)) {
+    action.params = value.params.filter((param): param is string => typeof param === "string");
+  }
+  if (isRecord(value.setState)) {
+    action.setState = Object.fromEntries(
+      Object.entries(value.setState).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  }
+  if (typeof value.condition === "string" && value.condition.trim()) {
+    action.condition = value.condition;
+  }
+  if (typeof value.fallback === "string" && value.fallback.trim()) {
+    action.fallback = value.fallback;
+  }
+  return action;
+}
+
+function normalizeAppGraph(
+  workspacePath: string,
+  input?: Partial<AppGraph> | null,
+): AppGraph {
+  const pages = listDemoPages(workspacePath);
+  const graphPages: AppGraph["pages"] = {};
+  for (const page of pages) {
+    if (!page.routeKey) continue;
+    graphPages[page.routeKey] = {
+      pageId: page.id,
+      title: page.name,
+    };
+  }
+
+  const routeKeys = new Set(Object.keys(graphPages));
+  const rawEntry = typeof input?.entry === "string" ? input.entry : "";
+  const firstRouteKey = pages.find((page) => page.routeKey)?.routeKey ?? "";
+  const entry = routeKeys.has(rawEntry) ? rawEntry : firstRouteKey;
+
+  const actions = Array.isArray(input?.actions)
+    ? input.actions
+        .map((action) => normalizeAppGraphAction(action))
+        .filter((action): action is AppGraphAction => action !== null)
+    : [];
+
+  return {
+    version: 1,
+    entry,
+    pages: graphPages,
+    actions,
+    state: isRecord(input?.state) ? input.state : {},
+  };
+}
+
+export function readAppGraph(workspacePath: string): AppGraph {
+  const graphPath = getAppGraphPath(workspacePath);
+  let parsed: Partial<AppGraph> | null = null;
+  if (fs.existsSync(graphPath)) {
+    try {
+      parsed = JSON.parse(fs.readFileSync(graphPath, "utf-8")) as Partial<AppGraph>;
+    } catch {
+      parsed = null;
+    }
+  }
+  return normalizeAppGraph(workspacePath, parsed);
+}
+
+export function writeAppGraph(
+  workspacePath: string,
+  graph: Partial<AppGraph>,
+): AppGraph {
+  const normalized = normalizeAppGraph(workspacePath, graph);
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
+  }
+  fs.writeFileSync(
+    getAppGraphPath(workspacePath),
+    JSON.stringify(normalized, null, 2),
+    "utf-8",
+  );
+  return normalized;
+}
+
+export function ensureAppGraph(workspacePath: string): AppGraph {
+  return writeAppGraph(workspacePath, readAppGraph(workspacePath));
+}
+
+export function validateAppGraph(graph: AppGraph): AppGraphValidationResult {
+  const issues: AppGraphValidationIssue[] = [];
+  const pageRouteKeys = new Set(Object.keys(graph.pages));
+
+  if (graph.entry && !pageRouteKeys.has(graph.entry)) {
+    issues.push({
+      code: "ENTRY_MISSING",
+      message: `入口页面不存在: ${graph.entry}`,
+      severity: "error",
+      routeKey: graph.entry,
+    });
+  }
+
+  for (const [routeKey, node] of Object.entries(graph.pages)) {
+    if (!isValidRouteKey(routeKey)) {
+      issues.push({
+        code: "PAGE_ROUTE_KEY_INVALID",
+        message: `页面 routeKey 不合法: ${routeKey}`,
+        severity: "error",
+        routeKey,
+      });
+    }
+    if (!node.pageId) {
+      issues.push({
+        code: "PAGE_TARGET_MISSING",
+        message: `页面节点缺少 pageId: ${routeKey}`,
+        severity: "error",
+        routeKey,
+      });
+    }
+  }
+
+  const actionKeys = new Set<string>();
+  for (const action of graph.actions) {
+    if (!pageRouteKeys.has(action.from)) {
+      issues.push({
+        code: "ACTION_FROM_MISSING",
+        message: `动作来源页面不存在: ${action.from}`,
+        severity: "error",
+        routeKey: action.from,
+        event: action.event,
+      });
+    }
+    if (action.to && !pageRouteKeys.has(action.to)) {
+      issues.push({
+        code: "ACTION_TO_MISSING",
+        message: `动作目标页面不存在: ${action.to}`,
+        severity: "error",
+        routeKey: action.to,
+        event: action.event,
+      });
+    }
+    if (action.fallback && !pageRouteKeys.has(action.fallback)) {
+      issues.push({
+        code: "ACTION_FALLBACK_MISSING",
+        message: `动作兜底页面不存在: ${action.fallback}`,
+        severity: "error",
+        routeKey: action.fallback,
+        event: action.event,
+      });
+    }
+
+    const key = `${action.from}:${action.event}`;
+    if (actionKeys.has(key)) {
+      issues.push({
+        code: "ACTION_DUPLICATE",
+        message: `重复动作: ${key}`,
+        severity: "error",
+        routeKey: action.from,
+        event: action.event,
+      });
+    }
+    actionKeys.add(key);
+  }
+
+  return {
+    valid: issues.every((issue) => issue.severity !== "error"),
+    issues,
+  };
+}
+
+function removePageFromAppGraph(workspacePath: string, demoId: string): void {
+  const graph = readAppGraph(workspacePath);
+  const routeKey = Object.entries(graph.pages).find(
+    ([, node]) => node.pageId === demoId,
+  )?.[0];
+  if (!routeKey) return;
+
+  const nextActions = graph.actions.filter(
+    (action) =>
+      action.from !== routeKey &&
+      action.to !== routeKey &&
+      action.fallback !== routeKey,
+  );
+  const nextEntry =
+    graph.entry === routeKey
+      ? Object.entries(graph.pages).find(([, node]) => node.pageId !== demoId)?.[0] ?? ""
+      : graph.entry;
+  writeAppGraph(workspacePath, {
+    ...graph,
+    entry: nextEntry,
+    actions: nextActions,
   });
 }
 
@@ -713,7 +1013,7 @@ export function ensureWorkspaceFiles(workspacePath: string): {
     fs.mkdirSync(demosDir, { recursive: true });
   }
 
-  // 确保知识库目录存在（含系统预设条目）
+  // 确保知识库目录存在并清理历史 system 条目
   ensureKnowledgeDir(workspacePath);
   ensureMemoryFile(workspacePath);
 
@@ -732,19 +1032,18 @@ export function ensureWorkspaceFiles(workspacePath: string): {
   if (existing.length > 0) {
     // 确保 workspace-tree.json 存在且与磁盘一致（修复 Docker 部署后页面丢失问题）
     readWorkspaceTree(workspacePath);
+    ensureAppGraph(workspacePath);
     return { demoIds: existing };
   }
 
   // 空项目只初始化目录与清单，不再自动创建默认页面。
   readWorkspaceTree(workspacePath);
+  ensureAppGraph(workspacePath);
 
   return { demoIds: [] };
 }
 
-/**
- * 确保知识库目录存在，含系统预设条目和 manifest.json
- * 系统预设条目每次幂等同步，确保旧工作空间也能获得新增内置知识
- */
+/** 确保知识库目录存在，并清理历史 system 条目。 */
 function ensureKnowledgeDir(workspacePath: string): void {
   syncBuiltinKnowledge(workspacePath);
 }
@@ -1712,11 +2011,16 @@ export function createWorkspaceDemoPage(
   const meta: DemoPageMeta = {
     id: demoId,
     name: name?.trim() || "新建页面",
+    routeKey: generateRouteKey(
+      name?.trim() || "新建页面",
+      existing.map((page) => page.routeKey).filter(Boolean) as string[],
+    ),
     order: nextOrder,
     parentId: parentId ?? null,
   };
 
   writeDemoPageMeta(wsPath, demoId, meta);
+  ensureAppGraph(wsPath);
   return meta;
 }
 
@@ -1749,11 +2053,16 @@ export function copyWorkspaceDemoPage(
   const meta: DemoPageMeta = {
     id: demoId,
     name: name?.trim() || "复制的页面",
+    routeKey: generateRouteKey(
+      name?.trim() || "复制的页面",
+      existing.map((page) => page.routeKey).filter(Boolean) as string[],
+    ),
     order: nextOrder,
     parentId: sourceMeta?.parentId ?? null,
   };
 
   writeDemoPageMeta(wsPath, demoId, meta);
+  ensureAppGraph(wsPath);
   return meta;
 }
 
@@ -1768,6 +2077,7 @@ export function deleteWorkspaceDemoPage(
   if (!wsPath) return false;
   const demoDir = getDemoDirPath(wsPath, demoId);
   if (!fs.existsSync(demoDir)) return false;
+  removePageFromAppGraph(wsPath, demoId);
   fs.rmSync(demoDir, { recursive: true, force: true });
   // 同步更新 workspace-tree.json，移除已删除页面的记录
   const tree = readWorkspaceTree(wsPath);
@@ -1776,6 +2086,7 @@ export function deleteWorkspaceDemoPage(
   if (tree.pages.length !== originalLength) {
     writeWorkspaceTree(wsPath, tree);
   }
+  ensureAppGraph(wsPath);
   return true;
 }
 

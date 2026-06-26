@@ -3,6 +3,7 @@ import { BackendAgent } from "../core/backend-agent";
 import { getAgentManager } from "../core/agent-manager";
 import type { AgentConfig } from "../core/types";
 import { getSessionModelConfigs } from "../config/session-model-configs";
+import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
 import { projectWorkspaceManager } from "../workspace/project-workspace-manager";
 import {
   buildViewerAiPromptContext,
@@ -71,6 +72,7 @@ export async function registerViewerAiRoutes(fastify: FastifyInstance): Promise<
           toolMode: "viewer-readonly",
           toolVersion: toolCapabilities.toolVersion,
           backendProviders: getSessionModelConfigs().get(sessionId),
+          externalAuth: getSessionExternalAuthConfigs().get(sessionId),
           permissions: {
             allowedPaths: [
               "workspace-tree.json",

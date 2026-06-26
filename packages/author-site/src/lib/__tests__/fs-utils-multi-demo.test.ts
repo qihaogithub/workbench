@@ -9,8 +9,12 @@ import {
   writeDemoPageMeta,
   listDemoPages,
   ensureWorkspaceFiles,
+  ensureAppGraph,
+  validateAppGraph,
+  readAppGraph,
+  deleteWorkspaceDemoPage,
+  getWorkspacesDir,
 } from "../fs-utils";
-import { BUILTIN_KNOWLEDGE_DOCUMENTS } from "../knowledge/builtin-documents";
 
 function makeTempWorkspace(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
@@ -134,14 +138,11 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(fs.readFileSync(memoryPath, "utf-8")).toBe(content);
     });
 
-    it("已存在 knowledge 目录时应保留用户文档并不再复制系统文档", () => {
-      expect(BUILTIN_KNOWLEDGE_DOCUMENTS.map((item) => item.fileName)).toContain(
-        "配置系统参考.md",
-      );
-
+    it("已存在 knowledge 目录时应保留用户文档并清理历史系统文档", () => {
       const knowledgeDir = path.join(ws, "knowledge");
       fs.mkdirSync(knowledgeDir, { recursive: true });
       fs.writeFileSync(path.join(knowledgeDir, "用户规范.md"), "# 用户规范", "utf-8");
+      fs.writeFileSync(path.join(knowledgeDir, "旧系统文档.md"), "# 旧系统文档", "utf-8");
       fs.writeFileSync(
         path.join(knowledgeDir, "manifest.json"),
         JSON.stringify({
@@ -153,6 +154,15 @@ describe("多 Demo 页面 — fs-utils", () => {
               source: "user",
               description: "用户添加的规范",
               fileName: "用户规范.md",
+              addedAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+            {
+              id: "kb_sys_001",
+              title: "旧系统文档",
+              source: "system",
+              description: "历史系统文档",
+              fileName: "旧系统文档.md",
               addedAt: "2026-01-01T00:00:00.000Z",
               updatedAt: "2026-01-01T00:00:00.000Z",
             },
@@ -168,7 +178,7 @@ describe("多 Demo 页面 — fs-utils", () => {
       ) as { items: Array<{ id: string; source: string; category?: string; tags?: string[] }> };
       expect(manifest.items.some((item) => item.id === "kb_user_001")).toBe(true);
       expect(manifest.items.some((item) => item.source === "system")).toBe(false);
-      expect(fs.existsSync(path.join(knowledgeDir, "配置系统参考.md"))).toBe(false);
+      expect(fs.existsSync(path.join(knowledgeDir, "旧系统文档.md"))).toBe(false);
     });
 
     it("不完整的 demo 子目录（缺少 index.tsx）应被忽略", () => {
@@ -206,6 +216,7 @@ describe("多 Demo 页面 — fs-utils", () => {
 
       expect(written.id).toBe(demoId);
       expect(written.name).toBe("页面 A");
+      expect(written.routeKey).toBe("a");
       expect(written.order).toBe(2);
       expect(written.parentId).toBeNull();
 
@@ -215,7 +226,22 @@ describe("多 Demo 页面 — fs-utils", () => {
       // patch order：未传 name 保留旧值
       const patched = writeDemoPageMeta(ws, demoId, { order: 5 });
       expect(patched.name).toBe("页面 A");
+      expect(patched.routeKey).toBe("a");
       expect(patched.order).toBe(5);
+    });
+
+    it("重复 routeKey 写入时应自动生成唯一值", () => {
+      const first = writeDemoPageMeta(ws, "demo_a", {
+        name: "Home",
+        routeKey: "home",
+      });
+      const second = writeDemoPageMeta(ws, "demo_b", {
+        name: "Home",
+        routeKey: "home",
+      });
+
+      expect(first.routeKey).toBe("home");
+      expect(second.routeKey).toBe("home-2");
     });
 
     it("读取不存在的 meta 返回 null", () => {
@@ -232,6 +258,84 @@ describe("多 Demo 页面 — fs-utils", () => {
 
       // readDemoPageMeta 应不抛错，尝试迁移后返回 null（因为旧格式也不存在）
       expect(readDemoPageMeta(ws, "demo_nonexist")).toBeNull();
+    });
+
+    it("旧 workspace-tree 读取时应补齐 routeKey", () => {
+      const demoDir = path.join(ws, "demos", "landing_1234");
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      fs.writeFileSync(
+        path.join(ws, "workspace-tree.json"),
+        JSON.stringify({
+          folders: [],
+          pages: [{ id: "landing_1234", name: "Landing Page", order: 0, parentId: null }],
+        }),
+        "utf-8",
+      );
+
+      const page = readDemoPageMeta(ws, "landing_1234");
+
+      expect(page?.routeKey).toBe("landing-page");
+      expect(fs.readFileSync(path.join(ws, "workspace-tree.json"), "utf-8")).toContain("routeKey");
+    });
+  });
+
+  describe("app graph", () => {
+    let ws: string;
+    beforeEach(() => {
+      ws = makeTempWorkspace("ws-graph");
+    });
+    afterEach(() => cleanup(ws));
+
+    it("应根据页面清单生成最小应用图并通过校验", () => {
+      const page = writeDemoPageMeta(ws, "home_1234", {
+        name: "Home",
+        routeKey: "home",
+      });
+      const demoDir = path.join(ws, "demos", page.id);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+
+      const graph = ensureAppGraph(ws);
+      const validation = validateAppGraph(graph);
+
+      expect(graph.entry).toBe("home");
+      expect(graph.pages.home).toEqual({ pageId: "home_1234", title: "Home" });
+      expect(validation.valid).toBe(true);
+    });
+
+    it("删除页面时应清理相关动作", () => {
+      const workspaceId = `ws-graph-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      ws = path.join(getWorkspacesDir(), workspaceId);
+      fs.mkdirSync(ws, { recursive: true });
+      for (const pageId of ["home_1234", "detail_1234"]) {
+        const demoDir = path.join(ws, "demos", pageId);
+        fs.mkdirSync(demoDir, { recursive: true });
+        fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+        fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      }
+      writeDemoPageMeta(ws, "home_1234", { name: "Home", routeKey: "home", order: 0 });
+      writeDemoPageMeta(ws, "detail_1234", { name: "Detail", routeKey: "detail", order: 1 });
+      fs.writeFileSync(
+        path.join(ws, "app.graph.json"),
+        JSON.stringify({
+          version: 1,
+          entry: "home",
+          pages: {},
+          actions: [{ from: "home", event: "viewDetail", to: "detail" }],
+          state: {},
+        }),
+        "utf-8",
+      );
+
+      const deleted = deleteWorkspaceDemoPage(workspaceId, "detail_1234");
+      const graph = readAppGraph(ws);
+
+      expect(deleted).toBe(true);
+      expect(graph.pages.detail).toBeUndefined();
+      expect(graph.actions).toEqual([]);
     });
   });
 

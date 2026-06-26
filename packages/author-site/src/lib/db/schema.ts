@@ -32,25 +32,13 @@ export function initializeDatabase(): void {
   `);
 
   db.exec(`
-    CREATE TABLE IF NOT EXISTS system_knowledge_documents (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      file_name TEXT UNIQUE NOT NULL,
-      content TEXT NOT NULL,
-      category TEXT NOT NULL,
-      tags_json TEXT NOT NULL,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      version INTEGER NOT NULL DEFAULT 1,
-      content_hash TEXT NOT NULL,
-      ai_summary TEXT NOT NULL DEFAULT '',
-      ai_keywords_json TEXT NOT NULL DEFAULT '[]',
-      summary_status TEXT NOT NULL DEFAULT 'stale',
-      summary_error TEXT,
-      created_at INTEGER NOT NULL,
+    CREATE TABLE IF NOT EXISTS user_external_auth_configs (
+      user_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      config_json TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
-      updated_by TEXT
+      PRIMARY KEY (user_id, provider),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
@@ -73,7 +61,7 @@ export function initializeDatabase(): void {
   `);
 
   console.log(
-    "[Database] Database initialized (users + system_configs + system_knowledge_documents + password_reset_logs)",
+    "[Database] Database initialized (users + system_configs + password_reset_logs)",
   );
 }
 

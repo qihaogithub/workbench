@@ -197,6 +197,11 @@ export class BackendAgent extends BaseAgent {
       changed = true;
     }
 
+    if (config.externalAuth !== undefined) {
+      this.config.externalAuth = config.externalAuth;
+      changed = true;
+    }
+
     if (changed) {
       this.backend.updateConfig?.(this.config);
       this.lastActivityAt = new Date();

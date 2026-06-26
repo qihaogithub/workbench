@@ -1,6 +1,6 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.3
+> 版本：v2.6
 > 创建日期：2026-04-05
 > 更新日期：2026-06-26
 
@@ -8,7 +8,7 @@
 
 ## 文档概览
 
-本系列文档用于指导 `@opencode-workbench/agent-service`、`@opencode-workbench/agent-client` 与 `@opencode-workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件。
+本系列文档用于指导 `@opencode-workbench/agent-service`、`@opencode-workbench/agent-client` 与 `@opencode-workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件，并通过 session 级配置接收当前用户的外部工具授权。
 
 核心原则：
 
@@ -95,6 +95,9 @@
 | Agent 运行方式 | 进程内动态导入 `@earendil-works/pi-agent-core` 和 node 子入口 |
 | 工具权限 | 由 Pi Tools 权限白名单、路径校验、用户确认和后端快照共同约束 |
 | 模型配置 | 通过全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效 |
+| 网页读取 | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容 |
+| 联网搜索 | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用 |
+| 外部授权 | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号 |
 | 事件流 | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、finish、error |
 | 文件变更 | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式 |
 | 截图 | `screenshot-service` 使用 author-site `/api/compile` 编译并通过 Puppeteer 渲染 |
@@ -111,3 +114,6 @@
 | 2026-06-04 | v2.1 | 新增快照服务文档 |
 | 2026-06-21 | v2.2 | 新增 Pi Agent 子 Agent 实现文档 |
 | 2026-06-26 | v2.3 | 按当前代码移除多后端主线叙述，更新为 Pi Agent 单后端索引 |
+| 2026-06-26 | v2.4 | 补充用户级外部工具授权的 session 注入与工具边界 |
+| 2026-06-26 | v2.5 | 新增 Pi Agent `webSearch` 联网搜索能力说明，采用 Brave Search API 免费额度方案 |
+| 2026-06-26 | v2.6 | 新增 Pi Agent `webRead` 网页正文读取能力和公网 URL 安全边界 |

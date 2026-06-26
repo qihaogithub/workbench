@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "projectId": "proj_1782286923644",
+  "updatedAt": 1782465485209,
+  "state": {
+    "viewport": {
+      "x": 167.41557883096036,
+      "y": 136.99904658810738,
+      "zoom": 0.49718835293324043
+    },
+    "pages": {
+      "external-guide_k7m2": {
+        "x": 0.02783717726058325,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0
+      },
+      "activity-loading_x4p1": {
+        "x": 424,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1
+      },
+      "age-confirmation_q8n5": {
+        "x": 837.0403249469938,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2
+      },
+      "active-home_r7yt": {
+        "x": 1265.7107335996266,
+        "y": -56,
+        "width": 375,
+        "height": 2646,
+        "zIndex": 4
+      },
+      "voted-lottery_p2wx": {
+        "x": 1695.798637140946,
+        "y": -56,
+        "width": 375,
+        "height": 886,
+        "zIndex": 5
+      },
+      "preheat-home_m4kq": {
+        "x": 2120.0149676529454,
+        "y": -56,
+        "width": 375,
+        "height": 1053,
+        "zIndex": 3
+      },
+      "champion-awards_x7z1": {
+        "x": 2545.2050777182912,
+        "y": -56,
+        "width": 375,
+        "height": 1017,
+        "zIndex": 8
+      },
+      "ended-pending_k8m2": {
+        "x": 2972.2705482387773,
+        "y": -56,
+        "width": 375,
+        "height": 1052.671875,
+        "zIndex": 7
+      },
+      "chances-used_a3f2": {
+        "x": 3388.2578705152473,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6
+      }
+    },
+    "nodes": {}
+  }
+}
