@@ -143,6 +143,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
 export * from "./workspace";
 export * from "./validator";
 export * from "./agent-config";
+export * from "./knowledge";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

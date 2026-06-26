@@ -5,7 +5,10 @@
  * 鉴权：使用 .env 中的 INTERNAL_API_TOKEN（与 agent-service 共享）
  */
 
-import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+import type {
+  BackendProvidersConfig,
+  SystemKnowledgeSnapshot,
+} from "@opencode-workbench/shared";
 
 const AGENT_SERVICE_URL =
   process.env.AGENT_SERVICE_URL || "http://localhost:3201";
@@ -155,6 +158,60 @@ export async function pushSessionModelConfigToAgent(
     return {
       ok: true,
       message: "已推送用户模型配置到 agent-service session",
+      data: body,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `推送失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function pushSystemKnowledgeToAgent(
+  snapshot: SystemKnowledgeSnapshot,
+): Promise<PushResult> {
+  if (!INTERNAL_TOKEN) {
+    return {
+      ok: false,
+      message:
+        "INTERNAL_API_TOKEN 未配置（.env），无法推送知识库到 agent-service",
+    };
+  }
+
+  try {
+    const res = await fetch(`${AGENT_SERVICE_URL}/internal/knowledge-documents`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Token": INTERNAL_TOKEN,
+      },
+      body: JSON.stringify(snapshot),
+    });
+
+    const text = await res.text();
+    let body: unknown = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { raw: text };
+    }
+
+    if (!res.ok) {
+      const message =
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof (body as { error?: { message?: unknown } }).error?.message ===
+          "string"
+          ? (body as { error: { message: string } }).error.message
+          : `agent-service 响应 ${res.status}`;
+      return { ok: false, message, data: body };
+    }
+
+    return {
+      ok: true,
+      message: `已推送知识库到 agent-service（${snapshot.documents.length} 篇）`,
       data: body,
     };
   } catch (err) {

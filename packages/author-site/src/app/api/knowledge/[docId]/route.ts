@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
+import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { getSystemKnowledgeDocument } from '@/lib/knowledge/system-knowledge';
 
 interface KnowledgeItem {
   id: string;
@@ -53,6 +55,14 @@ export async function PUT(
   }
 
   try {
+    if (getSystemKnowledgeDocument(docId)) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可修改' } },
+        { status: 403 }
+      );
+    }
+
+    syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
     if (!manifest) {
       return NextResponse.json(
@@ -131,6 +141,14 @@ export async function DELETE(
   }
 
   try {
+    if (getSystemKnowledgeDocument(docId)) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可删除' } },
+        { status: 403 }
+      );
+    }
+
+    syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
     if (!manifest) {
       return NextResponse.json(

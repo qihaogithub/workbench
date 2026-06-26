@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import type { SystemPromptContext } from "./system-prompt";
 import { listDemoPages } from "../fs-utils";
+import { syncBuiltinKnowledge } from "../knowledge/builtin-documents";
+import { listSystemKnowledgeIndexItems } from "../knowledge/system-knowledge";
 
 const MAX_INLINE_PAGES = 2;
 
@@ -133,34 +135,70 @@ export function readMemoryContent(workingDir: string): string | null {
 export function scanKnowledgeIndex(workingDir: string): string | null {
   const manifestPath = path.join(workingDir, "knowledge", "manifest.json");
   try {
-    if (!fs.existsSync(manifestPath)) return null;
-    const content = fs.readFileSync(manifestPath, "utf-8");
-    const manifest = JSON.parse(content);
-    if (!manifest.items || manifest.items.length === 0) return null;
-    const systemItems = manifest.items.filter(
-      (item: { source?: string }) => item.source === 'system'
-    );
-    const userItems = manifest.items.filter(
-      (item: { source?: string }) => item.source !== 'system'
-    );
+    const manifest = syncBuiltinKnowledge(workingDir);
+    const userItems = fs.existsSync(manifestPath)
+      ? (
+          JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
+            items?: Array<{
+              title: string;
+              source?: string;
+              description?: string;
+              fileName: string;
+              category?: string;
+              tags?: string[];
+              updatedAt?: string;
+            }>;
+          }
+        ).items?.filter((item) => item.source !== "system") || []
+      : manifest.items.filter((item) => item.source !== "system");
+    const systemItems = listSystemKnowledgeIndexItems();
+    const allItems = [...systemItems, ...userItems];
+    if (allItems.length === 0) return null;
+
+    const formatItem = (item: {
+      title: string;
+      description?: string;
+      fileName: string;
+      category?: string;
+      tags?: string[];
+      aiSummary?: string;
+      aiKeywords?: string[];
+      summaryStatus?: string;
+      updatedAt?: string;
+    }) => {
+      const meta: string[] = [];
+      if (item.category) meta.push(`分类：${item.category}`);
+      if (Array.isArray(item.tags) && item.tags.length > 0) {
+        meta.push(`标签：${item.tags.join(", ")}`);
+      }
+      if (Array.isArray(item.aiKeywords) && item.aiKeywords.length > 0) {
+        meta.push(`关键词：${item.aiKeywords.join(", ")}`);
+      }
+      if (item.updatedAt) meta.push(`更新：${item.updatedAt}`);
+      if (item.summaryStatus && item.summaryStatus !== "ready") {
+        meta.push(`摘要状态：${item.summaryStatus}`);
+      }
+      const summary = item.aiSummary || item.description;
+      const description = summary ? ` — ${summary}` : "";
+      const metaSuffix = meta.length > 0 ? `；${meta.join("；")}` : "";
+      return `  - ${item.title}${description}（knowledge/${item.fileName}${metaSuffix}）`;
+    };
 
     const sections: string[] = [];
     if (systemItems.length > 0) {
-      const lines = systemItems.map(
-        (item: { title: string; description: string; fileName: string }) =>
-          `  - ${item.title}：${item.description}（knowledge/${item.fileName}）`
-      );
-      sections.push(`\u{1F4D6} 系统内置：\n${lines.join('\n')}`);
+      const lines = systemItems.map(formatItem);
+      sections.push(`系统内置：\n${lines.join('\n')}`);
     }
     if (userItems.length > 0) {
-      const lines = userItems.map(
-        (item: { title: string; description: string; fileName: string }) =>
-          `  - ${item.title}：${item.description}（knowledge/${item.fileName}）`
-      );
-      sections.push(`\u{1F4C4} 用户添加：\n${lines.join('\n')}`);
+      const lines = userItems.map(formatItem);
+      sections.push(`用户添加：\n${lines.join('\n')}`);
     }
 
-    return `项目知识库（共 ${manifest.items.length} 篇）：\n${sections.join('\n')}\n→ 需要查阅时请用 readFile 读取对应文件`;
+    return [
+      `项目知识库索引（共 ${allItems.length} 篇，仅含摘要，正文不在上下文中）：`,
+      sections.join('\n'),
+      '→ 需要查阅时，请根据标题/描述/分类/标签选择最相关文档，再用 readFile 或 readFileWithLines 读取 knowledge/{文件名}；不要一次性读取全部知识库。',
+    ].join('\n');
   } catch {
     return null;
   }

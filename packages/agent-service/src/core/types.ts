@@ -38,6 +38,7 @@ export interface AgentConfig {
   workingDir?: string;
   demoId?: string;
   model?: string;
+  toolMode?: "workbench" | "viewer-readonly";
   toolVersion?: number;
   timeout?: number;
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;

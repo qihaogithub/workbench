@@ -13,8 +13,49 @@ function makeLayout(index: number): CanvasPageLayout {
 }
 
 describe("computeCanvasRenderModes", () => {
-  it("选中页始终 active，截图页保持 screenshot", () => {
-    const pages = ["page_1", "page_2", "page_3"].map(makePage);
+  it("少于 6 页时忽略截图和 iframe 预算，所有页面使用 iframe", () => {
+    const pages = Array.from({ length: 5 }, (_, index) =>
+      makePage(`page_${index}`),
+    );
+    const layouts = Object.fromEntries(
+      pages.map((page, index) => [page.id, makeLayout(index)]),
+    );
+    const visiblePageIds = new Set(pages.map((page) => page.id));
+
+    const result = computeCanvasRenderModes({
+      pages,
+      layouts,
+      visiblePageIds,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      containerWidth: 220,
+      containerHeight: 200,
+      screenshotUrls: { page_2: "/shot-2.png", page_3: "/shot-3.png" },
+      recentIframeAccess: new Map(),
+      maxActiveIframes: 2,
+      maxSleepingIframes: 2,
+    });
+
+    expect(result.modes).toEqual({
+      page_0: "iframe",
+      page_1: "iframe",
+      page_2: "iframe",
+      page_3: "iframe",
+      page_4: "iframe",
+    });
+    expect(result.activePageIds).toEqual([
+      "page_0",
+      "page_1",
+      "page_2",
+      "page_3",
+      "page_4",
+    ]);
+    expect(result.sleepingPageIds).toEqual([]);
+  });
+
+  it("6 页及以上时选中页始终 active，截图页保持 screenshot", () => {
+    const pages = Array.from({ length: 6 }, (_, index) =>
+      makePage(`page_${index + 1}`),
+    );
     const layouts = Object.fromEntries(
       pages.map((page, index) => [page.id, makeLayout(index)]),
     );
@@ -40,7 +81,7 @@ describe("computeCanvasRenderModes", () => {
   });
 
   it("超出 active 上限后，最近 active 的候选页进入 sleeping", () => {
-    const pages = Array.from({ length: 5 }, (_, index) =>
+    const pages = Array.from({ length: 6 }, (_, index) =>
       makePage(`page_${index}`),
     );
     const layouts = Object.fromEntries(
@@ -69,11 +110,17 @@ describe("computeCanvasRenderModes", () => {
     expect(result.modes.page_3).toBe("loading");
   });
 
-  it("离屏页不保留 iframe", () => {
-    const pages = ["page_1", "page_2"].map(makePage);
+  it("6 页及以上时离屏页不保留 iframe", () => {
+    const pages = Array.from({ length: 6 }, (_, index) =>
+      makePage(`page_${index + 1}`),
+    );
     const layouts = {
       page_1: { x: 0, y: 0, width: 100, height: 100 },
       page_2: { x: 1000, y: 1000, width: 100, height: 100 },
+      page_3: { x: 1120, y: 1000, width: 100, height: 100 },
+      page_4: { x: 1240, y: 1000, width: 100, height: 100 },
+      page_5: { x: 1360, y: 1000, width: 100, height: 100 },
+      page_6: { x: 1480, y: 1000, width: 100, height: 100 },
     };
 
     const result = computeCanvasRenderModes({

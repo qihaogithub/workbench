@@ -353,6 +353,7 @@ export class PiAgentBackend implements IBackendAdapter {
         this.config,
         (toolCallId, pageName) => this.requestPermission(toolCallId, pageName),
         {
+          mode: this.config.toolMode,
           includeDelegateTask: this.areSubagentsEnabled(),
           subagentRunner: (params, signal) => this.runSubagent(params, signal),
           planApprovalHandler: (toolCallId, request) => this.requestPlanApproval(toolCallId, request),

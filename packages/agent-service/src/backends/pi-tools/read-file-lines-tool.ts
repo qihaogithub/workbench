@@ -5,6 +5,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
+import { resolveVirtualKnowledgeFile } from './virtual-knowledge';
 
 const ReadFileLinesParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -34,7 +35,10 @@ export function createReadFileLinesTool(config: AgentConfig): AgentTool<typeof R
       }
 
       try {
-        const content = await fs.promises.readFile(filePath, 'utf-8');
+        const virtualFile = resolveVirtualKnowledgeFile(args.path, config.workingDir || '');
+        const content = virtualFile
+          ? virtualFile.content
+          : await fs.promises.readFile(filePath, 'utf-8');
         const lines = content.split('\n');
         const totalLines = lines.length;
 
@@ -57,12 +61,13 @@ export function createReadFileLinesTool(config: AgentConfig): AgentTool<typeof R
           .map((line, i) => `${clampedStart + i}→${line}`)
           .join('\n');
 
-        const header = `File: ${args.path} (${totalLines} lines total, showing ${clampedStart}-${clampedEnd})`;
+        const displayPath = virtualFile?.path || args.path;
+        const header = `File: ${displayPath} (${totalLines} lines total, showing ${clampedStart}-${clampedEnd})`;
 
-        logger.debug({ path: args.path, startLine: clampedStart, endLine: clampedEnd }, 'File read with lines successfully');
+        logger.debug({ path: displayPath, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) }, 'File read with lines successfully');
         return {
           content: [{ type: 'text', text: `${header}\n${numberedContent}` }],
-          details: { path: args.path, totalLines, startLine: clampedStart, endLine: clampedEnd },
+          details: { path: displayPath, totalLines, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

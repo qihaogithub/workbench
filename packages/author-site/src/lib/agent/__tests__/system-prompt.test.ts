@@ -123,6 +123,14 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('如果 schema 没有配置字段，Props 必须为空');
     expect(prompt).toContain('不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段');
   });
+
+  it('知识库查阅规则要求按索引自主选择并按需读取', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('上下文中只会提供知识库索引，不会提供正文');
+    expect(prompt).toContain('标题、描述、分类、标签');
+    expect(prompt).toContain('readFileWithLines');
+    expect(prompt).toContain('不要一次性读取全部知识库');
+  });
 });
 
 describe('buildDynamicContextPrefix', () => {

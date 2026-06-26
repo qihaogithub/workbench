@@ -8,7 +8,15 @@
       "description": "配置系统支持的控件类型、扩展字段和完整示例",
       "fileName": "配置系统参考.md",
       "addedAt": "2026-06-04T10:00:00Z",
-      "updatedAt": "2026-06-04T10:00:00Z"
+      "updatedAt": "2026-06-26T01:46:33.455Z",
+      "sizeBytes": 12135,
+      "category": "配置与预览",
+      "tags": [
+        "config.schema.json",
+        "配置项",
+        "表单控件",
+        "图片上传"
+      ]
     }
   ]
 }

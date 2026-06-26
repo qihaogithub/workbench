@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Settings, Database, Users, Bot } from "lucide-react";
+import { Settings, Database, Users, Bot, BookOpen } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -52,6 +52,13 @@ export default function AdminLayout({
               >
                 <Users className="h-5 w-5" />
                 用户管理
+              </Link>
+              <Link
+                href="/admin/knowledge"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100"
+              >
+                <BookOpen className="h-5 w-5" />
+                内置知识库
               </Link>
             </nav>
           </aside>

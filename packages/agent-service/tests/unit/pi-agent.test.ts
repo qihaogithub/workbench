@@ -996,5 +996,21 @@ describe('PiAgent 工具', () => {
       expect(capabilities.toolNames).toContain('deletePages');
       expect(capabilities.toolNames).not.toContain('delegateTask');
     });
+
+    it('使用端只读工具能力不应包含写入或执行工具', async () => {
+      const { getViewerReadonlyToolCapabilities } = await import('../../src/backends/pi-tools');
+      const capabilities = getViewerReadonlyToolCapabilities();
+
+      expect(capabilities.toolNames).toEqual([
+        'readFile',
+        'readFileWithLines',
+        'listFiles',
+      ]);
+      expect(capabilities.toolNames).not.toContain('writeFile');
+      expect(capabilities.toolNames).not.toContain('editFile');
+      expect(capabilities.toolNames).not.toContain('bash');
+      expect(capabilities.toolNames).not.toContain('deletePage');
+      expect(capabilities.toolNames).not.toContain('delegateTask');
+    });
   });
 });

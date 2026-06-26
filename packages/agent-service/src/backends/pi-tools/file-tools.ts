@@ -5,6 +5,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
+import { resolveVirtualKnowledgeFile } from './virtual-knowledge';
 
 const ReadFileParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -27,6 +28,15 @@ export function createReadFileTool(config: AgentConfig): AgentTool<typeof ReadFi
           content: [{ type: 'text', text: `Error: path "${args.path}" is not allowed by workspace permissions` }],
           details: { path: args.path, error: 'permission denied' },
           isError: true,
+        };
+      }
+
+      const virtualFile = resolveVirtualKnowledgeFile(args.path, config.workingDir || '');
+      if (virtualFile) {
+        logger.debug({ path: virtualFile.path }, 'Virtual system knowledge file read successfully');
+        return {
+          content: [{ type: 'text', text: virtualFile.content }],
+          details: { path: virtualFile.path, size: virtualFile.content.length, virtual: true },
         };
       }
       

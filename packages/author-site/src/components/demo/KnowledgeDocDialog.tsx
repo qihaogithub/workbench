@@ -27,6 +27,12 @@ export interface KnowledgeItem {
   addedAt: string;
   updatedAt: string;
   sizeBytes?: number;
+  category?: string;
+  tags?: string[];
+  aiSummary?: string;
+  aiKeywords?: string[];
+  summaryStatus?: "ready" | "stale" | "failed";
+  readonly?: boolean;
 }
 
 export type KnowledgeDocDialogMode = "read" | "edit" | "add";
