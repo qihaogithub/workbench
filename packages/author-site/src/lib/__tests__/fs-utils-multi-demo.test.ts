@@ -10,6 +10,7 @@ import {
   listDemoPages,
   ensureWorkspaceFiles,
 } from "../fs-utils";
+import { BUILTIN_KNOWLEDGE_DOCUMENTS } from "../knowledge/builtin-documents";
 
 function makeTempWorkspace(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
@@ -131,6 +132,43 @@ describe("多 Demo 页面 — fs-utils", () => {
       ensureWorkspaceFiles(ws);
 
       expect(fs.readFileSync(memoryPath, "utf-8")).toBe(content);
+    });
+
+    it("已存在 knowledge 目录时应保留用户文档并不再复制系统文档", () => {
+      expect(BUILTIN_KNOWLEDGE_DOCUMENTS.map((item) => item.fileName)).toContain(
+        "配置系统参考.md",
+      );
+
+      const knowledgeDir = path.join(ws, "knowledge");
+      fs.mkdirSync(knowledgeDir, { recursive: true });
+      fs.writeFileSync(path.join(knowledgeDir, "用户规范.md"), "# 用户规范", "utf-8");
+      fs.writeFileSync(
+        path.join(knowledgeDir, "manifest.json"),
+        JSON.stringify({
+          version: 1,
+          items: [
+            {
+              id: "kb_user_001",
+              title: "用户规范",
+              source: "user",
+              description: "用户添加的规范",
+              fileName: "用户规范.md",
+              addedAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }),
+        "utf-8",
+      );
+
+      ensureWorkspaceFiles(ws);
+
+      const manifest = JSON.parse(
+        fs.readFileSync(path.join(knowledgeDir, "manifest.json"), "utf-8"),
+      ) as { items: Array<{ id: string; source: string; category?: string; tags?: string[] }> };
+      expect(manifest.items.some((item) => item.id === "kb_user_001")).toBe(true);
+      expect(manifest.items.some((item) => item.source === "system")).toBe(false);
+      expect(fs.existsSync(path.join(knowledgeDir, "配置系统参考.md"))).toBe(false);
     });
 
     it("不完整的 demo 子目录（缺少 index.tsx）应被忽略", () => {

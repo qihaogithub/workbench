@@ -12,6 +12,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getBackendProvidersManager } from "../config/backend-providers";
 import { getSessionModelConfigs } from "../config/session-model-configs";
+import {
+  getSystemKnowledgeSnapshot,
+  setSystemKnowledgeSnapshot,
+  validateSystemKnowledgeSnapshot,
+} from "../config/system-knowledge";
 import { getAgentManager } from "../core/agent-manager";
 import { logger } from "../utils/logger";
 import type { BackendProvidersConfig } from "@opencode-workbench/shared";
@@ -210,5 +215,65 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
     },
   );
 
-  logger.info("内部配置同步路由已注册: POST/GET /internal/backend-providers");
+  fastify.post(
+    "/internal/knowledge-documents",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!checkToken(request, reply)) return;
+
+      const snapshot = validateSystemKnowledgeSnapshot(request.body);
+      if (!snapshot) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: "INVALID_BODY",
+            message: "请求体必须是系统知识库快照",
+          },
+        });
+      }
+
+      setSystemKnowledgeSnapshot(snapshot);
+      logger.info(
+        {
+          documentCount: snapshot.documents.length,
+          version: snapshot.version,
+        },
+        "System knowledge snapshot pushed from author-site",
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          documentCount: snapshot.documents.length,
+          version: snapshot.version,
+        },
+      });
+    },
+  );
+
+  fastify.get(
+    "/internal/knowledge-documents",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!checkToken(request, reply)) return;
+
+      const snapshot = getSystemKnowledgeSnapshot();
+      return reply.send({
+        success: true,
+        data: {
+          version: snapshot.version,
+          updatedAt: snapshot.updatedAt,
+          documentCount: snapshot.documents.length,
+          documents: snapshot.documents.map((doc) => ({
+            id: doc.id,
+            title: doc.title,
+            fileName: doc.fileName,
+            enabled: doc.enabled,
+            version: doc.version,
+            updatedAt: doc.updatedAt,
+          })),
+        },
+      });
+    },
+  );
+
+  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents");
 }

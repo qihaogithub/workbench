@@ -2,7 +2,7 @@ export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormPr
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
-export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES } from './canvas-render-scheduler';
+export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES, MIN_CANVAS_SCREENSHOT_PAGE_COUNT } from './canvas-render-scheduler';
 export { buildPreviewResourceFingerprint, clearPreviewResourceCacheForTests, extractPreviewImageUrls, getPreviewPageResourceDescriptor, getPreviewResourceCacheStats, normalizePreviewImageUrl, prewarmPreviewImageUrls, resolvePreviewRelativePath } from './preview-resource-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
 export { PageConfigPanel } from './PageConfigPanel';

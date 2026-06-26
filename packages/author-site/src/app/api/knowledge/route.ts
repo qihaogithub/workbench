@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { KnowledgeIndexItem } from '@opencode-workbench/shared';
+import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { listSystemKnowledgeIndexItems } from '@/lib/knowledge/system-knowledge';
 
 interface KnowledgeItem {
   id: string;
@@ -11,6 +14,12 @@ interface KnowledgeItem {
   addedAt: string;
   updatedAt: string;
   sizeBytes?: number;
+  category?: string;
+  tags?: string[];
+  aiSummary?: string;
+  aiKeywords?: string[];
+  summaryStatus?: "ready" | "stale" | "failed";
+  readonly?: boolean;
 }
 
 interface Manifest {
@@ -58,10 +67,16 @@ function sanitizeFileName(title: string): string {
  */
 function generateUniqueFileName(workingDir: string, baseName: string): string {
   const knowledgeDir = path.join(workingDir, 'knowledge');
+  const systemFileNames = new Set(
+    listSystemKnowledgeIndexItems().map((item) => item.fileName),
+  );
   let fileName = `${baseName}.md`;
   let counter = 2;
 
-  while (fs.existsSync(path.join(knowledgeDir, fileName))) {
+  while (
+    fs.existsSync(path.join(knowledgeDir, fileName)) ||
+    systemFileNames.has(fileName)
+  ) {
     fileName = `${baseName}_${counter}.md`;
     counter++;
   }
@@ -87,8 +102,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
-    const items = manifest?.items || [];
+    const userItems = (manifest?.items || []).filter(
+      (item) => item.source !== 'system',
+    );
+    const items: KnowledgeIndexItem[] = [
+      ...listSystemKnowledgeIndexItems(),
+      ...userItems,
+    ];
     return NextResponse.json({ success: true, data: items });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -140,8 +162,8 @@ export async function POST(request: NextRequest) {
     // 写入 .md 文件
     fs.writeFileSync(filePath, content, 'utf-8');
 
-    // 读取或初始化 manifest
-    const manifest = readManifest(workingDir) || { version: 1, items: [] };
+    // 读取或初始化 manifest；系统内置知识由全局数据库管理，不写入 workspace
+    const manifest = syncBuiltinKnowledge(workingDir);
 
     const now = new Date().toISOString();
     const stats = fs.statSync(filePath);

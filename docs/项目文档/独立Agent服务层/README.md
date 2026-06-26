@@ -1,27 +1,34 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.2
+> 版本：v2.3
 > 创建日期：2026-04-05
-> 更新日期：2026-06-06
+> 更新日期：2026-06-26
 
 ---
 
 ## 文档概览
 
-本系列文档用于指导独立 Agent 服务层的开发工作，将 Agent 相关逻辑从 Next.js 应用中剥离，创建可独立部署、可扩展的 Agent 服务。
+本系列文档用于指导 `@opencode-workbench/agent-service`、`@opencode-workbench/agent-client` 与 `@opencode-workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件。
+
+核心原则：
+
+- 只注册 `pi-agent` 后端，不恢复 OpenCode、Claude、Codex、Gemini 等历史多后端适配器。
+- 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖外部 OpenCode Server 或 CLI 子进程。
+- 前端消费层只处理 UI 和状态呈现，Agent 服务层负责会话生命周期、文件变更、工具权限和事件流。
+- 截图能力由独立 `screenshot-service` 提供，供创作端预览快照和 Pi Agent 截图工具复用。
 
 ---
 
 ## 文档列表
 
-| 文档                                         | 说明                                               | 阅读顺序 | 状态   |
-| :------------------------------------------- | :------------------------------------------------- | :------- | :----- |
-| [01-架构设计.md](./01-架构设计.md)           | 整体架构设计、分层职责、设计原则                   | 1        | 已更新 |
-| [02-接口规范.md](./02-接口规范.md)           | REST API、WebSocket 协议、类型定义                 | 2        | 已更新 |
-| [03-核心模块设计.md](./03-核心模块设计.md)   | Agent、Factory、Manager、Backend 等核心模块        | 3        | 已更新 |
-| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | **SSE 时序竞争问题解决、drain 机制设计、测试覆盖** | 4        | 已完成 |
-| [05-快照服务.md](./05-快照服务.md)           | 双模式架构、变更比较、丢弃回滚、Session 生命周期   | 5        | 已完成 |
-| [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 内部任务委派、子 Agent 生命周期与权限边界 | 6        | 已完成 |
+| 文档 | 说明 | 阅读顺序 | 状态 |
+| :--- | :--- | :--- | :--- |
+| [01-架构设计.md](./01-架构设计.md) | Fastify 服务、Pi Agent 单后端、工具权限、工作空间与截图服务协作 | 1 | 已更新 |
+| [02-接口规范.md](./02-接口规范.md) | REST API、WebSocket 消息、使用端只读 AI、内部配置同步、校验与模型接口 | 2 | 已更新 |
+| [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools 等模块职责 | 3 | 已更新 |
+| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | 历史 OpenCode SSE drain 问题记录，当前仅作迁移背景参考 | 4 | 历史参考 |
+| [05-快照服务.md](./05-快照服务.md) | Git/snapshot 双模式、变更比较、丢弃回滚、Session 生命周期 | 5 | 已完成 |
+| [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界 | 6 | 已完成 |
 
 ---
 
@@ -29,173 +36,78 @@
 
 ### 架构设计
 
-- [整体架构图](./01-架构设计.md#二整体架构)
-- [分层职责](./01-架构设计.md#22-分层职责)
-- [设计原则](./01-架构设计.md#三核心设计原则)
+- [整体架构](./01-架构设计.md#二整体架构)
+- [单后端适配](./01-架构设计.md#31-单后端适配)
 - [目录结构](./01-架构设计.md#四目录结构)
+- [通信协议](./01-架构设计.md#六通信协议)
+- [安全设计](./01-架构设计.md#七安全设计)
 
 ### 接口规范
 
 - [REST API](./02-接口规范.md#二rest-api)
 - [WebSocket API](./02-接口规范.md#三websocket-api)
+- [内部配置同步](./02-接口规范.md#24-内部配置同步)
+- [使用端只读 AI 问答](./02-接口规范.md#25-使用端只读-ai-问答)
 - [类型定义](./02-接口规范.md#四类型定义)
 - [错误处理](./02-接口规范.md#五错误处理)
 
 ### 核心模块
 
-- [类型定义](./03-核心模块设计.md#21-类型定义-typests)
-- [Agent 基类](./03-核心模块设计.md#22-agent-基类-agentts)
-- [Agent 工厂](./03-核心模块设计.md#23-agent-工厂-agent-factoryts)
-- [Agent 管理器](./03-核心模块设计.md#24-agent-管理器-agent-managerts)
-- [OpenCode 后端](./03-核心模块设计.md#32-opencode-后端-backendopencodets)
+- [Core 层](./03-核心模块设计.md#二-core-层)
+- [Pi Agent 后端层](./03-核心模块设计.md#三-pi-agent-后端层)
+- [Pi Tools 工具层](./03-核心模块设计.md#四-pi-tools-工具层)
+- [Session 与快照](./03-核心模块设计.md#五-session-与快照层)
+- [路由与事件](./03-核心模块设计.md#七-路由与事件层)
 
-### SSE Drain 机制
+### 快照与子 Agent
 
-- [SSE 时序竞争问题](./04_SSE_Drain机制.md#一问题背景)
-- [Drain 机制设计](./04_SSE_Drain机制.md#二drain-机制设计)
-- [测试覆盖](./04_SSE_Drain机制.md#三测试覆盖)
+- [快照服务](./05-快照服务.md)
+- [Pi Agent 子 Agent](./06-Pi-Agent子Agent.md)
 
-### 快照服务
+---
 
-- [双模式架构](./05-快照服务.md#二双模式架构)
-- [初始化流程](./05-快照服务.md#三核心流程)
-- [变更比较流程](./05-快照服务.md#32-变更比较流程)
-- [丢弃变更与回滚](./05-快照服务.md#33-丢弃变更流程)
-- [API 方法一览](./05-快照服务.md#五api-方法一览)
-- [与 Session 生命周期关系](./05-快照服务.md#十与-session-生命周期的关系)
+## 当前代码入口
 
-### Pi Agent 子 Agent
+| 包 | 路径 | 职责 |
+| :--- | :--- | :--- |
+| `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify Agent 服务、项目管理 API、Pi Agent 后端、WebSocket 事件流 |
+| `@opencode-workbench/agent-client` | `packages/agent-client/` | 浏览器端 AgentClient/AgentStream SDK |
+| `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer 截图服务，支持同步单页和异步批量截图 |
+| `@opencode-workbench/shared` | `packages/shared/` | 共享类型、校验器、预览 iframe 模板和 shared demo 组件 |
 
-- [定位](./06-Pi-Agent子Agent.md#一定位)
-- [协作关系](./06-Pi-Agent子Agent.md#二协作关系)
-- [权限与变更边界](./06-Pi-Agent子Agent.md#三权限与变更边界)
-- [生命周期](./06-Pi-Agent子Agent.md#四生命周期)
+关键源码入口：
+
+- `packages/agent-service/src/server.ts` - 服务启动、CORS、WebSocket、限流、Pi Agent 注册。
+- `packages/agent-service/src/routes/` - Agent、项目、模型、校验、内部配置和 WebSocket 路由。
+- `packages/agent-service/src/backends/pi-agent.ts` - Pi Agent 后端适配、模型配置、工具事件转换、文件变更捕获。
+- `packages/agent-service/src/backends/pi-tools/` - 工作台工具集。
+- `packages/agent-service/src/session/` - SessionStore、SessionGuard、SnapshotService。
+- `packages/agent-service/src/workspace/` - 临时工作空间与项目工作空间管理。
+- `packages/screenshot-service/src/routes/screenshots.ts` - 截图生成、批量任务、缓存读取。
 
 ---
 
 ## 核心设计决策
 
-### 1. 技术栈选型
-
-| 组件        | 选型        | 理由                                 |
-| :---------- | :---------- | :----------------------------------- |
-| 运行时      | Node.js 18+ | Monorepo 要求，与 opencode 兼容      |
-| 框架        | Fastify     | 高性能，原生支持 WebSocket           |
-| HTTP 客户端 | undici      | 比 node-fetch 更快，原生支持流式响应 |
-| 日志        | pino        | Fastify 默认日志库，高性能           |
-| 测试        | vitest      | agent-service 专用测试框架           |
-
-### 2. 架构模式
-
-- **工厂模式**：支持多种 AI 后端（14+ 后端）
-- **观察者模式**：事件驱动，解耦 Agent 和 UI
-- **单例模式**：全局 AgentManager + AgentFactory
-- **策略模式**：不同后端使用不同通信策略
-- **适配器模式**：BackendAgent 统一封装后端接口
-
-### 3. 核心原则
-
-```
-"Agent 服务层负责业务逻辑和 AI 交互，前端消费层只负责 UI 渲染和用户交互"
-```
-
----
-
-## 开发路线
-
-```
-Phase 1 (2天) ──► Phase 2 (3天) ──► Phase 3 (2天) ──► Phase 4 (2天) ──► Phase 5 (1天)
-   │                  │                  │                  │                  │
-   ▼                  ▼                  ▼                  ▼                  ▼
-基础框架          核心功能          集成迁移          测试优化          部署文档
-```
-
----
-
-## 相关资源
-
-### 参考文档
-
-- [需求文档](../../项目文档/需求文档.md)
-- AionUi 架构分析内容已整合到本文档系列中：
-  - [架构设计 - AionUi 参考](./01-架构设计.md#十三aionui-架构参考)
-  - [核心模块设计 - AionUi 代码参考](./03-核心模块设计.md#十aionui-代码参考指南)
-  - [核心模块设计 - 具体实施代码示例](./03-核心模块设计.md#十一具体实施代码示例)
-
-### 现有代码
-
-- `packages/agent-service/src/server.ts` - 服务入口
-- `packages/agent-service/src/core/` - 核心模块（Agent、Factory、Manager）
-- `packages/agent-service/src/backends/` - 后端适配器（14+ 后端）
-- `packages/agent-service/src/routes/` - API 路由
-- `packages/agent-service/src/session/` - 会话管理（SessionStore、SessionGuard、SnapshotService）
-- `packages/agent-client/src/` - 浏览器端 SDK，封装 HTTP + WebSocket 通信
-- `packages/screenshot-service/src/` - 截图服务（Puppeteer + Fastify）
-- `packages/shared/src/` - 共享类型
-
-### 相关包说明
-
-| 包 | 路径 | 说明 |
-|:---|:-----|:-----|
-| agent-client | `packages/agent-client/` | 浏览器端 SDK，提供 AgentClient（HTTP）和 AgentStream（WebSocket）类 |
-| screenshot-service | `packages/screenshot-service/` | Puppeteer 截图服务，支持同步/异步截图模式 |
-
----
-
----
-
-## AionUi 参考指南
-
-本项目大量参考了 [AionUi](../../AionUi) 的 Agent 架构设计。以下是具体的参考对照表。
-
-### 核心参考对照
-
-| 本项目模块      | AionUi 参考文件                     | 参考程度 | 说明                       |
-| :-------------- | :---------------------------------- | :------- | :------------------------- |
-| `AgentFactory`  | `src/process/task/AgentFactory.ts`  | **95%**  | 工厂模式几乎完全一致       |
-| `IAgentManager` | `src/process/task/IAgentManager.ts` | **90%**  | 接口定义参考               |
-| `BaseAgent`     | `src/process/agent/acp/index.ts`    | **70%**  | 核心结构参考，通信层需重写 |
-| 事件回调机制    | `AcpAgent.onStreamEvent`            | **85%**  | 回调解耦模式               |
-| 会话恢复        | `createOrResumeSession()`           | **80%**  | 恢复策略参考               |
-| 权限缓存        | `ApprovalStore.ts`                  | **60%**  | 可选功能，后期实现         |
-
-### 需要适配的关键差异
-
-```
-AionUi (Electron 应用)              本项目 (独立服务)
-─────────────────────────────────────────────────────────────
-IPC 通信                    →      HTTP REST / WebSocket
-spawn CLI 进程              →      undici 连接池调用 HTTP API
-AcpConnection (ACP 协议)    →      OpenCodeBackend (HTTP API)
-主进程内存存储              →      可选 Redis/数据库持久化
-Electron 生命周期           →      Fastify 生命周期
-```
-
-### 推荐抄作业顺序
-
-1. **直接抄**：`AgentFactory`、`IAgentManager` 接口定义
-2. **参考改**：`BaseAgent` 类结构、事件回调机制
-3. **理解后重写**：后端通信层（HTTP 替代 ACP 协议）
-4. **后期借鉴**：会话恢复、权限缓存、模型切换
-
-### AionUi 核心文件路径
-
-| 文件       | 路径                                            | 核心内容            |
-| :--------- | :---------------------------------------------- | :------------------ |
-| Agent 工厂 | `AionUi/src/process/task/AgentFactory.ts`       | 极简工厂实现        |
-| Agent 接口 | `AionUi/src/process/task/IAgentManager.ts`      | 生命周期接口        |
-| ACP Agent  | `AionUi/src/process/agent/acp/index.ts`         | 完整 Agent 实现     |
-| 连接管理   | `AionUi/src/process/agent/acp/AcpConnection.ts` | 连接生命周期        |
-| 权限缓存   | `AionUi/src/process/agent/acp/ApprovalStore.ts` | "always allow" 缓存 |
+| 决策 | 当前结论 |
+| :--- | :--- |
+| 后端形态 | 只支持 Pi Agent 单后端，`AgentType` 固定为 `pi-agent` |
+| Agent 运行方式 | 进程内动态导入 `@earendil-works/pi-agent-core` 和 node 子入口 |
+| 工具权限 | 由 Pi Tools 权限白名单、路径校验、用户确认和后端快照共同约束 |
+| 模型配置 | 通过全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效 |
+| 事件流 | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、finish、error |
+| 文件变更 | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式 |
+| 截图 | `screenshot-service` 使用 author-site `/api/compile` 编译并通过 Puppeteer 渲染 |
 
 ---
 
 ## 更新日志
 
-| 日期       | 版本 | 更新内容                           |
-| :--------- | :--- | :--------------------------------- |
-| 2026-04-05 | v1.0 | 初始版本，完成全部文档             |
-| 2026-04-05 | v1.1 | 添加 AionUi 参考指南               |
-| 2026-05-29 | v2.0 | 根据代码实现全面更新文档，对齐现状 |
-| 2026-06-04 | v2.1 | 新增 05-快照服务文档 |
+| 日期 | 版本 | 更新内容 |
+| :--- | :--- | :--- |
+| 2026-04-05 | v1.0 | 初始版本，完成独立服务层文档 |
+| 2026-04-05 | v1.1 | 添加早期 AionUi/OpenCode 参考 |
+| 2026-05-29 | v2.0 | 根据当时实现更新服务层文档 |
+| 2026-06-04 | v2.1 | 新增快照服务文档 |
 | 2026-06-21 | v2.2 | 新增 Pi Agent 子 Agent 实现文档 |
+| 2026-06-26 | v2.3 | 按当前代码移除多后端主线叙述，更新为 Pi Agent 单后端索引 |

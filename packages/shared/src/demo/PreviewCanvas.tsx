@@ -10,6 +10,7 @@ import {
   computeCanvasRenderModes,
   DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
   DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
+  MIN_CANVAS_SCREENSHOT_PAGE_COUNT,
 } from "./canvas-render-scheduler";
 import {
   computeAutoCanvasLayout,
@@ -521,6 +522,8 @@ export function PreviewCanvas({
     ],
   );
   const pageRenderModes = pageRenderPlan.modes;
+  const shouldUseScreenshotLayer =
+    pages.length >= MIN_CANVAS_SCREENSHOT_PAGE_COUNT;
 
   useEffect(() => {
     const currentTime = Date.now();
@@ -942,11 +945,19 @@ export function PreviewCanvas({
               isEditing={editingPageId === page.id}
               zoom={canvasState.viewport.zoom}
               visible={
-                visiblePageIds.has(page.id) || renderMode === "sleeping-iframe"
+                renderMode === "iframe" ||
+                visiblePageIds.has(page.id) ||
+                renderMode === "sleeping-iframe"
               }
               sessionId={sessionId}
-              screenshotUrl={screenshotUrls?.[page.id]}
-              screenshotRenderBox={screenshotRenderBoxes?.[page.id]}
+              screenshotUrl={
+                shouldUseScreenshotLayer ? screenshotUrls?.[page.id] : undefined
+              }
+              screenshotRenderBox={
+                shouldUseScreenshotLayer
+                  ? screenshotRenderBoxes?.[page.id]
+                  : undefined
+              }
               renderMode={renderMode}
               onLayoutChange={handleLayoutChange}
               onConfigEdit={onPageConfigEdit}

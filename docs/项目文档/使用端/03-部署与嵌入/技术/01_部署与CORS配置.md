@@ -51,7 +51,7 @@ covers:
 | 变量                            | 示例值                  | 说明                                           |
 | :------------------------------ | :---------------------- | :--------------------------------------------- |
 | `NEXT_PUBLIC_WEB_URL`           | `http://localhost:3200` | author-site 创作端地址，用于生成 viewer iframe URL |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL` | `http://localhost:3201` | agent-service 地址，用于调用项目列表和详情 API |
+| `NEXT_PUBLIC_AGENT_SERVICE_URL` | `http://localhost:3201` | agent-service 地址，用于使用端只读 AI 问答 API |
 
 这些变量以 `NEXT_PUBLIC_` 前缀开头，Next.js 会将其注入到客户端代码中，API 客户端可直接读取。
 
@@ -66,6 +66,8 @@ agent-service 使用 Fastify 的 `@fastify/cors` 插件，通过 `CORS_ORIGINS` 
 - 默认允许：`http://localhost:3200`、`http://127.0.0.1:3200`（创作端）
 - 使用端新增：`http://localhost:3300`、`http://127.0.0.1:3300`
 - 生产环境通过 `CORS_ORIGINS` 环境变量统一配置
+
+使用端 AI 问答由浏览器直接请求 agent-service 的只读接口，因此生产环境的 `CORS_ORIGINS` 也必须包含 viewer-site 实际访问域名。
 
 ### 3.2 author-site 创作端 CORS 配置
 

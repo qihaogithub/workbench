@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "projectId": "proj_1779608460377",
+  "updatedAt": 1782440418816,
+  "state": {
+    "viewport": {
+      "x": 112.20703125,
+      "y": 37.17578125,
+      "zoom": 0.5
+    },
+    "pages": {
+      "phone-popup_k8m2": {
+        "x": 0,
+        "y": 104.5546875,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1
+      },
+      "pad-popup_a3f2": {
+        "x": 414.5,
+        "y": 104.6015625,
+        "width": 1082.6041666666665,
+        "height": 811.953125
+      }
+    },
+    "nodes": {}
+  }
+}

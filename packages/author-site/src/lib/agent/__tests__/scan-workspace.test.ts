@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { scanWorkspaceContext } from '../scan-workspace';
+import { scanKnowledgeIndex, scanWorkspaceContext } from '../scan-workspace';
+import { closeDb } from '../../db';
 
 describe('scanWorkspaceContext', () => {
   let tmpDir: string;
@@ -21,9 +22,12 @@ describe('scanWorkspaceContext', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scan-workspace-test-'));
+    process.env.DATA_DIR = path.join(tmpDir, 'data');
   });
 
   afterEach(() => {
+    closeDb();
+    delete process.env.DATA_DIR;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -130,5 +134,39 @@ describe('scanWorkspaceContext', () => {
     const ctx = scanWorkspaceContext(tmpDir);
     expect(ctx.pageList).toContain('// x-code');
     expect(ctx.pageList).toContain('// y-code');
+  });
+
+  it('知识库索引应合并系统内置摘要索引并输出分类标签与按需读取提示', () => {
+    const knowledgeDir = path.join(tmpDir, 'knowledge');
+    fs.mkdirSync(knowledgeDir, { recursive: true });
+    fs.writeFileSync(path.join(knowledgeDir, '项目规范.md'), '# 项目规范');
+    fs.writeFileSync(
+      path.join(knowledgeDir, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'kb_user_001',
+            title: '项目规范',
+            source: 'user',
+            description: '项目视觉和组件使用约定',
+            fileName: '项目规范.md',
+            addedAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    const index = scanKnowledgeIndex(tmpDir);
+
+    expect(index).toContain('项目知识库索引');
+    expect(index).toContain('系统内置');
+    expect(index).toContain('配置系统参考');
+    expect(index).toContain('分类：配置与预览');
+    expect(index).toContain('标签：config.schema.json');
+    expect(index).toContain('用户添加');
+    expect(index).toContain('项目规范');
+    expect(index).toContain('不要一次性读取全部知识库');
   });
 });

@@ -7,6 +7,7 @@ import type {
 
 export const DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES = 12;
 export const DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES = 12;
+export const MIN_CANVAS_SCREENSHOT_PAGE_COUNT = 6;
 
 interface ComputeCanvasRenderModesInput {
   pages: CanvasPageData[];
@@ -55,6 +56,19 @@ export function computeCanvasRenderModes({
   maxSleepingIframes = DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
 }: ComputeCanvasRenderModesInput): CanvasRenderModeResult {
   const modes: Record<string, CanvasPageRenderMode> = {};
+
+  if (pages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
+    const activePageIds = pages.map((page) => page.id);
+    for (const pageId of activePageIds) {
+      modes[pageId] = "iframe";
+    }
+    return {
+      modes,
+      activePageIds,
+      sleepingPageIds: [],
+    };
+  }
+
   const zoom = viewport.zoom || 1;
   const viewportCenter = {
     x: (-viewport.x + containerWidth / 2) / zoom,

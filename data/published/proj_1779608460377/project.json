@@ -2,34 +2,61 @@
   "id": "proj_1779608460377",
   "name": "通用弹窗",
   "thumbnail": "/data/proj_1779608460377/thumbnail.webp",
-  "publishedVersion": "v23",
-  "publishedAt": 1780292121718,
+  "publishedVersion": "v28",
+  "publishedAt": 1782440424755,
   "demoPages": [
     {
-      "id": "demo_1779608460377_w4j5h1",
-      "name": "通用弹窗-手机",
-      "order": 1,
+      "id": "pad-popup_a3f2",
+      "name": "通用弹窗 - 平板版",
+      "order": 0,
       "parentId": null,
-      "compiledJsPath": "demos/demo_1779608460377_w4j5h1/compiled.js",
-      "schemaPath": "demos/demo_1779608460377_w4j5h1/schema.json",
-      "previewSize": {
-        "width": 375,
-        "height": 812
-      }
-    },
-    {
-      "id": "demo_1779608460377_f8g6t2",
-      "name": "通用弹窗-平板",
-      "order": 2,
-      "parentId": null,
-      "compiledJsPath": "demos/demo_1779608460377_f8g6t2/compiled.js",
-      "schemaPath": "demos/demo_1779608460377_f8g6t2/schema.json",
+      "compiledJsPath": "demos/pad-popup_a3f2/compiled.js",
+      "schemaPath": "demos/pad-popup_a3f2/schema.json",
       "previewSize": {
         "width": 1024,
         "height": 768
-      }
+      },
+      "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460377/demos/pad-popup_a3f2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "name": "通用弹窗 - 手机版",
+      "order": 1,
+      "parentId": null,
+      "compiledJsPath": "demos/phone-popup_k8m2/compiled.js",
+      "schemaPath": "demos/phone-popup_k8m2/schema.json",
+      "previewSize": {
+        "width": 375,
+        "height": 812
+      },
+      "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460377/demos/phone-popup_k8m2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     }
   ],
   "demoFolders": [],
-  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"通用弹窗 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"modalImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗图片\",\n      \"description\": \"上传弹窗展示的图片（宽度670px，高度670~890px）\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 670,\n        \"minHeight\": 670,\n        \"maxWidth\": 670,\n        \"maxHeight\": 890\n      }\n    }\n  },\n  \"required\": [\"modalImage\"]\n}"
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"通用弹窗 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"modalImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗图片\",\n      \"description\": \"上传弹窗展示的图片（宽度670px，高度670~890px）\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 670,\n        \"minHeight\": 670,\n        \"maxWidth\": 670,\n        \"maxHeight\": 890\n      }\n    }\n  },\n  \"required\": [\"modalImage\"]\n}",
+  "canvasState": {
+    "viewport": {
+      "x": 112.20703125,
+      "y": 37.17578125,
+      "zoom": 0.5
+    },
+    "pages": {
+      "phone-popup_k8m2": {
+        "x": 0,
+        "y": 104.5546875,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1
+      },
+      "pad-popup_a3f2": {
+        "x": 414.5,
+        "y": 104.6015625,
+        "width": 1082.6041666666665,
+        "height": 811.953125
+      }
+    },
+    "nodes": {}
+  }
 }

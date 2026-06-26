@@ -227,11 +227,34 @@
       "sessionId": "session-1780558855545-5rywkj9bu",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v26",
       "fileCount": 7
+    },
+    {
+      "versionId": "v28",
+      "savedAt": 1782440420363,
+      "savedBy": "qihao",
+      "sessionId": "session-1782440280905-naxmdvvlf",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v28",
+      "fileCount": 9
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1780562608090,
+  "updatedAt": 1782440420365,
   "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
-  "publishedVersion": "v23",
-  "publishedAt": 1780292121719
+  "publishedVersion": "v28",
+  "publishedAt": 1782440424755,
+  "pageVersions": {
+    "pad-popup_a3f2": [
+      {
+        "versionId": "v27",
+        "demoId": "pad-popup_a3f2",
+        "demoName": "通用弹窗 - 平板版",
+        "savedAt": 1782440419891,
+        "savedBy": "qihao",
+        "sessionId": "page-pad-popup_a3f2",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/pages/pad-popup_a3f2/v27",
+        "fileCount": 2,
+        "note": "修改了通用弹窗 - 平板版"
+      }
+    ]
+  }
 }

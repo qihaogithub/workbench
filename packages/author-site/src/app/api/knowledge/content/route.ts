@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
+import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { getSystemKnowledgeDocumentByFileName } from '@/lib/knowledge/system-knowledge';
 
 /**
  * 读取知识库文件内容
@@ -27,6 +29,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    syncBuiltinKnowledge(workingDir);
+    const systemDoc = getSystemKnowledgeDocumentByFileName(sanitizedFileName);
+    if (systemDoc) {
+      return NextResponse.json({
+        success: true,
+        data: { content: systemDoc.content, fileName: sanitizedFileName },
+      });
+    }
+
     const filePath = path.join(workingDir, 'knowledge', sanitizedFileName);
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(

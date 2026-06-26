@@ -72,6 +72,26 @@ export class AgentManager implements IAgentManager {
           logger.warn({ sessionId, error }, 'Failed to cleanly kill outdated agent');
         });
         this.agents.delete(sessionId);
+      } else if (
+        config.toolMode !== undefined &&
+        existingAgent.getConfig().toolMode !== config.toolMode
+      ) {
+        if (existingAgent.status === 'processing') {
+          logger.warn(
+            { sessionId, currentMode: existingAgent.getConfig().toolMode, newMode: config.toolMode },
+            'Agent tool mode changed while processing; keeping current agent until next turn',
+          );
+          return existingAgent;
+        }
+
+        logger.info(
+          { sessionId, currentMode: existingAgent.getConfig().toolMode, newMode: config.toolMode },
+          'Agent tool mode changed, rebuilding agent',
+        );
+        void existingAgent.kill().catch((error) => {
+          logger.warn({ sessionId, error }, 'Failed to cleanly kill agent with old tool mode');
+        });
+        this.agents.delete(sessionId);
       } else {
       if (this.hasConfigChanged(existingAgent, config)) {
         logger.info(
@@ -98,6 +118,7 @@ export class AgentManager implements IAgentManager {
     return (
       current.workingDir !== newConfig.workingDir ||
       current.demoId !== newConfig.demoId ||
+      current.toolMode !== newConfig.toolMode ||
       JSON.stringify(current.backendProviders ?? null) !==
         JSON.stringify(newConfig.backendProviders ?? null)
     );

@@ -37,6 +37,7 @@ export interface WorkbenchToolsOptions {
   subagentRunner?: SubagentRunner;
   includePlanApproval?: boolean;
   planApprovalHandler?: PlanApprovalHandler;
+  mode?: "workbench" | "viewer-readonly";
 }
 
 export function createWorkbenchTools(
@@ -44,6 +45,14 @@ export function createWorkbenchTools(
   permissionHandler?: PermissionHandler,
   options: WorkbenchToolsOptions = {},
 ): AgentTool[] {
+  if (options.mode === "viewer-readonly") {
+    return [
+      createReadFileTool(config),
+      createReadFileLinesTool(config),
+      createListFilesTool(config),
+    ];
+  }
+
   const deletionPlanStore = createDeletionPlanStore();
   const tools: AgentTool[] = [
     createReadFileTool(config),
@@ -86,6 +95,21 @@ export function getWorkbenchToolCapabilities(): {
 } {
   const tools = createWorkbenchTools({ sessionId: "capabilities" }, undefined, {
     includeDelegateTask: false,
+  });
+  return {
+    toolVersion: WORKBENCH_TOOL_VERSION,
+    toolNames: tools.map((tool) => tool.name),
+  };
+}
+
+export function getViewerReadonlyToolCapabilities(): {
+  toolVersion: number;
+  toolNames: string[];
+} {
+  const tools = createWorkbenchTools({ sessionId: "viewer-readonly-capabilities" }, undefined, {
+    includeDelegateTask: false,
+    includePlanApproval: false,
+    mode: "viewer-readonly",
   });
   return {
     toolVersion: WORKBENCH_TOOL_VERSION,

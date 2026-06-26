@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createReadFileTool, createWriteFileTool, createListFilesTool } from '../../src/backends/pi-tools/file-tools';
+import { createReadFileLinesTool } from '../../src/backends/pi-tools/read-file-lines-tool';
 import { createBashTool } from '../../src/backends/pi-tools/bash-tool';
+import { setSystemKnowledgeSnapshot } from '../../src/config/system-knowledge';
 import type { AgentConfig } from '../../src/core/types';
 
 vi.mock('fs', () => ({
@@ -24,6 +26,35 @@ const mockConfig: AgentConfig = {
 };
 
 describe('createReadFileTool - 权限感知', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setSystemKnowledgeSnapshot({
+      version: 1,
+      updatedAt: '2026-06-26T00:00:00.000Z',
+      documents: [
+        {
+          id: 'kb_sys_test',
+          title: '配置系统参考',
+          description: '测试系统知识',
+          fileName: '配置系统参考.md',
+          content: '# 配置系统参考\n\n系统知识正文',
+          category: '配置与预览',
+          tags: ['config.schema.json'],
+          enabled: true,
+          sortOrder: 0,
+          version: 1,
+          contentHash: 'hash',
+          aiSummary: '摘要',
+          aiKeywords: ['配置'],
+          summaryStatus: 'ready',
+          createdAt: '2026-06-26T00:00:00.000Z',
+          updatedAt: '2026-06-26T00:00:00.000Z',
+          sizeBytes: 20,
+        },
+      ],
+    });
+  });
+
   it('白名单内文件应正常读取', async () => {
     (fs.promises.readFile as any).mockResolvedValue('content');
     const tool = createReadFileTool(mockConfig);
@@ -49,6 +80,27 @@ describe('createReadFileTool - 权限感知', () => {
     const tool = createReadFileTool(mockConfig);
     const result = await tool.execute('id', { path: '../escape.ts' } as any);
     expect(result.isError).toBe(true);
+  });
+
+  it('系统知识库虚拟文件应无需物理文件即可读取', async () => {
+    const tool = createReadFileTool(mockConfig);
+    const result = await tool.execute('id', { path: 'knowledge/配置系统参考.md' } as any);
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('系统知识正文');
+    expect(fs.promises.readFile).not.toHaveBeenCalled();
+  });
+
+  it('系统知识库虚拟文件应支持按行读取', async () => {
+    const tool = createReadFileLinesTool(mockConfig);
+    const result = await tool.execute('id', {
+      path: 'knowledge/配置系统参考.md',
+      startLine: 1,
+      endLine: 1,
+    } as any);
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('File: knowledge/配置系统参考.md');
+    expect(result.content[0].text).toContain('1→# 配置系统参考');
+    expect(fs.promises.readFile).not.toHaveBeenCalled();
   });
 });
 

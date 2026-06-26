@@ -13,6 +13,7 @@ import {
   ChevronRight,
   FileText,
   Map as MapIcon,
+  MessageCircle,
 } from "lucide-react";
 import {
   getProjects,
@@ -35,6 +36,8 @@ import {
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@opencode-workbench/shared/demo";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { ViewerAiDrawer } from "@/components/ViewerAiDrawer";
 
 type SortOption = "newest" | "oldest" | "name";
 
@@ -359,6 +362,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -556,6 +560,16 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     <div className="flex flex-col h-full">
       <Header name={project.name} onBack={() => router.push("/")} />
       <div className="flex-1 flex min-h-0 overflow-hidden">
+        {project && activePage && (
+          <ViewerAiDrawer
+            open={aiDrawerOpen}
+            projectId={projectId}
+            project={project}
+            activePageId={activePage.id}
+            activeConfig={configData}
+            onOpenChange={setAiDrawerOpen}
+          />
+        )}
         {previewMode !== "canvas" && project.demoPages.length > 1 && (
           <div className="w-56 border-r border-border shrink-0 flex flex-col">
             <style>{`
@@ -689,6 +703,17 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           </div>
         )}
       </div>
+      {!aiDrawerOpen && (
+        <Button
+          type="button"
+          size="icon"
+          className="fixed bottom-4 left-4 z-40 h-11 w-11 rounded-full shadow-lg"
+          onClick={() => setAiDrawerOpen(true)}
+          title="打开 AI 问答"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -766,7 +791,13 @@ function TreeList({
   );
 }
 
-function Header({ name, onBack }: { name: string; onBack: () => void }) {
+function Header({
+  name,
+  onBack,
+}: {
+  name: string;
+  onBack: () => void;
+}) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
       <button

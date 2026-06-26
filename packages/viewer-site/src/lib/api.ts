@@ -46,6 +46,7 @@ export interface ProjectsIndex {
 }
 
 const DATA_BASE = process.env.NEXT_PUBLIC_DATA_BASE || "";
+const AGENT_SERVICE_BASE = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${DATA_BASE}${path}`, { cache: "no-store" });
@@ -92,4 +93,48 @@ export function getCompiledJsUrl(
   compiledJsPath: string,
 ): string {
   return `${DATA_BASE}/data/${projectId}/${compiledJsPath}`;
+}
+
+export interface ViewerAiHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ViewerAiChatRequest {
+  projectId: string;
+  sessionId?: string;
+  message: string;
+  activePageId?: string;
+  activeConfig?: Record<string, unknown>;
+  history?: ViewerAiHistoryMessage[];
+}
+
+export interface ViewerAiChatResponse {
+  sessionId: string;
+  answer: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function askViewerAi(
+  request: ViewerAiChatRequest,
+): Promise<ViewerAiChatResponse> {
+  const res = await fetch(`${AGENT_SERVICE_BASE}/api/viewer-ai/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload = await res.json().catch(() => null) as
+    | { success: true; data: ViewerAiChatResponse }
+    | { success: false; error?: { message?: string } }
+    | null;
+
+  if (!res.ok || !payload || !payload.success) {
+    throw new Error(
+      payload && "error" in payload && payload.error?.message
+        ? payload.error.message
+        : `AI 问答失败: ${res.status} ${res.statusText}`,
+    );
+  }
+
+  return payload.data;
 }
