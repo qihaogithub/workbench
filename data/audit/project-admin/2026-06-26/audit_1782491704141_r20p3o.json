@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1782491704141_r20p3o",
+  "at": 1782491704141,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update",
+  "projectId": "proj_1782286923644",
+  "resourceId": "age-confirmation_q8n5",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:age-confirmation_q8n5:code"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

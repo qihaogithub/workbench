@@ -1,5 +1,6 @@
 import { Circle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { trigger } from "@preview/sdk";
 
 interface DemoProps {}
 
@@ -12,6 +13,7 @@ const loadingTips = [
 export default function Demo(_props: DemoProps) {
   const [progress, setProgress] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
+  const hasTriggeredRef = useRef(false);
 
   useEffect(() => {
     // 进度条动画：3秒内从 0 到 100
@@ -38,6 +40,19 @@ export default function Demo(_props: DemoProps) {
 
     return () => clearInterval(tipTimer);
   }, []);
+
+  useEffect(() => {
+    if (progress < 100 || hasTriggeredRef.current) {
+      return;
+    }
+
+    hasTriggeredRef.current = true;
+    const timer = setTimeout(() => {
+      trigger("loadingComplete", { next: "age-confirmation" });
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [progress]);
 
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-emerald-900 flex flex-col items-center justify-center px-8">
