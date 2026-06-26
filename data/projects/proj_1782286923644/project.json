@@ -75,10 +75,18 @@
       "sessionId": "session-1782360753608-zfobgk3eb",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/v4",
       "fileCount": 21
+    },
+    {
+      "versionId": "v6",
+      "savedAt": 1782465485508,
+      "savedBy": "qihao",
+      "sessionId": "session-1782464408291-omchdxj36",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/v6",
+      "fileCount": 22
     }
   ],
   "createdAt": 1782286923647,
-  "updatedAt": 1782366378396,
+  "updatedAt": 1782465485510,
   "pageVersions": {
     "default-page_r9mr": [
       {
@@ -104,6 +112,19 @@
         "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/pages/activity-loading_x4p1/v3",
         "fileCount": 2,
         "note": "修改了活动加载页"
+      }
+    ],
+    "ended-pending_k8m2": [
+      {
+        "versionId": "v5",
+        "demoId": "ended-pending_k8m2",
+        "demoName": "已截止冠军待揭晓",
+        "savedAt": 1782465480943,
+        "savedBy": "qihao",
+        "sessionId": "page-ended-pending_k8m2",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/pages/ended-pending_k8m2/v5",
+        "fileCount": 2,
+        "note": "修改了已截止冠军待揭晓"
       }
     ]
   }

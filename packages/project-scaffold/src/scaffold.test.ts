@@ -60,6 +60,7 @@ try {
   assert.equal(pulled.ok, true);
   assert.equal(fs.existsSync(path.join(projectDir, "opencode.project.json")), true);
   assert.equal(fs.existsSync(path.join(projectDir, "scripts/dev-server.mjs")), true);
+  assert.equal(fs.existsSync(path.join(projectDir, "src/app.graph.json")), true);
 
   const install = spawnSync("pnpm", ["--dir", projectDir, "install", "--lockfile-only"], {
     encoding: "utf-8",
@@ -114,9 +115,12 @@ try {
   assert.deepEqual(upgradedDiff.diffSummary?.updated, []);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "opencode.project.json"), "utf-8")) as {
-    pages: Array<{ id: string; entry: string }>;
+    appGraph: string | null;
+    pages: Array<{ id: string; routeKey?: string; entry: string }>;
   };
   assert.equal(manifest.pages[0]?.id, pageId);
+  assert.equal(manifest.pages[0]?.routeKey, "page");
+  assert.equal(manifest.appGraph, "src/app.graph.json");
   fs.appendFileSync(path.join(projectDir, manifest.pages[0]?.entry ?? ""), "\n// local update\n", "utf-8");
 
   const changedDiff = diffProjectScaffold(projectDir);
@@ -137,7 +141,8 @@ try {
   const nextManifestPath = path.join(projectDir, "opencode.project.json");
   const nextManifest = JSON.parse(fs.readFileSync(nextManifestPath, "utf-8")) as {
     baseVersion: string;
-    pages: Array<{ id: string; name: string; entry: string; schema: string; parentId: string | null; order: number }>;
+    appGraph: string | null;
+    pages: Array<{ id: string; name: string; routeKey?: string; entry: string; schema: string; parentId: string | null; order: number }>;
     folders: Array<{ id: string; name: string; parentId: string | null; order: number }>;
   };
   const removedPage = nextManifest.pages[0];
@@ -147,6 +152,7 @@ try {
   nextManifest.pages = [{
     id: "local_page",
     name: "本地新增页",
+    routeKey: "local-page",
     parentId: "local_folder",
     order: 0,
     entry: "src/pages/local_page/index.tsx",
@@ -184,11 +190,13 @@ try {
   const exportedEntries = exportProjectScaffoldEntries(service, actor, { projectId });
   assert.equal(exportedEntries.ok, true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "opencode.project.json"), true);
+  assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/app.graph.json"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/pages/local_page/index.tsx"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/assets/images/logo.png"), true);
   const zip = buildProjectScaffoldZip(exportedEntries.data?.entries ?? []);
   assert.equal(zip.readUInt32LE(0), 0x04034b50);
   assert.equal(zip.includes(Buffer.from("opencode.project.json", "utf-8")), true);
+  assert.equal(zip.includes(Buffer.from("src/app.graph.json", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/pages/local_page/index.tsx", "utf-8")), true);
 
   const structuralDiff = diffProjectScaffold(projectDir);

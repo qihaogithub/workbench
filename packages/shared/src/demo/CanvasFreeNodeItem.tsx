@@ -90,7 +90,18 @@ function computeResizeLayout(
   edge: ResizeEdge,
   dx: number,
   dy: number,
+  options?: { aspectRatio?: number },
 ): CanvasPageLayout {
+  if (options?.aspectRatio) {
+    return computeAspectRatioResizeLayout(
+      layout,
+      edge,
+      dx,
+      dy,
+      options.aspectRatio,
+    );
+  }
+
   let { x, y, width, height } = layout;
 
   const clampWidth = (value: number) =>
@@ -111,6 +122,66 @@ function computeResizeLayout(
   if (edge.includes("n")) {
     height = clampHeight(layout.height - dy);
     y = layout.y + (layout.height - height);
+  }
+
+  return { ...layout, x, y, width, height };
+}
+
+function computeAspectRatioResizeLayout(
+  layout: CanvasPageLayout,
+  edge: ResizeEdge,
+  dx: number,
+  dy: number,
+  aspectRatio: number,
+): CanvasPageLayout {
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+    return computeResizeLayout(layout, edge, dx, dy);
+  }
+
+  const minWidth = Math.max(MIN_WIDTH, MIN_HEIGHT * aspectRatio);
+  const maxWidth = Math.min(MAX_SIZE, MAX_SIZE * aspectRatio);
+  const clampWidth = (value: number) =>
+    Math.min(Math.max(value, minWidth), maxWidth);
+
+  const horizontalWidth = edge.includes("e")
+    ? layout.width + dx
+    : edge.includes("w")
+      ? layout.width - dx
+      : undefined;
+  const verticalWidth = edge.includes("s")
+    ? (layout.height + dy) * aspectRatio
+    : edge.includes("n")
+      ? (layout.height - dy) * aspectRatio
+      : undefined;
+
+  let nextWidth = layout.width;
+  if (horizontalWidth !== undefined && verticalWidth !== undefined) {
+    const horizontalDelta = Math.abs(horizontalWidth - layout.width);
+    const verticalDelta = Math.abs(verticalWidth - layout.width);
+    nextWidth =
+      horizontalDelta >= verticalDelta ? horizontalWidth : verticalWidth;
+  } else if (horizontalWidth !== undefined) {
+    nextWidth = horizontalWidth;
+  } else if (verticalWidth !== undefined) {
+    nextWidth = verticalWidth;
+  }
+
+  const width = clampWidth(nextWidth);
+  const height = width / aspectRatio;
+
+  let x = layout.x;
+  let y = layout.y;
+
+  if (edge.includes("w")) {
+    x = layout.x + layout.width - width;
+  } else if (!edge.includes("e")) {
+    x = layout.x + (layout.width - width) / 2;
+  }
+
+  if (edge.includes("n")) {
+    y = layout.y + layout.height - height;
+  } else if (!edge.includes("s")) {
+    y = layout.y + (layout.height - height) / 2;
   }
 
   return { ...layout, x, y, width, height };
@@ -236,6 +307,13 @@ export function CanvasFreeNodeItem({
           isResizing,
           dx,
           dy,
+          {
+            aspectRatio:
+              node.kind === "image"
+                ? (node.intrinsicWidth ?? layoutStartRef.current.width) /
+                  (node.intrinsicHeight ?? layoutStartRef.current.height)
+                : undefined,
+          },
         );
         onLayoutChange?.(node.id, newLayout);
         onDragMove?.(node.id, newLayout, isResizing);
@@ -326,7 +404,8 @@ export function CanvasFreeNodeItem({
 
       <div
         className={cn(
-          "absolute inset-0 overflow-hidden rounded-lg border bg-background shadow-md",
+          "absolute inset-0 overflow-hidden rounded-lg border shadow-md",
+          node.kind === "document" && "bg-background",
           (selected || isDragging || isResizing) && "ring-2 ring-blue-500",
         )}
       >
@@ -354,11 +433,11 @@ export function CanvasFreeNodeItem({
         )}
 
         {node.kind === "image" && (
-          <div className="flex h-full items-center justify-center bg-black/5">
+          <div className="flex h-full items-center justify-center">
             <img
               src={node.src}
               alt={node.title}
-              className="h-full w-full object-contain"
+              className="h-full w-full object-fill"
               draggable={false}
             />
           </div>

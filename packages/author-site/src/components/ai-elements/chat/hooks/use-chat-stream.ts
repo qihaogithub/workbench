@@ -236,11 +236,13 @@ export function useChatStream(options: UseChatStreamOptions) {
       ]);
 
       try {
+        const assistantMessageId = `assistant-${Date.now()}`;
         memoryFilePathsRef.current.clear();
         setIsStreaming(true);
         setStreamContent("");
         setPlan(EMPTY_PLAN);
         setCurrentMessage({
+          id: assistantMessageId,
           role: "assistant",
           content: "",
           parts: [],
@@ -370,7 +372,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             stopSilenceTracking();
             const currentMsg = currentMessageRef.current;
             const assistantMessage: ChatMessage = {
-              id: `assistant-${Date.now()}`,
+              id: currentMsg.id || assistantMessageId,
               role: "assistant",
               content:
                 accumulatedContent ||
@@ -753,7 +755,41 @@ export function useChatStream(options: UseChatStreamOptions) {
     (targetAssistantId: string) => {
       const msgs = messagesRef.current;
       const targetIndex = msgs.findIndex((m) => m.id === targetAssistantId);
-      if (targetIndex < 1) return;
+      if (targetIndex < 1) {
+        const currentAssistantId = currentMessageRef.current?.id;
+        if (currentAssistantId !== targetAssistantId) return;
+
+        const userMsg = msgs
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user");
+        if (!userMsg) return;
+
+        streamServiceRef.current?.close();
+        stopSilenceTracking();
+        setIsStreaming(false);
+        setStreamContent("");
+        setCurrentMessage({
+          role: "assistant",
+          content: "",
+          parts: [],
+        });
+
+        const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
+        const images: ImageAttachment[] | undefined = imageParts.length > 0
+          ? imageParts.map((p) => {
+              if (p.type !== "image") return undefined;
+              const match = p.url.match(/^data:(.+);base64,(.+)$/);
+              if (match) {
+                return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
+              }
+              return undefined;
+            }).filter((img): img is ImageAttachment => img !== undefined)
+          : undefined;
+
+        handleSend(userMsg.content, images);
+        return;
+      }
 
       const userMsg = msgs
         .slice(0, targetIndex)
@@ -779,7 +815,17 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       handleSend(userMsg.content, images);
     },
-    [messagesRef, setMessages, sessionId, handleSend],
+    [
+      currentMessageRef,
+      messagesRef,
+      setCurrentMessage,
+      setIsStreaming,
+      setMessages,
+      setStreamContent,
+      sessionId,
+      stopSilenceTracking,
+      handleSend,
+    ],
   );
 
   const handleRollback = useCallback(

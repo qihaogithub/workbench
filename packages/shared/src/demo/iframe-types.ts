@@ -9,6 +9,7 @@ export type IframeOutMessageType =
   | 'THUMBNAIL_LAYOUT_ERROR'
   | 'POSITIONABLE_SIZES_RESULT'
   | 'CONSOLE_LOG'
+  | 'APP_ACTION'
   | 'VISUAL_HOVER'
   | 'VISUAL_SELECT'
   | 'VISUAL_INLINE_EDIT'
@@ -37,6 +38,11 @@ export interface ConsoleLogPayload {
   level: 'log' | 'warn' | 'error' | 'info' | 'debug';
   args: string;
   timestamp: number;
+}
+
+export interface AppActionPayload {
+  event: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface VisualNodeRect {

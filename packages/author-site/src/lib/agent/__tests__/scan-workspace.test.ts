@@ -136,7 +136,7 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.pageList).toContain('// y-code');
   });
 
-  it('知识库索引应合并系统内置摘要索引并输出分类标签与按需读取提示', () => {
+  it('知识库索引只输出项目知识并提供按需读取提示', () => {
     const knowledgeDir = path.join(tmpDir, 'knowledge');
     fs.mkdirSync(knowledgeDir, { recursive: true });
     fs.writeFileSync(path.join(knowledgeDir, '项目规范.md'), '# 项目规范');
@@ -161,12 +161,11 @@ describe('scanWorkspaceContext', () => {
     const index = scanKnowledgeIndex(tmpDir);
 
     expect(index).toContain('项目知识库索引');
-    expect(index).toContain('系统内置');
-    expect(index).toContain('配置系统参考');
-    expect(index).toContain('分类：配置与预览');
-    expect(index).toContain('标签：config.schema.json');
-    expect(index).toContain('用户添加');
+    expect(index).toContain('项目知识');
     expect(index).toContain('项目规范');
+    expect(index).toContain('项目视觉和组件使用约定');
+    expect(index).not.toContain('系统内置');
+    expect(index).not.toContain('配置系统参考');
     expect(index).toContain('不要一次性读取全部知识库');
   });
 });

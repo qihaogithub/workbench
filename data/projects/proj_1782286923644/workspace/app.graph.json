@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "external-guide_k7m2",
+      "title": "站外引导页"
+    },
+    "page-2": {
+      "pageId": "activity-loading_x4p1",
+      "title": "活动加载页"
+    },
+    "page-3": {
+      "pageId": "age-confirmation_q8n5",
+      "title": "年龄确认弹窗"
+    },
+    "page-4": {
+      "pageId": "preheat-home_m4kq",
+      "title": "预热期首页"
+    },
+    "page-5": {
+      "pageId": "active-home_r7yt",
+      "title": "进行中首页"
+    },
+    "page-6": {
+      "pageId": "voted-lottery_p2wx",
+      "title": "已投票待抽奖"
+    },
+    "page-7": {
+      "pageId": "chances-used_a3f2",
+      "title": "机会用完已有奖品"
+    },
+    "page-8": {
+      "pageId": "ended-pending_k8m2",
+      "title": "已截止冠军待揭晓"
+    },
+    "page-9": {
+      "pageId": "champion-awards_x7z1",
+      "title": "冠军确认表彰页"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

@@ -3,13 +3,13 @@ import * as path from "path";
 import type { SystemPromptContext } from "./system-prompt";
 import { listDemoPages } from "../fs-utils";
 import { syncBuiltinKnowledge } from "../knowledge/builtin-documents";
-import { listSystemKnowledgeIndexItems } from "../knowledge/system-knowledge";
 
 const MAX_INLINE_PAGES = 2;
 
 interface PageInfo {
   id: string;
   name: string;
+  routeKey?: string;
   indexPath: string;
   schemaPath: string;
   indexContent?: string;
@@ -44,6 +44,7 @@ function formatPageList(pages: PageInfo[]): string {
       const lines = [
         `- ${p.name}`,
         `  - id: \`${p.id}\``,
+        `  - routeKey: \`${p.routeKey ?? p.id}\``,
         `  - index.tsx: \`${p.indexPath}\``,
         `  - config.schema.json: \`${p.schemaPath}\``,
       ];
@@ -79,6 +80,7 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
     pages.push({
       id: p.id,
       name: p.name,
+      routeKey: p.routeKey,
       indexPath: path.join("demos", p.id, "index.tsx"),
       schemaPath: path.join("demos", p.id, "config.schema.json"),
     });
@@ -151,9 +153,7 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
           }
         ).items?.filter((item) => item.source !== "system") || []
       : manifest.items.filter((item) => item.source !== "system");
-    const systemItems = listSystemKnowledgeIndexItems();
-    const allItems = [...systemItems, ...userItems];
-    if (allItems.length === 0) return null;
+    if (userItems.length === 0) return null;
 
     const formatItem = (item: {
       title: string;
@@ -185,17 +185,13 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
     };
 
     const sections: string[] = [];
-    if (systemItems.length > 0) {
-      const lines = systemItems.map(formatItem);
-      sections.push(`系统内置：\n${lines.join('\n')}`);
-    }
     if (userItems.length > 0) {
       const lines = userItems.map(formatItem);
-      sections.push(`用户添加：\n${lines.join('\n')}`);
+      sections.push(`项目知识：\n${lines.join('\n')}`);
     }
 
     return [
-      `项目知识库索引（共 ${allItems.length} 篇，仅含摘要，正文不在上下文中）：`,
+      `项目知识库索引（共 ${userItems.length} 篇，仅含摘要，正文不在上下文中）：`,
       sections.join('\n'),
       '→ 需要查阅时，请根据标题/描述/分类/标签选择最相关文档，再用 readFile 或 readFileWithLines 读取 knowledge/{文件名}；不要一次性读取全部知识库。',
     ].join('\n');
@@ -227,10 +223,10 @@ export function migrateReferencesToKnowledge(workingDir: string): void {
       path.join(knowledgeDir, file)
     );
     return {
-      id: `kb_sys_${String(index + 1).padStart(3, "0")}`,
+      id: `kb_user_${String(index + 1).padStart(3, "0")}`,
       title,
-      source: "system",
-      description: "系统预设参考文档",
+      source: "user",
+      description: "从旧 references/ 迁移的项目知识文档",
       fileName: file,
       addedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

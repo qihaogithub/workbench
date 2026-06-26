@@ -1,5 +1,4 @@
 import { Icon } from "@preview/sdk";
-import { Smartphone, Download, QrCode, Trophy } from "lucide-react";
 
 interface DemoProps {}
 
@@ -24,7 +23,14 @@ export default function Demo(_props: DemoProps) {
       <div className="bg-gradient-to-b from-green-600 to-green-500 px-6 pt-8 pb-12 text-white">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-            <Trophy className="w-6 h-6 text-green-600" />
+            <svg className="w-6 h-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 6 9 6 9Z" />
+              <path d="M18 4.5A2.5 2.5 0 0 1 20.5 7c-1 1.5-2.5 2-2.5 2" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2v6.5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V2" />
+            </svg>
           </div>
           <div>
             <p className="text-xs text-green-100">官方活动</p>
@@ -64,18 +70,29 @@ export default function Demo(_props: DemoProps) {
           <>
             {/* 浏览器环境 */}
             <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all">
-              <Smartphone className="w-5 h-5" />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+                <path d="M12 18h.01" />
+              </svg>
               在 App 中打开
             </button>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-400 mb-3 flex items-center justify-center gap-1">
-                <QrCode className="w-4 h-4" />
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M12 7v10" />
+                  <path d="M7 12h10" />
+                </svg>
                 扫描二维码打开
               </p>
               {/* 二维码占位灰色方块 */}
               <div className="w-36 h-36 bg-gray-200 rounded-xl mx-auto flex items-center justify-center">
-                <QrCode className="w-10 h-10 text-gray-400" />
+                <svg className="w-10 h-10 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M12 7v10" />
+                  <path d="M7 12h10" />
+                </svg>
               </div>
             </div>
           </>
@@ -92,7 +109,11 @@ export default function Demo(_props: DemoProps) {
             </div>
 
             <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all">
-              <Download className="w-5 h-5" />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
               下载 App
             </button>
           </>
@@ -106,11 +127,17 @@ export default function Demo(_props: DemoProps) {
         </p>
         <div className="flex gap-3">
           <button className="flex-1 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-            <Smartphone className="w-4 h-4" />
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+              <path d="M12 18h.01" />
+            </svg>
             iOS 下载
           </button>
           <button className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-            <Smartphone className="w-4 h-4" />
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+              <path d="M12 18h.01" />
+            </svg>
             Android 下载
           </button>
         </div>

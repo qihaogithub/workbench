@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { AssistantMessage } from "../assistant-message";
 import { Tool } from "../tool";
@@ -19,6 +19,11 @@ jest.mock("@streamdown/math", () => ({ math: {} }), { virtual: true });
 jest.mock("@streamdown/cjk", () => ({ cjk: {} }), { virtual: true });
 
 describe("AssistantMessage 子 Agent 展示", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    Reflect.deleteProperty(global, "fetch");
+  });
+
   it("将 delegateTask 运行中状态展示为委派子 Agent 任务块", () => {
     render(
       <AssistantMessage
@@ -220,6 +225,122 @@ describe("AssistantMessage 子 Agent 展示", () => {
 
     expect(screen.getByText("src/app/page.tsx")).toBeInTheDocument();
     expect(screen.queryByText(/委派子 Agent/)).not.toBeInTheDocument();
+  });
+
+  it("将外部授权需求渲染为聊天内授权卡片", async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            provider: "dingtalk",
+            status: "pending",
+            authUrl: "https://login.dingtalk.test/device",
+            userCode: "ABCD-1234",
+            message: "请在浏览器完成钉钉授权",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            providers: [
+              {
+                provider: "figma",
+                status: "disconnected",
+              },
+              {
+                provider: "dingtalk",
+                status: "connected",
+                accountLabel: "Ding User",
+              },
+            ],
+          },
+        }),
+      });
+    (global as typeof globalThis & { fetch: typeof fetchMock }).fetch = fetchMock;
+    const clickMock = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const continueMock = jest.fn();
+
+    render(
+      <AssistantMessage
+        messageId="assistant-auth-1"
+        onExternalAuthConnected={continueMock}
+        parts={[
+          {
+            type: "tool",
+            toolCallId: "dingtalk-1",
+            toolName: "dingtalk",
+            status: "error",
+            details: {
+              kind: "external_auth_required",
+              provider: "dingtalk",
+              reason: "not_connected",
+              title: "连接钉钉后继续",
+              message: "需要使用你的钉钉权限授权。",
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("连接钉钉后继续")).toBeInTheDocument();
+    expect(screen.getByText(/需要使用你的钉钉权限授权/)).toBeInTheDocument();
+    expect(screen.queryByText(/去设置/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("连接 钉钉"));
+
+    await waitFor(() => expect(clickMock).toHaveBeenCalled());
+    expect(await screen.findByText("打开授权页")).toHaveAttribute(
+      "href",
+      "https://login.dingtalk.test/device",
+    );
+    expect(await screen.findByText("ABCD-1234")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("我已完成授权"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/钉钉 已连接：Ding User/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("已连接")).toBeDisabled();
+    expect(screen.getByText("重新检查授权")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(continueMock).toHaveBeenCalledWith("assistant-auth-1");
+    });
+  });
+
+  it("授权卡片不折叠进执行过程", () => {
+    render(
+      <AssistantMessage
+        parts={[
+          {
+            type: "reasoning",
+            content: "需要先检查工具权限。",
+          },
+          {
+            type: "tool",
+            toolCallId: "dingtalk-1",
+            toolName: "dingtalk",
+            status: "error",
+            details: {
+              kind: "external_auth_required",
+              provider: "dingtalk",
+              reason: "not_connected",
+              title: "连接钉钉后继续",
+              message: "需要使用你的钉钉权限授权。",
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("连接钉钉后继续")).toBeInTheDocument();
+    expect(screen.getByText("连接 钉钉")).toBeInTheDocument();
   });
 
   it("展示轻量处理中动效且不暴露日志入口", () => {

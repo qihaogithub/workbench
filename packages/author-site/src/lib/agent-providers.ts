@@ -7,7 +7,7 @@
 
 import type {
   BackendProvidersConfig,
-  SystemKnowledgeSnapshot,
+  ExternalAuthSessionConfig,
 } from "@opencode-workbench/shared";
 
 const AGENT_SERVICE_URL =
@@ -168,26 +168,30 @@ export async function pushSessionModelConfigToAgent(
   }
 }
 
-export async function pushSystemKnowledgeToAgent(
-  snapshot: SystemKnowledgeSnapshot,
+export async function pushSessionExternalAuthToAgent(
+  sessionId: string,
+  config: ExternalAuthSessionConfig,
 ): Promise<PushResult> {
   if (!INTERNAL_TOKEN) {
     return {
       ok: false,
       message:
-        "INTERNAL_API_TOKEN 未配置（.env），无法推送知识库到 agent-service",
+        "INTERNAL_API_TOKEN 未配置（.env），无法推送外部授权配置到 agent-service",
     };
   }
 
   try {
-    const res = await fetch(`${AGENT_SERVICE_URL}/internal/knowledge-documents`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Token": INTERNAL_TOKEN,
+    const res = await fetch(
+      `${AGENT_SERVICE_URL}/internal/sessions/${encodeURIComponent(sessionId)}/external-auth`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": INTERNAL_TOKEN,
+        },
+        body: JSON.stringify(config),
       },
-      body: JSON.stringify(snapshot),
-    });
+    );
 
     const text = await res.text();
     let body: unknown = null;
@@ -211,13 +215,101 @@ export async function pushSystemKnowledgeToAgent(
 
     return {
       ok: true,
-      message: `已推送知识库到 agent-service（${snapshot.documents.length} 篇）`,
+      message: "已推送用户外部授权配置到 agent-service session",
       data: body,
     };
   } catch (err) {
     return {
       ok: false,
       message: `推送失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function startDingtalkAuthOnAgent(userId: string): Promise<PushResult> {
+  if (!INTERNAL_TOKEN) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
+  }
+
+  try {
+    const res = await fetch(`${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/start`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Token": INTERNAL_TOKEN,
+      },
+      body: JSON.stringify({ userId }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) {
+      return {
+        ok: false,
+        message: body?.error?.message || `agent-service 响应 ${res.status}`,
+        data: body,
+      };
+    }
+    return { ok: true, message: "钉钉授权已启动", data: body.data };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `启动钉钉授权失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function fetchDingtalkAuthFromAgent(userId: string): Promise<PushResult> {
+  if (!INTERNAL_TOKEN) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
+  }
+
+  try {
+    const res = await fetch(
+      `${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`,
+      {
+        method: "GET",
+        headers: { "X-Internal-Token": INTERNAL_TOKEN },
+      },
+    );
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) {
+      return {
+        ok: false,
+        message: body?.error?.message || `agent-service 响应 ${res.status}`,
+        data: body,
+      };
+    }
+    return { ok: true, message: "已读取钉钉授权状态", data: body.data };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `读取钉钉授权状态失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function disconnectDingtalkAuthOnAgent(userId: string): Promise<PushResult> {
+  if (!INTERNAL_TOKEN) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
+  }
+
+  try {
+    const res = await fetch(`${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      headers: { "X-Internal-Token": INTERNAL_TOKEN },
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) {
+      return {
+        ok: false,
+        message: body?.error?.message || `agent-service 响应 ${res.status}`,
+        data: body,
+      };
+    }
+    return { ok: true, message: "钉钉授权已断开", data: body.data };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `断开钉钉授权失败: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }

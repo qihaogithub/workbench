@@ -31,7 +31,9 @@ interface ChatMessagesProps {
   isUserScrolling: boolean;
   onScrollToBottom: () => void;
   onRegenerate: (targetAssistantId: string) => void;
+  onExternalAuthConnected: (targetAssistantId: string) => void;
   onRollback: (targetAssistantId: string) => void;
+  externalAuthSessionId?: string;
   onEditResend: (targetMessageId: string, newContent: string) => void;
   messagesRef: React.MutableRefObject<ChatMessage[]>;
   setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
@@ -45,7 +47,9 @@ export function ChatMessages({
   isUserScrolling,
   onScrollToBottom,
   onRegenerate,
+  onExternalAuthConnected,
   onRollback,
+  externalAuthSessionId,
   onEditResend,
   messagesRef,
   setMessages,
@@ -110,7 +114,9 @@ export function ChatMessages({
             hasFileChanges={hasFileChanges(msg)}
             isStreaming={false}
             onRegenerate={onRegenerate}
+            onExternalAuthConnected={onExternalAuthConnected}
             onRollback={onRollback}
+            externalAuthSessionId={externalAuthSessionId}
           />
         );
       })}
@@ -121,7 +127,10 @@ export function ChatMessages({
           reasonings={currentMessage.reasonings}
           tools={currentMessage.tools}
           parts={currentMessage.parts}
+          messageId={currentMessage.id}
           isStreaming={true}
+          onExternalAuthConnected={onExternalAuthConnected}
+          externalAuthSessionId={externalAuthSessionId}
         />
       )}
 

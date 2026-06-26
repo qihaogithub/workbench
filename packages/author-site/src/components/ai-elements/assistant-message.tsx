@@ -28,7 +28,16 @@ import {
   RotateCcw,
   Undo2,
   ListChecks,
+  ExternalLink,
+  RefreshCw,
+  Link2,
 } from "lucide-react";
+import type {
+  ExternalAuthProvider,
+  ExternalAuthRequiredDetails,
+  ExternalAuthStartResponse,
+  ExternalAuthStatusResponse,
+} from "@opencode-workbench/shared";
 import {
   Collapsible,
   CollapsibleContent,
@@ -69,6 +78,8 @@ interface AssistantMessageProps {
   hasFileChanges?: boolean;
   onRegenerate?: (targetAssistantId: string) => void;
   onRollback?: (targetAssistantId: string) => void;
+  onExternalAuthConnected?: (targetAssistantId: string) => void;
+  externalAuthSessionId?: string;
 }
 
 function getToolKind(toolName?: string): "read" | "edit" | "execute" | "delegate" | "other" {
@@ -172,6 +183,28 @@ function isDelegateTask(part: ToolPart): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getExternalAuthRequiredDetails(
+  part: ToolPart,
+): ExternalAuthRequiredDetails | null {
+  const candidates: unknown[] = [part.details];
+  if (isRecord(part.result)) {
+    candidates.push(part.result.details);
+  }
+
+  for (const candidate of candidates) {
+    if (
+      isRecord(candidate) &&
+      candidate.kind === "external_auth_required" &&
+      (candidate.provider === "figma" || candidate.provider === "dingtalk") &&
+      typeof candidate.title === "string" &&
+      typeof candidate.message === "string"
+    ) {
+      return candidate as unknown as ExternalAuthRequiredDetails;
+    }
+  }
+  return null;
 }
 
 function extractResultText(result: unknown): string | undefined {
@@ -321,6 +354,8 @@ export function AssistantMessage({
   hasFileChanges = false,
   onRegenerate,
   onRollback,
+  onExternalAuthConnected,
+  externalAuthSessionId,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
 
@@ -417,6 +452,13 @@ export function AssistantMessage({
         flushReasonings();
         currentExecution.push(part);
       } else if (part.type === "tool") {
+        if (getExternalAuthRequiredDetails(part)) {
+          flushExecution();
+          flushReasonings();
+          flushTools();
+          blocks.push({ type: "tool-single", part });
+          return;
+        }
         flushReasonings();
         if (currentExecution.length > 0) {
           // 已在执行阶段中，直接加入
@@ -544,6 +586,7 @@ export function AssistantMessage({
               parts={block.parts}
               isStreaming={isStreaming}
               isComplete={isStreaming && !isLast}
+              externalAuthSessionId={externalAuthSessionId}
             />
           );
         }
@@ -561,6 +604,22 @@ export function AssistantMessage({
 
         if (block.type === "tool-single") {
           const part = block.part;
+          const authRequired = getExternalAuthRequiredDetails(part);
+          if (authRequired) {
+            return (
+              <ExternalAuthCard
+                key={`external-auth-${index}`}
+                details={authRequired}
+                sessionId={externalAuthSessionId}
+                onConnected={
+                  messageId && onExternalAuthConnected
+                    ? () => onExternalAuthConnected(messageId)
+                    : undefined
+                }
+              />
+            );
+          }
+
           if (isDelegateTask(part)) {
             return (
               <SubagentTaskBlock
@@ -616,6 +675,7 @@ export function AssistantMessage({
               count={block.parts.length}
               parts={block.parts}
               isRunning={hasRunning}
+              externalAuthSessionId={externalAuthSessionId}
             />
           );
         }
@@ -696,12 +756,14 @@ function ToolCallGroup({
   count,
   parts,
   isRunning,
+  externalAuthSessionId,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   count: number;
   parts: ToolPart[];
   isRunning: boolean;
+  externalAuthSessionId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -724,16 +786,25 @@ function ToolCallGroup({
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
         <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5">
-          {parts.map((p, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
-            >
-              <span className="truncate">{getToolActionText(p)}</span>
-              {p.status === "running" && (
-                <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-              )}
-            </div>
+            {parts.map((p, i) => (
+            getExternalAuthRequiredDetails(p) ? (
+              <ExternalAuthCard
+                key={`auth-${p.toolCallId || i}`}
+                details={getExternalAuthRequiredDetails(p)!}
+                sessionId={externalAuthSessionId}
+                compact
+              />
+            ) : (
+              <div
+                key={i}
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 py-0.5"
+              >
+                <span className="truncate">{getToolActionText(p)}</span>
+                {p.status === "running" && (
+                  <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                )}
+              </div>
+            )
           ))}
         </div>
       </CollapsibleContent>
@@ -972,14 +1043,232 @@ function RunProgressPanel({
   );
 }
 
+function getProviderLabel(provider: ExternalAuthProvider): string {
+  return provider === "figma" ? "Figma" : "钉钉";
+}
+
+function getProviderDescription(provider: ExternalAuthProvider): string {
+  return provider === "figma"
+    ? "授权后，AI 只能访问你在 Figma 中本来有权限访问的设计稿。"
+    : "授权后，AI 只能访问你在钉钉中本来有权限访问的文档、表格和知识库。";
+}
+
+function ExternalAuthCard({
+  details,
+  sessionId,
+  compact = false,
+  onConnected,
+}: {
+  details: ExternalAuthRequiredDetails;
+  sessionId?: string;
+  compact?: boolean;
+  onConnected?: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const autoContinueTriggeredRef = useRef(false);
+  const providerLabel = getProviderLabel(details.provider);
+
+  const markConnected = (message: string) => {
+    setConnected(true);
+    setStatusText(message);
+    setAuthUrl(null);
+    setUserCode(null);
+    if (!autoContinueTriggeredRef.current && onConnected) {
+      autoContinueTriggeredRef.current = true;
+      setTimeout(onConnected, 350);
+    }
+  };
+
+  const startAuth = async () => {
+    setLoading(true);
+    setStatusText(null);
+    try {
+      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+      const response = await fetch(
+        `/api/user/external-auth/${details.provider}/start${query}`,
+      );
+      const body = await response.json();
+      if (!response.ok || !body?.success) {
+        throw new Error(body?.error?.message || "启动授权失败");
+      }
+
+      const data = body.data as ExternalAuthStartResponse;
+      if (data.status === "connected") {
+        markConnected(`${providerLabel} 已连接，正在继续刚才的请求。`);
+        return;
+      }
+      if (data.status === "unsupported") {
+        setStatusText(data.message || `${providerLabel} 当前部署未启用。`);
+        return;
+      }
+
+      const nextUrl = data.authUrl || data.verificationUrl || null;
+      setAuthUrl(nextUrl);
+      setUserCode(data.userCode || null);
+      setStatusText(data.message || `请在浏览器完成 ${providerLabel} 授权。`);
+      setConnected(false);
+      if (nextUrl) {
+        const link = document.createElement("a");
+        link.href = nextUrl;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "启动授权失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshStatus = async () => {
+    setChecking(true);
+    try {
+      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+      const response = await fetch(`/api/user/external-auth${query}`);
+      const body = await response.json();
+      if (!response.ok || !body?.success) {
+        throw new Error(body?.error?.message || "刷新授权状态失败");
+      }
+
+      const data = body.data as ExternalAuthStatusResponse;
+      const provider = data.providers.find(
+        (item) => item.provider === details.provider,
+      );
+      if (provider?.status === "connected") {
+        markConnected(
+          `${providerLabel} 已连接${provider.accountLabel ? `：${provider.accountLabel}` : ""}，正在继续刚才的请求。`,
+        );
+      } else if (provider?.status === "unsupported") {
+        setConnected(false);
+        setStatusText(provider.message || `${providerLabel} 当前部署未启用。`);
+      } else {
+        setConnected(false);
+        setStatusText(provider?.message || `${providerLabel} 还未完成授权。`);
+      }
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "刷新授权状态失败");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-border/50 bg-muted/20 p-3 text-sm",
+        compact && "my-1",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-background/70 text-foreground/80">
+          <Link2 className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <div className="font-medium text-foreground">
+              {details.title || `连接 ${providerLabel} 后继续`}
+            </div>
+            <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {details.message}
+            </div>
+            <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+              {getProviderDescription(details.provider)}
+            </div>
+          </div>
+
+          {userCode && (
+            <div className="inline-flex items-center gap-2 rounded-md border border-border/40 bg-background/60 px-2.5 py-1.5 text-xs">
+              <span className="text-muted-foreground">授权码</span>
+              <code className="font-mono text-foreground">{userCode}</code>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => navigator.clipboard?.writeText(userCode)}
+              >
+                复制
+              </button>
+            </div>
+          )}
+
+          {statusText && (
+            <div className="text-xs leading-relaxed text-muted-foreground">
+              {statusText}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={startAuth}
+              disabled={loading || connected}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors disabled:opacity-70",
+                connected
+                  ? "border border-border/50 bg-background/50 text-muted-foreground"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+              )}
+            >
+              {loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : connected ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              {connected
+                ? "已连接"
+                : details.reason === "expired"
+                  ? "重新授权"
+                  : `连接 ${providerLabel}`}
+            </button>
+            <button
+              type="button"
+              onClick={refreshStatus}
+              disabled={checking}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/50 bg-background/50 px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+            >
+              {checking ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {connected ? "重新检查授权" : "我已完成授权"}
+            </button>
+            {authUrl && (
+              <a
+                href={authUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-blue-500 underline underline-offset-2"
+              >
+                打开授权页
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExecutionPhase({
   parts,
   isStreaming,
   isComplete,
+  externalAuthSessionId,
 }: {
   parts: MessagePart[];
   isStreaming: boolean;
   isComplete: boolean;
+  externalAuthSessionId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wasStreamingRef = useRef(false);
@@ -1085,6 +1374,18 @@ function ExecutionPhase({
               }
 
               if (part.type === "tool") {
+                const authRequired = getExternalAuthRequiredDetails(part);
+                if (authRequired) {
+                  return (
+                    <ExternalAuthCard
+                      key={`exec-auth-${part.toolCallId || i}`}
+                      details={authRequired}
+                      sessionId={externalAuthSessionId}
+                      compact
+                    />
+                  );
+                }
+
                 if (isDelegateTask(part)) {
                   return (
                     <SubagentTaskBlock

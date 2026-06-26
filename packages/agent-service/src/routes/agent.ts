@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
 import { getSessionModelConfigs } from '../config/session-model-configs';
+import { getSessionExternalAuthConfigs } from '../config/session-external-auth';
 import { getSessionStore } from '../session/session-store';
 import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
@@ -111,6 +112,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           model: request.body.model,
           toolVersion: getWorkbenchToolCapabilities().toolVersion,
           backendProviders: getSessionModelConfigs().get(sessionId),
+          externalAuth: getSessionExternalAuthConfigs().get(sessionId),
         };
 
         const agent = manager.getOrCreate(sessionId, config);
@@ -210,6 +212,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
       await manager.destroy(sessionId);
       getSessionModelConfigs().delete(sessionId);
+      getSessionExternalAuthConfigs().delete(sessionId);
       sessionStore.delete(sessionId);
 
       return reply.send({

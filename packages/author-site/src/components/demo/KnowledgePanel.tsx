@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/popover";
 import {
   Plus,
-  Lock,
   FileText,
   MoreVertical,
   Trash2,
@@ -49,13 +48,11 @@ export function KnowledgePanel({
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [builtinExpanded, setBuiltinExpanded] = useState(true);
   const [userExpanded, setUserExpanded] = useState(true);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const builtinItems = items.filter((item) => item.source === "system");
-  const userItems = items.filter((item) => item.source === "user");
+  const userItems = items.filter((item) => item.source !== "system");
 
   const fetchItems = useCallback(async () => {
     if (!workingDir) return;
@@ -193,43 +190,8 @@ export function KnowledgePanel({
           </div>
         ) : (
           <div className="pb-4">
-            {/* 内置知识库 */}
-            <div className="mt-1">
-              <div
-                className="group flex items-center gap-1.5 py-1.5 px-3 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
-                onClick={() => setBuiltinExpanded(!builtinExpanded)}
-              >
-                {builtinExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-                <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
-                <span className="font-medium text-foreground flex-1">
-                  内置知识库
-                </span>
-              </div>
-              {builtinExpanded && (
-                <div className="space-y-0">
-                  {builtinItems.map((item) => (
-                    <KnowledgeFileItem
-                      key={item.id}
-                      item={item}
-                      onSelect={() => onDocSelect?.(item, "read")}
-                      indent={24}
-                    />
-                  ))}
-                  {builtinItems.length === 0 && (
-                    <div className="py-2 px-3 text-xs text-muted-foreground" style={{ paddingLeft: 24 + 12 }}>
-                      暂无内置文档
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* 项目知识库 */}
-            <div className="mt-0.5">
+            <div className="mt-1">
               <div
                 className="group flex items-center gap-1.5 py-1.5 px-3 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
                 onClick={() => setUserExpanded(!userExpanded)}
@@ -341,25 +303,19 @@ function KnowledgeFileItem({
   onDelete?: () => void;
   indent?: number;
 }) {
-  const isSystem = item.source === "system";
-
   return (
     <div
       className="group flex items-center gap-1.5 py-1 px-2 text-sm hover:bg-accent/50 rounded-sm cursor-pointer transition-colors"
       style={{ paddingLeft: indent + 8 }}
       onClick={onSelect}
     >
-      {isSystem ? (
-        <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
-      ) : (
-        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-      )}
+      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
       <span className="truncate text-foreground flex-1">{item.title}</span>
       <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <Eye className="h-3 w-3 text-muted-foreground" />
-        {!isSystem && onEdit && <Pencil className="h-3 w-3 text-blue-400" />}
+        {onEdit && <Pencil className="h-3 w-3 text-blue-400" />}
       </span>
-      {!isSystem && onEdit && onDelete && (
+      {onEdit && onDelete && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

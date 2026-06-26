@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createReadFileTool, createWriteFileTool, createListFilesTool } from '../../src/backends/pi-tools/file-tools';
@@ -18,6 +18,7 @@ vi.mock('fs', () => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 const mockConfig: AgentConfig = {
@@ -183,6 +184,27 @@ describe('createBashTool - 权限感知', () => {
 });
 
 describe('createWorkbenchTools - permissions 透传', () => {
+  const originalWebSearchEnabled = process.env.PI_AGENT_WEB_SEARCH_ENABLED;
+  const originalWebReadEnabled = process.env.PI_AGENT_WEB_READ_ENABLED;
+
+  beforeEach(() => {
+    delete process.env.PI_AGENT_WEB_SEARCH_ENABLED;
+    delete process.env.PI_AGENT_WEB_READ_ENABLED;
+  });
+
+  afterEach(() => {
+    if (originalWebSearchEnabled === undefined) {
+      delete process.env.PI_AGENT_WEB_SEARCH_ENABLED;
+    } else {
+      process.env.PI_AGENT_WEB_SEARCH_ENABLED = originalWebSearchEnabled;
+    }
+    if (originalWebReadEnabled === undefined) {
+      delete process.env.PI_AGENT_WEB_READ_ENABLED;
+    } else {
+      process.env.PI_AGENT_WEB_READ_ENABLED = originalWebReadEnabled;
+    }
+  });
+
   it('自定义 permissions 配置应被工具使用', async () => {
     const customConfig: AgentConfig = {
       ...mockConfig,
@@ -201,12 +223,54 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(20);
+    expect(tools).toHaveLength(24);
+    expect(tools.some(t => t.name === 'webRead')).toBe(true);
+    expect(tools.some(t => t.name === 'webSearch')).toBe(false);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);
     expect(ok.isError).toBeFalsy();
     const denied = await readTool.execute('id', { path: 'forbidden/x.ts' } as any);
     expect(denied.isError).toBe(true);
+  });
+
+  it('启用联网搜索时应注册 webSearch 工具', async () => {
+    process.env.PI_AGENT_WEB_SEARCH_ENABLED = 'true';
+    const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+    const tools = createWorkbenchTools(mockConfig, undefined, {
+      subagentRunner: async () => ({
+        success: true,
+        content: 'ok',
+        durationMs: 1,
+      }),
+    });
+
+    expect(tools).toHaveLength(25);
+    expect(tools.some(t => t.name === 'webSearch')).toBe(true);
+  });
+
+  it('关闭网页读取时不注册 webRead 工具', async () => {
+    process.env.PI_AGENT_WEB_READ_ENABLED = 'false';
+    const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+    const tools = createWorkbenchTools(mockConfig, undefined, {
+      subagentRunner: async () => ({
+        success: true,
+        content: 'ok',
+        durationMs: 1,
+      }),
+    });
+
+    expect(tools.some(t => t.name === 'webRead')).toBe(false);
+  });
+
+  it('viewer-readonly 模式不注册 webSearch 工具', async () => {
+    process.env.PI_AGENT_WEB_SEARCH_ENABLED = 'true';
+    const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+    const tools = createWorkbenchTools(mockConfig, undefined, {
+      mode: 'viewer-readonly',
+    });
+
+    expect(tools.some(t => t.name === 'webRead')).toBe(false);
+    expect(tools.some(t => t.name === 'webSearch')).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import type {
   DemoFolderMeta,
   DemoMeta,
   DemoPageMeta,
+  AppGraph,
   Project,
   ProjectTemplateMeta,
   VersionInfo,
@@ -95,6 +96,7 @@ export interface ProjectPackageExport {
   folders: DemoFolderMeta[];
   versions: VersionInfo[];
   projectConfigSchema?: string;
+  appGraph?: AppGraph;
   assets: ExportedAsset[];
   baseVersion: string;
 }
@@ -264,6 +266,7 @@ export interface PageCreateInput {
   editId: string;
   name: string;
   pageId?: string;
+  routeKey?: string;
   parentId?: string | null;
   order?: number;
   code?: string;
@@ -277,6 +280,7 @@ export interface PageUpdateInput {
   code?: string;
   schema?: string;
   name?: string;
+  routeKey?: string;
   parentId?: string | null;
   order?: number;
   dryRun?: boolean;

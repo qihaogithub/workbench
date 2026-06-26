@@ -908,7 +908,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(20);
+      expect(tools).toHaveLength(24);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -922,7 +922,11 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('getConsoleLogs');
       expect(toolNames).toContain('captureScreenshot');
       expect(toolNames).toContain('listImages');
+      expect(toolNames).toContain('knowledgeReport');
       expect(toolNames).toContain('arrangeCanvasPages');
+      expect(toolNames).toContain('webRead');
+      expect(toolNames).toContain('figmaMcp');
+      expect(toolNames).toContain('dingtalk');
       expect(toolNames).toContain('requestPlanApproval');
       expect(toolNames).toContain('updatePlan');
       expect(toolNames).toContain('listPages');
@@ -937,7 +941,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(19);
+      expect(tools).toHaveLength(23);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
     });
 
@@ -994,6 +998,8 @@ describe('PiAgent 工具', () => {
       expect(capabilities.toolNames).toContain('previewDeletePages');
       expect(capabilities.toolNames).toContain('executeDeletePagePlan');
       expect(capabilities.toolNames).toContain('deletePages');
+      expect(capabilities.toolNames).toContain('knowledgeReport');
+      expect(capabilities.toolNames).toContain('webRead');
       expect(capabilities.toolNames).not.toContain('delegateTask');
     });
 
@@ -1005,7 +1011,9 @@ describe('PiAgent 工具', () => {
         'readFile',
         'readFileWithLines',
         'listFiles',
+        'knowledgeReport',
       ]);
+      expect(capabilities.toolNames).not.toContain('webRead');
       expect(capabilities.toolNames).not.toContain('writeFile');
       expect(capabilities.toolNames).not.toContain('editFile');
       expect(capabilities.toolNames).not.toContain('bash');

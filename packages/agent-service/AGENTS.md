@@ -16,7 +16,7 @@ src/
 │   ├── base.ts             # 后端适配器接口（IBackendAdapter）
 │   ├── pi-agent.ts         # Pi Agent 后端实现
 │   ├── pi-tools/           # Pi Agent 工具集
-│   │   ├── index.ts        # 工具导出（15 个工具）
+│   │   ├── index.ts        # 工具导出与能力集版本
 │   │   ├── file-tools.ts   # 文件操作工具
 │   │   ├── read-file-lines-tool.ts # 带行号读取文件
 │   │   ├── edit-file-tool.ts # 精确编辑文件（old_string/new_string 替换）
@@ -26,6 +26,8 @@ src/
 │   │   ├── console-tool.ts # 页面控制台日志获取工具
 │   │   ├── list-images-tool.ts # 项目图片清单查询
 │   │   ├── screenshot-tool.ts # 页面截图捕获工具
+│   │   ├── web-read-tool.ts # 公开网页正文读取工具（默认开启，可关闭）
+│   │   ├── web-search-tool.ts # Brave Search 联网搜索工具（默认关闭）
 │   │   └── subagent-tool.ts # 子 Agent 委派工具
 │   └── index.ts            # 模块导出
 ├── core/                   # 核心逻辑
@@ -71,7 +73,7 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 暴露 15 个工具：
+`src/backends/pi-tools/` 默认暴露 24 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
 
 | 工具 | 用途 |
 |:-----|:-----|
@@ -86,6 +88,8 @@ tests/
 | `listImages` | 查询当前项目已上传的图片清单 |
 | `getConsoleLogs` | 获取页面控制台日志 |
 | `captureScreenshot` | 捕获页面截图 |
+| `webRead` | 读取公开 HTTP/HTTPS 网页正文，拒绝本机、内网、保留地址和非文本内容 |
+| `webSearch` | 使用 Brave Search API 查询公开互联网搜索结果（默认关闭，需要 `BRAVE_SEARCH_API_KEY`） |
 | `listPages` | 查询工作空间页面清单 |
 | `deletePage` | 删除单个页面（需要权限确认） |
 | `deletePages` | 批量删除页面（需要权限确认） |
@@ -112,6 +116,13 @@ PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 SCREENSHOT_SERVICE_URL=http://localhost:3202  # 截图服务地址（captureScreenshot 工具使用）
 PI_AGENT_SUBAGENTS_ENABLED=true       # 是否启用 delegateTask 子 Agent 工具
 PI_AGENT_SUBAGENT_TIMEOUT=120000      # 子 Agent 单次任务超时时间（毫秒）
+PI_AGENT_WEB_READ_ENABLED=true        # 是否启用 webRead 网页读取工具
+PI_AGENT_WEB_READ_TIMEOUT_MS=10000    # webRead 单次请求超时
+PI_AGENT_WEB_READ_MAX_BYTES=1000000   # webRead 最大响应体积
+PI_AGENT_WEB_SEARCH_ENABLED=false     # 是否启用 webSearch 联网搜索工具
+BRAVE_SEARCH_API_KEY=                 # Brave Search API key（免费额度方案）
+PI_AGENT_WEB_SEARCH_TIMEOUT_MS=10000  # webSearch 单次请求超时
+PI_AGENT_WEB_SEARCH_CACHE_TTL_MS=600000 # webSearch 进程内缓存 TTL
 ```
 
 完整配置加载逻辑见 `src/utils/config.ts`。

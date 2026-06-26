@@ -7,15 +7,18 @@ import {
 describe("AI 页面预览运行时策略", () => {
   it("将 @preview/sdk 映射为受控虚拟模块", () => {
     const result = compileCode(`
-      import { Icon, Button } from "@preview/sdk";
+      import { Icon, Button, trigger, useRouteParams } from "@preview/sdk";
 
       export default function Demo() {
-        return <Button><Icon name="football" />参与活动</Button>;
+        const params = useRouteParams();
+        return <Button onClick={() => trigger("viewDetail", { productId: params.productId })}><Icon name="football" />参与活动</Button>;
       }
     `);
 
     expect(result.dependencies).toContain("@preview/sdk");
     expect(result.compiledCode).not.toContain("from '@preview/sdk'");
+    expect(result.compiledCode).toContain('from "data:application/javascript');
+    expect(result.compiledCode).not.toContain("from 'data:application/javascript");
     expect(result.compiledCode).toContain("data:application/javascript");
   });
 
@@ -64,4 +67,3 @@ describe("AI 页面预览运行时策略", () => {
     ]);
   });
 });
-

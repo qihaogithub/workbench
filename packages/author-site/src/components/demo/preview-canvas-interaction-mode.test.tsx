@@ -48,8 +48,58 @@ function TestCanvas() {
   );
 }
 
+function TestEditorCanvas() {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {
+      page_1: { x: 100, y: 120, width: 375, height: 812 },
+    },
+    nodes: {},
+  });
+
+  return (
+    <>
+      <PreviewCanvas
+        interactionMode="editor"
+        pages={[
+          {
+            id: "page_1",
+            name: "页面一",
+            order: 0,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 375, height: 812 },
+          },
+        ]}
+        canvasState={state}
+        onCanvasStateChange={setState}
+      />
+      <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
 function getCanvasState() {
   return JSON.parse(screen.getByTestId("canvas-state").textContent || "{}") as CanvasState;
+}
+
+function dropFiles(
+  target: HTMLElement,
+  files: File[],
+  point: { clientX: number; clientY: number },
+) {
+  const event = new MouseEvent("drop", {
+    bubbles: true,
+    cancelable: true,
+    clientX: point.clientX,
+    clientY: point.clientY,
+  });
+  Object.defineProperty(event, "dataTransfer", {
+    value: {
+      files,
+      items: [],
+    },
+  });
+  fireEvent(target, event);
 }
 
 describe("PreviewCanvas viewer 交互模式", () => {
@@ -80,6 +130,25 @@ describe("PreviewCanvas viewer 交互模式", () => {
     Object.defineProperty(window, "cancelAnimationFrame", {
       writable: true,
       value: (id: number) => window.clearTimeout(id),
+    });
+    class MockImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      naturalWidth = 800;
+      naturalHeight = 600;
+
+      set src(_value: string) {
+        window.setTimeout(() => this.onload?.(), 0);
+      }
+    }
+
+    Object.defineProperty(window, "Image", {
+      writable: true,
+      value: MockImage,
+    });
+    Object.defineProperty(globalThis, "Image", {
+      writable: true,
+      value: MockImage,
     });
     Object.defineProperty(HTMLElement.prototype, "clientWidth", {
       configurable: true,
@@ -214,6 +283,134 @@ describe("PreviewCanvas viewer 交互模式", () => {
       expect(state.viewport.x).toBeCloseTo(expected.x + 25, 5);
       expect(state.viewport.y).toBeCloseTo(expected.y + 35, 5);
       expect(state.pages.page_1).toEqual(initialState.pages.page_1);
+    });
+  });
+
+  it("支持拖入本地 Markdown 文档并按落点创建文档节点", async () => {
+    render(<TestEditorCanvas />);
+    const canvas = screen.getByLabelText("画布工作区");
+    const file = new File(["# 导入说明\n\n- 第一项"], "导入说明.md", {
+      type: "text/markdown",
+    });
+
+    dropFiles(canvas, [file], { clientX: 240, clientY: 190 });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const nodes = Object.values(state.nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "document",
+        title: "导入说明",
+        markdown: "# 导入说明\n\n- 第一项",
+        layout: {
+          x: 190,
+          y: 120,
+          width: 420,
+          height: 360,
+        },
+      });
+    });
+  });
+
+  it("支持拖入本地图片并按落点创建图片节点", async () => {
+    render(<TestEditorCanvas />);
+    const canvas = screen.getByLabelText("画布工作区");
+    const file = new File(["image-bytes"], "hero.png", {
+      type: "image/png",
+    });
+
+    dropFiles(canvas, [file], { clientX: 340, clientY: 240 });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const nodes = Object.values(state.nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "image",
+        title: "hero.png",
+        fileName: "hero.png",
+        intrinsicWidth: 800,
+        intrinsicHeight: 600,
+        layout: {
+          x: 320,
+          y: 190,
+          width: 560,
+          height: 420,
+        },
+      });
+      expect(nodes[0].kind === "image" ? nodes[0].src : "").toMatch(
+        /^data:image\/png;base64,/,
+      );
+    });
+  });
+
+  it("图片节点缩放时保持图片比例且不添加背景色", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const canvas = screen.getByLabelText("画布工作区");
+    const file = new File(["image-bytes"], "hero.png", {
+      type: "image/png",
+    });
+
+    dropFiles(canvas, [file], { clientX: 340, clientY: 240 });
+
+    await waitFor(() => {
+      expect(container.querySelector("[data-canvas-node-id]")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+
+    const imageNode = container.querySelector(
+      "[data-canvas-node-id]",
+    ) as HTMLElement;
+    const image = container.querySelector("img") as HTMLImageElement;
+    expect(image.parentElement).not.toHaveClass("bg-black/5");
+    expect(image.parentElement?.parentElement).not.toHaveClass("bg-background");
+
+    Object.defineProperty(imageNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 560,
+        bottom: 420,
+        width: 560,
+        height: 420,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(imageNode, {
+      button: 0,
+      clientX: 559,
+      clientY: 210,
+      pointerId: 1,
+    });
+    fireEvent.pointerMove(imageNode, {
+      clientX: 699,
+      clientY: 210,
+      pointerId: 1,
+    });
+    fireEvent.pointerUp(imageNode, {
+      clientX: 699,
+      clientY: 210,
+      pointerId: 1,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const node = Object.values(state.nodes ?? {})[0];
+      expect(node).toMatchObject({
+        kind: "image",
+        layout: {
+          x: 320,
+          y: 85,
+          width: 840,
+          height: 630,
+        },
+      });
     });
   });
 });

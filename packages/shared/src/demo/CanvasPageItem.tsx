@@ -53,6 +53,22 @@ const PAGE_LABEL_MAX_FONT_SIZE = 24;
 const PAGE_LABEL_SCREEN_GAP = 8;
 const PAGE_LABEL_MAX_TOP_OFFSET = 40;
 
+function parsePreviewSizeValue(
+  value: string | number | undefined,
+  fallback: number,
+): number {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.replace(/px$/, ""));
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
 const EDGE_CURSORS: Record<ResizeEdge, string> = {
   n: "ns-resize",
   s: "ns-resize",
@@ -204,12 +220,8 @@ export function CanvasPageItem({
 
   const handleContentHeightChange = useCallback(
     (newContentHeight: number, measuredWidth?: number) => {
-      const designHeight =
-        page.previewSize?.height != null
-          ? Number(page.previewSize.height)
-          : 812;
-      const designWidth =
-        page.previewSize?.width != null ? Number(page.previewSize.width) : 375;
+      const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
+      const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
 
       if (newContentHeight <= designHeight) {
         if (contentHeight !== null) setContentHeight(null);
@@ -244,12 +256,19 @@ export function CanvasPageItem({
     setIframeContentLoaded(true);
   }, []);
 
-  const effectiveHeight =
-    contentHeight != null &&
-    page.previewSize?.height != null &&
-    contentHeight > Number(page.previewSize.height)
-      ? contentHeight
-      : undefined;
+  const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
+  const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
+  const layoutScale = layout.width / designWidth;
+  const layoutDerivedContentHeight =
+    Number.isFinite(layoutScale) && layoutScale > 0
+      ? layout.height / layoutScale
+      : designHeight;
+  const effectiveHeight = Math.max(
+    contentHeight ?? 0,
+    layoutDerivedContentHeight,
+  );
+  const iframeEffectiveHeight =
+    effectiveHeight > designHeight + 1 ? effectiveHeight : undefined;
 
   // 当 screenshotUrl 变化时重置截图加载状态
   React.useEffect(() => {
@@ -512,7 +531,7 @@ export function CanvasPageItem({
             activityState={
               renderMode === "sleeping-iframe" ? "sleeping" : "active"
             }
-            effectiveHeight={effectiveHeight}
+            effectiveHeight={iframeEffectiveHeight}
             onPositionableSizes={onPositionableSizes}
           />
         </div>

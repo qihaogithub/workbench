@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Pencil, Lock } from "lucide-react";
+import { Save, Loader2, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { DocumentEditor } from "@opencode-workbench/shared/demo";
 import { Streamdown } from "streamdown";
@@ -70,8 +69,6 @@ export function KnowledgeDocDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
-  const isSystem = item?.source === "system";
 
   // 打开弹窗时重置模式并加载数据
   useEffect(() => {
@@ -189,19 +186,11 @@ export function KnowledgeDocDialog({
 
     return (
       <DialogTitle className="flex items-center gap-2">
-        {isSystem ? (
-          <Lock className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <Pencil className="h-4 w-4 text-muted-foreground" />
-        )}
+        <Pencil className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium truncate">
           {item?.title}
         </span>
-        {isSystem ? (
-          <Badge variant="secondary" className="text-[10px] h-4 px-1">
-            系统
-          </Badge>
-        ) : activeMode === "read" ? (
+        {activeMode === "read" ? (
           <Button
             variant="ghost"
             size="sm"
@@ -271,7 +260,7 @@ export function KnowledgeDocDialog({
       );
     }
 
-    if (activeMode === "edit" && !isSystem) {
+    if (activeMode === "edit") {
       return (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           <div>
@@ -324,7 +313,7 @@ export function KnowledgeDocDialog({
       );
     }
 
-    if (activeMode === "edit" && !isSystem) {
+    if (activeMode === "edit") {
       return (
         <DialogFooter>
           <Button

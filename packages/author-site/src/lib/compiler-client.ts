@@ -11,9 +11,10 @@ export interface CompileError {
 
 const MAX_CACHE_SIZE = 50;
 const compileCache = new Map<string, CompileResult>();
+const COMPILE_CLIENT_CACHE_VERSION = "2026-06-preview-runtime-v3";
 
 function getCacheKey(code: string): string {
-  return `${code.length}_${code.slice(0, 200)}`;
+  return `${COMPILE_CLIENT_CACHE_VERSION}_${code.length}_${code.slice(0, 200)}`;
 }
 
 export async function compileCode(code: string): Promise<CompileResult> {

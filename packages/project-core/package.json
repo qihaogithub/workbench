@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@opencode-workbench/knowledge-service": "workspace:*",
     "@opencode-workbench/shared": "workspace:*"
   },
   "devDependencies": {

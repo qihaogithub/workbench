@@ -123,6 +123,8 @@
 | `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
 | `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
 | `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
+| `@opencode-workbench/knowledge-core` | `packages/knowledge-core/` | 知识库领域模型与权限规则 | - | Vitest |
+| `@opencode-workbench/knowledge-service` | `packages/knowledge-service/` | Basic 检索、阅读地图、索引任务、知识报告 | - | Vitest |
 | `@opencode-workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 CLI 复用 | - | Vitest |
 | `@opencode-workbench/project-scaffold` | `packages/project-scaffold/` | 本地项目包协议与脚手架转换器 | - | Node/tsx 命令 |
 | `@opencode-workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
@@ -155,6 +157,8 @@ pnpm typecheck:viewer
 pnpm check:author
 pnpm check:agent
 pnpm check:screenshot
+pnpm check:knowledge-core
+pnpm check:knowledge-service
 pnpm check:project-core
 pnpm check:project-scaffold
 pnpm check:project-cli
@@ -299,6 +303,8 @@ Docker：
 - viewer-site：`pnpm check:viewer`，必要时 `pnpm build:viewer`。
 - agent-service：`pnpm check:agent`。
 - screenshot-service：`pnpm check:screenshot`。
+- knowledge-core：`pnpm check:knowledge-core`。
+- knowledge-service：`pnpm check:knowledge-service`。
 - project-core：`pnpm check:project-core`。
 - project-scaffold：`pnpm check:project-scaffold`。
 - project-cli：`pnpm check:project-cli`。

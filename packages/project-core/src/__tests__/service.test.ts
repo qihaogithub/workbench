@@ -328,6 +328,17 @@ describe("ProjectAdminService", () => {
     expect(template.ok).toBe(true);
     expect(template.data?.scope).toBe("official");
     expect(template.data?.official).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(
+          tempDir,
+          "knowledge",
+          "templates",
+          template.data?.id ?? "",
+          "reading-map.json",
+        ),
+      ),
+    ).toBe(true);
 
     const officialList = service.listTemplates({ scope: "official", official: true });
     expect(officialList.data?.map((item) => item.id)).toEqual([template.data?.id]);

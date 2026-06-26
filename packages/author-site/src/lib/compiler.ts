@@ -85,6 +85,10 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function toImportSpecifier(moduleName: string): string {
+  return JSON.stringify(moduleName);
+}
+
 /**
  * 将编译后代码中的 npm 包 import 路径替换为 CDN URL
  * 保留相对路径和 CSS 导入不变（由调用方单独处理）
@@ -106,14 +110,14 @@ export function rewriteImportsToCdn(
       `from\\s+(['"])${escapeRegex(dep)}\\1`,
       'g'
     );
-    result = result.replace(fromPattern, `from '${cdnUrl}'`);
+    result = result.replace(fromPattern, `from ${toImportSpecifier(cdnUrl)}`);
 
     // 替换 import 'package' 和 import "package"（副作用导入）
     const importPattern = new RegExp(
       `import\\s+(['"])${escapeRegex(dep)}\\1`,
       'g'
     );
-    result = result.replace(importPattern, `import '${cdnUrl}'`);
+    result = result.replace(importPattern, `import ${toImportSpecifier(cdnUrl)}`);
   }
 
   return result;

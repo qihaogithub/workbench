@@ -9,9 +9,17 @@
  * - GET  /internal/backend-providers  获取当前配置（用于调试/验证）
  */
 
+import { createHash } from "crypto";
+import { execFile, spawn } from "child_process";
+import fs from "fs";
+import path from "path";
+import { promisify } from "util";
+
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+
 import { getBackendProvidersManager } from "../config/backend-providers";
 import { getSessionModelConfigs } from "../config/session-model-configs";
+import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
 import {
   getSystemKnowledgeSnapshot,
   setSystemKnowledgeSnapshot,
@@ -19,9 +27,272 @@ import {
 } from "../config/system-knowledge";
 import { getAgentManager } from "../core/agent-manager";
 import { logger } from "../utils/logger";
-import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+import type {
+  BackendProvidersConfig,
+  ExternalAuthSessionConfig,
+} from "@opencode-workbench/shared";
 
 const TOKEN_HEADER = "x-internal-token";
+const execFileAsync = promisify(execFile);
+
+function getDwsConfigRoot(): string {
+  return path.join(process.env.DATA_DIR || path.join(process.cwd(), "data"), "dws-auth");
+}
+
+function getDwsConfigDir(userId: string): string {
+  const idHash = createHash("sha256").update(userId).digest("hex").slice(0, 32);
+  return path.join(getDwsConfigRoot(), idHash);
+}
+
+function getRecordValue(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null && key in value
+    ? (value as Record<string, unknown>)[key]
+    : undefined;
+}
+
+export function parseDwsStatusOutput(stdout: string): {
+  connected: boolean;
+  accountLabel?: string;
+} {
+  let body: unknown = null;
+  try {
+    body = JSON.parse(stdout) as unknown;
+  } catch {
+    body = null;
+  }
+
+  const data = getRecordValue(body, "data");
+  const nestedBody = getRecordValue(body, "body");
+  const candidates = [body, data, nestedBody];
+  for (const candidate of candidates) {
+    const authenticated = getRecordValue(candidate, "authenticated");
+    if (typeof authenticated === "boolean") {
+      return {
+        connected: authenticated,
+        accountLabel:
+          (getRecordValue(candidate, "userName") as string | undefined) ||
+          (getRecordValue(candidate, "name") as string | undefined) ||
+          (getRecordValue(candidate, "nick") as string | undefined),
+      };
+    }
+
+    const loggedIn = getRecordValue(candidate, "loggedIn");
+    if (typeof loggedIn === "boolean") {
+      return {
+        connected: loggedIn,
+        accountLabel:
+          (getRecordValue(candidate, "userName") as string | undefined) ||
+          (getRecordValue(candidate, "name") as string | undefined) ||
+          (getRecordValue(candidate, "nick") as string | undefined),
+      };
+    }
+  }
+
+  const status = candidates
+    .map((candidate) => getRecordValue(candidate, "status"))
+    .find((value): value is string => typeof value === "string")
+    ?.toLowerCase();
+  if (status) {
+    return {
+      connected: ["authenticated", "logged_in", "connected", "login"].includes(status),
+      accountLabel:
+        (getRecordValue(data, "userName") as string | undefined) ||
+        (getRecordValue(data, "name") as string | undefined) ||
+        (getRecordValue(nestedBody, "userName") as string | undefined) ||
+        (getRecordValue(nestedBody, "name") as string | undefined),
+    };
+  }
+
+  if (body === null) {
+    const text = stdout.toLowerCase();
+    const negative = text.includes("未登录") || text.includes("not logged in");
+    const positive =
+      text.includes("已登录") ||
+      text.includes("登录成功") ||
+      text.includes("logged in");
+    return { connected: positive && !negative };
+  }
+
+  return { connected: false };
+}
+
+export function parseDwsAccessProbeOutput(stdout: string): boolean {
+  let body: unknown = null;
+  try {
+    body = JSON.parse(stdout) as unknown;
+  } catch {
+    body = null;
+  }
+
+  if (getRecordValue(body, "success") === true) {
+    return true;
+  }
+
+  const nodes = getRecordValue(body, "nodes");
+  if (Array.isArray(nodes)) {
+    return true;
+  }
+
+  const data = getRecordValue(body, "data");
+  if (getRecordValue(data, "success") === true) {
+    return true;
+  }
+
+  const dataNodes = getRecordValue(data, "nodes");
+  return Array.isArray(dataNodes);
+}
+
+async function verifyDwsAccess(configDir: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync(
+      "dws",
+      ["doc", "list", "--format", "json", "--timeout", "10"],
+      {
+        env: { ...process.env, DWS_CONFIG_DIR: configDir },
+        timeout: 15_000,
+        maxBuffer: 512 * 1024,
+      },
+    );
+    return parseDwsAccessProbeOutput(stdout);
+  } catch {
+    return false;
+  }
+}
+
+async function readDwsStatus(configDir: string): Promise<{
+  connected: boolean;
+  accountLabel?: string;
+}> {
+  try {
+    const { stdout } = await execFileAsync("dws", ["auth", "status", "--format", "json"], {
+      env: { ...process.env, DWS_CONFIG_DIR: configDir },
+      timeout: 10_000,
+      maxBuffer: 512 * 1024,
+    });
+    const status = parseDwsStatusOutput(stdout);
+    if (status.connected) {
+      return status;
+    }
+
+    return {
+      connected: await verifyDwsAccess(configDir),
+      accountLabel: status.accountLabel,
+    };
+  } catch {
+    return { connected: await verifyDwsAccess(configDir) };
+  }
+}
+
+export function parseDwsDeviceOutput(output: string): {
+  authUrl?: string;
+  verificationUrl?: string;
+  userCode?: string;
+} {
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    parsed = null;
+  }
+  const body = parsed?.data || parsed?.body || parsed?.result || parsed || {};
+  const authUrl =
+    body.authUrl ||
+    body.auth_url ||
+    body.url ||
+    body.deviceUrl ||
+    body.device_url ||
+    body.verificationUriComplete ||
+    body.verification_uri_complete;
+  const verificationUrl =
+    body.verificationUrl ||
+    body.verification_url ||
+    body.verificationUri ||
+    body.verification_uri ||
+    body.authUrl ||
+    body.auth_url ||
+    body.url;
+  const userCode =
+    body.userCode ||
+    body.user_code ||
+    body.deviceCode ||
+    body.device_code ||
+    body.code;
+  if (authUrl || verificationUrl || userCode) {
+    return {
+      authUrl,
+      verificationUrl,
+      userCode,
+    };
+  }
+
+  const url = output.match(/https?:\/\/[^\s"'<>]+/);
+  const code =
+    output.match(/user[_ -]?code["':\s]+([A-Z0-9-]+)/i) ||
+    output.match(/设备码[：:\s]+([A-Z0-9-]+)/);
+  return {
+    authUrl: url?.[0],
+    verificationUrl: url?.[0],
+    userCode: code?.[1],
+  };
+}
+
+async function startDwsDeviceLogin(userId: string): Promise<{
+  configDir: string;
+  connected: boolean;
+  accountLabel?: string;
+  authUrl?: string;
+  verificationUrl?: string;
+  userCode?: string;
+}> {
+  const configDir = getDwsConfigDir(userId);
+  fs.mkdirSync(configDir, { recursive: true });
+
+  const current = await readDwsStatus(configDir);
+  if (current.connected) {
+    return { configDir, connected: true, accountLabel: current.accountLabel };
+  }
+
+  const child = spawn("dws", ["auth", "login", "--device", "--format", "json"], {
+    env: { ...process.env, DWS_CONFIG_DIR: configDir },
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: false,
+  });
+
+  let output = "";
+  child.stdout?.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.stderr?.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.on("error", (error) => {
+    logger.warn({ error: error.message }, "dws device login failed to start");
+  });
+  child.on("exit", (code) => {
+    logger.info({ code, configDir }, "dws device login finished");
+  });
+
+  await new Promise<void>((resolve) => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      const parsed = parseDwsDeviceOutput(output);
+      if (
+        parsed.authUrl ||
+        parsed.verificationUrl ||
+        parsed.userCode ||
+        Date.now() - startedAt >= 8000
+      ) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 200);
+  });
+  return {
+    configDir,
+    connected: false,
+    ...parseDwsDeviceOutput(output),
+  };
+}
 
 function checkToken(request: FastifyRequest, reply: FastifyReply): boolean {
   const expected =
@@ -184,6 +455,116 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
           sessionId: request.params.sessionId,
           providerCount: config.providers.length,
           activeProviderId: config.activeProviderId,
+        },
+      });
+    },
+  );
+
+  fastify.post(
+    "/internal/sessions/:sessionId/external-auth",
+    async (
+      request: FastifyRequest<{ Params: { sessionId: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const body = request.body as ExternalAuthSessionConfig | null;
+      const config: ExternalAuthSessionConfig =
+        body && typeof body === "object" ? body : {};
+
+      getSessionExternalAuthConfigs().set(request.params.sessionId, config);
+      const existingAgent = getAgentManager().get(request.params.sessionId);
+      if (existingAgent) {
+        existingAgent.updateConfig({
+          ...existingAgent.getConfig(),
+          externalAuth: config,
+        });
+      }
+
+      logger.info(
+        {
+          sessionId: request.params.sessionId,
+          hasFigma: Boolean(config.figma?.enabled),
+          hasDingtalk: Boolean(config.dingtalk?.enabled),
+        },
+        "Session external auth config pushed from author-site",
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          sessionId: request.params.sessionId,
+          hasFigma: Boolean(config.figma?.enabled),
+          hasDingtalk: Boolean(config.dingtalk?.enabled),
+        },
+      });
+    },
+  );
+
+  fastify.post(
+    "/internal/external-auth/dingtalk/start",
+    async (
+      request: FastifyRequest<{ Body: { userId?: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const userId = request.body?.userId;
+      if (!userId) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: "INVALID_BODY",
+            message: "userId 必填",
+          },
+        });
+      }
+
+      const result = await startDwsDeviceLogin(userId);
+      return reply.send({
+        success: true,
+        data: {
+          connected: result.connected,
+          configDir: result.connected ? result.configDir : undefined,
+          accountLabel: result.accountLabel,
+          authUrl: result.authUrl,
+          verificationUrl: result.verificationUrl,
+          userCode: result.userCode,
+        },
+      });
+    },
+  );
+
+  fastify.delete(
+    "/internal/external-auth/dingtalk/:userId",
+    async (
+      request: FastifyRequest<{ Params: { userId: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const configDir = getDwsConfigDir(request.params.userId);
+      fs.rmSync(configDir, { recursive: true, force: true });
+      return reply.send({ success: true, data: { removed: true } });
+    },
+  );
+
+  fastify.get(
+    "/internal/external-auth/dingtalk/:userId",
+    async (
+      request: FastifyRequest<{ Params: { userId: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const configDir = getDwsConfigDir(request.params.userId);
+      const status = await readDwsStatus(configDir);
+      return reply.send({
+        success: true,
+        data: {
+          connected: status.connected,
+          configDir: status.connected ? configDir : undefined,
+          accountLabel: status.accountLabel,
         },
       });
     },

@@ -42,7 +42,7 @@ export class PreviewRuntimeContractError extends Error {
   }
 }
 
-export const PREVIEW_DEPENDENCY_POLICY_VERSION = "2026-06-preview-runtime-v1";
+export const PREVIEW_DEPENDENCY_POLICY_VERSION = "2026-06-preview-runtime-v3";
 
 export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefinition> = {
   react: { version: "18.3.1", kind: "core" },
@@ -290,6 +290,56 @@ export function Button(props) {
   }, children);
 }
 
+function readRuntimeObject(name) {
+  if (typeof window === 'undefined') return {};
+  const value = window[name];
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+export function trigger(event, payload) {
+  if (typeof window === 'undefined') return;
+  if (!event || typeof event !== 'string') {
+    console.warn('@preview/sdk trigger(event, payload) requires a string event');
+    return;
+  }
+  const safePayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  window.parent.postMessage({ type: 'APP_ACTION', event, payload: safePayload }, '*');
+}
+
+export function PageAction(props) {
+  const { event, payload, children, as = 'button', onClick, type = 'button', ...rest } = props || {};
+  const handleClick = (clickEvent) => {
+    if (typeof onClick === 'function') onClick(clickEvent);
+    if (clickEvent.defaultPrevented) return;
+    trigger(event, typeof payload === 'function' ? payload() : payload);
+  };
+  return React.createElement(as, {
+    ...rest,
+    type: as === 'button' ? type : undefined,
+    onClick: handleClick
+  }, children);
+}
+
+export function useAppState() {
+  const [state, setState] = React.useState(() => readRuntimeObject('__APP_STATE__'));
+  React.useEffect(() => {
+    const handler = () => setState(readRuntimeObject('__APP_STATE__'));
+    window.addEventListener('PREVIEW_APP_RUNTIME_UPDATE', handler);
+    return () => window.removeEventListener('PREVIEW_APP_RUNTIME_UPDATE', handler);
+  }, []);
+  return state;
+}
+
+export function useRouteParams() {
+  const [params, setParams] = React.useState(() => readRuntimeObject('__ROUTE_PARAMS__'));
+  React.useEffect(() => {
+    const handler = () => setParams(readRuntimeObject('__ROUTE_PARAMS__'));
+    window.addEventListener('PREVIEW_APP_RUNTIME_UPDATE', handler);
+    return () => window.removeEventListener('PREVIEW_APP_RUNTIME_UPDATE', handler);
+  }, []);
+  return params;
+}
+
 export function Card(props) {
   const { className, children, ...rest } = props || {};
   return React.createElement('section', {
@@ -459,4 +509,3 @@ export function getPreviewDependencyUrl(packageName: string): string {
   }
   return buildCdnPackageUrl(packageName);
 }
-

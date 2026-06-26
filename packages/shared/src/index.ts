@@ -5,7 +5,7 @@ export interface DemoMeta {
   updatedAt: number;
   thumbnail?: string;
   demoCount?: number;
-  demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
+  demoPages?: Array<{ id: string; name: string; routeKey?: string; order: number; parentId: string | null }>;
   locked?: boolean;
 }
 
@@ -19,7 +19,7 @@ export interface ProjectTemplateMeta {
   scope?: "personal" | "team" | "official";
   official?: boolean;
   demoCount: number;
-  demoPages?: Array<{ id: string; name: string; order: number; parentId: string | null }>;
+  demoPages?: Array<{ id: string; name: string; routeKey?: string; order: number; parentId: string | null }>;
   createdAt: number;
   updatedAt: number;
 }
@@ -144,6 +144,7 @@ export * from "./workspace";
 export * from "./validator";
 export * from "./agent-config";
 export * from "./knowledge";
+export * from "./external-auth";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

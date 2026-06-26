@@ -772,18 +772,6 @@ export class PiAgentBackend implements IBackendAdapter {
         }
       }
 
-      if (toolName === 'writeFile' || toolName === 'editFile') {
-        const schemaPath = (input as any).path;
-        if (schemaPath && String(schemaPath).replace(/\\/g, '/').endsWith('config.schema.json')) {
-          if (!this.readKnowledgeFiles.has('配置系统参考.md')) {
-            return {
-              block: true,
-              reason: '修改 config.schema.json 前，请先用 readFile 读取 knowledge/配置系统参考.md，了解系统支持的控件类型、扩展字段和配置规范，避免生成无效 schema。',
-            };
-          }
-        }
-      }
-
       return undefined;
     });
     unsubStore.push(unsubToolCall);
@@ -871,19 +859,6 @@ Keep the final response concise: summarize what you changed, what you verified, 
         const targetPath = (input as any).path;
         if (targetPath && isKnowledgeBasePath(targetPath, this.config.workingDir ?? '')) {
           return { block: true, reason: '知识库文件由用户管理，AI 不可修改。如需更新请提示用户在知识库面板中操作。' };
-        }
-      }
-
-      // 3. Schema 修改前置校验：必须先读配置系统参考
-      if (toolName === 'writeFile' || toolName === 'editFile') {
-        const schemaPath = (input as any).path;
-        if (schemaPath && String(schemaPath).replace(/\\/g, '/').endsWith('config.schema.json')) {
-          if (!this.readKnowledgeFiles.has('配置系统参考.md')) {
-            return {
-              block: true,
-              reason: '修改 config.schema.json 前，请先用 readFile 读取 knowledge/配置系统参考.md，了解系统支持的控件类型、扩展字段和配置规范，避免生成无效 schema。',
-            };
-          }
         }
       }
 
@@ -1574,14 +1549,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   updateConfig(config: Partial<AgentConfig>): void {
-    this.config = {
-      ...this.config,
-      ...config,
-      piAgent: {
+    Object.assign(this.config, config);
+    if (config.piAgent) {
+      this.config.piAgent = {
         ...this.config.piAgent,
         ...config.piAgent,
-      },
-    };
+      };
+    }
   }
 
   setPromptTimeout(seconds: number): void {

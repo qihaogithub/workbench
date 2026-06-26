@@ -1,0 +1,107 @@
+{
+  "id": "reading-map:tmpl_1782463961129_yr9mdi",
+  "targetType": "template",
+  "targetId": "tmpl_1782463961129_yr9mdi",
+  "overview": {
+    "title": "App通用广告弹窗",
+    "scene": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
+    "pageCount": 2,
+    "configCount": 1,
+    "knowledgeCount": 1,
+    "updatedAt": "2026-06-26T08:52:41.137Z"
+  },
+  "structure": {
+    "pages": [
+      {
+        "id": "pad-popup_a3f2",
+        "title": "通用弹窗 - 平板版",
+        "path": "pages/pad-popup_a3f2.tsx",
+        "summary": "页面：通用弹窗 - 平板版"
+      },
+      {
+        "id": "phone-popup_k8m2",
+        "title": "通用弹窗 - 手机版",
+        "path": "pages/phone-popup_k8m2.tsx",
+        "summary": "页面：通用弹窗 - 手机版"
+      }
+    ],
+    "configs": [
+      {
+        "id": "project-config-schema",
+        "title": "通用弹窗 - 项目级共享配置",
+        "path": "project.config.schema.json",
+        "summary": "包含配置项：modalImage"
+      }
+    ],
+    "knowledgeDocuments": [],
+    "assets": []
+  },
+  "localSummaries": [
+    {
+      "id": "pad-popup_a3f2",
+      "title": "通用弹窗 - 平板版",
+      "path": "pages/pad-popup_a3f2.tsx",
+      "summary": "页面：通用弹窗 - 平板版"
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "title": "通用弹窗 - 手机版",
+      "path": "pages/phone-popup_k8m2.tsx",
+      "summary": "页面：通用弹窗 - 手机版"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "通用弹窗 - 项目级共享配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：modalImage"
+    }
+  ],
+  "taskEntries": [
+    {
+      "taskType": "修改页面",
+      "description": "先阅读相关页面摘要，再打开页面原文。",
+      "recommendedPaths": [
+        "pages/pad-popup_a3f2.tsx",
+        "pages/phone-popup_k8m2.tsx"
+      ]
+    },
+    {
+      "taskType": "修改配置",
+      "description": "先确认配置 Schema，再结合知识文档判断业务约束。",
+      "recommendedPaths": [
+        "project.config.schema.json",
+        null
+      ]
+    },
+    {
+      "taskType": "排查异常",
+      "description": "从页面、配置和知识文档三个入口交叉确认。",
+      "recommendedPaths": [
+        "pages/pad-popup_a3f2.tsx",
+        "pages/phone-popup_k8m2.tsx",
+        "project.config.schema.json",
+        null
+      ]
+    }
+  ],
+  "originalEntries": [
+    {
+      "id": "pad-popup_a3f2",
+      "title": "通用弹窗 - 平板版",
+      "path": "pages/pad-popup_a3f2.tsx",
+      "summary": "页面：通用弹窗 - 平板版"
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "title": "通用弹窗 - 手机版",
+      "path": "pages/phone-popup_k8m2.tsx",
+      "summary": "页面：通用弹窗 - 手机版"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "通用弹窗 - 项目级共享配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：modalImage"
+    }
+  ]
+}

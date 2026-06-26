@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
-import { getSystemKnowledgeDocument } from '@/lib/knowledge/system-knowledge';
 
 interface KnowledgeItem {
   id: string;
@@ -55,13 +54,6 @@ export async function PUT(
   }
 
   try {
-    if (getSystemKnowledgeDocument(docId)) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可修改' } },
-        { status: 403 }
-      );
-    }
-
     syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
     if (!manifest) {
@@ -81,10 +73,10 @@ export async function PUT(
 
     const item = manifest.items[itemIndex];
 
-    // 校验 source === "user"，系统条目不可修改
+    // 清理前的历史 system 条目不可修改
     if (item.source === 'system') {
       return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可修改' } },
+        { success: false, error: { code: 'FORBIDDEN', message: '历史 system 文档不可修改' } },
         { status: 403 }
       );
     }
@@ -141,13 +133,6 @@ export async function DELETE(
   }
 
   try {
-    if (getSystemKnowledgeDocument(docId)) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可删除' } },
-        { status: 403 }
-      );
-    }
-
     syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
     if (!manifest) {
@@ -167,10 +152,10 @@ export async function DELETE(
 
     const item = manifest.items[itemIndex];
 
-    // 校验 source === "user"，系统条目不可删除
+    // 清理前的历史 system 条目不可删除
     if (item.source === 'system') {
       return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: '系统预设文档不可删除' } },
+        { success: false, error: { code: 'FORBIDDEN', message: '历史 system 文档不可删除' } },
         { status: 403 }
       );
     }

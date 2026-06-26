@@ -75,6 +75,12 @@ importers:
       '@fastify/websocket':
         specifier: ^10.0.0
         version: 10.0.1
+      '@opencode-workbench/knowledge-core':
+        specifier: workspace:*
+        version: link:../knowledge-core
+      '@opencode-workbench/knowledge-service':
+        specifier: workspace:*
+        version: link:../knowledge-service
       '@opencode-workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -160,6 +166,9 @@ importers:
       '@opencode-workbench/agent-client':
         specifier: workspace:*
         version: link:../agent-client
+      '@opencode-workbench/knowledge-service':
+        specifier: workspace:*
+        version: link:../knowledge-service
       '@opencode-workbench/project-core':
         specifier: workspace:*
         version: link:../project-core
@@ -423,6 +432,34 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  packages/knowledge-core:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.37)
+
+  packages/knowledge-service:
+    dependencies:
+      '@opencode-workbench/knowledge-core':
+        specifier: workspace:*
+        version: link:../knowledge-core
+      '@opencode-workbench/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.16
+        version: 20.19.37
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.37)
+
   packages/project-cli:
     dependencies:
       '@opencode-workbench/project-core':
@@ -444,6 +481,9 @@ importers:
 
   packages/project-core:
     dependencies:
+      '@opencode-workbench/knowledge-service':
+        specifier: workspace:*
+        version: link:../knowledge-service
       '@opencode-workbench/shared':
         specifier: workspace:*
         version: link:../shared

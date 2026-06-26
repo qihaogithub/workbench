@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scanWorkspaceContext, readMemoryContent, scanKnowledgeIndex, migrateReferencesToKnowledge } from '@/lib/agent/scan-workspace';
-import { pushSystemKnowledgeToAgent } from '@/lib/agent-providers';
-import { createSystemKnowledgeSnapshot } from '@/lib/knowledge/system-knowledge';
 
 export async function GET(request: NextRequest) {
   const workingDir = request.nextUrl.searchParams.get('workingDir');
@@ -37,10 +35,6 @@ export async function GET(request: NextRequest) {
     const memoryContent = readMemoryContent(workingDir);
     // 迁移旧 references/ 到 knowledge/（仅执行一次）
     migrateReferencesToKnowledge(workingDir);
-    const pushResult = await pushSystemKnowledgeToAgent(createSystemKnowledgeSnapshot());
-    if (!pushResult.ok) {
-      console.warn('[workspace-context] 知识库推送失败:', pushResult.message);
-    }
     const knowledgeIndex = scanKnowledgeIndex(workingDir);
     return NextResponse.json({ success: true, data: { ...context, memoryContent, knowledgeIndex } });
   } catch (error) {

@@ -70,8 +70,54 @@ export interface PageVersionInfo extends VersionInfo {
 export interface DemoPageMeta {
   id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
   name: string;                // 显示名称，如 "首页"、"详情页"
+  routeKey?: string;           // 页面稳定语义标识，供应用逻辑图、AI 和工程交接使用
   order: number;               // 在页面列表中的展示顺序（小者在前）
   parentId: string | null;     // 所属文件夹 ID，null 表示根级
+}
+
+export interface AppGraphPageNode {
+  pageId: string;
+  title: string;
+}
+
+export interface AppGraphAction {
+  from: string;
+  event: string;
+  to?: string;
+  params?: string[];
+  setState?: Record<string, string>;
+  condition?: string;
+  fallback?: string;
+}
+
+export interface AppGraph {
+  version: 1;
+  entry: string;
+  pages: Record<string, AppGraphPageNode>;
+  actions: AppGraphAction[];
+  state: Record<string, unknown>;
+}
+
+export type AppGraphValidationSeverity = "error" | "warning";
+
+export interface AppGraphValidationIssue {
+  code:
+    | "ENTRY_MISSING"
+    | "PAGE_TARGET_MISSING"
+    | "PAGE_ROUTE_KEY_INVALID"
+    | "ACTION_FROM_MISSING"
+    | "ACTION_TO_MISSING"
+    | "ACTION_FALLBACK_MISSING"
+    | "ACTION_DUPLICATE";
+  message: string;
+  severity: AppGraphValidationSeverity;
+  routeKey?: string;
+  event?: string;
+}
+
+export interface AppGraphValidationResult {
+  valid: boolean;
+  issues: AppGraphValidationIssue[];
 }
 
 /**
