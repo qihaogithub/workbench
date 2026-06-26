@@ -379,7 +379,7 @@ Agent 行为约束建议：
 - [x] 与产品/开发确认是否采用该协议作为后续实现方向。
 - [x] 完成首期实现：`routeKey`、`app.graph.json`、SDK action、viewer 执行、发布与 scaffold 输出。
 - [x] 实施完成后，同步更新 `docs/项目文档/` 下对应模块文档。
-- [ ] 完成端到端验证并记录结果。
+- [x] 完成端到端验证并记录结果。
 
 ## 进度记录
 
@@ -391,6 +391,7 @@ Agent 行为约束建议：
 - 2026-06-26：预览运行时新增 `@preview/sdk.trigger`、`PageAction`、`useAppState`、`useRouteParams`；iframe 通过 `APP_ACTION` 上报动作，`PreviewPanel` 只转发，viewer shell 解释应用图并切页、传参、更新 state 和同步 URL。
 - 2026-06-26：发布产物写出 `app.graph.json`，本地 scaffold manifest 增加页面 `routeKey` 和 `appGraph` 入口，Agent 工作区扫描展示 `routeKey`。
 - 2026-06-26：已同步更新项目文档：[预览系统实时机制](../../项目文档/创作端/04-配置与预览/技术/02_实时预览机制.md) 与 [Project Admin CLI 能力层](../../项目文档/创作端/03-项目管理/技术/10_Project_Admin_CLI能力层.md)。
+- 2026-06-26：完成端到端验证。使用 Node 20.19.0 运行 author-site，并按 Node 20 重新编译 `better-sqlite3` native addon 后，Playwright 完整通过“打开首页 -> 新建项目 -> 编辑代码 -> 保存 -> 删除”流程。
 
 ## 验证方式
 
@@ -403,6 +404,19 @@ Agent 行为约束建议：
 - 本地 scaffold 导出应用图的测试。
 - 根目录 `pnpm check:author`、`pnpm check:project-core`、`pnpm check:project-scaffold`。
 - 服务启动后执行 `pnpm test:e2e` 验证多页面关键流程。
+
+已完成验证：
+
+- `corepack pnpm --filter @opencode-workbench/project-core typecheck`
+- `corepack pnpm --filter @opencode-workbench/project-core test`
+- `corepack pnpm --filter @opencode-workbench/project-scaffold typecheck`
+- `corepack pnpm --filter @opencode-workbench/project-scaffold test`
+- `corepack pnpm --filter @opencode-workbench/author-site typecheck`
+- `corepack pnpm --filter @opencode-workbench/author-site test`
+- `corepack pnpm --filter @opencode-workbench/viewer-site typecheck`
+- `PATH="$HOME/.nvm/versions/node/v20.19.0/bin:$PATH" E2E_BASE_URL=http://localhost:3210 E2E_USER=e2e_ai_native_0626 E2E_PASSWORD=e2e-pass-0626 corepack pnpm exec playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts`
+
+端到端结果：1 个 Playwright 用例通过，覆盖项目创建、登录、创建页面、通过编辑页 API 写入页面代码与 Schema、合并保存版本、返回首页删除项目。
 
 ## 风险与待确认事项
 

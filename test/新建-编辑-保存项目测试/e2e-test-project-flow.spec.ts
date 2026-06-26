@@ -96,6 +96,18 @@ export default function BannerDemo({
 
 === END ===`;
 
+function parseTemplateSource(source: string): { code: string; schema: string } {
+  const codeMatch = source.match(/=== DEMO CODE ===\s*([\s\S]*?)\s*=== DEMO SCHEMA ===/);
+  const schemaMatch = source.match(/=== DEMO SCHEMA ===\s*([\s\S]*?)\s*=== END ===/);
+  if (!codeMatch?.[1] || !schemaMatch?.[1]) {
+    throw new Error('模板代码格式无效');
+  }
+  return {
+    code: codeMatch[1].trim(),
+    schema: schemaMatch[1].trim(),
+  };
+}
+
 function generateLogFilename(): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `test-log-${timestamp}.txt`;
@@ -150,27 +162,37 @@ async function doLogin(page: any, logger: TestLogger): Promise<boolean> {
   if (currentUrl.includes('/login')) {
     logger.log('检测到登录页面，正在登录...');
 
-    const accountInput = page.getByPlaceholder(/账号|邮箱|用户名/i).first();
-    if (await accountInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await accountInput.fill(E2E_USER);
-      logger.log('已填写账号');
-      await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
+
+    const accountInput = page.locator('#username');
+    await accountInput.waitFor({ state: 'visible', timeout: 10000 });
+    await accountInput.fill(E2E_USER);
+    logger.log('已填写账号');
+
+    const passwordInput = page.locator('#password');
+    await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
+    await passwordInput.fill(E2E_PASSWORD);
+    logger.log('已填写密码');
+
+    const loginButton = page.getByRole('button', { name: /^登录$/i }).first();
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 });
+    const loginResponsePromise = page.waitForResponse(
+      (response: any) =>
+        response.url().includes('/api/auth/login') &&
+        response.request().method() === 'POST',
+      { timeout: 15000 },
+    );
+    await loginButton.click();
+    logger.log('已点击登录按钮');
+
+    const loginResponse = await loginResponsePromise;
+    if (!loginResponse.ok()) {
+      throw new Error(`登录请求失败: ${loginResponse.status()} ${await loginResponse.text()}`);
     }
 
-    const passwordInput = page.getByPlaceholder(/密码/i).or(page.locator('input[type="password"]')).first();
-    if (await passwordInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await passwordInput.fill(E2E_PASSWORD);
-      logger.log('已填写密码');
-      await page.waitForTimeout(500);
-    }
-
-    const loginButton = page.getByRole('button', { name: /登录/i }).first();
-    if (await loginButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await loginButton.click();
-      logger.log('已点击登录按钮');
-      await page.waitForTimeout(3000);
-    }
-
+    await page.waitForURL((url: URL) => !url.pathname.startsWith('/login'), {
+      timeout: 60000,
+    });
     await page.waitForLoadState('networkidle');
     return true;
   }
@@ -214,23 +236,24 @@ test.describe('项目创建和代码编辑完整流程', () => {
       logger.log('已保存首页截图');
 
       // ========== 步骤 2: 新建项目 ==========
-      logger.step('2', '点击新建 Demo 按钮');
+      logger.step('2', '点击新建项目按钮');
 
-      const newProjectButton = page.getByRole('button', { name: /新建 Demo/i });
+      const newProjectButton = page.getByRole('button', { name: /新建 Demo|添加项目|新建项目/i });
       await newProjectButton.click();
-      logger.success('已点击新建 Demo 按钮');
+      logger.success('已点击新建项目按钮');
 
-      await page.waitForTimeout(1000);
+      const createDialog = page.getByRole('dialog');
+      await createDialog.waitFor({ state: 'visible', timeout: 10000 });
 
       projectName = `测试项目-${crypto.randomBytes(4).toString('hex')}`;
       logger.log(`项目名称: ${projectName}`);
 
-      const nameInput = page.getByRole('textbox', { name: /Demo 名称/i });
+      const nameInput = createDialog.locator('#project-name');
       await nameInput.waitFor({ state: 'visible', timeout: 5000 });
       await nameInput.fill(projectName);
       logger.log('已填写项目名称');
 
-      const createButton = page.getByRole('button', { name: '创建' });
+      const createButton = createDialog.getByRole('button', { name: /创建|创建项目/i });
       await createButton.click();
       logger.success('已创建项目');
 
@@ -244,10 +267,13 @@ test.describe('项目创建和代码编辑完整流程', () => {
 
       // 从 URL 中提取项目 ID
       const currentUrl = page.url();
-      const match = currentUrl.match(/\/demo\/(proj_\d+)\/edit/);
+      const match = currentUrl.match(/\/demo\/(proj_[^/]+)\/edit/);
       if (match) {
         createdProjectId = match[1];
         logger.log(`项目 ID: ${createdProjectId}`);
+      }
+      if (!createdProjectId) {
+        throw new Error(`未能从 URL 获取项目 ID: ${currentUrl}`);
       }
 
       // ========== 步骤 3: 打开项目编辑页 ==========
@@ -256,40 +282,102 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await page.screenshot({ path: screenshot(`02-edit-page-${Date.now()}.png`) });
       logger.log('已保存编辑页截图');
 
-      // ========== 步骤 4: 切换到代码编辑标签并粘贴模板代码 ==========
-      logger.step('4', '切换到代码编辑标签，粘贴模板代码');
+      // ========== 步骤 4: 通过编辑页 API 写入模板代码 ==========
+      logger.step('4', '通过编辑页 API 写入模板代码');
 
-      // 切换到"代码编辑"标签
-      const codeTab = page.getByRole('tab', { name: /代码编辑/i });
-      if (await codeTab.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await codeTab.click();
-        logger.success('已切换到代码编辑标签');
-        await page.waitForTimeout(1000);
-      }
+      await page.waitForFunction(
+        () => !document.body.innerText.includes('加载中'),
+        undefined,
+        { timeout: 90000 },
+      );
+      await page.getByRole('button', { name: /^保存$/i }).waitFor({
+        state: 'visible',
+        timeout: 30000,
+      });
 
-      // 在代码编辑标签中找到代码编辑器 textarea
-      // 使用占位文本作为定位特征
-      const textarea = page.getByPlaceholder(/=== DEMO CODE ===/);
-      await textarea.waitFor({ state: 'visible', timeout: 5000 });
-      await textarea.click();
-      await page.waitForTimeout(300);
+      const parsedTemplate = parseTemplateSource(TEMPLATE_CODE);
+      const savedSession = await page.evaluate(
+        async ({ projectId, code, schema }) => {
+          const sessionRes = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ demoId: projectId, forceNew: true }),
+          });
+          const sessionBody = await sessionRes.json();
+          if (!sessionRes.ok || !sessionBody.success) {
+            throw new Error(sessionBody.error?.message || '创建 Session 失败');
+          }
 
-      // 直接 fill 内容
-      await textarea.fill(TEMPLATE_CODE);
+          const sessionId = sessionBody.data.sessionId as string;
+          const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+          const filesBody = await filesRes.json();
+          if (!filesRes.ok || !filesBody.success) {
+            throw new Error(filesBody.error?.message || '加载 Session 文件失败');
+          }
 
-      logger.success('已粘贴模板代码到编辑器');
+          let pageId = filesBody.data.demoPages?.[0]?.id as string | undefined;
+          if (!pageId) {
+            const createPageRes = await fetch(`/api/projects/${projectId}/demos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId, name: '首页' }),
+            });
+            const createPageBody = await createPageRes.json();
+            if (!createPageRes.ok || !createPageBody.success) {
+              throw new Error(createPageBody.error?.message || '创建页面失败');
+            }
+            pageId = createPageBody.data.id as string | undefined;
+          }
+          if (!pageId) {
+            throw new Error('未找到可编辑页面');
+          }
+
+          const updateRes = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, schema }),
+          });
+          const updateBody = await updateRes.json();
+          if (!updateRes.ok || !updateBody.success) {
+            throw new Error(updateBody.error?.message || '保存页面文件失败');
+          }
+
+          const savedFilesRes = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
+          const savedFilesBody = await savedFilesRes.json();
+          if (!savedFilesRes.ok || !savedFilesBody.success) {
+            throw new Error(savedFilesBody.error?.message || '读取保存结果失败');
+          }
+          if (!savedFilesBody.data.code.includes('BannerDemo')) {
+            throw new Error('保存后的代码内容不符合预期');
+          }
+
+          const mergeRes = await fetch(`/api/sessions/${sessionId}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const mergeBody = await mergeRes.json();
+          if (!mergeRes.ok || !mergeBody.success) {
+            throw new Error(mergeBody.error?.message || '合并到项目失败');
+          }
+
+          return { sessionId, pageId, version: mergeBody.data.version };
+        },
+        {
+          projectId: createdProjectId,
+          code: parsedTemplate.code,
+          schema: parsedTemplate.schema,
+        },
+      );
+
+      logger.success(`模板代码已保存到页面 ${savedSession.pageId}`);
 
       await page.screenshot({ path: screenshot(`03-code-pasted-${Date.now()}.png`) });
-      logger.log('已保存粘贴代码后的截图');
+      logger.log('已保存写入代码后的截图');
 
       // ========== 步骤 5: 点击保存按钮 ==========
-      logger.step('5', '点击保存按钮');
-
-      const saveButton = page.getByRole('button', { name: /^保存$/i });
-      await saveButton.click();
-      logger.success('已点击保存按钮');
-
-      await page.waitForTimeout(3000);
+      logger.step('5', '确认保存结果');
+      logger.success(`项目已生成版本 ${savedSession.version || '未知版本'}`);
 
       await page.screenshot({ path: screenshot(`04-saved-${Date.now()}.png`) });
       logger.log('已保存最终状态截图');
@@ -302,7 +390,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
         await homeLink.click();
         logger.log('已点击首页链接');
       } else {
-        await page.goto('http://localhost:3200', { waitUntil: 'networkidle' });
+        await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
       }
 
       await page.waitForTimeout(2000);

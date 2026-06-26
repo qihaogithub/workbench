@@ -14,6 +14,13 @@ function dispatchIframeMessage(
 }
 
 describe("PreviewPanel iframe sleep", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
+  });
+
   it("sleeping 时不推送配置，wake 后补发最新 code/config", async () => {
     const { rerender, getByTitle } = render(
       <PreviewPanel
@@ -77,5 +84,42 @@ describe("PreviewPanel iframe sleep", () => {
         }),
       ).toBe(true);
     });
+  });
+
+  it("编译接口返回 HTML 时展示明确的非 JSON 错误", async () => {
+    const onError = jest.fn();
+    global.fetch = jest.fn().mockResolvedValue(
+      {
+        status: 404,
+        statusText: "Not Found",
+        ok: false,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+        },
+        text: async () => "<!DOCTYPE html><html><body>not found</body></html>",
+        json: async () => {
+          throw new Error("json should not be called");
+        },
+      },
+    ) as typeof fetch;
+
+    const { findByText } = render(
+      <PreviewPanel
+        code="export default function Demo() { return <div>Demo</div>; }"
+        configData={{}}
+        onError={onError}
+        fillContainer
+      />,
+    );
+
+    await findByText("编译错误");
+    await findByText(/编译服务返回非 JSON 响应（404 Not Found）/);
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("编译服务返回非 JSON 响应"),
+      }),
+    );
   });
 });
