@@ -262,6 +262,28 @@ interface CompileResult {
   cssImports: string[];
 }
 
+interface CompileApiResponse {
+  success?: boolean;
+  data?: CompileResult;
+  error?: {
+    message?: string;
+  };
+}
+
+async function readCompileResponse(response: Response): Promise<CompileApiResponse> {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return (await response.json()) as CompileApiResponse;
+  }
+
+  const text = await response.text().catch(() => "");
+  const snippet = text.replace(/\s+/g, " ").trim().slice(0, 120);
+  const status = `${response.status} ${response.statusText}`.trim();
+  const suffix = snippet ? `：${snippet}` : "";
+  throw new Error(`编译服务返回非 JSON 响应（${status}）${suffix}`);
+}
+
 function hideIframeScrollbar(iframe: HTMLIFrameElement) {
   try {
     const doc = iframe.contentDocument;
@@ -540,11 +562,11 @@ export function PreviewPanel({
           body: JSON.stringify(body),
         });
 
-        const result = await response.json();
+        const result = await readCompileResponse(response);
 
         if (cancelled) return;
 
-        if (!result.success) {
+        if (!response.ok || !result.success || !result.data) {
           const message = result.error?.message || "编译失败";
           setCompileError(message);
           onError?.(new Error(message));
