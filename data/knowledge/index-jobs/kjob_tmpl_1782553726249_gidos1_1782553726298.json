@@ -1,0 +1,13 @@
+{
+  "id": "kjob_tmpl_1782553726249_gidos1_1782553726298",
+  "targetType": "template",
+  "targetId": "tmpl_1782553726249_gidos1",
+  "targetTitle": "知识库索引验证模板-画布文档版-1782553725551",
+  "targetDescription": "包含圆形页面、画布文档节点和知识库文档的验证模板",
+  "status": "ready",
+  "createdAt": "2026-06-27T09:48:46.297Z",
+  "updatedAt": "2026-06-27T09:48:46.303Z",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\templates\\tmpl_1782553726249_gidos1\\workspace",
+  "itemCount": 9,
+  "readingMapPath": "knowledge/templates/tmpl_1782553726249_gidos1/reading-map.json"
+}

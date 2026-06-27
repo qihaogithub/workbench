@@ -13,6 +13,8 @@ import { Copy, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { CodeEditor } from "./CodeEditor";
 import { DocumentEditor } from "@opencode-workbench/shared/demo";
+import type { CollabResourceKind, CollabRoomDescriptor } from "@opencode-workbench/shared";
+import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { getFileLanguage, getFileEditorType } from "@/lib/workspace-file-utils";
 
 interface WorkspaceCodeDialogProps {
@@ -23,6 +25,9 @@ interface WorkspaceCodeDialogProps {
   editable: boolean;
   onSave: (content: string) => Promise<void>;
   onSaved?: (params: { filePath: string; content: string }) => void;
+  projectId?: string;
+  workspaceId?: string;
+  sessionId?: string;
 }
 
 /**
@@ -37,6 +42,9 @@ export function WorkspaceCodeDialog({
   editable,
   onSave,
   onSaved,
+  projectId,
+  workspaceId,
+  sessionId,
 }: WorkspaceCodeDialogProps) {
   const [editContent, setEditContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +53,22 @@ export function WorkspaceCodeDialog({
 
   const language = getFileLanguage(filePath);
   const editorType = getFileEditorType(filePath);
+  const collabKind = getCollabResourceKind(filePath);
+  const collabDescriptor: CollabRoomDescriptor | null =
+    open && editable && projectId && workspaceId && sessionId && collabKind
+      ? {
+          projectId,
+          workspaceId,
+          sessionId,
+          resourcePath: filePath.replace(/^\/+/, ""),
+          kind: collabKind,
+        }
+      : null;
+  const collab = useCollabDocument(collabDescriptor, {
+    userId: sessionId,
+    username: "当前用户",
+  });
+  const useCollab = Boolean(collabDescriptor && collab.ytext && collab.provider);
 
   // 打开弹窗时重置状态
   useEffect(() => {
@@ -54,9 +78,20 @@ export function WorkspaceCodeDialog({
     }
   }, [open, content]);
 
+  useEffect(() => {
+    if (!open || !useCollab) return;
+    if (collab.value === editContent) return;
+    setEditContent(collab.value);
+    setHasChanges(true);
+    onSaved?.({ filePath, content: collab.value });
+  }, [collab.value, editContent, filePath, onSaved, open, useCollab]);
+
   const handleChange = (value: string) => {
     setEditContent(value);
     setHasChanges(value !== content);
+    if (useCollab) {
+      onSaved?.({ filePath, content: value });
+    }
   };
 
   const handleCopy = () => {
@@ -67,7 +102,11 @@ export function WorkspaceCodeDialog({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(editContent);
+      if (useCollab) {
+        await collab.flush();
+      } else {
+        await onSave(editContent);
+      }
       onSaved?.({ filePath, content: editContent });
       toast({ title: "保存成功" });
       setHasChanges(false);
@@ -84,6 +123,7 @@ export function WorkspaceCodeDialog({
   };
 
   const fileName = filePath.split("/").pop() || filePath;
+  const collabUsers = collab.awareness.filter((presence) => presence.userId !== sessionId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,7 +136,7 @@ export function WorkspaceCodeDialog({
               </span>
               {editable ? (
                 <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">
-                  可编辑
+                  {useCollab ? getCollabStatusText(collab.status) : "可编辑"}
                 </span>
               ) : (
                 <span className="text-xs px-1.5 py-0.5 bg-muted text-muted-foreground rounded">
@@ -127,9 +167,37 @@ export function WorkspaceCodeDialog({
               language={language}
               readOnly={!editable}
               height="100%"
+              collab={
+                useCollab && collab.ytext && collab.provider
+                  ? {
+                      ytext: collab.ytext,
+                      awareness: collab.provider.awareness,
+                    }
+                  : undefined
+              }
             />
           )}
         </div>
+
+        {useCollab && (
+          <div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{collab.error || getCollabStatusDescription(collab.status)}</span>
+            {collabUsers.length > 0 && (
+              <div className="flex items-center gap-1">
+                {collabUsers.slice(0, 4).map((presence) => (
+                  <span
+                    key={`${presence.userId}-${presence.resourcePath}`}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                    title={presence.username}
+                    style={{ backgroundColor: presence.color }}
+                  >
+                    {presence.username.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -157,4 +225,30 @@ export function WorkspaceCodeDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function getCollabResourceKind(filePath: string): CollabResourceKind | null {
+  const normalized = filePath.replace(/^\/+/, "");
+  if (/^demos\/[^/]+\/index\.tsx$/.test(normalized)) return "page-code";
+  if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
+  if (normalized === "project.config.schema.json") return "project-schema";
+  if (normalized === "workspace-tree.json") return "workspace-tree";
+  if (normalized === ".canvas-layout.json") return "canvas-layout";
+  return null;
+}
+
+function getCollabStatusText(status: string): string {
+  if (status === "saving") return "同步中";
+  if (status === "offline") return "离线待同步";
+  if (status === "error") return "协同异常";
+  if (status === "synced") return "草稿已实时保存";
+  return "连接中";
+}
+
+function getCollabStatusDescription(status: string): string {
+  if (status === "saving") return "正在将协同草稿写入工作区";
+  if (status === "offline") return "协同连接已断开，本地更改会在重连后继续同步";
+  if (status === "error") return "协同连接异常，请稍后重试";
+  if (status === "synced") return "草稿会实时保存到当前工作区，点击保存会生成项目版本";
+  return "正在连接协同编辑服务";
 }

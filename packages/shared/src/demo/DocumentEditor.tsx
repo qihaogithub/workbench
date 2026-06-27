@@ -9,11 +9,18 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Blockquote from "@tiptap/extension-blockquote";
+import { Table } from "@tiptap/extension-table";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TableRow from "@tiptap/extension-table-row";
 import {
   defaultMarkdownSerializer,
   MarkdownSerializer,
 } from "prosemirror-markdown";
-import type { Node } from "@tiptap/pm/model";
+import {
+  DOMParser as ProseMirrorDOMParser,
+  type Node,
+} from "@tiptap/pm/model";
 import MarkdownIt from "markdown-it";
 import {
   Bold,
@@ -105,8 +112,35 @@ function markdownToHtml(mdText: string): string {
   }
 }
 
+function looksLikeMarkdown(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  return (
+    /(^|\n)\s{0,3}#{1,6}\s+\S/.test(trimmed) ||
+    /(^|\n)\s{0,3}[-*+]\s+\S/.test(trimmed) ||
+    /(^|\n)\s{0,3}\d+\.\s+\S/.test(trimmed) ||
+    /(^|\n)\s{0,3}>+\s+\S/.test(trimmed) ||
+    /(^|\n)\s{0,3}```/.test(trimmed) ||
+    /(^|\n)\s{0,3}- \[[ xX]\]\s+\S/.test(trimmed) ||
+    /(^|\n)\s{0,3}\|.+\|/.test(trimmed) ||
+    /\[[^\]]+\]\([^)]+\)/.test(trimmed) ||
+    /(\*\*|__)[^\n]+(\*\*|__)/.test(trimmed) ||
+    /(^|\s)`[^`\n]+`($|\s)/.test(trimmed)
+  );
+}
+
 function htmlToPlainText(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
+}
+
+function escapeMarkdownTableCell(value: string): string {
+  const escaped = value
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, "<br>")
+    .trim();
+  return escaped || " ";
 }
 
 function createMarkdownSerializer(): MarkdownSerializer {
@@ -149,6 +183,36 @@ function createMarkdownSerializer(): MarkdownSerializer {
       state.closeBlock(node);
     };
   }
+
+  nodes.table = (state, node) => {
+    const rows: string[][] = [];
+    node.forEach((row) => {
+      const cells: string[] = [];
+      row.forEach((cell) => {
+        cells.push(escapeMarkdownTableCell(cell.textContent));
+      });
+      rows.push(cells);
+    });
+
+    if (rows.length === 0) return;
+
+    const columnCount = Math.max(...rows.map((row) => row.length), 1);
+    const normalizeRow = (row: string[]) =>
+      Array.from({ length: columnCount }, (_, index) => row[index] ?? " ");
+    const header = normalizeRow(rows[0]);
+    const bodyRows = rows.slice(1).map(normalizeRow);
+
+    state.write(`| ${header.join(" | ")} |\n`);
+    state.write(`| ${Array.from({ length: columnCount }, () => "---").join(" | ")} |\n`);
+    bodyRows.forEach((row) => {
+      state.write(`| ${row.join(" | ")} |\n`);
+    });
+    state.closeBlock(node);
+  };
+
+  nodes.tableRow = () => {};
+  nodes.tableCell = () => {};
+  nodes.tableHeader = () => {};
 
   const marks: Record<string, MarkdownSerializer["marks"][string]> = {};
 
@@ -226,6 +290,12 @@ export function DocumentEditor({
         nested: true,
       }),
       Blockquote,
+      Table.configure({
+        resizable: false,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: "",
     editable: !readOnly && !previewMode,
@@ -248,6 +318,21 @@ export function DocumentEditor({
       }
     },
     editorProps: {
+      handlePaste: (view, event) => {
+        if (format !== "markdown" || readOnly || previewMode) return false;
+
+        const text = event.clipboardData?.getData("text/plain") ?? "";
+        if (!looksLikeMarkdown(text)) return false;
+
+        event.preventDefault();
+        const container = document.createElement("div");
+        container.innerHTML = markdownToHtml(text);
+        const slice = ProseMirrorDOMParser.fromSchema(
+          view.state.schema,
+        ).parseSlice(container);
+        view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
+        return true;
+      },
       attributes: {
         class: cn(
           "markdown-editor-content focus:outline-none min-h-[200px] px-3 py-2 text-sm",

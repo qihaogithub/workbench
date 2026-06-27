@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782561516586_2p4vyr",
+  "at": 1782561516586,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782561516572_tqftfj",
+  "inputSummary": {
+    "name": "协同验收 1782561516524",
+    "category": "验收"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782561516572_tqftfj"
+    ]
+  }
+}

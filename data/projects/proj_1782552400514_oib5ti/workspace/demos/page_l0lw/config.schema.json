@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "title": "任务页配置",
+  "properties": {
+    "taskTitle": {
+      "type": "string",
+      "default": "三步任务说明"
+    },
+    "dailySubmitLimit": {
+      "type": "number",
+      "default": 2
+    }
+  }
+}

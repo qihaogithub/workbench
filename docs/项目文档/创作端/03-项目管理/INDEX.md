@@ -23,4 +23,5 @@
 | [06_项目工作空间迁移方案.md](./技术/06_项目工作空间迁移方案.md) | 项目工作空间迁移策略 |
 | [07_工作空间对话解耦.md](./技术/07_工作空间对话解耦.md) | Session 与 Workspace 解耦、workspaceId 传递链路、循环依赖解决 |
 | [08_项目模板库.md](./技术/08_项目模板库.md) | 独立模板库、模板快照复制、模板创建和 AI 推荐 |
-| [10_Project_Admin_CLI能力层.md](./技术/10_Project_Admin_CLI能力层.md) | JSON-first CLI 入口、项目管理命令、本地项目包与应用逻辑图交接、参数输入和 Agent 边界 |
+| [10_Project_Admin_CLI能力层.md](./技术/10_Project_Admin_CLI能力层.md) | 历史归档入口；当前 CLI 文档已迁移到 [10-CLI](../10-CLI/) |
+| [11_实时保存与协同编辑.md](./技术/11_实时保存与协同编辑.md) | 基于 Workspace 草稿的实时保存、多人协同房间、presence 与手动版本保存边界 |

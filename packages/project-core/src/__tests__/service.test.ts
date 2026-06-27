@@ -22,15 +22,32 @@ afterEach(() => {
 
 describe("ProjectAdminService", () => {
   it("创建项目并读取详情", () => {
-    const created = service.createProject({ name: "测试项目" });
+    const created = service.createProject({ name: "测试项目", category: "活动" });
 
     expect(created.ok).toBe(true);
     expect(created.data?.name).toBe("测试项目");
+    expect(created.data?.category).toBe("活动");
 
     const detail = service.getProject(created.data?.id ?? "");
     expect(detail.ok).toBe(true);
     expect(detail.data?.project.name).toBe("测试项目");
+    expect(detail.data?.project.category).toBe("活动");
     expect(detail.data?.pages).toEqual([]);
+  });
+
+  it("历史项目缺少分类时默认归入未分类", () => {
+    const created = service.createProject({ name: "旧项目" });
+    const projectId = created.data?.id ?? "";
+    const projectPath = path.join(tempDir, "projects", projectId, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    delete project.category;
+    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2), "utf-8");
+
+    const detail = service.getProject(projectId);
+    const list = service.listProjects();
+
+    expect(detail.data?.project.category).toBe("未分类");
+    expect(list.data?.find((item) => item.id === projectId)?.category).toBe("未分类");
   });
 
   it("在编辑事务中创建页面并提交版本", () => {
@@ -359,6 +376,22 @@ describe("ProjectAdminService", () => {
     ).toBe(true);
   });
 
+  it("复制项目时可指定新项目分类", () => {
+    const source = service.createProject({ name: "复制源", category: "活动" });
+    const duplicated = service.duplicateProject(
+      source.data?.id ?? "",
+      "复制结果",
+      "复用项目",
+    );
+
+    expect(duplicated.ok).toBe(true);
+    expect(duplicated.data?.name).toBe("复制结果");
+    expect(duplicated.data?.category).toBe("复用项目");
+
+    const detail = service.getProject(duplicated.data?.id ?? "");
+    expect(detail.data?.project.category).toBe("复用项目");
+  });
+
   it("演练管理员预设模板、批量页面维护、发布和回滚", () => {
     const source = service.createProject({ name: "官方模板源" });
     const sourceEdit = service.beginEdit(source.data?.id ?? "");
@@ -376,8 +409,13 @@ describe("ProjectAdminService", () => {
     });
     expect(template.ok).toBe(true);
 
-    const project = service.instantiateTemplate(template.data?.id ?? "", "从官方模板创建");
+    const project = service.instantiateTemplate(
+      template.data?.id ?? "",
+      "从官方模板创建",
+      "模板生成",
+    );
     const projectId = project.data?.id ?? "";
+    expect(project.data?.category).toBe("模板生成");
     const edit = service.beginEdit(projectId);
     const editId = (edit.data as EditTransaction).editId;
     const pageList = service.listPages(editId);

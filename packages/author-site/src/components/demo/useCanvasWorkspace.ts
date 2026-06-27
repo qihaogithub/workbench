@@ -15,6 +15,7 @@ const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
   pages: {},
   nodes: {},
+  hiddenKnowledgeDocumentIds: [],
 };
 
 const SAVE_DELAY = 700;
@@ -183,6 +184,15 @@ export function useCanvasWorkspace({
     setCanvasState(nextState);
   }, [setCanvasPersistenceDirty]);
 
+  const applyRemoteCanvasState = useCallback((nextState: CanvasState) => {
+    lastPersistedRef.current = JSON.stringify(nextState);
+    setCanvasPersistenceDirty(false);
+    setHasUnsavedCanvasChanges(false);
+    setCanvasState(nextState);
+    setSaveStatus("saved");
+    setSaveError(undefined);
+  }, [setCanvasPersistenceDirty]);
+
   const markCanvasChangesSaved = useCallback(() => {
     setHasUnsavedCanvasChanges(false);
   }, []);
@@ -211,6 +221,7 @@ export function useCanvasWorkspace({
     saveStatus,
     saveError,
     hasUnsavedCanvasChanges,
+    applyRemoteCanvasState,
     markCanvasChangesSaved,
   };
 }

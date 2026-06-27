@@ -102,6 +102,13 @@ const ALLOWED_ASSET_MIME_TYPES = new Set([
   "image/svg+xml",
 ]);
 
+const DEFAULT_PROJECT_CATEGORY = "未分类";
+
+function normalizeProjectCategory(category?: string): string {
+  const normalized = category?.trim();
+  return normalized || DEFAULT_PROJECT_CATEGORY;
+}
+
 function nowId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -342,6 +349,7 @@ export class ProjectAdminService {
       projects.push({
         id: entry.name,
         name: project?.name ?? entry.name,
+        category: normalizeProjectCategory(project?.category),
         description: project?.description,
         createdAt: project?.createdAt ?? stats.birthtimeMs,
         updatedAt: project?.updatedAt ?? stats.mtimeMs,
@@ -397,7 +405,24 @@ export class ProjectAdminService {
     const assets = this.walkFiles(path.join(workspacePath, "assets"))
       .filter((file) => fs.statSync(file).isFile())
       .map((file) => {
-        const relativePath = path.join("assets", path.relative(path.join(workspacePath, "assets"), file));
+        const relativePath = ["assets", path.relative(path.join(workspacePath, "assets"), file)]
+          .join("/")
+          .split(path.sep)
+          .join("/");
+        const buffer = fs.readFileSync(file);
+        return {
+          path: relativePath,
+          dataBase64: buffer.toString("base64"),
+          size: buffer.length,
+        };
+      });
+    const knowledgeFiles = this.walkFiles(path.join(workspacePath, "knowledge"))
+      .filter((file) => fs.statSync(file).isFile())
+      .map((file) => {
+        const relativePath = ["knowledge", path.relative(path.join(workspacePath, "knowledge"), file)]
+          .join("/")
+          .split(path.sep)
+          .join("/");
         const buffer = fs.readFileSync(file);
         return {
           path: relativePath,
@@ -414,6 +439,7 @@ export class ProjectAdminService {
       projectConfigSchema: detail.data.projectConfigSchema,
       appGraph: this.readAppGraph(workspacePath),
       assets,
+      knowledgeFiles,
       baseVersion,
     });
   }
@@ -425,11 +451,13 @@ export class ProjectAdminService {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
     const name = input.name.trim();
     if (!name) return fail("INVALID_REQUEST", "项目名称不能为空");
+    const category = normalizeProjectCategory(input.category);
     if (input.dryRun) {
       return ok(
         {
           id: "dry-run",
           name,
+          category,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           demoCount: 0,
@@ -463,6 +491,7 @@ export class ProjectAdminService {
     const project: Project = {
       id: projectId,
       name,
+      category,
       description: input.description,
       workspacePath,
       demoPages: sortPages(tree.pages),
@@ -477,6 +506,7 @@ export class ProjectAdminService {
     const result: DemoMeta = {
       id: projectId,
       name,
+      category,
       createdAt: stats.birthtimeMs,
       updatedAt: stats.mtimeMs,
       demoCount: project.demoPages.length,
@@ -484,7 +514,7 @@ export class ProjectAdminService {
     };
     const auditId = this.audit("project_create", actor, "L1", true, {
       projectId,
-      inputSummary: { name, templateId: input.templateId },
+      inputSummary: { name, category, templateId: input.templateId },
       diffSummary: { created: [`project:${projectId}`] },
     });
     return ok(result, {
@@ -495,7 +525,7 @@ export class ProjectAdminService {
   }
 
   updateProject(
-    input: { projectId: string; name?: string; description?: string; dryRun?: boolean },
+    input: { projectId: string; name?: string; category?: string; description?: string; dryRun?: boolean },
     actor = this.defaultActor(),
   ): ProjectAdminResult<Project> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
@@ -510,6 +540,10 @@ export class ProjectAdminService {
       if (!name) return fail("INVALID_REQUEST", "项目名称不能为空");
       next.name = name;
       diff.updated?.push("project.name");
+    }
+    if (input.category !== undefined) {
+      next.category = normalizeProjectCategory(input.category);
+      diff.updated?.push("project.category");
     }
     if (input.description !== undefined) {
       next.description = input.description;
@@ -529,6 +563,7 @@ export class ProjectAdminService {
   duplicateProject(
     projectId: string,
     name?: string,
+    category?: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
     const access = this.requireProjectAccess(projectId, actor);
@@ -541,7 +576,7 @@ export class ProjectAdminService {
       description: "项目复制临时快照",
     });
     const created = this.createProject(
-      { name: name ?? `${source.name} 副本`, templateId },
+      { name: name ?? `${source.name} 副本`, category: normalizeProjectCategory(category ?? source.category), templateId },
       actor,
     );
     fs.rmSync(this.getTemplatePath(templateId), { recursive: true, force: true });
@@ -815,9 +850,16 @@ export class ProjectAdminService {
   instantiateTemplate(
     templateId: string,
     name: string,
+    categoryOrActor?: string | ProjectAdminActor,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
-    return this.createProject({ name, templateId }, actor);
+    const category =
+      typeof categoryOrActor === "string" ? categoryOrActor : undefined;
+    const effectiveActor =
+      typeof categoryOrActor === "object" && categoryOrActor
+        ? categoryOrActor
+        : actor;
+    return this.createProject({ name, category, templateId }, effectiveActor);
   }
 
   beginEdit(
@@ -1519,8 +1561,8 @@ export class ProjectAdminService {
     const filename = this.generateAssetFilename(input.filename);
     const relativePath = input.targetPath
       ? this.safeRelativeAssetPath(input.targetPath)
-      : path.join("assets", "images", filename);
-    if (input.targetPath && relativePath.split(path.sep)[0] !== "assets") {
+      : `assets/images/${filename}`;
+    if (input.targetPath && relativePath.split("/")[0] !== "assets") {
       return fail("INVALID_ASSET_PATH", "targetPath 必须位于 assets/ 目录下");
     }
     const targetPath = path.join(transaction.data.workspacePath, relativePath);
@@ -2005,6 +2047,7 @@ export class ProjectAdminService {
     return {
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
+      category: normalizeProjectCategory(parsed.category),
       description: parsed.description,
       workspacePath: parsed.workspacePath ?? this.projectWorkspacePath(projectId),
       demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
@@ -2582,7 +2625,7 @@ export class ProjectAdminService {
   }
 
   private safeRelativeAssetPath(assetPath: string): string {
-    const normalized = path.normalize(assetPath).replace(/^(\.\.(\/|\\|$))+/, "");
+    const normalized = path.normalize(assetPath).replace(/^(\.\.(\/|\\|$))+/, "").split(path.sep).join("/");
     if (path.isAbsolute(normalized) || normalized.startsWith("..")) {
       throw new Error("INVALID_ASSET_PATH");
     }
@@ -2599,7 +2642,7 @@ export class ProjectAdminService {
       const content = fs.readFileSync(file, "utf-8");
       if (!content.includes(oldPath)) continue;
       fs.writeFileSync(file, content.split(oldPath).join(newPath), "utf-8");
-      updated.push(path.relative(workspacePath, file));
+      updated.push(path.relative(workspacePath, file).split(path.sep).join("/"));
     }
     return updated;
   }

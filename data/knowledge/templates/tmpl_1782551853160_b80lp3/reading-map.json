@@ -1,0 +1,125 @@
+{
+  "id": "reading-map:tmpl_1782551853160_b80lp3",
+  "targetType": "template",
+  "targetId": "tmpl_1782551853160_b80lp3",
+  "overview": {
+    "title": "知识库索引验证模板-扩展版",
+    "scene": "包含 3 个页面、全局配置和 4 份知识文档，用于评估 AI 对模板知识库的检索与引用能力。",
+    "pageCount": 3,
+    "configCount": 1,
+    "knowledgeCount": 0,
+    "updatedAt": "2026-06-27T09:17:33.193Z"
+  },
+  "structure": {
+    "pages": [
+      {
+        "id": "page_qhlg",
+        "title": "活动规则首页",
+        "path": "pages/page_qhlg.tsx",
+        "summary": "页面：活动规则首页"
+      },
+      {
+        "id": "page_l0lw",
+        "title": "知识任务页",
+        "path": "pages/page_l0lw.tsx",
+        "summary": "页面：知识任务页"
+      },
+      {
+        "id": "page_cdjg",
+        "title": "中奖履约页",
+        "path": "pages/page_cdjg.tsx",
+        "summary": "页面：中奖履约页"
+      }
+    ],
+    "configs": [
+      {
+        "id": "project-config-schema",
+        "title": "星桥活动全局配置",
+        "path": "project.config.schema.json",
+        "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+      }
+    ],
+    "knowledgeDocuments": [],
+    "assets": []
+  },
+  "localSummaries": [
+    {
+      "id": "page_qhlg",
+      "title": "活动规则首页",
+      "path": "pages/page_qhlg.tsx",
+      "summary": "页面：活动规则首页"
+    },
+    {
+      "id": "page_l0lw",
+      "title": "知识任务页",
+      "path": "pages/page_l0lw.tsx",
+      "summary": "页面：知识任务页"
+    },
+    {
+      "id": "page_cdjg",
+      "title": "中奖履约页",
+      "path": "pages/page_cdjg.tsx",
+      "summary": "页面：中奖履约页"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "星桥活动全局配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+    }
+  ],
+  "taskEntries": [
+    {
+      "taskType": "修改页面",
+      "description": "先阅读相关页面摘要，再打开页面原文。",
+      "recommendedPaths": [
+        "pages/page_qhlg.tsx",
+        "pages/page_l0lw.tsx",
+        "pages/page_cdjg.tsx"
+      ]
+    },
+    {
+      "taskType": "修改配置",
+      "description": "先确认配置 Schema，再结合知识文档判断业务约束。",
+      "recommendedPaths": [
+        "project.config.schema.json"
+      ]
+    },
+    {
+      "taskType": "排查异常",
+      "description": "从页面、配置和知识文档三个入口交叉确认。",
+      "recommendedPaths": [
+        "pages/page_qhlg.tsx",
+        "pages/page_l0lw.tsx",
+        "pages/page_cdjg.tsx",
+        "project.config.schema.json"
+      ]
+    }
+  ],
+  "originalEntries": [
+    {
+      "id": "page_qhlg",
+      "title": "活动规则首页",
+      "path": "pages/page_qhlg.tsx",
+      "summary": "页面：活动规则首页"
+    },
+    {
+      "id": "page_l0lw",
+      "title": "知识任务页",
+      "path": "pages/page_l0lw.tsx",
+      "summary": "页面：知识任务页"
+    },
+    {
+      "id": "page_cdjg",
+      "title": "中奖履约页",
+      "path": "pages/page_cdjg.tsx",
+      "summary": "页面：中奖履约页"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "星桥活动全局配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+    }
+  ]
+}

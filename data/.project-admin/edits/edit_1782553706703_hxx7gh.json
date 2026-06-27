@@ -1,0 +1,16 @@
+{
+  "editId": "edit_1782553706703_hxx7gh",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "workspaceId": "cli_edit_1782553706703_hxx7gh",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\workspaces\\local-codex\\proj_1782547891917_g0e1l9\\cli_edit_1782553706703_hxx7gh",
+  "baseVersion": "v4",
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "createdAt": 1782553706745,
+  "expiresAt": 1782560906745,
+  "status": "committed"
+}

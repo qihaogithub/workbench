@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Save, Loader2, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { DocumentEditor } from "@opencode-workbench/shared/demo";
+import type { CollabRoomDescriptor } from "@opencode-workbench/shared";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
+import { useCollabDocument, type CollabUser } from "@/hooks/useCollabDocument";
 
 export interface KnowledgeItem {
   id: string;
@@ -42,7 +44,20 @@ interface KnowledgeDocDialogProps {
   mode: KnowledgeDocDialogMode;
   item: KnowledgeItem | null;
   workingDir?: string;
+  projectId?: string;
+  workspaceId?: string;
+  sessionId?: string;
+  collabUser?: Partial<CollabUser>;
   onSaved: (item?: KnowledgeItem) => void;
+}
+
+function replaceCollabText(
+  ytext: { toString: () => string; delete: (index: number, length: number) => void; insert: (index: number, text: string) => void } | null,
+  value: string,
+): void {
+  if (!ytext || ytext.toString() === value) return;
+  ytext.delete(0, ytext.toString().length);
+  if (value) ytext.insert(0, value);
 }
 
 /**
@@ -55,6 +70,10 @@ export function KnowledgeDocDialog({
   mode: initialMode,
   item,
   workingDir,
+  projectId,
+  workspaceId,
+  sessionId,
+  collabUser,
   onSaved,
 }: KnowledgeDocDialogProps) {
   const { toast } = useToast();
@@ -69,6 +88,28 @@ export function KnowledgeDocDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const collabDescriptor = useMemo<CollabRoomDescriptor | null>(() => {
+    if (
+      !open ||
+      activeMode !== "edit" ||
+      !item ||
+      item.source === "system" ||
+      !projectId ||
+      !workspaceId ||
+      !sessionId
+    ) {
+      return null;
+    }
+
+    return {
+      projectId,
+      workspaceId,
+      sessionId,
+      resourcePath: `knowledge/${item.fileName}`,
+      kind: "knowledge-document",
+    };
+  }, [activeMode, item, open, projectId, sessionId, workspaceId]);
+  const collab = useCollabDocument(collabDescriptor, collabUser);
 
   // 打开弹窗时重置模式并加载数据
   useEffect(() => {
@@ -99,6 +140,13 @@ export function KnowledgeDocDialog({
         .finally(() => setLoading(false));
     }
   }, [open, initialMode, item, workingDir]);
+
+  useEffect(() => {
+    if (!collabDescriptor || activeMode !== "edit") return;
+    if (collab.status === "connecting" || collab.status === "offline") return;
+    setContent(collab.value);
+    setEditContent(collab.value);
+  }, [activeMode, collab.status, collab.value, collabDescriptor]);
 
   // 编辑模式变更检测
   useEffect(() => {
@@ -140,6 +188,12 @@ export function KnowledgeDocDialog({
           });
         }
       } else if (activeMode === "edit" && item) {
+        if (collabDescriptor) {
+          await collab.flush();
+        }
+        const contentToSave = collabDescriptor
+          ? collab.ytext?.toString() ?? editContent
+          : editContent;
         const res = await fetch(
           `/api/knowledge/${item.id}?workingDir=${encodeURIComponent(workingDir)}`,
           {
@@ -147,12 +201,14 @@ export function KnowledgeDocDialog({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               description: editDescription,
-              content: editContent,
+              content: contentToSave,
             }),
           }
         );
         const data = await res.json();
         if (data.success) {
+          setContent(contentToSave);
+          setEditContent(contentToSave);
           toast({ title: "保存成功" });
           onSaved(data.data);
           onOpenChange(false);
@@ -276,10 +332,21 @@ export function KnowledgeDocDialog({
           <div className="flex-1 min-h-0">
             <DocumentEditor
               value={editContent}
-              onChange={setEditContent}
+              onChange={(nextValue) => {
+                setEditContent(nextValue);
+                if (collabDescriptor) {
+                  replaceCollabText(collab.ytext, nextValue);
+                }
+              }}
               format="markdown"
             />
           </div>
+          {collabDescriptor && (
+            <div className="text-[11px] text-muted-foreground">
+              协同状态：{collab.status === "synced" ? "已同步" : collab.status === "saving" ? "保存中" : collab.status === "connecting" ? "连接中" : "离线"}
+              {collab.awareness.length > 1 ? ` · ${collab.awareness.length} 人在线` : ""}
+            </div>
+          )}
         </div>
       );
     }

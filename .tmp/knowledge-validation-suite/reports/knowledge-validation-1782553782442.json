@@ -1,0 +1,79 @@
+{
+  "startedAt": "2026-06-27T09:49:16.454Z",
+  "command": "ai",
+  "projectId": "proj_1782553732626_b5j7yi",
+  "templateId": null,
+  "instantiatedProjectId": null,
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": null,
+    "instantiatedCanvasDocumentNodeCount": null
+  },
+  "ai": {
+    "model": "mydeepseek/deepseek-v4-flash",
+    "agentUrl": "http://127.0.0.1:3211",
+    "prompts": [
+      {
+        "sessionId": "kb-metrics-explicit-knowledge-report-1782553756458",
+        "text": "以下是根据项目知识库整理的全部信息及对应来源：\n\n---\n\n## 📋 项目知识问答汇总\n\n| 项目 | 内容 | 来源文档 |\n|------|------|----------|\n| **活动代号** | **KB-ORION-7421**，对外名称为「星桥知识库挑战」 | `knowledge/玩法规则.md` |\n| **任务换抽奖资格规则** | 用户完成 **3 个知识任务** 后获得 **1 次抽奖资格**。抽奖资格在 **当天 23:30 过期**，不能跨天累计。过期后不会恢复。 | `knowledge/玩法规则.md`、`knowledge/FAQ与客服口径.md` |\n| **分享奖励** | 分享海报 **只奖励 20 星币**，**不增加抽奖次数**。客服或 AI 不应把分享解释为额外抽奖机会。 | `knowledge/玩法规则.md`、`knowledge/FAQ与客服口径.md` |\n| **地址填写时限** | 中奖后需要在 **72 小时内** 填写收货地址。 | `knowledge/中奖履约SOP.md` |\n| **超时状态** | 超过 72 小时仍未提交地址时，奖品状态标记为 **`EXPIRED_ADDRESS_MISSING`**。 | `knowledge/中奖履约SOP.md` |\n| **客服升级码** | **SUP-KB-17**，仅限地址异常、奖品状态不一致、任务完成记录缺失三类问题允许升级。 | `knowledge/FAQ与客服口径.md`、`knowledge/风控与异常处理.md` |\n| **风控状态** | ① **同一设备每天最多提交 2 次**任务答案（设备是风控主维度）；② 同一账号 **10 分钟内切换超过 3 台设备** → 触发 **`RISK_DEVICE_ROTATION`** 标记；③ 任务页停留时间低于 **每题 8 秒** → 提示重新阅读，不直接判定作弊。 | `knowledge/风控与异常处理.md` |\n\n---\n\n### 补充说明（AI 回答时的三条口径）\n\n来自 `knowledge/风控与异常处理.md` 的三条必须遵守的口径：\n1. ❌ 抽奖资格过期 → 不会恢复\n2. ❌ 分享不增加抽奖次数\n3. ❌ 口令不能直接告知用户（需引导回规则页查找）",
+        "score": {
+          "matchedFacts": [
+            "KB-ORION-7421",
+            "星桥知识库挑战",
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "SUP-KB-17",
+            "RISK_DEVICE_ROTATION"
+          ],
+          "factRecall": 0.8,
+          "citedSources": [
+            "玩法规则.md",
+            "FAQ与客服口径.md",
+            "中奖履约SOP.md",
+            "风控与异常处理.md"
+          ],
+          "sourceCitationRate": 1,
+          "hallucinationFlags": [
+            "share_draw_conflict_candidate"
+          ]
+        }
+      },
+      {
+        "sessionId": "kb-metrics-implicit-support-answer-1782553765973",
+        "text": "以下是基于项目知识库整理的 **客服口径完整版**，涵盖两个场景的话术 + 升级条件说明。\n\n---\n\n## 场景一：分享后为什么没有增加抽奖次数？\n\n### 👩‍💼 客服口径\n\n> **用户问：** 我明明分享了海报，为什么抽奖次数没增加？\n>\n> **客服答：**\n> 您好，这里需要跟您说明一下：我们活动的**分享奖励是 20 星币**，并不会增加抽奖次数哦😊\n>\n> 抽奖资格的唯一获取方式是**完成 3 个知识任务**，且当天 **23:30 前**有效，过期不会恢复。分享海报属于额外福利路径，奖励以星币形式发放，不计入抽奖次数。\n>\n> 如果您还想继续抽奖，可以回到任务页看看是否还有未完成的知识任务。请问还有什么可以帮您的吗？\n\n### ⚠️ 回答红线（切记遵守）\n\n| 规则 | 说明 |\n|------|------|\n| **不要**说\"分享可以增加抽奖次数\" | 系统设计就是分享不加次数，这是三条固定口径之一 |\n| **不要**引导用户认为分享是额外抽奖机会 | 客服/AI 不应把分享解释为抽奖资格 |\n| 如用户追问\"为什么别人分享能加\" | 统一回复：\"活动规则以页面公示为准，分享仅奖励星币哦。\" |\n\n---\n\n## 场景二：担心中奖后忘记填地址\n\n### 👩‍💼 客服口径\n\n> **用户问：** 中奖了要填地址吗？我怕到时候忘了怎么办？\n>\n> **客服答：**\n> 不用担心！我们给您留了 **72 小时**的时间来填写收货地址。中奖后您会看到地址填写入口，在这个时间内提交都可以。\n>\n> 💡 **建议您这样做：**\n> 1. 中奖后立即截图保存中奖页面\n> 2. 回到活动页 → 进入「我的奖品」或中奖记录，随时可以填写\n> 3. 建议设置一个手机闹钟提醒自己，比如「明天晚上前填地址」\n>\n> 但是也提醒您注意：**超过 72 小时仍未提交地址的话，奖品状态会标记为地址缺失，将无法补填**，所以还是建议尽快填写哦！\n>\n> 另外，如果您是未成年人，还需要**监护人确认**后才能填写地址，可以提前跟家长说一下～\n\n### 📋 补充说明（客服内部掌握）\n\n- **72 小时倒计时**：从中奖时刻开始计算，不是自然日\n- 超时后状态变为 `EXPIRED_ADDRESS_MISSING`，**不支持恢复**\n- 如用户提交地址后物流长时间未更新，可检查是否标记为 `MANUAL_REISSUE_REQUIRED`，此时可升级客服处理\n\n---\n\n## 升级客服的条件\n\n### 允许升级（使用升级码 **SUP-KB-17**）\n\n只有以下 **三类问题** 可以升级到高级客服处理：\n\n| 问题类型 | 举例 |\n|---------|------|\n| 🏠 **地址异常** | 用户已提交地址，但物流信息缺失（状态 `MANUAL_REISSUE_REQUIRED`） |\n| 🏆 **奖品状态不一致** | 页面显示中奖但奖品未发放、状态对不上 |\n| 📋 **任务完成记录缺失** | 用户确认完成了 3 个任务，系统未给抽奖资格 |\n\n### 不允许升级（一线客服直接闭环）\n\n| 场景 | 处理方式 |\n|------|---------|\n| 分享不加抽奖次数 | 按口径解释，无需升级 |\n| 抽奖资格过期（超 23:30） | 告知规则，无法恢复 |\n| 口令问题 | 引导回规则页查找，不直接说出口令 |\n| 同一设备提交超 2 次 | 提示\"今日机会已用完，请次日再试\" |\n\n### 升级流程\n\n> 📞 **话术参考：**\n> \"您的问题属于地址异常/奖品状态不一致/任务记录缺失类，我已记录相关信息，现在为您转接高级客服处理（升级码 SUP-KB-17），预计 XX 时间内反馈结果，请保持联系方式畅通。\"\n\n---\n\n**总结一句话：**\n> **分享只给星币不给次数 → 按口径闭环；地址担心 → 告知72小时窗口 + 建议截图设提醒；只有地址异常/奖品状态不一致/任务记录缺失三类用 SUP-KB-17 升级，其他场景一线直接消化。**",
+        "score": {
+          "matchedFacts": [
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "MANUAL_REISSUE_REQUIRED",
+            "SUP-KB-17"
+          ],
+          "factRecall": 0.6,
+          "citedSources": [],
+          "sourceCitationRate": 0,
+          "hallucinationFlags": [
+            "share_draw_conflict_candidate"
+          ]
+        }
+      }
+    ],
+    "averageFactRecall": 0.7,
+    "averageSourceCitationRate": 0.5,
+    "hallucinationFlagCount": 2
+  },
+  "finishedAt": "2026-06-27T09:49:42.442Z",
+  "failures": [
+    "averageFactRecall < 0.8",
+    "hallucination flags present"
+  ],
+  "ok": false
+}

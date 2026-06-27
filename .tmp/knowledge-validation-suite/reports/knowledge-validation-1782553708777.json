@@ -1,0 +1,170 @@
+{
+  "startedAt": "2026-06-27T09:48:26.298Z",
+  "command": "fixture",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "templateId": null,
+  "instantiatedProjectId": null,
+  "fixture": {
+    "editId": "edit_1782553706703_hxx7gh",
+    "validation": {
+      "ok": true,
+      "data": {
+        "ok": true,
+        "issues": []
+      },
+      "validation": {
+        "ok": true,
+        "issues": []
+      }
+    },
+    "diff": {
+      "ok": true,
+      "data": {
+        "updated": [
+          ".canvas-layout.json",
+          "demos\\page_t70m\\config.schema.json",
+          "demos\\page_t70m\\index.tsx",
+          "workspace-tree.json"
+        ],
+        "notes": [
+          "当前事务包含 4 个变更文件"
+        ]
+      }
+    },
+    "commit": {
+      "ok": true,
+      "data": {
+        "version": {
+          "versionId": "v5",
+          "savedAt": 1782553708742,
+          "savedBy": "Local Codex",
+          "sessionId": "edit_1782553706703_hxx7gh",
+          "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v5",
+          "fileCount": 17,
+          "note": "补充知识库验证圆形页面与画布文档节点"
+        },
+        "project": {
+          "id": "proj_1782547891917_g0e1l9",
+          "name": "知识库功能验证项目",
+          "description": "用于验证模板保存后的知识索引、阅读地图和 AI 知识报告检索",
+          "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1782547891917_g0e1l9\\workspace",
+          "demoPages": [
+            {
+              "id": "page_qhlg",
+              "name": "活动规则首页",
+              "routeKey": "page",
+              "order": 0,
+              "parentId": null
+            },
+            {
+              "id": "page_l0lw",
+              "name": "知识任务页",
+              "routeKey": "page-2",
+              "order": 1,
+              "parentId": null
+            },
+            {
+              "id": "page_cdjg",
+              "name": "中奖履约页",
+              "routeKey": "page-3",
+              "order": 2,
+              "parentId": null
+            },
+            {
+              "id": "page_t70m",
+              "name": "圆形知识雷达页",
+              "routeKey": "page-4",
+              "order": 3,
+              "parentId": null
+            }
+          ],
+          "demoFolders": [],
+          "versions": [
+            {
+              "versionId": "v1",
+              "savedAt": 1782547957674,
+              "savedBy": "Local Codex",
+              "sessionId": "edit_1782547895800_8bg2c8",
+              "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v1",
+              "fileCount": 4,
+              "note": "初始化知识库验证项目页面与配置"
+            },
+            {
+              "versionId": "v2",
+              "savedAt": 1782551609265,
+              "savedBy": "Local Codex",
+              "sessionId": "edit_1782551553823_jvgg4w",
+              "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v2",
+              "fileCount": 11,
+              "note": "扩充知识库验证项目页面与配置"
+            },
+            {
+              "versionId": "v3",
+              "savedAt": 1782551788984,
+              "savedBy": "Local Codex",
+              "sessionId": "edit_1782551786060_vkjdaq",
+              "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v3",
+              "fileCount": 10,
+              "note": "补充知识库验证项目配置 schema"
+            },
+            {
+              "versionId": "v4",
+              "savedAt": 1782551841559,
+              "savedBy": "Local Codex",
+              "sessionId": "edit_1782551841349_x1vt6w",
+              "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v4",
+              "fileCount": 14,
+              "note": "补充知识库验证文档"
+            },
+            {
+              "versionId": "v5",
+              "savedAt": 1782553708742,
+              "savedBy": "Local Codex",
+              "sessionId": "edit_1782553706703_hxx7gh",
+              "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v5",
+              "fileCount": 17,
+              "note": "补充知识库验证圆形页面与画布文档节点"
+            }
+          ],
+          "pageVersions": {},
+          "createdAt": 1782547891922,
+          "updatedAt": 1782553708744
+        }
+      },
+      "auditId": "audit_1782553708750_366t71",
+      "diffSummary": {
+        "updated": [
+          ".canvas-layout.json",
+          "demos\\page_t70m\\config.schema.json",
+          "demos\\page_t70m\\index.tsx",
+          "workspace-tree.json"
+        ],
+        "notes": [
+          "生成版本 v5"
+        ]
+      },
+      "validation": {
+        "ok": true,
+        "issues": []
+      },
+      "nextActions": [
+        "project_get"
+      ]
+    }
+  },
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": null,
+    "instantiatedCanvasDocumentNodeCount": null
+  },
+  "finishedAt": "2026-06-27T09:48:28.776Z",
+  "failures": [
+    "template knowledgeCount < 4"
+  ],
+  "ok": false
+}

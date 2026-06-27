@@ -6,6 +6,8 @@ import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
+import type * as Y from "yjs";
+import { yCollab } from "y-codemirror.next";
 
 interface CodeEditorProps {
   value: string;
@@ -13,6 +15,10 @@ interface CodeEditorProps {
   language: "typescript" | "json" | "text";
   readOnly?: boolean;
   height?: string;
+  collab?: {
+    ytext: Y.Text;
+    awareness: unknown;
+  };
 }
 
 /**
@@ -25,6 +31,7 @@ export function CodeEditor({
   language,
   readOnly = false,
   height = "100%",
+  collab,
 }: CodeEditorProps) {
   const extensions = useMemo(() => {
     const ext = [];
@@ -41,6 +48,10 @@ export function CodeEditor({
       ext.push(EditorView.editable.of(false));
     }
 
+    if (collab) {
+      ext.push(yCollab(collab.ytext, collab.awareness));
+    }
+
     // 基础样式微调
     ext.push(
       EditorView.theme({
@@ -55,7 +66,7 @@ export function CodeEditor({
 
   return (
     <CodeMirror
-      value={value}
+      value={collab ? undefined : value}
       onChange={onChange}
       extensions={extensions}
       theme={vscodeDark}

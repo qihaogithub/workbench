@@ -103,6 +103,75 @@ describe("canvas layout route", () => {
       pages: {
         page_1: { x: 10, y: 20, width: 375, height: 812 },
       },
+      nodes: {
+        "doc-kb_1": {
+          id: "doc-kb_1",
+          kind: "document",
+          title: "活动规则",
+          knowledgeDocument: {
+            id: "kb_1",
+            title: "活动规则",
+            fileName: "活动规则.md",
+            description: "活动规则",
+          },
+          collapsed: true,
+          expandedHeight: 360,
+          layout: { x: 440, y: 20, width: 420, height: 360 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        "img-1": {
+          id: "img-1",
+          kind: "image",
+          title: "hero.png",
+          src: "data:image/png;base64,aGVybw==",
+          fileName: "hero.png",
+          intrinsicWidth: 800,
+          intrinsicHeight: 600,
+          layout: { x: 900, y: 20, width: 320, height: 240 },
+          createdAt: 2,
+          updatedAt: 2,
+        },
+        "text-1": {
+          id: "text-1",
+          kind: "text",
+          title: "说明文字",
+          text: "说明文字",
+          fontSize: 18,
+          color: "#111827",
+          backgroundColor: "#ffffff",
+          layout: { x: 40, y: 900, width: 240, height: 120 },
+          createdAt: 3,
+          updatedAt: 3,
+        },
+        "arrow-1": {
+          id: "arrow-1",
+          kind: "arrow",
+          title: "箭头",
+          color: "#2563eb",
+          strokeWidth: 6,
+          direction: "right",
+          layout: { x: 320, y: 900, width: 240, height: 80 },
+          createdAt: 4,
+          updatedAt: 4,
+        },
+        "draw-1": {
+          id: "draw-1",
+          kind: "drawing",
+          title: "画笔",
+          points: [
+            { x: 10, y: 12 },
+            { x: 48, y: 56 },
+            { x: 90, y: 88 },
+          ],
+          color: "#111827",
+          strokeWidth: 4,
+          layout: { x: 600, y: 900, width: 180, height: 120 },
+          createdAt: 5,
+          updatedAt: 5,
+        },
+      },
+      hiddenKnowledgeDocumentIds: ["kb_hidden"],
     };
 
     const response = await POST(
@@ -138,5 +207,41 @@ describe("canvas layout route", () => {
 
     expect(body.success).toBe(true);
     expect(body.data.state).toEqual(state);
+  });
+
+  it("保存非法自由节点时返回无效请求", async () => {
+    const fsUtils = await import("@/lib/fs-utils");
+    const sessionManager = await import("@/lib/session-manager");
+    const { POST } = await import("./route");
+
+    const project = fsUtils.createProject("非法画布布局项目");
+    const session = await sessionManager.createEditSession(
+      "user-1",
+      project.id,
+    );
+    const state = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      pages: {},
+      nodes: {
+        "draw-1": {
+          id: "draw-1",
+          kind: "drawing",
+          title: "画笔",
+          points: [{ x: 10, y: 10 }],
+          color: "#111827",
+          strokeWidth: 4,
+          layout: { x: 0, y: 0, width: 120, height: 80 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    };
+
+    const response = await POST(
+      createJsonRequest({ projectId: project.id, version: 1, state }),
+      { params: { sessionId: session.sessionId } },
+    );
+
+    expect(response.status).toBe(400);
   });
 });

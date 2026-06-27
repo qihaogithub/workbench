@@ -28,6 +28,7 @@ interface WorkspaceKnowledgeManifest {
     id?: unknown;
     title?: unknown;
     description?: unknown;
+    path?: unknown;
     fileName?: unknown;
     category?: unknown;
     tags?: unknown;
@@ -134,14 +135,20 @@ function workspaceKnowledgeItems(workingDir: string, projectId: string): Knowled
   );
   const items = manifest?.items ?? [];
   return items
-    .filter((item) => typeof item.fileName === "string")
-    .map((item, index) => {
-      const fileName = String(item.fileName);
+    .flatMap((item, index) => {
+      const manifestPath =
+        typeof item.path === "string"
+          ? item.path
+          : typeof item.fileName === "string"
+            ? item.fileName
+            : "";
+      const fileName = safeKnowledgeRelativePath(manifestPath);
+      if (!fileName) return [];
       const content = readText(path.join(knowledgeDir, fileName));
       const tags = Array.isArray(item.tags)
         ? item.tags.filter((tag): tag is string => typeof tag === "string")
         : [];
-      return {
+      return [{
         id: typeof item.id === "string" ? item.id : `workspace-knowledge-${index + 1}`,
         sourceType: "current-project",
         sourceId: projectId,
@@ -164,8 +171,17 @@ function workspaceKnowledgeItems(workingDir: string, projectId: string): Knowled
           typeof item.updatedAt === "string" ? item.updatedAt : new Date(0).toISOString(),
         readPath: `knowledge/${fileName}`,
         contentSnippet: content.slice(0, 300),
-      } satisfies KnowledgeItem;
+      } satisfies KnowledgeItem];
     });
+}
+
+function safeKnowledgeRelativePath(value: string): string | null {
+  const normalized = value.replace(/\\/g, "/").replace(/^knowledge\//, "");
+  if (!normalized || path.isAbsolute(normalized)) return null;
+  const parts = normalized.split("/");
+  if (parts.includes("..") || parts.some((part) => part.trim() === "")) return null;
+  if (!normalized.endsWith(".md")) return null;
+  return normalized;
 }
 
 function formatReport(report: ReturnType<BasicRetrievalBackend["report"]>): string {

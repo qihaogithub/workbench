@@ -2,7 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
+  ArrowRight,
   FileText,
+  Image as ImageIcon,
+  Pencil,
+  Type,
   ZoomIn,
   ZoomOut,
   Maximize,
@@ -26,6 +30,10 @@ interface CanvasToolbarProps {
   onFitToScreen?: () => void;
   onAutoLayout?: () => void;
   onAddDocument?: () => void;
+  onAddText?: () => void;
+  onAddArrow?: () => void;
+  onStartDrawing?: () => void;
+  onAddImageFiles?: (files: FileList) => void;
   toolMode?: CanvasToolMode;
   onToolModeChange?: (mode: CanvasToolMode) => void;
 }
@@ -82,11 +90,16 @@ export function CanvasToolbar({
   onFitToScreen,
   onAutoLayout,
   onAddDocument,
+  onAddText,
+  onAddArrow,
+  onStartDrawing,
+  onAddImageFiles,
   toolMode = "hand",
   onToolModeChange,
 }: CanvasToolbarProps) {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const isEditorMode = interactionMode === "editor";
 
   // 点击外部关闭菜单
@@ -147,18 +160,105 @@ export function CanvasToolbar({
           </ToolbarGroup>
         )}
 
-        {isEditorMode && onAddDocument && (
+        {isEditorMode && (onAddDocument || onAddText || onAddArrow || onStartDrawing || onAddImageFiles) && (
           <ToolbarGroup>
-            <ToolbarTooltip label="添加 Markdown 文档">
-              <button
-                type="button"
-                onClick={onAddDocument}
-                className={toolbarButtonClass}
-                aria-label="添加文档"
-              >
-                <FileText className="h-4 w-4" />
-              </button>
-            </ToolbarTooltip>
+            {onAddDocument && (
+              <ToolbarTooltip label="添加 Markdown 文档">
+                <button
+                  type="button"
+                  onClick={onAddDocument}
+                  className={toolbarButtonClass}
+                  aria-label="添加文档"
+                >
+                  <FileText className="h-4 w-4" />
+                </button>
+              </ToolbarTooltip>
+            )}
+            {onAddText && (
+              <ToolbarTooltip label="添加文字">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddText();
+                    onToolModeChange?.("text");
+                  }}
+                  className={cn(
+                    toolbarButtonClass,
+                    toolMode === "text" && activeToolbarButtonClass,
+                  )}
+                  aria-label="添加文字"
+                >
+                  <Type className="h-4 w-4" />
+                </button>
+              </ToolbarTooltip>
+            )}
+            {onAddArrow && (
+              <ToolbarTooltip label="添加箭头">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddArrow();
+                    onToolModeChange?.("arrow");
+                  }}
+                  className={cn(
+                    toolbarButtonClass,
+                    toolMode === "arrow" && activeToolbarButtonClass,
+                  )}
+                  aria-label="添加箭头"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </ToolbarTooltip>
+            )}
+            {onStartDrawing && (
+              <ToolbarTooltip label="画笔">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStartDrawing();
+                    onToolModeChange?.("draw");
+                  }}
+                  className={cn(
+                    toolbarButtonClass,
+                    toolMode === "draw" && activeToolbarButtonClass,
+                  )}
+                  aria-label="画笔"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              </ToolbarTooltip>
+            )}
+            {onAddImageFiles && (
+              <>
+                <ToolbarTooltip label="添加图片">
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className={cn(
+                      toolbarButtonClass,
+                      toolMode === "image" && activeToolbarButtonClass,
+                    )}
+                    aria-label="添加图片"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
+                </ToolbarTooltip>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files.length > 0) {
+                      onAddImageFiles(event.target.files);
+                      onToolModeChange?.("image");
+                    }
+                    event.target.value = "";
+                  }}
+                />
+              </>
+            )}
           </ToolbarGroup>
         )}
 

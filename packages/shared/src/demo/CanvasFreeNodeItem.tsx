@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
-import { Edit3 } from "lucide-react";
+import { Check, Edit3, Maximize2, Minimize2, X } from "lucide-react";
 import { cn } from "./utils";
 import type {
   CanvasFreeNode,
@@ -20,6 +20,8 @@ interface CanvasFreeNodeItemProps {
   selected?: boolean;
   onLayoutChange?: (nodeId: string, layout: CanvasPageLayout) => void;
   onEdit?: (node: CanvasFreeNode) => void;
+  onTextChange?: (nodeId: string, text: string) => void;
+  onToggleCollapse?: (nodeId: string) => void;
   onSelect?: (nodeId: string) => void;
   onDragStart?: (nodeId: string) => void;
   onDragMove?: (nodeId: string, layout: CanvasPageLayout, edge?: string) => void;
@@ -195,6 +197,8 @@ export function CanvasFreeNodeItem({
   selected = false,
   onLayoutChange,
   onEdit,
+  onTextChange,
+  onToggleCollapse,
   onSelect,
   onDragStart,
   onDragMove,
@@ -204,6 +208,7 @@ export function CanvasFreeNodeItem({
   const [isHovering, setIsHovering] = useState(false);
   const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
+  const [textDraft, setTextDraft] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef(node.layout);
@@ -248,7 +253,7 @@ export function CanvasFreeNodeItem({
       if (!canInteract || e.button !== 0) return;
 
       const target = e.target as HTMLElement;
-      if (target.closest("button,a")) return;
+      if (target.closest("button,a,textarea,input")) return;
 
       const el = containerRef.current;
       if (el) {
@@ -376,6 +381,7 @@ export function CanvasFreeNodeItem({
       }}
       onDoubleClick={() => {
         if (node.kind === "document") onEdit?.(node);
+        if (node.kind === "text") setTextDraft(node.text);
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -395,7 +401,7 @@ export function CanvasFreeNodeItem({
       onDragStart={(e) => e.preventDefault()}
     >
       <div
-        className="absolute left-0 max-w-full truncate font-medium text-muted-foreground pointer-events-none"
+        className="pointer-events-none absolute left-0 z-30 max-w-full truncate font-medium text-foreground/75 drop-shadow-sm"
         title={node.title}
         style={{ top: -labelTopOffset, fontSize: labelFontSize, lineHeight: 1.2 }}
       >
@@ -405,12 +411,29 @@ export function CanvasFreeNodeItem({
       <div
         className={cn(
           "absolute inset-0 overflow-hidden rounded-lg border shadow-md",
-          node.kind === "document" && "bg-background",
+          (node.kind === "document" || node.kind === "text") && "bg-background",
+          node.kind === "arrow" && "border-transparent bg-transparent shadow-none",
+          node.kind === "drawing" && "border-transparent bg-transparent shadow-none",
           (selected || isDragging || isResizing) && "ring-2 ring-blue-500",
         )}
       >
         {node.kind === "document" && isHovering && (
-          <div className="absolute right-2 top-2 z-30">
+          <div className="absolute right-2 top-2 z-30 flex gap-1">
+            <button
+              type="button"
+              className="rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+              title={node.collapsed ? "展开" : "折叠"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCollapse?.(node.id);
+              }}
+            >
+              {node.collapsed ? (
+                <Maximize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Minimize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
             <button
               type="button"
               className="rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
@@ -425,9 +448,17 @@ export function CanvasFreeNodeItem({
           </div>
         )}
 
-        {node.kind === "document" && (
+        {node.kind === "document" && node.collapsed && (
+          <div className="flex h-full items-center px-4 py-3 text-sm font-medium text-foreground">
+            <span className="truncate" title={node.title}>
+              {node.title}
+            </span>
+          </div>
+        )}
+
+        {node.kind === "document" && !node.collapsed && (
           <div
-            className="markdown-editor-content h-full overflow-auto px-4 py-3 text-sm"
+            className="markdown-editor-content scrollbar-thin h-full overflow-auto px-4 py-3 text-sm"
             dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
           />
         )}
@@ -442,7 +473,170 @@ export function CanvasFreeNodeItem({
             />
           </div>
         )}
+
+        {node.kind === "text" && (
+          <div
+            className="flex h-full w-full items-center overflow-hidden px-4 py-3"
+            style={{
+              color: node.color,
+              backgroundColor: node.backgroundColor,
+              fontSize: node.fontSize,
+              lineHeight: 1.35,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {node.text}
+          </div>
+        )}
+
+        {node.kind === "arrow" && (
+          <svg
+            className="h-full w-full overflow-visible"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {node.direction === "right" && (
+              <>
+                <line
+                  x1="8"
+                  y1="50"
+                  x2="86"
+                  y2="50"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                />
+                <polyline
+                  points="72,34 88,50 72,66"
+                  fill="none"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </>
+            )}
+            {node.direction === "left" && (
+              <>
+                <line
+                  x1="14"
+                  y1="50"
+                  x2="92"
+                  y2="50"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                />
+                <polyline
+                  points="28,34 12,50 28,66"
+                  fill="none"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </>
+            )}
+            {node.direction === "down" && (
+              <>
+                <line
+                  x1="50"
+                  y1="8"
+                  x2="50"
+                  y2="86"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                />
+                <polyline
+                  points="34,72 50,88 66,72"
+                  fill="none"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </>
+            )}
+            {node.direction === "up" && (
+              <>
+                <line
+                  x1="50"
+                  y1="14"
+                  x2="50"
+                  y2="92"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                />
+                <polyline
+                  points="34,28 50,12 66,28"
+                  fill="none"
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </>
+            )}
+          </svg>
+        )}
+
+        {node.kind === "drawing" && (
+          <svg
+            className="h-full w-full overflow-visible"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <polyline
+              points={node.points.map((point) => `${point.x},${point.y}`).join(" ")}
+              fill="none"
+              stroke={node.color}
+              strokeWidth={node.strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </div>
+
+      {node.kind === "text" && textDraft !== null && (
+        <div className="absolute inset-0 z-40 flex flex-col rounded-lg border bg-background shadow-lg">
+          <textarea
+            className="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm outline-none"
+            value={textDraft}
+            autoFocus
+            onPointerDown={(event) => event.stopPropagation()}
+            onChange={(event) => setTextDraft(event.target.value)}
+          />
+          <div className="flex justify-end gap-1 border-t p-1.5">
+            <button
+              type="button"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="取消文字编辑"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setTextDraft(null)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="保存文字"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => {
+                onTextChange?.(node.id, textDraft);
+                setTextDraft(null);
+              }}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {showEdgeHandles && (
         <>

@@ -108,7 +108,13 @@ export interface ConfigFormProps {
 export type PreviewMode = "single" | "canvas";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
-export type CanvasToolMode = "hand" | "select";
+export type CanvasToolMode =
+  | "hand"
+  | "select"
+  | "text"
+  | "arrow"
+  | "draw"
+  | "image";
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
 
@@ -130,6 +136,7 @@ export interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
   nodes?: Record<string, CanvasFreeNode>;
+  hiddenKnowledgeDocumentIds?: string[];
 }
 
 export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
@@ -157,7 +164,12 @@ export type CanvasPageRenderMode =
   | "sleeping-iframe"
   | "loading";
 
-export type CanvasFreeNodeKind = "document" | "image";
+export type CanvasFreeNodeKind =
+  | "document"
+  | "image"
+  | "text"
+  | "arrow"
+  | "drawing";
 
 export interface CanvasFreeNodeBase {
   id: string;
@@ -172,6 +184,8 @@ export interface CanvasDocumentNode extends CanvasFreeNodeBase {
   kind: "document";
   markdown?: string;
   knowledgeDocument?: CanvasKnowledgeDocument;
+  collapsed?: boolean;
+  expandedHeight?: number;
 }
 
 export interface CanvasImageNode extends CanvasFreeNodeBase {
@@ -182,9 +196,39 @@ export interface CanvasImageNode extends CanvasFreeNodeBase {
   intrinsicHeight?: number;
 }
 
+export interface CanvasTextNode extends CanvasFreeNodeBase {
+  kind: "text";
+  text: string;
+  fontSize: number;
+  color: string;
+  backgroundColor?: string;
+}
+
+export interface CanvasArrowNode extends CanvasFreeNodeBase {
+  kind: "arrow";
+  color: string;
+  strokeWidth: number;
+  direction: "right" | "left" | "down" | "up";
+}
+
+export interface CanvasDrawingPoint {
+  x: number;
+  y: number;
+}
+
+export interface CanvasDrawingNode extends CanvasFreeNodeBase {
+  kind: "drawing";
+  points: CanvasDrawingPoint[];
+  color: string;
+  strokeWidth: number;
+}
+
 export type CanvasFreeNode =
   | CanvasDocumentNode
-  | CanvasImageNode;
+  | CanvasImageNode
+  | CanvasTextNode
+  | CanvasArrowNode
+  | CanvasDrawingNode;
 
 export interface CanvasKnowledgeDocument {
   id: string;

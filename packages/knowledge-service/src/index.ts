@@ -26,8 +26,10 @@ interface WorkspaceKnowledgeManifest {
   items?: Array<{
     id?: unknown;
     title?: unknown;
+    path?: unknown;
     fileName?: unknown;
     description?: unknown;
+    tags?: unknown;
     addedAt?: unknown;
     updatedAt?: unknown;
   }>;
@@ -414,9 +416,15 @@ function readWorkspaceKnowledgeDocuments(workspacePath: string) {
   const manifest = readJson<WorkspaceKnowledgeManifest>(path.join(knowledgeDir, "manifest.json"));
   if (manifest?.items?.length) {
     return manifest.items
-      .filter((item) => typeof item.fileName === "string")
       .map((item, index) => {
-        const fileName = String(item.fileName);
+        const manifestPath =
+          typeof item.path === "string"
+            ? item.path
+            : typeof item.fileName === "string"
+              ? item.fileName
+              : "";
+        const fileName = safeKnowledgeRelativePath(manifestPath);
+        if (!fileName) return null;
         return {
           id: typeof item.id === "string" ? item.id : `knowledge-${index + 1}`,
           title: typeof item.title === "string" ? item.title : fileName,
@@ -425,8 +433,10 @@ function readWorkspaceKnowledgeDocuments(workspacePath: string) {
             typeof item.description === "string" && item.description.trim()
               ? item.description
               : `知识文档：${fileName}`,
+          tags: Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : [],
         };
-      });
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   }
 
   if (!fs.existsSync(knowledgeDir)) return [];
@@ -439,6 +449,15 @@ function readWorkspaceKnowledgeDocuments(workspacePath: string) {
       path: `knowledge/${fileName}`,
       summary: `知识文档：${fileName}`,
     }));
+}
+
+function safeKnowledgeRelativePath(value: string): string | null {
+  const normalized = value.replace(/\\/g, "/").replace(/^knowledge\//, "");
+  if (!normalized || path.isAbsolute(normalized)) return null;
+  const parts = normalized.split("/");
+  if (parts.includes("..") || parts.some((part) => part.trim() === "")) return null;
+  if (!normalized.endsWith(".md")) return null;
+  return normalized;
 }
 
 function buildTaskEntries(

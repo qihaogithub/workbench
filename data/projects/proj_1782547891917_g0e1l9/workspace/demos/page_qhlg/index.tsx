@@ -1,1 +1,0 @@
-export default function Demo(props){ return <main><h1>{props.title}</h1><p>{props.ruleText}</p><button>{props.ctaText}</button></main>; }

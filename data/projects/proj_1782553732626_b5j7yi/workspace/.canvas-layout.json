@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "projectId": "proj_1782547891917_g0e1l9",
+  "updatedAt": 1782553707503,
+  "state": {
+    "viewport": {
+      "x": 48,
+      "y": 48,
+      "zoom": 0.5
+    },
+    "pages": {
+      "page_qhlg": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0
+      },
+      "page_l0lw": {
+        "x": 423,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1
+      },
+      "page_cdjg": {
+        "x": 846,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2
+      },
+      "page_t70m": {
+        "x": 1269,
+        "y": 40,
+        "width": 320,
+        "height": 320,
+        "zIndex": 3
+      }
+    },
+    "nodes": {
+      "doc-----": {
+        "id": "doc-----",
+        "kind": "document",
+        "title": "玩法规则",
+        "knowledgeDocument": {
+          "id": "玩法规则",
+          "title": "玩法规则",
+          "fileName": "玩法规则.md",
+          "description": "知识库文档：玩法规则.md"
+        },
+        "markdown": "# 星桥知识库挑战玩法规则\n\n活动代号为 KB-ORION-7421，对外名称为星桥知识库挑战。\n\n用户完成 3 个知识任务后获得 1 次抽奖资格。抽奖资格在当天 23:30 过期，不能跨天累计。\n\n任务页口令为「青石计划」。用户需要先阅读规则页，再在任务页输入口令。口令错误时只提示“请回到规则页确认口令”，不要直接展示正确口令。\n\n分享海报只奖励 20 星币，不增加抽奖次数。客服或 AI 不应把分享解释为额外抽奖机会。\n\n同一设备每天最多提交 2 次任务答案。超过次数后展示“今日机会已用完”，并建议用户次日再试。\n\n未成年人需要监护人确认后才能填写收货地址。\n",
+        "collapsed": false,
+        "expandedHeight": 360,
+        "layout": {
+          "x": 0,
+          "y": 900,
+          "width": 400,
+          "height": 360,
+          "zIndex": 20
+        },
+        "createdAt": 1782553600000,
+        "updatedAt": 1782553707502
+      },
+      "doc-FAQ-----": {
+        "id": "doc-FAQ-----",
+        "kind": "document",
+        "title": "FAQ 与客服口径",
+        "knowledgeDocument": {
+          "id": "FAQ与客服口径",
+          "title": "FAQ 与客服口径",
+          "fileName": "FAQ与客服口径.md",
+          "description": "知识库文档：FAQ与客服口径.md"
+        },
+        "markdown": "# FAQ 与客服口径\n\n## 抽奖资格\n\n问：完成任务后为什么没有抽奖资格？\n\n答：先确认用户是否完成 3 个知识任务，再确认是否超过当天 23:30。抽奖资格当天有效，过期后不会恢复。\n\n## 分享奖励\n\n问：分享后能多抽一次吗？\n\n答：不能。分享海报只奖励 20 星币，不增加抽奖次数。\n\n## 口令问题\n\n问：口令是什么？\n\n答：不要直接说出口令。应该引导用户回到规则页查找。内部测试口令是「青石计划」。\n\n## 客服升级\n\n客服升级码为 SUP-KB-17。只有地址异常、奖品状态不一致、任务完成记录缺失三类问题允许升级。\n",
+        "collapsed": false,
+        "expandedHeight": 360,
+        "layout": {
+          "x": 448,
+          "y": 900,
+          "width": 400,
+          "height": 360,
+          "zIndex": 21
+        },
+        "createdAt": 1782553600001,
+        "updatedAt": 1782553707502
+      },
+      "doc-----SOP": {
+        "id": "doc-----SOP",
+        "kind": "document",
+        "title": "中奖履约 SOP",
+        "knowledgeDocument": {
+          "id": "中奖履约SOP",
+          "title": "中奖履约 SOP",
+          "fileName": "中奖履约SOP.md",
+          "description": "知识库文档：中奖履约SOP.md"
+        },
+        "markdown": "# 中奖履约 SOP\n\n奖品池包含星币、实体徽章和季度会员券。\n\n中奖后需要在 72 小时内填写收货地址。超过 72 小时仍未提交地址时，奖品状态标记为 EXPIRED_ADDRESS_MISSING。\n\n如果物流信息缺失但用户已提交地址，状态标记为 MANUAL_REISSUE_REQUIRED。客服补发入口只对 MANUAL_REISSUE_REQUIRED 开放。\n\n实体徽章发货前需要校验监护人确认状态。未成年人缺少监护人确认时，不进入发货队列。\n\n季度会员券发放失败时，先检查用户账号绑定状态，再判断是否需要进入补发流程。\n",
+        "collapsed": false,
+        "expandedHeight": 360,
+        "layout": {
+          "x": 896,
+          "y": 900,
+          "width": 400,
+          "height": 360,
+          "zIndex": 22
+        },
+        "createdAt": 1782553600002,
+        "updatedAt": 1782553707502
+      },
+      "doc--------": {
+        "id": "doc--------",
+        "kind": "document",
+        "title": "风控与异常处理",
+        "knowledgeDocument": {
+          "id": "风控与异常处理",
+          "title": "风控与异常处理",
+          "fileName": "风控与异常处理.md",
+          "description": "知识库文档：风控与异常处理.md"
+        },
+        "markdown": "# 风控与异常处理\n\n同一设备每天最多提交 2 次任务答案。设备维度是活动风控主维度，不以手机号作为唯一判断条件。\n\n如果发现同一账号在 10 分钟内切换超过 3 台设备，应触发 RISK_DEVICE_ROTATION 标记。\n\n如果任务页停留时间低于每题 8 秒，应提示用户重新阅读后提交，不直接判定作弊。\n\n地址异常、奖品状态不一致、任务完成记录缺失时，可以使用客服升级码 SUP-KB-17。\n\n抽奖资格过期、分享不增加抽奖次数、口令不能直接告知用户，是 AI 回答时必须遵守的三条口径。\n",
+        "collapsed": false,
+        "expandedHeight": 360,
+        "layout": {
+          "x": 1344,
+          "y": 900,
+          "width": 400,
+          "height": 360,
+          "zIndex": 23
+        },
+        "createdAt": 1782553600003,
+        "updatedAt": 1782553707502
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

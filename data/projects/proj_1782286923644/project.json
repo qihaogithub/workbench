@@ -1,6 +1,7 @@
 {
   "id": "proj_1782286923644",
-  "name": "测试",
+  "name": "测试项目",
+  "category": "未分类",
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782286923644/workspace",
   "demoPages": [
     {
@@ -118,6 +119,14 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782286923644/v10",
       "fileCount": 22,
       "note": "修复年龄确认后卡在进入活动"
+    },
+    {
+      "versionId": "v12",
+      "savedAt": 1782549647355,
+      "savedBy": "qihao",
+      "sessionId": "session-1782548355214-biy8bbl1v",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782286923644\\v12",
+      "fileCount": 23
     }
   ],
   "pageVersions": {
@@ -172,8 +181,21 @@
         "fileCount": 2,
         "note": "修改了年龄确认弹窗"
       }
+    ],
+    "external-guide_k7m2": [
+      {
+        "versionId": "v11",
+        "demoId": "external-guide_k7m2",
+        "demoName": "站外引导页",
+        "savedAt": 1782549644454,
+        "savedBy": "qihao",
+        "sessionId": "page-external-guide_k7m2",
+        "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782286923644\\pages\\external-guide_k7m2\\v11",
+        "fileCount": 2,
+        "note": "修改了站外引导页"
+      }
     ]
   },
   "createdAt": 1782286923647,
-  "updatedAt": 1782491736860
+  "updatedAt": 1782562719466
 }

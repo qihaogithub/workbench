@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-06-27T09:48:39.059Z",
+  "command": "metrics",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "templateId": null,
+  "instantiatedProjectId": null,
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": null,
+    "instantiatedCanvasDocumentNodeCount": null
+  },
+  "finishedAt": "2026-06-27T09:48:39.061Z",
+  "failures": [],
+  "ok": true
+}
