@@ -2,11 +2,14 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
-import { Check, Edit3, Maximize2, Minimize2, X } from "lucide-react";
+import { Edit3, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "./utils";
 import type {
+  CanvasArrowNode,
+  CanvasDrawingNode,
   CanvasFreeNode,
   CanvasPageLayout,
+  CanvasTextNode,
   CanvasToolMode,
 } from "./types";
 
@@ -21,6 +24,7 @@ interface CanvasFreeNodeItemProps {
   onLayoutChange?: (nodeId: string, layout: CanvasPageLayout) => void;
   onEdit?: (node: CanvasFreeNode) => void;
   onTextChange?: (nodeId: string, text: string) => void;
+  onNodeStyleChange?: (node: CanvasFreeNode) => void;
   onToggleCollapse?: (nodeId: string) => void;
   onSelect?: (nodeId: string) => void;
   onDragStart?: (nodeId: string) => void;
@@ -37,6 +41,7 @@ const NODE_LABEL_SCREEN_FONT_SIZE = 12;
 const NODE_LABEL_MAX_FONT_SIZE = 24;
 const NODE_LABEL_SCREEN_GAP = 8;
 const NODE_LABEL_MAX_TOP_OFFSET = 40;
+const TEXT_NODE_MIN_HEIGHT = 44;
 
 const EDGE_CURSORS: Record<ResizeEdge, string> = {
   n: "ns-resize",
@@ -198,6 +203,7 @@ export function CanvasFreeNodeItem({
   onLayoutChange,
   onEdit,
   onTextChange,
+  onNodeStyleChange,
   onToggleCollapse,
   onSelect,
   onDragStart,
@@ -208,7 +214,6 @@ export function CanvasFreeNodeItem({
   const [isHovering, setIsHovering] = useState(false);
   const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
-  const [textDraft, setTextDraft] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef(node.layout);
@@ -219,7 +224,13 @@ export function CanvasFreeNodeItem({
 
   const canInteract = editable && toolMode === "select";
   const showEdgeHandles =
-    isHovering && canInteract && !isDragging && !isResizing;
+    (isHovering || selected) && canInteract && !isDragging && !isResizing;
+  const showPropertiesBubble =
+    selected &&
+    canInteract &&
+    !isDragging &&
+    !isResizing &&
+    (node.kind === "text" || node.kind === "arrow" || node.kind === "drawing");
 
   const renderedMarkdown = useMemo(() => {
     if (node.kind !== "document") return "";
@@ -253,7 +264,7 @@ export function CanvasFreeNodeItem({
       if (!canInteract || e.button !== 0) return;
 
       const target = e.target as HTMLElement;
-      if (target.closest("button,a,textarea,input")) return;
+      if (target.closest("button,a,textarea,input,label")) return;
 
       const el = containerRef.current;
       if (el) {
@@ -381,7 +392,6 @@ export function CanvasFreeNodeItem({
       }}
       onDoubleClick={() => {
         if (node.kind === "document") onEdit?.(node);
-        if (node.kind === "text") setTextDraft(node.text);
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -400,13 +410,24 @@ export function CanvasFreeNodeItem({
       }}
       onDragStart={(e) => e.preventDefault()}
     >
-      <div
-        className="pointer-events-none absolute left-0 z-30 max-w-full truncate font-medium text-foreground/75 drop-shadow-sm"
-        title={node.title}
-        style={{ top: -labelTopOffset, fontSize: labelFontSize, lineHeight: 1.2 }}
-      >
-        {node.title}
-      </div>
+      {(node.kind === "document" || node.kind === "image") && (
+        <div
+          className="pointer-events-none absolute left-0 z-30 max-w-full truncate font-medium text-foreground/75 drop-shadow-sm"
+          title={node.title}
+          style={{ top: -labelTopOffset, fontSize: labelFontSize, lineHeight: 1.2 }}
+        >
+          {node.title}
+        </div>
+      )}
+
+      {showPropertiesBubble && (
+        <CanvasNodePropertiesBubble
+          node={node}
+          zoom={safeZoom}
+          onTextChange={onTextChange}
+          onNodeStyleChange={onNodeStyleChange}
+        />
+      )}
 
       <div
         className={cn(
@@ -475,19 +496,39 @@ export function CanvasFreeNodeItem({
         )}
 
         {node.kind === "text" && (
-          <div
-            className="flex h-full w-full items-center overflow-hidden px-4 py-3"
-            style={{
-              color: node.color,
-              backgroundColor: node.backgroundColor,
-              fontSize: node.fontSize,
-              lineHeight: 1.35,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {node.text}
-          </div>
+          selected && canInteract ? (
+            <textarea
+              aria-label="编辑文字"
+              className="h-full w-full resize-none bg-transparent px-4 py-3 outline-none"
+              value={node.text}
+              autoFocus
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => onTextChange?.(node.id, event.target.value)}
+              placeholder="输入文字"
+              style={{
+                color: node.color,
+                backgroundColor: node.backgroundColor,
+                fontSize: node.fontSize,
+                lineHeight: 1.35,
+                minHeight: TEXT_NODE_MIN_HEIGHT,
+              }}
+            />
+          ) : (
+            <div
+              className="flex h-full w-full items-center overflow-hidden px-4 py-3"
+              style={{
+                color: node.color,
+                backgroundColor: node.backgroundColor,
+                fontSize: node.fontSize,
+                lineHeight: 1.35,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {node.text || "输入文字"}
+            </div>
+          )
         )}
 
         {node.kind === "arrow" && (
@@ -497,7 +538,33 @@ export function CanvasFreeNodeItem({
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            {node.direction === "right" && (
+            {node.start && node.end ? (
+              <>
+                <defs>
+                  <marker
+                    id={`arrow-head-${node.id}`}
+                    markerWidth="8"
+                    markerHeight="8"
+                    refX="7"
+                    refY="4"
+                    orient="auto"
+                    markerUnits="strokeWidth"
+                  >
+                    <path d="M0,0 L8,4 L0,8" fill="none" stroke={node.color} strokeLinecap="round" strokeLinejoin="round" />
+                  </marker>
+                </defs>
+                <line
+                  x1={node.start.x}
+                  y1={node.start.y}
+                  x2={node.end.x}
+                  y2={node.end.y}
+                  stroke={node.color}
+                  strokeWidth={node.strokeWidth}
+                  strokeLinecap="round"
+                  markerEnd={`url(#arrow-head-${node.id})`}
+                />
+              </>
+            ) : node.direction === "right" && (
               <>
                 <line
                   x1="8"
@@ -518,7 +585,7 @@ export function CanvasFreeNodeItem({
                 />
               </>
             )}
-            {node.direction === "left" && (
+            {!node.start && node.direction === "left" && (
               <>
                 <line
                   x1="14"
@@ -539,7 +606,7 @@ export function CanvasFreeNodeItem({
                 />
               </>
             )}
-            {node.direction === "down" && (
+            {!node.start && node.direction === "down" && (
               <>
                 <line
                   x1="50"
@@ -560,7 +627,7 @@ export function CanvasFreeNodeItem({
                 />
               </>
             )}
-            {node.direction === "up" && (
+            {!node.start && node.direction === "up" && (
               <>
                 <line
                   x1="50"
@@ -603,41 +670,6 @@ export function CanvasFreeNodeItem({
         )}
       </div>
 
-      {node.kind === "text" && textDraft !== null && (
-        <div className="absolute inset-0 z-40 flex flex-col rounded-lg border bg-background shadow-lg">
-          <textarea
-            className="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm outline-none"
-            value={textDraft}
-            autoFocus
-            onPointerDown={(event) => event.stopPropagation()}
-            onChange={(event) => setTextDraft(event.target.value)}
-          />
-          <div className="flex justify-end gap-1 border-t p-1.5">
-            <button
-              type="button"
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="取消文字编辑"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => setTextDraft(null)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="保存文字"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => {
-                onTextChange?.(node.id, textDraft);
-                setTextDraft(null);
-              }}
-            >
-              <Check className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {showEdgeHandles && (
         <>
           <div className="absolute top-0 left-0 right-0 z-20" style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }} />
@@ -645,6 +677,109 @@ export function CanvasFreeNodeItem({
           <div className="absolute top-0 left-0 bottom-0 z-20" style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }} />
           <div className="absolute top-0 right-0 bottom-0 z-20" style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }} />
         </>
+      )}
+    </div>
+  );
+}
+
+function CanvasNodePropertiesBubble({
+  node,
+  zoom,
+  onTextChange,
+  onNodeStyleChange,
+}: {
+  node: CanvasTextNode | CanvasArrowNode | CanvasDrawingNode;
+  zoom: number;
+  onTextChange?: (nodeId: string, text: string) => void;
+  onNodeStyleChange?: (node: CanvasFreeNode) => void;
+}) {
+  const top = -Math.min(48 / zoom, 88);
+  const inputClass =
+    "h-7 rounded-md border bg-background px-2 text-xs text-foreground outline-none";
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="标注属性"
+      className="absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-background/95 p-2 shadow-lg backdrop-blur"
+      style={{ top }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <label className="flex items-center gap-1 text-xs text-muted-foreground">
+        颜色
+        <input
+          aria-label="标注颜色"
+          type="color"
+          className="h-7 w-8 cursor-pointer rounded border bg-background p-0.5"
+          value={node.color}
+          onChange={(event) =>
+            onNodeStyleChange?.({ ...node, color: event.target.value })
+          }
+        />
+      </label>
+
+      {node.kind === "text" && (
+        <>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+            字号
+            <input
+              aria-label="文字字号"
+              type="number"
+              min={10}
+              max={96}
+              className={cn(inputClass, "w-16")}
+              value={node.fontSize}
+              onChange={(event) =>
+                onNodeStyleChange?.({
+                  ...node,
+                  fontSize: Number(event.target.value) || node.fontSize,
+                })
+              }
+            />
+          </label>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+            背景
+            <input
+              aria-label="文字背景色"
+              type="color"
+              className="h-7 w-8 cursor-pointer rounded border bg-background p-0.5"
+              value={node.backgroundColor ?? "#ffffff"}
+              onChange={(event) =>
+                onNodeStyleChange?.({
+                  ...node,
+                  backgroundColor: event.target.value,
+                })
+              }
+            />
+          </label>
+          <button
+            type="button"
+            className="h-7 rounded-md border px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => onTextChange?.(node.id, "")}
+          >
+            清空
+          </button>
+        </>
+      )}
+
+      {(node.kind === "arrow" || node.kind === "drawing") && (
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          粗细
+          <input
+            aria-label="线条粗细"
+            type="range"
+            min={1}
+            max={16}
+            value={node.strokeWidth}
+            onChange={(event) =>
+              onNodeStyleChange?.({
+                ...node,
+                strokeWidth: Number(event.target.value) || node.strokeWidth,
+              })
+            }
+          />
+        </label>
       )}
     </div>
   );

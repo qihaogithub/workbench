@@ -209,6 +209,8 @@ export interface CanvasArrowNode extends CanvasFreeNodeBase {
   color: string;
   strokeWidth: number;
   direction: "right" | "left" | "down" | "up";
+  start?: CanvasDrawingPoint;
+  end?: CanvasDrawingPoint;
 }
 
 export interface CanvasDrawingPoint {
