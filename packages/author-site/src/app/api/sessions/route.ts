@@ -27,24 +27,38 @@ import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 
 async function pushUserModelConfig(userId: string, sessionId: string): Promise<void> {
-  const globalConfig = await getModelConfig();
-  const config = readUserBackendProvidersConfig(
-    userId,
-    globalConfig.backendProviders,
-  );
-  if (!config) return;
+  try {
+    const globalConfig = await getModelConfig();
+    const config = readUserBackendProvidersConfig(
+      userId,
+      globalConfig.backendProviders,
+    );
+    if (!config) return;
 
-  const result = await pushSessionModelConfigToAgent(sessionId, config);
-  if (!result.ok) {
-    console.warn("[sessions] Failed to push user model config:", result.message);
+    const result = await pushSessionModelConfigToAgent(sessionId, config);
+    if (!result.ok) {
+      console.warn("[sessions] Failed to push user model config:", result.message);
+    }
+  } catch (error) {
+    console.warn(
+      "[sessions] Failed to prepare user model config:",
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 
 async function pushUserExternalAuth(userId: string, sessionId: string): Promise<void> {
-  const config = await readExternalAuthSessionConfigWithRefresh(userId);
-  const result = await pushSessionExternalAuthToAgent(sessionId, config);
-  if (!result.ok) {
-    console.warn("[sessions] Failed to push external auth config:", result.message);
+  try {
+    const config = await readExternalAuthSessionConfigWithRefresh(userId);
+    const result = await pushSessionExternalAuthToAgent(sessionId, config);
+    if (!result.ok) {
+      console.warn("[sessions] Failed to push external auth config:", result.message);
+    }
+  } catch (error) {
+    console.warn(
+      "[sessions] Failed to prepare external auth config:",
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 

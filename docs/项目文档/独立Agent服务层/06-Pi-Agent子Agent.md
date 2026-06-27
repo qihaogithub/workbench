@@ -9,7 +9,7 @@ covers:
 
 # Pi Agent 子 Agent
 
-> 更新日期：2026-06-21
+> 更新日期：2026-06-27
 
 ## 一、定位
 
@@ -17,7 +17,7 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 
 ## 二、协作关系
 
-主 Agent 和子 Agent 共享同一个工作空间、模型配置、API Key 解析方式和工具权限。差异在于子 Agent 创建工具集时会禁用 `delegateTask`，避免子 Agent 继续创建新的子 Agent。
+主 Agent 和子 Agent 共享同一个工作空间、模型配置、API Key 解析方式、工具权限和预装 Skills。差异在于子 Agent 创建工具集时会禁用 `delegateTask`，避免子 Agent 继续创建新的子 Agent。
 
 运行时协作流程如下：
 
@@ -35,6 +35,7 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 - 知识库文件只允许读取，不允许由 Agent 写入。
 - 修改 `config.schema.json` 仍受工作空间路径权限和 L2 配置规则约束。
 - `deletePage` 和 `deletePages` 继续复用现有权限确认流程。
+- 预装 Skill 只能通过 `readPreinstalledSkill` 读取，不写入工作空间，也不扩大文件工具白名单。
 
 文件变更收集由 `PiAgentBackend` 统一处理。主 Agent 和子 Agent 的 `writeFile`、`editFile`、`deletePage`、`deletePages` 工具结果都会进入同一套变更汇总逻辑，因此 `/files` 查询和消息完成结果可以看到子 Agent 产生的变更。
 

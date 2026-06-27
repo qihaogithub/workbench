@@ -624,6 +624,7 @@ describe('PiAgentBackend', () => {
         }),
       );
       expect(piAgentMocks.harnesses[0].options.tools.map((tool: any) => tool.name)).not.toContain('delegateTask');
+      expect(piAgentMocks.harnesses[0].options.resources.skills[0].name).toBe('design-taste-frontend');
       expect(piAgentMocks.envs[0].cleanup).toHaveBeenCalled();
       expect(piAgentMocks.harnesses[0].abort).toHaveBeenCalled();
     });
@@ -635,13 +636,19 @@ describe('PiAgentBackend', () => {
       await backend.updateSystemPrompt('# 测试提示');
 
       const harness = piAgentMocks.harnesses[0];
+      expect(harness.options.resources.skills[0].name).toBe('design-taste-frontend');
+
       const prompt = await harness.options.systemPrompt({
         activeTools: harness.options.tools,
+        resources: harness.options.resources,
       });
 
       expect(prompt).toContain('当前实际可用工具');
       expect(prompt).toContain('delegateTask');
       expect(prompt).toContain('真正可以调用的工具');
+      expect(prompt).toContain('预装 Skills');
+      expect(prompt).toContain('design-taste-frontend');
+      expect(prompt).toContain('readPreinstalledSkill');
 
       await backend.destroy();
     });
@@ -908,7 +915,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(24);
+      expect(tools).toHaveLength(25);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -923,6 +930,7 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('captureScreenshot');
       expect(toolNames).toContain('listImages');
       expect(toolNames).toContain('knowledgeReport');
+      expect(toolNames).toContain('readPreinstalledSkill');
       expect(toolNames).toContain('arrangeCanvasPages');
       expect(toolNames).toContain('webRead');
       expect(toolNames).toContain('figmaMcp');
@@ -941,7 +949,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(23);
+      expect(tools).toHaveLength(24);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
     });
 
@@ -976,6 +984,19 @@ describe('PiAgent 工具', () => {
       expect(delegateTask.executionMode).toBe('parallel');
     });
 
+    it('readPreinstalledSkill 应读取内置 taste-skill', async () => {
+      const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
+      const tools = createWorkbenchTools(mockConfig);
+      const readSkill = tools.find(tool => tool.name === 'readPreinstalledSkill')!;
+
+      const result = await readSkill.execute('id', { name: 'design-taste-frontend' });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0].text).toContain('Skill: design-taste-frontend');
+      expect(result.content[0].text).toContain('Source: github:Leonxlnx/taste-skill');
+      expect(result.content[0].text).toContain('edited file content');
+    });
+
     it('每个工具应有 label 和 execute 方法', async () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig);
@@ -999,6 +1020,7 @@ describe('PiAgent 工具', () => {
       expect(capabilities.toolNames).toContain('executeDeletePagePlan');
       expect(capabilities.toolNames).toContain('deletePages');
       expect(capabilities.toolNames).toContain('knowledgeReport');
+      expect(capabilities.toolNames).toContain('readPreinstalledSkill');
       expect(capabilities.toolNames).toContain('webRead');
       expect(capabilities.toolNames).not.toContain('delegateTask');
     });

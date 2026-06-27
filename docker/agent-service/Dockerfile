@@ -20,6 +20,7 @@ FROM node:20-bookworm-slim
 WORKDIR /app
 
 COPY --from=builder /app/packages/agent-service/dist/server.js ./server.js
+COPY --from=builder /app/packages/agent-service/src/preinstalled-skills ./preinstalled-skills
 
 RUN npm install --no-save fastify @fastify/cors @fastify/rate-limit @fastify/websocket pino pino-pretty undici ws eventsource
 
