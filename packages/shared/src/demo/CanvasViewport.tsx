@@ -84,6 +84,11 @@ export function CanvasViewport({
   const isPanningRef = useRef(false);
   const [selectionBox, setSelectionBox] =
     useState<CanvasSelectionRect | null>(null);
+  const [arrowPreview, setArrowPreview] =
+    useState<CanvasCreationDrag | null>(null);
+  const [drawingPreviewPoints, setDrawingPreviewPoints] = useState<
+    CanvasPointerPoint[]
+  >([]);
   const isSelectingRef = useRef(false);
   const isDrawingRef = useRef(false);
   const isArrowCreatingRef = useRef(false);
@@ -342,9 +347,11 @@ export function CanvasViewport({
         containerRef.current?.setPointerCapture(e.pointerId);
         if (activeCreationMode === "draw") {
           isDrawingRef.current = true;
+          setDrawingPreviewPoints([point]);
           onDrawingStart?.(point);
         } else if (activeCreationMode === "arrow") {
           isArrowCreatingRef.current = true;
+          setArrowPreview({ start: point, end: point });
         } else {
           isPointCreatingRef.current = true;
         }
@@ -383,7 +390,26 @@ export function CanvasViewport({
     (e: React.PointerEvent) => {
       if (isDrawingRef.current) {
         const point = getCanvasPointFromPointer(e.clientX, e.clientY);
-        if (point) onDrawingMove?.(point);
+        if (point) {
+          setDrawingPreviewPoints((current) => {
+            const last = current[current.length - 1];
+            if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= 2) {
+              return [...current, point];
+            }
+            return current;
+          });
+          onDrawingMove?.(point);
+        }
+        return;
+      }
+
+      if (isArrowCreatingRef.current) {
+        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
+        if (point) {
+          setArrowPreview((current) =>
+            current ? { ...current, end: point } : current,
+          );
+        }
         return;
       }
 
@@ -420,6 +446,7 @@ export function CanvasViewport({
         const point = getCanvasPointFromPointer(e.clientX, e.clientY);
         containerRef.current?.releasePointerCapture(e.pointerId);
         if (point) onDrawingEnd?.(point);
+        setDrawingPreviewPoints([]);
         creationStartPointRef.current = null;
         return;
       }
@@ -430,6 +457,7 @@ export function CanvasViewport({
         const end = getCanvasPointFromPointer(e.clientX, e.clientY);
         containerRef.current?.releasePointerCapture(e.pointerId);
         creationStartPointRef.current = null;
+        setArrowPreview(null);
         if (start && end) onArrowCreate?.({ start, end });
         return;
       }
@@ -595,6 +623,27 @@ export function CanvasViewport({
       >
         {children}
 
+        {arrowPreview && <CanvasArrowCreationPreview drag={arrowPreview} />}
+
+        {drawingPreviewPoints.length > 1 && (
+          <svg
+            className="pointer-events-none absolute overflow-visible"
+            style={{ left: 0, top: 0, width: 1, height: 1, zIndex: 9998 }}
+            aria-hidden="true"
+          >
+            <polyline
+              points={drawingPreviewPoints
+                .map((point) => `${point.x},${point.y}`)
+                .join(" ")}
+              fill="none"
+              stroke="#111827"
+              strokeWidth={4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+
         {/* 对齐辅助线 */}
         {alignmentGuides.map((guide, index) => {
           if (guide.type === "vertical") {
@@ -643,5 +692,59 @@ export function CanvasViewport({
         />
       )}
     </div>
+  );
+}
+
+function CanvasArrowCreationPreview({ drag }: { drag: CanvasCreationDrag }) {
+  const padding = 16;
+  const left = Math.min(drag.start.x, drag.end.x) - padding;
+  const top = Math.min(drag.start.y, drag.end.y) - padding;
+  const width = Math.max(1, Math.abs(drag.end.x - drag.start.x)) + padding * 2;
+  const height = Math.max(1, Math.abs(drag.end.y - drag.start.y)) + padding * 2;
+  const start = {
+    x: drag.start.x - left,
+    y: drag.start.y - top,
+  };
+  const end = {
+    x: drag.end.x - left,
+    y: drag.end.y - top,
+  };
+
+  return (
+    <svg
+      className="pointer-events-none absolute overflow-visible"
+      style={{ left, top, width, height, zIndex: 9998 }}
+      aria-hidden="true"
+    >
+      <defs>
+        <marker
+          id="canvas-arrow-creation-preview-head"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path
+            d="M0,0 L8,4 L0,8"
+            fill="none"
+            stroke="#2563eb"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </marker>
+      </defs>
+      <line
+        x1={start.x}
+        y1={start.y}
+        x2={end.x}
+        y2={end.y}
+        stroke="#2563eb"
+        strokeWidth={6}
+        strokeLinecap="round"
+        markerEnd="url(#canvas-arrow-creation-preview-head)"
+      />
+    </svg>
   );
 }

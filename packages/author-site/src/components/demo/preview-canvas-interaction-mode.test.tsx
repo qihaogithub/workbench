@@ -333,16 +333,39 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(nodes[0]).toMatchObject({
         kind: "text",
         title: "文字",
-        text: "双击编辑文字",
+        text: "",
         fontSize: 18,
         color: "#111827",
         layout: {
           x: 400,
-          y: 340,
+          y: 352,
           width: 240,
-          height: 120,
+          height: 96,
         },
       });
+    });
+    expect(screen.getByLabelText("编辑文字")).toHaveFocus();
+    expect(screen.getByLabelText("标注属性")).toBeInTheDocument();
+  });
+  it("箭头工具点击空白画布不会创建固定长度箭头", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("添加箭头"));
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 260,
+      clientY: 220,
+      pointerId: 7,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 260,
+      clientY: 220,
+      pointerId: 7,
+    });
+
+    await waitFor(() => {
+      expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
     });
   });
   it("箭头工具支持在画布空白处拖拽创建箭头节点", async () => {

@@ -1492,11 +1492,11 @@ export function PreviewCanvas({
       id,
       kind: "text",
       title: "文字",
-      text: "双击编辑文字",
+      text: "",
       fontSize: 18,
       color: "#111827",
       backgroundColor: "#ffffff",
-      layout: getNodeLayout(240, 120, canvasPoint),
+      layout: getNodeLayout(240, 96, canvasPoint),
       createdAt: now,
       updatedAt: now,
     });
@@ -1518,26 +1518,33 @@ export function PreviewCanvas({
       const dx = drag.end.x - drag.start.x;
       const dy = drag.end.y - drag.start.y;
       const isDrag = Math.hypot(dx, dy) >= 8;
+      if (!isDrag) return;
       const direction =
-        isDrag && Math.abs(dy) > Math.abs(dx)
+        Math.abs(dy) > Math.abs(dx)
           ? dy >= 0
             ? "down"
             : "up"
-          : isDrag && dx < 0
+          : dx < 0
             ? "left"
             : "right";
-      const width = isDrag ? Math.max(48, Math.abs(dx)) : 240;
-      const height = isDrag ? Math.max(48, Math.abs(dy)) : 80;
+      const width = Math.max(48, Math.abs(dx));
+      const height = Math.max(48, Math.abs(dy));
       const padding = 16;
-      const layout = isDrag
-        ? {
+      const layout = {
             x: Math.min(drag.start.x, drag.end.x) - padding,
             y: Math.min(drag.start.y, drag.end.y) - padding,
             width: width + padding * 2,
             height: height + padding * 2,
             zIndex: getNodeLayout(width, height).zIndex,
-          }
-        : getNodeLayout(240, 80, drag?.start);
+          };
+      const normalizedStart = {
+        x: ((drag.start.x - layout.x) / layout.width) * 100,
+        y: ((drag.start.y - layout.y) / layout.height) * 100,
+      };
+      const normalizedEnd = {
+        x: ((drag.end.x - layout.x) / layout.width) * 100,
+        y: ((drag.end.y - layout.y) / layout.height) * 100,
+      };
     const now = Date.now();
     const id = createNodeId("arrow");
     addOrUpdateNode({
@@ -1547,6 +1554,8 @@ export function PreviewCanvas({
       color: "#2563eb",
       strokeWidth: 6,
       direction,
+      start: normalizedStart,
+      end: normalizedEnd,
       layout,
       createdAt: now,
       updatedAt: now,
@@ -1591,7 +1600,7 @@ export function PreviewCanvas({
 
   const handleTextNodeChange = useCallback(
     (nodeId: string, text: string) => {
-      const normalizedText = text.trim() || "文字";
+      const titleText = text.trim() || "文字";
       updateState((prev) => {
         const node = prev.nodes?.[nodeId];
         if (!node || node.kind !== "text") return prev;
@@ -1601,10 +1610,27 @@ export function PreviewCanvas({
             ...(prev.nodes ?? {}),
             [nodeId]: {
               ...node,
-              title: normalizedText.split(/\r?\n/)[0]?.slice(0, 24) || "文字",
-              text: normalizedText,
+              title: titleText.split(/\r?\n/)[0]?.slice(0, 24) || "文字",
+              text,
               updatedAt: Date.now(),
             },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handleNodeStyleChange = useCallback(
+    (nextNode: CanvasFreeNode) => {
+      updateState((prev) => {
+        const existing = prev.nodes?.[nextNode.id];
+        if (!existing || existing.kind !== nextNode.kind) return prev;
+        return {
+          ...prev,
+          nodes: {
+            ...(prev.nodes ?? {}),
+            [nextNode.id]: { ...nextNode, updatedAt: Date.now() },
           },
         };
       });
@@ -1991,6 +2017,7 @@ export function PreviewCanvas({
             onLayoutChange={handleNodeLayoutChange}
             onEdit={handleEditNode}
             onTextChange={handleTextNodeChange}
+            onNodeStyleChange={handleNodeStyleChange}
             onToggleCollapse={handleNodeToggleCollapse}
             onSelect={setSelectedNodeId}
             onDragStart={handleDragStart}
