@@ -114,7 +114,12 @@ export async function registerWebSocketRoutes(
 
   fastify.get<{ Params: StreamParams }>(
     "/api/agent/:sessionId/stream",
-    { websocket: true },
+    {
+      websocket: true,
+      config: {
+        rateLimit: false,
+      },
+    },
     async (
       socket: WebSocket,
       request: FastifyRequest<{ Params: StreamParams }>,
