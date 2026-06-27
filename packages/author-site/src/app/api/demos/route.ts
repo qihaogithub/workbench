@@ -23,8 +23,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, templateId } = body as {
+    const { name, category, templateId } = body as {
       name?: unknown;
+      category?: unknown;
       templateId?: unknown;
     };
 
@@ -42,8 +43,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (category !== undefined && typeof category !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "category 参数必须是字符串"),
+        { status: 400 },
+      );
+    }
+
     const result = getProjectAdminService().createProject({
       name,
+      category,
       templateId,
     });
     return projectAdminResponse(result, 201);

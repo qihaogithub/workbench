@@ -90,6 +90,12 @@ export interface ExportedAsset {
   size: number;
 }
 
+export interface ExportedKnowledgeFile {
+  path: string;
+  dataBase64: string;
+  size: number;
+}
+
 export interface ProjectPackageExport {
   project: Project;
   pages: PageDetail[];
@@ -98,6 +104,7 @@ export interface ProjectPackageExport {
   projectConfigSchema?: string;
   appGraph?: AppGraph;
   assets: ExportedAsset[];
+  knowledgeFiles: ExportedKnowledgeFile[];
   baseVersion: string;
 }
 
@@ -250,6 +257,7 @@ export interface AuditEvent {
 
 export interface CreateProjectInput {
   name: string;
+  category?: string;
   templateId?: string;
   description?: string;
   dryRun?: boolean;
@@ -258,6 +266,7 @@ export interface CreateProjectInput {
 export interface UpdateProjectInput {
   projectId: string;
   name?: string;
+  category?: string;
   description?: string;
   dryRun?: boolean;
 }

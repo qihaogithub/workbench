@@ -1,0 +1,92 @@
+{
+  "startedAt": "2026-06-27T09:50:12.895Z",
+  "command": "ai",
+  "projectId": "proj_1782553732626_b5j7yi",
+  "templateId": null,
+  "instantiatedProjectId": null,
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": null,
+    "instantiatedCanvasDocumentNodeCount": null
+  },
+  "ai": {
+    "model": "mydeepseek/deepseek-v4-flash",
+    "agentUrl": "http://127.0.0.1:3211",
+    "prompts": [
+      {
+        "sessionId": "kb-metrics-explicit-knowledge-report-1782553812899",
+        "text": "以下是基于项目知识库的完整回答，所有信息均标注了来源文档：\n\n---\n\n## 📋 活动规则总结\n\n### 1️⃣ 活动代号\n**`KB-ORION-7421`**\n- 对外名称：**星桥知识库挑战**\n- 任务页口令：「青石计划」\n- 📄 **来源**：`knowledge/玩法规则.md`\n\n---\n\n### 2️⃣ 任务换抽奖资格规则\n- 用户需**完成 3 个知识任务**，获得 **1 次抽奖资格**\n- 抽奖资格**当天 23:30 过期**，不能跨天累计\n- 过期后不会恢复\n- 📄 **来源**：`knowledge/玩法规则.md`、`knowledge/FAQ与客服口径.md`\n\n---\n\n### 3️⃣ 分享奖励\n- 分享海报**只奖励 20 星币**，**不增加抽奖次数**\n- 客服或 AI **不应把分享解释为额外抽奖机会**\n- 📄 **来源**：`knowledge/玩法规则.md`、`knowledge/FAQ与客服口径.md`\n\n---\n\n### 4️⃣ 地址填写时限\n- 中奖后需要在 **72 小时内**填写收货地址\n- 📄 **来源**：`knowledge/中奖履约SOP.md`\n\n---\n\n### 5️⃣ 超时状态\n- 超过 72 小时仍未提交地址 → 奖品状态标记为 **`EXPIRED_ADDRESS_MISSING`**\n- 若物流信息缺失但用户已提交地址 → 状态标记为 **`MANUAL_REISSUE_REQUIRED`**（客服补发入口仅对此状态开放）\n- 📄 **来源**：`knowledge/中奖履约SOP.md`\n\n---\n\n### 6️⃣ 客服升级码\n**`SUP-KB-17`**\n- 仅允许以下三类问题使用升级码：\n  1. **地址异常**\n  2. **奖品状态不一致**\n  3. **任务完成记录缺失**\n- 📄 **来源**：`knowledge/FAQ与客服口径.md`、`knowledge/风控与异常处理.md`\n\n---\n\n### 7️⃣ 风控状态\n| 风控/规则 | 说明 |\n|---|---|\n| **每日提交上限** | 同一设备每天最多提交 **2 次**任务答案，超限提示\"今日机会已用完\" |\n| **设备维度主风控** | 不以手机号作为唯一判断条件，以**设备维度**为主 |\n| **`RISK_DEVICE_ROTATION`** | 同一账号 **10 分钟内切换超过 3 台设备** 时触发 |\n| **答题时间校验** | 任务页停留时间低于**每题 8 秒**，提示用户重新阅读后提交，不直接判定作弊 |\n\n- 📄 **来源**：`knowledge/风控与异常处理.md`、`knowledge/玩法规则.md`\n\n---\n\n### ⚠️ AI 回答必须遵守的三条口径\n来自 `knowledge/风控与异常处理.md`：\n1. **抽奖资格过期** → 不可恢复，不能补发\n2. **分享不增加抽奖次数**\n3. **口令不能直接告知用户** → 应引导用户回到规则页查找",
+        "score": {
+          "matchedFacts": [
+            "KB-ORION-7421",
+            "星桥知识库挑战",
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "SUP-KB-17",
+            "RISK_DEVICE_ROTATION"
+          ],
+          "expectedFacts": [
+            "KB-ORION-7421",
+            "星桥知识库挑战",
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "SUP-KB-17",
+            "RISK_DEVICE_ROTATION"
+          ],
+          "factRecall": 1,
+          "citedSources": [
+            "玩法规则.md",
+            "FAQ与客服口径.md",
+            "中奖履约SOP.md",
+            "风控与异常处理.md"
+          ],
+          "sourceCitationRate": 1,
+          "hallucinationFlags": []
+        }
+      },
+      {
+        "sessionId": "kb-metrics-implicit-support-answer-1782553824657",
+        "text": "知识库文件受保护，AI 不能直接修改。以下是我整理好的完整客服口径，您可以手动更新到 `knowledge/FAQ与客服口径.md` 中。\n\n---\n\n## 一、分享后为什么没有增加抽奖次数？\n\n### 标准口径\n\n> 分享海报的奖励是 **20 星币**，并不是增加抽奖次数哦。抽奖次数只有一种获取方式：**完成 3 个知识任务**，每天最多获得 1 次抽奖资格，资格在当天 **23:30 过期**，不会跨天累计。\n\n### 用户追问：\"但我明明点了分享，次数没变啊？\"\n\n> 分享任务完成后，您可以到\"我的星币\"查看星币到账情况。抽奖次数只跟 **任务完成进度** 挂钩，与分享行为无关。您完成 3 个知识任务后，抽奖资格会自动生效。\n\n### ⚠️ 遵守口径红线\n\n> 根据项目规则，**\"分享不增加抽奖次数\"** 是 AI 回答时必须遵守的三条口径之一，不能做任何模糊化或\"建议用户试试\"的表述。\n\n---\n\n## 二、担心中奖后忘记填地址\n\n### 标准口径\n\n> 您可以在中奖后 **72 小时内** 随时填写收货地址，时间上是比较充裕的。建议您：\n> 1. **中奖后立即填写**——弹窗内直接提交地址最方便；\n> 2. 或者后续进入 **\"我的奖品\"** 页面补充地址；\n> 3. 如果超过 72 小时仍未填写，奖品状态会标记为 **地址缺失（EXPIRED_ADDRESS_MISSING）**，届时需要联系客服处理。\n\n### 用户追问：\"要是真忘了，还能补救吗？\"\n\n> 如果已超过 72 小时，您需要联系客服并提供中奖记录截图，客服核实后会引导后续补发流程。不过还是建议您中奖后尽早填写，避免遗忘带来的不便。\n\n### 未成年人场景\n\n> 如果中奖用户是未成年人，填写收货地址前需要先由 **监护人在活动页面完成确认**，否则无法进入发货队列。\n\n---\n\n## 三、客服升级条件\n\n| 项目 | 内容 |\n|------|------|\n| **客服升级码** | `SUP-KB-17` |\n| **允许升级的三类问题** | ① **地址异常**（如已提交地址但物流信息缺失，标记为 MANUAL_REISSUE_REQUIRED）<br>② **奖品状态不一致**（用户看到的奖品状态与实际不符）<br>③ **任务完成记录缺失**（用户已完成任务但系统未记录） |\n| **不允许升级的场景** | ✗ 抽奖资格过期<br>✗ 分享不增加抽奖次数<br>✗ 口令相关的咨询<br>（这三类由 AI 直接按口径回复，无需升级到人工客服） |\n\n### 升级话术示例\n\n> \"您好，您反馈的问题属于地址异常/奖品状态不一致/任务记录缺失（选其一），我已记录相关信息，现在为您升级到人工客服处理。升级码为 SUP-KB-17，请您保持联系方式畅通，客服会在 1 个工作日内联系您。\"\n\n---\n\n以上内容已覆盖两个问题的完整口径，并明确了升级条件。您可以直接将新增内容补入 `knowledge/FAQ与客服口径.md` 文件中。",
+        "score": {
+          "matchedFacts": [
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "MANUAL_REISSUE_REQUIRED",
+            "SUP-KB-17"
+          ],
+          "expectedFacts": [
+            "23:30",
+            "20 星币",
+            "72",
+            "EXPIRED_ADDRESS_MISSING",
+            "MANUAL_REISSUE_REQUIRED",
+            "SUP-KB-17"
+          ],
+          "factRecall": 1,
+          "citedSources": [
+            "FAQ与客服口径.md"
+          ],
+          "sourceCitationRate": null,
+          "hallucinationFlags": []
+        }
+      }
+    ],
+    "averageFactRecall": 1,
+    "averageSourceCitationRate": 1,
+    "hallucinationFlagCount": 0
+  },
+  "finishedAt": "2026-06-27T09:50:47.446Z",
+  "failures": [],
+  "ok": true
+}

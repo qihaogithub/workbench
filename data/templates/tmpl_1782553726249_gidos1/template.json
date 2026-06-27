@@ -1,0 +1,42 @@
+{
+  "id": "tmpl_1782553726249_gidos1",
+  "sourceProjectId": "proj_1782547891917_g0e1l9",
+  "category": "知识库验证",
+  "name": "知识库索引验证模板-画布文档版-1782553725551",
+  "description": "包含圆形页面、画布文档节点和知识库文档的验证模板",
+  "scope": "team",
+  "official": false,
+  "demoCount": 4,
+  "demoPages": [
+    {
+      "id": "page_qhlg",
+      "name": "活动规则首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "page_l0lw",
+      "name": "知识任务页",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "page_cdjg",
+      "name": "中奖履约页",
+      "routeKey": "page-3",
+      "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "page_t70m",
+      "name": "圆形知识雷达页",
+      "routeKey": "page-4",
+      "order": 3,
+      "parentId": null
+    }
+  ],
+  "createdAt": 1782553726296,
+  "updatedAt": 1782553726296
+}

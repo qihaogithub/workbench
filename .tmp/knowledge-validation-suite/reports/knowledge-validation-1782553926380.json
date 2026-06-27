@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-06-27T09:52:06.378Z",
+  "command": "metrics",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "templateId": "tmpl_1782553726249_gidos1",
+  "instantiatedProjectId": "proj_1782553732626_b5j7yi",
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": {
+      "pageCount": 4,
+      "configCount": 1,
+      "knowledgeCount": 4,
+      "sourcePaths": [
+        "knowledge/玩法规则.md",
+        "knowledge/FAQ与客服口径.md",
+        "knowledge/中奖履约SOP.md",
+        "knowledge/风控与异常处理.md"
+      ]
+    },
+    "instantiatedCanvasDocumentNodeCount": 4
+  },
+  "finishedAt": "2026-06-27T09:52:06.380Z",
+  "failures": [],
+  "ok": true
+}

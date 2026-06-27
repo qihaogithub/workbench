@@ -73,6 +73,7 @@ import {
   ArrowLeft,
   MessageSquarePlus,
   Settings2,
+  Users,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -103,7 +104,9 @@ import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
+import { useCollabDocument } from "@/hooks/useCollabDocument";
 import type {
+  CanvasState,
   CanvasKnowledgeDocument,
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
@@ -116,6 +119,7 @@ import type {
   PageVersionInfo,
   VersionHistoryResponse,
   VersionInfo,
+  WorkspaceTree,
 } from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
@@ -235,7 +239,7 @@ type HistoryEvent =
   | {
       id: string;
       kind: "project";
-      title: "保存项目" | "恢复项目";
+      title: "创建项目版本" | "恢复项目";
       savedAt: number;
       savedBy: string;
       version: VersionInfo;
@@ -277,6 +281,66 @@ function dedupeHistoryEvents(events: HistoryEvent[]): HistoryEvent[] {
   });
 }
 
+function replaceCollabText(ytext: { toString: () => string; delete: (index: number, length: number) => void; insert: (index: number, text: string) => void } | null, value: string): void {
+  if (!ytext || ytext.toString() === value) return;
+  ytext.delete(0, ytext.toString().length);
+  if (value) ytext.insert(0, value);
+}
+
+function serializeCanvasLayout(projectId: string, state: CanvasState): string {
+  return JSON.stringify(
+    {
+      version: 1,
+      projectId,
+      updatedAt: Date.now(),
+      state,
+    },
+    null,
+    2,
+  );
+}
+
+function parseCanvasLayoutState(value: string): CanvasState | null {
+  if (!value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value) as { state?: CanvasState };
+    return parsed.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function arePositionableSizesEqual(
+  current: Record<string, PositionableSizeItem>,
+  next: Record<string, PositionableSizeItem>,
+): boolean {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return false;
+
+  return nextKeys.every((key) => {
+    const currentItem = current[key];
+    const nextItem = next[key];
+    return (
+      currentItem?.width === nextItem?.width &&
+      currentItem?.height === nextItem?.height
+    );
+  });
+}
+
+async function flushWorkspaceCollab(projectId: string, workspaceId: string, sessionId: string): Promise<void> {
+  if (!projectId || !workspaceId || !sessionId) return;
+  const baseUrl = (process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201").replace(/\/$/, "");
+  const params = new URLSearchParams({ sessionId });
+  const response = await fetch(
+    `${baseUrl}/api/collab/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspaceId)}/flush-all?${params.toString()}`,
+    { method: "POST" },
+  );
+  if (!response.ok) {
+    throw new Error("协同草稿同步失败");
+  }
+}
+
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
   const { id: demoId } = params;
@@ -298,6 +362,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
+  const handlePositionableSizes = useCallback(
+    (sizes: Record<string, PositionableSizeItem>) => {
+      setPositionableItemSizes((current) =>
+        arePositionableSizesEqual(current, sizes) ? current : sizes,
+      );
+    },
+    [],
+  );
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -334,6 +406,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const activeDemoIdRef = useRef(activeDemoId);
   activeDemoIdRef.current = activeDemoId;
+  const suppressNextCanvasCollabPushRef = useRef(false);
   const [projectConfigSchema, setProjectConfigSchema] = useState<
     string | undefined
   >(undefined);
@@ -352,6 +425,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     clearCanvasSelection,
     flushCanvasState,
     hasUnsavedCanvasChanges,
+    applyRemoteCanvasState,
     markCanvasChangesSaved,
   } = useCanvasWorkspace({
     sessionId,
@@ -661,6 +735,73 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >(null);
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>('');
+  const collabUser = useMemo(
+    () => ({
+      userId: sessionId || "anonymous",
+      username: currentUsername || "当前用户",
+    }),
+    [currentUsername, sessionId],
+  );
+  const activeCodeCollab = useCollabDocument(
+    sessionId && workspaceId && activeDemoId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: `demos/${activeDemoId}/index.tsx`,
+          kind: "page-code",
+        }
+      : null,
+    collabUser,
+  );
+  const activeSchemaCollab = useCollabDocument(
+    sessionId && workspaceId && activeDemoId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: `demos/${activeDemoId}/config.schema.json`,
+          kind: "page-schema",
+        }
+      : null,
+    collabUser,
+  );
+  const projectSchemaCollab = useCollabDocument(
+    sessionId && workspaceId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: "project.config.schema.json",
+          kind: "project-schema",
+        }
+      : null,
+    collabUser,
+  );
+  const workspaceTreeCollab = useCollabDocument(
+    sessionId && workspaceId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: "workspace-tree.json",
+          kind: "workspace-tree",
+        }
+      : null,
+    collabUser,
+  );
+  const canvasLayoutCollab = useCollabDocument(
+    sessionId && workspaceId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: ".canvas-layout.json",
+          kind: "canvas-layout",
+        }
+      : null,
+    collabUser,
+  );
   const [previewRuntimeError, setPreviewRuntimeError] =
     useState<PreviewRuntimeErrorContext | null>(null);
 
@@ -755,12 +896,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     (params: {
       code?: string;
       schema?: string;
-      source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch";
+      source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch" | "collab";
     }) => {
       const { code: newCode, schema: newSchema, source } = params;
       const targetPageId = activeDemoIdRef.current;
 
       if (newCode !== undefined) {
+        if (source !== "collab") {
+          replaceCollabText(activeCodeCollab.ytext, newCode);
+        }
         setCode((prev) => (prev === newCode ? prev : newCode));
         codeRef.current = newCode;
         if (targetPageId) {
@@ -776,6 +920,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       if (newSchema !== undefined) {
+        if (source !== "collab") {
+          replaceCollabText(activeSchemaCollab.ytext, newSchema);
+        }
         const oldSchema = schemaRef.current;
         setSchema(newSchema);
         schemaRef.current = newSchema;
@@ -822,12 +969,150 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setHasUnsavedChanges(true);
       }
     },
-    [sessionId, activeDemoId],
+    [activeCodeCollab.ytext, activeSchemaCollab.ytext, sessionId, activeDemoId],
   );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    if (activeCodeCollab.status !== "synced") return;
+    if (activeCodeCollab.value === codeRef.current) return;
+    applyDemoSnapshot({
+      code: activeCodeCollab.value,
+      source: "collab",
+    });
+    markWorkspaceChanged();
+  }, [activeCodeCollab.status, activeCodeCollab.value, applyDemoSnapshot, markWorkspaceChanged]);
+
+  useEffect(() => {
+    if (activeSchemaCollab.status !== "synced") return;
+    if (activeSchemaCollab.value === schemaRef.current) return;
+    applyDemoSnapshot({
+      schema: activeSchemaCollab.value,
+      source: "collab",
+    });
+    markWorkspaceChanged();
+  }, [activeSchemaCollab.status, activeSchemaCollab.value, applyDemoSnapshot, markWorkspaceChanged]);
+
+  useEffect(() => {
+    if (projectSchemaCollab.status !== "synced") return;
+    if (projectSchemaCollab.value === projectConfigSchema) return;
+    setProjectConfigSchema(projectSchemaCollab.value);
+    markWorkspaceChanged();
+  }, [markWorkspaceChanged, projectConfigSchema, projectSchemaCollab.status, projectSchemaCollab.value]);
+
+  const syncWorkspaceFileToCollab = useCallback(
+    async (
+      resourcePath: string,
+      ytext: { toString: () => string; delete: (index: number, length: number) => void; insert: (index: number, text: string) => void } | null,
+    ) => {
+      if (!sessionId || !ytext) return;
+      const response = await fetch(
+        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(resourcePath)}`,
+      );
+      const result = await response.json();
+      if (!response.ok || !result.success || typeof result.data?.content !== "string") {
+        throw new Error(result.error?.message || "刷新协同资源失败");
+      }
+      replaceCollabText(ytext, result.data.content);
+    },
+    [sessionId],
+  );
+
+  const handleWorkspaceTreeChanged = useCallback(() => {
+    markWorkspaceChanged();
+    void syncWorkspaceFileToCollab("workspace-tree.json", workspaceTreeCollab.ytext)
+      .catch((error) => {
+        console.warn("[collab] 刷新页面树协同文档失败", error);
+      });
+  }, [markWorkspaceChanged, syncWorkspaceFileToCollab, workspaceTreeCollab.ytext]);
+
+  useEffect(() => {
+    if (workspaceTreeCollab.status !== "synced" || !workspaceTreeCollab.value.trim()) return;
+    let parsed: WorkspaceTree;
+    try {
+      parsed = JSON.parse(workspaceTreeCollab.value) as WorkspaceTree;
+    } catch {
+      return;
+    }
+    if (!Array.isArray(parsed.pages) || !Array.isArray(parsed.folders)) return;
+
+    const current = JSON.stringify({
+      pages: demoPages.map(({ id, name, routeKey, order, parentId }) => ({
+        id,
+        name,
+        routeKey,
+        order,
+        parentId,
+      })),
+      folders: demoFolders,
+    });
+    const incoming = JSON.stringify({
+      pages: parsed.pages.map(({ id, name, routeKey, order, parentId }) => ({
+        id,
+        name,
+        routeKey,
+        order,
+        parentId,
+      })),
+      folders: parsed.folders,
+    });
+    if (current === incoming) return;
+
+    setDemoPages(
+      parsed.pages
+        .map((page) => ({
+          ...page,
+          previewSize: pagePreviewSizeMap[page.id],
+        }))
+        .sort((a, b) => a.order - b.order),
+    );
+    setDemoFolders([...parsed.folders].sort((a, b) => a.order - b.order));
+    markWorkspaceChanged();
+  }, [
+    demoFolders,
+    demoPages,
+    markWorkspaceChanged,
+    pagePreviewSizeMap,
+    workspaceTreeCollab.status,
+    workspaceTreeCollab.value,
+  ]);
+
+  useEffect(() => {
+    if (canvasLayoutCollab.status !== "synced") return;
+    const remoteState = parseCanvasLayoutState(canvasLayoutCollab.value);
+    if (!remoteState) return;
+    if (JSON.stringify(remoteState) === JSON.stringify(canvasState)) return;
+    suppressNextCanvasCollabPushRef.current = true;
+    applyRemoteCanvasState(remoteState);
+    markWorkspaceChanged();
+  }, [
+    applyRemoteCanvasState,
+    canvasLayoutCollab.status,
+    canvasLayoutCollab.value,
+    canvasState,
+    markWorkspaceChanged,
+  ]);
+
+  useEffect(() => {
+    if (canvasLayoutCollab.status !== "synced" || !hasUnsavedCanvasChanges) return;
+    if (suppressNextCanvasCollabPushRef.current) {
+      suppressNextCanvasCollabPushRef.current = false;
+      return;
+    }
+    replaceCollabText(
+      canvasLayoutCollab.ytext,
+      serializeCanvasLayout(demoId, canvasState),
+    );
+  }, [
+    canvasLayoutCollab.status,
+    canvasLayoutCollab.ytext,
+    canvasState,
+    demoId,
+    hasUnsavedCanvasChanges,
+  ]);
 
   useEffect(() => {
     const hasErrors =
@@ -1217,6 +1502,7 @@ ${context.details}
 
   const handleSchemaChange = useCallback(
     (newSchema: string) => {
+      replaceCollabText(activeSchemaCollab.ytext, newSchema);
       setSchema(newSchema);
       const currentPageId = activeDemoIdRef.current;
       if (currentPageId) {
@@ -1227,12 +1513,13 @@ ${context.details}
         return buildFigmaText(currentCode, newSchema);
       });
     },
-    [code],
+    [activeSchemaCollab.ytext, code],
   );
 
   const handleProjectSchemaChange = useCallback((newSchema: string) => {
+    replaceCollabText(projectSchemaCollab.ytext, newSchema);
     setProjectConfigSchema(newSchema);
-  }, []);
+  }, [projectSchemaCollab.ytext]);
 
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
@@ -1313,7 +1600,7 @@ ${context.details}
       });
       if (!hasWorkspaceStructureChange || !sessionId) return;
 
-      markWorkspaceChanged();
+      handleWorkspaceTreeChanged();
 
       const previousPageIds = new Set(demoPages.map((page) => page.id));
       const previousActiveId = activeDemoIdRef.current;
@@ -1412,7 +1699,7 @@ ${context.details}
     [
       demoPages,
       getSafeMergedDefaults,
-      markWorkspaceChanged,
+      handleWorkspaceTreeChanged,
       previewMode,
       sessionId,
       setFocusCanvasPageId,
@@ -1485,6 +1772,7 @@ ${context.details}
   const handlePublish = async () => {
     setPublishing(true);
     try {
+      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
       const publishResult = await projectApiClient.publishProject(demoId);
       setPublishStatus('published');
       setPublishedVersion(publishResult.publishedVersion);
@@ -1673,11 +1961,11 @@ ${context.details}
     }
   };
 
-  const handleSave = async (): Promise<boolean> => {
+  const handleCreateVersion = async (): Promise<boolean> => {
     if (!sessionId) {
-      console.error("[handleSave] sessionId 为空!");
+      console.error("[handleCreateVersion] sessionId 为空!");
       toast({
-        title: "保存失败",
+        title: "创建版本失败",
         description: "Session 未创建，请刷新页面重试",
         variant: "destructive",
       });
@@ -1685,10 +1973,10 @@ ${context.details}
     }
 
     if (!activeDemoId) {
-      console.error("[handleSave] activeDemoId 为空!");
+      console.error("[handleCreateVersion] activeDemoId 为空!");
       toast({
-        title: "保存失败",
-        description: "未选中页面，请先选择要保存的页面",
+        title: "创建版本失败",
+        description: "未选中页面，请先选择要创建版本的页面",
         variant: "destructive",
       });
       return false;
@@ -1704,20 +1992,21 @@ ${context.details}
 
       if (errors.length > 0) {
         toast({
-          title: "保存失败：存在语法错误",
-          description: `发现 ${errors.length} 个错误，需要先修复后才能正常预览`,
+          title: "创建版本失败：存在语法错误",
+          description: `发现 ${errors.length} 个错误，需要先修复后才能创建版本`,
           variant: "destructive",
         });
       } else if (warnings.length > 0) {
         toast({
           title: "存在配置不一致",
-          description: `发现 ${warnings.length} 个警告，保存后预览可能异常`,
+          description: `发现 ${warnings.length} 个警告，版本预览可能异常`,
         });
       }
     }
 
     try {
       setIsSaving(true);
+      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
       await flushCanvasState();
 
       const saveRes = await fetch(
@@ -1750,8 +2039,8 @@ ${context.details}
       }
 
       toast({
-        title: "保存成功",
-        description: "Demo 已更新",
+        title: "版本已创建",
+        description: "当前草稿已记录为版本快照",
       });
 
       setHasUnsavedChanges(false);
@@ -1763,7 +2052,7 @@ ${context.details}
       return true;
     } catch (error) {
       toast({
-        title: "保存失败",
+        title: "创建版本失败",
         description: error instanceof Error ? error.message : "未知错误",
         variant: "destructive",
       });
@@ -1783,9 +2072,9 @@ ${context.details}
     }
   }, [hasPendingChanges, router]);
 
-  const handleSaveAndExit = async () => {
+  const handleCreateVersionAndExit = async () => {
     setShowExitDialog(false);
-    await handleSave();
+    await handleCreateVersion();
     router.push("/");
   };
 
@@ -2272,7 +2561,7 @@ ${context}
         title:
           version.sessionId === "restore" || version.note?.includes("恢复")
             ? "恢复项目"
-            : "保存项目",
+            : "创建项目版本",
         savedAt: version.savedAt,
         savedBy: getVersionSavedBy(version.savedBy),
         version,
@@ -2308,16 +2597,35 @@ ${context}
   const hasPublishableChanges =
     publishStatus === "never_published" ||
     publishStatus === "unpublished_changes";
-  const shouldSaveBeforePublish = hasPendingChanges;
+  const shouldCreateVersionBeforePublish = hasPendingChanges;
   const publishButtonDisabled =
     isSaving ||
     publishing ||
     publishStatus === null ||
     (!hasPendingChanges && !hasPublishableChanges);
-  const publishButtonText = shouldSaveBeforePublish ? "保存并发布" : "发布";
-  const publishingButtonText = shouldSaveBeforePublish
-    ? "保存并发布中..."
+  const publishButtonText = shouldCreateVersionBeforePublish ? "创建版本并发布" : "发布";
+  const publishingButtonText = shouldCreateVersionBeforePublish
+    ? "创建版本并发布中..."
     : "发布中...";
+  const collabStatuses = [
+    activeCodeCollab.status,
+    activeSchemaCollab.status,
+    projectSchemaCollab.status,
+    workspaceTreeCollab.status,
+    canvasLayoutCollab.status,
+  ];
+  const collabStatusLabel = collabStatuses.includes("error")
+    ? "协同异常"
+    : collabStatuses.includes("offline")
+      ? "离线待同步"
+      : collabStatuses.includes("saving")
+        ? "同步中"
+        : collabStatuses.includes("connecting")
+          ? "连接中"
+          : "草稿已实时保存";
+  const collabUsers = workspaceTreeCollab.awareness.filter(
+    (presence) => presence.userId !== sessionId,
+  );
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -2361,21 +2669,29 @@ ${context}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={isSaving || !hasPendingChanges}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                保存中...
-              </>
-            ) : (
-              "保存"
+          <div className="hidden items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground md:flex">
+            <Users className="h-3.5 w-3.5" />
+            <span>{collabStatusLabel}</span>
+            {collabUsers.length > 0 && (
+              <div className="flex -space-x-1">
+                {collabUsers.slice(0, 4).map((presence) => (
+                  <span
+                    key={`${presence.userId}-${presence.resourcePath}`}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-background text-[10px] font-medium text-white"
+                    title={presence.username}
+                    style={{ backgroundColor: presence.color }}
+                  >
+                    {presence.username.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+              </div>
             )}
-          </Button>
+          </div>
           <Button
             onClick={async () => {
-              if (shouldSaveBeforePublish) {
-                const saved = await handleSave();
-                if (!saved) {
+              if (shouldCreateVersionBeforePublish) {
+                const versionCreated = await handleCreateVersion();
+                if (!versionCreated) {
                   return;
                 }
               }
@@ -2770,7 +3086,7 @@ ${context}
                   folders={demoFolders}
                   onPagesChange={setDemoPages}
                   onFoldersChange={setDemoFolders}
-                  onWorkspaceChange={markWorkspaceChanged}
+                  onWorkspaceChange={handleWorkspaceTreeChanged}
                   activeDemoId={activeDemoId}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
@@ -2835,7 +3151,7 @@ ${context}
                             p.id === pageId ? { ...p, name } : p,
                           ),
                         );
-                        markWorkspaceChanged();
+                        handleWorkspaceTreeChanged();
                         toast({ title: "名称已更新" });
                       } else {
                         toast({
@@ -2875,7 +3191,7 @@ ${context}
                             (a, b) => a.order - b.order,
                           ),
                         );
-                        markWorkspaceChanged();
+                        handleWorkspaceTreeChanged();
                         toast({ title: "页面复制成功" });
                       } else {
                         toast({
@@ -2906,7 +3222,7 @@ ${context}
                       );
                       const data = await res.json();
                       if (data.success) {
-                        markWorkspaceChanged();
+                        handleWorkspaceTreeChanged();
                         setDemoPages((prev) =>
                           prev.filter((p) => p.id !== pageId),
                         );
@@ -3003,6 +3319,24 @@ ${context}
                       <span className="text-sm font-medium">历史</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleCreateVersion}
+                        disabled={isSaving || !hasPendingChanges}
+                        className="h-8 gap-1.5"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            创建中...
+                          </>
+                        ) : (
+                          <>
+                            <History className="h-3.5 w-3.5" />
+                            创建版本
+                          </>
+                        )}
+                      </Button>
                       {publishStatus && (
                         <Badge
                           variant={
@@ -3029,7 +3363,7 @@ ${context}
                     <div className="py-8 text-center text-sm text-muted-foreground">
                       <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>暂无版本历史</p>
-                      <p className="text-xs mt-1">保存编辑后会记录历史</p>
+                      <p className="text-xs mt-1">草稿会自动保存，需要时可手动创建版本</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -3171,7 +3505,7 @@ ${context}
                       screenshotRenderBoxes={canvasScreenshotRenderBoxes}
                       onConsoleEntry={handleConsoleEntry}
                       onError={handlePreviewError}
-                      onPositionableSizes={setPositionableItemSizes}
+                      onPositionableSizes={handlePositionableSizes}
                       knowledgeDocuments={canvasKnowledgeDocuments}
                       onCreateKnowledgeDocument={createCanvasKnowledgeDocument}
                       onUpdateKnowledgeDocument={updateCanvasKnowledgeDocument}
@@ -3353,7 +3687,7 @@ ${context}
                         pageScreenshots[activeDemoId]?.screenshotUrl
                       }
                       onConsoleEntry={handleConsoleEntry}
-                      onPositionableSizes={setPositionableItemSizes}
+                      onPositionableSizes={handlePositionableSizes}
                       visualEditMode={visualEditMode}
                       selectedVisualNodeId={
                         selectedVisualNode?.domPath ||
@@ -3595,6 +3929,9 @@ ${context}
         filePath={wsCodeDialogData.filePath}
         content={wsCodeDialogData.content}
         editable={wsCodeDialogData.editable}
+        projectId={demoId}
+        workspaceId={workspaceId}
+        sessionId={sessionId}
         onSave={async (content) => {
           if (!sessionId) return;
           const res = await fetch(
@@ -3621,7 +3958,14 @@ ${context}
         mode={kbDocDialogMode}
         item={kbDocDialogItem}
         workingDir={tempWorkspace || undefined}
-        onSaved={() => {
+        projectId={demoId}
+        workspaceId={workspaceId}
+        sessionId={sessionId}
+        collabUser={collabUser}
+        onSaved={(item) => {
+          if (item) {
+            upsertKnowledgeItem(item);
+          }
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
@@ -3689,23 +4033,23 @@ ${context}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>未保存的更改</DialogTitle>
+            <DialogTitle>尚未创建版本</DialogTitle>
             <DialogDescription>
-              你有未保存的更改，是否在退出前保存？
+              当前草稿已自动保存。退出前是否创建一个可回退的版本记录？
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={handleDirectExit}>
               直接退出
             </Button>
-            <Button onClick={handleSaveAndExit} disabled={isSaving}>
+            <Button onClick={handleCreateVersionAndExit} disabled={isSaving}>
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  保存中...
+                  创建中...
                 </>
               ) : (
-                "保存并退出"
+                "创建版本并退出"
               )}
             </Button>
           </DialogFooter>

@@ -14,6 +14,8 @@ const SCAFFOLD_VERSION = "0.1.0";
 const PROJECT_FILE = "opencode.project.json";
 const SYNC_STATE_FILE = path.join(".opencode", "sync-state.json");
 const REMOTE_FILE = path.join(".opencode", "remote.json");
+const WORKSPACE_KNOWLEDGE_DIR = "knowledge";
+const DEFAULT_LOCAL_KNOWLEDGE_DIR = "src/knowledge";
 
 interface LocalProjectPage {
   id: string;
@@ -43,6 +45,7 @@ interface LocalProjectManifest {
   appGraph: string | null;
   projectConfig: string | null;
   assetsDir: string;
+  knowledgeDir?: string | null;
 }
 
 interface SyncFileState {
@@ -69,6 +72,7 @@ export interface ProjectScaffoldExport {
   baseVersion: string;
   pages: number;
   assets: number;
+  knowledgeFiles: number;
   entries: ProjectScaffoldEntry[];
 }
 
@@ -161,6 +165,9 @@ function managedFiles(projectDir: string, manifest: LocalProjectManifest): strin
     ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...walkFiles(path.join(projectDir, manifest.assetsDir)).map((file) => relativeTo(projectDir, file)),
+    ...(manifest.knowledgeDir
+      ? walkFiles(path.join(projectDir, manifest.knowledgeDir)).map((file) => relativeTo(projectDir, file))
+      : []),
   ];
   return [...new Set(files)].filter((file) => fs.existsSync(path.join(projectDir, file)));
 }
@@ -189,6 +196,11 @@ function computeSyncStateFromEntries(entries: ProjectScaffoldEntry[], manifest: 
     ...entries
       .map((entry) => entry.path)
       .filter((entryPath) => entryPath.startsWith(`${manifest.assetsDir.replace(/\/$/, "")}/`)),
+    ...(manifest.knowledgeDir
+      ? entries
+          .map((entry) => entry.path)
+          .filter((entryPath) => entryPath.startsWith(`${manifest.knowledgeDir?.replace(/\/$/, "")}/`))
+      : []),
   ];
   const files = Object.fromEntries(
     [...new Set(managedPaths)]
@@ -248,12 +260,43 @@ function validateManifestShape(manifest: LocalProjectManifest | null): Validatio
   if (!manifest.assetsDir || typeof manifest.assetsDir !== "string") {
     issues.push({ code: "ASSETS_DIR_INVALID", message: "assetsDir 必须是字符串", severity: "blocking" });
   }
+  if (
+    manifest.knowledgeDir !== undefined &&
+    manifest.knowledgeDir !== null &&
+    (!manifest.knowledgeDir || typeof manifest.knowledgeDir !== "string")
+  ) {
+    issues.push({ code: "KNOWLEDGE_DIR_INVALID", message: "knowledgeDir 必须是字符串或 null", severity: "blocking" });
+  }
   return issues;
 }
 
 function localAssetFileToWorkspacePath(manifest: LocalProjectManifest, file: string): string {
   const prefix = `${manifest.assetsDir.replace(/\/$/, "")}/`;
   return `assets/${file.slice(prefix.length)}`;
+}
+
+function localKnowledgeFileToWorkspacePath(manifest: LocalProjectManifest, file: string): string {
+  const knowledgeDir = manifest.knowledgeDir ?? DEFAULT_LOCAL_KNOWLEDGE_DIR;
+  const prefix = `${knowledgeDir.replace(/\/$/, "")}/`;
+  return `${WORKSPACE_KNOWLEDGE_DIR}/${file.slice(prefix.length)}`;
+}
+
+function writeWorkspaceKnowledgeFile(workspacePath: string, relativePath: string, data: Buffer): void {
+  const normalized = relativePath.split(/[\\/]+/).filter(Boolean);
+  if (normalized[0] !== WORKSPACE_KNOWLEDGE_DIR || normalized.some((segment) => segment === "..")) {
+    throw new Error(`Invalid knowledge path: ${relativePath}`);
+  }
+  const targetPath = path.join(workspacePath, ...normalized);
+  ensureDir(path.dirname(targetPath));
+  fs.writeFileSync(targetPath, data);
+}
+
+function deleteWorkspaceKnowledgeFile(workspacePath: string, relativePath: string): void {
+  const normalized = relativePath.split(/[\\/]+/).filter(Boolean);
+  if (normalized[0] !== WORKSPACE_KNOWLEDGE_DIR || normalized.some((segment) => segment === "..")) {
+    throw new Error(`Invalid knowledge path: ${relativePath}`);
+  }
+  fs.rmSync(path.join(workspacePath, ...normalized), { force: true });
 }
 
 function mimeTypeForFile(file: string): string | undefined {
@@ -295,6 +338,22 @@ function validateSchemaFile(projectDir: string, relativePath: string, resourceId
       code: "SCHEMA_JSON_INVALID",
       message: `Schema 不是合法 JSON: ${relativePath}`,
       resourceId,
+      severity: "blocking",
+    }];
+  }
+}
+
+function validateKnowledgeManifest(projectDir: string, knowledgeDir: string): ValidationIssue[] {
+  const manifestPath = path.join(projectDir, knowledgeDir, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return [];
+  try {
+    JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    return [];
+  } catch {
+    return [{
+      code: "KNOWLEDGE_MANIFEST_INVALID",
+      message: `${knowledgeDir}/manifest.json 不是合法 JSON`,
+      resourceId: "knowledge/manifest.json",
       severity: "blocking",
     }];
   }
@@ -625,6 +684,7 @@ export function exportProjectScaffoldEntries(
     appGraph: projectPackage.data.appGraph ? "src/app.graph.json" : null,
     projectConfig: projectPackage.data.projectConfigSchema ? "src/project.config.schema.json" : null,
     assetsDir: "src/assets",
+    knowledgeDir: DEFAULT_LOCAL_KNOWLEDGE_DIR,
   };
 
   const entries: ProjectScaffoldEntry[] = [
@@ -667,6 +727,13 @@ export function exportProjectScaffoldEntries(
       data: Buffer.from(asset.dataBase64, "base64"),
     });
   }
+  for (const knowledgeFile of projectPackage.data.knowledgeFiles) {
+    const relativeKnowledgePath = knowledgeFile.path.replace(/^knowledge\//, "");
+    entries.push({
+      path: `${DEFAULT_LOCAL_KNOWLEDGE_DIR}/${relativeKnowledgePath}`,
+      data: Buffer.from(knowledgeFile.dataBase64, "base64"),
+    });
+  }
   entries.push({
     path: SYNC_STATE_FILE,
     data: jsonBuffer(computeSyncStateFromEntries(entries, manifest)),
@@ -677,6 +744,7 @@ export function exportProjectScaffoldEntries(
     baseVersion: manifest.baseVersion,
     pages: manifest.pages.length,
     assets: projectPackage.data.assets.length,
+    knowledgeFiles: projectPackage.data.knowledgeFiles.length,
     entries,
   });
 }
@@ -746,6 +814,9 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
     }
     if (manifest.projectConfig) {
       issues.push(...validateSchemaFile(resolvedDir, manifest.projectConfig, "project"));
+    }
+    if (manifest.knowledgeDir) {
+      issues.push(...validateKnowledgeManifest(resolvedDir, manifest.knowledgeDir));
     }
     if (!readSyncState(resolvedDir)) {
       issues.push({ code: "SYNC_STATE_MISSING", message: ".opencode/sync-state.json 不存在或不是合法 JSON", severity: "warning" });
@@ -936,12 +1007,23 @@ export function submitProjectScaffold(
   const createdAssets = (diff.diffSummary?.created ?? []).filter((file) => file.startsWith(assetPrefix));
   const updatedAssets = (diff.diffSummary?.updated ?? []).filter((file) => file.startsWith(assetPrefix));
   const deletedAssets = (diff.diffSummary?.deleted ?? []).filter((file) => file.startsWith(assetPrefix));
+  const knowledgePrefix = manifest.knowledgeDir ? `${manifest.knowledgeDir.replace(/\/$/, "")}/` : null;
+  const createdKnowledgeFiles = knowledgePrefix
+    ? (diff.diffSummary?.created ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    : [];
+  const updatedKnowledgeFiles = knowledgePrefix
+    ? (diff.diffSummary?.updated ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    : [];
+  const deletedKnowledgeFiles = knowledgePrefix
+    ? (diff.diffSummary?.deleted ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    : [];
 
   const edit = service.beginEdit(manifest.projectId, actor);
   if (!edit.ok || !edit.data) {
     return fail(edit.error?.code ?? "EDIT_BEGIN_FAILED", edit.error?.message ?? "编辑事务打开失败");
   }
   const editId = edit.data.editId;
+  const editWorkspacePath = edit.data.workspacePath;
 
   const remotePageIds = new Set(remote.data.pages.map((page) => page.id));
   const localPageIds = new Set(manifest.pages.map((page) => page.id));
@@ -1067,6 +1149,26 @@ export function submitProjectScaffold(
     return discardAndFail(service, editId, configResult.error?.code ?? "CONFIG_UPDATE_FAILED", configResult.error?.message ?? "项目配置提交失败", {
       validation: configResult.validation,
     });
+  }
+
+  try {
+    for (const file of [...createdKnowledgeFiles, ...updatedKnowledgeFiles]) {
+      writeWorkspaceKnowledgeFile(
+        editWorkspacePath,
+        localKnowledgeFileToWorkspacePath(manifest, file),
+        fs.readFileSync(path.join(resolvedDir, file)),
+      );
+    }
+    for (const file of deletedKnowledgeFiles) {
+      deleteWorkspaceKnowledgeFile(editWorkspacePath, localKnowledgeFileToWorkspacePath(manifest, file));
+    }
+  } catch (error) {
+    return discardAndFail(
+      service,
+      editId,
+      "KNOWLEDGE_SYNC_FAILED",
+      error instanceof Error ? error.message : "知识文档同步失败",
+    );
   }
 
   for (const file of [...createdAssets, ...updatedAssets]) {

@@ -160,6 +160,7 @@ export function isDemoFolder(item: DemoPageItem): item is DemoFolderMeta {
 export interface Project {
   id: string;                  // 项目唯一标识
   name: string;                // 项目名称
+  category?: string;           // 首页项目分类
   description?: string;        // 项目描述
   workspacePath: string;       // 正式工作空间绝对路径
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
@@ -277,6 +278,7 @@ export interface EditSession {
  */
 export interface CreateProjectRequest {
   name: string;
+  category?: string;
   description?: string;
   workspacePath?: string;      // 可选：指定初始工作空间路径
 }
@@ -376,6 +378,7 @@ export interface ProjectListResponse {
   projects: Array<{
     id: string;
     name: string;
+    category?: string;
     description?: string;
     thumbnail?: string;
     currentVersion: string;

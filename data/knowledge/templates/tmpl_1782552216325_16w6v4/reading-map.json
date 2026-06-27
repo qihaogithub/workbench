@@ -1,0 +1,257 @@
+{
+  "id": "reading-map:tmpl_1782552216325_16w6v4",
+  "targetType": "template",
+  "targetId": "tmpl_1782552216325_16w6v4",
+  "overview": {
+    "title": "知识库索引验证模板-扩展版-v2",
+    "scene": "修复 manifest path 索引后生成：包含 3 个页面、全局配置和 4 份知识文档，用于评估 AI 对模板知识库的检索与引用能力。",
+    "pageCount": 3,
+    "configCount": 1,
+    "knowledgeCount": 4,
+    "updatedAt": "2026-06-27T09:23:36.370Z"
+  },
+  "structure": {
+    "pages": [
+      {
+        "id": "page_qhlg",
+        "title": "活动规则首页",
+        "path": "pages/page_qhlg.tsx",
+        "summary": "页面：活动规则首页"
+      },
+      {
+        "id": "page_l0lw",
+        "title": "知识任务页",
+        "path": "pages/page_l0lw.tsx",
+        "summary": "页面：知识任务页"
+      },
+      {
+        "id": "page_cdjg",
+        "title": "中奖履约页",
+        "path": "pages/page_cdjg.tsx",
+        "summary": "页面：中奖履约页"
+      }
+    ],
+    "configs": [
+      {
+        "id": "project-config-schema",
+        "title": "星桥活动全局配置",
+        "path": "project.config.schema.json",
+        "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+      }
+    ],
+    "knowledgeDocuments": [
+      {
+        "id": "knowledge-1",
+        "title": "玩法规则",
+        "path": "knowledge/玩法规则.md",
+        "summary": "知识文档：玩法规则.md",
+        "tags": [
+          "rules",
+          "task",
+          "lottery"
+        ]
+      },
+      {
+        "id": "knowledge-2",
+        "title": "FAQ 与客服口径",
+        "path": "knowledge/FAQ与客服口径.md",
+        "summary": "知识文档：FAQ与客服口径.md",
+        "tags": [
+          "faq",
+          "support"
+        ]
+      },
+      {
+        "id": "knowledge-3",
+        "title": "中奖履约 SOP",
+        "path": "knowledge/中奖履约SOP.md",
+        "summary": "知识文档：中奖履约SOP.md",
+        "tags": [
+          "reward",
+          "fulfillment"
+        ]
+      },
+      {
+        "id": "knowledge-4",
+        "title": "风控与异常处理",
+        "path": "knowledge/风控与异常处理.md",
+        "summary": "知识文档：风控与异常处理.md",
+        "tags": [
+          "risk",
+          "abuse"
+        ]
+      }
+    ],
+    "assets": []
+  },
+  "localSummaries": [
+    {
+      "id": "page_qhlg",
+      "title": "活动规则首页",
+      "path": "pages/page_qhlg.tsx",
+      "summary": "页面：活动规则首页"
+    },
+    {
+      "id": "page_l0lw",
+      "title": "知识任务页",
+      "path": "pages/page_l0lw.tsx",
+      "summary": "页面：知识任务页"
+    },
+    {
+      "id": "page_cdjg",
+      "title": "中奖履约页",
+      "path": "pages/page_cdjg.tsx",
+      "summary": "页面：中奖履约页"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "星桥活动全局配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+    },
+    {
+      "id": "knowledge-1",
+      "title": "玩法规则",
+      "path": "knowledge/玩法规则.md",
+      "summary": "知识文档：玩法规则.md",
+      "tags": [
+        "rules",
+        "task",
+        "lottery"
+      ]
+    },
+    {
+      "id": "knowledge-2",
+      "title": "FAQ 与客服口径",
+      "path": "knowledge/FAQ与客服口径.md",
+      "summary": "知识文档：FAQ与客服口径.md",
+      "tags": [
+        "faq",
+        "support"
+      ]
+    },
+    {
+      "id": "knowledge-3",
+      "title": "中奖履约 SOP",
+      "path": "knowledge/中奖履约SOP.md",
+      "summary": "知识文档：中奖履约SOP.md",
+      "tags": [
+        "reward",
+        "fulfillment"
+      ]
+    },
+    {
+      "id": "knowledge-4",
+      "title": "风控与异常处理",
+      "path": "knowledge/风控与异常处理.md",
+      "summary": "知识文档：风控与异常处理.md",
+      "tags": [
+        "risk",
+        "abuse"
+      ]
+    }
+  ],
+  "taskEntries": [
+    {
+      "taskType": "修改页面",
+      "description": "先阅读相关页面摘要，再打开页面原文。",
+      "recommendedPaths": [
+        "pages/page_qhlg.tsx",
+        "pages/page_l0lw.tsx",
+        "pages/page_cdjg.tsx"
+      ]
+    },
+    {
+      "taskType": "修改配置",
+      "description": "先确认配置 Schema，再结合知识文档判断业务约束。",
+      "recommendedPaths": [
+        "project.config.schema.json",
+        "knowledge/玩法规则.md",
+        "knowledge/FAQ与客服口径.md",
+        "knowledge/中奖履约SOP.md",
+        "knowledge/风控与异常处理.md"
+      ]
+    },
+    {
+      "taskType": "排查异常",
+      "description": "从页面、配置和知识文档三个入口交叉确认。",
+      "recommendedPaths": [
+        "pages/page_qhlg.tsx",
+        "pages/page_l0lw.tsx",
+        "pages/page_cdjg.tsx",
+        "project.config.schema.json",
+        "knowledge/玩法规则.md",
+        "knowledge/FAQ与客服口径.md",
+        "knowledge/中奖履约SOP.md",
+        "knowledge/风控与异常处理.md"
+      ]
+    }
+  ],
+  "originalEntries": [
+    {
+      "id": "page_qhlg",
+      "title": "活动规则首页",
+      "path": "pages/page_qhlg.tsx",
+      "summary": "页面：活动规则首页"
+    },
+    {
+      "id": "page_l0lw",
+      "title": "知识任务页",
+      "path": "pages/page_l0lw.tsx",
+      "summary": "页面：知识任务页"
+    },
+    {
+      "id": "page_cdjg",
+      "title": "中奖履约页",
+      "path": "pages/page_cdjg.tsx",
+      "summary": "页面：中奖履约页"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "星桥活动全局配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：campaignName, rewardPolicy, globalDailyAttemptLimit, addressDeadlineHours, supportEscalationCode"
+    },
+    {
+      "id": "knowledge-1",
+      "title": "玩法规则",
+      "path": "knowledge/玩法规则.md",
+      "summary": "知识文档：玩法规则.md",
+      "tags": [
+        "rules",
+        "task",
+        "lottery"
+      ]
+    },
+    {
+      "id": "knowledge-2",
+      "title": "FAQ 与客服口径",
+      "path": "knowledge/FAQ与客服口径.md",
+      "summary": "知识文档：FAQ与客服口径.md",
+      "tags": [
+        "faq",
+        "support"
+      ]
+    },
+    {
+      "id": "knowledge-3",
+      "title": "中奖履约 SOP",
+      "path": "knowledge/中奖履约SOP.md",
+      "summary": "知识文档：中奖履约SOP.md",
+      "tags": [
+        "reward",
+        "fulfillment"
+      ]
+    },
+    {
+      "id": "knowledge-4",
+      "title": "风控与异常处理",
+      "path": "knowledge/风控与异常处理.md",
+      "summary": "知识文档：风控与异常处理.md",
+      "tags": [
+        "risk",
+        "abuse"
+      ]
+    }
+  ]
+}

@@ -34,7 +34,7 @@ function TestCanvas() {
         pages={[
           {
             id: "page_1",
-            name: "页面一",
+            name: "椤甸潰涓€",
             order: 0,
             code: "export default function Demo(){return null}",
             previewSize: { width: 375, height: 812 },
@@ -64,7 +64,7 @@ function TestEditorCanvas() {
         pages={[
           {
             id: "page_1",
-            name: "页面一",
+            name: "椤甸潰涓€",
             order: 0,
             code: "export default function Demo(){return null}",
             previewSize: { width: 375, height: 812 },
@@ -96,7 +96,7 @@ function TestMultiPageEditorCanvas() {
         pages={[
           {
             id: "page_1",
-            name: "页面一",
+            name: "椤甸潰涓€",
             order: 0,
             code: "export default function Demo(){return null}",
             previewSize: { width: 100, height: 100 },
@@ -171,7 +171,7 @@ function dragMarquee(
   });
 }
 
-describe("PreviewCanvas viewer 交互模式", () => {
+describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
   beforeAll(() => {
     class MockPointerEvent extends MouseEvent {
       pointerId: number;
@@ -270,7 +270,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("显示 viewer 工具栏并隐藏编辑入口", () => {
+  it("鏄剧ず viewer 宸ュ叿鏍忓苟闅愯棌缂栬緫鍏ュ彛", () => {
     render(<TestCanvas />);
 
     expect(screen.getByLabelText("拖动工具")).toBeInTheDocument();
@@ -280,11 +280,15 @@ describe("PreviewCanvas viewer 交互模式", () => {
 
     expect(screen.queryByLabelText("选择工具")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("添加文档")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("添加文字")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("添加箭头")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("画笔")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("添加图片")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("自动排版")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("重置布局")).not.toBeInTheDocument();
   });
 
-  it("editor 模式默认选中选择工具", () => {
+  it("editor 妯″紡榛樿閫変腑閫夋嫨宸ュ叿", () => {
     const { container } = render(<TestEditorCanvas />);
 
     const toolButtons = Array.from(
@@ -294,6 +298,164 @@ describe("PreviewCanvas viewer 交互模式", () => {
     expect(toolButtons).toHaveLength(2);
     expect(toolButtons[0]).toHaveAttribute("aria-pressed", "false");
     expect(toolButtons[1]).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("editor 妯″紡鏄剧ず鑷敱鏍囨敞宸ュ叿鍏ュ彛", () => {
+    render(<TestEditorCanvas />);
+
+    expect(screen.getByLabelText("添加文档")).toBeInTheDocument();
+    expect(screen.getByLabelText("添加文字")).toBeInTheDocument();
+    expect(screen.getByLabelText("添加箭头")).toBeInTheDocument();
+    expect(screen.getByLabelText("画笔")).toBeInTheDocument();
+    expect(screen.getByLabelText("添加图片")).toBeInTheDocument();
+  });
+  it("文字工具在画布目标位置点击后创建文字节点", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("添加文字"));
+    expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 300,
+      clientY: 240,
+      pointerId: 4,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 300,
+      clientY: 240,
+      pointerId: 4,
+    });
+
+    await waitFor(() => {
+      const nodes = Object.values(getCanvasState().nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "text",
+        title: "文字",
+        text: "双击编辑文字",
+        fontSize: 18,
+        color: "#111827",
+        layout: {
+          x: 400,
+          y: 340,
+          width: 240,
+          height: 120,
+        },
+      });
+    });
+  });
+  it("箭头工具支持在画布空白处拖拽创建箭头节点", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("添加箭头"));
+    expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 260,
+      clientY: 220,
+      pointerId: 5,
+    });
+    fireEvent.pointerMove(root, {
+      clientX: 420,
+      clientY: 230,
+      pointerId: 5,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 420,
+      clientY: 230,
+      pointerId: 5,
+    });
+
+    await waitFor(() => {
+      const nodes = Object.values(getCanvasState().nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "arrow",
+        title: "箭头",
+        color: "#2563eb",
+        strokeWidth: 6,
+        direction: "right",
+      });
+      expect(nodes[0].layout.width).toBeGreaterThan(160);
+    });
+  });
+  it("图片工具支持从本地选择图片并在目标位置创建图片节点", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+    const input = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const file = new File(["image-bytes"], "toolbar-hero.png", {
+      type: "image/png",
+    });
+
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 360,
+      clientY: 260,
+      pointerId: 6,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 360,
+      clientY: 260,
+      pointerId: 6,
+    });
+
+    await waitFor(() => {
+      const nodes = Object.values(getCanvasState().nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "image",
+        title: "toolbar-hero.png",
+        fileName: "toolbar-hero.png",
+        intrinsicWidth: 800,
+        intrinsicHeight: 600,
+      });
+      expect(nodes[0].kind === "image" ? nodes[0].src : "").toMatch(
+        /^data:image\/png;base64,/,
+      );
+    });
+  });
+
+  it("鐢荤瑪妯″紡鏀寔鎷栨嫿鍒涘缓缁樺埗鑺傜偣", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("画笔"));
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 200,
+      clientY: 180,
+      pointerId: 3,
+    });
+    fireEvent.pointerMove(root, {
+      clientX: 240,
+      clientY: 220,
+      pointerId: 3,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 280,
+      clientY: 240,
+      pointerId: 3,
+    });
+
+    await waitFor(() => {
+      const nodes = Object.values(getCanvasState().nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "drawing",
+        title: "画笔",
+        color: "#111827",
+        strokeWidth: 4,
+      });
+      expect(
+        nodes[0].kind === "drawing" ? nodes[0].points.length : 0,
+      ).toBeGreaterThanOrEqual(2);
+    });
   });
 
   it("选择工具支持框选多个页面并执行左对齐", async () => {
@@ -316,7 +478,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("多选后支持水平均分页面", async () => {
+  it("澶氶€夊悗鏀寔姘村钩鍧囧垎椤甸潰", async () => {
     const { container } = render(<TestMultiPageEditorCanvas />);
     const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
 
@@ -336,7 +498,58 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("初始加载后自动适应屏幕", async () => {
+  it("鎷栧姩澶氶€変腑鐨勯〉闈㈡椂鍚屾绉诲姩鎵€鏈夐€変腑椤甸潰", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 430, clientY: 260 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
+    });
+
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 200,
+        bottom: 200,
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 150,
+      clientY: 150,
+      pointerId: 2,
+    });
+    fireEvent.pointerMove(page, {
+      clientX: 180,
+      clientY: 190,
+      pointerId: 2,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 180,
+      clientY: 190,
+      pointerId: 2,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.pages.page_1).toMatchObject({ x: 130, y: 140 });
+      expect(state.pages.page_2).toMatchObject({ x: 330, y: 170 });
+      expect(state.pages.page_3).toMatchObject({ x: 520, y: 180 });
+    });
+  });
+
+  it("鍒濆鍔犺浇鍚庤嚜鍔ㄩ€傚簲灞忓箷", async () => {
     render(<TestCanvas />);
 
     const expected = getExpectedFitViewport();
@@ -396,7 +609,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("抓手工具滚轮无需 Ctrl 或 Cmd 即可缩放画布", async () => {
+  it("鎶撴墜宸ュ叿婊氳疆鏃犻渶 Ctrl 鎴?Cmd 鍗冲彲缂╂斁鐢诲竷", async () => {
     const { container } = render(<TestEditorCanvas />);
     const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
     const initialZoom = getCanvasState().viewport.zoom;
@@ -413,7 +626,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("支持工具栏缩放且不移动页面布局", async () => {
+  it("鏀寔宸ュ叿鏍忕缉鏀句笖涓嶇Щ鍔ㄩ〉闈㈠竷灞€", async () => {
     render(<TestCanvas />);
 
     const expected = getExpectedFitViewport();
@@ -465,7 +678,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("支持拖入本地 Markdown 文档并按落点创建文档节点", async () => {
+  it("鏀寔鎷栧叆鏈湴 Markdown 鏂囨。骞舵寜钀界偣鍒涘缓鏂囨。鑺傜偣", async () => {
     render(<TestEditorCanvas />);
     const canvas = screen.getByLabelText("画布工作区");
     const file = new File(["# 导入说明\n\n- 第一项"], "导入说明.md", {
@@ -492,7 +705,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("支持拖入本地图片并按落点创建图片节点", async () => {
+  it("鏀寔鎷栧叆鏈湴鍥剧墖骞舵寜钀界偣鍒涘缓鍥剧墖鑺傜偣", async () => {
     render(<TestEditorCanvas />);
     const canvas = screen.getByLabelText("画布工作区");
     const file = new File(["image-bytes"], "hero.png", {
@@ -524,7 +737,7 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("图片节点缩放时保持图片比例且不添加背景色", async () => {
+  it("鍥剧墖鑺傜偣缂╂斁鏃朵繚鎸佸浘鐗囨瘮渚嬩笖涓嶆坊鍔犺儗鏅壊", async () => {
     const { container } = render(<TestEditorCanvas />);
     const canvas = screen.getByLabelText("画布工作区");
     const file = new File(["image-bytes"], "hero.png", {

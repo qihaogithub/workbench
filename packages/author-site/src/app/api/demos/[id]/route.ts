@@ -9,26 +9,48 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await request.json();
-    const { name } = body;
+    const { name, category } = body as {
+      name?: unknown;
+      category?: unknown;
+    };
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       return NextResponse.json(
         createApiError('INVALID_REQUEST', 'name 参数必填且不能为空'),
         { status: 400 }
       );
     }
 
+    if (category !== undefined && (typeof category !== 'string' || !category.trim())) {
+      return NextResponse.json(
+        createApiError('INVALID_REQUEST', 'category 参数必须是非空字符串'),
+        { status: 400 }
+      );
+    }
+
+    if (name === undefined && category === undefined) {
+      return NextResponse.json(
+        createApiError('INVALID_REQUEST', 'name 或 category 至少提供一项'),
+        { status: 400 }
+      );
+    }
+
     const result = getProjectAdminService().updateProject({
       projectId: id,
-      name: name.trim(),
+      name: typeof name === 'string' ? name.trim() : undefined,
+      category: typeof category === 'string' ? category.trim() : undefined,
     });
     if (!result.ok) return projectAdminResponse(result);
 
-    return NextResponse.json(createApiSuccess({ id, name: result.data?.name }));
+    return NextResponse.json(createApiSuccess({
+      id,
+      name: result.data?.name,
+      category: result.data?.category,
+    }));
   } catch (error) {
     console.error('Error updating project:', error);
     return NextResponse.json(
-      createApiError('FILE_WRITE_ERROR', '更新项目名称失败'),
+      createApiError('FILE_WRITE_ERROR', '更新项目失败'),
       { status: 500 }
     );
   }

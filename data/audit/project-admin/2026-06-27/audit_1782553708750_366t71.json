@@ -1,0 +1,30 @@
+{
+  "auditId": "audit_1782553708750_366t71",
+  "at": 1782553708750,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "resourceId": "edit_1782553706703_hxx7gh",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      ".canvas-layout.json",
+      "demos\\page_t70m\\config.schema.json",
+      "demos\\page_t70m\\index.tsx",
+      "workspace-tree.json"
+    ],
+    "notes": [
+      "生成版本 v5"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

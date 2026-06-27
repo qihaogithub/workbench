@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1782551841424_ryvvu8",
+  "at": 1782551841424,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "config_set_project_schema",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "resourceId": "edit_1782551841349_x1vt6w",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "project.config.schema.json"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

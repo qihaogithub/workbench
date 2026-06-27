@@ -57,12 +57,47 @@ export function useProjectTemplates() {
 
 export async function createDemo(
   name: string,
+  category?: string,
   templateId?: string,
 ): Promise<ApiResponse<DemoMeta>> {
   const response = await fetch('/api/demos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, templateId }),
+    body: JSON.stringify({ name, category, templateId }),
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/demos')
+  }
+
+  return response
+}
+
+export async function duplicateDemo(
+  id: string,
+  input: { name: string; category?: string },
+): Promise<ApiResponse<DemoMeta>> {
+  const response = await fetch(`/api/demos/${id}/duplicate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/demos')
+  }
+
+  return response
+}
+
+export async function updateDemo(
+  id: string,
+  input: { name?: string; category?: string },
+): Promise<ApiResponse<{ id: string; name?: string; category?: string }>> {
+  const response = await fetch(`/api/demos/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
   }).then((res) => res.json())
 
   if (response.success) {

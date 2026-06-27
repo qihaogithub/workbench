@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "path": "玩法规则.md",
+      "title": "玩法规则",
+      "tags": [
+        "rules",
+        "task",
+        "lottery"
+      ]
+    },
+    {
+      "path": "FAQ与客服口径.md",
+      "title": "FAQ 与客服口径",
+      "tags": [
+        "faq",
+        "support"
+      ]
+    },
+    {
+      "path": "中奖履约SOP.md",
+      "title": "中奖履约 SOP",
+      "tags": [
+        "reward",
+        "fulfillment"
+      ]
+    },
+    {
+      "path": "风控与异常处理.md",
+      "title": "风控与异常处理",
+      "tags": [
+        "risk",
+        "abuse"
+      ]
+    }
+  ]
+}

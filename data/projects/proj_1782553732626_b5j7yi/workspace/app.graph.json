@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "page_qhlg",
+      "title": "活动规则首页"
+    },
+    "page-2": {
+      "pageId": "page_l0lw",
+      "title": "知识任务页"
+    },
+    "page-3": {
+      "pageId": "page_cdjg",
+      "title": "中奖履约页"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

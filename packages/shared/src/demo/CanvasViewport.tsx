@@ -16,6 +16,16 @@ interface CanvasSelectionRect {
   height: number;
 }
 
+interface CanvasPointerPoint {
+  x: number;
+  y: number;
+}
+
+interface CanvasCreationDrag {
+  start: CanvasPointerPoint;
+  end: CanvasPointerPoint;
+}
+
 interface CanvasViewportProps {
   viewport: CanvasViewportState;
   onViewportChange: (viewport: CanvasViewportState) => void;
@@ -31,6 +41,13 @@ interface CanvasViewportProps {
   alignmentGuides?: AlignmentGuide[];
   toolMode?: CanvasToolMode;
   onSelectionRectChange?: (rect: CanvasSelectionRect) => void;
+  creationMode?: Extract<CanvasToolMode, "text" | "arrow" | "draw" | "image"> | null;
+  onCanvasPointClick?: (point: CanvasPointerPoint) => void;
+  onArrowCreate?: (drag: CanvasCreationDrag) => void;
+  drawingMode?: boolean;
+  onDrawingStart?: (point: CanvasPointerPoint) => void;
+  onDrawingMove?: (point: CanvasPointerPoint) => void;
+  onDrawingEnd?: (point: CanvasPointerPoint) => void;
 }
 
 const MIN_ZOOM = 0.05;
@@ -52,6 +69,13 @@ export function CanvasViewport({
   alignmentGuides = [],
   toolMode = "hand",
   onSelectionRectChange,
+  creationMode,
+  onCanvasPointClick,
+  onArrowCreate,
+  drawingMode = false,
+  onDrawingStart,
+  onDrawingMove,
+  onDrawingEnd,
 }: CanvasViewportProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
@@ -61,11 +85,17 @@ export function CanvasViewport({
   const [selectionBox, setSelectionBox] =
     useState<CanvasSelectionRect | null>(null);
   const isSelectingRef = useRef(false);
+  const isDrawingRef = useRef(false);
+  const isArrowCreatingRef = useRef(false);
+  const isPointCreatingRef = useRef(false);
+  const creationStartPointRef = useRef<CanvasPointerPoint | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const viewportStartRef = useRef({ x: 0, y: 0 });
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
+  const activeCreationMode =
+    creationMode ?? (drawingMode ? "draw" : null);
   // 记录 pointerDown 时的目标对象 ID（用于 hand 模式下点击后触发选择）
   const clickedPageIdRef = useRef<string | null>(null);
   const clickedNodeIdRef = useRef<string | null>(null);
@@ -123,6 +153,30 @@ export function CanvasViewport({
           height: screenRect.height / zoom,
         },
       };
+    },
+    [],
+  );
+
+  const getCanvasPointFromPointer = useCallback(
+    (clientX: number, clientY: number): CanvasPointerPoint | null => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const zoom = viewportRef.current.zoom || 1;
+      return {
+        x: (clientX - rect.left - viewportRef.current.x) / zoom,
+        y: (clientY - rect.top - viewportRef.current.y) / zoom,
+      };
+    },
+    [],
+  );
+
+  const isBlankCanvasTarget = useCallback(
+    (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return (
+        !target.closest("[data-page-id]") &&
+        !target.closest("[data-canvas-node-id]")
+      );
     },
     [],
   );
@@ -237,6 +291,7 @@ export function CanvasViewport({
   const handlePointerDownCapture = useCallback(
     (e: React.PointerEvent) => {
       if (!canInteractWithViewport) return;
+      if (activeCreationMode) return;
 
       const isPrimaryButton = e.button === 0 || e.button === undefined;
       const isMiddleButton = e.button === 1;
@@ -265,7 +320,7 @@ export function CanvasViewport({
         markInteracting();
       }
     },
-    [canInteractWithViewport, toolMode, spaceHeld, markInteracting],
+    [canInteractWithViewport, activeCreationMode, toolMode, spaceHeld, markInteracting],
   );
 
   // Bubble phase: select-mode background drag starts marquee selection.
@@ -273,6 +328,28 @@ export function CanvasViewport({
     (e: React.PointerEvent) => {
       // hand 模式、空格+左键、中键已在 capture phase 处理
       const isPrimaryButton = e.button === 0 || e.button === undefined;
+      if (activeCreationMode && isPrimaryButton) {
+        if (!isBlankCanvasTarget(e.target)) {
+          return;
+        }
+        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
+        if (!point) return;
+        e.preventDefault();
+        e.stopPropagation();
+        clickedPageIdRef.current = null;
+        clickedNodeIdRef.current = null;
+        creationStartPointRef.current = point;
+        containerRef.current?.setPointerCapture(e.pointerId);
+        if (activeCreationMode === "draw") {
+          isDrawingRef.current = true;
+          onDrawingStart?.(point);
+        } else if (activeCreationMode === "arrow") {
+          isArrowCreatingRef.current = true;
+        } else {
+          isPointCreatingRef.current = true;
+        }
+        return;
+      }
       if (toolMode === "hand" || e.button === 1 || (isPrimaryButton && spaceHeld)) return;
 
       // In select mode, pan is handled by Space or middle mouse.
@@ -292,11 +369,24 @@ export function CanvasViewport({
         }
       }
     },
-    [toolMode, spaceHeld],
+    [
+      activeCreationMode,
+      getCanvasPointFromPointer,
+      isBlankCanvasTarget,
+      onDrawingStart,
+      toolMode,
+      spaceHeld,
+    ],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (isDrawingRef.current) {
+        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
+        if (point) onDrawingMove?.(point);
+        return;
+      }
+
       if (isSelectingRef.current) {
         const selection = getSelectionFromPointer(e.clientX, e.clientY);
         if (!selection) return;
@@ -314,11 +404,47 @@ export function CanvasViewport({
         zoom: viewportRef.current.zoom,
       });
     },
-    [getSelectionFromPointer, onSelectionRectChange, scheduleUpdate],
+    [
+      getCanvasPointFromPointer,
+      getSelectionFromPointer,
+      onDrawingMove,
+      onSelectionRectChange,
+      scheduleUpdate,
+    ],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
+        containerRef.current?.releasePointerCapture(e.pointerId);
+        if (point) onDrawingEnd?.(point);
+        creationStartPointRef.current = null;
+        return;
+      }
+
+      if (isArrowCreatingRef.current) {
+        isArrowCreatingRef.current = false;
+        const start = creationStartPointRef.current;
+        const end = getCanvasPointFromPointer(e.clientX, e.clientY);
+        containerRef.current?.releasePointerCapture(e.pointerId);
+        creationStartPointRef.current = null;
+        if (start && end) onArrowCreate?.({ start, end });
+        return;
+      }
+
+      if (isPointCreatingRef.current) {
+        isPointCreatingRef.current = false;
+        const point =
+          creationStartPointRef.current ??
+          getCanvasPointFromPointer(e.clientX, e.clientY);
+        containerRef.current?.releasePointerCapture(e.pointerId);
+        creationStartPointRef.current = null;
+        if (point) onCanvasPointClick?.(point);
+        return;
+      }
+
       if (isSelectingRef.current) {
         isSelectingRef.current = false;
         const selection = getSelectionFromPointer(e.clientX, e.clientY);
@@ -360,8 +486,12 @@ export function CanvasViewport({
     },
     [
       flushUpdate,
+      getCanvasPointFromPointer,
       getSelectionFromPointer,
       onCanvasClick,
+      onArrowCreate,
+      onCanvasPointClick,
+      onDrawingEnd,
       onNodeClick,
       onPageClick,
       onSelectionRectChange,
@@ -423,7 +553,9 @@ export function CanvasViewport({
 
   // 光标样式：hand 模式显示抓手，select 模式默认光标（空格时显示抓手）
   const cursorClass = canInteractWithViewport
-    ? toolMode === "hand"
+    ? activeCreationMode
+      ? "cursor-crosshair"
+      : toolMode === "hand"
       ? isPanning
         ? "cursor-grabbing"
         : "cursor-grab"

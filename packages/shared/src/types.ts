@@ -1,6 +1,7 @@
 export interface DemoMeta {
   id: string;
   name: string;
+  category?: string;
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;

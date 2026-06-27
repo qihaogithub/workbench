@@ -108,29 +108,22 @@ describe("saveEditSession", () => {
     const workspacePath = getProjectWorkspace(project.id);
     writeMarkerFile(workspacePath, "受保护数据");
 
-    // 在 source 目录中创建一个不可读的子目录，模拟 cpSync 中途失败
-    const sessionPath = getSessionPath(project.id, session.sessionId);
-    const trapDir = path.join(sessionPath, "_trap_dir");
-    fs.mkdirSync(trapDir);
-    fs.writeFileSync(path.join(trapDir, "trap.txt"), "hello");
-    // 设为 mode 000 使 cpSync 递归复制时失败
-    fs.chmodSync(trapDir, 0o000);
+    const originalCpSync = fs.cpSync.bind(fs);
+    const cpSyncSpy = jest.spyOn(fs, "cpSync").mockImplementation(
+      ((src: string | URL, dest: string | URL, options?: fs.CopySyncOptions) => {
+        if (String(dest).endsWith("workspace.tmp")) {
+          throw new Error("mock copy failed");
+        }
+        return originalCpSync(src, dest, options);
+      }) as typeof fs.cpSync,
+    );
 
     const result = saveEditSession(session.sessionId);
+    cpSyncSpy.mockRestore();
 
-    // 恢复权限以便清理
-    fs.chmodSync(trapDir, 0o755);
-
-    // 在当前代码（先删后拷）中，rm 已发生但 cp 失败 → workspace 可能被破坏
-    // 修复后：cp 到临时目录失败 → workspace 应完好
     expect(result.success).toBe(false);
-
-    if (fs.existsSync(workspacePath)) {
-      // 修复后：workspace 完好
-      expect(readMarkerFile(workspacePath)).toBe("受保护数据");
-    }
-    // 若 workspace 不存在，说明旧代码的 rm 已执行但 cp 失败
-    // 这正是我们要修复的问题
+    expect(fs.existsSync(workspacePath)).toBe(true);
+    expect(readMarkerFile(workspacePath)).toBe("受保护数据");
   });
 
   it("存在残留 .tmp 目录时不应影响正常保存", () => {

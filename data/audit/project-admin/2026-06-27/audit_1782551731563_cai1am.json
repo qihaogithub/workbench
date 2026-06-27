@@ -1,0 +1,15 @@
+{
+  "auditId": "audit_1782551731563_cai1am",
+  "at": 1782551731564,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "edit_discard",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "resourceId": "edit_1782551660521_yhjmbi",
+  "ok": true
+}

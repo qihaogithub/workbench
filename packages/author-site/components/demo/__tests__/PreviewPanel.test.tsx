@@ -4,6 +4,17 @@ import { PreviewPanel } from "@opencode-workbench/shared/demo";
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
+function jsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "content-type" ? "application/json" : null,
+    },
+    json: async () => body,
+  } as Response;
+}
+
 describe("PreviewPanel", () => {
   const mockCode = `export default function Demo({ title }: { title: string }) {
     return <h1>{title}</h1>;
@@ -30,10 +41,9 @@ describe("PreviewPanel", () => {
   });
 
   it("应处理编译错误", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: false, error: { message: "语法错误: 第3行" } }),
-    } as Response);
+    mockFetch.mockResolvedValue(
+      jsonResponse({ success: false, error: { message: "语法错误: 第3行" } }),
+    );
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
@@ -54,13 +64,12 @@ describe("PreviewPanel", () => {
   });
 
   it("应渲染 iframe 并正确加载", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValue(
+      jsonResponse({
         success: true,
         data: { compiledCode: "", dependencies: [], cssImports: [] },
       }),
-    } as Response);
+    );
 
     render(
       <PreviewPanel
@@ -75,13 +84,12 @@ describe("PreviewPanel", () => {
   });
 
   it("应支持 scale 缩放属性", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValue(
+      jsonResponse({
         success: true,
         data: { compiledCode: "", dependencies: [], cssImports: [] },
       }),
-    } as Response);
+    );
 
     render(
       <PreviewPanel
@@ -97,13 +105,12 @@ describe("PreviewPanel", () => {
   });
 
   it("配置变更不应触发重新编译，应发送 UPDATE_CONFIG", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValue(
+      jsonResponse({
         success: true,
         data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
       }),
-    } as Response);
+    );
 
     const { rerender } = render(
       <PreviewPanel code={mockCode} configData={{ title: "First" }} />,
@@ -157,13 +164,12 @@ describe("PreviewPanel", () => {
   });
 
   it("收到 LOADED 后应从截图占位切换到真实 iframe", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValue(
+      jsonResponse({
         success: true,
         data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
       }),
-    } as Response);
+    );
 
     render(
       <PreviewPanel
@@ -193,13 +199,12 @@ describe("PreviewPanel", () => {
     });
   });
   it("应支持 sessionId 模式", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValue(
+      jsonResponse({
         success: true,
         data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
       }),
-    } as Response);
+    );
 
     render(<PreviewPanel sessionId="test-session" configData={{}} />);
 

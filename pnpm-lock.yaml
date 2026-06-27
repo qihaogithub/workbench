@@ -90,6 +90,9 @@ importers:
       fastify:
         specifier: ^4.26.0
         version: 4.29.1
+      lib0:
+        specifier: ^0.2.117
+        version: 0.2.117
       pino:
         specifier: ^8.0.0
         version: 8.21.0
@@ -102,6 +105,12 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.20.0
+      y-protocols:
+        specifier: ^1.0.7
+        version: 1.0.7(yjs@13.6.31)
+      yjs:
+        specifier: ^13.6.31
+        version: 13.6.31
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -358,6 +367,15 @@ importers:
       tailwind-merge:
         specifier: ^2.2.1
         version: 2.6.1
+      y-codemirror.next:
+        specifier: ^0.3.5
+        version: 0.3.5(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)(yjs@13.6.31)
+      y-websocket:
+        specifier: ^3.0.0
+        version: 3.0.0(yjs@13.6.31)
+      yjs:
+        specifier: ^13.6.31
+        version: 13.6.31
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.9.1
@@ -589,6 +607,18 @@ importers:
       '@tiptap/extension-placeholder':
         specifier: ^3.22.5
         version: 3.22.5(@tiptap/extensions@3.22.5)
+      '@tiptap/extension-table':
+        specifier: 3.24.0
+        version: 3.24.0(@tiptap/core@3.22.5)(@tiptap/pm@3.22.5)
+      '@tiptap/extension-table-cell':
+        specifier: 3.24.0
+        version: 3.24.0(@tiptap/extension-table@3.24.0)
+      '@tiptap/extension-table-header':
+        specifier: 3.24.0
+        version: 3.24.0(@tiptap/extension-table@3.24.0)
+      '@tiptap/extension-table-row':
+        specifier: 3.24.0
+        version: 3.24.0(@tiptap/extension-table@3.24.0)
       '@tiptap/extension-task-item':
         specifier: ^3.24.0
         version: 3.24.0(@tiptap/extension-list@3.24.0)
@@ -4892,6 +4922,40 @@ packages:
       '@tiptap/core': 3.22.5
     dependencies:
       '@tiptap/core': 3.22.5(@tiptap/pm@3.22.5)
+    dev: false
+
+  /@tiptap/extension-table-cell@3.24.0(@tiptap/extension-table@3.24.0):
+    resolution: {integrity: sha512-jg62iVc1L8tOycSuwZ5i82EGKGuvelCIkpFX7wvHMl9EiPX9fv70enmb4ua9DyLgRtYg/MNrGOdUATRpxWsFRA==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.24.0
+    dependencies:
+      '@tiptap/extension-table': 3.24.0(@tiptap/core@3.22.5)(@tiptap/pm@3.22.5)
+    dev: false
+
+  /@tiptap/extension-table-header@3.24.0(@tiptap/extension-table@3.24.0):
+    resolution: {integrity: sha512-z1TGVoBD5lVX48hpKcrQY5vETB8aCR61Enk5wGl45zNO/sMEMNxYfDKTkMydyOFUWfGqvOPnjDHJqJuT36/19w==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.24.0
+    dependencies:
+      '@tiptap/extension-table': 3.24.0(@tiptap/core@3.22.5)(@tiptap/pm@3.22.5)
+    dev: false
+
+  /@tiptap/extension-table-row@3.24.0(@tiptap/extension-table@3.24.0):
+    resolution: {integrity: sha512-kASEYMWZF9ZqO6DRGz0LiD11c3LPfzOlFiJQVDrOyLP7xkJpHzIAKH0K+8u4aohOziDLn8nz+8I+3xjRS46oGg==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.24.0
+    dependencies:
+      '@tiptap/extension-table': 3.24.0(@tiptap/core@3.22.5)(@tiptap/pm@3.22.5)
+    dev: false
+
+  /@tiptap/extension-table@3.24.0(@tiptap/core@3.22.5)(@tiptap/pm@3.22.5):
+    resolution: {integrity: sha512-lr5elob3uJnB+ltgqPDEeVQmIPRx6JoS0I6z93tOgKsI2mIsaw5ErghteeiCTpExdyax7aWR0fn5pZzLVDQL8A==}
+    peerDependencies:
+      '@tiptap/core': 3.24.0
+      '@tiptap/pm': 3.24.0
+    dependencies:
+      '@tiptap/core': 3.22.5(@tiptap/pm@3.22.5)
+      '@tiptap/pm': 3.22.5
     dev: false
 
   /@tiptap/extension-task-item@3.24.0(@tiptap/extension-list@3.24.0):
@@ -9547,6 +9611,10 @@ packages:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
     dev: true
 
+  /isomorphic.js@0.2.5:
+    resolution: {integrity: sha512-PIeMbHqMt4DnUP3MA/Flc0HElYjMXArsw1qwJZcm9sqR8mq3l8NYizFMty0pWwE/tzIGH3EKK5+jes5mAr85yw==}
+    dev: false
+
   /isstream@0.1.2:
     resolution: {integrity: sha512-Yljz7ffyPbrLpLngrMtZ7NduUgVvi6wG9RJ9IUcyCd59YQ911PBJphODUcbOVbqYfxe1wuYf/LJ8PauMRwsM/g==}
     dev: false
@@ -10286,6 +10354,14 @@ packages:
       prelude-ls: 1.2.1
       type-check: 0.4.0
     dev: true
+
+  /lib0@0.2.117:
+    resolution: {integrity: sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw==}
+    engines: {node: '>=16'}
+    hasBin: true
+    dependencies:
+      isomorphic.js: 0.2.5
+    dev: false
 
   /light-my-request@5.14.0:
     resolution: {integrity: sha512-aORPWntbpH5esaYpGOOmri0OHDOe3wC5M2MQxZ9dvMLZm6DnaAn0kJlcbU9hwsQgLzmZyReKwFwwPkR+nHu5kA==}
@@ -14552,6 +14628,40 @@ packages:
     engines: {node: '>=0.4'}
     dev: false
 
+  /y-codemirror.next@0.3.5(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)(yjs@13.6.31):
+    resolution: {integrity: sha512-VluNu3e5HfEXybnypnsGwKAj+fKLd4iAnR7JuX1Sfyydmn1jCBS5wwEL/uS04Ch2ib0DnMAOF6ZRR/8kK3wyGw==}
+    peerDependencies:
+      '@codemirror/state': ^6.0.0
+      '@codemirror/view': ^6.0.0
+      yjs: ^13.5.6
+    dependencies:
+      '@codemirror/state': 6.6.0
+      '@codemirror/view': 6.43.0
+      lib0: 0.2.117
+      yjs: 13.6.31
+    dev: false
+
+  /y-protocols@1.0.7(yjs@13.6.31):
+    resolution: {integrity: sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      yjs: ^13.0.0
+    dependencies:
+      lib0: 0.2.117
+      yjs: 13.6.31
+    dev: false
+
+  /y-websocket@3.0.0(yjs@13.6.31):
+    resolution: {integrity: sha512-mUHy7AzkOZ834T/7piqtlA8Yk6AchqKqcrCXjKW8J1w2lPtRDjz8W5/CvXz9higKAHgKRKqpI3T33YkRFLkPtg==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      yjs: ^13.5.6
+    dependencies:
+      lib0: 0.2.117
+      y-protocols: 1.0.7(yjs@13.6.31)
+      yjs: 13.6.31
+    dev: false
+
   /y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
@@ -14586,6 +14696,13 @@ packages:
     dependencies:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
+    dev: false
+
+  /yjs@13.6.31:
+    resolution: {integrity: sha512-Eq+5BRfbeGyqGVrTJL3bEcr8gKkxPuyuoHmAwpk52fDb8kOVMrfVSTRPd6yiGgX5Fskb96qCRjzjbRjrL4YEnw==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    dependencies:
+      lib0: 0.2.117
     dev: false
 
   /yn@3.1.1:

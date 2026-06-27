@@ -1,6 +1,7 @@
 export interface DemoMeta {
   id: string;
   name: string;
+  category?: string;
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;
@@ -60,6 +61,45 @@ export interface SessionMeta {
   basedOnVersion?: string;
   opencodeSessionId?: string | null;
   workspaceId?: string;
+}
+
+export type CollabResourceKind =
+  | "page-code"
+  | "page-schema"
+  | "project-schema"
+  | "workspace-tree"
+  | "canvas-layout"
+  | "knowledge-document";
+
+export type CollabSyncStatus =
+  | "connecting"
+  | "synced"
+  | "saving"
+  | "offline"
+  | "error";
+
+export interface CollabSelectionRange {
+  anchor: number;
+  head: number;
+}
+
+export interface CollabPresence {
+  userId: string;
+  username: string;
+  color: string;
+  activePageId?: string;
+  resourcePath: string;
+  cursor?: number;
+  selection?: CollabSelectionRange;
+  lastActiveAt: number;
+}
+
+export interface CollabRoomDescriptor {
+  projectId: string;
+  workspaceId: string;
+  sessionId: string;
+  resourcePath: string;
+  kind: CollabResourceKind;
 }
 
 export interface ApiSuccessResponse<T> {

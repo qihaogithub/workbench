@@ -29,6 +29,20 @@ const actor: ProjectAdminActor = {
   source: "project-scaffold-test",
 };
 
+function runPnpm(args: string[], options: { env?: NodeJS.ProcessEnv } = {}) {
+  const pnpmCli = process.env.npm_execpath;
+  if (pnpmCli) {
+    return spawnSync(process.execPath, [pnpmCli, ...args], {
+      encoding: "utf-8",
+      env: options.env,
+    });
+  }
+  return spawnSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", args, {
+    encoding: "utf-8",
+    env: options.env,
+  });
+}
+
 try {
   const packageSchema = JSON.parse(
     fs.readFileSync(path.join(packageRoot, "src/project-package.schema.json"), "utf-8"),
@@ -62,16 +76,11 @@ try {
   assert.equal(fs.existsSync(path.join(projectDir, "scripts/dev-server.mjs")), true);
   assert.equal(fs.existsSync(path.join(projectDir, "src/app.graph.json")), true);
 
-  const install = spawnSync("pnpm", ["--dir", projectDir, "install", "--lockfile-only"], {
-    encoding: "utf-8",
-  });
+  const install = runPnpm(["--dir", projectDir, "install", "--lockfile-only"]);
   assert.equal(install.status, 0, install.stderr || install.stdout);
-  const localBuild = spawnSync("pnpm", ["--dir", projectDir, "run", "build"], {
-    encoding: "utf-8",
-  });
+  const localBuild = runPnpm(["--dir", projectDir, "run", "build"]);
   assert.equal(localBuild.status, 0, localBuild.stderr || localBuild.stdout);
-  const localDev = spawnSync("pnpm", ["--dir", projectDir, "run", "dev"], {
-    encoding: "utf-8",
+  const localDev = runPnpm(["--dir", projectDir, "run", "dev"], {
     env: {
       ...process.env,
       OW_DEV_ONCE: "1",
@@ -116,11 +125,13 @@ try {
 
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "opencode.project.json"), "utf-8")) as {
     appGraph: string | null;
+    knowledgeDir?: string | null;
     pages: Array<{ id: string; routeKey?: string; entry: string }>;
   };
   assert.equal(manifest.pages[0]?.id, pageId);
   assert.equal(manifest.pages[0]?.routeKey, "page");
   assert.equal(manifest.appGraph, "src/app.graph.json");
+  assert.equal(manifest.knowledgeDir, "src/knowledge");
   fs.appendFileSync(path.join(projectDir, manifest.pages[0]?.entry ?? ""), "\n// local update\n", "utf-8");
 
   const changedDiff = diffProjectScaffold(projectDir);
@@ -142,6 +153,7 @@ try {
   const nextManifest = JSON.parse(fs.readFileSync(nextManifestPath, "utf-8")) as {
     baseVersion: string;
     appGraph: string | null;
+    knowledgeDir?: string | null;
     pages: Array<{ id: string; name: string; routeKey?: string; entry: string; schema: string; parentId: string | null; order: number }>;
     folders: Array<{ id: string; name: string; parentId: string | null; order: number }>;
   };
@@ -172,6 +184,26 @@ try {
   );
   fs.mkdirSync(path.join(projectDir, "src/assets/images"), { recursive: true });
   fs.writeFileSync(path.join(projectDir, "src/assets/images/logo.png"), Buffer.from("fake-image"));
+  fs.mkdirSync(path.join(projectDir, "src/knowledge"), { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, "src/knowledge", "活动规则.md"),
+    "# 活动规则\n\n当前模板要求 rewardPolicy 与页面文案保持一致。",
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(projectDir, "src/knowledge", "manifest.json"),
+    JSON.stringify({
+      items: [
+        {
+          id: "activity-rule",
+          title: "活动规则",
+          fileName: "活动规则.md",
+          description: "解释模板活动规则与 rewardPolicy 的关系。",
+        },
+      ],
+    }, null, 2),
+    "utf-8",
+  );
 
   const structuralSubmit = submitProjectScaffold(service, actor, {
     projectDir,
@@ -186,6 +218,8 @@ try {
   assert.equal(exported.data?.pages.some((item) => item.meta.id === pageId), false);
   assert.equal(exported.data?.folders.some((item) => item.id === "local_folder"), true);
   assert.equal(exported.data?.assets.some((item) => item.path === "assets/images/logo.png"), true);
+  assert.equal(exported.data?.knowledgeFiles.some((item) => item.path === "knowledge/活动规则.md"), true);
+  assert.equal(exported.data?.knowledgeFiles.some((item) => item.path === "knowledge/manifest.json"), true);
 
   const exportedEntries = exportProjectScaffoldEntries(service, actor, { projectId });
   assert.equal(exportedEntries.ok, true);
@@ -193,11 +227,13 @@ try {
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/app.graph.json"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/pages/local_page/index.tsx"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/assets/images/logo.png"), true);
+  assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/knowledge/活动规则.md"), true);
   const zip = buildProjectScaffoldZip(exportedEntries.data?.entries ?? []);
   assert.equal(zip.readUInt32LE(0), 0x04034b50);
   assert.equal(zip.includes(Buffer.from("opencode.project.json", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/app.graph.json", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/pages/local_page/index.tsx", "utf-8")), true);
+  assert.equal(zip.includes(Buffer.from("src/knowledge/活动规则.md", "utf-8")), true);
 
   const structuralDiff = diffProjectScaffold(projectDir);
   assert.equal(structuralDiff.ok, true);
@@ -213,6 +249,12 @@ try {
   assert.equal(template.ok, true);
   const templateId = template.data?.id ?? "";
   assert.ok(templateId);
+  const templateReadingMap = JSON.parse(
+    fs.readFileSync(path.join(tempDir, "knowledge", "templates", templateId, "reading-map.json"), "utf-8"),
+  ) as { overview: { knowledgeCount: number }; structure: { knowledgeDocuments: Array<{ title: string; path: string }> } };
+  assert.equal(templateReadingMap.overview.knowledgeCount, 1);
+  assert.equal(templateReadingMap.structure.knowledgeDocuments[0]?.title, "活动规则");
+  assert.equal(templateReadingMap.structure.knowledgeDocuments[0]?.path, "knowledge/活动规则.md");
 
   const templateDir = path.join(tempDir, "template-local-project");
   const initializedTemplate = initTemplateScaffold(service, actor, {
@@ -222,6 +264,7 @@ try {
   });
   assert.equal(initializedTemplate.ok, true);
   assert.equal(fs.existsSync(path.join(templateDir, "opencode.project.json")), true);
+  assert.equal(fs.existsSync(path.join(templateDir, "src/knowledge/活动规则.md")), true);
 
   const submittedTemplate = submitTemplateScaffold(service, actor, {
     projectDir: templateDir,

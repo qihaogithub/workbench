@@ -1,0 +1,83 @@
+{
+  "startedAt": "2026-06-27T09:48:52.284Z",
+  "command": "instantiate",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "templateId": "tmpl_1782553726249_gidos1",
+  "instantiatedProjectId": "proj_1782553732626_b5j7yi",
+  "instantiated": {
+    "created": {
+      "ok": true,
+      "data": {
+        "id": "proj_1782553732626_b5j7yi",
+        "name": "知识库AI跨项目指标验证-1782553732285",
+        "createdAt": 1782553732626.9607,
+        "updatedAt": 1782553732670.113,
+        "demoCount": 4,
+        "demoPages": [
+          {
+            "id": "page_qhlg",
+            "name": "活动规则首页",
+            "routeKey": "page",
+            "order": 0,
+            "parentId": null
+          },
+          {
+            "id": "page_l0lw",
+            "name": "知识任务页",
+            "routeKey": "page-2",
+            "order": 1,
+            "parentId": null
+          },
+          {
+            "id": "page_cdjg",
+            "name": "中奖履约页",
+            "routeKey": "page-3",
+            "order": 2,
+            "parentId": null
+          },
+          {
+            "id": "page_t70m",
+            "name": "圆形知识雷达页",
+            "routeKey": "page-4",
+            "order": 3,
+            "parentId": null
+          }
+        ]
+      },
+      "auditId": "audit_1782553732671_7czrzb",
+      "diffSummary": {
+        "created": [
+          "project:proj_1782553732626_b5j7yi"
+        ]
+      },
+      "nextActions": [
+        "edit_begin",
+        "project_get"
+      ]
+    },
+    "projectId": "proj_1782553732626_b5j7yi"
+  },
+  "static": {
+    "pageCount": 4,
+    "circularPagePresent": true,
+    "circularPreviewIsSquare": true,
+    "knowledgeDocumentCount": 4,
+    "canvasDocumentNodeCount": 4,
+    "canvasPageLayoutCount": 4,
+    "templateReadingMap": {
+      "pageCount": 4,
+      "configCount": 1,
+      "knowledgeCount": 4,
+      "sourcePaths": [
+        "knowledge/玩法规则.md",
+        "knowledge/FAQ与客服口径.md",
+        "knowledge/中奖履约SOP.md",
+        "knowledge/风控与异常处理.md"
+      ]
+    },
+    "instantiatedCanvasDocumentNodeCount": 4
+  },
+  "finishedAt": "2026-06-27T09:48:52.695Z",
+  "failures": [],
+  "ok": true
+}

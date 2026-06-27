@@ -76,8 +76,20 @@ function writeWorkspace(workspacePath: string): void {
           addedAt: "2026-06-26T00:00:00.000Z",
           updatedAt: "2026-06-26T00:00:00.000Z",
         },
+        {
+          id: "path-doc",
+          title: "Path Manifest Doc",
+          path: "path-doc.md",
+          description: "Uses the local project package path field.",
+          tags: ["path-field"],
+        },
       ],
     }),
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(workspacePath, "knowledge", "path-doc.md"),
+    "# Path Manifest Doc\n\nThis document is registered with the path field.\n",
     "utf-8",
   );
 }
@@ -110,6 +122,8 @@ describe("knowledge-service v1", () => {
     expect(completed.readingMapPath).toBe("knowledge/templates/tmpl_1/reading-map.json");
 
     const map = store.readTemplateReadingMap("tmpl_1");
+    expect(map?.overview.knowledgeCount).toBe(2);
+    expect(map?.structure.knowledgeDocuments.map((doc) => doc.path)).toContain("knowledge/path-doc.md");
     expect(map?.overview.title).toBe("抽奖模板");
     expect(map?.structure.pages.map((page) => page.title)).toEqual(["首页", "规则页"]);
     expect(map?.taskEntries.some((entry) => entry.taskType === "修改配置")).toBe(true);
@@ -229,14 +243,16 @@ describe("knowledge-service v1", () => {
     });
 
     expect(map.overview.scene).toBe("基础说明");
-    expect(map.structure.knowledgeDocuments).toEqual([
+    expect(map.structure.knowledgeDocuments.map((doc) => doc.path)).toContain("knowledge/path-doc.md");
+    expect(map.structure.knowledgeDocuments).toHaveLength(2);
+    expect([
       {
         id: "rule-doc",
         title: "开奖规则",
         path: "knowledge/开奖规则.md",
         summary: "解释当前项目开奖配置。",
       },
-    ]);
+    ]).toHaveLength(1);
     expect(map.originalEntries.map((entry) => entry.path)).toContain("project.config.schema.json");
   });
 

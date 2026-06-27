@@ -1,0 +1,198 @@
+import fs from "fs";
+import path from "path";
+
+import type { CollabResourceKind } from "@opencode-workbench/shared";
+
+export interface SessionValidation {
+  ok: boolean;
+  reason?: string;
+  userId?: string;
+  username?: string;
+  workspacePath?: string;
+}
+
+interface SessionMetaFile {
+  sessionId?: string;
+  demoId?: string;
+  userId?: string;
+  username?: string;
+  workspaceId?: string;
+  expiresAt?: number;
+}
+
+interface WorkspaceMetaFile {
+  workspaceId?: string;
+  demoId?: string;
+  userId?: string;
+}
+
+export class WorkspaceFilePersistence {
+  readonly dataDir: string;
+
+  constructor(dataDir = process.env.DATA_DIR ?? path.join(process.cwd(), "data")) {
+    this.dataDir = dataDir;
+  }
+
+  validateSession(input: {
+    projectId: string;
+    workspaceId: string;
+    sessionId: string;
+    resourcePath: string;
+    kind: CollabResourceKind;
+  }): SessionValidation {
+    const session = this.findSessionMeta(input.sessionId);
+    if (!session) return { ok: false, reason: "SESSION_NOT_FOUND" };
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      return { ok: false, reason: "SESSION_EXPIRED" };
+    }
+    if (session.demoId !== input.projectId) {
+      return { ok: false, reason: "PROJECT_MISMATCH" };
+    }
+    if (session.workspaceId !== input.workspaceId) {
+      return { ok: false, reason: "WORKSPACE_MISMATCH" };
+    }
+
+    const workspacePath = this.findWorkspacePath(input.workspaceId);
+    if (!workspacePath) return { ok: false, reason: "WORKSPACE_NOT_FOUND" };
+
+    const workspaceMeta = this.readWorkspaceMeta(workspacePath);
+    if (workspaceMeta?.demoId && workspaceMeta.demoId !== input.projectId) {
+      return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };
+    }
+    if (workspaceMeta?.userId && session.userId && workspaceMeta.userId !== session.userId) {
+      return { ok: false, reason: "WORKSPACE_USER_MISMATCH" };
+    }
+
+    const safePath = this.resolveResourcePath(workspacePath, input.resourcePath, input.kind);
+    if (!safePath) return { ok: false, reason: "INVALID_RESOURCE_PATH" };
+
+    return {
+      ok: true,
+      userId: session.userId,
+      username: session.username ?? session.userId,
+      workspacePath,
+    };
+  }
+
+  readResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind): string {
+    const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
+    if (!filePath || !fs.existsSync(filePath)) return "";
+    return fs.readFileSync(filePath, "utf-8");
+  }
+
+  writeResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind, content: string): void {
+    const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
+    if (!filePath) throw new Error("INVALID_RESOURCE_PATH");
+
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    fs.writeFileSync(tmpPath, content, "utf-8");
+    fs.renameSync(tmpPath, filePath);
+    this.touchWorkspace(workspacePath);
+  }
+
+  resolveResourcePath(
+    workspacePath: string,
+    resourcePath: string,
+    kind: CollabResourceKind,
+  ): string | null {
+    const normalized = resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
+    if (normalized.includes("\0") || normalized.split("/").includes("..")) {
+      return null;
+    }
+    if (!this.isAllowedResource(normalized, kind)) return null;
+
+    const fullPath = path.resolve(workspacePath, normalized);
+    const root = path.resolve(workspacePath);
+    if (fullPath !== root && !fullPath.startsWith(`${root}${path.sep}`)) {
+      return null;
+    }
+    return fullPath;
+  }
+
+  private isAllowedResource(resourcePath: string, kind: CollabResourceKind): boolean {
+    if (kind === "page-code") return /^demos\/[^/]+\/index\.tsx$/.test(resourcePath);
+    if (kind === "page-schema") return /^demos\/[^/]+\/config\.schema\.json$/.test(resourcePath);
+    if (kind === "project-schema") return resourcePath === "project.config.schema.json";
+    if (kind === "workspace-tree") return resourcePath === "workspace-tree.json";
+    if (kind === "canvas-layout") return resourcePath === ".canvas-layout.json";
+    if (kind === "knowledge-document") {
+      return /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(resourcePath);
+    }
+    return false;
+  }
+
+  private findSessionMeta(sessionId: string): SessionMetaFile | null {
+    const sessionsDir = path.join(this.dataDir, "sessions");
+    if (!fs.existsSync(sessionsDir)) return null;
+    return this.findJsonFile<SessionMetaFile>(sessionsDir, ".session.json", (meta) => meta.sessionId === sessionId);
+  }
+
+  private findWorkspacePath(workspaceId: string): string | null {
+    const workspacesDir = path.join(this.dataDir, "workspaces");
+    if (!fs.existsSync(workspacesDir)) return null;
+    const found = this.findJsonPath(workspacesDir, ".workspace.json", (meta: WorkspaceMetaFile) => {
+      return meta.workspaceId === workspaceId;
+    });
+    return found ? path.dirname(found) : null;
+  }
+
+  private readWorkspaceMeta(workspacePath: string): WorkspaceMetaFile | null {
+    const metaPath = path.join(workspacePath, ".workspace.json");
+    if (!fs.existsSync(metaPath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMetaFile;
+    } catch {
+      return null;
+    }
+  }
+
+  private touchWorkspace(workspacePath: string): void {
+    const metaPath = path.join(workspacePath, ".workspace.json");
+    if (!fs.existsSync(metaPath)) return;
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMetaFile & { updatedAt?: number };
+      meta.updatedAt = Date.now();
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    } catch {
+      /* Ignore malformed workspace metadata; the file content was already saved. */
+    }
+  }
+
+  private findJsonFile<T>(
+    root: string,
+    filename: string,
+    predicate: (value: T) => boolean,
+  ): T | null {
+    const foundPath = this.findJsonPath(root, filename, predicate);
+    if (!foundPath) return null;
+    try {
+      return JSON.parse(fs.readFileSync(foundPath, "utf-8")) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  private findJsonPath<T>(
+    root: string,
+    filename: string,
+    predicate: (value: T) => boolean,
+  ): string | null {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(root, entry.name);
+      if (entry.isDirectory()) {
+        const nested = this.findJsonPath(entryPath, filename, predicate);
+        if (nested) return nested;
+      } else if (entry.isFile() && entry.name === filename) {
+        try {
+          const value = JSON.parse(fs.readFileSync(entryPath, "utf-8")) as T;
+          if (predicate(value)) return entryPath;
+        } catch {
+          continue;
+        }
+      }
+    }
+    return null;
+  }
+}

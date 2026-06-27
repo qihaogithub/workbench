@@ -18,6 +18,7 @@ covers:
 # Project Admin CLI 能力层
 
 > 更新日期：2026-06-26
+> 迁移说明：当前 CLI 长期文档已独立到 [10-CLI 模块](../../10-CLI/)。本文保留为项目管理模块内的历史归档入口。
 
 Project Admin CLI 是项目管理模块面向编码代理的本地 shell 入口。它直接调用 `project-core`，让 Agent 通过普通终端命令完成项目、模板、页面、配置、资产、发布、审计和 AI 会话管理。
 

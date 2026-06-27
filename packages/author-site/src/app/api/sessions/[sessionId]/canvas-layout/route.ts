@@ -62,6 +62,36 @@ function readString(record: Record<string, unknown>, key: string): string | null
   return typeof value === "string" ? value : null;
 }
 
+function readBoolean(record: Record<string, unknown>, key: string): boolean | null {
+  const value = record[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function readStringArray(
+  record: Record<string, unknown>,
+  key: string,
+): string[] | null {
+  const value = record[key];
+  if (!Array.isArray(value)) return null;
+  const strings = value.filter((item): item is string => typeof item === "string");
+  return strings.length === value.length ? strings : null;
+}
+
+function parseDrawingPoints(value: unknown): Array<{ x: number; y: number }> | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+
+  const points = value.map((item) => {
+    if (!isRecord(item)) return null;
+    const x = readNumber(item, "x");
+    const y = readNumber(item, "y");
+    if (x === null || y === null) return null;
+    return { x, y };
+  });
+
+  if (points.some((point) => point === null)) return null;
+  return points as Array<{ x: number; y: number }>;
+}
+
 function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   if (!isRecord(value)) return null;
 
@@ -81,12 +111,16 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   if (kind === "document") {
     const markdown = readString(value, "markdown");
     const knowledgeDocument = parseKnowledgeDocument(value.knowledgeDocument);
+    const collapsed = readBoolean(value, "collapsed");
+    const expandedHeight = readNumber(value, "expandedHeight");
     if (markdown === null && !knowledgeDocument) return null;
     return {
       ...base,
       kind,
       ...(markdown === null ? {} : { markdown }),
       ...(knowledgeDocument ? { knowledgeDocument } : {}),
+      ...(collapsed === null ? {} : { collapsed }),
+      ...(expandedHeight === null ? {} : { expandedHeight }),
     };
   }
 
@@ -104,6 +138,59 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
       ...(intrinsicWidth !== null && intrinsicHeight !== null
         ? { intrinsicWidth, intrinsicHeight }
         : {}),
+    };
+  }
+
+  if (kind === "text") {
+    const text = readString(value, "text");
+    const fontSize = readNumber(value, "fontSize");
+    const color = readString(value, "color");
+    const backgroundColor = readString(value, "backgroundColor");
+    if (!text || fontSize === null || fontSize <= 0 || !color) return null;
+    return {
+      ...base,
+      kind,
+      text,
+      fontSize,
+      color,
+      ...(backgroundColor ? { backgroundColor } : {}),
+    };
+  }
+
+  if (kind === "arrow") {
+    const color = readString(value, "color");
+    const strokeWidth = readNumber(value, "strokeWidth");
+    const direction = readString(value, "direction");
+    if (
+      !color ||
+      strokeWidth === null ||
+      strokeWidth <= 0 ||
+      !["right", "left", "down", "up"].includes(direction ?? "")
+    ) {
+      return null;
+    }
+    return {
+      ...base,
+      kind,
+      color,
+      strokeWidth,
+      direction: direction as "right" | "left" | "down" | "up",
+    };
+  }
+
+  if (kind === "drawing") {
+    const color = readString(value, "color");
+    const strokeWidth = readNumber(value, "strokeWidth");
+    const points = parseDrawingPoints(value.points);
+    if (!color || strokeWidth === null || strokeWidth <= 0 || !points) {
+      return null;
+    }
+    return {
+      ...base,
+      kind,
+      points,
+      color,
+      strokeWidth,
     };
   }
 
@@ -167,6 +254,9 @@ function parseCanvasState(value: unknown): CanvasState | null {
     }
   }
 
+  const hiddenKnowledgeDocumentIds =
+    readStringArray(value, "hiddenKnowledgeDocumentIds") ?? undefined;
+
   return {
     viewport: {
       x: viewportX,
@@ -175,6 +265,7 @@ function parseCanvasState(value: unknown): CanvasState | null {
     },
     pages,
     ...(nodes ? { nodes } : {}),
+    ...(hiddenKnowledgeDocumentIds ? { hiddenKnowledgeDocumentIds } : {}),
   };
 }
 
