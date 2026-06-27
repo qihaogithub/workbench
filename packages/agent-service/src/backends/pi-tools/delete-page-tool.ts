@@ -80,29 +80,28 @@ const DeletePagesParams = Type.Object({
 
 type DeletePagesParams = Static<typeof DeletePagesParams>;
 
-const PreviewDeletePagesParams = Type.Union([
-  Type.Object({
-    mode: Type.Literal('nameIncludes'),
-    query: Type.String({
-      minLength: 1,
-      description: 'Text that target page names must include, for example "副本".',
-    }),
+const PreviewDeletePagesParams = Type.Object({
+  mode: Type.Union([
+    Type.Literal('nameIncludes'),
+    Type.Literal('folderId'),
+    Type.Literal('explicitIds'),
+  ], {
+    description: 'How to select pages for the deletion preview.',
   }),
-  Type.Object({
-    mode: Type.Literal('folderId'),
-    query: Type.String({
-      minLength: 1,
-      description: 'Exact folder ID whose direct child pages should be deleted.',
-    }),
-  }),
-  Type.Object({
-    mode: Type.Literal('explicitIds'),
-    pageIds: Type.Array(
-      Type.String({ description: 'Exact page IDs from listPages.' }),
-      { minItems: 1 },
-    ),
-  }),
-]);
+  query: Type.Optional(Type.String({
+    minLength: 1,
+    description: 'Required for nameIncludes and folderId modes. Name substring or exact folder ID.',
+  })),
+  pageIds: Type.Optional(Type.Array(
+    Type.String({ description: 'Exact page IDs from listPages.' }),
+    {
+      minItems: 1,
+      description: 'Required for explicitIds mode.',
+    },
+  )),
+}, {
+  additionalProperties: false,
+});
 
 type PreviewDeletePagesParams = Static<typeof PreviewDeletePagesParams>;
 
@@ -473,11 +472,29 @@ export function createPreviewDeletePagesTool(
 
       try {
         const pages = listPages(workingDir);
-        const pageIds = args.mode === 'explicitIds'
-          ? Array.from(new Set(args.pageIds))
-          : args.mode === 'folderId'
-            ? pages.filter((page) => page.parentId === args.query).map((page) => page.id)
-            : pages.filter((page) => page.name.includes(args.query)).map((page) => page.id);
+        let pageIds: string[];
+        if (args.mode === 'explicitIds') {
+          if (!Array.isArray(args.pageIds) || args.pageIds.length === 0) {
+            return {
+              content: [{ type: 'text' as const, text: 'Error: explicitIds mode requires non-empty pageIds.' }],
+              details: { error: 'missing_page_ids', mode: args.mode },
+              isError: true,
+            };
+          }
+          pageIds = Array.from(new Set(args.pageIds));
+        } else {
+          if (!args.query) {
+            return {
+              content: [{ type: 'text' as const, text: `Error: ${args.mode} mode requires query.` }],
+              details: { error: 'missing_query', mode: args.mode },
+              isError: true,
+            };
+          }
+          const query = args.query;
+          pageIds = args.mode === 'folderId'
+            ? pages.filter((page) => page.parentId === query).map((page) => page.id)
+            : pages.filter((page) => page.name.includes(query)).map((page) => page.id);
+        }
 
         const byId = new Map(pages.map((page) => [page.id, page]));
         const matchedPages = pageIds

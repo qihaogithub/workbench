@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  BetweenHorizontalStart,
+  BetweenVerticalStart,
+} from "lucide-react";
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem } from "./CanvasPageItem";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
@@ -43,6 +53,23 @@ interface CanvasImportFile {
 interface CanvasPoint {
   x: number;
   y: number;
+}
+
+type MultiPageAlignAction =
+  | "left"
+  | "center-x"
+  | "right"
+  | "top"
+  | "center-y"
+  | "bottom"
+  | "distribute-x"
+  | "distribute-y";
+
+interface CanvasRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 const MARKDOWN_FILE_EXTENSIONS = [".md", ".markdown", ".mdown"];
@@ -114,6 +141,29 @@ function getCanvasLayoutSignature(
       ].join(":"),
     )
     .join("|");
+}
+
+function getLayoutBounds(layouts: CanvasPageLayout[]): CanvasRect | null {
+  if (layouts.length === 0) return null;
+  const left = Math.min(...layouts.map((layout) => layout.x));
+  const top = Math.min(...layouts.map((layout) => layout.y));
+  const right = Math.max(...layouts.map((layout) => layout.x + layout.width));
+  const bottom = Math.max(...layouts.map((layout) => layout.y + layout.height));
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+function rectsIntersect(a: CanvasRect, b: CanvasRect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
 }
 
 const SNAP_THRESHOLD = 8; // 吸附阈值（px）
@@ -275,6 +325,10 @@ export function PreviewCanvas({
   onError,
   focusPageId,
   onPositionableSizes,
+  knowledgeDocuments,
+  onCreateKnowledgeDocument,
+  onUpdateKnowledgeDocument,
+  onReadKnowledgeDocument,
 }: PreviewCanvasProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const isEditorMode = resolvedInteractionMode === "editor";
@@ -290,13 +344,20 @@ export function PreviewCanvas({
   const [activeDragItemId, setActiveDragItemId] = useState<string | null>(null);
   const [documentDraft, setDocumentDraft] = useState<{
     nodeId?: string;
+    knowledgeDocumentId?: string;
     markdown: string;
+    title?: string;
   } | null>(null);
+  const [knowledgeDocumentMarkdown, setKnowledgeDocumentMarkdown] = useState<
+    Record<string, string>
+  >({});
+  const [documentSaving, setDocumentSaving] = useState(false);
   const [draggingFileOver, setDraggingFileOver] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
 
   // 工具模式状态
-  const [toolMode, setToolMode] = useState<CanvasToolMode>("hand");
+  const [toolMode, setToolMode] = useState<CanvasToolMode>("select");
   const effectiveToolMode: CanvasToolMode = isEditorMode ? toolMode : "hand";
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -317,6 +378,25 @@ export function PreviewCanvas({
   const pageIds = useMemo(() => new Set(pages.map((page) => page.id)), [pages]);
 
   const effectiveNodes = canvasState.nodes ?? {};
+  const knowledgeDocumentsById = useMemo(
+    () =>
+      new Map(
+        (knowledgeDocuments ?? []).map((document) => [document.id, document]),
+      ),
+    [knowledgeDocuments],
+  );
+
+  const selectedPageLayouts = useMemo(
+    () =>
+      selectedPageIds
+        .map((pageId) => effectivePages[pageId])
+        .filter((layout): layout is CanvasPageLayout => Boolean(layout)),
+    [effectivePages, selectedPageIds],
+  );
+  const selectedPageBounds = useMemo(
+    () => getLayoutBounds(selectedPageLayouts),
+    [selectedPageLayouts],
+  );
 
   const pageResourceDescriptors = useMemo(() => {
     return Object.fromEntries(
@@ -354,8 +434,15 @@ export function PreviewCanvas({
 
   const handleCanvasClick = useCallback(() => {
     setSelectedNodeId(null);
+    setSelectedPageIds([]);
     onCanvasClick?.();
   }, [onCanvasClick]);
+
+  useEffect(() => {
+    setSelectedPageIds((current) =>
+      current.filter((pageId) => pageIds.has(pageId)),
+    );
+  }, [pageIds]);
 
   const handleLayoutChange = useCallback(
     (pageId: string, layout: CanvasPageLayout) => {
@@ -365,6 +452,127 @@ export function PreviewCanvas({
       }));
     },
     [updateState],
+  );
+
+  const handleSelectionRectChange = useCallback(
+    (rect: CanvasRect) => {
+      if (!isEditorMode || effectiveToolMode !== "select") return;
+      if (rect.width < 2 && rect.height < 2) {
+        setSelectedPageIds([]);
+        return;
+      }
+
+      const nextSelectedPageIds = pages
+        .filter((page) => {
+          const layout = effectivePages[page.id];
+          if (!layout) return false;
+          return rectsIntersect(rect, layout);
+        })
+        .map((page) => page.id);
+
+      setSelectedNodeId(null);
+      setSelectedPageIds(nextSelectedPageIds);
+    },
+    [effectivePages, effectiveToolMode, isEditorMode, pages],
+  );
+
+  const handlePageSelect = useCallback(
+    (pageId: string) => {
+      if (isEditorMode && effectiveToolMode === "select") {
+        setSelectedNodeId(null);
+        setSelectedPageIds([pageId]);
+      }
+      onPageConfigEdit?.(pageId);
+    },
+    [effectiveToolMode, isEditorMode, onPageConfigEdit],
+  );
+
+  const updateSelectedPageLayouts = useCallback(
+    (action: MultiPageAlignAction) => {
+      if (selectedPageIds.length < 2 || !selectedPageBounds) return;
+
+      updateState((prev) => {
+        const selectedLayouts = selectedPageIds
+          .map((pageId) => [pageId, effectivePages[pageId]] as const)
+          .filter((entry): entry is readonly [string, CanvasPageLayout] =>
+            Boolean(entry[1]),
+          );
+        if (selectedLayouts.length < 2) return prev;
+
+        const nextPages = { ...prev.pages };
+
+        if (action === "distribute-x") {
+          if (selectedLayouts.length < 3) return prev;
+          const sorted = [...selectedLayouts].sort(
+            ([, a], [, b]) => a.x - b.x,
+          );
+          const totalWidth = sorted.reduce(
+            (sum, [, layout]) => sum + layout.width,
+            0,
+          );
+          const gap = (selectedPageBounds.width - totalWidth) / (sorted.length - 1);
+          let cursor = selectedPageBounds.x;
+          for (const [pageId, layout] of sorted) {
+            nextPages[pageId] = { ...layout, x: cursor };
+            cursor += layout.width + gap;
+          }
+          return { ...prev, pages: nextPages };
+        }
+
+        if (action === "distribute-y") {
+          if (selectedLayouts.length < 3) return prev;
+          const sorted = [...selectedLayouts].sort(
+            ([, a], [, b]) => a.y - b.y,
+          );
+          const totalHeight = sorted.reduce(
+            (sum, [, layout]) => sum + layout.height,
+            0,
+          );
+          const gap =
+            (selectedPageBounds.height - totalHeight) / (sorted.length - 1);
+          let cursor = selectedPageBounds.y;
+          for (const [pageId, layout] of sorted) {
+            nextPages[pageId] = { ...layout, y: cursor };
+            cursor += layout.height + gap;
+          }
+          return { ...prev, pages: nextPages };
+        }
+
+        for (const [pageId, layout] of selectedLayouts) {
+          if (action === "left") {
+            nextPages[pageId] = { ...layout, x: selectedPageBounds.x };
+          } else if (action === "center-x") {
+            nextPages[pageId] = {
+              ...layout,
+              x: selectedPageBounds.x + selectedPageBounds.width / 2 - layout.width / 2,
+            };
+          } else if (action === "right") {
+            nextPages[pageId] = {
+              ...layout,
+              x: selectedPageBounds.x + selectedPageBounds.width - layout.width,
+            };
+          } else if (action === "top") {
+            nextPages[pageId] = { ...layout, y: selectedPageBounds.y };
+          } else if (action === "center-y") {
+            nextPages[pageId] = {
+              ...layout,
+              y:
+                selectedPageBounds.y +
+                selectedPageBounds.height / 2 -
+                layout.height / 2,
+            };
+          } else if (action === "bottom") {
+            nextPages[pageId] = {
+              ...layout,
+              y: selectedPageBounds.y + selectedPageBounds.height - layout.height,
+            };
+          }
+        }
+
+        return { ...prev, pages: nextPages };
+      });
+    },
+    [effectivePages, selectedPageBounds, selectedPageIds, updateState],
   );
 
   const handleNodeLayoutChange = useCallback(
@@ -453,6 +661,101 @@ export function PreviewCanvas({
     },
     [updateState],
   );
+
+  useEffect(() => {
+    if (!knowledgeDocuments) return;
+
+    updateState((prev) => {
+      const nodes = prev.nodes ?? {};
+      const validKnowledgeIds = new Set(knowledgeDocuments.map((item) => item.id));
+      const existingKnowledgeIds = new Set<string>();
+      const nextNodes = { ...nodes };
+      let changed = false;
+
+      for (const [nodeId, node] of Object.entries(nodes)) {
+        if (node.kind !== "document" || !node.knowledgeDocument) continue;
+        existingKnowledgeIds.add(node.knowledgeDocument.id);
+        if (!validKnowledgeIds.has(node.knowledgeDocument.id)) {
+          delete nextNodes[nodeId];
+          changed = true;
+        }
+      }
+
+      const maxZ = Math.max(
+        0,
+        ...Object.values(prev.pages).map((layout) => layout.zIndex ?? 0),
+        ...Object.values(nextNodes).map((node) => node.layout.zIndex ?? 0),
+      );
+
+      knowledgeDocuments.forEach((document, index) => {
+        if (existingKnowledgeIds.has(document.id)) return;
+        const now = Date.now();
+        const id = `doc-${document.id}`;
+        nextNodes[id] = {
+          id,
+          kind: "document",
+          title: document.title,
+          knowledgeDocument: document,
+          layout: {
+            x: 80 + index * 28,
+            y: 80 + index * 28,
+            width: 420,
+            height: 360,
+            zIndex: maxZ + index + 1,
+          },
+          createdAt: now,
+          updatedAt: now,
+        };
+        changed = true;
+      });
+
+      return changed ? { ...prev, nodes: nextNodes } : prev;
+    });
+  }, [knowledgeDocuments, updateState]);
+
+  useEffect(() => {
+    if (!onReadKnowledgeDocument) return;
+
+    const documentsToLoad = Object.values(effectiveNodes)
+      .map((node) =>
+        node.kind === "document" ? node.knowledgeDocument : undefined,
+      )
+      .filter((document): document is NonNullable<typeof document> =>
+        Boolean(
+          document &&
+            knowledgeDocumentMarkdown[document.id] === undefined,
+        ),
+      );
+
+    if (documentsToLoad.length === 0) return;
+
+    let cancelled = false;
+    void Promise.all(
+      documentsToLoad.map(async (document) => {
+        try {
+          return {
+            id: document.id,
+            markdown: await onReadKnowledgeDocument(document),
+          };
+        } catch {
+          return { id: document.id, markdown: "文档内容加载失败" };
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setKnowledgeDocumentMarkdown((prev) => {
+        const next = { ...prev };
+        for (const result of results) {
+          next[result.id] = result.markdown;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveNodes, knowledgeDocumentMarkdown, onReadKnowledgeDocument]);
 
   useEffect(() => {
     if (!isEditorMode || !selectedNodeId || documentDraft) return;
@@ -744,23 +1047,63 @@ export function PreviewCanvas({
     [],
   );
 
-  const handleSaveDocument = useCallback(() => {
+  const handleSaveDocument = useCallback(async () => {
     if (!documentDraft) return;
+    setDocumentSaving(true);
     const now = Date.now();
     const existing = documentDraft.nodeId
       ? effectiveNodes[documentDraft.nodeId]
       : undefined;
     const id = existing?.id ?? createNodeId("doc");
-    addOrUpdateNode({
-      id,
-      kind: "document",
-      title: getDocumentTitleFromMarkdown(documentDraft.markdown),
-      markdown: documentDraft.markdown,
-      layout: existing?.layout ?? getNodeLayout(420, 360),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    });
-    setDocumentDraft(null);
+    const title = getDocumentTitleFromMarkdown(
+      documentDraft.markdown,
+      documentDraft.title ?? "文档",
+    );
+
+    try {
+      const existingDocument =
+        documentDraft.knowledgeDocumentId
+          ? knowledgeDocumentsById.get(documentDraft.knowledgeDocumentId) ??
+            (existing?.kind === "document" ? existing.knowledgeDocument : undefined)
+          : existing?.kind === "document"
+            ? existing.knowledgeDocument
+            : undefined;
+      const knowledgeDocument =
+        existingDocument && onUpdateKnowledgeDocument
+          ? await onUpdateKnowledgeDocument(existingDocument.id, {
+              title,
+              content: documentDraft.markdown,
+            })
+          : onCreateKnowledgeDocument
+            ? await onCreateKnowledgeDocument({
+                title,
+                description: title,
+                content: documentDraft.markdown,
+              })
+            : undefined;
+
+      addOrUpdateNode({
+        id,
+        kind: "document",
+        title: knowledgeDocument?.title ?? title,
+        ...(knowledgeDocument
+          ? { knowledgeDocument }
+          : { markdown: documentDraft.markdown }),
+        layout: existing?.layout ?? getNodeLayout(420, 360),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      });
+
+      if (knowledgeDocument) {
+        setKnowledgeDocumentMarkdown((prev) => ({
+          ...prev,
+          [knowledgeDocument.id]: documentDraft.markdown,
+        }));
+      }
+      setDocumentDraft(null);
+    } finally {
+      setDocumentSaving(false);
+    }
   }, [
     addOrUpdateNode,
     createNodeId,
@@ -768,6 +1111,9 @@ export function PreviewCanvas({
     effectiveNodes,
     getDocumentTitleFromMarkdown,
     getNodeLayout,
+    knowledgeDocumentsById,
+    onCreateKnowledgeDocument,
+    onUpdateKnowledgeDocument,
   ]);
 
   const addImageFile = useCallback(
@@ -857,17 +1203,25 @@ export function PreviewCanvas({
         reader.readAsText(file);
       });
 
-      const now = Date.now();
       const fallbackTitle = file.name
         ? getFileNameWithoutExtension(file.name)
         : "文档";
+      const title = getDocumentTitleFromMarkdown(markdown, fallbackTitle);
+      const knowledgeDocument = onCreateKnowledgeDocument
+        ? await onCreateKnowledgeDocument({
+            title,
+            description: `画布导入文档: ${file.name}`,
+            content: markdown,
+          })
+        : undefined;
+      const now = Date.now();
       const layout = getNodeLayout(420, 360, canvasPoint);
       const id = createNodeId("doc");
       addOrUpdateNode({
         id,
         kind: "document",
-        title: getDocumentTitleFromMarkdown(markdown, fallbackTitle),
-        markdown,
+        title: knowledgeDocument?.title ?? title,
+        ...(knowledgeDocument ? { knowledgeDocument } : { markdown }),
         layout: {
           ...layout,
           x: layout.x + index * 24,
@@ -876,8 +1230,21 @@ export function PreviewCanvas({
         createdAt: now,
         updatedAt: now,
       });
+
+      if (knowledgeDocument) {
+        setKnowledgeDocumentMarkdown((prev) => ({
+          ...prev,
+          [knowledgeDocument.id]: markdown,
+        }));
+      }
     },
-    [addOrUpdateNode, createNodeId, getDocumentTitleFromMarkdown, getNodeLayout],
+    [
+      addOrUpdateNode,
+      createNodeId,
+      getDocumentTitleFromMarkdown,
+      getNodeLayout,
+      onCreateKnowledgeDocument,
+    ],
   );
 
   const handleAddImportFiles = useCallback(
@@ -894,14 +1261,17 @@ export function PreviewCanvas({
   );
 
   const handleEditNode = useCallback((node: CanvasFreeNode) => {
-    if (node.kind === "document") {
-      setDocumentDraft({
-        nodeId: node.id,
-        markdown: node.markdown,
-      });
-      return;
-    }
-  }, []);
+    if (node.kind !== "document") return;
+
+    setDocumentDraft({
+      nodeId: node.id,
+      knowledgeDocumentId: node.knowledgeDocument?.id,
+      title: node.title,
+      markdown: node.knowledgeDocument
+        ? knowledgeDocumentMarkdown[node.knowledgeDocument.id] ?? node.markdown ?? ""
+        : node.markdown ?? "",
+    });
+  }, [knowledgeDocumentMarkdown]);
 
   const classifyImportFile = useCallback(
     (file: File): CanvasImportFile | null => {
@@ -960,6 +1330,39 @@ export function PreviewCanvas({
       return Array.from(items).some((item) => item.kind === "file");
     },
     [],
+  );
+
+  const selectionToolbarStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (!selectedPageBounds || selectedPageIds.length < 2) return undefined;
+    const zoom = canvasState.viewport.zoom || 1;
+    return {
+      left:
+        canvasState.viewport.x +
+        (selectedPageBounds.x + selectedPageBounds.width / 2) * zoom,
+      top: Math.max(12, canvasState.viewport.y + selectedPageBounds.y * zoom - 48),
+      transform: "translateX(-50%)",
+    };
+  }, [canvasState.viewport, selectedPageBounds, selectedPageIds.length]);
+
+  const renderAlignmentButton = (
+    action: MultiPageAlignAction,
+    label: string,
+    icon: React.ReactNode,
+    disabled = false,
+  ) => (
+    <button
+      key={action}
+      type="button"
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
+      )}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={() => updateSelectedPageLayouts(action)}
+    >
+      {icon}
+    </button>
   );
 
   const focusCanvasForClipboard = useCallback(
@@ -1054,14 +1457,6 @@ export function PreviewCanvas({
               viewport: { ...prev.viewport, zoom },
             }))
           }
-          onReset={() =>
-            updateState((prev) => ({
-              ...prev,
-              pages: isEditorMode ? computeInitialCanvasLayout(pages) : prev.pages,
-              viewport: { x: 40, y: 40, zoom: 0.5 },
-              nodes: prev.nodes,
-            }))
-          }
           interactionMode={isEditorMode ? "editor" : "viewer"}
           onFitToScreen={handleFitToScreen}
           onAutoLayout={isEditorMode ? handleAutoLayout : undefined}
@@ -1082,6 +1477,60 @@ export function PreviewCanvas({
         <div className="pointer-events-none absolute inset-3 z-30 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
       )}
 
+      {isEditorMode && selectionToolbarStyle && (
+        <div
+          role="toolbar"
+          aria-label="多选对齐工具栏"
+          className="absolute z-30 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
+          style={selectionToolbarStyle}
+        >
+          {renderAlignmentButton(
+            "left",
+            "左对齐",
+            <AlignStartVertical className="h-4 w-4" />,
+          )}
+          {renderAlignmentButton(
+            "center-x",
+            "水平居中对齐",
+            <AlignCenterVertical className="h-4 w-4" />,
+          )}
+          {renderAlignmentButton(
+            "right",
+            "右对齐",
+            <AlignEndVertical className="h-4 w-4" />,
+          )}
+          <div className="mx-1 h-5 w-px bg-border" />
+          {renderAlignmentButton(
+            "top",
+            "顶部对齐",
+            <AlignStartHorizontal className="h-4 w-4" />,
+          )}
+          {renderAlignmentButton(
+            "center-y",
+            "垂直居中对齐",
+            <AlignCenterHorizontal className="h-4 w-4" />,
+          )}
+          {renderAlignmentButton(
+            "bottom",
+            "底部对齐",
+            <AlignEndHorizontal className="h-4 w-4" />,
+          )}
+          <div className="mx-1 h-5 w-px bg-border" />
+          {renderAlignmentButton(
+            "distribute-x",
+            "水平均分",
+            <BetweenHorizontalStart className="h-4 w-4" />,
+            selectedPageIds.length < 3,
+          )}
+          {renderAlignmentButton(
+            "distribute-y",
+            "垂直均分",
+            <BetweenVerticalStart className="h-4 w-4" />,
+            selectedPageIds.length < 3,
+          )}
+        </div>
+      )}
+
       <CanvasViewport
         viewport={canvasState.viewport}
         onViewportChange={(viewport) =>
@@ -1090,15 +1539,20 @@ export function PreviewCanvas({
         editable={isEditorMode}
         interactionMode={resolvedInteractionMode}
         onCanvasClick={handleCanvasClick}
-        onPageClick={(pageId) => {
-          setSelectedNodeId(null);
-          onPageConfigEdit?.(pageId);
-        }}
-        onNodeClick={isEditorMode ? setSelectedNodeId : undefined}
+        onPageClick={handlePageSelect}
+        onNodeClick={
+          isEditorMode
+            ? (nodeId) => {
+                setSelectedPageIds([]);
+                setSelectedNodeId(nodeId);
+              }
+            : undefined
+        }
         onFitToScreen={handleFitToScreen}
         onToolModeChange={isEditorMode ? setToolMode : undefined}
         alignmentGuides={alignmentGuides}
         toolMode={effectiveToolMode}
+        onSelectionRectChange={handleSelectionRectChange}
       >
         {pages.map((page) => {
           const renderMode = pageRenderModes[page.id] ?? "loading";
@@ -1132,21 +1586,39 @@ export function PreviewCanvas({
               }
               renderMode={renderMode}
               onLayoutChange={handleLayoutChange}
-              onConfigEdit={onPageConfigEdit}
+              onConfigEdit={handlePageSelect}
               onConsoleEntry={onConsoleEntry}
               onError={onError}
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
               toolMode={effectiveToolMode}
+              selected={selectedPageIds.includes(page.id)}
               onPositionableSizes={onPositionableSizes}
             />
           );
         })}
-        {Object.values(effectiveNodes).map((node) => (
+        {Object.values(effectiveNodes).map((node) => {
+          const renderedNode =
+            node.kind === "document" && node.knowledgeDocument
+              ? {
+                  ...node,
+                  title:
+                    knowledgeDocumentsById.get(node.knowledgeDocument.id)?.title ??
+                    node.title,
+                  knowledgeDocument:
+                    knowledgeDocumentsById.get(node.knowledgeDocument.id) ??
+                    node.knowledgeDocument,
+                  markdown:
+                    knowledgeDocumentMarkdown[node.knowledgeDocument.id] ??
+                    node.markdown,
+                }
+              : node;
+
+          return (
           <CanvasFreeNodeItem
             key={node.id}
-            node={node}
+            node={renderedNode}
             editable={isEditorMode}
             zoom={canvasState.viewport.zoom}
             toolMode={effectiveToolMode}
@@ -1158,7 +1630,8 @@ export function PreviewCanvas({
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
           />
-        ))}
+          );
+        })}
       </CanvasViewport>
 
       {documentDraft && (
@@ -1189,10 +1662,11 @@ export function PreviewCanvas({
               </button>
               <button
                 type="button"
-                className="h-9 rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90"
+                className="h-9 rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleSaveDocument}
+                disabled={documentSaving}
               >
-                保存
+                {documentSaving ? "保存中..." : "保存"}
               </button>
             </div>
           </div>

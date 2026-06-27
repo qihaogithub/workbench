@@ -151,6 +151,22 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           status: result.success ? 'ready' : 'error',
         });
 
+        if (!result.success) {
+          return reply.code(500).send({
+            success: false,
+            error: result.error || {
+              code: 'MESSAGE_SEND_ERROR',
+              message: 'Agent request failed',
+              retryable: true,
+            },
+            data: {
+              sessionId,
+              files: result.files,
+              metadata: result.metadata,
+            },
+          });
+        }
+
         return reply.send({
           success: true,
           data: {

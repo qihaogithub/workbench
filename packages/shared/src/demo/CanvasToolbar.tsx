@@ -5,7 +5,6 @@ import {
   FileText,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
   Maximize,
   Hand,
   MousePointer2,
@@ -23,7 +22,6 @@ import type { CanvasToolMode, CanvasInteractionMode } from "./types";
 interface CanvasToolbarProps {
   zoom: number;
   onZoomChange: (zoom: number) => void;
-  onReset: () => void;
   interactionMode?: Exclude<CanvasInteractionMode, "readonly">;
   onFitToScreen?: () => void;
   onAutoLayout?: () => void;
@@ -80,7 +78,6 @@ function ToolbarTooltip({
 export function CanvasToolbar({
   zoom,
   onZoomChange,
-  onReset,
   interactionMode = "editor",
   onFitToScreen,
   onAutoLayout,
@@ -255,18 +252,6 @@ export function CanvasToolbar({
           </ToolbarTooltip>
         </ToolbarGroup>
 
-        <ToolbarGroup>
-          <ToolbarTooltip label="重置布局">
-            <button
-              type="button"
-              onClick={onReset}
-              className={toolbarButtonClass}
-              aria-label="重置布局"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-          </ToolbarTooltip>
-        </ToolbarGroup>
       </div>
     </TooltipProvider>
   );

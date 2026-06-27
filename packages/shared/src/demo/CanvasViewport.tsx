@@ -9,6 +9,13 @@ import type {
   CanvasInteractionMode,
 } from "./types";
 
+interface CanvasSelectionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface CanvasViewportProps {
   viewport: CanvasViewportState;
   onViewportChange: (viewport: CanvasViewportState) => void;
@@ -23,6 +30,7 @@ interface CanvasViewportProps {
   className?: string;
   alignmentGuides?: AlignmentGuide[];
   toolMode?: CanvasToolMode;
+  onSelectionRectChange?: (rect: CanvasSelectionRect) => void;
 }
 
 const MIN_ZOOM = 0.05;
@@ -43,12 +51,16 @@ export function CanvasViewport({
   className,
   alignmentGuides = [],
   toolMode = "hand",
+  onSelectionRectChange,
 }: CanvasViewportProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const isPanningRef = useRef(false);
+  const [selectionBox, setSelectionBox] =
+    useState<CanvasSelectionRect | null>(null);
+  const isSelectingRef = useRef(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const viewportStartRef = useRef({ x: 0, y: 0 });
@@ -86,6 +98,34 @@ export function CanvasViewport({
       setWillChangeTransform(false);
     }, 100);
   }, []);
+
+  const getSelectionFromPointer = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const screenX = clientX - rect.left;
+      const screenY = clientY - rect.top;
+      const startX = startPosRef.current.x - rect.left;
+      const startY = startPosRef.current.y - rect.top;
+      const screenRect = {
+        x: Math.min(startX, screenX),
+        y: Math.min(startY, screenY),
+        width: Math.abs(screenX - startX),
+        height: Math.abs(screenY - startY),
+      };
+      const zoom = viewportRef.current.zoom || 1;
+      return {
+        screenRect,
+        canvasRect: {
+          x: (screenRect.x - viewportRef.current.x) / zoom,
+          y: (screenRect.y - viewportRef.current.y) / zoom,
+          width: screenRect.width / zoom,
+          height: screenRect.height / zoom,
+        },
+      };
+    },
+    [],
+  );
 
   // 键盘快捷键
   useEffect(() => {
@@ -228,36 +268,43 @@ export function CanvasViewport({
     [canInteractWithViewport, toolMode, spaceHeld, markInteracting],
   );
 
-  // bubble phase：处理 select 模式下点击画布空白区域的平移
+  // Bubble phase: select-mode background drag starts marquee selection.
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       // hand 模式、空格+左键、中键已在 capture phase 处理
       const isPrimaryButton = e.button === 0 || e.button === undefined;
       if (toolMode === "hand" || e.button === 1 || (isPrimaryButton && spaceHeld)) return;
 
-      // select 模式下，点击画布空白区域触发平移
+      // In select mode, pan is handled by Space or middle mouse.
       if (toolMode === "select" && isPrimaryButton) {
         const target = e.target as HTMLElement;
         const isCanvasBackground =
           target === containerRef.current || target === containerRef.current?.firstElementChild;
 
         if (isCanvasBackground) {
+          e.preventDefault();
           clickedPageIdRef.current = null;
           clickedNodeIdRef.current = null;
-          isPanningRef.current = true;
-          setIsPanning(true);
+          isSelectingRef.current = true;
           startPosRef.current = { x: e.clientX, y: e.clientY };
-          viewportStartRef.current = { x: viewportRef.current.x, y: viewportRef.current.y };
           containerRef.current?.setPointerCapture(e.pointerId);
-          markInteracting();
+          setSelectionBox({ x: 0, y: 0, width: 0, height: 0 });
         }
       }
     },
-    [toolMode, spaceHeld, markInteracting],
+    [toolMode, spaceHeld],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (isSelectingRef.current) {
+        const selection = getSelectionFromPointer(e.clientX, e.clientY);
+        if (!selection) return;
+        setSelectionBox(selection.screenRect);
+        onSelectionRectChange?.(selection.canvasRect);
+        return;
+      }
+
       if (!isPanningRef.current) return;
       const dx = e.clientX - startPosRef.current.x;
       const dy = e.clientY - startPosRef.current.y;
@@ -267,11 +314,27 @@ export function CanvasViewport({
         zoom: viewportRef.current.zoom,
       });
     },
-    [scheduleUpdate],
+    [getSelectionFromPointer, onSelectionRectChange, scheduleUpdate],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      if (isSelectingRef.current) {
+        isSelectingRef.current = false;
+        const selection = getSelectionFromPointer(e.clientX, e.clientY);
+        const dx = e.clientX - startPosRef.current.x;
+        const dy = e.clientY - startPosRef.current.y;
+        const isClick = Math.abs(dx) < 3 && Math.abs(dy) < 3;
+        setSelectionBox(null);
+        containerRef.current?.releasePointerCapture(e.pointerId);
+        if (isClick) {
+          onCanvasClick?.();
+        } else if (selection) {
+          onSelectionRectChange?.(selection.canvasRect);
+        }
+        return;
+      }
+
       if (!isPanningRef.current) return;
       isPanningRef.current = false;
       setIsPanning(false);
@@ -295,12 +358,22 @@ export function CanvasViewport({
       clickedPageIdRef.current = null;
       clickedNodeIdRef.current = null;
     },
-    [flushUpdate, onCanvasClick, onNodeClick, onPageClick, markInteractingEnd],
+    [
+      flushUpdate,
+      getSelectionFromPointer,
+      onCanvasClick,
+      onNodeClick,
+      onPageClick,
+      onSelectionRectChange,
+      markInteractingEnd,
+    ],
   );
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       if (!canInteractWithViewport) return;
+      if (toolMode !== "hand" && !e.ctrlKey && !e.metaKey) return;
+
       e.preventDefault();
       markInteracting();
 
@@ -322,8 +395,24 @@ export function CanvasViewport({
 
       markInteractingEnd();
     },
-    [canInteractWithViewport, scheduleUpdate, markInteracting, markInteractingEnd],
+    [
+      canInteractWithViewport,
+      toolMode,
+      scheduleUpdate,
+      markInteracting,
+      markInteractingEnd,
+    ],
   );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheel]);
 
   useEffect(() => {
     return () => {
@@ -360,7 +449,6 @@ export function CanvasViewport({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
-      onWheel={handleWheel}
     >
       <div
         style={{
@@ -410,6 +498,18 @@ export function CanvasViewport({
           }
         })}
       </div>
+      {selectionBox && (selectionBox.width > 1 || selectionBox.height > 1) && (
+        <div
+          className="pointer-events-none absolute z-40 border border-primary bg-primary/10"
+          data-canvas-selection-box="true"
+          style={{
+            left: selectionBox.x,
+            top: selectionBox.y,
+            width: selectionBox.width,
+            height: selectionBox.height,
+          }}
+        />
+      )}
     </div>
   );
 }

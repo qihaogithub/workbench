@@ -42,7 +42,7 @@ interface KnowledgeDocDialogProps {
   mode: KnowledgeDocDialogMode;
   item: KnowledgeItem | null;
   workingDir?: string;
-  onSaved: () => void;
+  onSaved: (item?: KnowledgeItem) => void;
 }
 
 /**
@@ -130,7 +130,7 @@ export function KnowledgeDocDialog({
         const data = await res.json();
         if (data.success) {
           toast({ title: "添加成功" });
-          onSaved();
+          onSaved(data.data);
           onOpenChange(false);
         } else {
           toast({
@@ -154,7 +154,7 @@ export function KnowledgeDocDialog({
         const data = await res.json();
         if (data.success) {
           toast({ title: "保存成功" });
-          onSaved();
+          onSaved(data.data);
           onOpenChange(false);
         } else {
           toast({

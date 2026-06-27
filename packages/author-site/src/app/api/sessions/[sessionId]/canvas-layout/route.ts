@@ -80,8 +80,14 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
 
   if (kind === "document") {
     const markdown = readString(value, "markdown");
-    if (markdown === null) return null;
-    return { ...base, kind, markdown };
+    const knowledgeDocument = parseKnowledgeDocument(value.knowledgeDocument);
+    if (markdown === null && !knowledgeDocument) return null;
+    return {
+      ...base,
+      kind,
+      ...(markdown === null ? {} : { markdown }),
+      ...(knowledgeDocument ? { knowledgeDocument } : {}),
+    };
   }
 
   if (kind === "image") {
@@ -102,6 +108,31 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   }
 
   return null;
+}
+
+function parseKnowledgeDocument(value: unknown):
+  | {
+      id: string;
+      title: string;
+      fileName: string;
+      description?: string;
+    }
+  | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value, "id");
+  const title = readString(value, "title");
+  const fileName = readString(value, "fileName");
+  const description = readString(value, "description");
+
+  if (!id || !title || !fileName) return null;
+
+  return {
+    id,
+    title,
+    fileName,
+    ...(description ? { description } : {}),
+  };
 }
 
 function parseCanvasState(value: unknown): CanvasState | null {

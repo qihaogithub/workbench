@@ -33,7 +33,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 11;
+export const WORKBENCH_TOOL_VERSION = 12;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
