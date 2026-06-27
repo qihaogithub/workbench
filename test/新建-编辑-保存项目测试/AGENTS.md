@@ -1,3 +1,5 @@
+<!-- maintained-by: h5-test -->
+
 # 新建-编辑-保存项目测试
 
 > 本文件为 AI 编码代理提供关于此 E2E 测试脚本的指南。
@@ -7,6 +9,7 @@
 ```
 test/新建-编辑-保存项目测试/
 ├── e2e-test-project-flow.spec.ts    # 主测试脚本
+├── author-core-flow-regression.spec.ts # 创作端核心流程回归脚本
 ├── playwright.config.ts              # Playwright 配置文件
 └── AGENTS.md                         # 本文件
 ```
@@ -21,6 +24,16 @@ test/新建-编辑-保存项目测试/
 4. **粘贴代码** - 将预设模板代码粘贴到代码编辑区
 5. **保存** - 点击保存按钮
 6. **生成日志** - 在 `test/新建-编辑-保存项目测试/test-outputs/` 目录生成完整测试日志和截图
+
+`author-core-flow-regression.spec.ts` 是更聚焦的核心流程回归用例，覆盖：
+
+1. **登录并打开首页** - 使用真实登录页面进入创作端
+2. **从 UI 新建项目** - 监听并断言 `/api/demos` 创建响应
+3. **创建编辑会话** - 调用 `/api/sessions` 获取工作空间会话
+4. **写入页面文件** - 更新首个页面的代码和 Schema
+5. **保存版本** - 调用保存接口生成项目版本
+6. **重新读取持久化结果** - 新建会话后读取页面文件，确认正式项目已保存新内容
+7. **删除测试项目** - 通过删除接口清理测试数据
 
 ## 运行测试
 
@@ -53,6 +66,9 @@ pnpm install
 
 # 运行测试（无头模式）
 pnpm test:e2e
+
+# 只运行创作端核心流程回归
+pnpm test:e2e:core-flow
 
 # 有头模式运行（可见浏览器）
 pnpm test:e2e:headed
