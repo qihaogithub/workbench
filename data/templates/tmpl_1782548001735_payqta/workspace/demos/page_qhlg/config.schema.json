@@ -1,0 +1,1 @@
+{"type":"object","title":"知识验证活动配置","properties":{"title":{"type":"string","default":"夏日积分挑战"},"ruleText":{"type":"string","default":"用户每天完成任务获得积分，积分可兑换抽奖机会。"},"ctaText":{"type":"string","default":"立即参与"}}}

@@ -218,7 +218,7 @@ export function CanvasFreeNodeItem({
 
   const renderedMarkdown = useMemo(() => {
     if (node.kind !== "document") return "";
-    return markdownRenderer.render(node.markdown || "空文档");
+    return markdownRenderer.render(node.markdown || "文档内容加载中...");
   }, [node]);
 
   const updateEdgeFromPointer = useCallback(

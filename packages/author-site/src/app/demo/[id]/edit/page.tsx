@@ -104,6 +104,11 @@ import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
 import type {
+  CanvasKnowledgeDocument,
+  CanvasKnowledgeDocumentCreateInput,
+  CanvasKnowledgeDocumentUpdateInput,
+} from "@opencode-workbench/shared/demo";
+import type {
   DemoFiles,
   DemoPageMeta,
   DemoFolderMeta,
@@ -250,6 +255,15 @@ type HistoryEvent =
       savedAt: number;
       version: VersionInfo;
     };
+
+function toCanvasKnowledgeDocument(item: KnowledgeItem): CanvasKnowledgeDocument {
+  return {
+    id: item.id,
+    title: item.title,
+    fileName: item.fileName,
+    description: item.description,
+  };
+}
 
 function dedupeHistoryEvents(events: HistoryEvent[]): HistoryEvent[] {
   const seen = new Set<string>();
@@ -491,6 +505,103 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
   const [kbDocDialogMode, setKbDocDialogMode] = useState<KnowledgeDocDialogMode>("read");
   const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(null);
+  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
+
+  const upsertKnowledgeItem = useCallback((item: KnowledgeItem) => {
+    setKnowledgeItems((current) => {
+      const exists = current.some((existing) => existing.id === item.id);
+      if (exists) {
+        return current.map((existing) =>
+          existing.id === item.id ? item : existing,
+        );
+      }
+      return [...current, item];
+    });
+  }, []);
+
+  const canvasKnowledgeDocuments = useMemo(
+    () =>
+      knowledgeItems
+        .filter((item) => item.source !== "system")
+        .map(toCanvasKnowledgeDocument),
+    [knowledgeItems],
+  );
+
+  const createCanvasKnowledgeDocument = useCallback(
+    async (
+      input: CanvasKnowledgeDocumentCreateInput,
+    ): Promise<CanvasKnowledgeDocument> => {
+      if (!tempWorkspace) {
+        throw new Error("工作空间未初始化");
+      }
+
+      const res = await fetch(
+        `/api/knowledge?workingDir=${encodeURIComponent(tempWorkspace)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: input.title,
+            description: input.description ?? input.title,
+            content: input.content,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || "添加知识文档失败");
+      }
+
+      upsertKnowledgeItem(data.data);
+      window.dispatchEvent(new Event("knowledge-updated"));
+      return toCanvasKnowledgeDocument(data.data);
+    },
+    [tempWorkspace, upsertKnowledgeItem],
+  );
+
+  const updateCanvasKnowledgeDocument = useCallback(
+    async (
+      id: string,
+      input: CanvasKnowledgeDocumentUpdateInput,
+    ): Promise<CanvasKnowledgeDocument> => {
+      if (!tempWorkspace) {
+        throw new Error("工作空间未初始化");
+      }
+
+      const res = await fetch(
+        `/api/knowledge/${id}?workingDir=${encodeURIComponent(tempWorkspace)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || "保存知识文档失败");
+      }
+
+      upsertKnowledgeItem(data.data);
+      window.dispatchEvent(new Event("knowledge-updated"));
+      return toCanvasKnowledgeDocument(data.data);
+    },
+    [tempWorkspace, upsertKnowledgeItem],
+  );
+
+  const readCanvasKnowledgeDocument = useCallback(
+    async (document: CanvasKnowledgeDocument): Promise<string> => {
+      if (!tempWorkspace) return "";
+      const res = await fetch(
+        `/api/knowledge/content?workingDir=${encodeURIComponent(tempWorkspace)}&fileName=${encodeURIComponent(document.fileName)}`,
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || "读取知识文档失败");
+      }
+      return data.data.content;
+    },
+    [tempWorkspace],
+  );
 
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiIsStreaming, setAiIsStreaming] = useState(false);
@@ -2571,6 +2682,8 @@ ${context}
                   {fileView === "doc" ? (
                     <KnowledgePanel
                       workingDir={tempWorkspace || undefined}
+                      onItemsChange={setKnowledgeItems}
+                      onDocCreated={upsertKnowledgeItem}
                       onDocSelect={(item, mode) => {
                         setKbDocDialogItem(item);
                         setKbDocDialogMode(mode);
@@ -3059,6 +3172,10 @@ ${context}
                       onConsoleEntry={handleConsoleEntry}
                       onError={handlePreviewError}
                       onPositionableSizes={setPositionableItemSizes}
+                      knowledgeDocuments={canvasKnowledgeDocuments}
+                      onCreateKnowledgeDocument={createCanvasKnowledgeDocument}
+                      onUpdateKnowledgeDocument={updateCanvasKnowledgeDocument}
+                      onReadKnowledgeDocument={readCanvasKnowledgeDocument}
                       onPageConfigEdit={(pageId) => {
                         setCanvasEditingPageId(pageId);
                         setConfigPanelDetailPageId(pageId);

@@ -78,6 +78,52 @@ function TestEditorCanvas() {
   );
 }
 
+function TestMultiPageEditorCanvas() {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    pages: {
+      page_1: { x: 100, y: 100, width: 100, height: 100 },
+      page_2: { x: 300, y: 130, width: 100, height: 100 },
+      page_3: { x: 520, y: 180, width: 100, height: 100 },
+    },
+    nodes: {},
+  });
+
+  return (
+    <>
+      <PreviewCanvas
+        interactionMode="editor"
+        pages={[
+          {
+            id: "page_1",
+            name: "页面一",
+            order: 0,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 100, height: 100 },
+          },
+          {
+            id: "page_2",
+            name: "页面二",
+            order: 1,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 100, height: 100 },
+          },
+          {
+            id: "page_3",
+            name: "页面三",
+            order: 2,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 100, height: 100 },
+          },
+        ]}
+        canvasState={state}
+        onCanvasStateChange={setState}
+      />
+      <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
 function getCanvasState() {
   return JSON.parse(screen.getByTestId("canvas-state").textContent || "{}") as CanvasState;
 }
@@ -100,6 +146,29 @@ function dropFiles(
     },
   });
   fireEvent(target, event);
+}
+
+function dragMarquee(
+  target: HTMLElement,
+  from: { clientX: number; clientY: number },
+  to: { clientX: number; clientY: number },
+) {
+  fireEvent.pointerDown(target, {
+    button: 0,
+    clientX: from.clientX,
+    clientY: from.clientY,
+    pointerId: 1,
+  });
+  fireEvent.pointerMove(target, {
+    clientX: to.clientX,
+    clientY: to.clientY,
+    pointerId: 1,
+  });
+  fireEvent.pointerUp(target, {
+    clientX: to.clientX,
+    clientY: to.clientY,
+    pointerId: 1,
+  });
 }
 
 describe("PreviewCanvas viewer 交互模式", () => {
@@ -208,11 +277,63 @@ describe("PreviewCanvas viewer 交互模式", () => {
     expect(screen.getByLabelText("适应屏幕")).toBeInTheDocument();
     expect(screen.getByLabelText("缩小")).toBeInTheDocument();
     expect(screen.getByLabelText("放大")).toBeInTheDocument();
-    expect(screen.getByLabelText("重置布局")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("选择工具")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("添加文档")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("自动排版")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("重置布局")).not.toBeInTheDocument();
+  });
+
+  it("editor 模式默认选中选择工具", () => {
+    const { container } = render(<TestEditorCanvas />);
+
+    const toolButtons = Array.from(
+      container.querySelectorAll("button[aria-pressed]"),
+    );
+
+    expect(toolButtons).toHaveLength(2);
+    expect(toolButtons[0]).toHaveAttribute("aria-pressed", "false");
+    expect(toolButtons[1]).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("选择工具支持框选多个页面并执行左对齐", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 430, clientY: 260 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("左对齐"));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.pages.page_1.x).toBe(100);
+      expect(state.pages.page_2.x).toBe(100);
+      expect(state.pages.page_3.x).toBe(520);
+    });
+  });
+
+  it("多选后支持水平均分页面", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 650, clientY: 320 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("水平均分"));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.pages.page_1.x).toBe(100);
+      expect(state.pages.page_2.x).toBe(310);
+      expect(state.pages.page_3.x).toBe(520);
+    });
   });
 
   it("初始加载后自动适应屏幕", async () => {
@@ -228,7 +349,71 @@ describe("PreviewCanvas viewer 交互模式", () => {
     });
   });
 
-  it("支持缩放和重置视图且不重置页面布局", async () => {
+  it("选择工具滚轮只在按住 Ctrl 或 Cmd 时缩放画布", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    const initialZoom = getCanvasState().viewport.zoom;
+
+    fireEvent.wheel(root, {
+      clientX: 500,
+      clientY: 400,
+      deltaY: -100,
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeCloseTo(initialZoom, 5);
+    });
+
+    fireEvent.wheel(root, {
+      clientX: 500,
+      clientY: 400,
+      deltaY: -100,
+      ctrlKey: true,
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeGreaterThan(initialZoom);
+    });
+  });
+
+  it("Ctrl 加滚轮缩放画布时阻止浏览器默认缩放", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+    const event = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 400,
+      deltaY: -100,
+      ctrlKey: true,
+    });
+
+    fireEvent(root, event);
+
+    await waitFor(() => {
+      expect(event.defaultPrevented).toBe(true);
+    });
+  });
+
+  it("抓手工具滚轮无需 Ctrl 或 Cmd 即可缩放画布", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+    const initialZoom = getCanvasState().viewport.zoom;
+
+    fireEvent.click(screen.getByLabelText("拖动工具"));
+    fireEvent.wheel(root, {
+      clientX: 500,
+      clientY: 400,
+      deltaY: -100,
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeGreaterThan(initialZoom);
+    });
+  });
+
+  it("支持工具栏缩放且不移动页面布局", async () => {
     render(<TestCanvas />);
 
     const expected = getExpectedFitViewport();
@@ -239,14 +424,8 @@ describe("PreviewCanvas viewer 交互模式", () => {
     fireEvent.click(screen.getByLabelText("放大"));
 
     await waitFor(() => {
-      expect(getCanvasState().viewport.zoom).toBeGreaterThan(expected.zoom);
-    });
-
-    fireEvent.click(screen.getByLabelText("重置布局"));
-
-    await waitFor(() => {
       const state = getCanvasState();
-      expect(state.viewport).toEqual({ x: 40, y: 40, zoom: 0.5 });
+      expect(state.viewport.zoom).toBeGreaterThan(expected.zoom);
       expect(state.pages.page_1).toEqual(initialState.pages.page_1);
     });
   });

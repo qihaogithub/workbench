@@ -170,7 +170,8 @@ export interface CanvasFreeNodeBase {
 
 export interface CanvasDocumentNode extends CanvasFreeNodeBase {
   kind: "document";
-  markdown: string;
+  markdown?: string;
+  knowledgeDocument?: CanvasKnowledgeDocument;
 }
 
 export interface CanvasImageNode extends CanvasFreeNodeBase {
@@ -184,6 +185,25 @@ export interface CanvasImageNode extends CanvasFreeNodeBase {
 export type CanvasFreeNode =
   | CanvasDocumentNode
   | CanvasImageNode;
+
+export interface CanvasKnowledgeDocument {
+  id: string;
+  title: string;
+  fileName: string;
+  description?: string;
+}
+
+export interface CanvasKnowledgeDocumentCreateInput {
+  title: string;
+  description?: string;
+  content: string;
+}
+
+export interface CanvasKnowledgeDocumentUpdateInput {
+  title?: string;
+  description?: string;
+  content?: string;
+}
 
 export interface ScreenshotRenderBox {
   width: number;
@@ -244,6 +264,15 @@ export interface PreviewCanvasProps {
   onError?: (error: Error) => void;
   focusPageId?: string;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+  knowledgeDocuments?: CanvasKnowledgeDocument[];
+  onCreateKnowledgeDocument?: (
+    input: CanvasKnowledgeDocumentCreateInput,
+  ) => Promise<CanvasKnowledgeDocument>;
+  onUpdateKnowledgeDocument?: (
+    id: string,
+    input: CanvasKnowledgeDocumentUpdateInput,
+  ) => Promise<CanvasKnowledgeDocument>;
+  onReadKnowledgeDocument?: (document: CanvasKnowledgeDocument) => Promise<string>;
 }
 
 export interface PreviewState {

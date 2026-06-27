@@ -1,0 +1,15 @@
+{
+  "checkedAt": 1782548014308,
+  "total": 1,
+  "ok": true,
+  "items": [
+    {
+      "templateId": "tmpl_1782548001735_payqta",
+      "name": "知识库索引验证模板",
+      "scope": "team",
+      "official": false,
+      "ok": true,
+      "issues": []
+    }
+  ]
+}

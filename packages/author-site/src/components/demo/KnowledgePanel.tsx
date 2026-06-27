@@ -36,14 +36,18 @@ interface KnowledgePanelProps {
   workingDir?: string;
   onDocSelect?: (item: KnowledgeItem, mode: KnowledgeDocDialogMode) => void;
   onDocAdd?: () => void;
+  onDocCreated?: (item: KnowledgeItem) => void;
   onMemorySelect?: () => void;
+  onItemsChange?: (items: KnowledgeItem[]) => void;
 }
 
 export function KnowledgePanel({
   workingDir,
   onDocSelect,
   onDocAdd,
+  onDocCreated,
   onMemorySelect,
+  onItemsChange,
 }: KnowledgePanelProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -64,13 +68,14 @@ export function KnowledgePanel({
       const data = await res.json();
       if (data.success) {
         setItems(data.data);
+        onItemsChange?.(data.data);
       }
     } catch {
       // 静默失败
     } finally {
       setLoading(false);
     }
-  }, [workingDir]);
+  }, [workingDir, onItemsChange]);
 
   useEffect(() => {
     fetchItems();
@@ -135,6 +140,7 @@ export function KnowledgePanel({
         const data = await res.json();
         if (data.success) {
           toast({ title: "上传成功" });
+          onDocCreated?.(data.data);
           fetchItems();
         } else {
           toast({
@@ -151,7 +157,7 @@ export function KnowledgePanel({
       e.target.value = "";
       setAddMenuOpen(false);
     },
-    [workingDir, toast, fetchItems]
+    [workingDir, toast, fetchItems, onDocCreated]
   );
 
   // 监听 knowledge-updated 事件

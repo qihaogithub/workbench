@@ -1,0 +1,30 @@
+{
+  "id": "proj_1782547891917_g0e1l9",
+  "name": "知识库功能验证项目",
+  "description": "用于验证模板保存后的知识索引、阅读地图和 AI 知识报告检索",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1782547891917_g0e1l9\\workspace",
+  "demoPages": [
+    {
+      "id": "page_qhlg",
+      "name": "活动规则首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "savedAt": 1782547957674,
+      "savedBy": "Local Codex",
+      "sessionId": "edit_1782547895800_8bg2c8",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782547891917_g0e1l9\\v1",
+      "fileCount": 4,
+      "note": "初始化知识库验证项目页面与配置"
+    }
+  ],
+  "pageVersions": {},
+  "createdAt": 1782547891922,
+  "updatedAt": 1782547957675
+}

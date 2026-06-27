@@ -1,0 +1,13 @@
+{
+  "id": "kjob_tmpl_1782548001735_payqta_1782548001749",
+  "targetType": "template",
+  "targetId": "tmpl_1782548001735_payqta",
+  "targetTitle": "知识库索引验证模板",
+  "targetDescription": "包含活动规则首页和项目配置，用于验证模板阅读地图、索引任务和知识报告检索。",
+  "status": "ready",
+  "createdAt": "2026-06-27T08:13:21.748Z",
+  "updatedAt": "2026-06-27T08:13:21.764Z",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\templates\\tmpl_1782548001735_payqta\\workspace",
+  "itemCount": 2,
+  "readingMapPath": "knowledge/templates/tmpl_1782548001735_payqta/reading-map.json"
+}

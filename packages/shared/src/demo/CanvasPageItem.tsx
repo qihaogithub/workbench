@@ -26,6 +26,7 @@ interface CanvasPageItemProps {
   screenshotRenderBox?: ScreenshotRenderBox;
   renderMode?: CanvasPageRenderMode;
   visible?: boolean;
+  selected?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
   className?: string;
@@ -182,6 +183,7 @@ export function CanvasPageItem({
   screenshotRenderBox,
   renderMode = "iframe",
   visible = true,
+  selected = false,
   onLayoutChange,
   onConfigEdit,
   onConsoleEntry,
@@ -576,6 +578,9 @@ export function CanvasPageItem({
         "absolute rounded-lg transition-shadow duration-200 select-none",
         isEditing &&
           "ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_14px_34px_rgba(15,23,42,0.28)]",
+        selected &&
+          !isEditing &&
+          "ring-2 ring-blue-500 shadow-[0_0_0_1px_rgba(37,99,235,0.35),0_12px_30px_rgba(37,99,235,0.22)]",
       )}
       style={{
         left: layout.x,
