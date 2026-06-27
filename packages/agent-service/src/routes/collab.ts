@@ -53,7 +53,12 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
     Querystring: CollabQuery;
   }>(
     "/api/collab/projects/:projectId/workspaces/:workspaceId/:room",
-    { websocket: true },
+    {
+      websocket: true,
+      config: {
+        rateLimit: false,
+      },
+    },
     async (
       socket: WebSocket,
       request: FastifyRequest<{ Params: CollabParams; Querystring: CollabQuery }>,

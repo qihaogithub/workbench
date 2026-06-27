@@ -35,6 +35,7 @@ export interface CollabPresenceState {
 }
 
 const USER_COLORS = ["#2563eb", "#059669", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
+const OFFLINE_STATUS_DELAY_MS = 5000;
 
 function pickColor(seed: string): string {
   let hash = 0;
@@ -79,20 +80,59 @@ export function useCollabDocument(
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [ytext, setYtext] = useState<Y.Text | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
-  const descriptorRef = useRef<CollabRoomDescriptor | null>(descriptor);
-  descriptorRef.current = descriptor;
+  const offlineStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const descriptorProjectId = descriptor?.projectId ?? "";
+  const descriptorWorkspaceId = descriptor?.workspaceId ?? "";
+  const descriptorSessionId = descriptor?.sessionId ?? "";
+  const descriptorResourcePath = descriptor?.resourcePath ?? "";
+  const descriptorKind: CollabRoomDescriptor["kind"] | "" = descriptor?.kind ?? "";
+  const descriptorKey = descriptor
+    ? [
+        descriptorProjectId,
+        descriptorWorkspaceId,
+        descriptorSessionId,
+        descriptorResourcePath,
+        descriptorKind,
+      ].join("\u0000")
+    : "";
+  const stableDescriptor = useMemo<CollabRoomDescriptor | null>(() => {
+    if (!descriptorKey || !descriptorKind) return null;
+    return {
+      projectId: descriptorProjectId,
+      workspaceId: descriptorWorkspaceId,
+      sessionId: descriptorSessionId,
+      resourcePath: descriptorResourcePath,
+      kind: descriptorKind,
+    };
+  }, [
+    descriptorKey,
+    descriptorKind,
+    descriptorProjectId,
+    descriptorResourcePath,
+    descriptorSessionId,
+    descriptorWorkspaceId,
+  ]);
+  const descriptorRef = useRef<CollabRoomDescriptor | null>(stableDescriptor);
+  descriptorRef.current = stableDescriptor;
+
+  const clearOfflineStatusTimer = useCallback(() => {
+    if (!offlineStatusTimerRef.current) return;
+    clearTimeout(offlineStatusTimerRef.current);
+    offlineStatusTimerRef.current = null;
+  }, []);
 
   const collabUser = useMemo<CollabUser>(() => {
-    const userId = user?.userId || descriptor?.sessionId || "anonymous";
+    const userId = user?.userId || stableDescriptor?.sessionId || "anonymous";
     return {
       userId,
       username: user?.username || "协作者",
       color: user?.color || pickColor(userId),
     };
-  }, [descriptor?.sessionId, user?.color, user?.userId, user?.username]);
+  }, [stableDescriptor?.sessionId, user?.color, user?.userId, user?.username]);
 
   useEffect(() => {
-    if (!descriptor) {
+    if (!stableDescriptor) {
+      clearOfflineStatusTimer();
       setStatus("offline");
       setValue("");
       setAwareness([]);
@@ -102,6 +142,7 @@ export function useCollabDocument(
       return;
     }
 
+    clearOfflineStatusTimer();
     setStatus("connecting");
     setError(null);
 
@@ -109,13 +150,13 @@ export function useCollabDocument(
     const text = doc.getText("content");
     const baseUrl = getCollabBaseUrl();
     const endpoint = `${baseUrl}/api/collab/projects/${encodeURIComponent(
-      descriptor.projectId,
-    )}/workspaces/${encodeURIComponent(descriptor.workspaceId)}`;
-    const nextProvider = new WebsocketProvider(endpoint, encodeRoomName(descriptor.resourcePath), doc, {
+      stableDescriptor.projectId,
+    )}/workspaces/${encodeURIComponent(stableDescriptor.workspaceId)}`;
+    const nextProvider = new WebsocketProvider(endpoint, encodeRoomName(stableDescriptor.resourcePath), doc, {
       params: {
-        sessionId: descriptor.sessionId,
-        resourcePath: descriptor.resourcePath,
-        kind: descriptor.kind,
+        sessionId: stableDescriptor.sessionId,
+        resourcePath: stableDescriptor.resourcePath,
+        kind: stableDescriptor.kind,
       },
     });
 
@@ -134,8 +175,8 @@ export function useCollabDocument(
       userId: collabUser.userId,
       username: collabUser.username,
       color: collabUser.color,
-      activePageId: descriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
-      resourcePath: descriptor.resourcePath,
+      activePageId: stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
+      resourcePath: stableDescriptor.resourcePath,
       lastActiveAt: Date.now(),
     } satisfies CollabPresence);
     updatePresence();
@@ -147,8 +188,8 @@ export function useCollabDocument(
         userId: collabUser.userId,
         username: collabUser.username,
         color: collabUser.color,
-        activePageId: descriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
-        resourcePath: descriptor.resourcePath,
+        activePageId: stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
+        resourcePath: stableDescriptor.resourcePath,
         lastActiveAt: Date.now(),
       } satisfies CollabPresence);
     };
@@ -156,27 +197,55 @@ export function useCollabDocument(
     text.observe(handleTextChange);
     nextProvider.awareness.on("change", updatePresence);
     nextProvider.on("status", ({ status: wsStatus }: { status: "connecting" | "connected" | "disconnected" }) => {
-      setStatus(wsStatus === "connected" ? "synced" : wsStatus === "connecting" ? "connecting" : "offline");
+      if (wsStatus === "connected") {
+        clearOfflineStatusTimer();
+        setStatus("synced");
+        return;
+      }
+
+      if (wsStatus === "connecting") {
+        clearOfflineStatusTimer();
+        setStatus((current) =>
+          current === "offline" || current === "synced" || current === "saving"
+            ? current
+            : "connecting",
+        );
+        return;
+      }
+
+      clearOfflineStatusTimer();
+      offlineStatusTimerRef.current = setTimeout(() => {
+        if (providerRef.current === nextProvider) {
+          setStatus("offline");
+        }
+        offlineStatusTimerRef.current = null;
+      }, OFFLINE_STATUS_DELAY_MS);
+      setStatus((current) =>
+        current === "synced" || current === "saving" ? current : "connecting",
+      );
     });
     nextProvider.on("sync", (isSynced: boolean) => {
       if (isSynced) {
+        clearOfflineStatusTimer();
         setValue(text.toString());
         setStatus("synced");
       }
     });
     nextProvider.on("connection-error", () => {
+      clearOfflineStatusTimer();
       setError("协同连接失败");
       setStatus("error");
     });
 
     return () => {
+      clearOfflineStatusTimer();
       text.unobserve(handleTextChange);
       nextProvider.awareness.off("change", updatePresence);
       nextProvider.destroy();
       doc.destroy();
       if (providerRef.current === nextProvider) providerRef.current = null;
     };
-  }, [collabUser.color, collabUser.userId, collabUser.username, descriptor]);
+  }, [clearOfflineStatusTimer, collabUser.color, collabUser.userId, collabUser.username, stableDescriptor]);
 
   const flush = useCallback(async () => {
     const current = descriptorRef.current;
