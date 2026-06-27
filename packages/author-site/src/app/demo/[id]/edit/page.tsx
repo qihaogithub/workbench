@@ -105,6 +105,8 @@ import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
+import { useVisualEditState } from "./hooks/useVisualEditState";
+import { useVersionControl } from "./hooks/useVersionControl";
 import type {
   CanvasState,
   CanvasKnowledgeDocument,
@@ -690,50 +692,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [tabValue, setTabValue] = useState("ai");
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
-  const [visualEditMode, setVisualEditMode] = useState(false);
-  const [visualAnnotationMode, setVisualAnnotationMode] = useState(false);
-  const [hoveredVisualNode, setHoveredVisualNode] =
-    useState<VisualNodeInfo | null>(null);
-  const [selectedVisualNode, setSelectedVisualNode] =
-    useState<VisualNodeInfo | null>(null);
-  const [visualAnnotations, setVisualAnnotations] = useState<
-    VisualAnnotation[]
-  >([]);
-  const [visualPatches, setVisualPatches] = useState<VisualEditPatch[]>([]);
-  const [visualConfigMode, setVisualConfigMode] = useState(false);
-  const [visualConfigNode, setVisualConfigNode] =
-    useState<VisualNodeInfo | null>(null);
-  const [visualConfigCandidateId, setVisualConfigCandidateId] = useState("");
-  const [visualConfigTitle, setVisualConfigTitle] = useState("");
-  const [visualConfigFieldKey, setVisualConfigFieldKey] = useState("");
-  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState("");
-  const [visualConfigError, setVisualConfigError] = useState<string | null>(
-    null,
-  );
-  const [visualConfigApplying, setVisualConfigApplying] = useState(false);
+  // visualEditMode and related state moved to useVisualEditState hook
 
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
   const autoPreviewRepairPageIdsRef = useRef<Set<string>>(new Set());
   const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
-  const [publishStatus, setPublishStatus] = useState<'never_published' | 'published' | 'unpublished_changes' | null>(null);
-  const [publishing, setPublishing] = useState(false);
-
-  const [versionHistory, setVersionHistory] = useState<VersionHistoryResponse | null>(null);
-  const [pageVersionHistories, setPageVersionHistories] = useState<
-    Record<string, PageVersionHistoryResponse>
-  >({});
-  const [restoring, setRestoring] = useState<string | null>(null);
-  const [previewVersion, setPreviewVersion] = useState<
-    | {
-        scope: "page";
-        version: PageVersionInfo;
-        files: DemoFiles;
-      }
-    | null
-  >(null);
-  const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
+  // publishStatus, versionHistory, and related state moved to useVersionControl hook
   const [currentUsername, setCurrentUsername] = useState<string>('');
   const collabUser = useMemo(
     () => ({
@@ -810,17 +776,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const configData = configDataMap[activeDemoId] ?? {};
-  const visualConfigCandidates = useMemo(
-    () => buildVisualConfigCandidates(visualConfigNode),
-    [visualConfigNode],
-  );
-  const selectedVisualConfigCandidate = useMemo(
-    () =>
-      visualConfigCandidates.find(
-        (candidate) => candidate.id === visualConfigCandidateId,
-      ) ?? visualConfigCandidates[0],
-    [visualConfigCandidateId, visualConfigCandidates],
-  );
+  // visualConfigCandidates and selectedVisualConfigCandidate moved to useVisualEditState hook
   const activeViewContext = useMemo<ActiveViewContext>(() => {
     const focusedPageId =
       previewMode === "canvas"
@@ -971,6 +927,115 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     },
     [activeCodeCollab.ytext, activeSchemaCollab.ytext, sessionId, activeDemoId],
   );
+
+  // Visual edit state hook
+  const visualEditState = useVisualEditState({
+    codeRef,
+    schemaRef,
+    projectConfigSchema,
+    activeDemoIdRef,
+    sessionId,
+    activeDemoId,
+    applyDemoSnapshot,
+    markWorkspaceChanged,
+    setConfigDataMap,
+    setTabValue,
+    setTriggerAutoSend,
+  });
+  const {
+    visualEditMode,
+    setVisualEditMode,
+    visualAnnotationMode,
+    setVisualAnnotationMode,
+    hoveredVisualNode,
+    setHoveredVisualNode,
+    selectedVisualNode,
+    setSelectedVisualNode,
+    visualAnnotations,
+    setVisualAnnotations,
+    visualPatches,
+    setVisualPatches,
+    visualConfigMode,
+    setVisualConfigMode,
+    visualConfigNode,
+    setVisualConfigNode,
+    visualConfigCandidateId,
+    setVisualConfigCandidateId,
+    visualConfigTitle,
+    setVisualConfigTitle,
+    visualConfigFieldKey,
+    setVisualConfigFieldKey,
+    visualConfigDefaultValue,
+    setVisualConfigDefaultValue,
+    visualConfigError,
+    setVisualConfigError,
+    visualConfigApplying,
+    setVisualConfigApplying,
+    visualConfigCandidates,
+    selectedVisualConfigCandidate,
+    visualConfigDialogOpen,
+    handleVisualConfigCandidateChange,
+    handleVisualSelect,
+    handleStartVisualConfig,
+    handleApplyVisualConfig,
+    handleCloseVisualConfigDialog,
+    handleVisualConfigTitleChange,
+    handleStartVisualAnnotation,
+    handleSendVisualAnnotationsToAI,
+    handleVisualInlineEdit,
+    handleCreateVisualAnnotation,
+  } = visualEditState;
+
+  // Version control hook
+  const versionControl = useVersionControl({
+    demoId,
+    sessionId,
+    workspaceId,
+    activeDemoId,
+    activeDemoIdRef,
+    currentUsername,
+    code,
+    schema,
+    validationResult,
+    demoPages,
+    hasUnsavedChanges,
+    hasUnsavedCanvasChanges,
+    isSaving,
+    applyDemoSnapshot,
+    flushCanvasState,
+    markCanvasChangesSaved,
+    setActiveDemoId,
+    setDemoPages,
+    setDemoFolders,
+    setProjectConfigSchema,
+    setPageCodes,
+    setHasUnsavedChanges,
+    setIsSaving,
+  });
+  const {
+    publishStatus,
+    setPublishStatus,
+    publishing,
+    versionHistory,
+    pageVersionHistories,
+    restoring,
+    previewVersion,
+    setPreviewVersion,
+    publishedVersion,
+    loadVersionHistory,
+    loadPageVersionHistories,
+    handlePublish,
+    handleRestoreVersion,
+    handlePreviewPageVersion,
+    handleRestorePageVersion,
+    hasPendingChanges,
+    hasPublishableChanges,
+    shouldCreateVersionBeforePublish,
+    publishButtonDisabled,
+    publishButtonText,
+    publishingButtonText,
+    handleCreateVersion,
+  } = versionControl;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1708,15 +1773,6 @@ ${context.details}
   );
 
   useEffect(() => {
-    projectApiClient.getPublishStatus(demoId).then((result) => {
-      setPublishStatus(result.status);
-      setPublishedVersion(result.publishedVersion);
-    }).catch(() => {
-      setPublishStatus(null);
-    });
-  }, [demoId]);
-
-  useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -1727,155 +1783,8 @@ ${context.details}
       .catch(() => {});
   }, []);
 
-  const loadVersionHistory = useCallback(async () => {
-    try {
-      const data = await projectApiClient.getVersionHistory(demoId);
-      setVersionHistory(data);
-    } catch {
-      setVersionHistory(null);
-    }
-  }, [demoId]);
-
-  const loadPageVersionHistories = useCallback(async () => {
-    if (demoPages.length === 0) {
-      setPageVersionHistories({});
-      return;
-    }
-
-    const entries = await Promise.all(
-      demoPages.map(async (page) => {
-        try {
-          const history = await projectApiClient.getPageVersionHistory(
-            demoId,
-            page.id,
-          );
-          return [page.id, history] as const;
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    setPageVersionHistories(
-      Object.fromEntries(entries.filter((entry): entry is NonNullable<typeof entry> => !!entry)),
-    );
-  }, [demoId, demoPages]);
-
-  useEffect(() => {
-    loadVersionHistory();
-  }, [loadVersionHistory]);
-
-  useEffect(() => {
-    loadPageVersionHistories();
-  }, [loadPageVersionHistories]);
-
-  const handlePublish = async () => {
-    setPublishing(true);
-    try {
-      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-      const publishResult = await projectApiClient.publishProject(demoId);
-      setPublishStatus('published');
-      setPublishedVersion(publishResult.publishedVersion);
-      toast({
-        title: '发布成功',
-        description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
-      });
-    } catch (publishErr) {
-      toast({
-        title: '发布失败',
-        description: publishErr instanceof Error ? publishErr.message : '发布失败',
-        variant: 'destructive',
-      });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const handleRestoreVersion = async (version: VersionInfo) => {
-    if (!confirm(`确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`)) {
-      return;
-    }
-
-    setRestoring(version.versionId);
-    try {
-      const result = await projectApiClient.restoreVersion(demoId, {
-        versionId: version.versionId,
-        username: currentUsername || '未知用户',
-      });
-
-      const syncRes = await fetch(`/api/sessions/${sessionId}/sync-project`, {
-        method: 'POST',
-      });
-      if (!syncRes.ok) {
-        throw new Error('同步会话工作区失败');
-      }
-
-      const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
-      const filesData = await filesRes.json();
-      if (filesData.success) {
-        const multi = filesData.data;
-        const pageIds = (multi.demoPages || []).map(
-          (p: { id: string }) => p.id,
-        );
-        const newActiveId = pageIds.includes(activeDemoId)
-          ? activeDemoId
-          : pageIds[0];
-        const targetDemo = multi.demos?.[newActiveId];
-
-        if (newActiveId && newActiveId !== activeDemoId) {
-          setActiveDemoId(newActiveId);
-          activeDemoIdRef.current = newActiveId;
-        }
-
-        if (targetDemo) {
-          applyDemoSnapshot({
-            code: targetDemo.code ?? '',
-            schema: targetDemo.schema ?? '',
-            source: 'manual-load',
-          });
-        } else {
-          setActiveDemoId("");
-          activeDemoIdRef.current = "";
-          applyDemoSnapshot({
-            code: '',
-            schema: '',
-            source: 'manual-load',
-          });
-        }
-
-        setDemoPages(
-          pageIds.map((id: string) => ({
-            id,
-            name:
-              multi.demoPages.find(
-                (p: { id: string }) => p.id === id,
-              )?.name || id,
-            order: 0,
-            parentId: null,
-          })),
-        );
-        setDemoFolders(multi.demoFolders || []);
-        setProjectConfigSchema(multi.projectConfigSchema);
-      }
-
-      toast({
-        title: '恢复成功',
-        description: `已恢复到新版本 ${result.newVersionId}`,
-      });
-      await loadVersionHistory();
-      const statusResult = await projectApiClient.getPublishStatus(demoId);
-      setPublishStatus(statusResult.status);
-      setPublishedVersion(statusResult.publishedVersion);
-    } catch (err) {
-      toast({
-        title: '恢复失败',
-        description: err instanceof Error ? err.message : '恢复版本失败',
-        variant: 'destructive',
-      });
-    } finally {
-      setRestoring(null);
-    }
-  };
+  // loadVersionHistory, loadPageVersionHistories, publish status effect, handlePublish,
+  // and handleRestoreVersion moved to useVersionControl hook
 
   const persistActivePageToSession = async () => {
     if (!sessionId || !activeDemoId) {
@@ -1896,173 +1805,9 @@ ${context.details}
     }
   };
 
-  const handlePreviewPageVersion = async (version: PageVersionInfo) => {
-    try {
-      const files = await projectApiClient.getPageVersionFiles(
-        demoId,
-        version.demoId,
-        version.versionId,
-      );
-      setPreviewVersion({ scope: "page", version, files });
-    } catch (err) {
-      toast({
-        title: "预览失败",
-        description: err instanceof Error ? err.message : "读取页面版本失败",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRestorePageVersion = async (version: PageVersionInfo) => {
-    const pageName =
-      version.demoName ||
-      demoPages.find((page) => page.id === version.demoId)?.name ||
-      version.demoId;
-    if (!confirm(`确定要将页面「${pageName}」恢复到 ${version.versionId} 吗？`)) {
-      return;
-    }
-
-    setRestoring(version.versionId);
-    try {
-      const result = await projectApiClient.restorePageVersion(
-        demoId,
-        version.demoId,
-        version.versionId,
-        { sessionId },
-      );
-
-      if (activeDemoId !== version.demoId) {
-        setActiveDemoId(version.demoId);
-        activeDemoIdRef.current = version.demoId;
-      }
-      applyDemoSnapshot({
-        code: result.files.code,
-        schema: result.files.schema,
-        source: "manual-load",
-      });
-      setPageCodes((prev) => ({ ...prev, [version.demoId]: result.files.code }));
-      setHasUnsavedChanges(false);
-      setPublishStatus("unpublished_changes");
-      setPreviewVersion(null);
-
-      toast({
-        title: "页面恢复成功",
-        description: `已生成项目版本 ${result.newVersionId}`,
-      });
-      await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
-    } catch (err) {
-      toast({
-        title: "页面恢复失败",
-        description: err instanceof Error ? err.message : "恢复页面版本失败",
-        variant: "destructive",
-      });
-    } finally {
-      setRestoring(null);
-    }
-  };
-
-  const handleCreateVersion = async (): Promise<boolean> => {
-    if (!sessionId) {
-      console.error("[handleCreateVersion] sessionId 为空!");
-      toast({
-        title: "创建版本失败",
-        description: "Session 未创建，请刷新页面重试",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!activeDemoId) {
-      console.error("[handleCreateVersion] activeDemoId 为空!");
-      toast({
-        title: "创建版本失败",
-        description: "未选中页面，请先选择要创建版本的页面",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!validationResult.isValid) {
-      const errors = validationResult.errors.filter(
-        (e) => e.severity === "error",
-      );
-      const warnings = validationResult.errors.filter(
-        (e) => e.severity === "warning",
-      );
-
-      if (errors.length > 0) {
-        toast({
-          title: "创建版本失败：存在语法错误",
-          description: `发现 ${errors.length} 个错误，需要先修复后才能创建版本`,
-          variant: "destructive",
-        });
-      } else if (warnings.length > 0) {
-        toast({
-          title: "存在配置不一致",
-          description: `发现 ${warnings.length} 个警告，版本预览可能异常`,
-        });
-      }
-    }
-
-    try {
-      setIsSaving(true);
-      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-      await flushCanvasState();
-
-      const saveRes = await fetch(
-        `/api/sessions/${sessionId}/files/${activeDemoId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, schema }),
-        },
-      );
-
-      if (!saveRes.ok) {
-        throw new Error("保存文件失败");
-      }
-
-      const activePage = demoPages.find((page) => page.id === activeDemoId);
-      await projectApiClient.createPageVersion(demoId, activeDemoId, {
-        sessionId,
-        note: activePage ? `修改了${activePage.name}` : "修改了页面",
-      });
-
-      const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-
-      if (!saveRes2.ok) {
-        throw new Error("合并到 Demo 失败");
-      }
-
-      toast({
-        title: "版本已创建",
-        description: "当前草稿已记录为版本快照",
-      });
-
-      setHasUnsavedChanges(false);
-      markCanvasChangesSaved();
-      setPublishStatus('unpublished_changes');
-
-      loadVersionHistory();
-      loadPageVersionHistories();
-      return true;
-    } catch (error) {
-      toast({
-        title: "创建版本失败",
-        description: error instanceof Error ? error.message : "未知错误",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const hasPendingChanges = hasUnsavedChanges || hasUnsavedCanvasChanges;
+  // handlePreviewPageVersion and handleRestorePageVersion moved to useVersionControl hook
+  // handleCreateVersion moved to useVersionControl hook
+  // hasPendingChanges moved to useVersionControl hook
 
   const handleBackClick = useCallback(() => {
     if (hasPendingChanges) {
@@ -2115,383 +1860,12 @@ ${context.details}
     [applyDemoSnapshot],
   );
 
-  const initializeVisualConfigDialog = useCallback(
-    (node: VisualNodeInfo, preferredCandidate?: VisualConfigCandidate) => {
-      const candidates = buildVisualConfigCandidates(node);
-      const candidate = preferredCandidate ?? candidates[0];
-      if (!candidate) {
-        toast({
-          title: "这个元素暂时不能自动配置化",
-          description: "请选择文本、图片或带颜色样式的元素。",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
-      setVisualConfigNode(node);
-      setVisualConfigCandidateId(candidate.id);
-      setVisualConfigTitle(candidate.fieldTitle);
-      setVisualConfigFieldKey(
-        suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
-      );
-      setVisualConfigDefaultValue(candidate.defaultValue);
-      setVisualConfigError(null);
-    },
-    [projectConfigSchema, toast],
-  );
-
-  const handleVisualConfigCandidateChange = useCallback(
-    (candidateId: string) => {
-      const candidate = visualConfigCandidates.find(
-        (item) => item.id === candidateId,
-      );
-      if (!candidate) return;
-      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
-      setVisualConfigCandidateId(candidate.id);
-      setVisualConfigTitle(candidate.fieldTitle);
-      setVisualConfigFieldKey(
-        suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
-      );
-      setVisualConfigDefaultValue(candidate.defaultValue);
-      setVisualConfigError(null);
-    },
-    [projectConfigSchema, visualConfigCandidates],
-  );
-
-  const handleVisualSelect = useCallback(
-    (node: VisualNodeInfo | null) => {
-      setSelectedVisualNode(node);
-      if (!node) return;
-
-      if (visualConfigMode) {
-        initializeVisualConfigDialog(node);
-      }
-    },
-    [initializeVisualConfigDialog, visualConfigMode],
-  );
-
-  const handleStartVisualConfig = useCallback(() => {
-    if (visualConfigMode) {
-      setVisualConfigMode(false);
-      setVisualEditMode(false);
-      setVisualConfigNode(null);
-      setSelectedVisualNode(null);
-      setHoveredVisualNode(null);
-      return;
-    }
-
-    setVisualConfigMode(true);
-    setVisualAnnotationMode(false);
-    setVisualEditMode(true);
-    setSelectedVisualNode(null);
-    setHoveredVisualNode(null);
-    setVisualConfigError(null);
-  }, [visualConfigMode]);
-
-  const handleApplyVisualConfig = useCallback(async () => {
-    if (!visualConfigNode || !selectedVisualConfigCandidate) return;
-
-    setVisualConfigApplying(true);
-    setVisualConfigError(null);
-    try {
-      const response = await fetch("/api/visual-configure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: codeRef.current,
-          schema: schemaRef.current,
-          projectConfigSchema,
-          demoId: activeDemoIdRef.current,
-          node: visualConfigNode,
-          target: {
-            kind: selectedVisualConfigCandidate.kind,
-            fieldKey: visualConfigFieldKey.trim(),
-            title: visualConfigTitle.trim(),
-            defaultValue: visualConfigDefaultValue,
-            colorProperty: selectedVisualConfigCandidate.colorProperty,
-          },
-        }),
-      });
-      const data = (await response.json()) as
-        | {
-            success: true;
-            data: Extract<VisualConfigureResult, { ok: true }>;
-          }
-        | { success: false; error?: { message?: string } };
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.success ? "添加配置项失败" : data.error?.message || "添加配置项失败",
-        );
-      }
-
-      applyDemoSnapshot({
-        code: data.data.code,
-        schema: data.data.schema,
-        source: "manual-load",
-      });
-      setConfigDataMap((prev) => {
-        const pageId = activeDemoIdRef.current;
-        return {
-          ...prev,
-          [pageId]: {
-            ...(prev[pageId] ?? {}),
-            ...data.data.configPatch,
-          },
-        };
-      });
-      markWorkspaceChanged();
-      setVisualConfigNode(null);
-      setSelectedVisualNode(null);
-      toast({ title: "配置项已添加" });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "添加配置项失败";
-      setVisualConfigError(message);
-      toast({
-        title: "无法添加配置项",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setVisualConfigApplying(false);
-    }
-  }, [
-    applyDemoSnapshot,
-    markWorkspaceChanged,
-    projectConfigSchema,
-    selectedVisualConfigCandidate,
-    toast,
-    visualConfigDefaultValue,
-    visualConfigFieldKey,
-    visualConfigNode,
-    visualConfigTitle,
-  ]);
-
-  const handleCloseVisualConfigDialog = useCallback(() => {
-    setVisualConfigNode(null);
-    setVisualConfigError(null);
-  }, []);
-
-  const visualConfigDialogOpen = !!visualConfigNode;
-
-  const handleVisualConfigTitleChange = useCallback(
-    (value: string) => {
-      setVisualConfigTitle(value);
-      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
-      setVisualConfigFieldKey(suggestVisualConfigFieldKey(value, usedKeys));
-    },
-    [projectConfigSchema],
-  );
-
-  const handleStartVisualAnnotation = useCallback(() => {
-    if (visualAnnotationMode) {
-      const pendingCount = visualAnnotations.filter((item) => !item.resolved).length;
-      if (
-        pendingCount > 0 &&
-        !window.confirm(`当前有 ${pendingCount} 条未发送批注，确定取消并丢弃吗？`)
-      ) {
-        return;
-      }
-      setVisualAnnotationMode(false);
-      setVisualEditMode(false);
-      setVisualConfigMode(false);
-      setVisualConfigNode(null);
-      setSelectedVisualNode(null);
-      setHoveredVisualNode(null);
-      setVisualAnnotations((prev) => prev.filter((item) => item.resolved));
-      return;
-    }
-
-    const next = !visualAnnotationMode;
-    setVisualAnnotationMode(next);
-    setVisualConfigMode(false);
-    setVisualConfigNode(null);
-    setVisualEditMode(next);
-    setSelectedVisualNode(null);
-    setHoveredVisualNode(null);
-  }, [visualAnnotationMode, visualAnnotations]);
-
-  const handleSendVisualAnnotationsToAI = useCallback(() => {
-    const activeAnnotations = visualAnnotations.filter((item) => !item.resolved);
-    if (activeAnnotations.length === 0) {
-      return;
-    }
-
-    const summary = `请根据 ${activeAnnotations.length} 条页面批注修改当前页面。`;
-    const context = activeAnnotations
-      .map((annotation, index) => {
-        const styleLines =
-          annotation.styleChanges && annotation.styleChanges.length > 0
-            ? [
-                "- 样式修改：",
-                ...annotation.styleChanges.map(
-                  (change) =>
-                    `  - ${change.label}（${change.property}）：${change.previousValue ?? "未设置"} -> ${change.value}`,
-                ),
-              ]
-            : [];
-        return [
-          `批注 ${index + 1}`,
-          `- 评论：${annotation.text}`,
-          ...styleLines,
-          `- DOM 路径：${annotation.domPath}`,
-          `- 节点 ID：${annotation.nodeId}`,
-        ].join("\n");
-      })
-      .join("\n\n");
-
-    const prompt = `${summary}
-
-请优先读取并修改 demos/${activeDemoIdRef.current}/index.tsx。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。
-
-<!-- VISUAL_ANNOTATION_CONTEXT
-${context}
--->`;
-
-    setTabValue("ai");
-    setTriggerAutoSend(prompt);
-    setVisualAnnotationMode(false);
-    setVisualEditMode(false);
-    setSelectedVisualNode(null);
-    setVisualAnnotations((prev) =>
-      prev.map((item) =>
-        item.resolved ? item : { ...item, resolved: true },
-      ),
-    );
-  }, [visualAnnotations]);
-
-  const handleVisualInlineEdit = useCallback(
-    (payload: VisualInlineEditPayload) => {
-      const patch: VisualEditPatch = {
-        id: createVisualId("patch"),
-        title: `修改 <${payload.node.tagName}> 文本`,
-        file: `demos/${activeDemoIdRef.current}/index.tsx`,
-        before: payload.before,
-        after: payload.after,
-        kind: "text",
-        status: "previewed",
-        node: payload.node,
-      };
-      setSelectedVisualNode(payload.node);
-      setVisualPatches((prev) => [patch, ...prev]);
-      setTabValue("ai");
-      toast({
-        title: "已生成文本修改建议",
-        description: "请在批注面板中接受或拒绝该修改。",
-      });
-    },
-    [toast],
-  );
-
-  const handleCreateVisualAnnotation = useCallback(
-    (
-      text?: string,
-      targetNode?: VisualNodeInfo,
-      styleChanges?: VisualStyleChange[],
-    ) => {
-      const node = targetNode ?? selectedVisualNode;
-      if (!node) {
-        return;
-      }
-      const annotationText =
-        text?.trim() ||
-        (styleChanges && styleChanges.length > 0 ? "样式修改" : "待处理的页面批注");
-      const annotation: VisualAnnotation = {
-        id: createVisualId("note"),
-        nodeId: node.nodeId,
-        domPath: node.domPath,
-        text: annotationText,
-        styleChanges,
-        createdAt: Date.now(),
-      };
-      setVisualAnnotations((prev) => [annotation, ...prev]);
-    },
-    [selectedVisualNode],
-  );
-
-  const handleAcceptVisualPatch = useCallback(
-    (patch: VisualEditPatch) => {
-      if (patch.status === "accepted") return;
-      if (patch.kind !== "text") {
-        setVisualPatches((prev) =>
-          prev.map((item) =>
-            item.id === patch.id
-              ? { ...item, error: "该类型的写回尚未实现" }
-              : item,
-          ),
-        );
-        return;
-      }
-
-      const result = replaceUniqueText(
-        codeRef.current,
-        patch.before,
-        patch.after,
-      );
-      if (result.error || !result.code) {
-        setVisualPatches((prev) =>
-          prev.map((item) =>
-            item.id === patch.id
-              ? { ...item, status: "draft", error: result.error }
-              : item,
-          ),
-        );
-        toast({
-          title: "无法安全写回",
-          description: result.error,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      applyDemoSnapshot({ code: result.code, source: "ai-finish" });
-      setVisualPatches((prev) =>
-        prev.map((item) =>
-          item.id === patch.id
-            ? { ...item, status: "accepted", error: undefined }
-            : item,
-        ),
-      );
-      toast({ title: "修改已写回代码" });
-    },
-    [applyDemoSnapshot, toast],
-  );
-
-  const handleRejectVisualPatch = useCallback(
-    (patchId: string) => {
-      setVisualPatches((prev) =>
-        prev.map((item) =>
-          item.id === patchId ? { ...item, status: "rejected" } : item,
-        ),
-      );
-      if (sessionId && activeDemoId) {
-        invalidateCompileCache(sessionId, activeDemoId);
-      }
-      toast({ title: "已拒绝该修改" });
-    },
-    [activeDemoId, sessionId, toast],
-  );
-
-  const handleSendSelectionToAI = useCallback(() => {
-    if (!selectedVisualNode) {
-      toast({ title: "请先在预览区选择一个元素" });
-      return;
-    }
-    const prompt = `请只针对当前可视化选区提出修改建议，不要静默扩大范围。
-
-【当前选区】
-- 元素：<${selectedVisualNode.tagName}>
-- DOM 路径：${selectedVisualNode.domPath}
-- className：${selectedVisualNode.className || "无"}
-- 文本：${selectedVisualNode.textContent || "无"}
-- 页面文件：demos/${activeDemoIdRef.current}/index.tsx
-
-请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
-    setTabValue("ai");
-    setTriggerAutoSend(prompt);
-  }, [selectedVisualNode, toast]);
+  // Visual edit handlers (initializeVisualConfigDialog, handleVisualConfigCandidateChange,
+  // handleVisualSelect, handleStartVisualConfig, handleApplyVisualConfig,
+  // handleCloseVisualConfigDialog, visualConfigDialogOpen, handleVisualConfigTitleChange,
+  // handleStartVisualAnnotation, handleSendVisualAnnotationsToAI, handleVisualInlineEdit,
+  // handleCreateVisualAnnotation, handleAcceptVisualPatch, handleRejectVisualPatch,
+  // handleSendSelectionToAI) moved to useVisualEditState hook
 
   // 从工作空间文件路径提取 demoId
   function extractDemoIdFromPath(normalizedPath: string): string | null {
@@ -2594,19 +1968,8 @@ ${context}
     });
     return groups;
   }, []);
-  const hasPublishableChanges =
-    publishStatus === "never_published" ||
-    publishStatus === "unpublished_changes";
-  const shouldCreateVersionBeforePublish = hasPendingChanges;
-  const publishButtonDisabled =
-    isSaving ||
-    publishing ||
-    publishStatus === null ||
-    (!hasPendingChanges && !hasPublishableChanges);
-  const publishButtonText = shouldCreateVersionBeforePublish ? "创建版本并发布" : "发布";
-  const publishingButtonText = shouldCreateVersionBeforePublish
-    ? "创建版本并发布中..."
-    : "发布中...";
+  // hasPublishableChanges, shouldCreateVersionBeforePublish, publishButtonDisabled,
+  // publishButtonText, publishingButtonText moved to useVersionControl hook
   const collabStatuses = [
     activeCodeCollab.status,
     activeSchemaCollab.status,
