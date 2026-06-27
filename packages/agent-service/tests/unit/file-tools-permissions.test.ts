@@ -223,9 +223,10 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(24);
+    expect(tools).toHaveLength(25);
     expect(tools.some(t => t.name === 'webRead')).toBe(true);
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
+    expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);
@@ -245,8 +246,9 @@ describe('createWorkbenchTools - permissions 透传', () => {
       }),
     });
 
-    expect(tools).toHaveLength(25);
+    expect(tools).toHaveLength(26);
     expect(tools.some(t => t.name === 'webSearch')).toBe(true);
+    expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);
   });
 
   it('关闭网页读取时不注册 webRead 工具', async () => {

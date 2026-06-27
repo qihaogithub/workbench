@@ -1,3 +1,8 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
+import type { BackendProvider, BackendProvidersConfig } from '@opencode-workbench/shared';
+
 import { IBackendAdapter, BackendStatus } from './base';
 import { AgentConfig, AgentEvent, FileChange, ImageAttachment, PlanItem } from '../core/types';
 import { createWorkbenchTools, type PermissionHandler, type SubagentRunResult } from './pi-tools';
@@ -7,10 +12,12 @@ import { logger } from '../utils/logger';
 import { loadConfig, type ServiceConfig } from '../utils/config';
 import { getBackendProvidersManager } from '../config/backend-providers';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './pi-tools/permissions';
-import type { BackendProvider, BackendProvidersConfig } from '@opencode-workbench/shared';
 import { ImageDescriber, type VisionDescribeRequest } from '../services/image-describer';
-import * as fs from 'fs';
-import * as path from 'path';
+import {
+  formatPreinstalledSkillsForPrompt,
+  getPreinstalledSkills,
+  type PreinstalledSkill,
+} from './preinstalled-skills';
 
 /**
  * 判断文件路径是否属于知识库目录（knowledge/）
@@ -362,6 +369,7 @@ export class PiAgentBackend implements IBackendAdapter {
 
       // 4. 获取模型
       const model = this.getModel();
+      const resources = { skills: getPreinstalledSkills() };
 
       logger.info({ modelId: model.id, provider: model.provider, baseUrl: model.baseUrl }, "Pi Agent model configured");
 
@@ -370,6 +378,7 @@ export class PiAgentBackend implements IBackendAdapter {
         env: this.env,
         session: this.session,
         tools,
+        resources,
         model,
         systemPrompt: (context: any) => this.buildSystemPrompt(context),
         getApiKeyAndHeaders: (model: any) => this.getApiKeyAndHeaders(model),
@@ -800,15 +809,22 @@ export class PiAgentBackend implements IBackendAdapter {
     unsubStore.push(unsubToolResult);
   }
 
-  private buildSubagentSystemPrompt(): string {
+  private buildSubagentSystemPrompt(context?: {
+    resources?: { skills?: PreinstalledSkill[] };
+  }): string {
     const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手';
-    return `${basePrompt}
-
-# Subagent Mode
+    const preinstalledSkills = formatPreinstalledSkillsForPrompt(
+      context?.resources?.skills || [],
+    );
+    return [
+      basePrompt,
+      preinstalledSkills,
+      `# Subagent Mode
 
 You are a short-lived subagent working for the main agent in the same workspace.
 Complete only the delegated task. You may read and edit allowed workspace files, but you must not spawn another subagent.
-Keep the final response concise: summarize what you changed, what you verified, and any remaining risks.`;
+Keep the final response concise: summarize what you changed, what you verified, and any remaining risks.`,
+    ].filter(Boolean).join('\n\n');
   }
 
   /**
@@ -1200,13 +1216,16 @@ Keep the final response concise: summarize what you changed, what you verified, 
         { includeDelegateTask: false, includePlanApproval: false },
       );
       const model = this.getModel();
+      const resources = { skills: getPreinstalledSkills() };
 
       harness = new AgentHarness({
         env,
         session,
         tools,
+        resources,
         model,
-        systemPrompt: () => this.buildSubagentSystemPrompt(),
+        systemPrompt: (context: { resources?: { skills?: PreinstalledSkill[] } }) =>
+          this.buildSubagentSystemPrompt(context),
         getApiKeyAndHeaders: (model: any) => this.getApiKeyAndHeaders(model),
         thinkingLevel: 'off',
       });
@@ -1601,11 +1620,14 @@ Keep the final response concise: summarize what you changed, what you verified, 
     model: any;
     thinkingLevel: any;
     activeTools: any[];
-    resources: any;
+    resources: { skills?: PreinstalledSkill[] };
   }): string {
     const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手\n\n等待 system prompt 注入...';
     const runtimeTools = formatRuntimeToolsForPrompt(context.activeTools || []);
-    return runtimeTools ? `${basePrompt}\n\n${runtimeTools}` : basePrompt;
+    const preinstalledSkills = formatPreinstalledSkillsForPrompt(
+      context.resources?.skills || [],
+    );
+    return [basePrompt, runtimeTools, preinstalledSkills].filter(Boolean).join('\n\n');
   }
 
   /**

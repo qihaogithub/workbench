@@ -14,6 +14,7 @@ import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
+import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool";
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
 import { createDingtalkTool } from "./dingtalk-tool";
 import { createFigmaMcpTool } from "./figma-mcp-tool";
@@ -32,7 +33,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 10;
+export const WORKBENCH_TOOL_VERSION = 11;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -73,6 +74,7 @@ export function createWorkbenchTools(
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
     createKnowledgeReportTool(config),
+    createReadPreinstalledSkillTool(),
     createArrangeCanvasPagesTool(config),
     ...(isWebReadEnabled() ? [createWebReadTool()] : []),
     ...(isWebSearchEnabled() ? [createWebSearchTool()] : []),

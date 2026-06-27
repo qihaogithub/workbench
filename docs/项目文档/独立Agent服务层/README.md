@@ -1,8 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.6
+> 版本：v2.7
 > 创建日期：2026-04-05
-> 更新日期：2026-06-26
+> 更新日期：2026-06-27
 
 ---
 
@@ -25,7 +25,7 @@
 | :--- | :--- | :--- | :--- |
 | [01-架构设计.md](./01-架构设计.md) | Fastify 服务、Pi Agent 单后端、工具权限、工作空间与截图服务协作 | 1 | 已更新 |
 | [02-接口规范.md](./02-接口规范.md) | REST API、WebSocket 消息、使用端只读 AI、内部配置同步、校验与模型接口 | 2 | 已更新 |
-| [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools 等模块职责 | 3 | 已更新 |
+| [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools、预装 Skills 等模块职责 | 3 | 已更新 |
 | [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | 历史 OpenCode SSE drain 问题记录，当前仅作迁移背景参考 | 4 | 历史参考 |
 | [05-快照服务.md](./05-快照服务.md) | Git/snapshot 双模式、变更比较、丢弃回滚、Session 生命周期 | 5 | 已完成 |
 | [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界 | 6 | 已完成 |
@@ -98,6 +98,7 @@
 | 网页读取 | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容 |
 | 联网搜索 | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用 |
 | 外部授权 | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号 |
+| 预装 Skills | agent-service 随包携带 `design-taste-frontend`，通过 `readPreinstalledSkill` 按需读取完整指令 |
 | 事件流 | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、finish、error |
 | 文件变更 | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式 |
 | 截图 | `screenshot-service` 使用 author-site `/api/compile` 编译并通过 Puppeteer 渲染 |
@@ -117,3 +118,4 @@
 | 2026-06-26 | v2.4 | 补充用户级外部工具授权的 session 注入与工具边界 |
 | 2026-06-26 | v2.5 | 新增 Pi Agent `webSearch` 联网搜索能力说明，采用 Brave Search API 免费额度方案 |
 | 2026-06-26 | v2.6 | 新增 Pi Agent `webRead` 网页正文读取能力和公网 URL 安全边界 |
+| 2026-06-27 | v2.7 | 新增创作端 Agent 预装 `design-taste-frontend` Skill 与按需读取工具说明 |
