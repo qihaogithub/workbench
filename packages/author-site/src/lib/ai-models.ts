@@ -14,6 +14,8 @@
  * - 使用 model-config.ts 中的 getModelConfig() 函数
  */
 
+import { getModelEnvConfig } from "./runtime-config";
+
 export type ModelMatcher = RegExp | string;
 
 export type ThinkingDepth = "low" | "medium" | "high";
@@ -82,13 +84,9 @@ function parseDynamicPrefixesFromConfig(prefixes: string[]): ModelConfig[] {
  * @deprecated 使用 parseDynamicPrefixesFromConfig 替代
  */
 function parseDynamicPrefixes(): ModelConfig[] {
-  const raw = process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "";
-  if (!raw.trim()) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((prefix) => ({ matcher: prefix }));
+  return getModelEnvConfig().allowedPrefixes.map((prefix) => ({
+    matcher: prefix,
+  }));
 }
 
 /**
@@ -111,14 +109,7 @@ function parseBlacklistFromConfig(blacklist: string[]): Set<string> {
  * @deprecated 使用 parseBlacklistFromConfig 替代
  */
 function parseBlacklist(): Set<string> {
-  const raw = process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "";
-  if (!raw.trim()) return new Set();
-  return new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+  return new Set(getModelEnvConfig().blacklist);
 }
 
 /**
@@ -157,12 +148,7 @@ function parseNameFiltersFromConfig(
  * @deprecated 使用 parseNameFiltersFromConfig 替代
  */
 function parseNameFilters(): Array<{ group: string; keyword: string }> {
-  const raw = process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "";
-  if (!raw.trim()) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
+  return getModelEnvConfig().nameFilters
     .map((entry) => {
       const idx = entry.indexOf(":");
       if (idx < 0) return { group: entry, keyword: "" };
@@ -185,12 +171,7 @@ function parseNameFilters(): Array<{ group: string; keyword: string }> {
  * 未设置时为空数组
  */
 function parseDefaultModelIds(): string[] {
-  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "";
-  if (!raw.trim()) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return getModelEnvConfig().defaultModelIds;
 }
 
 export function isModelBlacklisted(id: string): boolean {
@@ -367,18 +348,8 @@ export async function applyModelConfigsAsync(
  * 环境变量 fallback 配置 (当 API 不可用时使用)
  */
 function getEnvFallbackConfig() {
-  const allowedPrefixes = (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const nameFilters = (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const defaultModelIds = (process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const { allowedPrefixes, nameFilters, defaultModelIds, blacklist } =
+    getModelEnvConfig();
   return {
     enabledModels: defaultModelIds,
     autoEnableRules: [
@@ -386,10 +357,7 @@ function getEnvFallbackConfig() {
       ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
     ],
     allowedPrefixes,
-    blacklist: (process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    blacklist,
     nameFilters,
     multimodalModels: [] as string[],
   };

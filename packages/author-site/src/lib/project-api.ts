@@ -11,6 +11,8 @@ import type {
   MultiDemoFiles,
 } from '@opencode-workbench/shared';
 
+import { getBrowserAgentServiceUrl } from './runtime-config';
+
 /**
  * 项目级共享配置 Schema 响应
  */
@@ -26,9 +28,6 @@ export interface SessionMultiDemoFiles extends MultiDemoFiles {
   demoPages: DemoPageMeta[];
   workspacePath: string;
 }
-
-// Agent Service 的基础 URL（可以通过环境变量配置）
-const AGENT_SERVICE_URL = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || 'http://localhost:3201';
 
 /**
  * API 响应类型
@@ -51,7 +50,7 @@ export class ProjectApiClient {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || AGENT_SERVICE_URL;
+    this.baseUrl = baseUrl || getBrowserAgentServiceUrl();
   }
 
   /**

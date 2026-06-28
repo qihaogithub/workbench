@@ -1,4 +1,4 @@
-# CLI 与创作端能力对齐长期跟踪
+﻿# CLI 与创作端能力对齐长期跟踪
 
 ## 用途
 
@@ -24,7 +24,7 @@
 
 | 编号 | 状态 | 缺口 | 需要补什么 |
 |:-----|:-----|:-----|:-----------|
-| GAP-000 | 新增 | `project duplicate` 命令回归 | 修正 [`packages/project-cli/src/index.ts`](../../packages/project-cli/src/index.ts) 的参数顺序，并补 CLI 类型检查与全命令回归测试 |
+| GAP-000 | 新增 | `project duplicate` 命令回归 | 修正 [`packages/project-cli/src/index.ts`](../../../packages/project-cli/src/index.ts) 的参数顺序，并补 CLI 类型检查与全命令回归测试 |
 | GAP-001 | 待处理 | 页面版本历史/快照查询缺失 | 增加 `page version-list`、`page version-get`、`page version-create`，并补 `project-core` 对应读取/创建能力 |
 | GAP-002 | 待处理 | 会话管理缺失 | 增加项目会话创建或复用、项目会话列表、会话详情、会话删除命令 |
 | GAP-003 | 待处理 | 工作区管理缺失 | 增加工作区创建、列表、详情、删除命令 |
@@ -41,13 +41,13 @@
 - `pnpm check:project-core`：未通过。阻塞原因同上
 - `pnpm check:project-scaffold`：未通过。阻塞原因同上
 - 直接替代验证：
-- `packages/project-cli` `tsc --noEmit`：失败，[`packages/project-cli/src/index.ts`](../../packages/project-cli/src/index.ts) 第 599 行把 `actor` 误传给 `duplicateProject(..., category?, actor)`
+- `packages/project-cli` `tsc --noEmit`：失败，[`packages/project-cli/src/index.ts`](../../../packages/project-cli/src/index.ts) 第 599 行把 `actor` 误传给 `duplicateProject(..., category?, actor)`
 - `packages/project-cli` `src/cli.test.ts`：通过
 - `packages/project-cli` `src/cli-all-commands.test.ts`：失败，`project duplicate` 运行时命中同一回归
 - `packages/project-core` `tsc --noEmit`：通过
-- `packages/project-core` `vitest run`：失败，[`packages/project-core/src/__tests__/service.test.ts`](../../packages/project-core/src/__tests__/service.test.ts) 第 442 行仍断言首次发布版本号为 `v1`，与“发布前自动生成发布快照”的现行语义不一致
+- `packages/project-core` `vitest run`：失败，[`packages/project-core/src/__tests__/service.test.ts`](../../../packages/project-core/src/__tests__/service.test.ts) 第 442 行仍断言首次发布版本号为 `v1`，与“发布前自动生成发布快照”的现行语义不一致
 - `packages/project-scaffold` `tsc --noEmit`：通过
-- `packages/project-scaffold` `src/scaffold.test.ts`：失败，[`packages/project-scaffold/src/scaffold.test.ts`](../../packages/project-scaffold/src/scaffold.test.ts) 第 80 行依赖 `pnpm install --lockfile-only` 返回 0，当前环境会因 `pnpm` 版本不匹配而失败
+- `packages/project-scaffold` `src/scaffold.test.ts`：失败，[`packages/project-scaffold/src/scaffold.test.ts`](../../../packages/project-scaffold/src/scaffold.test.ts) 第 80 行依赖 `pnpm install --lockfile-only` 返回 0，当前环境会因 `pnpm` 版本不匹配而失败
 - 未补跑 `pnpm check:author`：本轮未发现新的 author-site / shared 契约差异，只做静态能力对比即可
 
 ## 下次重点检查

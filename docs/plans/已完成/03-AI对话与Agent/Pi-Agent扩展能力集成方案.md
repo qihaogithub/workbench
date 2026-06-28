@@ -320,7 +320,7 @@ Pi 的设计哲学是**故意不内置 MCP 支持**，原因：
 
 ## 九、相关文档
 
-- [Pi Agent 后端架构说明（AGENTS.md）](../../agent-service/AGENTS.md)
+- [Pi Agent 后端架构说明（AGENTS.md）](../../../../packages/agent-service/AGENTS.md)
 - [迁移计划方案](./Pi-Agent迁移到AgentHarness计划.md)
 - [Pi Agent 官方扩展文档](https://pi.dev/docs/latest/extensions)
 - [Pi MCP Adapter 官方文档](https://github.com/nicobailon/pi-mcp-adapter)

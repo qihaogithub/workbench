@@ -10,9 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
-
-const AGENT_SERVICE_URL =
-  process.env.AGENT_SERVICE_URL || "http://localhost:3201";
+import { getServerAgentServiceUrl } from "@/lib/runtime-config";
 
 export async function GET(request: NextRequest) {
   // 验证 Admin 权限
@@ -31,7 +29,7 @@ export async function GET(request: NextRequest) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const res = await fetch(`${AGENT_SERVICE_URL}/models`, {
+    const res = await fetch(`${getServerAgentServiceUrl()}/models`, {
       method: "GET",
       signal: controller.signal,
     });

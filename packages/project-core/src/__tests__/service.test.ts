@@ -439,7 +439,7 @@ describe("ProjectAdminService", () => {
     expect(firstCommit.ok).toBe(true);
     const published = service.publishProject(projectId);
     expect(published.ok).toBe(true);
-    expect(published.data?.publishedVersion).toBe("v1");
+    expect(published.data?.publishedVersion).toBe("v2");
     expect(published.data?.artifactSummary?.demoCount).toBe(3);
     expect(published.data?.artifactSummary?.entryPaths).toContain("project-admin-status.json");
     expect(published.data?.accessUrls?.viewerUrl).toBe(`/projects/${projectId}`);
@@ -451,10 +451,45 @@ describe("ProjectAdminService", () => {
     expect(service.commitEdit(secondEditId, "发布后调整").ok).toBe(true);
 
     const republished = service.publishProject(projectId);
-    expect(republished.data?.publishedVersion).toBe("v2");
+    expect(republished.data?.publishedVersion).toBe("v4");
 
     const rolledBack = service.publishRollback(projectId);
     expect(rolledBack.ok).toBe(true);
-    expect(rolledBack.data?.publishedVersion).toBe("v1");
+    expect(rolledBack.data?.publishedVersion).toBe("v3");
+  });
+
+  it("支持将模板快照转为普通项目并移除模板", () => {
+    const source = service.createProject({ name: "模板源项目", category: "活动" });
+    const projectId = source.data?.id ?? "";
+    const projectWorkspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    const treePath = path.join(projectWorkspacePath, "workspace-tree.json");
+    fs.writeFileSync(
+      treePath,
+      JSON.stringify(
+        {
+          pages: [{ id: "page-home", name: "首页", order: 0, parentId: null }],
+          folders: [],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const template = service.createTemplateFromProject(projectId, {
+      category: "营销模板",
+      name: "可转换模板",
+      description: "用于转换为普通项目",
+    });
+
+    const converted = service.convertTemplateToProject(template.data?.id ?? "");
+
+    expect(converted.ok).toBe(true);
+    expect(converted.data?.name).toBe("可转换模板");
+    expect(converted.data?.category).toBe("营销模板");
+    expect(service.getTemplate(template.data?.id ?? "").ok).toBe(false);
+
+    const detail = service.getProject(converted.data?.id ?? "");
+    expect(detail.data?.pages.map((page) => page.name)).toEqual(["首页"]);
   });
 });

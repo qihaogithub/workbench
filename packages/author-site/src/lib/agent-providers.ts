@@ -10,11 +10,10 @@ import type {
   ExternalAuthSessionConfig,
 } from "@opencode-workbench/shared";
 
-const AGENT_SERVICE_URL =
-  process.env.AGENT_SERVICE_URL || "http://localhost:3201";
-const INTERNAL_TOKEN =
-  process.env.INTERNAL_API_TOKEN ||
-  (process.env.NODE_ENV === "production" ? "" : "dev-internal-token");
+import {
+  getInternalApiToken,
+  getServerAgentServiceUrl,
+} from "./runtime-config";
 
 export interface PushResult {
   ok: boolean;
@@ -30,7 +29,8 @@ export interface PushResult {
 export async function pushBackendProvidersToAgent(
   config: BackendProvidersConfig,
 ): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return {
       ok: false,
       message:
@@ -39,11 +39,11 @@ export async function pushBackendProvidersToAgent(
   }
 
   try {
-    const res = await fetch(`${AGENT_SERVICE_URL}/internal/backend-providers`, {
+    const res = await fetch(`${getServerAgentServiceUrl()}/internal/backend-providers`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Internal-Token": INTERNAL_TOKEN,
+        "X-Internal-Token": internalToken,
       },
       body: JSON.stringify(config),
     });
@@ -85,15 +85,16 @@ export async function fetchBackendProvidersFromAgent(): Promise<{
   config?: BackendProvidersConfig;
   message?: string;
 }> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
   }
 
   try {
-    const res = await fetch(`${AGENT_SERVICE_URL}/internal/backend-providers`, {
+    const res = await fetch(`${getServerAgentServiceUrl()}/internal/backend-providers`, {
       method: "GET",
       headers: {
-        "X-Internal-Token": INTERNAL_TOKEN,
+        "X-Internal-Token": internalToken,
       },
     });
 
@@ -114,7 +115,8 @@ export async function pushSessionModelConfigToAgent(
   sessionId: string,
   config: BackendProvidersConfig,
 ): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return {
       ok: false,
       message:
@@ -124,12 +126,12 @@ export async function pushSessionModelConfigToAgent(
 
   try {
     const res = await fetch(
-      `${AGENT_SERVICE_URL}/internal/sessions/${encodeURIComponent(sessionId)}/model-config`,
+      `${getServerAgentServiceUrl()}/internal/sessions/${encodeURIComponent(sessionId)}/model-config`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Internal-Token": INTERNAL_TOKEN,
+          "X-Internal-Token": internalToken,
         },
         body: JSON.stringify(config),
       },
@@ -172,7 +174,8 @@ export async function pushSessionExternalAuthToAgent(
   sessionId: string,
   config: ExternalAuthSessionConfig,
 ): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return {
       ok: false,
       message:
@@ -182,12 +185,12 @@ export async function pushSessionExternalAuthToAgent(
 
   try {
     const res = await fetch(
-      `${AGENT_SERVICE_URL}/internal/sessions/${encodeURIComponent(sessionId)}/external-auth`,
+      `${getServerAgentServiceUrl()}/internal/sessions/${encodeURIComponent(sessionId)}/external-auth`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Internal-Token": INTERNAL_TOKEN,
+          "X-Internal-Token": internalToken,
         },
         body: JSON.stringify(config),
       },
@@ -227,16 +230,17 @@ export async function pushSessionExternalAuthToAgent(
 }
 
 export async function startDingtalkAuthOnAgent(userId: string): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
   }
 
   try {
-    const res = await fetch(`${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/start`, {
+    const res = await fetch(`${getServerAgentServiceUrl()}/internal/external-auth/dingtalk/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Internal-Token": INTERNAL_TOKEN,
+        "X-Internal-Token": internalToken,
       },
       body: JSON.stringify({ userId }),
     });
@@ -258,16 +262,17 @@ export async function startDingtalkAuthOnAgent(userId: string): Promise<PushResu
 }
 
 export async function fetchDingtalkAuthFromAgent(userId: string): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
   }
 
   try {
     const res = await fetch(
-      `${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`,
+      `${getServerAgentServiceUrl()}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`,
       {
         method: "GET",
-        headers: { "X-Internal-Token": INTERNAL_TOKEN },
+        headers: { "X-Internal-Token": internalToken },
       },
     );
     const body = await res.json().catch(() => null);
@@ -288,14 +293,15 @@ export async function fetchDingtalkAuthFromAgent(userId: string): Promise<PushRe
 }
 
 export async function disconnectDingtalkAuthOnAgent(userId: string): Promise<PushResult> {
-  if (!INTERNAL_TOKEN) {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
     return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
   }
 
   try {
-    const res = await fetch(`${AGENT_SERVICE_URL}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`, {
+    const res = await fetch(`${getServerAgentServiceUrl()}/internal/external-auth/dingtalk/${encodeURIComponent(userId)}`, {
       method: "DELETE",
-      headers: { "X-Internal-Token": INTERNAL_TOKEN },
+      headers: { "X-Internal-Token": internalToken },
     });
     const body = await res.json().catch(() => null);
     if (!res.ok || !body?.success) {

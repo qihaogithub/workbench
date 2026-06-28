@@ -367,9 +367,9 @@ def detect_duplicates(documents):
 
 ## 🌟 核心文档推荐
 
-1. [{文档1}](./01-架构决策/xxx.md) - {1句话描述价值}
-2. [{文档2}](./02-核心问题分析/xxx.md) - {1句话描述价值}
-3. [{文档3}](./03-{主题}/xxx.md) - {1句话描述价值}
+1. `{文档1}`（例如 `./01-架构决策与技术方案/xxx.md`）- {1句话描述价值}
+2. `{文档2}`（例如 `./02-核心问题根因分析/xxx.md`）- {1句话描述价值}
+3. `{文档3}`（例如 `./03-{主题}/xxx.md`）- {1句话描述价值}
 
 ## 📝 文档维护规范
 
@@ -461,8 +461,8 @@ def detect_duplicates(documents):
 ## 📚 相关资源
 
 - [AGENTS.md](../../../AGENTS.md) - 项目整体工作指南
-- [doc-maintainer Skill](../../../.opencode/skills/) - 文档维护技能
-- [experience-doc Skill](../../../.opencode/skills/) - 架构复盘文档生成
+- [doc-maintainer Skill](../../../.agents/skills/doc-maintainer/) - 文档维护技能
+- [experience-doc Skill](../../../.agents/skills/experience-doc/) - 架构复盘文档生成
 
 ---
 

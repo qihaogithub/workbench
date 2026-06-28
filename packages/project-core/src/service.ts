@@ -52,6 +52,16 @@ import type {
   TemplateMetaInput,
   ValidationResult,
 } from "./types.js";
+import {
+  getAgentServiceUrl,
+  getProjectAdminActorEnv,
+  getProjectAdminAuditDir,
+  getProjectAdminDataDir,
+  getProjectAdminMaxBatchSize,
+  getProjectAdminMode,
+  getScreenshotServiceUrl,
+  getViewerBaseUrl,
+} from "./config";
 
 const DEFAULT_DEMO_CODE = `import React from 'react';
 
@@ -112,17 +122,6 @@ function normalizeProjectCategory(category?: string): string {
 
 function nowId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
 }
 
 function safeId(id: string, label: string): string {
@@ -260,10 +259,7 @@ export class ProjectAdminService {
   readonly maxBatchSize: number;
 
   constructor(private readonly config: ProjectAdminConfig = {}) {
-    this.dataDir =
-      config.dataDir ??
-      process.env.DATA_DIR ??
-      path.join(findProjectRoot(process.cwd()), "data");
+    this.dataDir = config.dataDir ?? getProjectAdminDataDir();
     this.projectsDir = path.join(this.dataDir, "projects");
     this.templatesDir = path.join(this.dataDir, "templates");
     this.workspacesDir = path.join(this.dataDir, "workspaces");
@@ -271,16 +267,11 @@ export class ProjectAdminService {
     this.publishedDir = path.join(this.dataDir, "published");
     this.sessionsDir = path.join(this.dataDir, "sessions");
     this.agentRunLogsDir = path.join(this.dataDir, "agent-run-logs");
-    this.auditDir =
-      config.auditDir ??
-      process.env.PROJECT_ADMIN_AUDIT_DIR ??
-      path.join(this.dataDir, "audit", "project-admin");
+    this.auditDir = config.auditDir ?? getProjectAdminAuditDir(this.dataDir);
     this.internalDir = path.join(this.dataDir, ".project-admin");
     this.editsDir = path.join(this.internalDir, "edits");
     this.plansDir = path.join(this.internalDir, "plans");
-    this.maxBatchSize =
-      config.maxBatchSize ??
-      Number(process.env.PROJECT_ADMIN_MAX_BATCH_SIZE || 20);
+    this.maxBatchSize = config.maxBatchSize ?? getProjectAdminMaxBatchSize();
   }
 
   ensureDirs(): void {
@@ -302,8 +293,7 @@ export class ProjectAdminService {
     const writable = actor.role !== "readonly";
     return ok({
       actor,
-      mode:
-        process.env.PROJECT_ADMIN_CLI_MODE === "local" ? "local" : writable ? "cli" : "readonly",
+      mode: getProjectAdminMode(writable),
       writable,
       maxBatchSize: this.maxBatchSize,
       tools: [
@@ -324,17 +314,13 @@ export class ProjectAdminService {
   }
 
   defaultActor(): ProjectAdminActor {
-    const role = (process.env.PROJECT_ADMIN_ROLE ?? "admin") as ProjectAdminActor["role"];
-    const allowedProjectIds = (process.env.PROJECT_ADMIN_ALLOWED_PROJECTS ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const actor = getProjectAdminActorEnv();
     return {
-      id: process.env.USER ?? "local-codex",
-      name: process.env.USER ?? "Local Codex",
-      role: ["admin", "creator", "readonly"].includes(role) ? role : "admin",
-      source: "project-admin-core",
-      allowedProjectIds: allowedProjectIds.length > 0 ? allowedProjectIds : undefined,
+      ...actor,
+      allowedProjectIds:
+        actor.allowedProjectIds && actor.allowedProjectIds.length > 0
+          ? actor.allowedProjectIds
+          : undefined,
     };
   }
 
@@ -818,6 +804,44 @@ export class ProjectAdminService {
       { deleted: true, templateId: plan.resourceId },
       { auditId, diffSummary: { deleted: [`template:${plan.resourceId}`] } },
     );
+  }
+
+  convertTemplateToProject(
+    templateId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<DemoMeta> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const template = this.readTemplate(templateId);
+    if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+
+    const created = this.createProject(
+      {
+        name: template.name,
+        category: template.category,
+        description: template.description,
+        templateId,
+      },
+      actor,
+    );
+    if (!created.ok || !created.data) return created;
+
+    fs.rmSync(this.getTemplatePath(templateId), { recursive: true, force: true });
+    const auditId = this.audit("template_convert_to_project", actor, "L2", true, {
+      projectId: created.data.id,
+      resourceId: templateId,
+      diffSummary: {
+        created: [`project:${created.data.id}`],
+        deleted: [`template:${templateId}`],
+      },
+    });
+    return ok(created.data, {
+      auditId,
+      diffSummary: {
+        created: [`project:${created.data.id}`],
+        deleted: [`template:${templateId}`],
+      },
+      nextActions: ["project_get", "template_list"],
+    });
   }
 
   recommendTemplate(description: string): ProjectAdminResult<{
@@ -1751,7 +1775,7 @@ export class ProjectAdminService {
   }
 
   private viewerBaseUrl(): string {
-    return (process.env.VIEWER_CLOUDFLARE_URL || process.env.VIEWER_LAN_URL || "").replace(/\/+$/, "");
+    return getViewerBaseUrl();
   }
 
   private buildPublishStatus(
@@ -2688,18 +2712,10 @@ export class ProjectAdminService {
   }
 
   private getScreenshotServiceUrl(): string {
-    return (
-      process.env.SCREENSHOT_SERVICE_URL ||
-      process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL ||
-      "http://localhost:3202"
-    ).replace(/\/+$/, "");
+    return getScreenshotServiceUrl();
   }
 
   private getAgentServiceUrl(): string {
-    return (
-      process.env.AGENT_SERVICE_URL ||
-      process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ||
-      "http://localhost:3201"
-    ).replace(/\/+$/, "");
+    return getAgentServiceUrl();
   }
 }

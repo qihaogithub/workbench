@@ -3,9 +3,8 @@ import * as path from 'path';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
+import { loadConfig } from '../../utils/config';
 import { logger } from '../../utils/logger';
-
-const DEFAULT_SCREENSHOT_SERVICE_URL = 'http://localhost:3202';
 
 const CaptureScreenshotParams = Type.Object({
   width: Type.Optional(
@@ -65,7 +64,7 @@ function inferProjectId(workingDir: string): string | null {
 }
 
 function getScreenshotServiceUrl(): string {
-  return (process.env.SCREENSHOT_SERVICE_URL || DEFAULT_SCREENSHOT_SERVICE_URL).replace(/\/$/, '');
+  return loadConfig().screenshotServiceUrl.replace(/\/+$/, '');
 }
 
 function getDemoDir(workingDir: string, demoId: string): string {
