@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
 import { uploadCover, deleteCover } from '@/lib/api'
 import { ImagePlus, Trash2, RefreshCcw, Loader2 } from 'lucide-react'
+import type { ApiResponse } from '@opencode-workbench/shared'
 
 interface CoverImageDialogProps {
   open: boolean
@@ -19,6 +20,8 @@ interface CoverImageDialogProps {
   projectId: string
   currentThumbnail?: string
   onThumbnailChange: (thumbnail: string | null) => void
+  onUpload?: (file: File) => Promise<ApiResponse<{ thumbnail: string }>>
+  onDelete?: () => Promise<ApiResponse<{ thumbnail: string | null }>>
 }
 
 export function CoverImageDialog({
@@ -27,6 +30,8 @@ export function CoverImageDialog({
   projectId,
   currentThumbnail,
   onThumbnailChange,
+  onUpload,
+  onDelete,
 }: CoverImageDialogProps) {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -48,7 +53,9 @@ export function CoverImageDialog({
 
       setIsUploading(true)
       try {
-        const result = await uploadCover(projectId, file)
+        const result = onUpload
+          ? await onUpload(file)
+          : await uploadCover(projectId, file)
         if (result.success) {
           onThumbnailChange(result.data.thumbnail)
           toast({ title: '封面图已更新' })
@@ -61,13 +68,13 @@ export function CoverImageDialog({
         setIsUploading(false)
       }
     },
-    [projectId, onThumbnailChange, toast],
+    [projectId, onThumbnailChange, onUpload, toast],
   )
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true)
     try {
-      const result = await deleteCover(projectId)
+      const result = onDelete ? await onDelete() : await deleteCover(projectId)
       if (result.success) {
         onThumbnailChange(result.data.thumbnail ?? null)
         toast({ title: '封面图已删除' })
@@ -79,7 +86,7 @@ export function CoverImageDialog({
     } finally {
       setIsDeleting(false)
     }
-  }, [projectId, onThumbnailChange, toast])
+  }, [projectId, onDelete, onThumbnailChange, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()

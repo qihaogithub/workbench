@@ -371,6 +371,7 @@ export class ProjectWorkspaceManager {
     // 步骤 4: 记录版本信息
     const versionInfo: VersionInfo = {
       versionId,
+      type: 'named_version',
       savedAt: Date.now(),
       savedBy: session.username,
       sessionId,
@@ -489,6 +490,7 @@ export class ProjectWorkspaceManager {
     // 记录版本信息
     const newVersion: VersionInfo = {
       versionId: newVersionId,
+      type: 'restore_snapshot',
       savedAt: Date.now(),
       savedBy: username,
       sessionId: 'restore',

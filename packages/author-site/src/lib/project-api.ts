@@ -418,7 +418,7 @@ export class ProjectApiClient {
 
   // ============ 发布管理 ============
 
-  async publishProject(projectId: string): Promise<{
+  async publishProject(projectId: string, request?: { sessionId?: string }): Promise<{
     projectId: string;
     publishedVersion: string;
     publishedAt: number;
@@ -433,7 +433,10 @@ export class ProjectApiClient {
       duration: number;
     }>(
       `/api/projects/${projectId}/publish`,
-      { method: 'POST' }
+      {
+        method: 'POST',
+        body: JSON.stringify(request ?? {}),
+      }
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '发布失败');

@@ -5,6 +5,7 @@ import {
   createDemo,
   duplicateDemo,
   updateDemo,
+  updateProjectTemplate,
   useDemos,
   useProjectTemplates,
 } from "@/lib/api";
@@ -22,9 +23,13 @@ jest.mock("@/components/ui/toast-provider", () => ({
 jest.mock("@/lib/api", () => ({
   createDemo: jest.fn(),
   deleteDemo: jest.fn(),
+  deleteProjectTemplate: jest.fn(),
+  deleteTemplateCover: jest.fn(),
   duplicateDemo: jest.fn(),
   saveDemoAsTemplate: jest.fn(),
   updateDemo: jest.fn(),
+  updateProjectTemplate: jest.fn(),
+  uploadTemplateCover: jest.fn(),
   useDemos: jest.fn(),
   useProjectTemplates: jest.fn(),
 }));
@@ -36,6 +41,9 @@ const mockUseProjectTemplates = useProjectTemplates as jest.MockedFunction<
 const mockCreateDemo = createDemo as jest.MockedFunction<typeof createDemo>;
 const mockDuplicateDemo = duplicateDemo as jest.MockedFunction<typeof duplicateDemo>;
 const mockUpdateDemo = updateDemo as jest.MockedFunction<typeof updateDemo>;
+const mockUpdateProjectTemplate = updateProjectTemplate as jest.MockedFunction<
+  typeof updateProjectTemplate
+>;
 
 const demos = [
   {
@@ -88,6 +96,10 @@ describe("HomePage", () => {
       success: true,
       data: { id: "proj-1", name: "更新后", category: "新分类" },
     });
+    mockUpdateProjectTemplate.mockResolvedValue({
+      success: true,
+      data: { ...templates[0], name: "更新后模板", category: "新模板分类" },
+    });
   });
 
   afterEach(() => {
@@ -120,18 +132,23 @@ describe("HomePage", () => {
     });
   });
 
-  it("模板目录中复制模板会带上输入的项目分类", async () => {
+  it("模板更多菜单中使用此模板新建会带上输入的项目分类", async () => {
     render(<HomePage initialDemos={demos} />);
 
     fireEvent.click(screen.getByRole("button", { name: /知识库验证/ }));
-    fireEvent.click(screen.getByRole("button", { name: "复制模板 验证模板" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /使用此模板新建/ }),
+    );
     fireEvent.change(screen.getByLabelText("项目名称"), {
       target: { value: "模板生成项目" },
     });
     fireEvent.change(screen.getByLabelText("项目分类"), {
       target: { value: "模板项目" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "复制项目" }));
+    fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
 
     await waitFor(() => {
       expect(mockCreateDemo).toHaveBeenCalledWith(
@@ -139,6 +156,70 @@ describe("HomePage", () => {
         "模板项目",
         "tmpl-1",
       );
+    });
+  });
+
+  it("模板更多菜单提供名称、分类、封面、删除和新建入口", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+    );
+
+    const menuItems = await screen.findAllByRole("menuitem");
+    expect(menuItems.map((item) => item.textContent)).toEqual([
+      "使用此模板新建",
+      "修改名称",
+      "修改分类",
+      "修改封面",
+      "删除",
+    ]);
+    expect(screen.getByRole("menuitem", { name: /修改名称/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /修改分类/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /修改封面/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /使用此模板新建/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /^删除$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /保存为模板/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /复制当前项目/ })).not.toBeInTheDocument();
+  });
+
+  it("模板项目卡片不显示页数", () => {
+    render(<HomePage initialDemos={demos} />);
+
+    expect(screen.queryByText("1 页")).not.toBeInTheDocument();
+  });
+
+  it("模板更多菜单支持修改名称和分类", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /修改名称/ }));
+    fireEvent.change(screen.getByLabelText("项目名称"), {
+      target: { value: "改名后的模板" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(mockUpdateProjectTemplate).toHaveBeenCalledWith("tmpl-1", {
+        name: "改名后的模板",
+      });
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /修改分类/ }));
+    fireEvent.change(screen.getByLabelText("项目分类"), {
+      target: { value: "新模板分类" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(mockUpdateProjectTemplate).toHaveBeenCalledWith("tmpl-1", {
+        category: "新模板分类",
+      });
     });
   });
 

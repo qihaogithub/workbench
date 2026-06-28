@@ -22,6 +22,7 @@ import { createWorkspace } from "./workspace-manager";
 import type {
   VersionInfo,
   MultiDemoFiles,
+  VersionHistoryEntryType,
 } from "@opencode-workbench/shared";
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
@@ -422,6 +423,7 @@ export function saveEditSession(
   sessionId: string,
   username?: string,
   note?: string,
+  versionType: VersionHistoryEntryType = "named_version",
 ): SaveEditSessionResult {
   const sessionMeta = getEditSession(sessionId);
   if (!sessionMeta) {
@@ -512,6 +514,7 @@ export function saveEditSession(
 
     const versionInfo: VersionInfo = {
       versionId,
+      type: versionType,
       savedAt: Date.now(),
       savedBy: username || '未知用户',
       sessionId,
@@ -586,6 +589,59 @@ export function saveEditSession(
       return { success: false, error: `Save failed: ${error.message}` };
     }
     return { success: false, error: 'Save failed' };
+  }
+}
+
+export function syncEditSessionToProjectWorkspace(
+  sessionId: string,
+): { success: boolean; projectId?: string; workspacePath?: string; error?: string } {
+  const sessionMeta = getEditSession(sessionId);
+  if (!sessionMeta) {
+    return { success: false, error: "Session not found" };
+  }
+
+  const { demoId: projectId, workspaceId } = sessionMeta;
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, "workspace");
+
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: "Project not found" };
+  }
+
+  const sourcePath = workspaceId ? findWorkspacePath(workspaceId) : "";
+  if (!sourcePath || !fs.existsSync(sourcePath)) {
+    return { success: false, error: `Workspace source not found: ${workspaceId}` };
+  }
+
+  const tempPath = `${workspacePath}.tmp`;
+  if (fs.existsSync(tempPath)) {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+  }
+
+  try {
+    fs.cpSync(sourcePath, tempPath, {
+      recursive: true,
+      filter: (src: string) => !src.includes("node_modules"),
+    });
+
+    for (const filename of [".session.json", ".workspace.json"]) {
+      const filePath = path.join(tempPath, filename);
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+      }
+    }
+
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+    fs.renameSync(tempPath, workspacePath);
+    syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
+    return { success: true, projectId, workspacePath };
+  } catch (error) {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sync failed",
+    };
   }
 }
 

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782638325075_oanmga",
+  "at": 1782638325075,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1782638312807_lunhiq",
+  "resourceId": "proj_1782638312807_lunhiq",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1782638312807_lunhiq"
+    ]
+  }
+}

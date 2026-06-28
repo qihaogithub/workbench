@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
-import { Edit3, Maximize2, Minimize2 } from "lucide-react";
+import {
+  ALargeSmall,
+  Edit3,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
+import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { cn } from "./utils";
 import type {
-  CanvasArrowNode,
-  CanvasDrawingNode,
   CanvasFreeNode,
   CanvasPageLayout,
   CanvasTextNode,
@@ -21,10 +25,12 @@ interface CanvasFreeNodeItemProps {
   zoom?: number;
   toolMode?: CanvasToolMode;
   selected?: boolean;
+  editing?: boolean;
   onLayoutChange?: (nodeId: string, layout: CanvasPageLayout) => void;
   onEdit?: (node: CanvasFreeNode) => void;
   onTextChange?: (nodeId: string, text: string) => void;
   onNodeStyleChange?: (node: CanvasFreeNode) => void;
+  onTextEditStart?: (nodeId: string) => void;
   onToggleCollapse?: (nodeId: string) => void;
   onSelect?: (nodeId: string) => void;
   onDragStart?: (nodeId: string) => void;
@@ -37,11 +43,67 @@ const MIN_HEIGHT = 120;
 const MAX_SIZE = 2400;
 const EDGE_HIT_SIZE = 8;
 const CORNER_HIT_SIZE = 16;
+const TEXT_EDGE_HIT_SIZE = 3;
+const TEXT_CORNER_HIT_SIZE = 8;
 const NODE_LABEL_SCREEN_FONT_SIZE = 12;
 const NODE_LABEL_MAX_FONT_SIZE = 24;
 const NODE_LABEL_SCREEN_GAP = 8;
 const NODE_LABEL_MAX_TOP_OFFSET = 40;
-const TEXT_NODE_MIN_HEIGHT = 44;
+const TEXT_LINE_HEIGHT = 1.35;
+const TEXT_NODE_VERTICAL_PADDING = 0;
+const TEXT_NODE_MIN_HEIGHT = 24;
+const TEXT_NODE_HORIZONTAL_PADDING = 0;
+const TEXT_NODE_MIN_CHAR_COUNT = 1;
+const TEXT_NODE_AVERAGE_CHAR_WIDTH_RATIO = 0.56;
+const TEXT_NODE_AUTO_WIDTH_PADDING = 2;
+const TEXT_PROPERTIES_BUBBLE_SCREEN_GAP = 24;
+const TEXT_NODE_MIN_FONT_SIZE = 8;
+const TEXT_NODE_MAX_FONT_SIZE = 96;
+const TEXT_COLOR_SWATCHES = [
+  "#111827",
+  "#374151",
+  "#4b5563",
+  "#6b7280",
+  "#9ca3af",
+  "#d1d5db",
+  "#f9fafb",
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#10b981",
+  "#06b6d4",
+  "#3b82f6",
+  "#6366f1",
+  "#a855f7",
+  "#ec4899",
+] as const;
+const BACKGROUND_COLOR_SWATCHES = [
+  "#ffffff",
+  "#111827",
+  "#374151",
+  "#6b7280",
+  "#9ca3af",
+  "#d1d5db",
+  "#f3f4f6",
+  "#fee2e2",
+  "#ffedd5",
+  "#fef3c7",
+  "#fef9c3",
+  "#dcfce7",
+  "#ccfbf1",
+  "#dbeafe",
+  "#e0e7ff",
+  "#fce7f3",
+  "#fb7185",
+  "#fb923c",
+  "#fbbf24",
+  "#34d399",
+  "#22d3ee",
+  "#60a5fa",
+  "#818cf8",
+  "#e879f9",
+] as const;
 
 const EDGE_CURSORS: Record<ResizeEdge, string> = {
   n: "ns-resize",
@@ -65,17 +127,19 @@ function detectResizeEdge(
   localY: number,
   width: number,
   height: number,
+  edgeHitSize = EDGE_HIT_SIZE,
+  cornerHitSize = CORNER_HIT_SIZE,
 ): ResizeEdge | null {
-  const nearLeft = localX < EDGE_HIT_SIZE;
-  const nearRight = localX > width - EDGE_HIT_SIZE;
-  const nearTop = localY < EDGE_HIT_SIZE;
-  const nearBottom = localY > height - EDGE_HIT_SIZE;
+  const nearLeft = localX < edgeHitSize;
+  const nearRight = localX > width - edgeHitSize;
+  const nearTop = localY < edgeHitSize;
+  const nearBottom = localY > height - edgeHitSize;
 
   if (!nearLeft && !nearRight && !nearTop && !nearBottom) return null;
 
   const inCornerZone =
-    (localX < CORNER_HIT_SIZE || localX > width - CORNER_HIT_SIZE) &&
-    (localY < CORNER_HIT_SIZE || localY > height - CORNER_HIT_SIZE);
+    (localX < cornerHitSize || localX > width - cornerHitSize) &&
+    (localY < cornerHitSize || localY > height - cornerHitSize);
 
   if (inCornerZone) {
     if (nearTop && nearLeft) return "nw";
@@ -97,7 +161,7 @@ function computeResizeLayout(
   edge: ResizeEdge,
   dx: number,
   dy: number,
-  options?: { aspectRatio?: number },
+  options?: { aspectRatio?: number; minWidth?: number; minHeight?: number },
 ): CanvasPageLayout {
   if (options?.aspectRatio) {
     return computeAspectRatioResizeLayout(
@@ -111,10 +175,12 @@ function computeResizeLayout(
 
   let { x, y, width, height } = layout;
 
+  const minWidth = options?.minWidth ?? MIN_WIDTH;
+  const minHeight = options?.minHeight ?? MIN_HEIGHT;
   const clampWidth = (value: number) =>
-    Math.min(Math.max(value, MIN_WIDTH), MAX_SIZE);
+    Math.min(Math.max(value, minWidth), MAX_SIZE);
   const clampHeight = (value: number) =>
-    Math.min(Math.max(value, MIN_HEIGHT), MAX_SIZE);
+    Math.min(Math.max(value, minHeight), MAX_SIZE);
 
   if (edge.includes("e")) {
     width = clampWidth(layout.width + dx);
@@ -132,6 +198,55 @@ function computeResizeLayout(
   }
 
   return { ...layout, x, y, width, height };
+}
+
+function isCornerResize(edge: ResizeEdge): boolean {
+  return edge.length === 2;
+}
+
+function clampTextScaleFontSize(fontSize: number, scale: number): number {
+  const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 18;
+  return Math.min(
+    Math.max(Math.round(safeFontSize * scale), TEXT_NODE_MIN_FONT_SIZE),
+    TEXT_NODE_MAX_FONT_SIZE,
+  );
+}
+
+function computeTextScaleResize(
+  layout: CanvasPageLayout,
+  fontSize: number,
+  edge: ResizeEdge,
+  dx: number,
+  dy: number,
+): { layout: CanvasPageLayout; fontSize: number } {
+  const safeFontSize =
+    Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 18;
+  const proposedWidth = edge.includes("e") ? layout.width + dx : layout.width - dx;
+  const proposedHeight = edge.includes("s") ? layout.height + dy : layout.height - dy;
+  const widthScale = proposedWidth / layout.width;
+  const heightScale = proposedHeight / layout.height;
+  const rawScale =
+    Math.abs(widthScale - 1) >= Math.abs(heightScale - 1)
+      ? widthScale
+      : heightScale;
+  const nextFontSize = clampTextScaleFontSize(safeFontSize, rawScale);
+  const scale = nextFontSize / safeFontSize;
+  const width = Math.min(Math.max(layout.width * scale, safeFontSize * scale), MAX_SIZE);
+  const height = Math.min(Math.max(layout.height * scale, TEXT_NODE_MIN_HEIGHT * scale), MAX_SIZE);
+
+  let x = layout.x;
+  let y = layout.y;
+  if (edge.includes("w")) {
+    x = layout.x + layout.width - width;
+  }
+  if (edge.includes("n")) {
+    y = layout.y + layout.height - height;
+  }
+
+  return {
+    layout: { ...layout, x, y, width, height },
+    fontSize: nextFontSize,
+  };
 }
 
 function computeAspectRatioResizeLayout(
@@ -194,16 +309,80 @@ function computeAspectRatioResizeLayout(
   return { ...layout, x, y, width, height };
 }
 
+function estimateTextLineWidthUnits(line: string): number {
+  return Array.from(line).reduce((total, char) => {
+    const codePoint = char.codePointAt(0) ?? 0;
+    if (char === "\t") return total + 2;
+    if (char === " ") return total + 0.33;
+    if (
+      (codePoint >= 0x1100 && codePoint <= 0x11ff) ||
+      (codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
+      (codePoint >= 0xac00 && codePoint <= 0xd7af) ||
+      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+      (codePoint >= 0xff00 && codePoint <= 0xffef)
+    ) {
+      return total + 1;
+    }
+    return total + TEXT_NODE_AVERAGE_CHAR_WIDTH_RATIO;
+  }, 0);
+}
+
+function estimateTextNodeContentHeight(node: CanvasTextNode, width?: number): number {
+  const safeFontSize =
+    Number.isFinite(node.fontSize) && node.fontSize > 0 ? node.fontSize : 18;
+  const lineHeight = safeFontSize * TEXT_LINE_HEIGHT;
+  const safeWidth =
+    Number.isFinite(width) && width && width > 0 ? width : node.layout.width;
+  const lineCapacity = Math.max(1, safeWidth / safeFontSize);
+  const visualLines = (node.text || "")
+    .split(/\r?\n/)
+    .reduce((total, line) => {
+      return total + Math.max(1, Math.ceil(estimateTextLineWidthUnits(line) / lineCapacity));
+    }, 0);
+
+  return Math.ceil(
+    Math.max(TEXT_NODE_MIN_HEIGHT, visualLines * lineHeight + TEXT_NODE_VERTICAL_PADDING),
+  );
+}
+
+function estimateTextNodeContentWidth(node: CanvasTextNode): number {
+  const safeFontSize =
+    Number.isFinite(node.fontSize) && node.fontSize > 0 ? node.fontSize : 18;
+  return Math.ceil(
+    Math.max(
+      safeFontSize * TEXT_NODE_MIN_CHAR_COUNT,
+      safeFontSize * TEXT_NODE_AVERAGE_CHAR_WIDTH_RATIO +
+        TEXT_NODE_HORIZONTAL_PADDING,
+    ),
+  );
+}
+
+function estimateTextNodeAutoWidth(node: CanvasTextNode, text: string): number {
+  const safeFontSize =
+    Number.isFinite(node.fontSize) && node.fontSize > 0 ? node.fontSize : 18;
+  const longestLineUnits = text
+    .split(/\r?\n/)
+    .reduce((max, line) => Math.max(max, estimateTextLineWidthUnits(line)), 0);
+  return Math.ceil(
+    Math.max(
+      estimateTextNodeContentWidth(node),
+      longestLineUnits * safeFontSize + TEXT_NODE_AUTO_WIDTH_PADDING,
+    ),
+  );
+}
+
 export function CanvasFreeNodeItem({
   node,
   editable,
   zoom = 1,
   toolMode = "hand",
   selected = false,
+  editing = false,
   onLayoutChange,
   onEdit,
   onTextChange,
   onNodeStyleChange,
+  onTextEditStart,
   onToggleCollapse,
   onSelect,
   onDragStart,
@@ -215,8 +394,10 @@ export function CanvasFreeNodeItem({
   const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef(node.layout);
+  const fontSizeStartRef = useRef(node.kind === "text" ? node.fontSize : 18);
   const layoutRef = useRef(node.layout);
   layoutRef.current = node.layout;
   const zoomRef = useRef(zoom);
@@ -230,12 +411,21 @@ export function CanvasFreeNodeItem({
     canInteract &&
     !isDragging &&
     !isResizing &&
-    (node.kind === "text" || node.kind === "arrow" || node.kind === "drawing");
+    node.kind === "text";
 
-  const renderedMarkdown = useMemo(() => {
-    if (node.kind !== "document") return "";
-    return markdownRenderer.render(node.markdown || "文档内容加载中...");
-  }, [node]);
+  const renderedMarkdown =
+    node.kind === "document"
+      ? markdownRenderer.render(node.markdown || "文档内容加载中...")
+      : "";
+
+  useEffect(() => {
+    if (node.kind !== "text" || !selected || !editing || !canInteract) return;
+    const textArea = textAreaRef.current;
+    if (!textArea) return;
+    const caretPosition = textArea.value.length;
+    textArea.focus();
+    textArea.setSelectionRange(caretPosition, caretPosition);
+  }, [canInteract, editing, node.kind, node.id, node.kind === "text" ? node.text : "", selected]);
 
   const updateEdgeFromPointer = useCallback(
     (e: React.PointerEvent | React.MouseEvent) => {
@@ -246,15 +436,20 @@ export function CanvasFreeNodeItem({
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
+      const edgeHitSize = node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
+      const cornerHitSize =
+        node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE;
       const edge = detectResizeEdge(
         e.clientX - rect.left,
         e.clientY - rect.top,
         rect.width,
         rect.height,
+        edgeHitSize,
+        cornerHitSize,
       );
       setHoveredEdge(edge);
     },
-    [canInteract, isDragging, isResizing],
+    [canInteract, isDragging, isResizing, node.kind],
   );
 
   const handlePointerDown = useCallback(
@@ -269,11 +464,17 @@ export function CanvasFreeNodeItem({
       const el = containerRef.current;
       if (el) {
         const rect = el.getBoundingClientRect();
+        const edgeHitSize =
+          node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
+        const cornerHitSize =
+          node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE;
         const edge = detectResizeEdge(
           e.clientX - rect.left,
           e.clientY - rect.top,
           rect.width,
           rect.height,
+          edgeHitSize,
+          cornerHitSize,
         );
         if (edge) {
           e.stopPropagation();
@@ -281,6 +482,7 @@ export function CanvasFreeNodeItem({
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           setIsResizing(edge);
           layoutStartRef.current = { ...layoutRef.current };
+          fontSizeStartRef.current = node.kind === "text" ? node.fontSize : 18;
           onDragStart?.(node.id);
           return;
         }
@@ -318,7 +520,25 @@ export function CanvasFreeNodeItem({
         const scale = zoomRef.current || 1;
         const dx = (e.clientX - startPosRef.current.x) / scale;
         const dy = (e.clientY - startPosRef.current.y) / scale;
-        const newLayout = computeResizeLayout(
+        if (node.kind === "text" && isCornerResize(isResizing)) {
+          const next = computeTextScaleResize(
+            layoutStartRef.current,
+            fontSizeStartRef.current,
+            isResizing,
+            dx,
+            dy,
+          );
+          onNodeStyleChange?.({
+            ...node,
+            autoWidth: false,
+            fontSize: next.fontSize,
+            layout: next.layout,
+          });
+          onDragMove?.(node.id, next.layout, isResizing);
+          return;
+        }
+
+        let newLayout = computeResizeLayout(
           layoutStartRef.current,
           isResizing,
           dx,
@@ -329,16 +549,42 @@ export function CanvasFreeNodeItem({
                 ? (node.intrinsicWidth ?? layoutStartRef.current.width) /
                   (node.intrinsicHeight ?? layoutStartRef.current.height)
                 : undefined,
+            minWidth:
+              node.kind === "text" ? estimateTextNodeContentWidth(node) : undefined,
+            minHeight: node.kind === "text" ? TEXT_NODE_MIN_HEIGHT : undefined,
           },
         );
-        onLayoutChange?.(node.id, newLayout);
+        if (node.kind === "text") {
+          const minHeight = estimateTextNodeContentHeight(node, newLayout.width);
+          if (newLayout.height < minHeight) {
+            const heightDelta = minHeight - newLayout.height;
+            newLayout = {
+              ...newLayout,
+              y: isResizing.includes("n") ? newLayout.y - heightDelta : newLayout.y,
+              height: minHeight,
+            };
+          }
+        }
+        if (node.kind === "text" && node.autoWidth) {
+          onNodeStyleChange?.({ ...node, autoWidth: false, layout: newLayout });
+        } else {
+          onLayoutChange?.(node.id, newLayout);
+        }
         onDragMove?.(node.id, newLayout, isResizing);
         return;
       }
 
       updateEdgeFromPointer(e);
     },
-    [isDragging, isResizing, node.id, onDragMove, onLayoutChange, updateEdgeFromPointer],
+    [
+      isDragging,
+      isResizing,
+      node,
+      onDragMove,
+      onLayoutChange,
+      onNodeStyleChange,
+      updateEdgeFromPointer,
+    ],
   );
 
   const handlePointerUp = useCallback(
@@ -356,6 +602,34 @@ export function CanvasFreeNodeItem({
       }
     },
     [isDragging, isResizing, onDragEnd],
+  );
+
+  const handleTextAreaChange = useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (node.kind !== "text") return;
+      const text = event.target.value;
+      onTextChange?.(node.id, text);
+
+      const nextLayout = node.autoWidth
+        ? {
+            ...node.layout,
+            width: estimateTextNodeAutoWidth(node, text),
+            height: Math.ceil(node.fontSize * TEXT_LINE_HEIGHT),
+          }
+        : {
+            ...node.layout,
+            height: estimateTextNodeContentHeight({ ...node, text }, node.layout.width),
+          };
+      if (
+        nextLayout.width !== node.layout.width ||
+        nextLayout.height !== node.layout.height
+      ) {
+        onLayoutChange?.(node.id, {
+          ...nextLayout,
+        });
+      }
+    },
+    [node, onLayoutChange, onTextChange],
   );
 
   const activeCursor =
@@ -392,6 +666,7 @@ export function CanvasFreeNodeItem({
       }}
       onDoubleClick={() => {
         if (node.kind === "document") onEdit?.(node);
+        if (node.kind === "text" && canInteract) onTextEditStart?.(node.id);
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -424,18 +699,15 @@ export function CanvasFreeNodeItem({
         <CanvasNodePropertiesBubble
           node={node}
           zoom={safeZoom}
-          onTextChange={onTextChange}
           onNodeStyleChange={onNodeStyleChange}
         />
       )}
 
       <div
         className={cn(
-          "absolute inset-0 overflow-hidden rounded-lg border shadow-md",
-          (node.kind === "document" || node.kind === "text") && "bg-background",
-          node.kind === "arrow" && "border-transparent bg-transparent shadow-none",
-          node.kind === "drawing" && "border-transparent bg-transparent shadow-none",
-          (selected || isDragging || isResizing) && "ring-2 ring-blue-500",
+          "absolute inset-0 overflow-hidden",
+          node.kind !== "text" && "rounded-lg border shadow-md",
+          node.kind === "document" && "bg-background",
         )}
       >
         {node.kind === "document" && isHovering && (
@@ -496,179 +768,51 @@ export function CanvasFreeNodeItem({
         )}
 
         {node.kind === "text" && (
-          selected && canInteract ? (
+          selected && editing && canInteract ? (
             <textarea
+              ref={textAreaRef}
               aria-label="编辑文字"
-              className="h-full w-full resize-none bg-transparent px-4 py-3 outline-none"
+              className="h-full w-full resize-none bg-transparent p-0 outline-none"
               value={node.text}
               autoFocus
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
-              onChange={(event) => onTextChange?.(node.id, event.target.value)}
-              placeholder="输入文字"
+              onChange={handleTextAreaChange}
               style={{
                 color: node.color,
                 backgroundColor: node.backgroundColor,
                 fontSize: node.fontSize,
-                lineHeight: 1.35,
-                minHeight: TEXT_NODE_MIN_HEIGHT,
+                lineHeight: TEXT_LINE_HEIGHT,
+                minHeight: node.autoWidth
+                  ? Math.ceil(node.fontSize * TEXT_LINE_HEIGHT)
+                  : estimateTextNodeContentHeight(node, node.layout.width),
+                overflow: "hidden",
+                whiteSpace: node.autoWidth ? "pre" : "pre-wrap",
               }}
             />
           ) : (
             <div
-              className="flex h-full w-full items-center overflow-hidden px-4 py-3"
+              className="h-full w-full overflow-hidden p-0"
               style={{
                 color: node.color,
                 backgroundColor: node.backgroundColor,
                 fontSize: node.fontSize,
-                lineHeight: 1.35,
-                whiteSpace: "pre-wrap",
+                lineHeight: TEXT_LINE_HEIGHT,
+                whiteSpace: node.autoWidth ? "pre" : "pre-wrap",
                 wordBreak: "break-word",
               }}
             >
-              {node.text || "输入文字"}
+              {node.text}
             </div>
           )
         )}
 
-        {node.kind === "arrow" && (
-          <svg
-            className="h-full w-full overflow-visible"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {node.start && node.end ? (
-              <>
-                <defs>
-                  <marker
-                    id={`arrow-head-${node.id}`}
-                    markerWidth="8"
-                    markerHeight="8"
-                    refX="7"
-                    refY="4"
-                    orient="auto"
-                    markerUnits="strokeWidth"
-                  >
-                    <path d="M0,0 L8,4 L0,8" fill="none" stroke={node.color} strokeLinecap="round" strokeLinejoin="round" />
-                  </marker>
-                </defs>
-                <line
-                  x1={node.start.x}
-                  y1={node.start.y}
-                  x2={node.end.x}
-                  y2={node.end.y}
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                  markerEnd={`url(#arrow-head-${node.id})`}
-                />
-              </>
-            ) : node.direction === "right" && (
-              <>
-                <line
-                  x1="8"
-                  y1="50"
-                  x2="86"
-                  y2="50"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                />
-                <polyline
-                  points="72,34 88,50 72,66"
-                  fill="none"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </>
-            )}
-            {!node.start && node.direction === "left" && (
-              <>
-                <line
-                  x1="14"
-                  y1="50"
-                  x2="92"
-                  y2="50"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                />
-                <polyline
-                  points="28,34 12,50 28,66"
-                  fill="none"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </>
-            )}
-            {!node.start && node.direction === "down" && (
-              <>
-                <line
-                  x1="50"
-                  y1="8"
-                  x2="50"
-                  y2="86"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                />
-                <polyline
-                  points="34,72 50,88 66,72"
-                  fill="none"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </>
-            )}
-            {!node.start && node.direction === "up" && (
-              <>
-                <line
-                  x1="50"
-                  y1="14"
-                  x2="50"
-                  y2="92"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                />
-                <polyline
-                  points="34,28 50,12 66,28"
-                  fill="none"
-                  stroke={node.color}
-                  strokeWidth={node.strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </>
-            )}
-          </svg>
-        )}
-
-        {node.kind === "drawing" && (
-          <svg
-            className="h-full w-full overflow-visible"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <polyline
-              points={node.points.map((point) => `${point.x},${point.y}`).join(" ")}
-              fill="none"
-              stroke={node.color}
-              strokeWidth={node.strokeWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
       </div>
+
+      <CanvasSelectionBox
+        visible={selected || isDragging || Boolean(isResizing)}
+        handles={canInteract}
+      />
 
       {showEdgeHandles && (
         <>
@@ -685,44 +829,142 @@ export function CanvasFreeNodeItem({
 function CanvasNodePropertiesBubble({
   node,
   zoom,
-  onTextChange,
   onNodeStyleChange,
 }: {
-  node: CanvasTextNode | CanvasArrowNode | CanvasDrawingNode;
+  node: CanvasTextNode;
   zoom: number;
-  onTextChange?: (nodeId: string, text: string) => void;
   onNodeStyleChange?: (node: CanvasFreeNode) => void;
 }) {
-  const top = -Math.min(48 / zoom, 88);
+  const [colorPanelOpen, setColorPanelOpen] = useState(false);
+  const top = -Math.min((48 + TEXT_PROPERTIES_BUBBLE_SCREEN_GAP) / zoom, 120);
   const inputClass =
-    "h-7 rounded-md border bg-background px-2 text-xs text-foreground outline-none";
+    "h-8 rounded-md border border-border/70 bg-background px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25";
+  const iconClass = "h-4 w-4 text-muted-foreground";
+  const colorButtonClass =
+    "flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-background p-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
+  const swatchClass =
+    "h-6 w-6 cursor-pointer rounded-md border border-border/70 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+
+  const renderColorPanel = () => {
+    if (!colorPanelOpen) return null;
+
+    const applyTextColor = (color: string) => {
+      onNodeStyleChange?.({ ...node, color });
+    };
+    const applyBackgroundColor = (color: string | undefined) => {
+      onNodeStyleChange?.(
+        { ...node, backgroundColor: color },
+      );
+    };
+
+    return (
+      <div
+        className="absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 rounded-lg border border-border/80 bg-background/98 p-3 shadow-xl backdrop-blur"
+        role="dialog"
+        aria-label="颜色设置"
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <div className="text-sm font-medium text-foreground">字体颜色</div>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+            经典
+          </span>
+        </div>
+        <div className="grid grid-cols-8 gap-1.5">
+          {TEXT_COLOR_SWATCHES.map((color) => (
+            <button
+              key={`text-${color}`}
+              type="button"
+              className={cn(
+                swatchClass,
+                node.color.toLowerCase() === color.toLowerCase() &&
+                  "ring-2 ring-blue-500",
+              )}
+              style={{ backgroundColor: color }}
+              title={color}
+              aria-label={`字体颜色 ${color}`}
+              onClick={() => applyTextColor(color)}
+            />
+          ))}
+        </div>
+
+        <div className="mb-2 mt-4 flex items-center gap-2">
+          <div className="text-sm font-medium text-foreground">背景颜色</div>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+            经典
+          </span>
+        </div>
+        <div className="grid grid-cols-8 gap-1.5">
+          <button
+            type="button"
+            className={cn(
+              swatchClass,
+              "relative overflow-hidden bg-background",
+              node.backgroundColor === undefined && "ring-2 ring-blue-500",
+            )}
+            title="无背景"
+            aria-label="无背景"
+            onClick={() => applyBackgroundColor(undefined)}
+          >
+            <span className="absolute left-1/2 top-0 h-full w-px -rotate-45 bg-border" />
+          </button>
+          {BACKGROUND_COLOR_SWATCHES.map((color) => (
+            <button
+              key={`background-${color}`}
+              type="button"
+              className={cn(
+                swatchClass,
+                node.backgroundColor?.toLowerCase() === color.toLowerCase() &&
+                  "ring-2 ring-blue-500",
+              )}
+              style={{ backgroundColor: color }}
+              title={color}
+              aria-label={`背景颜色 ${color}`}
+              onClick={() => applyBackgroundColor(color)}
+            />
+          ))}
+        </div>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-1 text-sm text-foreground transition-colors hover:bg-muted">
+            <span
+              className="h-5 w-5 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 90deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #ec4899, #ef4444)",
+              }}
+            />
+            <span>更多颜色</span>
+            <input
+              aria-label="更多字体颜色"
+              type="color"
+              className="sr-only"
+              value={node.color}
+              onChange={(event) => applyTextColor(event.target.value)}
+            />
+          </label>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
       role="toolbar"
-      aria-label="标注属性"
-      className="absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-background/95 p-2 shadow-lg backdrop-blur"
+      aria-label="文字属性"
+      className="absolute left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border/80 bg-background/95 p-1.5 shadow-lg backdrop-blur"
       style={{ top }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setColorPanelOpen(false);
+      }}
     >
-      <label className="flex items-center gap-1 text-xs text-muted-foreground">
-        颜色
-        <input
-          aria-label="标注颜色"
-          type="color"
-          className="h-7 w-8 cursor-pointer rounded border bg-background p-0.5"
-          value={node.color}
-          onChange={(event) =>
-            onNodeStyleChange?.({ ...node, color: event.target.value })
-          }
-        />
-      </label>
-
       {node.kind === "text" && (
         <>
-          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-            字号
+          <label
+            className="flex h-8 items-center gap-1 rounded-md px-1"
+            title="字号"
+          >
+            <ALargeSmall className={iconClass} />
             <input
               aria-label="文字字号"
               type="number"
@@ -738,49 +980,29 @@ function CanvasNodePropertiesBubble({
               }
             />
           </label>
-          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-            背景
-            <input
-              aria-label="文字背景色"
-              type="color"
-              className="h-7 w-8 cursor-pointer rounded border bg-background p-0.5"
-              value={node.backgroundColor ?? "#ffffff"}
-              onChange={(event) =>
-                onNodeStyleChange?.({
-                  ...node,
-                  backgroundColor: event.target.value,
-                })
-              }
-            />
-          </label>
           <button
+            aria-label="颜色设置"
             type="button"
-            className="h-7 rounded-md border px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => onTextChange?.(node.id, "")}
+            title="颜色设置"
+            className={colorButtonClass}
+            onClick={() => setColorPanelOpen((current) => !current)}
           >
-            清空
+            <span className="relative h-full w-full overflow-hidden rounded-sm border border-border/60 bg-background">
+              <span
+                className="absolute inset-0"
+                style={{ backgroundColor: node.backgroundColor ?? "transparent" }}
+              />
+              <span
+                className="absolute bottom-0.5 left-1 text-sm font-semibold leading-none"
+                style={{ color: node.color }}
+              >
+                A
+              </span>
+            </span>
           </button>
         </>
       )}
-
-      {(node.kind === "arrow" || node.kind === "drawing") && (
-        <label className="flex items-center gap-1 text-xs text-muted-foreground">
-          粗细
-          <input
-            aria-label="线条粗细"
-            type="range"
-            min={1}
-            max={16}
-            value={node.strokeWidth}
-            onChange={(event) =>
-              onNodeStyleChange?.({
-                ...node,
-                strokeWidth: Number(event.target.value) || node.strokeWidth,
-              })
-            }
-          />
-        </label>
-      )}
+      {renderColorPanel()}
     </div>
   );
 }

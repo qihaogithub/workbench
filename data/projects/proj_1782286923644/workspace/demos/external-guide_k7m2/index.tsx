@@ -1,158 +1,281 @@
-import { Icon, trigger } from "@preview/sdk";
+import { trigger } from "@preview/sdk";
 
 interface DemoProps {}
 
-/**
- * 站外引导页 - 叫叫 App 之外的引导落地页
- * 默认展示浏览器环境引导版；通过修改 isWechat 变量可切换为微信环境
- */
-export default function Demo(_props: DemoProps) {
-  // 模拟环境检测：通过 userAgent 判断
-  // 在实际项目中可改为从 props 或 UA 真实获取
-  const isWechat = false; // 设为 true 模拟微信环境
+const text = {
+  official: "\u5b98\u65b9\u6d3b\u52a8",
+  title: "\u4e16\u754c\u676f\u52a9\u5a01\u76db\u5178",
+  subtitle:
+    "\u53c2\u4e0e\u6d3b\u52a8\u8d62\u53d6\u4e30\u539a\u597d\u793c\uff0c\u4e3a\u4e16\u754c\u676f\u559d\u5f69\uff01",
+  prizeTitle: "\u5956\u54c1\u9884\u89c8",
+  openApp: "\u5728 App \u4e2d\u6253\u5f00",
+  scanQr: "\u626b\u63cf\u4e8c\u7ef4\u7801\u6253\u5f00",
+  wechatTip:
+    "\u70b9\u51fb\u53f3\u4e0a\u89d2 ... \u540e\u5728\u6d4f\u89c8\u5668\u4e2d\u6253\u5f00",
+  downloadApp: "\u4e0b\u8f7d App",
+  noApp: "\u8fd8\u6ca1\u6709\u4e0b\u8f7d\u53eb\u53eb App\uff1f",
+  ios: "iOS \u4e0b\u8f7d",
+  android: "Android \u4e0b\u8f7d",
+  copyright: "\u00a9 2024 \u53eb\u53eb \u4fdd\u7559\u6240\u6709\u6743\u5229",
+};
 
-  const prizes = [
-    { name: "冠军签名球衣", emoji: "👕", color: "bg-green-100" },
-    { name: "限量版足球", emoji: "⚽", color: "bg-emerald-100" },
-    { name: "VIP 观赛券", emoji: "🎫", color: "bg-lime-100" },
-  ];
+const prizes = [
+  {
+    name: "\u51a0\u519b\u7b7e\u540d\u7403\u8863",
+    color: "bg-green-100",
+    icon: TrophyIcon,
+  },
+  {
+    name: "\u9650\u91cf\u7248\u8db3\u7403",
+    color: "bg-emerald-100",
+    icon: BallIcon,
+  },
+  {
+    name: "VIP\u89c2\u8d5b\u5238",
+    color: "bg-lime-100",
+    icon: TicketIcon,
+  },
+];
+
+export default function Demo(_props: DemoProps) {
+  const isWechat = false;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* 顶部品牌区域 */}
-      <div className="bg-gradient-to-b from-green-600 to-green-500 px-6 pt-8 pb-12 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 6 9 6 9Z" />
-              <path d="M18 4.5A2.5 2.5 0 0 1 20.5 7c-1 1.5-2.5 2-2.5 2" />
-              <path d="M4 22h16" />
-              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-              <path d="M18 2v6.5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V2" />
-            </svg>
+    <div className="min-h-screen bg-white text-gray-900">
+      <header className="bg-gradient-to-b from-green-600 to-green-500 px-6 pb-12 pt-8 text-white">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-green-600">
+            <TrophyIcon className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs text-green-100">官方活动</p>
-            <h1 className="text-lg font-bold">⚽ 世界杯助威盛典</h1>
+            <p className="text-xs text-green-100">{text.official}</p>
+            <h1 className="text-lg font-bold">{text.title}</h1>
           </div>
         </div>
-        <p className="text-green-100 text-sm">
-          参与活动赢取丰厚好礼，为世界杯喝彩！
-        </p>
-      </div>
+        <p className="text-sm leading-6 text-green-100">{text.subtitle}</p>
+      </header>
 
-      {/* 奖品预览 */}
-      <div className="px-6 -mt-6">
-        <div className="bg-white rounded-2xl shadow-lg p-5">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">
-            🎁 奖品预览
+      <main className="-mt-6 px-6 pb-8">
+        <section className="rounded-2xl bg-white p-5 shadow-lg">
+          <h2 className="mb-4 text-base font-semibold text-gray-800">
+            {text.prizeTitle}
           </h2>
           <div className="grid grid-cols-3 gap-3">
-            {prizes.map((prize) => (
-              <div
-                key={prize.name}
-                className={`${prize.color} rounded-xl p-3 text-center`}
-              >
-                <div className="text-2xl mb-1">{prize.emoji}</div>
-                <p className="text-xs font-medium text-gray-700 leading-tight">
-                  {prize.name}
-                </p>
-              </div>
-            ))}
+            {prizes.map((prize) => {
+              const PrizeIcon = prize.icon;
+              return (
+                <div
+                  key={prize.name}
+                  className={`${prize.color} rounded-xl p-3 text-center`}
+                >
+                  <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-green-700">
+                    <PrizeIcon className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium leading-tight text-gray-700">
+                    {prize.name}
+                  </p>
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* 主操作区域 */}
-      <div className="px-6 mt-6">
-        {!isWechat ? (
-          <>
-            {/* 浏览器环境 */}
-            <button
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all"
-              onClick={() => trigger("openApp", { source: "external-guide" })}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-                <path d="M12 18h.01" />
-              </svg>
-              在 App 中打开
-            </button>
+        <section className="mt-6">
+          {!isWechat ? (
+            <>
+              <button
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-4 font-semibold text-white shadow-lg shadow-green-200 transition-all hover:bg-green-700"
+                onClick={() => trigger("openApp", { source: "external-guide" })}
+              >
+                <PhoneIcon className="h-5 w-5" />
+                {text.openApp}
+              </button>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-400 mb-3 flex items-center justify-center gap-1">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M12 7v10" />
-                  <path d="M7 12h10" />
-                </svg>
-                扫描二维码打开
-              </p>
-              {/* 二维码占位灰色方块 */}
-              <div className="w-36 h-36 bg-gray-200 rounded-xl mx-auto flex items-center justify-center">
-                <svg className="w-10 h-10 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M12 7v10" />
-                  <path d="M7 12h10" />
-                </svg>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* 微信环境 */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
-              <div className="flex items-center gap-3">
-                <Icon name="browser" className="w-6 h-6 text-yellow-600" />
-                <p className="text-sm text-yellow-800 font-medium">
-                  点击右上角 <span className="font-bold">···</span> → 在浏览器中打开
+              <div className="mt-6 text-center">
+                <p className="mb-3 flex items-center justify-center gap-1 text-sm text-gray-400">
+                  <QrIcon className="h-4 w-4" />
+                  {text.scanQr}
                 </p>
+                <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-xl bg-gray-200 text-gray-400">
+                  <QrIcon className="h-10 w-10" />
+                </div>
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="mb-4 rounded-2xl border border-yellow-200 bg-yellow-50 p-4">
+                <div className="flex items-center gap-3">
+                  <BrowserIcon className="h-6 w-6 text-yellow-600" />
+                  <p className="text-sm font-medium text-yellow-800">
+                    {text.wechatTip}
+                  </p>
+                </div>
+              </div>
 
-            <button
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all"
-              onClick={() => trigger("openApp", { source: "wechat-guide" })}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" x2="12" y1="15" y2="3" />
-              </svg>
-              下载 App
+              <button
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-4 font-semibold text-white shadow-lg shadow-green-200 transition-all hover:bg-green-700"
+                onClick={() => trigger("openApp", { source: "wechat-guide" })}
+              >
+                <DownloadIcon className="h-5 w-5" />
+                {text.downloadApp}
+              </button>
+            </>
+          )}
+        </section>
+
+        <section className="mt-8">
+          <p className="mb-3 text-center text-xs text-gray-400">{text.noApp}</p>
+          <div className="flex gap-3">
+            <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white transition-all hover:bg-gray-800">
+              <PhoneIcon className="h-4 w-4" />
+              {text.ios}
             </button>
-          </>
-        )}
-      </div>
+            <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 py-3 text-sm font-medium text-white transition-all hover:bg-green-600">
+              <PhoneIcon className="h-4 w-4" />
+              {text.android}
+            </button>
+          </div>
+        </section>
+      </main>
 
-      {/* App 下载入口 */}
-      <div className="px-6 mt-8 mb-10">
-        <p className="text-xs text-gray-400 text-center mb-3">
-          还没下载叫叫 App？
-        </p>
-        <div className="flex gap-3">
-          <button className="flex-1 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-              <path d="M12 18h.01" />
-            </svg>
-            iOS 下载
-          </button>
-          <button className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-              <path d="M12 18h.01" />
-            </svg>
-            Android 下载
-          </button>
-        </div>
-      </div>
-
-      {/* 底部版权 */}
-      <div className="px-6 pb-6 text-center">
-        <p className="text-xs text-gray-300">© 2024 叫叫 保留所有权利</p>
-      </div>
+      <footer className="px-6 pb-6 text-center">
+        <p className="text-xs text-gray-300">{text.copyright}</p>
+      </footer>
     </div>
+  );
+}
+
+function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 6 9 6 9Z" />
+      <path d="M18 4.5A2.5 2.5 0 0 1 20.5 7c-1 1.5-2.5 2-2.5 2" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+      <path d="M18 2v6.5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V2" />
+    </svg>
+  );
+}
+
+function BallIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9.5 8.5 2.5-1.8 2.5 1.8-.9 3H10.4l-.9-3Z" />
+      <path d="m7 16 3.4-4.5" />
+      <path d="m17 16-3.4-4.5" />
+      <path d="M12 20v-5" />
+    </svg>
+  );
+}
+
+function TicketIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 9a3 3 0 0 0 0 6v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3a3 3 0 0 0 0-6V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+      <path d="M13 5v2" />
+      <path d="M13 17v2" />
+      <path d="M13 11v2" />
+    </svg>
+  );
+}
+
+function PhoneIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+      <path d="M12 18h.01" />
+    </svg>
+  );
+}
+
+function QrIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="6" height="6" x="3" y="3" rx="1" />
+      <rect width="6" height="6" x="15" y="3" rx="1" />
+      <rect width="6" height="6" x="3" y="15" rx="1" />
+      <path d="M15 15h2v2h-2z" />
+      <path d="M19 15h2v6h-6v-2" />
+    </svg>
+  );
+}
+
+function BrowserIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.6 9h16.8" />
+      <path d="M3.6 15h16.8" />
+      <path d="M12 3a14 14 0 0 1 0 18" />
+      <path d="M12 3a14 14 0 0 0 0 18" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" x2="12" y1="15" y2="3" />
+    </svg>
   );
 }

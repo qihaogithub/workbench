@@ -21,11 +21,6 @@ interface CanvasPointerPoint {
   y: number;
 }
 
-interface CanvasCreationDrag {
-  start: CanvasPointerPoint;
-  end: CanvasPointerPoint;
-}
-
 interface CanvasViewportProps {
   viewport: CanvasViewportState;
   onViewportChange: (viewport: CanvasViewportState) => void;
@@ -41,18 +36,20 @@ interface CanvasViewportProps {
   alignmentGuides?: AlignmentGuide[];
   toolMode?: CanvasToolMode;
   onSelectionRectChange?: (rect: CanvasSelectionRect) => void;
-  creationMode?: Extract<CanvasToolMode, "text" | "arrow" | "draw" | "image"> | null;
+  creationMode?: Extract<CanvasToolMode, "text" | "image"> | null;
   onCanvasPointClick?: (point: CanvasPointerPoint) => void;
-  onArrowCreate?: (drag: CanvasCreationDrag) => void;
-  drawingMode?: boolean;
-  onDrawingStart?: (point: CanvasPointerPoint) => void;
-  onDrawingMove?: (point: CanvasPointerPoint) => void;
-  onDrawingEnd?: (point: CanvasPointerPoint) => void;
 }
 
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 1.1;
+
+function isTextEditingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest("textarea,input,select,[contenteditable='true']"),
+  );
+}
 
 export function CanvasViewport({
   viewport,
@@ -71,11 +68,6 @@ export function CanvasViewport({
   onSelectionRectChange,
   creationMode,
   onCanvasPointClick,
-  onArrowCreate,
-  drawingMode = false,
-  onDrawingStart,
-  onDrawingMove,
-  onDrawingEnd,
 }: CanvasViewportProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
@@ -84,14 +76,7 @@ export function CanvasViewport({
   const isPanningRef = useRef(false);
   const [selectionBox, setSelectionBox] =
     useState<CanvasSelectionRect | null>(null);
-  const [arrowPreview, setArrowPreview] =
-    useState<CanvasCreationDrag | null>(null);
-  const [drawingPreviewPoints, setDrawingPreviewPoints] = useState<
-    CanvasPointerPoint[]
-  >([]);
   const isSelectingRef = useRef(false);
-  const isDrawingRef = useRef(false);
-  const isArrowCreatingRef = useRef(false);
   const isPointCreatingRef = useRef(false);
   const creationStartPointRef = useRef<CanvasPointerPoint | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -99,8 +84,7 @@ export function CanvasViewport({
   const viewportStartRef = useRef({ x: 0, y: 0 });
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
-  const activeCreationMode =
-    creationMode ?? (drawingMode ? "draw" : null);
+  const activeCreationMode = creationMode ?? null;
   // 记录 pointerDown 时的目标对象 ID（用于 hand 模式下点击后触发选择）
   const clickedPageIdRef = useRef<string | null>(null);
   const clickedNodeIdRef = useRef<string | null>(null);
@@ -191,6 +175,8 @@ export function CanvasViewport({
     if (!canInteractWithViewport) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTextEditingTarget(e.target)) return;
+
       // Space 键：切换为平移模式
       if (e.code === "Space" && !e.repeat) {
         e.preventDefault();
@@ -273,6 +259,8 @@ export function CanvasViewport({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (isTextEditingTarget(e.target)) return;
+
       if (e.code === "Space") {
         setSpaceHeld(false);
       }
@@ -345,16 +333,7 @@ export function CanvasViewport({
         clickedNodeIdRef.current = null;
         creationStartPointRef.current = point;
         containerRef.current?.setPointerCapture(e.pointerId);
-        if (activeCreationMode === "draw") {
-          isDrawingRef.current = true;
-          setDrawingPreviewPoints([point]);
-          onDrawingStart?.(point);
-        } else if (activeCreationMode === "arrow") {
-          isArrowCreatingRef.current = true;
-          setArrowPreview({ start: point, end: point });
-        } else {
-          isPointCreatingRef.current = true;
-        }
+        isPointCreatingRef.current = true;
         return;
       }
       if (toolMode === "hand" || e.button === 1 || (isPrimaryButton && spaceHeld)) return;
@@ -380,7 +359,6 @@ export function CanvasViewport({
       activeCreationMode,
       getCanvasPointFromPointer,
       isBlankCanvasTarget,
-      onDrawingStart,
       toolMode,
       spaceHeld,
     ],
@@ -388,31 +366,6 @@ export function CanvasViewport({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (isDrawingRef.current) {
-        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
-        if (point) {
-          setDrawingPreviewPoints((current) => {
-            const last = current[current.length - 1];
-            if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= 2) {
-              return [...current, point];
-            }
-            return current;
-          });
-          onDrawingMove?.(point);
-        }
-        return;
-      }
-
-      if (isArrowCreatingRef.current) {
-        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
-        if (point) {
-          setArrowPreview((current) =>
-            current ? { ...current, end: point } : current,
-          );
-        }
-        return;
-      }
-
       if (isSelectingRef.current) {
         const selection = getSelectionFromPointer(e.clientX, e.clientY);
         if (!selection) return;
@@ -431,9 +384,7 @@ export function CanvasViewport({
       });
     },
     [
-      getCanvasPointFromPointer,
       getSelectionFromPointer,
-      onDrawingMove,
       onSelectionRectChange,
       scheduleUpdate,
     ],
@@ -441,27 +392,6 @@ export function CanvasViewport({
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      if (isDrawingRef.current) {
-        isDrawingRef.current = false;
-        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
-        containerRef.current?.releasePointerCapture(e.pointerId);
-        if (point) onDrawingEnd?.(point);
-        setDrawingPreviewPoints([]);
-        creationStartPointRef.current = null;
-        return;
-      }
-
-      if (isArrowCreatingRef.current) {
-        isArrowCreatingRef.current = false;
-        const start = creationStartPointRef.current;
-        const end = getCanvasPointFromPointer(e.clientX, e.clientY);
-        containerRef.current?.releasePointerCapture(e.pointerId);
-        creationStartPointRef.current = null;
-        setArrowPreview(null);
-        if (start && end) onArrowCreate?.({ start, end });
-        return;
-      }
-
       if (isPointCreatingRef.current) {
         isPointCreatingRef.current = false;
         const point =
@@ -517,9 +447,7 @@ export function CanvasViewport({
       getCanvasPointFromPointer,
       getSelectionFromPointer,
       onCanvasClick,
-      onArrowCreate,
       onCanvasPointClick,
-      onDrawingEnd,
       onNodeClick,
       onPageClick,
       onSelectionRectChange,
@@ -582,7 +510,9 @@ export function CanvasViewport({
   // 光标样式：hand 模式显示抓手，select 模式默认光标（空格时显示抓手）
   const cursorClass = canInteractWithViewport
     ? activeCreationMode
-      ? "cursor-crosshair"
+      ? activeCreationMode === "text"
+        ? "cursor-text"
+        : "cursor-crosshair"
       : toolMode === "hand"
       ? isPanning
         ? "cursor-grabbing"
@@ -622,27 +552,6 @@ export function CanvasViewport({
         onDragStart={(e) => e.preventDefault()}
       >
         {children}
-
-        {arrowPreview && <CanvasArrowCreationPreview drag={arrowPreview} />}
-
-        {drawingPreviewPoints.length > 1 && (
-          <svg
-            className="pointer-events-none absolute overflow-visible"
-            style={{ left: 0, top: 0, width: 1, height: 1, zIndex: 9998 }}
-            aria-hidden="true"
-          >
-            <polyline
-              points={drawingPreviewPoints
-                .map((point) => `${point.x},${point.y}`)
-                .join(" ")}
-              fill="none"
-              stroke="#111827"
-              strokeWidth={4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
 
         {/* 对齐辅助线 */}
         {alignmentGuides.map((guide, index) => {
@@ -692,59 +601,5 @@ export function CanvasViewport({
         />
       )}
     </div>
-  );
-}
-
-function CanvasArrowCreationPreview({ drag }: { drag: CanvasCreationDrag }) {
-  const padding = 16;
-  const left = Math.min(drag.start.x, drag.end.x) - padding;
-  const top = Math.min(drag.start.y, drag.end.y) - padding;
-  const width = Math.max(1, Math.abs(drag.end.x - drag.start.x)) + padding * 2;
-  const height = Math.max(1, Math.abs(drag.end.y - drag.start.y)) + padding * 2;
-  const start = {
-    x: drag.start.x - left,
-    y: drag.start.y - top,
-  };
-  const end = {
-    x: drag.end.x - left,
-    y: drag.end.y - top,
-  };
-
-  return (
-    <svg
-      className="pointer-events-none absolute overflow-visible"
-      style={{ left, top, width, height, zIndex: 9998 }}
-      aria-hidden="true"
-    >
-      <defs>
-        <marker
-          id="canvas-arrow-creation-preview-head"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
-          orient="auto"
-          markerUnits="strokeWidth"
-        >
-          <path
-            d="M0,0 L8,4 L0,8"
-            fill="none"
-            stroke="#2563eb"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </marker>
-      </defs>
-      <line
-        x1={start.x}
-        y1={start.y}
-        x2={end.x}
-        y2={end.y}
-        stroke="#2563eb"
-        strokeWidth={6}
-        strokeLinecap="round"
-        markerEnd="url(#canvas-arrow-creation-preview-head)"
-      />
-    </svg>
   );
 }

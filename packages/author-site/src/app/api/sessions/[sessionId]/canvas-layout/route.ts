@@ -5,13 +5,17 @@ import {
   createApiError,
   createApiSuccess,
   findWorkspacePath,
+  getProjectPath,
   getSessionMeta,
   getSessionPath,
+  projectExists,
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { normalizeCanvasStateLayers } from "@opencode-workbench/shared/demo";
 import type {
   CanvasFreeNode,
+  CanvasLayersState,
   CanvasPageLayout,
   CanvasState,
 } from "@opencode-workbench/shared/demo";
@@ -75,21 +79,6 @@ function readStringArray(
   if (!Array.isArray(value)) return null;
   const strings = value.filter((item): item is string => typeof item === "string");
   return strings.length === value.length ? strings : null;
-}
-
-function parseDrawingPoints(value: unknown): Array<{ x: number; y: number }> | null {
-  if (!Array.isArray(value) || value.length < 2) return null;
-
-  const points = value.map((item) => {
-    if (!isRecord(item)) return null;
-    const x = readNumber(item, "x");
-    const y = readNumber(item, "y");
-    if (x === null || y === null) return null;
-    return { x, y };
-  });
-
-  if (points.some((point) => point === null)) return null;
-  return points as Array<{ x: number; y: number }>;
 }
 
 function parseCanvasNode(value: unknown): CanvasFreeNode | null {
@@ -157,44 +146,26 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
     };
   }
 
-  if (kind === "arrow") {
-    const color = readString(value, "color");
-    const strokeWidth = readNumber(value, "strokeWidth");
-    const direction = readString(value, "direction");
-    if (
-      !color ||
-      strokeWidth === null ||
-      strokeWidth <= 0 ||
-      !["right", "left", "down", "up"].includes(direction ?? "")
-    ) {
-      return null;
-    }
-    return {
-      ...base,
-      kind,
-      color,
-      strokeWidth,
-      direction: direction as "right" | "left" | "down" | "up",
-    };
-  }
-
-  if (kind === "drawing") {
-    const color = readString(value, "color");
-    const strokeWidth = readNumber(value, "strokeWidth");
-    const points = parseDrawingPoints(value.points);
-    if (!color || strokeWidth === null || strokeWidth <= 0 || !points) {
-      return null;
-    }
-    return {
-      ...base,
-      kind,
-      points,
-      color,
-      strokeWidth,
-    };
-  }
-
   return null;
+}
+
+function parseCanvasLayers(value: unknown): CanvasLayersState | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+
+  let annotationNodes: Record<string, CanvasFreeNode> | undefined;
+  if (isRecord(value.annotations) && isRecord(value.annotations.nodes)) {
+    annotationNodes = {};
+    for (const [nodeId, nodeValue] of Object.entries(value.annotations.nodes)) {
+      const node = parseCanvasNode(nodeValue);
+      if (!node || node.id !== nodeId) return null;
+      annotationNodes[nodeId] = node;
+    }
+  }
+
+  return {
+    ...(annotationNodes ? { annotations: { nodes: annotationNodes } } : {}),
+  };
 }
 
 function parseKnowledgeDocument(value: unknown):
@@ -254,10 +225,13 @@ function parseCanvasState(value: unknown): CanvasState | null {
     }
   }
 
+  const layers = parseCanvasLayers(value.layers);
+  if (layers === null) return null;
+
   const hiddenKnowledgeDocumentIds =
     readStringArray(value, "hiddenKnowledgeDocumentIds") ?? undefined;
 
-  return {
+  return normalizeCanvasStateLayers({
     viewport: {
       x: viewportX,
       y: viewportY,
@@ -265,8 +239,9 @@ function parseCanvasState(value: unknown): CanvasState | null {
     },
     pages,
     ...(nodes ? { nodes } : {}),
+    ...(layers ? { layers } : {}),
     ...(hiddenKnowledgeDocumentIds ? { hiddenKnowledgeDocumentIds } : {}),
-  };
+  });
 }
 
 async function validateSessionAccess(sessionId: string) {
@@ -318,18 +293,30 @@ async function validateSessionAccess(sessionId: string) {
     ? findWorkspacePath(meta.workspaceId) ?? undefined
     : undefined;
 
-  return { sessionPath: getSessionPath(sessionId), workspacePath };
+  return {
+    sessionPath: getSessionPath(sessionId),
+    workspacePath,
+    projectId: meta.demoId,
+  };
 }
 
 function getCanvasLayoutPath(sessionPath: string): string {
   return path.join(sessionPath, ".canvas-layout.json");
 }
 
+function getProjectWorkspacePath(projectId?: string): string | undefined {
+  if (!projectId || !projectExists(projectId)) return undefined;
+  return path.join(getProjectPath(projectId), "workspace");
+}
+
 function getCanvasLayoutPaths(access: {
   sessionPath: string;
   workspacePath?: string;
+  projectId?: string;
 }): string[] {
+  const projectWorkspacePath = getProjectWorkspacePath(access.projectId);
   const paths = [
+    projectWorkspacePath ? getCanvasLayoutPath(projectWorkspacePath) : null,
     access.workspacePath ? getCanvasLayoutPath(access.workspacePath) : null,
     getCanvasLayoutPath(access.sessionPath),
   ].filter((value): value is string => Boolean(value));
@@ -426,6 +413,7 @@ export async function POST(
     };
 
     for (const layoutPath of getCanvasLayoutPaths(access)) {
+      fs.mkdirSync(path.dirname(layoutPath), { recursive: true });
       fs.writeFileSync(layoutPath, JSON.stringify(stored, null, 2), "utf-8");
     }
 

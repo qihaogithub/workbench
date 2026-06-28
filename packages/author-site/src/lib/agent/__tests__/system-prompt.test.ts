@@ -140,6 +140,7 @@ describe('buildDynamicContextPrefix', () => {
     workspacePath: '/tmp/workspace',
     pageCount: 2,
     pageList: '- 首页 — `demos/home/`\n- 关于 — `demos/about/`',
+    canvasTextSummary: '（暂无画布文本节点）',
   };
 
   it('仅渲染页面列表，不包含冗余的项目元信息', () => {

@@ -12,7 +12,6 @@ export function initializeDatabase(): void {
     )
   `);
 
-  // 系统配置表 (用于管理后台动态配置)
   db.exec(`
     CREATE TABLE IF NOT EXISTS system_configs (
       id TEXT PRIMARY KEY,
@@ -42,7 +41,36 @@ export function initializeDatabase(): void {
     )
   `);
 
-  // 密码重置日志表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_dingtalk_identities (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      corp_id TEXT NOT NULL,
+      union_id TEXT,
+      dingtalk_user_id TEXT NOT NULL,
+      name TEXT,
+      avatar TEXT,
+      raw_json TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      last_login_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dingtalk_identity_corp_union
+    ON user_dingtalk_identities(corp_id, union_id)
+    WHERE union_id IS NOT NULL
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dingtalk_identity_corp_user
+    ON user_dingtalk_identities(corp_id, dingtalk_user_id)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_dingtalk_identity_user
+    ON user_dingtalk_identities(user_id)
+  `);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_logs (
       id TEXT PRIMARY KEY,
@@ -61,13 +89,10 @@ export function initializeDatabase(): void {
   `);
 
   console.log(
-    "[Database] Database initialized (users + system_configs + password_reset_logs)",
+    "[Database] Database initialized (users + system_configs + user auth configs)",
   );
 }
 
-/**
- * 获取用户总数（用于首次访问检测）
- */
 export function getUserCount(): number {
   const db = getDb();
   const row = db.prepare("SELECT COUNT(*) as count FROM users").get() as {
