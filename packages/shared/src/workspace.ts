@@ -38,11 +38,20 @@ export interface WorkspaceMeta {
 // 项目工作空间与版本管理相关类型
 // ============================================
 
+export type VersionHistoryEntryType =
+  | "auto_checkpoint"
+  | "named_version"
+  | "publish_snapshot"
+  | "restore_snapshot";
+
 /**
- * 版本信息（每次保存自动生成）
+ * 历史记录条目。
+ *
+ * 旧数据可能没有 type，读取时应按普通命名版本兼容。
  */
 export interface VersionInfo {
   versionId: string;           // 例如 "v1", "v2", "v3"
+  type?: VersionHistoryEntryType; // 历史记录类型
   savedAt: number;             // 保存时间戳
   savedBy: string;             // 保存者用户名
   sessionId: string;           // 关联的编辑会话 ID

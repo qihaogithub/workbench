@@ -8,6 +8,19 @@ export interface User {
   createdAt: number;
 }
 
+export interface DingtalkIdentity {
+  id: string;
+  userId: string;
+  corpId: string;
+  unionId?: string;
+  dingtalkUserId: string;
+  name?: string;
+  avatar?: string;
+  createdAt: number;
+  updatedAt: number;
+  lastLoginAt: number;
+}
+
 export interface CreateUserInput {
   username: string;
   password: string;
@@ -30,6 +43,35 @@ export async function createUser(input: CreateUserInput): Promise<User> {
   ).run(id, input.username, passwordHash, now);
 
   return { id, username: input.username, createdAt: now };
+}
+
+async function createPasswordlessUser(username: string): Promise<User> {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const passwordHash = await hashPassword(crypto.randomUUID());
+  const now = Date.now();
+
+  db.prepare(
+    `
+    INSERT INTO users (id, username, password_hash, created_at)
+    VALUES (?, ?, ?, ?)
+  `,
+  ).run(id, username, passwordHash, now);
+
+  return { id, username, createdAt: now };
+}
+
+function normalizeUsernamePart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 10) || "user";
+}
+
+function createDingtalkUsername(corpId: string, dingtalkUserId: string): string {
+  const hash = crypto
+    .createHash("sha256")
+    .update(`${corpId}:${dingtalkUserId}`)
+    .digest("hex")
+    .slice(0, 8);
+  return `dt_${normalizeUsernamePart(dingtalkUserId)}_${hash}`.slice(0, 20);
 }
 
 /**
@@ -58,6 +100,162 @@ export function findUserById(id: string): User | null {
       )
       .get(id) as User) || null
   );
+}
+
+interface DingtalkIdentityRow {
+  id: string;
+  user_id: string;
+  corp_id: string;
+  union_id?: string | null;
+  dingtalk_user_id: string;
+  name?: string | null;
+  avatar?: string | null;
+  created_at: number;
+  updated_at: number;
+  last_login_at: number;
+}
+
+function toDingtalkIdentity(row: DingtalkIdentityRow): DingtalkIdentity {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    corpId: row.corp_id,
+    unionId: row.union_id || undefined,
+    dingtalkUserId: row.dingtalk_user_id,
+    name: row.name || undefined,
+    avatar: row.avatar || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at,
+  };
+}
+
+export function findDingtalkIdentity(
+  corpId: string,
+  input: { unionId?: string; dingtalkUserId?: string },
+): DingtalkIdentity | null {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT id, user_id, corp_id, union_id, dingtalk_user_id, name, avatar,
+              created_at, updated_at, last_login_at
+       FROM user_dingtalk_identities
+       WHERE corp_id = ?
+         AND ((union_id IS NOT NULL AND union_id = ?) OR dingtalk_user_id = ?)
+       LIMIT 1`,
+    )
+    .all(corpId, input.unionId ?? "", input.dingtalkUserId ?? "") as DingtalkIdentityRow[];
+
+  return rows[0] ? toDingtalkIdentity(rows[0]) : null;
+}
+
+export function findDingtalkIdentityByUserId(userId: string): DingtalkIdentity | null {
+  const row = getDb()
+    .prepare(
+      `SELECT id, user_id, corp_id, union_id, dingtalk_user_id, name, avatar,
+              created_at, updated_at, last_login_at
+       FROM user_dingtalk_identities
+       WHERE user_id = ?
+       ORDER BY last_login_at DESC
+       LIMIT 1`,
+    )
+    .get(userId) as DingtalkIdentityRow | undefined;
+
+  return row ? toDingtalkIdentity(row) : null;
+}
+
+export async function findOrCreateUserByDingtalkIdentity(input: {
+  corpId: string;
+  unionId?: string;
+  dingtalkUserId: string;
+  name?: string;
+  avatar?: string;
+  raw?: unknown;
+}): Promise<{ user: User; identity: DingtalkIdentity; created: boolean }> {
+  const db = getDb();
+  const now = Date.now();
+  const existing = findDingtalkIdentity(input.corpId, {
+    unionId: input.unionId,
+    dingtalkUserId: input.dingtalkUserId,
+  });
+
+  if (existing) {
+    db.prepare(
+      `UPDATE user_dingtalk_identities
+       SET union_id = COALESCE(?, union_id),
+           name = COALESCE(?, name),
+           avatar = COALESCE(?, avatar),
+           raw_json = ?,
+           updated_at = ?,
+           last_login_at = ?
+       WHERE id = ?`,
+    ).run(
+      input.unionId,
+      input.name,
+      input.avatar,
+      input.raw ? JSON.stringify(input.raw) : null,
+      now,
+      now,
+      existing.id,
+    );
+    const user = findUserById(existing.userId);
+    if (!user) {
+      throw new Error("DingTalk identity points to a missing user");
+    }
+    return {
+      user,
+      identity: {
+        ...existing,
+        unionId: input.unionId ?? existing.unionId,
+        name: input.name ?? existing.name,
+        avatar: input.avatar ?? existing.avatar,
+        updatedAt: now,
+        lastLoginAt: now,
+      },
+      created: false,
+    };
+  }
+
+  const user = await createPasswordlessUser(
+    createDingtalkUsername(input.corpId, input.dingtalkUserId),
+  );
+  const identityId = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO user_dingtalk_identities (
+       id, user_id, corp_id, union_id, dingtalk_user_id, name, avatar,
+       raw_json, created_at, updated_at, last_login_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    identityId,
+    user.id,
+    input.corpId,
+    input.unionId,
+    input.dingtalkUserId,
+    input.name,
+    input.avatar,
+    input.raw ? JSON.stringify(input.raw) : null,
+    now,
+    now,
+    now,
+  );
+
+  return {
+    user,
+    identity: {
+      id: identityId,
+      userId: user.id,
+      corpId: input.corpId,
+      unionId: input.unionId,
+      dingtalkUserId: input.dingtalkUserId,
+      name: input.name,
+      avatar: input.avatar,
+      createdAt: now,
+      updatedAt: now,
+      lastLoginAt: now,
+    },
+    created: true,
+  };
 }
 
 /**

@@ -25,10 +25,10 @@
     "check:knowledge-service": "pnpm --filter @opencode-workbench/knowledge-service typecheck && pnpm --filter @opencode-workbench/knowledge-service test",
     "check:viewer": "pnpm --filter @opencode-workbench/viewer-site typecheck",
     "check:all": "pnpm check:knowledge-core && pnpm check:knowledge-service && pnpm check:project-core && pnpm check:project-scaffold && pnpm check:project-cli && pnpm check:agent && pnpm check:screenshot && pnpm check:author && pnpm check:viewer",
-    "test:e2e": "playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts",
-    "test:e2e:core-flow": "playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts author-core-flow-regression.spec.ts",
-    "test:e2e:ui": "playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts --ui",
-    "test:e2e:headed": "playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts --headed",
+    "test:e2e": "playwright test --config test/创作端E2E回归测试/playwright.config.ts",
+    "test:e2e:core-flow": "playwright test --config test/创作端E2E回归测试/playwright.config.ts author-core-flow-regression.spec.ts",
+    "test:e2e:ui": "playwright test --config test/创作端E2E回归测试/playwright.config.ts --ui",
+    "test:e2e:headed": "playwright test --config test/创作端E2E回归测试/playwright.config.ts --headed",
     "test:ai-workspace-refresh": "node scripts/development/test-ai-workspace-refresh.mjs",
     "test:sync-status-flap": "node scripts/development/detect-sync-status-flap.mjs",
     "test:knowledge-validation": "node scripts/development/knowledge-validation-suite.mjs metrics",
@@ -38,6 +38,11 @@
     "@playwright/test": "^1.42.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@radix-ui/react-compose-refs": "1.0.0"
+    }
   },
   "packageManager": "pnpm@8.15.0",
   "engines": {

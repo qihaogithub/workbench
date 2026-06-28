@@ -5,6 +5,7 @@ import { compileCode } from "@/lib/compiler";
 import {
   readProjectMeta,
   writeProjectMeta,
+  createProjectVersionSnapshot,
   listDemoPages,
   getDemoDirPath,
   getProjectConfigSchema,
@@ -123,7 +124,7 @@ export async function publishProject(
     throw new Error("PROJECT_NOT_FOUND");
   }
 
-  const project = readProjectMeta(projectId);
+  let project = readProjectMeta(projectId);
   if (!project) {
     throw new Error("PROJECT_NOT_FOUND");
   }
@@ -274,10 +275,21 @@ export async function publishProject(
     }
   }
 
-  const currentVersion =
-    project.versions.length > 0
-      ? project.versions[project.versions.length - 1].versionId
-      : "v0";
+  const snapshotResult = createProjectVersionSnapshot(projectId, "system", {
+    type: "publish_snapshot",
+    sessionId: `publish-${Date.now()}`,
+    note: "发布快照",
+    sourceWorkspacePath: workspacePath,
+  });
+  if (!snapshotResult.success || !snapshotResult.version) {
+    throw new Error("SNAPSHOT_CREATE_ERROR");
+  }
+  project = readProjectMeta(projectId);
+  if (!project) {
+    throw new Error("PROJECT_NOT_FOUND");
+  }
+
+  const currentVersion = snapshotResult.version.versionId;
 
   const publishedProject: PublishedProject = {
     id: project.id,

@@ -1,4 +1,4 @@
-export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasImageNode, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeRect, VisualStyleChange, AppActionPayload } from './types';
+export type { PreviewSize, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeRect, VisualStyleChange, AppActionPayload } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
@@ -27,4 +27,5 @@ export { CanvasFreeNodeItem } from './CanvasFreeNodeItem';
 export { CanvasToolbar } from './CanvasToolbar';
 export { PageSkeleton } from './PageSkeleton';
 export { loadCanvasLayout, saveCanvasLayout } from './canvas-utils';
+export { normalizeCanvasStateLayers, summarizeCanvasTextNodes } from './canvas-kernel';
 export { cn, debounce } from './utils';

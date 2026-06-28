@@ -71,12 +71,12 @@
 
 - `docs/项目文档/项目总览.md` 仍描述 Agent 服务“支持多后端切换”和“Agent Factory 多后端适配”，与当前 Pi Agent 单后端目标冲突。
 - `docs/项目文档/独立Agent服务层/01-架构设计.md` 仍写“支持多后端切换”。这会误导 agent 在后端任务中恢复或补全已删除抽象。
-- `test/新建-编辑-保存项目测试/AGENTS.md` 仍提到 `pnpm dev:web`、`test-logs/`、`test-reports/`，但当前根脚本没有 `dev:web`，测试实际输出在 `test/新建-编辑-保存项目测试/test-outputs/`。
+- `test/创作端E2E回归测试/AGENTS.md` 仍提到 `pnpm dev:web`、`test-logs/`、`test-reports/`，但当前根脚本没有 `dev:web`，测试实际输出在 `test/创作端E2E回归测试/test-outputs/`。
 - `doc-maintainer` 技能要求更新 `docs/INDEX.md`，但项目指南说明当前入口是 `docs/项目文档/INDEX.md`，且仓库根 `docs/` 下没有 `INDEX.md`。这属于跨技能规则冲突，容易让 agent 创建不符合项目现状的新索引。
 
 ### 3. 验证入口不够 agent 友好
 
-- 根 `test:e2e` 直接执行 `playwright test`，但唯一 Playwright 配置在 `test/新建-编辑-保存项目测试/playwright.config.ts`。agent 需要额外知道 `--config`，否则可能使用默认配置运行。
+- 根 `test:e2e` 直接执行 `playwright test`，但唯一 Playwright 配置在 `test/创作端E2E回归测试/playwright.config.ts`。agent 需要额外知道 `--config`，否则可能使用默认配置运行。
 - 根 `build`、`lint`、`typecheck` 当前主要覆盖 `author-site` 或少数包，没有表达“全仓最小验证矩阵”。
 - `project-core` 和 `project-admin-mcp` 有 `typecheck`/`test`，但根指南没有纳入常用验证命令。
 - `agent-client` 只有 `build`/`dev`，`shared` 没有真实 `typecheck`/`test`，agent 很难判断改动共享包后应该运行什么。
@@ -115,9 +115,9 @@
    - 若仍需保留 `dev:snapshot`，应在脚本名或注释中显式标记“历史不可用”，避免 agent 用它判断服务健康。
 
 3. 修正 E2E 入口：
-   - 将根 `test:e2e` 改为 `playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts`。
+   - 将根 `test:e2e` 改为 `playwright test --config test/创作端E2E回归测试/playwright.config.ts`。
    - 同步更新 `test:e2e:ui`、`test:e2e:headed`。
-   - 更新 `test/新建-编辑-保存项目测试/AGENTS.md`，删除 `pnpm dev:web`，把输出目录改为 `test-outputs/`。
+   - 更新 `test/创作端E2E回归测试/AGENTS.md`，删除 `pnpm dev:web`，把输出目录改为 `test-outputs/`。
 
 4. 修正 Docker 指南：
    - 根 `AGENTS.md` 与 `docs/项目文档/创作端/06-基础设施/技术/03_Docker部署方案.md` 应以当前 `docker-compose.yml` 为准。
@@ -238,7 +238,7 @@
 
 | 优化批次 | 验证方式 |
 | --- | --- |
-| 入口纠偏 | `pnpm exec playwright test --config test/新建-编辑-保存项目测试/playwright.config.ts --list` 或等价 Playwright 列表命令，确认使用指定 config；人工核对根 `AGENTS.md` 包表与 `pnpm-workspace.yaml` 一致 |
+| 入口纠偏 | `pnpm exec playwright test --config test/创作端E2E回归测试/playwright.config.ts --list` 或等价 Playwright 列表命令，确认使用指定 config；人工核对根 `AGENTS.md` 包表与 `pnpm-workspace.yaml` 一致 |
 | 验证矩阵 | 逐个执行新增 `check:*` 脚本，确认失败范围可定位到对应包 |
 | 生成物治理 | `git status --short`、`git ls-files` 检查覆盖率、tsbuildinfo、E2E 输出和运行日志不再污染工作区 |
 | 包级指南 | 从任一包目录开始，让 agent 能只读根指南 + 包指南判断验证命令 |

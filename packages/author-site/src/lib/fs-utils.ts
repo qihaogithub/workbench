@@ -16,6 +16,7 @@ import type {
   Project,
   VersionInfo,
   PageVersionInfo,
+  VersionHistoryEntryType,
   DemoPageMeta,
   DemoFolderMeta,
   MultiDemoFiles,
@@ -1375,18 +1376,83 @@ export function generateVersionId(project: Project): string {
 export function cleanupOldVersions(project: Project): void {
   if (project.versions.length <= MAX_VERSIONS_KEEP) return;
 
-  const toDelete = project.versions.slice(
-    0,
-    project.versions.length - MAX_VERSIONS_KEEP,
-  );
+  const removeCount = project.versions.length - MAX_VERSIONS_KEEP;
+  const removable = project.versions
+    .map((version, index) => ({ version, index }))
+    .filter(({ version }) => version.type === "auto_checkpoint");
+  const fallback = project.versions.map((version, index) => ({ version, index }));
+  const toDeleteEntries = [...removable, ...fallback]
+    .filter(
+      (entry, index, all) =>
+        all.findIndex((item) => item.index === entry.index) === index,
+    )
+    .slice(0, removeCount);
+  const deleteIndexes = new Set(toDeleteEntries.map((entry) => entry.index));
 
-  for (const version of toDelete) {
+  for (const { version } of toDeleteEntries) {
     if (fs.existsSync(version.snapshotPath)) {
       fs.rmSync(version.snapshotPath, { recursive: true, force: true });
     }
   }
 
-  project.versions = project.versions.slice(-MAX_VERSIONS_KEEP);
+  project.versions = project.versions.filter((_, index) => !deleteIndexes.has(index));
+}
+
+export function createProjectVersionSnapshot(
+  projectId: string,
+  username: string,
+  options?: {
+    sessionId?: string;
+    note?: string;
+    type?: VersionHistoryEntryType;
+    sourceWorkspacePath?: string;
+  },
+): { success: boolean; version?: VersionInfo; error?: string } {
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return { success: false, error: "项目不存在" };
+  }
+
+  const workspacePath = path.join(getProjectPath(projectId), "workspace");
+  const sourceWorkspacePath = options?.sourceWorkspacePath || workspacePath;
+  if (!fs.existsSync(sourceWorkspacePath)) {
+    return { success: false, error: "工作空间不存在" };
+  }
+
+  const versionId = generateVersionId(project);
+  const snapshotPath = getSnapshotPath(projectId, versionId);
+
+  fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+  fs.rmSync(snapshotPath, { recursive: true, force: true });
+  fs.cpSync(sourceWorkspacePath, snapshotPath, {
+    recursive: true,
+    filter: (src: string) => {
+      const basename = path.basename(src);
+      return (
+        !src.includes("node_modules") &&
+        basename !== ".session.json" &&
+        basename !== ".workspace.json"
+      );
+    },
+  });
+
+  const versionInfo: VersionInfo = {
+    versionId,
+    type: options?.type ?? "named_version",
+    savedAt: Date.now(),
+    savedBy: username,
+    sessionId: options?.sessionId ?? `snapshot-${versionId}`,
+    snapshotPath,
+    fileCount: countFiles(sourceWorkspacePath),
+    note: options?.note,
+  };
+
+  project.versions.push(versionInfo);
+  project.updatedAt = versionInfo.savedAt;
+  cleanupOldVersions(project);
+  writeProjectMeta(projectId, project);
+
+  return { success: true, version: versionInfo };
 }
 
 // ========================================
@@ -1441,6 +1507,7 @@ export function createPageVersionSnapshot(
   username?: string,
   note?: string,
   sourceWorkspacePath?: string,
+  type: VersionHistoryEntryType = "named_version",
 ): { success: boolean; version?: PageVersionInfo; error?: string } {
   const project = readProjectMeta(projectId);
   if (!project) {
@@ -1469,6 +1536,7 @@ export function createPageVersionSnapshot(
     project.demoPages.find((page) => page.id === demoId);
   const versionInfo: PageVersionInfo = {
     versionId,
+    type,
     demoId,
     demoName: demoMeta?.name,
     savedAt: Date.now(),
@@ -1558,6 +1626,7 @@ export function restorePageVersion(
   const restoredAt = Date.now();
   const projectVersion: VersionInfo = {
     versionId: newVersionId,
+    type: "restore_snapshot",
     savedAt: restoredAt,
     savedBy: username || "未知用户",
     sessionId: `restore-page-${demoId}-${versionId}`,
@@ -1612,6 +1681,7 @@ export function restoreVersion(
 
   const backupVersion: VersionInfo = {
     versionId: backupVersionId,
+    type: "auto_checkpoint",
     savedAt: Date.now(),
     savedBy: username || "system",
     sessionId: `restore-from-${versionId}`,
@@ -1632,6 +1702,7 @@ export function restoreVersion(
 
   const restoreVersionInfo: VersionInfo = {
     versionId: restoreVersionId,
+    type: "restore_snapshot",
     savedAt: Date.now(),
     savedBy: username || "system",
     sessionId: `restore-${versionId}`,

@@ -2,9 +2,11 @@ import fs from "fs";
 import path from "path";
 import type {
   CanvasFreeNode,
+  CanvasLayersState,
   CanvasPageLayout,
   CanvasState,
 } from "@opencode-workbench/shared/demo";
+import { normalizeCanvasStateLayers } from "@opencode-workbench/shared/demo";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -18,6 +20,21 @@ function readNumber(record: Record<string, unknown>, key: string): number | null
 function readString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
+}
+
+function readBoolean(record: Record<string, unknown>, key: string): boolean | null {
+  const value = record[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function readStringArray(
+  record: Record<string, unknown>,
+  key: string,
+): string[] | null {
+  const value = record[key];
+  if (!Array.isArray(value)) return null;
+  const strings = value.filter((item): item is string => typeof item === "string");
+  return strings.length === value.length ? strings : null;
 }
 
 function parseLayout(value: unknown): CanvasPageLayout | null {
@@ -63,8 +80,18 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
 
   if (kind === "document") {
     const markdown = readString(value, "markdown");
-    if (markdown === null) return null;
-    return { ...base, kind, markdown };
+    const knowledgeDocument = parseKnowledgeDocument(value.knowledgeDocument);
+    const collapsed = readBoolean(value, "collapsed");
+    const expandedHeight = readNumber(value, "expandedHeight");
+    if (markdown === null && !knowledgeDocument) return null;
+    return {
+      ...base,
+      kind,
+      ...(markdown === null ? {} : { markdown }),
+      ...(knowledgeDocument ? { knowledgeDocument } : {}),
+      ...(collapsed === null ? {} : { collapsed }),
+      ...(expandedHeight === null ? {} : { expandedHeight }),
+    };
   }
 
   if (kind === "image") {
@@ -84,7 +111,67 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
     };
   }
 
+  if (kind === "text") {
+    const text = readString(value, "text");
+    const fontSize = readNumber(value, "fontSize");
+    const color = readString(value, "color");
+    const backgroundColor = readString(value, "backgroundColor");
+    if (text === null || fontSize === null || fontSize <= 0 || !color) return null;
+    return {
+      ...base,
+      kind,
+      text,
+      fontSize,
+      color,
+      ...(backgroundColor ? { backgroundColor } : {}),
+    };
+  }
+
   return null;
+}
+
+function parseKnowledgeDocument(value: unknown):
+  | {
+      id: string;
+      title: string;
+      fileName: string;
+      description?: string;
+    }
+  | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value, "id");
+  const title = readString(value, "title");
+  const fileName = readString(value, "fileName");
+  const description = readString(value, "description");
+
+  if (!id || !title || !fileName) return null;
+
+  return {
+    id,
+    title,
+    fileName,
+    ...(description ? { description } : {}),
+  };
+}
+
+function parseCanvasLayers(value: unknown): CanvasLayersState | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+
+  let annotationNodes: Record<string, CanvasFreeNode> | undefined;
+  if (isRecord(value.annotations) && isRecord(value.annotations.nodes)) {
+    annotationNodes = {};
+    for (const [nodeId, nodeValue] of Object.entries(value.annotations.nodes)) {
+      const node = parseCanvasNode(nodeValue);
+      if (!node || node.id !== nodeId) return null;
+      annotationNodes[nodeId] = node;
+    }
+  }
+
+  return {
+    ...(annotationNodes ? { annotations: { nodes: annotationNodes } } : {}),
+  };
 }
 
 export function parseCanvasState(value: unknown): CanvasState | null {
@@ -110,13 +197,22 @@ export function parseCanvasState(value: unknown): CanvasState | null {
   if (isRecord(value.nodes)) {
     nodes = {};
     for (const [nodeId, nodeValue] of Object.entries(value.nodes)) {
+      if (isRecord(nodeValue) && readString(nodeValue, "kind") === "webpage") {
+        continue;
+      }
       const node = parseCanvasNode(nodeValue);
       if (!node || node.id !== nodeId) return null;
       nodes[nodeId] = node;
     }
   }
 
-  return {
+  const layers = parseCanvasLayers(value.layers);
+  if (layers === null) return null;
+
+  const hiddenKnowledgeDocumentIds =
+    readStringArray(value, "hiddenKnowledgeDocumentIds") ?? undefined;
+
+  return normalizeCanvasStateLayers({
     viewport: {
       x: viewportX,
       y: viewportY,
@@ -124,7 +220,9 @@ export function parseCanvasState(value: unknown): CanvasState | null {
     },
     pages,
     ...(nodes ? { nodes } : {}),
-  };
+    ...(layers ? { layers } : {}),
+    ...(hiddenKnowledgeDocumentIds ? { hiddenKnowledgeDocumentIds } : {}),
+  });
 }
 
 export function readCanvasStateFromWorkspace(workspacePath: string): CanvasState | undefined {

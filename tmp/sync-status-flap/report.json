@@ -1,0 +1,663 @@
+{
+  "ok": true,
+  "targetUrl": "http://localhost:3200/demo/proj_1782286923644/edit",
+  "generatedAt": "2026-06-27T15:30:42.086Z",
+  "sampleMs": 500,
+  "durationMs": 20000,
+  "screenshotPath": "tmp\\sync-status-flap\\last-page.png",
+  "summary": {
+    "statusCounts": {
+      "missing": 3,
+      "synced": 36
+    },
+    "foundStatusCount": 36,
+    "transitions": [
+      {
+        "atMs": 1530,
+        "from": "missing",
+        "to": "synced"
+      }
+    ],
+    "connectingOfflineTransitions": [],
+    "flapDetected": false
+  },
+  "statusMissing": false,
+  "runtimeErrors": [],
+  "pageErrors": [],
+  "samples": [
+    {
+      "atMs": 7,
+      "status": "missing",
+      "text": "",
+      "candidate": null
+    },
+    {
+      "atMs": 511,
+      "status": "missing",
+      "text": "",
+      "candidate": null
+    },
+    {
+      "atMs": 1017,
+      "status": "missing",
+      "text": "",
+      "candidate": null
+    },
+    {
+      "atMs": 1530,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 2078,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 2594,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 3102,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 3618,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 4128,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 4640,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 5151,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 5662,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 6174,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 6684,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 7198,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 7713,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 8223,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 8738,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 9254,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 9767,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 10283,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 10805,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 11310,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 11827,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 12336,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 12846,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 13362,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 13867,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 14376,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 14888,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 15406,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 15916,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 16430,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 16945,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 17456,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 17967,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 18483,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 18992,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    },
+    {
+      "atMs": 19504,
+      "status": "synced",
+      "text": "草稿已实时保存",
+      "candidate": {
+        "text": "草稿已实时保存",
+        "matched": "草稿已实时保存",
+        "tag": "span",
+        "className": "",
+        "top": 28,
+        "left": 1157,
+        "width": 84,
+        "height": 16
+      }
+    }
+  ],
+  "consoleEvents": [
+    {
+      "type": "warning",
+      "text": "WebSocket connection to 'ws://localhost:3201/api/collab/projects/proj_1782286923644/workspaces/ws-1782574222375-hoiyfwe8g/cHJvamVjdC5jb25maWcuc2NoZW1hLmpzb24?sessionId=session-1782574222463-m2c0v3qvj&resourcePath=project.config.schema.json&kind=project-schema' failed: WebSocket is closed before the connection is established."
+    },
+    {
+      "type": "warning",
+      "text": "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing."
+    },
+    {
+      "type": "warning",
+      "text": "WebSocket connection to 'ws://localhost:3201/api/agent/session-1782574222463-m2c0v3qvj/stream' failed: WebSocket is closed before the connection is established."
+    },
+    {
+      "type": "warning",
+      "text": "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation"
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "http://localhost:3200/_next/static/chunks/main-app.js?v=1782574217350",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/demos",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/auth/me",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/auth/me",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/demos",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/screenshots/health",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3201/api/projects/proj_1782286923644/versions",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/projects/proj_1782286923644/publish-status",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/projects/proj_1782286923644/publish-status",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3201/api/projects/proj_1782286923644/versions",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/screenshots/health",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "websocketResponses": []
+}

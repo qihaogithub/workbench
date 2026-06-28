@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { PreviewCanvas } from "../../../../shared/src/demo/PreviewCanvas";
 import type { CanvasState } from "../../../../shared/src/demo/types";
@@ -116,6 +117,71 @@ function TestMultiPageEditorCanvas() {
             previewSize: { width: 100, height: 100 },
           },
         ]}
+        canvasState={state}
+        onCanvasStateChange={setState}
+      />
+      <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
+function TestTextNodeEditorCanvas() {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    pages: {},
+    nodes: {
+      text_1: {
+        id: "text_1",
+        kind: "text",
+        title: "两行文字",
+        text: "第一行\n第二行",
+        fontSize: 22,
+        color: "#ffffff",
+        layout: { x: 100, y: 100, width: 240, height: 80 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      text_2: {
+        id: "text_2",
+        kind: "text",
+        title: "文字",
+        text: "文字",
+        fontSize: 18,
+        color: "#ffffff",
+        layout: { x: 420, y: 100, width: 240, height: 40 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      text_3: {
+        id: "text_3",
+        kind: "text",
+        title: "持续输入",
+        text: "",
+        fontSize: 18,
+        color: "#ffffff",
+        layout: { x: 100, y: 240, width: 80, height: 25 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      text_4: {
+        id: "text_4",
+        kind: "text",
+        title: "三行中文",
+        text: "文字文字文字文字文字文字文字",
+        fontSize: 18,
+        color: "#ffffff",
+        layout: { x: 100, y: 340, width: 90, height: 120 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    },
+  });
+
+  return (
+    <>
+      <PreviewCanvas
+        interactionMode="editor"
+        pages={[]}
         canvasState={state}
         onCanvasStateChange={setState}
       />
@@ -284,20 +350,19 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     expect(screen.queryByLabelText("添加箭头")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("画笔")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("添加图片")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("结构化图层")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Excalidraw 标注验证")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("自动排版")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("重置布局")).not.toBeInTheDocument();
   });
 
   it("editor 妯″紡榛樿閫変腑閫夋嫨宸ュ叿", () => {
-    const { container } = render(<TestEditorCanvas />);
+    render(<TestEditorCanvas />);
 
-    const toolButtons = Array.from(
-      container.querySelectorAll("button[aria-pressed]"),
-    );
-
-    expect(toolButtons).toHaveLength(2);
-    expect(toolButtons[0]).toHaveAttribute("aria-pressed", "false");
-    expect(toolButtons[1]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("拖动工具")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("选择工具")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText("结构化图层")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Excalidraw 标注验证")).not.toBeInTheDocument();
   });
 
   it("editor 妯″紡鏄剧ず鑷敱鏍囨敞宸ュ叿鍏ュ彛", () => {
@@ -305,11 +370,14 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
 
     expect(screen.getByLabelText("添加文档")).toBeInTheDocument();
     expect(screen.getByLabelText("添加文字")).toBeInTheDocument();
-    expect(screen.getByLabelText("添加箭头")).toBeInTheDocument();
-    expect(screen.getByLabelText("画笔")).toBeInTheDocument();
+    expect(screen.queryByLabelText("添加箭头")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("画笔")).not.toBeInTheDocument();
     expect(screen.getByLabelText("添加图片")).toBeInTheDocument();
+    expect(screen.queryByLabelText("结构化图层")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Excalidraw 标注验证")).not.toBeInTheDocument();
   });
   it("文字工具在画布目标位置点击后创建文字节点", async () => {
+    const user = userEvent.setup();
     const { container } = render(<TestEditorCanvas />);
     const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
 
@@ -335,73 +403,35 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
         title: "文字",
         text: "",
         fontSize: 18,
-        color: "#111827",
+        color: "#ffffff",
+        autoWidth: true,
         layout: {
-          x: 400,
-          y: 352,
-          width: 240,
-          height: 96,
+          x: 520,
+          y: 400,
+          width: 18,
+          height: 25,
         },
       });
+      expect(nodes[0]).not.toHaveProperty("backgroundColor");
     });
     expect(screen.getByLabelText("编辑文字")).toHaveFocus();
-    expect(screen.getByLabelText("标注属性")).toBeInTheDocument();
-  });
-  it("箭头工具点击空白画布不会创建固定长度箭头", async () => {
-    const { container } = render(<TestEditorCanvas />);
-    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+    expect(screen.getByLabelText("文字属性")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑文字")).not.toHaveAttribute("placeholder");
+    expect(
+      container.querySelector("[data-canvas-node-id] [data-canvas-selection-box='true']"),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("添加箭头"));
-    fireEvent.pointerDown(root, {
-      button: 0,
-      clientX: 260,
-      clientY: 220,
-      pointerId: 7,
-    });
-    fireEvent.pointerUp(root, {
-      clientX: 260,
-      clientY: 220,
-      pointerId: 7,
-    });
-
-    await waitFor(() => {
-      expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
-    });
-  });
-  it("箭头工具支持在画布空白处拖拽创建箭头节点", async () => {
-    const { container } = render(<TestEditorCanvas />);
-    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
-
-    fireEvent.click(screen.getByLabelText("添加箭头"));
-    expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
-    fireEvent.pointerDown(root, {
-      button: 0,
-      clientX: 260,
-      clientY: 220,
-      pointerId: 5,
-    });
-    fireEvent.pointerMove(root, {
-      clientX: 420,
-      clientY: 230,
-      pointerId: 5,
-    });
-    fireEvent.pointerUp(root, {
-      clientX: 420,
-      clientY: 230,
-      pointerId: 5,
-    });
+    await user.keyboard("hello world");
 
     await waitFor(() => {
       const nodes = Object.values(getCanvasState().nodes ?? {});
-      expect(nodes).toHaveLength(1);
       expect(nodes[0]).toMatchObject({
-        kind: "arrow",
-        title: "箭头",
-        color: "#2563eb",
-        strokeWidth: 6,
-        direction: "right",
+        kind: "text",
+        title: "hello world",
+        text: "hello world",
       });
-      expect(nodes[0].layout.width).toBeGreaterThan(160);
+      expect(nodes[0].layout.width).toBeGreaterThan(18);
+      expect(nodes[0].layout.height).toBe(25);
     });
   });
   it("图片工具支持从本地选择图片并在目标位置创建图片节点", async () => {
@@ -444,40 +474,350 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     });
   });
 
-  it("鐢荤瑪妯″紡鏀寔鎷栨嫿鍒涘缓缁樺埗鑺傜偣", async () => {
-    const { container } = render(<TestEditorCanvas />);
-    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+  it("文字节点缩放高度不能小于当前文本内容高度", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_1']",
+    ) as HTMLElement;
 
-    fireEvent.click(screen.getByLabelText("画笔"));
-    fireEvent.pointerDown(root, {
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    Object.defineProperty(textNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 340,
+        bottom: 180,
+        width: 240,
+        height: 80,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(textNode, {
       button: 0,
-      clientX: 200,
-      clientY: 180,
-      pointerId: 3,
+      clientX: 220,
+      clientY: 179,
+      pointerId: 11,
     });
-    fireEvent.pointerMove(root, {
-      clientX: 240,
-      clientY: 220,
-      pointerId: 3,
+    fireEvent.pointerMove(textNode, {
+      clientX: 220,
+      clientY: 120,
+      pointerId: 11,
     });
-    fireEvent.pointerUp(root, {
-      clientX: 280,
-      clientY: 240,
-      pointerId: 3,
+    fireEvent.pointerUp(textNode, {
+      clientX: 220,
+      clientY: 120,
+      pointerId: 11,
     });
 
     await waitFor(() => {
-      const nodes = Object.values(getCanvasState().nodes ?? {});
-      expect(nodes).toHaveLength(1);
-      expect(nodes[0]).toMatchObject({
-        kind: "drawing",
-        title: "画笔",
-        color: "#111827",
-        strokeWidth: 4,
-      });
+      const state = getCanvasState();
+      expect(state.nodes?.text_1.layout.height).toBe(60);
+    });
+  });
+
+  it("文字节点缩放宽度最小为一个字宽度并按当前宽度提高最小高度", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_2']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    Object.defineProperty(textNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 420,
+        top: 100,
+        right: 660,
+        bottom: 140,
+        width: 240,
+        height: 40,
+        x: 420,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(textNode, {
+      button: 0,
+      clientX: 659,
+      clientY: 120,
+      pointerId: 12,
+    });
+    fireEvent.pointerMove(textNode, {
+      clientX: 430,
+      clientY: 120,
+      pointerId: 12,
+    });
+    fireEvent.pointerUp(textNode, {
+      clientX: 430,
+      clientY: 120,
+      pointerId: 12,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.nodes?.text_2.layout.width).toBe(18);
+      expect(state.nodes?.text_2.layout.height).toBe(49);
+    });
+  });
+
+  it("选中文字节点时光标位于文本末尾", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_2']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    fireEvent.pointerDown(textNode, {
+      button: 0,
+      clientX: 430,
+      clientY: 110,
+      pointerId: 18,
+    });
+    fireEvent.pointerUp(textNode, {
+      clientX: 430,
+      clientY: 110,
+      pointerId: 18,
+    });
+    expect(container.querySelector("textarea")).not.toBeInTheDocument();
+    fireEvent.doubleClick(textNode);
+
+    await waitFor(() => {
+      const textArea = container.querySelector("textarea") as HTMLTextAreaElement;
+      expect(textArea.selectionStart).toBe(textArea.value.length);
+      expect(textArea.selectionEnd).toBe(textArea.value.length);
+    });
+  });
+
+  it("选择工具框选文本节点时只选中文本框不进入编辑", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    dragMarquee(root, { clientX: 410, clientY: 90 }, { clientX: 670, clientY: 150 });
+
+    await waitFor(() => {
       expect(
-        nodes[0].kind === "drawing" ? nodes[0].points.length : 0,
-      ).toBeGreaterThanOrEqual(2);
+        container.querySelector(
+          "[data-canvas-node-id='text_2'] [data-canvas-selection-box='true']",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(container.querySelector("textarea")).not.toBeInTheDocument();
+  });
+
+  it("选中文本节点后拖拽文本框内部可以移动节点", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_2']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    Object.defineProperty(textNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 420,
+        top: 100,
+        right: 660,
+        bottom: 140,
+        width: 240,
+        height: 40,
+        x: 420,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(textNode, {
+      button: 0,
+      clientX: 520,
+      clientY: 120,
+      pointerId: 19,
+    });
+    fireEvent.pointerMove(textNode, {
+      clientX: 550,
+      clientY: 145,
+      pointerId: 19,
+    });
+    fireEvent.pointerUp(textNode, {
+      clientX: 550,
+      clientY: 145,
+      pointerId: 19,
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().nodes?.text_2.layout).toMatchObject({
+        x: 450,
+        y: 125,
+        width: 240,
+        height: 40,
+      });
+    });
+  });
+
+  it("文字节点按当前宽度下的中文实际换行限制最小高度", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_4']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    Object.defineProperty(textNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 340,
+        right: 190,
+        bottom: 460,
+        width: 90,
+        height: 120,
+        x: 100,
+        y: 340,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(textNode, {
+      button: 0,
+      clientX: 145,
+      clientY: 459,
+      pointerId: 15,
+    });
+    fireEvent.pointerMove(textNode, {
+      clientX: 145,
+      clientY: 380,
+      pointerId: 15,
+    });
+    fireEvent.pointerUp(textNode, {
+      clientX: 145,
+      clientY: 380,
+      pointerId: 15,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.nodes?.text_4.layout.height).toBe(73);
+    });
+  });
+
+  it("文字节点拖拽四角时等比例缩放文本框和字号", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector(
+      "[data-canvas-node-id='text_2']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    Object.defineProperty(textNode, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 420,
+        top: 100,
+        right: 660,
+        bottom: 140,
+        width: 240,
+        height: 40,
+        x: 420,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(textNode, {
+      button: 0,
+      clientX: 659,
+      clientY: 139,
+      pointerId: 16,
+    });
+    fireEvent.pointerMove(textNode, {
+      clientX: 779,
+      clientY: 159,
+      pointerId: 16,
+    });
+    fireEvent.pointerUp(textNode, {
+      clientX: 779,
+      clientY: 159,
+      pointerId: 16,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.nodes?.text_2.layout.width).toBe(360);
+      expect(state.nodes?.text_2.layout.height).toBe(60);
+      expect(state.nodes?.text_2.kind === "text" ? state.nodes.text_2.fontSize : undefined).toBe(27);
+    });
+  });
+
+  it("文字节点持续输入时自动增高而不是出现滚动条", async () => {
+    const user = userEvent.setup();
+    render(<TestTextNodeEditorCanvas />);
+    const nodeElement = document.querySelector(
+      "[data-canvas-node-id='text_3']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    fireEvent.pointerDown(nodeElement, {
+      button: 0,
+      clientX: 110,
+      clientY: 250,
+      pointerId: 13,
+    });
+    fireEvent.pointerUp(nodeElement, {
+      clientX: 110,
+      clientY: 250,
+      pointerId: 13,
+    });
+    fireEvent.doubleClick(nodeElement);
+
+    const textNode = await screen.findByLabelText("编辑文字");
+    await user.click(textNode);
+    await user.keyboard("第一行{Enter}第二行{Enter}第三行");
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.nodes?.text_3.layout.height).toBeGreaterThan(25);
+    });
+    expect(textNode).toHaveStyle({ overflow: "hidden" });
+  });
+
+  it("文字节点删除行后自动缩小高度", async () => {
+    render(<TestTextNodeEditorCanvas />);
+    const nodeElement = document.querySelector(
+      "[data-canvas-node-id='text_3']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    fireEvent.pointerDown(nodeElement, {
+      button: 0,
+      clientX: 110,
+      clientY: 250,
+      pointerId: 17,
+    });
+    fireEvent.pointerUp(nodeElement, {
+      clientX: 110,
+      clientY: 250,
+      pointerId: 17,
+    });
+    fireEvent.doubleClick(nodeElement);
+
+    const textNode = await screen.findByLabelText("编辑文字");
+    fireEvent.change(textNode, {
+      target: { value: "line one\nline two\nline three" },
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().nodes?.text_3.layout.height).toBe(98);
+    });
+
+    fireEvent.change(textNode, {
+      target: { value: "line one\nline two" },
+    });
+
+    await waitFor(() => {
+      expect(getCanvasState().nodes?.text_3.layout.height).toBe(49);
     });
   });
 
@@ -647,6 +987,48 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     await waitFor(() => {
       expect(getCanvasState().viewport.zoom).toBeGreaterThan(initialZoom);
     });
+  });
+
+  it("editor 抓手工具左键拖动只平移画布视口", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("拖动工具"));
+
+    fireEvent.pointerDown(root, {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      pointerId: 9,
+    });
+    fireEvent.pointerMove(root, {
+      clientX: 140,
+      clientY: 125,
+      pointerId: 9,
+    });
+    fireEvent.pointerUp(root, {
+      clientX: 140,
+      clientY: 125,
+      pointerId: 9,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.viewport).toMatchObject({ x: 80, y: 65, zoom: 0.5 });
+      expect(state.pages.page_1).toEqual({
+        x: 100,
+        y: 120,
+        width: 375,
+        height: 812,
+      });
+    });
+  });
+
+  it("默认不挂载结构化图层和 Excalidraw 标注验证层", () => {
+    const { container } = render(<TestEditorCanvas />);
+
+    expect(container.querySelector("[data-structured-graph-layer='true']")).toBeNull();
+    expect(container.querySelector("[data-excalidraw-spike-layer='true']")).toBeNull();
   });
 
   it("鏀寔宸ュ叿鏍忕缉鏀句笖涓嶇Щ鍔ㄩ〉闈㈠竷灞€", async () => {

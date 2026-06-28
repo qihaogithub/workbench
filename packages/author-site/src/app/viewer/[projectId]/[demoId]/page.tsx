@@ -10,10 +10,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings, Loader2 } from "lucide-react";
 import type {
   AppGraph,
-  AppGraphAction,
   AppGraphValidationResult,
 } from "@opencode-workbench/shared";
 import type { AppActionPayload } from "@opencode-workbench/shared/demo";
+import {
+  isViewerAppActionResolution,
+  resolveViewerAppAction,
+} from "@/lib/viewer-app-graph-runtime";
 
 interface ViewerDemoPage {
   id: string;
@@ -249,71 +252,31 @@ export default function ViewerDemoPage() {
     }
   }, [data, getSafeMergedDefaults, syncBrowserUrl]);
 
-  const resolveStateValue = useCallback((
-    expression: string,
-    payload: Record<string, unknown>,
-    previousState: Record<string, unknown>,
-  ): unknown => {
-    if (expression.startsWith("$params.")) {
-      return payload[expression.slice("$params.".length)];
-    }
-    if (expression.startsWith("$state.")) {
-      return previousState[expression.slice("$state.".length)];
-    }
-    return expression;
-  }, []);
-
-  const pickRouteParams = useCallback((
-    action: AppGraphAction,
-    payload: Record<string, unknown>,
-  ): Record<string, unknown> => {
-    if (!action.params?.length) return payload;
-    return Object.fromEntries(
-      action.params
-        .filter((param) => Object.prototype.hasOwnProperty.call(payload, param))
-        .map((param) => [param, payload[param]]),
-    );
-  }, []);
-
   const handleAppAction = useCallback((message: AppActionPayload & { pageId?: string }) => {
-    if (!data?.appGraph || !message.pageId) return;
-    const fromPage = data.demoPages.find((page) => page.id === message.pageId);
-    const fromRouteKey = fromPage?.routeKey;
-    if (!fromRouteKey) return;
+    if (!data?.appGraph) return;
 
-    const action = data.appGraph.actions.find(
-      (item) => item.from === fromRouteKey && item.event === message.event,
-    );
-    if (!action) {
-      console.warn(`[viewer] 未声明的页面动作: ${fromRouteKey}.${message.event}`);
+    const result = resolveViewerAppAction({
+      appGraph: data.appGraph,
+      pages: data.demoPages,
+      message,
+      previousState: appState,
+    });
+
+    if (!isViewerAppActionResolution(result)) {
+      if (result.error === "ACTION_MISSING" && result.routeKey) {
+        console.warn(`[viewer] 未声明的页面动作: ${result.routeKey}.${result.event}`);
+      } else if (result.error === "TARGET_MISSING" && result.routeKey) {
+        console.warn(`[viewer] 动作目标页面不存在: ${result.routeKey}`);
+      }
       return;
     }
 
-    const payload = message.payload ?? {};
-    if (action.setState) {
-      setAppState((previousState) => ({
-        ...previousState,
-        ...Object.fromEntries(
-          Object.entries(action.setState ?? {}).map(([key, expression]) => [
-            key,
-            resolveStateValue(expression, payload, previousState),
-          ]),
-        ),
-      }));
+    setAppState(result.nextState);
+    setRouteParams(result.routeParams);
+    if (result.targetPageId) {
+      handlePageSwitch(result.targetPageId);
     }
-
-    const targetRouteKey = action.to ?? action.fallback;
-    if (!targetRouteKey) return;
-    const targetNode =
-      data.appGraph.pages[targetRouteKey] ??
-      (action.fallback ? data.appGraph.pages[action.fallback] : undefined);
-    if (!targetNode) {
-      console.warn(`[viewer] 动作目标页面不存在: ${targetRouteKey}`);
-      return;
-    }
-    setRouteParams(pickRouteParams(action, payload));
-    handlePageSwitch(targetNode.pageId);
-  }, [data, handlePageSwitch, pickRouteParams, resolveStateValue]);
+  }, [appState, data, handlePageSwitch]);
 
   const handlePageSwitchRef = useRef(handlePageSwitch);
   handlePageSwitchRef.current = handlePageSwitch;

@@ -136,6 +136,44 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.pageList).toContain('// y-code');
   });
 
+  it('扫描画布文本语义节点并生成 Agent 可读摘要', () => {
+    createDemoPage('home');
+    fs.writeFileSync(
+      path.join(tmpDir, '.canvas-layout.json'),
+      JSON.stringify({
+        version: 1,
+        updatedAt: 1000,
+        state: {
+          viewport: { x: 0, y: 0, zoom: 1 },
+          pages: {
+            home: { x: 0, y: 0, width: 375, height: 812 },
+          },
+          nodes: {
+            'text-1': {
+              id: 'text-1',
+              kind: 'text',
+              title: '修改意图',
+              text: '把首页按钮文案改成立即领取',
+              fontSize: 18,
+              color: '#111827',
+              layout: { x: 20, y: 120, width: 260, height: 100 },
+              createdAt: 1,
+              updatedAt: 2,
+            },
+          },
+        },
+      }, null, 2),
+      'utf-8',
+    );
+
+    const ctx = scanWorkspaceContext(tmpDir);
+
+    expect(ctx.canvasTextSummary).toContain('修改意图');
+    expect(ctx.canvasTextSummary).toContain('把首页按钮文案改成立即领取');
+    expect(ctx.canvasTextSummary).toContain('`text-1`');
+    expect(ctx.canvasTextSummary).toContain('`home`');
+  });
+
   it('知识库索引只输出项目知识并提供按需读取提示', () => {
     const knowledgeDir = path.join(tmpDir, 'knowledge');
     fs.mkdirSync(knowledgeDir, { recursive: true });

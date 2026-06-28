@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782638312813_z9fxdn",
+  "at": 1782638312813,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782638312807_lunhiq",
+  "inputSummary": {
+    "name": "画布退出恢复回归-73f6f37c",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782638312807_lunhiq"
+    ]
+  }
+}

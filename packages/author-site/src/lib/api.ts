@@ -124,6 +124,35 @@ export async function saveDemoAsTemplate(
   return response
 }
 
+export async function updateProjectTemplate(
+  id: string,
+  input: { name?: string; category?: string },
+): Promise<ApiResponse<ProjectTemplateMeta>> {
+  const response = await fetch(`/api/templates/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/templates')
+  }
+
+  return response
+}
+
+export async function deleteProjectTemplate(id: string): Promise<ApiResponse<void>> {
+  const response = await fetch(`/api/templates/${id}`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/templates')
+  }
+
+  return response
+}
+
 export async function recommendProjectTemplate(
   description: string,
 ): Promise<ApiResponse<{
@@ -194,6 +223,39 @@ export async function deleteCover(
 
   if (response.success) {
     mutate('/api/demos')
+  }
+
+  return response
+}
+
+export async function uploadTemplateCover(
+  templateId: string,
+  file: File,
+): Promise<ApiResponse<{ thumbnail: string }>> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`/api/templates/${templateId}/cover`, {
+    method: 'POST',
+    body: formData,
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/templates')
+  }
+
+  return response
+}
+
+export async function deleteTemplateCover(
+  templateId: string,
+): Promise<ApiResponse<{ thumbnail: string | null }>> {
+  const response = await fetch(`/api/templates/${templateId}/cover`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/templates')
   }
 
   return response

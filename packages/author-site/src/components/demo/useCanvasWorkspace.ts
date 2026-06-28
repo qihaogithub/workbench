@@ -43,6 +43,7 @@ export function useCanvasWorkspace({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
   const lastPersistedRef = useRef("");
+  const canvasStateRef = useRef<CanvasState>(DEFAULT_CANVAS_STATE);
 
   const setCanvasPersistenceDirty = useCallback((dirty: boolean) => {
     dirtyRef.current = dirty;
@@ -75,9 +76,11 @@ export function useCanvasWorkspace({
         if (cancelled) return;
 
         if (state) {
+          canvasStateRef.current = state;
           setCanvasState(state);
           lastPersistedRef.current = JSON.stringify(state);
         } else {
+          canvasStateRef.current = DEFAULT_CANVAS_STATE;
           setCanvasState(DEFAULT_CANVAS_STATE);
           lastPersistedRef.current = "";
         }
@@ -107,7 +110,8 @@ export function useCanvasWorkspace({
 
     const currentSessionId = sessionId;
     const currentProjectId = projectId;
-    const serialized = JSON.stringify(canvasState);
+    const stateToSave = canvasStateRef.current;
+    const serialized = JSON.stringify(stateToSave);
     if (serialized === lastPersistedRef.current) {
       setCanvasPersistenceDirty(false);
       return;
@@ -122,7 +126,7 @@ export function useCanvasWorkspace({
 
     saveTimerRef.current = setTimeout(async () => {
       try {
-        await saveCanvasLayout(currentSessionId, currentProjectId, canvasState);
+        await saveCanvasLayout(currentSessionId, currentProjectId, stateToSave);
         lastPersistedRef.current = serialized;
         setCanvasPersistenceDirty(false);
         setSaveStatus("saved");
@@ -152,7 +156,8 @@ export function useCanvasWorkspace({
 
     if (!sessionId || !projectId) return;
 
-    const serialized = JSON.stringify(canvasState);
+    const stateToSave = canvasStateRef.current;
+    const serialized = JSON.stringify(stateToSave);
     if (serialized === lastPersistedRef.current && !dirtyRef.current) {
       setCanvasPersistenceDirty(false);
       return;
@@ -162,7 +167,7 @@ export function useCanvasWorkspace({
     setSaveError(undefined);
 
     try {
-      await saveCanvasLayout(sessionId, projectId, canvasState);
+      await saveCanvasLayout(sessionId, projectId, stateToSave);
       lastPersistedRef.current = serialized;
       setCanvasPersistenceDirty(false);
       setSaveStatus("saved");
@@ -179,12 +184,14 @@ export function useCanvasWorkspace({
   }, [canvasState, projectId, sessionId, setCanvasPersistenceDirty]);
 
   const updateCanvasState = useCallback((nextState: CanvasState) => {
+    canvasStateRef.current = nextState;
     setCanvasPersistenceDirty(true);
     setHasUnsavedCanvasChanges(true);
     setCanvasState(nextState);
   }, [setCanvasPersistenceDirty]);
 
   const applyRemoteCanvasState = useCallback((nextState: CanvasState) => {
+    canvasStateRef.current = nextState;
     lastPersistedRef.current = JSON.stringify(nextState);
     setCanvasPersistenceDirty(false);
     setHasUnsavedCanvasChanges(false);

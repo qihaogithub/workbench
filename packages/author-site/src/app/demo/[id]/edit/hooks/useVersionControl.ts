@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, type MutableRefObject } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { projectApiClient } from "@/lib/project-api";
 import type {
@@ -13,6 +13,9 @@ import type {
   VersionInfo,
 } from "@opencode-workbench/shared";
 import type { ValidationResult } from "../../../../../../lib/validator";
+
+const IDLE_AUTO_CHECKPOINT_MS = 5 * 60 * 1000;
+const CONTINUOUS_AUTO_CHECKPOINT_MS = 30 * 60 * 1000;
 
 async function flushWorkspaceCollab(
   projectId: string,
@@ -119,6 +122,42 @@ export function useVersionControl(params: UseVersionControlParams) {
     null,
   );
   const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
+  const autoCheckpointInFlightRef = useRef(false);
+  const autoCheckpointBatchStartedAtRef = useRef<number | null>(null);
+  const lastAutoCheckpointSignatureRef = useRef("");
+  const latestSnapshotRef = useRef({
+    activeDemoId,
+    code,
+    schema,
+    hasUnsavedChanges,
+    hasUnsavedCanvasChanges,
+  });
+
+  const autoCheckpointSignature = useMemo(() => {
+    return JSON.stringify({
+      activeDemoId,
+      code,
+      schema,
+      pageCount: demoPages.length,
+      canvasDirty: hasUnsavedCanvasChanges,
+    });
+  }, [activeDemoId, code, demoPages.length, hasUnsavedCanvasChanges, schema]);
+
+  useEffect(() => {
+    latestSnapshotRef.current = {
+      activeDemoId,
+      code,
+      schema,
+      hasUnsavedChanges,
+      hasUnsavedCanvasChanges,
+    };
+  }, [
+    activeDemoId,
+    code,
+    hasUnsavedCanvasChanges,
+    hasUnsavedChanges,
+    schema,
+  ]);
 
   const loadVersionHistory = useCallback(async () => {
     try {
@@ -182,7 +221,9 @@ export function useVersionControl(params: UseVersionControlParams) {
     setPublishing(true);
     try {
       await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-      const publishResult = await projectApiClient.publishProject(demoId);
+      const publishResult = await projectApiClient.publishProject(demoId, {
+        sessionId,
+      });
       setPublishStatus("published");
       setPublishedVersion(publishResult.publishedVersion);
       toast({
@@ -367,7 +408,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     if (!sessionId) {
       console.error("[handleCreateVersion] sessionId 为空!");
       toast({
-        title: "创建版本失败",
+        title: "命名版本失败",
         description: "Session 未创建，请刷新页面重试",
         variant: "destructive",
       });
@@ -377,8 +418,8 @@ export function useVersionControl(params: UseVersionControlParams) {
     if (!activeDemoId) {
       console.error("[handleCreateVersion] activeDemoId 为空!");
       toast({
-        title: "创建版本失败",
-        description: "未选中页面，请先选择要创建版本的页面",
+        title: "命名版本失败",
+        description: "未选中页面，请先选择要命名的页面",
         variant: "destructive",
       });
       return false;
@@ -394,8 +435,8 @@ export function useVersionControl(params: UseVersionControlParams) {
 
       if (errors.length > 0) {
         toast({
-          title: "创建版本失败：存在语法错误",
-          description: `发现 ${errors.length} 个错误，需要先修复后才能创建版本`,
+          title: "命名版本失败：存在语法错误",
+          description: `发现 ${errors.length} 个错误，需要先修复后才能命名版本`,
           variant: "destructive",
         });
       } else if (warnings.length > 0) {
@@ -441,8 +482,8 @@ export function useVersionControl(params: UseVersionControlParams) {
       }
 
       toast({
-        title: "版本已创建",
-        description: "当前草稿已记录为版本快照",
+        title: "已命名此版本",
+        description: "当前内容已记录到历史记录",
       });
 
       setHasUnsavedChanges(false);
@@ -454,7 +495,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       return true;
     } catch (error) {
       toast({
-        title: "创建版本失败",
+        title: "命名版本失败",
         description: error instanceof Error ? error.message : "未知错误",
         variant: "destructive",
       });
@@ -464,22 +505,128 @@ export function useVersionControl(params: UseVersionControlParams) {
     }
   };
 
+  const createAutoCheckpoint = useCallback(
+    async (reason: "idle" | "continuous") => {
+      if (!sessionId || !workspaceId || !demoId) return false;
+      if (autoCheckpointInFlightRef.current) return false;
+      if (!latestSnapshotRef.current.hasUnsavedChanges && !latestSnapshotRef.current.hasUnsavedCanvasChanges) {
+        return false;
+      }
+      if (lastAutoCheckpointSignatureRef.current === autoCheckpointSignature) {
+        return false;
+      }
+
+      autoCheckpointInFlightRef.current = true;
+      try {
+        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+        await flushCanvasState();
+
+        if (latestSnapshotRef.current.activeDemoId) {
+          const saveRes = await fetch(
+            `/api/sessions/${sessionId}/files/${latestSnapshotRef.current.activeDemoId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                code: latestSnapshotRef.current.code,
+                schema: latestSnapshotRef.current.schema,
+              }),
+            },
+          );
+
+          if (!saveRes.ok) {
+            throw new Error("自动保存页面文件失败");
+          }
+        }
+
+        const checkpointRes = await fetch(`/api/sessions/${sessionId}/checkpoint`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            note: reason === "idle"
+              ? "停止编辑后自动保存记录"
+              : "持续编辑自动保存记录",
+          }),
+        });
+
+        if (!checkpointRes.ok) {
+          throw new Error("创建自动保存记录失败");
+        }
+
+        lastAutoCheckpointSignatureRef.current = autoCheckpointSignature;
+        autoCheckpointBatchStartedAtRef.current = null;
+        setHasUnsavedChanges(false);
+        markCanvasChangesSaved();
+        setPublishStatus("unpublished_changes");
+        await loadVersionHistory();
+        return true;
+      } catch (error) {
+        console.warn("[auto-checkpoint] failed:", error);
+        return false;
+      } finally {
+        autoCheckpointInFlightRef.current = false;
+      }
+    },
+    [
+      autoCheckpointSignature,
+      demoId,
+      flushCanvasState,
+      loadVersionHistory,
+      markCanvasChangesSaved,
+      sessionId,
+      setHasUnsavedChanges,
+      workspaceId,
+    ],
+  );
+
+  useEffect(() => {
+    const hasPendingChanges = hasUnsavedChanges || hasUnsavedCanvasChanges;
+    if (!hasPendingChanges || !sessionId || !workspaceId) {
+      autoCheckpointBatchStartedAtRef.current = null;
+      return;
+    }
+
+    if (autoCheckpointBatchStartedAtRef.current === null) {
+      autoCheckpointBatchStartedAtRef.current = Date.now();
+    }
+
+    const idleTimer = window.setTimeout(() => {
+      void createAutoCheckpoint("idle");
+    }, IDLE_AUTO_CHECKPOINT_MS);
+
+    const continuousDelay = Math.max(
+      CONTINUOUS_AUTO_CHECKPOINT_MS -
+        (Date.now() - autoCheckpointBatchStartedAtRef.current),
+      0,
+    );
+    const continuousTimer = window.setTimeout(() => {
+      void createAutoCheckpoint("continuous");
+    }, continuousDelay);
+
+    return () => {
+      window.clearTimeout(idleTimer);
+      window.clearTimeout(continuousTimer);
+    };
+  }, [
+    autoCheckpointSignature,
+    createAutoCheckpoint,
+    hasUnsavedCanvasChanges,
+    hasUnsavedChanges,
+    sessionId,
+    workspaceId,
+  ]);
+
   const hasPendingChanges = hasUnsavedChanges || hasUnsavedCanvasChanges;
   const hasPublishableChanges =
     publishStatus === "never_published" ||
     publishStatus === "unpublished_changes";
-  const shouldCreateVersionBeforePublish = hasPendingChanges;
   const publishButtonDisabled =
     externalIsSaving ||
     publishing ||
     publishStatus === null ||
     (!hasPendingChanges && !hasPublishableChanges);
-  const publishButtonText = shouldCreateVersionBeforePublish
-    ? "创建版本并发布"
-    : "发布";
-  const publishingButtonText = shouldCreateVersionBeforePublish
-    ? "创建版本并发布中..."
-    : "发布中...";
+  const publishButtonText = hasPendingChanges ? "同步并发布" : "发布";
+  const publishingButtonText = hasPendingChanges ? "同步并发布中..." : "发布中...";
 
   return {
     // State
@@ -495,7 +642,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     // Computed
     hasPendingChanges,
     hasPublishableChanges,
-    shouldCreateVersionBeforePublish,
+    shouldCreateVersionBeforePublish: false,
     publishButtonDisabled,
     publishButtonText,
     publishingButtonText,

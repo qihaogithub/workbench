@@ -50,6 +50,22 @@ type ExternalAuthStartResponse = {
   message?: string;
 };
 
+type DingtalkBindingStatus = {
+  config: {
+    enabled: boolean;
+    corpId?: string;
+    message?: string;
+  };
+  binding: {
+    corpId: string;
+    unionId?: string;
+    userId: string;
+    name?: string;
+    avatar?: string;
+    lastLoginAt: number;
+  } | null;
+};
+
 export function SettingsButton() {
   const router = useRouter();
   const { toast } = useToast();
@@ -71,6 +87,8 @@ export function SettingsButton() {
   const [externalProviders, setExternalProviders] = useState<ExternalProviderStatus[]>([]);
   const [externalMessage, setExternalMessage] = useState("");
   const [loadingExternalAuth, setLoadingExternalAuth] = useState(false);
+  const [dingtalkBinding, setDingtalkBinding] =
+    useState<DingtalkBindingStatus | null>(null);
 
   // 获取当前登录用户信息
   const fetchUser = async (): Promise<UserInfo | null> => {
@@ -147,6 +165,11 @@ export function SettingsButton() {
       const data = await res.json();
       if (data.success) {
         setExternalProviders(data.data?.providers || []);
+        const bindingRes = await fetch("/api/auth/dingtalk/binding");
+        const bindingData = await bindingRes.json();
+        if (bindingData.success) {
+          setDingtalkBinding(bindingData.data);
+        }
       } else {
         toast({
           title: "读取失败",
@@ -600,6 +623,16 @@ export function SettingsButton() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 py-2">
+                <div className="rounded-lg border border-border bg-accent/30 px-4 py-3">
+                  <p className="text-sm font-medium">钉钉企业身份</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {dingtalkBinding?.binding
+                      ? `${dingtalkBinding.binding.name || dingtalkBinding.binding.userId} · ${dingtalkBinding.binding.corpId}`
+                      : dingtalkBinding?.config.enabled
+                        ? "当前账号尚未通过钉钉企业登录绑定"
+                        : dingtalkBinding?.config.message || "钉钉企业登录未启用"}
+                  </p>
+                </div>
                 {(["figma", "dingtalk"] as const).map((provider) => {
                   const item = externalProviders.find((p) => p.provider === provider);
                   const status = item?.status || "disconnected";

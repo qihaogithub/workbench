@@ -112,8 +112,6 @@ export type CanvasToolMode =
   | "hand"
   | "select"
   | "text"
-  | "arrow"
-  | "draw"
   | "image";
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
@@ -136,6 +134,7 @@ export interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
   nodes?: Record<string, CanvasFreeNode>;
+  layers?: CanvasLayersState;
   hiddenKnowledgeDocumentIds?: string[];
 }
 
@@ -167,9 +166,7 @@ export type CanvasPageRenderMode =
 export type CanvasFreeNodeKind =
   | "document"
   | "image"
-  | "text"
-  | "arrow"
-  | "drawing";
+  | "text";
 
 export interface CanvasFreeNodeBase {
   id: string;
@@ -202,41 +199,38 @@ export interface CanvasTextNode extends CanvasFreeNodeBase {
   fontSize: number;
   color: string;
   backgroundColor?: string;
-}
-
-export interface CanvasArrowNode extends CanvasFreeNodeBase {
-  kind: "arrow";
-  color: string;
-  strokeWidth: number;
-  direction: "right" | "left" | "down" | "up";
-  start?: CanvasDrawingPoint;
-  end?: CanvasDrawingPoint;
-}
-
-export interface CanvasDrawingPoint {
-  x: number;
-  y: number;
-}
-
-export interface CanvasDrawingNode extends CanvasFreeNodeBase {
-  kind: "drawing";
-  points: CanvasDrawingPoint[];
-  color: string;
-  strokeWidth: number;
+  autoWidth?: boolean;
 }
 
 export type CanvasFreeNode =
   | CanvasDocumentNode
   | CanvasImageNode
-  | CanvasTextNode
-  | CanvasArrowNode
-  | CanvasDrawingNode;
+  | CanvasTextNode;
+
+export interface CanvasLayersState {
+  annotations?: {
+    nodes?: Record<string, CanvasFreeNode>;
+  };
+  documents?: {
+    nodes?: Record<string, CanvasDocumentNode>;
+  };
+}
 
 export interface CanvasKnowledgeDocument {
   id: string;
   title: string;
   fileName: string;
   description?: string;
+}
+
+export interface CanvasTextNodeSummary {
+  id: string;
+  title: string;
+  text: string;
+  layout: CanvasPageLayout;
+  relatedPageIds: string[];
+  updatedAt: number;
+  truncated: boolean;
 }
 
 export interface CanvasKnowledgeDocumentCreateInput {

@@ -1,3 +1,6 @@
 packages:
   - "packages/*"
   - "OPS/CLI"
+
+overrides:
+  "@radix-ui/react-compose-refs": "1.0.0"

@@ -29,9 +29,13 @@ import { cn } from "@/lib/utils";
 import {
   createDemo,
   deleteDemo,
+  deleteProjectTemplate,
+  deleteTemplateCover,
   duplicateDemo,
   saveDemoAsTemplate,
+  updateProjectTemplate,
   updateDemo,
+  uploadTemplateCover,
   useDemos,
   useProjectTemplates,
 } from "@/lib/api";
@@ -50,6 +54,8 @@ type DialogAction =
   | { type: "duplicate-template"; template: ProjectTemplateMeta }
   | { type: "rename-project"; project: DemoMeta }
   | { type: "change-category"; project: DemoMeta }
+  | { type: "rename-template"; template: ProjectTemplateMeta }
+  | { type: "change-template-category"; template: ProjectTemplateMeta }
   | null;
 
 function normalizeCategory(category?: string): string {
@@ -132,8 +138,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
   const [isSubmittingDialog, setIsSubmittingDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null);
+  const [templateDeleteTarget, setTemplateDeleteTarget] =
+    useState<ProjectTemplateMeta | null>(null);
   const [templateTarget, setTemplateTarget] = useState<DemoMeta | null>(null);
   const [coverTarget, setCoverTarget] = useState<DemoMeta | null>(null);
+  const [templateCoverTarget, setTemplateCoverTarget] =
+    useState<ProjectTemplateMeta | null>(null);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),
@@ -329,6 +339,52 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     });
   };
 
+  const handleRenameTemplate = async (
+    template: ProjectTemplateMeta,
+    input: ProjectNameCategoryValue,
+  ) => {
+    const response = await updateProjectTemplate(template.id, {
+      name: input.name,
+    });
+    if (response.success) {
+      toast({
+        title: "更新成功",
+        description: `模板已重命名为「${input.name}」`,
+      });
+      revalidateTemplates();
+      return;
+    }
+
+    toast({
+      variant: "destructive",
+      title: "更新失败",
+      description: response.error.message,
+    });
+  };
+
+  const handleChangeTemplateCategory = async (
+    template: ProjectTemplateMeta,
+    input: ProjectNameCategoryValue,
+  ) => {
+    const response = await updateProjectTemplate(template.id, {
+      category: input.category,
+    });
+    if (response.success) {
+      toast({
+        title: "更新成功",
+        description: `模板已移动到「${input.category}」`,
+      });
+      revalidateTemplates();
+      return;
+    }
+
+    toast({
+      variant: "destructive",
+      title: "更新失败",
+      description: response.error.message,
+    });
+  };
+
   const handleDialogSubmit = async (input: ProjectNameCategoryValue) => {
     if (!dialogAction) return;
     setIsSubmittingDialog(true);
@@ -341,8 +397,15 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         await handleDuplicateTemplate(dialogAction.template, input);
       } else if (dialogAction.type === "rename-project") {
         await handleRenameProject(dialogAction.project, input);
-      } else {
+      } else if (dialogAction.type === "rename-template") {
+        await handleRenameTemplate(dialogAction.template, input);
+      } else if (dialogAction.type === "change-template-category") {
+        await handleChangeTemplateCategory(dialogAction.template, input);
+      } else if (dialogAction.type === "change-category") {
         await handleChangeCategory(dialogAction.project, input);
+      } else {
+        const _exhaustive: never = dialogAction;
+        return _exhaustive;
       }
       setDialogAction(null);
     } finally {
@@ -394,21 +457,49 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     setDeleteTarget(null);
   };
 
+  const handleDeleteTemplate = async () => {
+    if (!templateDeleteTarget) return;
+
+    const response = await deleteProjectTemplate(templateDeleteTarget.id);
+    if (response.success) {
+      toast({
+        title: "删除成功",
+        description: `模板「${templateDeleteTarget.name}」已删除`,
+      });
+      revalidateTemplates();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "删除失败",
+        description: response.error.message,
+      });
+    }
+    setTemplateDeleteTarget(null);
+  };
+
   const dialogTitle =
     dialogAction?.type === "rename-project"
       ? "修改项目名称"
+      : dialogAction?.type === "rename-template"
+        ? "修改模板名称"
       : dialogAction?.type === "change-category"
         ? "修改项目分类"
-        : dialogAction?.type === "duplicate-project"
+        : dialogAction?.type === "change-template-category"
+          ? "修改模板分类"
+          : dialogAction?.type === "duplicate-project"
       ? "复制当前项目"
       : dialogAction?.type === "duplicate-template"
-        ? "从模板新建项目"
+        ? "使用此模板新建"
         : "新建空白项目";
   const dialogDescription =
     dialogAction?.type === "rename-project"
       ? `更新「${dialogAction.project.name}」的显示名称。`
+      : dialogAction?.type === "rename-template"
+        ? `更新模板「${dialogAction.template.name}」的显示名称。`
       : dialogAction?.type === "change-category"
         ? `更新「${dialogAction.project.name}」所在的首页分类。`
+        : dialogAction?.type === "change-template-category"
+          ? `更新模板「${dialogAction.template.name}」所在的首页分类。`
         : dialogAction?.type === "duplicate-project"
       ? `将复制「${dialogAction.project.name}」为独立项目。`
       : dialogAction?.type === "duplicate-template"
@@ -417,8 +508,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const dialogDefaultName =
     dialogAction?.type === "rename-project"
       ? dialogAction.project.name
+      : dialogAction?.type === "rename-template"
+        ? dialogAction.template.name
       : dialogAction?.type === "change-category"
         ? dialogAction.project.name
+        : dialogAction?.type === "change-template-category"
+          ? dialogAction.template.name
         : dialogAction?.type === "duplicate-project"
       ? `${dialogAction.project.name} 副本`
       : dialogAction?.type === "duplicate-template"
@@ -427,27 +522,36 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const dialogDefaultCategory =
     dialogAction?.type === "rename-project"
       ? normalizeCategory(dialogAction.project.category)
+      : dialogAction?.type === "rename-template"
+        ? normalizeCategory(dialogAction.template.category)
       : dialogAction?.type === "change-category"
         ? normalizeCategory(dialogAction.project.category)
+        : dialogAction?.type === "change-template-category"
+          ? normalizeCategory(dialogAction.template.category)
         : dialogAction?.type === "duplicate-project"
       ? normalizeCategory(dialogAction.project.category)
       : dialogAction?.type === "duplicate-template"
         ? normalizeCategory(dialogAction.template.category)
         : DEFAULT_CATEGORY;
   const dialogFields =
-    dialogAction?.type === "rename-project"
+    dialogAction?.type === "rename-project" ||
+    dialogAction?.type === "rename-template"
       ? "name"
-      : dialogAction?.type === "change-category"
+      : dialogAction?.type === "change-category" ||
+          dialogAction?.type === "change-template-category"
         ? "category"
         : "both";
   const dialogSubmitLabel =
     dialogAction?.type === "blank"
       ? "创建项目"
       : dialogAction?.type === "rename-project" ||
-          dialogAction?.type === "change-category"
+          dialogAction?.type === "rename-template" ||
+          dialogAction?.type === "change-category" ||
+          dialogAction?.type === "change-template-category"
         ? "保存"
-        : "复制项目";
-
+        : dialogAction?.type === "duplicate-project"
+          ? "复制项目"
+        : "创建项目";
   if (error) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -630,6 +734,20 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                             template: item,
                           })
                         }
+                        onRename={(item) =>
+                          setDialogAction({
+                            type: "rename-template",
+                            template: item,
+                          })
+                        }
+                        onChangeCategory={(item) =>
+                          setDialogAction({
+                            type: "change-template-category",
+                            template: item,
+                          })
+                        }
+                        onChangeCover={(item) => setTemplateCoverTarget(item)}
+                        onDelete={(item) => setTemplateDeleteTarget(item)}
                       />
                     ))}
                   </div>
@@ -667,6 +785,13 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
           demoName={deleteTarget?.name || ""}
         />
 
+        <DeleteConfirmDialog
+          open={!!templateDeleteTarget}
+          onOpenChange={(open) => !open && setTemplateDeleteTarget(null)}
+          onConfirm={handleDeleteTemplate}
+          demoName={templateDeleteTarget?.name || ""}
+        />
+
         {coverTarget && (
           <CoverImageDialog
             open={!!coverTarget}
@@ -676,6 +801,21 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
             onThumbnailChange={() => {
               revalidate();
               setCoverTarget(null);
+            }}
+          />
+        )}
+
+        {templateCoverTarget && (
+          <CoverImageDialog
+            open={!!templateCoverTarget}
+            onOpenChange={(open) => !open && setTemplateCoverTarget(null)}
+            projectId={templateCoverTarget.id}
+            currentThumbnail={templateCoverTarget.thumbnail}
+            onUpload={(file) => uploadTemplateCover(templateCoverTarget.id, file)}
+            onDelete={() => deleteTemplateCover(templateCoverTarget.id)}
+            onThumbnailChange={() => {
+              revalidateTemplates();
+              setTemplateCoverTarget(null);
             }}
           />
         )}

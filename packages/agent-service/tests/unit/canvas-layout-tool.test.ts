@@ -9,6 +9,9 @@ interface StoredCanvasLayout {
   state: {
     pages: Record<string, { x: number; y: number; width: number; height: number; zIndex?: number }>;
     viewport: { x: number; y: number; zoom: number };
+    nodes?: Record<string, unknown>;
+    layers?: Record<string, unknown>;
+    hiddenKnowledgeDocumentIds?: string[];
   };
 }
 
@@ -129,5 +132,53 @@ describe('arrangeCanvasPages tool', () => {
     expect(result.isError).toBe(true);
     expect(result.details.error).toBe('page_not_found');
     expect(fs.existsSync(path.join(tmpDir, '.canvas-layout.json'))).toBe(false);
+  });
+
+  it('整理页面时保留画布自由节点、图层和隐藏知识文档状态', async () => {
+    writeTree([
+      createPage('page_a', '页面 A', 0, { width: 320, height: 640 }),
+      createPage('page_b', '页面 B', 1, { width: 375, height: 812 }),
+    ]);
+    const textNode = {
+      id: 'text-1',
+      kind: 'text',
+      title: '说明文字',
+      text: 'Agent 可读的画布说明',
+      fontSize: 18,
+      color: '#111827',
+      layout: { x: 40, y: 760, width: 260, height: 120 },
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    fs.writeFileSync(
+      path.join(tmpDir, '.canvas-layout.json'),
+      JSON.stringify({
+        version: 1,
+        projectId: 'project_1',
+        updatedAt: 1000,
+        state: {
+          pages: {
+            page_a: { x: 0, y: 0, width: 320, height: 640 },
+            page_b: { x: 400, y: 0, width: 375, height: 812 },
+          },
+          viewport: { x: 10, y: 20, zoom: 0.5 },
+          nodes: { 'text-1': textNode },
+          layers: { annotations: { nodes: { 'text-1': textNode } } },
+          hiddenKnowledgeDocumentIds: ['kb-1'],
+        },
+      }, null, 2),
+      'utf-8',
+    );
+
+    const result = await createArrangeCanvasPagesTool(config).execute('tool', {
+      mode: 'grid',
+      columns: 2,
+    } as any);
+    const stored = readCanvasLayout();
+
+    expect(result.isError).toBeFalsy();
+    expect(stored.state.nodes).toEqual({ 'text-1': textNode });
+    expect(stored.state.layers).toEqual({ annotations: { nodes: { 'text-1': textNode } } });
+    expect(stored.state.hiddenKnowledgeDocumentIds).toEqual(['kb-1']);
   });
 });

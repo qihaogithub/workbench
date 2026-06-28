@@ -18,7 +18,7 @@
 
 如果某个脚本已经具备稳定的通过/失败判断，并且需要作为长期回归保障，应迁移或补写到 `test/` 目录：
 
-- Playwright E2E 回归用例维护在 `test/新建-编辑-保存项目测试/`，写成 `.spec.ts`。
+- Playwright E2E 回归用例维护在 `test/创作端E2E回归测试/`，写成 `.spec.ts`。
 - 包级单元或集成回归用例维护在对应包的测试目录，例如 `packages/agent-service/tests/`。
 - 根目录 `package.json` 只保留清晰的运行入口，例如 `pnpm test:e2e` 或更聚焦的回归命令。
 

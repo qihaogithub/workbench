@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
+import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import type {
@@ -296,7 +297,7 @@ export function CanvasPageItem({
 
   const canInteract = editable && !isEditing && toolMode === "select";
   const showEdgeHandles =
-    isHovering && canInteract && !isDragging && !isResizing;
+    (isHovering || selected) && canInteract && !isDragging && !isResizing;
 
   const shouldRenderIframe =
     renderMode === "iframe" || renderMode === "sleeping-iframe";
@@ -578,9 +579,6 @@ export function CanvasPageItem({
         "absolute rounded-lg transition-shadow duration-200 select-none",
         isEditing &&
           "ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_14px_34px_rgba(15,23,42,0.28)]",
-        selected &&
-          !isEditing &&
-          "ring-2 ring-blue-500 shadow-[0_0_0_1px_rgba(37,99,235,0.35),0_12px_30px_rgba(37,99,235,0.22)]",
       )}
       style={{
         left: layout.x,
@@ -624,6 +622,11 @@ export function CanvasPageItem({
         {pageContent}
       </div>
 
+      <CanvasSelectionBox
+        visible={!isEditing && (selected || isDragging || Boolean(isResizing))}
+        handles={canInteract}
+      />
+
       {/* 边框热区 — 四条边 */}
       {showEdgeHandles && (
         <>
@@ -652,33 +655,6 @@ export function CanvasPageItem({
             style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
           />
         </>
-      )}
-
-      {/* 角点视觉指示器 — 四角小方块 */}
-      {showEdgeHandles && (
-        <>
-          <div
-            className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-30 opacity-70 hover:opacity-100 hover:scale-150 transition-all"
-            style={{ top: -3, left: -3, cursor: "nwse-resize" }}
-          />
-          <div
-            className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-30 opacity-70 hover:opacity-100 hover:scale-150 transition-all"
-            style={{ top: -3, right: -3, cursor: "nesw-resize" }}
-          />
-          <div
-            className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-30 opacity-70 hover:opacity-100 hover:scale-150 transition-all"
-            style={{ bottom: -3, left: -3, cursor: "nesw-resize" }}
-          />
-          <div
-            className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-30 opacity-70 hover:opacity-100 hover:scale-150 transition-all"
-            style={{ bottom: -3, right: -3, cursor: "nwse-resize" }}
-          />
-        </>
-      )}
-
-      {/* 拖拽/缩放时的蓝色边框指示器 */}
-      {(isDragging || isResizing) && (
-        <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none" />
       )}
 
       {/* 右键菜单 */}

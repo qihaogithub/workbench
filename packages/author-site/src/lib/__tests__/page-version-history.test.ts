@@ -112,6 +112,7 @@ describe("页面级版本历史", () => {
     );
     expect(first.success).toBe(true);
     expect(first.version?.versionId).toBe("v1");
+    expect(first.version?.type).toBe("named_version");
     expect(first.version?.fileCount).toBe(2);
     expect(first.version?.savedBy).toBe("alice");
 
@@ -177,6 +178,7 @@ describe("页面级版本历史", () => {
     expect(project?.versions).toHaveLength(1);
     expect(project?.versions[0]).toMatchObject({
       versionId: "v3",
+      type: "restore_snapshot",
       savedBy: "bob",
       sessionId: "restore-page-home-v1",
     });

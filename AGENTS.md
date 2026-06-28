@@ -212,11 +212,11 @@ pnpm --filter @opencode-workbench/project-cli test
 
 ## Playwright E2E
 
-- 配置文件在 `test/新建-编辑-保存项目测试/playwright.config.ts`，不是根目录默认配置。
+- 配置文件在 `test/创作端E2E回归测试/playwright.config.ts`，不是根目录默认配置。
 - baseURL 是 `http://localhost:3200`。
 - 前置条件：author-site 等相关服务已启动；首次运行需要 `pnpm playwright install chromium`。
 - 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。根脚本已显式指定 Playwright 配置文件。
-- 正式回归用例必须维护在 `test/` 下的 Playwright 测试目录中，优先放入 `test/新建-编辑-保存项目测试/` 并写成 `.spec.ts`。
+- 正式回归用例必须维护在 `test/` 下的 Playwright 测试目录中，优先放入 `test/创作端E2E回归测试/` 并写成 `.spec.ts`。
 - `scripts/development/` 只放开发期诊断、复现、采样和报告生成脚本；脚本可以调用 Playwright，但不作为正式回归用例的长期维护位置。
 - 当某个 `scripts/development/` 脚本需要长期纳入回归验证时，应迁移或补写为 `test/` 下的 Playwright spec，并通过根目录 `package.json` 暴露清晰的测试命令。
 

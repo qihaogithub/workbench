@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
+import { summarizeCanvasTextNodes } from "@opencode-workbench/shared/demo";
 import type { SystemPromptContext } from "./system-prompt";
+import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
 import { listDemoPages } from "../fs-utils";
 import { syncBuiltinKnowledge } from "../knowledge/builtin-documents";
 
@@ -71,6 +73,31 @@ function formatPageList(pages: PageInfo[]): string {
     .join("\n\n");
 }
 
+function formatCanvasTextSummary(workingDir: string): string {
+  const state = readCanvasStateFromWorkspace(workingDir);
+  if (!state) return "（暂无画布文本节点）";
+
+  const summaries = summarizeCanvasTextNodes(state);
+  if (summaries.length === 0) return "（暂无画布文本节点）";
+
+  return summaries
+    .map((node) => {
+      const relatedPages =
+        node.relatedPageIds.length > 0
+          ? node.relatedPageIds.map((pageId) => `\`${pageId}\``).join(", ")
+          : "无";
+      const suffix = node.truncated ? "（已截断）" : "";
+      return [
+        `- ${node.title || "文字"}（id: \`${node.id}\`）${suffix}`,
+        `  - text: ${node.text || "（空）"}`,
+        `  - layout: x=${node.layout.x}, y=${node.layout.y}, w=${node.layout.width}, h=${node.layout.height}`,
+        `  - relatedPageIds: ${relatedPages}`,
+        `  - updatedAt: ${node.updatedAt}`,
+      ].join("\n");
+    })
+    .join("\n");
+}
+
 export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   const pages: PageInfo[] = [];
 
@@ -98,6 +125,7 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   );
 
   const pageList = formatPageList(pages);
+  const canvasTextSummary = formatCanvasTextSummary(workingDir);
 
   const projectName = path.basename(workingDir);
 
@@ -106,6 +134,7 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
     projectConfigStatus: hasProjectConfig ? "已设置" : "未设置",
     pageCount: pages.length,
     pageList,
+    canvasTextSummary,
     workspacePath: workingDir,
   };
 }

@@ -115,12 +115,6 @@ export function useCollabDocument(
   const descriptorRef = useRef<CollabRoomDescriptor | null>(stableDescriptor);
   descriptorRef.current = stableDescriptor;
 
-  const clearOfflineStatusTimer = useCallback(() => {
-    if (!offlineStatusTimerRef.current) return;
-    clearTimeout(offlineStatusTimerRef.current);
-    offlineStatusTimerRef.current = null;
-  }, []);
-
   const collabUser = useMemo<CollabUser>(() => {
     const userId = user?.userId || stableDescriptor?.sessionId || "anonymous";
     return {
@@ -131,6 +125,12 @@ export function useCollabDocument(
   }, [stableDescriptor?.sessionId, user?.color, user?.userId, user?.username]);
 
   useEffect(() => {
+    const clearOfflineStatusTimer = () => {
+      if (!offlineStatusTimerRef.current) return;
+      clearTimeout(offlineStatusTimerRef.current);
+      offlineStatusTimerRef.current = null;
+    };
+
     if (!stableDescriptor) {
       clearOfflineStatusTimer();
       setStatus("offline");
@@ -245,7 +245,7 @@ export function useCollabDocument(
       doc.destroy();
       if (providerRef.current === nextProvider) providerRef.current = null;
     };
-  }, [clearOfflineStatusTimer, collabUser.color, collabUser.userId, collabUser.username, stableDescriptor]);
+  }, [collabUser.color, collabUser.userId, collabUser.username, stableDescriptor]);
 
   const flush = useCallback(async () => {
     const current = descriptorRef.current;

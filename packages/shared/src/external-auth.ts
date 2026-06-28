@@ -50,6 +50,46 @@ export interface DingtalkExternalAuthCredential {
   configDir: string;
 }
 
+export interface DingtalkEnterpriseIdentity {
+  corpId: string;
+  userId: string;
+  unionId?: string;
+  name?: string;
+  avatar?: string;
+  lastLoginAt?: number;
+}
+
+export type ExternalDocumentProvider = "dingtalk";
+
+export type ExternalDocumentSyncMode = "snapshot" | "manual" | "auto";
+
+export type ExternalDocumentSyncStatus =
+  | "idle"
+  | "syncing"
+  | "synced"
+  | "failed"
+  | "needs_auth";
+
+export interface ExternalDocumentReference {
+  provider: ExternalDocumentProvider;
+  sourceUrl: string;
+  corpId?: string;
+  documentId?: string;
+  spaceId?: string;
+  nodeId?: string;
+  dentryId?: string;
+  title?: string;
+}
+
+export interface ExternalDocumentSnapshot {
+  reference: ExternalDocumentReference;
+  syncMode: ExternalDocumentSyncMode;
+  syncStatus: ExternalDocumentSyncStatus;
+  markdown?: string;
+  lastSyncedAt?: number;
+  message?: string;
+}
+
 export interface ExternalAuthSessionConfig {
   figma?: {
     enabled: boolean;

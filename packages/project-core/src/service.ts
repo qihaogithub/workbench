@@ -14,6 +14,7 @@ import type {
   Project,
   ProjectTemplateMeta,
   VersionInfo,
+  VersionHistoryEntryType,
   WorkspaceTree,
 } from "@opencode-workbench/shared";
 
@@ -705,7 +706,9 @@ export class ProjectAdminService {
       category: input.category?.trim() || template.category,
       name: input.name?.trim() || template.name,
       description: input.description?.trim() || template.description,
-      thumbnail: input.thumbnail ?? template.thumbnail,
+      thumbnail: Object.prototype.hasOwnProperty.call(input, "thumbnail")
+        ? input.thumbnail
+        : template.thumbnail,
       scope: input.scope ?? template.scope,
       official: input.official ?? template.official,
       updatedAt: Date.now(),
@@ -974,14 +977,14 @@ export class ProjectAdminService {
     const changedFiles = this.diffWorkspaceFiles(projectWorkspace, transaction.workspacePath);
     fs.rmSync(projectWorkspace, { recursive: true, force: true });
     copyWorkspace(transaction.workspacePath, projectWorkspace);
-    const version = this.createProjectVersion(project, projectWorkspace, actor.name, editId, note);
+    const version = this.createProjectVersion(project, projectWorkspace, actor.name, editId, note, "named_version");
     const tree = this.readWorkspaceTree(projectWorkspace);
     const updatedProject: Project = {
       ...project,
       workspacePath: projectWorkspace,
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
-      versions: [...project.versions, version].slice(-MAX_VERSIONS_KEEP),
+      versions: this.compactProjectVersions([...project.versions, version]),
       updatedAt: Date.now(),
     };
     this.writeProject(project.id, updatedProject);
@@ -1291,6 +1294,7 @@ export class ProjectAdminService {
       actor.name,
       `restore-page-${pageId}-${versionId}`,
       `从页面 ${page.name} 的历史版本 ${versionId} 恢复`,
+      "restore_snapshot",
     );
     const tree = this.readWorkspaceTree(workspacePath);
     const updatedProject: Project = {
@@ -1298,7 +1302,7 @@ export class ProjectAdminService {
       workspacePath,
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
-      versions: [...project.versions, version].slice(-MAX_VERSIONS_KEEP),
+      versions: this.compactProjectVersions([...project.versions, version]),
       updatedAt: restoredAt,
     };
     this.writeProject(projectId, updatedProject);
@@ -1817,13 +1821,27 @@ export class ProjectAdminService {
     }
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const snapshot = this.createProjectVersion(
+      project,
+      this.projectWorkspacePath(projectId),
+      actor.name,
+      `publish-${Date.now()}`,
+      "发布快照",
+      "publish_snapshot",
+    );
+    const versionedProject = {
+      ...project,
+      versions: this.compactProjectVersions([...project.versions, snapshot]),
+      updatedAt: Date.now(),
+    };
+    this.writeProject(projectId, versionedProject);
     const status = this.buildPublishStatus(projectId, {
       published: true,
-      publishedVersion: project.versions.at(-1)?.versionId ?? "v0",
+      publishedVersion: snapshot.versionId,
       publishedAt: Date.now(),
       artifactPath: path.join(this.publishedDir, projectId),
     });
-    const updated = { ...project, publishedVersion: status.publishedVersion, publishedAt: status.publishedAt };
+    const updated = { ...versionedProject, publishedVersion: status.publishedVersion, publishedAt: status.publishedAt };
     this.writeProject(projectId, updated);
     ensureDir(status.artifactPath ?? "");
     writeJsonFile(path.join(status.artifactPath ?? "", "project-admin-status.json"), status);
@@ -2262,6 +2280,7 @@ export class ProjectAdminService {
     actorName: string,
     editId: string,
     note?: string,
+    type: VersionHistoryEntryType = "named_version",
   ): VersionInfo {
     const maxVersion = project.versions.reduce((max, version) => {
       const match = /^v(\d+)$/.exec(version.versionId);
@@ -2274,6 +2293,7 @@ export class ProjectAdminService {
     copyWorkspace(workspacePath, snapshotPath);
     return {
       versionId,
+      type,
       savedAt: Date.now(),
       savedBy: actorName,
       sessionId: editId,
@@ -2281,6 +2301,26 @@ export class ProjectAdminService {
       fileCount: countFiles(workspacePath),
       note,
     };
+  }
+
+  private compactProjectVersions(versions: VersionInfo[]): VersionInfo[] {
+    if (versions.length <= MAX_VERSIONS_KEEP) return versions;
+    const removeCount = versions.length - MAX_VERSIONS_KEEP;
+    const removable = versions
+      .map((version, index) => ({ version, index }))
+      .filter(({ version }) => version.type === "auto_checkpoint");
+    const fallback = versions.map((version, index) => ({ version, index }));
+    const toRemove = [...removable, ...fallback]
+      .filter(
+        (entry, index, all) =>
+          all.findIndex((item) => item.index === entry.index) === index,
+      )
+      .slice(0, removeCount);
+    const removeIndexes = new Set(toRemove.map((entry) => entry.index));
+    for (const { version } of toRemove) {
+      fs.rmSync(version.snapshotPath, { recursive: true, force: true });
+    }
+    return versions.filter((_, index) => !removeIndexes.has(index));
   }
 
   private diffWorkspaceFiles(basePath: string, nextPath: string): string[] {

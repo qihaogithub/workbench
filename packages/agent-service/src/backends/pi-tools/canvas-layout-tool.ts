@@ -58,6 +58,10 @@ interface CanvasViewportState {
 interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
+  nodes?: unknown;
+  layers?: unknown;
+  hiddenKnowledgeDocumentIds?: string[];
+  [key: string]: unknown;
 }
 
 interface StoredCanvasLayout {
@@ -250,6 +254,15 @@ function parseCanvasState(value: unknown): CanvasState | null {
   return {
     viewport: { x: viewportX, y: viewportY, zoom },
     pages,
+    ...(value.nodes === undefined ? {} : { nodes: value.nodes }),
+    ...(value.layers === undefined ? {} : { layers: value.layers }),
+    ...(Array.isArray(value.hiddenKnowledgeDocumentIds)
+      ? {
+          hiddenKnowledgeDocumentIds: value.hiddenKnowledgeDocumentIds.filter(
+            (item): item is string => typeof item === 'string',
+          ),
+        }
+      : {}),
   };
 }
 
@@ -637,6 +650,7 @@ export function createArrangeCanvasPagesTool(
         }
 
         const state: CanvasState = {
+          ...(stored?.state ?? {}),
           pages: nextPages,
           viewport: computeFitCanvasViewport(nextPages, viewportWidth, viewportHeight),
         };

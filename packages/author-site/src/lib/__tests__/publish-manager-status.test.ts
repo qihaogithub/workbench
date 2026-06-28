@@ -4,6 +4,7 @@ import os from "os";
 
 let tempDir: string;
 let getPublishStatus: typeof import("../publish-manager").getPublishStatus;
+let publishProject: typeof import("../publish-manager").publishProject;
 
 function setupProject(
   projectId: string,
@@ -51,7 +52,54 @@ beforeAll(() => {
   process.env.DATA_DIR = tempDir;
   jest.resetModules();
   getPublishStatus = require("../publish-manager").getPublishStatus;
+  publishProject = require("../publish-manager").publishProject;
 });
+
+function setupPublishableProject(projectId: string) {
+  const projectDir = path.join(tempDir, "projects", projectId);
+  const workspacePath = path.join(projectDir, "workspace");
+  const demoDir = path.join(workspacePath, "demos", "home");
+  fs.mkdirSync(demoDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(demoDir, "index.tsx"),
+    "export default function Demo() { return <div>hello</div>; }",
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(demoDir, "config.schema.json"),
+    JSON.stringify({ type: "object", properties: {} }),
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(workspacePath, "workspace-tree.json"),
+    JSON.stringify({
+      folders: [],
+      pages: [{ id: "home", name: "首页", order: 0, parentId: null }],
+    }),
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(workspacePath, "app.graph.json"),
+    JSON.stringify({ version: 1, entry: "home", pages: {}, actions: [], state: {} }),
+    "utf-8",
+  );
+
+  const now = Date.now();
+  const project = {
+    id: projectId,
+    name: "可发布项目",
+    workspacePath,
+    demoPages: [{ id: "home", name: "首页", order: 0, parentId: null }],
+    demoFolders: [],
+    versions: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(projectDir, "project.json"),
+    JSON.stringify(project, null, 2),
+  );
+}
 
 afterAll(() => {
   delete process.env.DATA_DIR;
@@ -134,5 +182,26 @@ describe("getPublishStatus", () => {
     expect(result.status).toBe("unpublished_changes");
     expect(result.publishedVersion).toBe("v2");
     expect(result.currentVersion).toBe("v3");
+  });
+
+  it("发布前应创建发布快照并指向该版本", async () => {
+    setupPublishableProject("proj-publish-snapshot");
+
+    const result = await publishProject("proj-publish-snapshot");
+    expect(result.publishedVersion).toBe("v1");
+
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, "projects", "proj-publish-snapshot", "project.json"),
+        "utf-8",
+      ),
+    );
+    expect(project.publishedVersion).toBe("v1");
+    expect(project.versions).toHaveLength(1);
+    expect(project.versions[0]).toMatchObject({
+      versionId: "v1",
+      type: "publish_snapshot",
+      note: "发布快照",
+    });
   });
 });

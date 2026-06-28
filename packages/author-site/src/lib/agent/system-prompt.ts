@@ -6,6 +6,7 @@ export interface SystemPromptContext {
   projectConfigStatus: '已设置' | '未设置';
   pageCount: number;
   pageList: string;
+  canvasTextSummary: string;
   workspacePath: string;
 }
 
@@ -153,6 +154,7 @@ export function buildDynamicContextPrefix(context: SystemPromptContext): string 
     WORKSPACE_PATH: context.workspacePath,
     PAGE_COUNT: String(context.pageCount),
     PAGE_LIST: context.pageList || '（暂无页面）',
+    CANVAS_TEXT_SUMMARY: context.canvasTextSummary || '（暂无画布文本节点）',
   });
 }
 

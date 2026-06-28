@@ -241,7 +241,7 @@ type HistoryEvent =
   | {
       id: string;
       kind: "project";
-      title: "创建项目版本" | "恢复项目";
+      title: "命名版本" | "发布快照" | "自动保存记录" | "恢复项目";
       savedAt: number;
       savedBy: string;
       version: VersionInfo;
@@ -433,6 +433,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     sessionId,
     projectId: demoId,
   });
+  const canvasStateRef = useRef(canvasState);
+  canvasStateRef.current = canvasState;
+  const lastAppliedCanvasCollabValueRef = useRef<string | null>(null);
 
   const {
     pageScreenshots,
@@ -1030,7 +1033,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleRestorePageVersion,
     hasPendingChanges,
     hasPublishableChanges,
-    shouldCreateVersionBeforePublish,
     publishButtonDisabled,
     publishButtonText,
     publishingButtonText,
@@ -1147,18 +1149,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   useEffect(() => {
     if (canvasLayoutCollab.status !== "synced") return;
+    if (canvasLayoutCollab.value === lastAppliedCanvasCollabValueRef.current) {
+      return;
+    }
+    lastAppliedCanvasCollabValueRef.current = canvasLayoutCollab.value;
     const remoteState = parseCanvasLayoutState(canvasLayoutCollab.value);
     if (!remoteState) return;
-    if (JSON.stringify(remoteState) === JSON.stringify(canvasState)) return;
+    if (JSON.stringify(remoteState) === JSON.stringify(canvasStateRef.current)) {
+      return;
+    }
     suppressNextCanvasCollabPushRef.current = true;
     applyRemoteCanvasState(remoteState);
-    markWorkspaceChanged();
   }, [
     applyRemoteCanvasState,
     canvasLayoutCollab.status,
     canvasLayoutCollab.value,
-    canvasState,
-    markWorkspaceChanged,
   ]);
 
   useEffect(() => {
@@ -1809,39 +1814,51 @@ ${context.details}
   // handleCreateVersion moved to useVersionControl hook
   // hasPendingChanges moved to useVersionControl hook
 
-  const handleBackClick = useCallback(() => {
-    if (hasPendingChanges) {
-      setShowExitDialog(true);
-    } else {
-      router.push("/");
-    }
-  }, [hasPendingChanges, router]);
+  const exitSyncStatuses = [
+    activeCodeCollab.status,
+    activeSchemaCollab.status,
+    projectSchemaCollab.status,
+    workspaceTreeCollab.status,
+    canvasLayoutCollab.status,
+  ];
+  const hasExitSyncRisk =
+    hasUnsavedChanges &&
+    exitSyncStatuses.some((status) =>
+      status === "error" ||
+      status === "offline" ||
+      status === "saving" ||
+      status === "connecting",
+    );
 
-  const handleCreateVersionAndExit = async () => {
+  const flushBeforeExit = useCallback(async () => {
+    await flushCanvasState();
+    if (hasUnsavedChanges) {
+      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+    }
+  }, [demoId, flushCanvasState, hasUnsavedChanges, sessionId, workspaceId]);
+
+  const handleBackClick = useCallback(async () => {
+    if (hasExitSyncRisk) {
+      setShowExitDialog(true);
+      return;
+    }
+
+    try {
+      await flushBeforeExit();
+      router.push("/");
+    } catch (error) {
+      console.error("[Exit] Failed to flush before exit:", error);
+      setShowExitDialog(true);
+    }
+  }, [flushBeforeExit, hasExitSyncRisk, router]);
+
+  const handleStayOnPage = () => {
     setShowExitDialog(false);
-    await handleCreateVersion();
-    router.push("/");
   };
 
-  const handleDirectExit = async () => {
+  const handleDirectExit = () => {
     setShowExitDialog(false);
-    try {
-      if (sessionId) {
-        const res = await fetch(`/api/sessions/${sessionId}/meta`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "discarded" }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          console.error("[Exit] Failed to archive session:", sessionId, data);
-        }
-      }
-    } catch (error) {
-      console.error("[Exit] Error archiving session:", error);
-    } finally {
-      router.push("/");
-    }
+    router.push("/");
   };
 
   // 处理 AI 代码更新 — 通过 applyDemoSnapshot 统一应用
@@ -1933,9 +1950,13 @@ ${context.details}
         id: `project-${version.versionId}`,
         kind: "project",
         title:
-          version.sessionId === "restore" || version.note?.includes("恢复")
-            ? "恢复项目"
-            : "创建项目版本",
+          version.type === "publish_snapshot"
+            ? "发布快照"
+            : version.type === "auto_checkpoint"
+              ? "自动保存记录"
+              : version.sessionId === "restore" || version.note?.includes("恢复")
+                ? "恢复项目"
+                : "命名版本",
         savedAt: version.savedAt,
         savedBy: getVersionSavedBy(version.savedBy),
         version,
@@ -1968,7 +1989,7 @@ ${context.details}
     });
     return groups;
   }, []);
-  // hasPublishableChanges, shouldCreateVersionBeforePublish, publishButtonDisabled,
+  // hasPublishableChanges, publishButtonDisabled,
   // publishButtonText, publishingButtonText moved to useVersionControl hook
   const collabStatuses = [
     activeCodeCollab.status,
@@ -1985,7 +2006,7 @@ ${context.details}
         ? "同步中"
         : collabStatuses.includes("connecting")
           ? "连接中"
-          : "草稿已实时保存";
+          : "已自动保存";
   const collabUsers = workspaceTreeCollab.awareness.filter(
     (presence) => presence.userId !== sessionId,
   );
@@ -2052,12 +2073,6 @@ ${context.details}
           </div>
           <Button
             onClick={async () => {
-              if (shouldCreateVersionBeforePublish) {
-                const versionCreated = await handleCreateVersion();
-                if (!versionCreated) {
-                  return;
-                }
-              }
               await handlePublish();
             }}
             disabled={publishButtonDisabled}
@@ -2696,7 +2711,7 @@ ${context.details}
                         ) : (
                           <>
                             <History className="h-3.5 w-3.5" />
-                            创建版本
+                            命名此版本
                           </>
                         )}
                       </Button>
@@ -2725,8 +2740,8 @@ ${context.details}
                   {historyEvents.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
                       <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>暂无版本历史</p>
-                      <p className="text-xs mt-1">草稿会自动保存，需要时可手动创建版本</p>
+                      <p>暂无历史记录</p>
+                      <p className="text-xs mt-1">内容会自动保存，需要时可命名重要版本</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -3396,24 +3411,17 @@ ${context.details}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>尚未创建版本</DialogTitle>
+            <DialogTitle>修改仍在同步</DialogTitle>
             <DialogDescription>
-              当前草稿已自动保存。退出前是否创建一个可回退的版本记录？
+              最新修改尚未确认同步完成。网络恢复或同步完成后可安全退出。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={handleDirectExit}>
-              直接退出
+              仍然退出
             </Button>
-            <Button onClick={handleCreateVersionAndExit} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  创建中...
-                </>
-              ) : (
-                "创建版本并退出"
-              )}
+            <Button onClick={handleStayOnPage}>
+              继续编辑
             </Button>
           </DialogFooter>
         </DialogContent>
