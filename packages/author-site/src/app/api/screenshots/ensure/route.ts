@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { findProjectRoot } from "@/lib/fs-utils";
+import { getDataDir } from "@/lib/fs-utils";
+import { getScreenshotServiceUrl } from "@/lib/runtime-config";
 
-const DATA_DIR =
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
+const DATA_DIR = getDataDir();
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
-
-const SCREENSHOT_SERVICE_URL =
-  process.env.SCREENSHOT_SERVICE_URL ||
-  process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL ||
-  "http://localhost:3202";
 
 interface EnsureRequest {
   projectId: string;
@@ -125,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // 调用截图服务批量生成缺失截图（fire-and-forget）
     try {
-      await fetch(`${SCREENSHOT_SERVICE_URL}/api/screenshots/generate-batch`, {
+      await fetch(`${getScreenshotServiceUrl()}/api/screenshots/generate-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -18,6 +18,7 @@ import { verifyAdminRequest } from "@/lib/admin-auth";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
 import { pushBackendProvidersToAgent } from "@/lib/agent-providers";
+import { getModelEnvConfig } from "@/lib/runtime-config";
 
 const CONFIG_ID = "model_config";
 
@@ -25,18 +26,8 @@ const CONFIG_ID = "model_config";
  * 默认配置结构 (从环境变量初始化)
  */
 function getDefaultConfig() {
-  const allowedPrefixes = (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const nameFilters = (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const defaultModelIds = (process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const { allowedPrefixes, nameFilters, defaultModelIds, blacklist } =
+    getModelEnvConfig();
 
   return {
     frontend: {
@@ -46,10 +37,7 @@ function getDefaultConfig() {
         ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
       ],
       allowedPrefixes,
-      blacklist: (process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      blacklist,
       defaultModelIds,
       nameFilters,
     },

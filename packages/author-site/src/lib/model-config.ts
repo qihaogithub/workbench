@@ -8,6 +8,7 @@
  */
 
 import { readDbConfig } from "./db-config";
+import { getModelEnvConfig } from "./runtime-config";
 import type { BackendProvidersConfig } from "@opencode-workbench/shared";
 
 const CONFIG_ID = "model_config";
@@ -57,18 +58,8 @@ let cachedConfig: CachedConfig | null = null;
  * 从环境变量读取配置 (Fallback)
  */
 function readFromEnv(): ModelConfigData {
-  const allowedPrefixes = (process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const nameFilters = (process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const defaultModelIds = (process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const { allowedPrefixes, nameFilters, defaultModelIds, blacklist } =
+    getModelEnvConfig();
 
   return {
     frontend: {
@@ -80,10 +71,7 @@ function readFromEnv(): ModelConfigData {
       ],
       // 旧结构: 原样保留
       allowedPrefixes,
-      blacklist: (process.env.NEXT_PUBLIC_MODEL_BLACKLIST || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      blacklist,
       defaultModelIds,
       nameFilters,
     },

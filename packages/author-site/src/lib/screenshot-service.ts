@@ -1,14 +1,12 @@
 import { randomUUID } from "crypto";
 
-const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:3202";
-const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
+import {
+  getScreenshotProxyTimeoutMs,
+  getScreenshotServiceUrl as getConfiguredScreenshotServiceUrl,
+} from "./runtime-config";
 
 export function getScreenshotServiceUrl(): string {
-  return (
-    process.env.SCREENSHOT_SERVICE_URL ||
-    process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL ||
-    DEFAULT_SCREENSHOT_SERVICE_URL
-  ).replace(/\/+$/, "");
+  return getConfiguredScreenshotServiceUrl();
 }
 
 export function createScreenshotServiceUnavailableResponse() {
@@ -46,11 +44,7 @@ export async function fetchScreenshotService(
   init: RequestInit & { requestId?: string } = {},
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutMs = parseInt(
-    process.env.SCREENSHOT_PROXY_TIMEOUT_MS ||
-      String(DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS),
-    10,
-  );
+  const timeoutMs = getScreenshotProxyTimeoutMs();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const headers = new Headers(init.headers);
   headers.set("x-request-id", init.requestId || randomUUID());

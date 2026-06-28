@@ -1,10 +1,10 @@
-# AI 行为约束机制完善方案
+﻿# AI 行为约束机制完善方案
 
 > 版本：v3.2
 > 创建日期：2026-05-27
 > 更新日期：2026-06-01
 > 状态：📋 计划中（待实施）
-> 关联文档：[03_AI行为约束机制.md](../../项目文档/创作端/05-AI对话/技术/03_AI行为约束机制.md)、[全面迁移至Pi-Agent并移除多后端支持方案.md](./全面迁移至Pi-Agent并移除多后端支持方案.md)、[packages/agent-service/AGENTS.md](../../packages/agent-service/AGENTS.md)
+> 关联文档：[03_AI行为约束机制.md](../../../项目文档/创作端/05-AI对话/技术/03_AI行为约束机制.md)、[全面迁移至Pi-Agent并移除多后端支持方案.md](../01-架构决策与技术方案/全面迁移至Pi-Agent并移除多后端支持方案.md)、[packages/agent-service/AGENTS.md](../../../../packages/agent-service/AGENTS.md)
 >
 > **v3.2 重大变更**（基于 LLM API 缓存优化分析）：
 > 1. **L3 从 system prompt 移至 user message 前缀**：v3.1 设计中 L3 变化导致整个 system prompt 失效，缓存命中率 ≈ 0
