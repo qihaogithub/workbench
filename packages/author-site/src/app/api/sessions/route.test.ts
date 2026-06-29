@@ -169,3 +169,5 @@ describe("sessions route external auth reuse", () => {
     );
   });
 });
+
+export {};

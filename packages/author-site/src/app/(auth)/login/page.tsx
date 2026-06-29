@@ -85,10 +85,11 @@ export default function LoginPage() {
   const handleLogin = async (username: string, password: string) => {
     setLoading(true);
     try {
+      const normalizedUsername = username.trim();
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: normalizedUsername, password }),
       });
 
       const data = await res.json();

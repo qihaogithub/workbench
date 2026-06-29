@@ -20,6 +20,20 @@ const renderBox = {
   fullPage: true,
 };
 
+const renderTimings = {
+  browserMs: 1,
+  pageCreateMs: 2,
+  setViewportMs: 3,
+  setContentMs: 4,
+  waitForSelectorMs: 5,
+  waitForNetworkIdleMs: 6,
+  animationFrameMs: 7,
+  runtimeErrorCheckMs: 8,
+  measurementMs: 9,
+  viewportResizeMs: 10,
+  screenshotMs: 11,
+};
+
 describe("screenshot routes", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -112,6 +126,7 @@ describe("screenshot routes", () => {
                     renderBox,
                     queueWaitMs: 0,
                     renderMs: 1,
+                    renderTimings,
                   }),
                 25,
               ),
@@ -225,6 +240,11 @@ describe("screenshot routes", () => {
       },
     ]);
     expect(response.json().data.priorityStats.background.total).toBe(1);
+    expect(response.json().data.prioritySlices.background).toMatchObject({
+      total: 1,
+      status: "pending",
+    });
+    expect(response.json().data.retryAfterMs).toBe(1000);
     await app.close();
   });
 
@@ -252,6 +272,7 @@ describe("screenshot routes", () => {
               renderBox,
               queueWaitMs: priority === "active" ? 2 : 5,
               renderMs: priority === "active" ? 7 : 11,
+              renderTimings,
             };
           },
         ),
@@ -299,7 +320,15 @@ describe("screenshot routes", () => {
         active: { completed: number };
         background: { completed: number };
       };
-      metrics: { rendered: number; totalQueueWaitMs: number };
+      metrics: {
+        rendered: number;
+        totalQueueWaitMs: number;
+        renderStages: { pageCreateMs: number; setContentMs: number };
+      };
+      retryAfterMs: number;
+      prioritySlices: {
+        active: { status: string; completedElapsedMs: number };
+      };
       results: Array<{ pageId: string }>;
     } | undefined;
     await vi.waitFor(async () => {
@@ -314,6 +343,13 @@ describe("screenshot routes", () => {
     expect(data?.priorityStats.background.completed).toBe(1);
     expect(data?.metrics.rendered).toBe(2);
     expect(data?.metrics.totalQueueWaitMs).toBe(7);
+    expect(data?.metrics.renderStages.pageCreateMs).toBe(4);
+    expect(data?.metrics.renderStages.setContentMs).toBe(8);
+    expect(data?.retryAfterMs).toBe(0);
+    expect(data?.prioritySlices.active).toMatchObject({
+      status: "completed",
+      completedElapsedMs: expect.any(Number),
+    });
     expect(data?.results.map((item: { pageId: string }) => item.pageId)).toEqual([
       "page_active",
       "page_background",

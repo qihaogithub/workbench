@@ -10,6 +10,7 @@ import { config } from "./config";
 import { registerRoutes } from "./routes";
 import { getBrowserPool } from "./utils/browser-pool";
 import { getCompileCache } from "./utils/compile-cache";
+import { getScreenshotMetrics } from "./utils/screenshot-metrics";
 
 async function start() {
   const fastify = Fastify({
@@ -63,6 +64,7 @@ async function start() {
       cache: {
         compileEntries: getCompileCache().size,
       },
+      metrics: getScreenshotMetrics().snapshot(),
       lastError: browser.lastError,
       ...(deepCheck ? { deepCheck } : {}),
     };

@@ -69,6 +69,12 @@ describe("BrowserPool", () => {
     const results = await Promise.all(tasks);
 
     expect(results).toHaveLength(4);
+    expect(results[0].renderTimings).toMatchObject({
+      browserMs: expect.any(Number),
+      pageCreateMs: expect.any(Number),
+      setContentMs: expect.any(Number),
+      screenshotMs: expect.any(Number),
+    });
     expect(counters.max).toBeLessThanOrEqual(3);
   });
 

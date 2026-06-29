@@ -22,10 +22,12 @@ import {
 } from "../utils/screenshot-store";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
 import type {
+  RenderStageTimings,
   ScreenshotPriority,
   ScreenshotRenderBox,
   ScreenshotRenderMode,
 } from "../utils/browser-pool";
+import { getScreenshotMetrics } from "../utils/screenshot-metrics";
 
 // --- Request schemas ---
 
@@ -86,6 +88,11 @@ interface BatchPriorityStats {
   completed: number;
   failed: number;
   cached: number;
+  status: "pending" | "running" | "completed";
+  firstCompletedAt?: string;
+  completedAt?: string;
+  firstCompletedElapsedMs?: number;
+  completedElapsedMs?: number;
 }
 
 interface BatchMetrics {
@@ -94,6 +101,7 @@ interface BatchMetrics {
   totalRenderMs: number;
   totalWriteMs: number;
   totalQueueWaitMs: number;
+  renderStages: RenderStageTimings;
   rendered: number;
   screenshotCacheHits: number;
   compileCacheHits: number;
@@ -126,6 +134,7 @@ interface ScreenshotTimings {
   renderMs: number;
   writeMs: number;
   totalMs: number;
+  renderStages: RenderStageTimings;
 }
 
 interface ScreenshotCacheStats {
@@ -232,11 +241,41 @@ function buildScreenshotUrl(
 
 function createPriorityStats(): Record<ScreenshotPriority, BatchPriorityStats> {
   return {
-    active: { total: 0, completed: 0, failed: 0, cached: 0 },
-    visible: { total: 0, completed: 0, failed: 0, cached: 0 },
-    nearby: { total: 0, completed: 0, failed: 0, cached: 0 },
-    thumbnail: { total: 0, completed: 0, failed: 0, cached: 0 },
-    background: { total: 0, completed: 0, failed: 0, cached: 0 },
+    active: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cached: 0,
+      status: "completed",
+    },
+    visible: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cached: 0,
+      status: "completed",
+    },
+    nearby: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cached: 0,
+      status: "completed",
+    },
+    thumbnail: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cached: 0,
+      status: "completed",
+    },
+    background: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cached: 0,
+      status: "completed",
+    },
   };
 }
 
@@ -247,11 +286,45 @@ function createBatchMetrics(): BatchMetrics {
     totalRenderMs: 0,
     totalWriteMs: 0,
     totalQueueWaitMs: 0,
+    renderStages: createEmptyRenderStageTimings(),
     rendered: 0,
     screenshotCacheHits: 0,
     compileCacheHits: 0,
     inFlightHits: 0,
   };
+}
+
+function createEmptyRenderStageTimings(): RenderStageTimings {
+  return {
+    browserMs: 0,
+    pageCreateMs: 0,
+    setViewportMs: 0,
+    setContentMs: 0,
+    waitForSelectorMs: 0,
+    waitForNetworkIdleMs: 0,
+    animationFrameMs: 0,
+    runtimeErrorCheckMs: 0,
+    measurementMs: 0,
+    viewportResizeMs: 0,
+    screenshotMs: 0,
+  };
+}
+
+function addRenderStageTimings(
+  target: RenderStageTimings,
+  source: RenderStageTimings,
+): void {
+  target.browserMs += source.browserMs;
+  target.pageCreateMs += source.pageCreateMs;
+  target.setViewportMs += source.setViewportMs;
+  target.setContentMs += source.setContentMs;
+  target.waitForSelectorMs += source.waitForSelectorMs;
+  target.waitForNetworkIdleMs += source.waitForNetworkIdleMs;
+  target.animationFrameMs += source.animationFrameMs;
+  target.runtimeErrorCheckMs += source.runtimeErrorCheckMs;
+  target.measurementMs += source.measurementMs;
+  target.viewportResizeMs += source.viewportResizeMs;
+  target.screenshotMs += source.screenshotMs;
 }
 
 function sortBatchPages(pages: BatchPage[]): BatchPage[] {
@@ -277,12 +350,17 @@ function recordBatchSuccess(
   const stats = batch.priorityStats[priority];
   stats.completed++;
   if (result.cached) stats.cached++;
+  recordPrioritySliceProgress(batch, stats);
 
   batch.metrics.totalElapsedMs += result.elapsed;
   batch.metrics.totalCompileMs += result.timings.compileMs;
   batch.metrics.totalRenderMs += result.timings.renderMs;
   batch.metrics.totalWriteMs += result.timings.writeMs;
   batch.metrics.totalQueueWaitMs += result.queueWaitMs;
+  addRenderStageTimings(
+    batch.metrics.renderStages,
+    result.timings.renderStages,
+  );
   if (!result.cached) batch.metrics.rendered++;
   if (result.cache.screenshotHit) batch.metrics.screenshotCacheHits++;
   if (result.cache.compileHit) batch.metrics.compileCacheHits++;
@@ -296,6 +374,45 @@ function recordBatchFailure(
   const stats = batch.priorityStats[priority];
   stats.completed++;
   stats.failed++;
+  recordPrioritySliceProgress(batch, stats);
+}
+
+function recordPrioritySliceProgress(
+  batch: BatchState,
+  stats: BatchPriorityStats,
+): void {
+  const now = Date.now();
+  const createdAtMs = Date.parse(batch.createdAt);
+  const elapsedMs = Number.isFinite(createdAtMs) ? now - createdAtMs : undefined;
+
+  if (!stats.firstCompletedAt) {
+    stats.firstCompletedAt = new Date(now).toISOString();
+    stats.firstCompletedElapsedMs = elapsedMs;
+  }
+
+  if (stats.completed >= stats.total) {
+    stats.status = "completed";
+    stats.completedAt = new Date(now).toISOString();
+    stats.completedElapsedMs = elapsedMs;
+  } else {
+    stats.status = "running";
+  }
+}
+
+function getBatchRetryAfterMs(batch: BatchState): number {
+  if (batch.status !== "running" || batch.cancelled) return 0;
+
+  const hasInteractiveWork = ["active", "visible"].some((priority) => {
+    const stats = batch.priorityStats[priority as ScreenshotPriority];
+    return stats.total > 0 && stats.completed < stats.total;
+  });
+
+  if (hasInteractiveWork) return 500;
+
+  const remaining = Math.max(0, batch.total - batch.completed);
+  if (remaining === 0) return 0;
+  if (remaining <= config.maxConcurrentPages) return 1000;
+  return 1500;
 }
 
 function createScreenshotIdentity(sessionId?: string): Record<string, unknown> {
@@ -360,11 +477,28 @@ async function generateScreenshot(
     );
     if (renderBox) {
       const assetUrl = buildScreenshotUrl(projectId, pageId, hash, variant);
+      const elapsed = Date.now() - startTime;
+      const renderStages = createEmptyRenderStageTimings();
+      getScreenshotMetrics().recordSuccess({
+        elapsedMs: elapsed,
+        compileMs: 0,
+        renderMs: 0,
+        writeMs: 0,
+        queueWaitMs: 0,
+        width,
+        height,
+        fullPage,
+        cached: true,
+        priority,
+        variant,
+        renderMode,
+        renderStages,
+      });
       return {
         url: `/api/screenshots/file/${projectId}/${pageId}`,
         assetUrl,
         hash,
-        elapsed: Date.now() - startTime,
+        elapsed,
         cached: true,
         requestId,
         queueWaitMs: 0,
@@ -373,7 +507,8 @@ async function generateScreenshot(
           compileMs: 0,
           renderMs: 0,
           writeMs: 0,
-          totalMs: Date.now() - startTime,
+          totalMs: elapsed,
+          renderStages,
         },
         cache: {
           screenshotHit: true,
@@ -502,6 +637,22 @@ async function generateScreenshotUncached(
 
   const elapsed = Date.now() - startTime;
   const assetUrl = buildScreenshotUrl(projectId, pageId, hash, renderMode);
+  const renderStages = renderResult.renderTimings || createEmptyRenderStageTimings();
+  getScreenshotMetrics().recordSuccess({
+    elapsedMs: elapsed,
+    compileMs,
+    renderMs: renderResult.renderMs,
+    writeMs,
+    queueWaitMs: renderResult.queueWaitMs,
+    width,
+    height,
+    fullPage,
+    cached: false,
+    priority,
+    variant: renderMode,
+    renderMode,
+    renderStages,
+  });
   return {
     url: `/api/screenshots/file/${projectId}/${pageId}`,
     assetUrl,
@@ -516,6 +667,7 @@ async function generateScreenshotUncached(
       renderMs: renderResult.renderMs,
       writeMs,
       totalMs: elapsed,
+      renderStages,
     },
     cache: {
       screenshotHit: false,
@@ -596,6 +748,7 @@ async function handleGenerate(
   } catch (err) {
     const message = getErrorMessage(err);
     const code = getScreenshotErrorCode(err);
+    getScreenshotMetrics().recordError(code);
 
     request.log.warn({ requestId, projectId, pageId, code, message }, "screenshot failed");
 
@@ -634,7 +787,9 @@ async function handleGenerateBatch(
   const priorityStats = createPriorityStats();
 
   for (const page of sortedPages) {
-    priorityStats[normalizePriority(page.priority)].total++;
+    const stats = priorityStats[normalizePriority(page.priority)];
+    stats.total++;
+    stats.status = "pending";
   }
 
   const results: BatchResult[] = sortedPages.map((page) => ({
@@ -679,7 +834,9 @@ async function handleGenerateBatch(
       total: batch.total,
       cached: 0,
       priorityStats: batch.priorityStats,
+      prioritySlices: batch.priorityStats,
       metrics: batch.metrics,
+      retryAfterMs: getBatchRetryAfterMs(batch),
       results: initialResults,
     },
   });
@@ -755,6 +912,7 @@ async function processBatch(
       } catch (err) {
         const message = getErrorMessage(err);
         const errorCode = getScreenshotErrorCode(err);
+        getScreenshotMetrics().recordError(errorCode);
         batch.results[resultIndex] = {
           pageId: page.pageId,
           priority,
@@ -794,6 +952,7 @@ async function processBatch(
       cached: batch.cached,
       status: batch.status,
       priorityStats: batch.priorityStats,
+      prioritySlices: batch.priorityStats,
       metrics: batch.metrics,
     },
     "screenshot batch completed",
@@ -892,9 +1051,11 @@ async function handleStatus(
       expiresAt: batch.expiresAt,
       errorsByCode: batch.errorsByCode,
       priorityStats: batch.priorityStats,
+      prioritySlices: batch.priorityStats,
       metrics: batch.metrics,
       cancelled: batch.cancelled,
       results: batch.results,
+      retryAfterMs: getBatchRetryAfterMs(batch),
     },
   });
 }

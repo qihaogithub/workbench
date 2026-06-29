@@ -41,6 +41,11 @@
   "devDependencies": {
     "@playwright/test": "^1.42.0",
     "concurrently": "^9.2.1",
+    "esbuild": "^0.20.2",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.323.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "typescript": "^5.3.3"
   },
   "pnpm": {

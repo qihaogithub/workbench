@@ -6,15 +6,17 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
+    const normalizedUsername =
+      typeof username === "string" ? username.trim() : username;
 
-    if (!username || !password) {
+    if (!normalizedUsername || !password) {
       return NextResponse.json(
         createApiError("VALIDATION_ERROR", "用户名和密码不能为空"),
         { status: 400 },
       );
     }
 
-    const user = await verifyUserPassword(username, password);
+    const user = await verifyUserPassword(normalizedUsername, password);
     if (!user) {
       return NextResponse.json(
         createApiError("VALIDATION_ERROR", "用户名或密码错误"),

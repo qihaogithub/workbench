@@ -20,6 +20,7 @@ RUN pnpm install --no-frozen-lockfile
 COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/shared/ ./packages/shared/
 COPY packages/viewer-site/ ./packages/viewer-site/
+COPY scripts/ ./scripts/
 
 RUN pnpm --filter @opencode-workbench/viewer-site build
 
