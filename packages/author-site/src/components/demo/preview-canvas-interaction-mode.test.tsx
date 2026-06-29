@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { PreviewCanvas } from "../../../../shared/src/demo/PreviewCanvas";
-import type { CanvasState } from "../../../../shared/src/demo/types";
+import { PreviewCanvas, type CanvasState } from "@opencode-workbench/demo-ui";
 
 const initialState: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -76,6 +75,38 @@ function TestEditorCanvas() {
       />
       <output data-testid="canvas-state">{JSON.stringify(state)}</output>
     </>
+  );
+}
+
+function TestEditorCanvasWithConfigCallback({
+  onPageConfigEdit,
+}: {
+  onPageConfigEdit: (pageId: string) => void;
+}) {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {
+      page_1: { x: 100, y: 120, width: 375, height: 812 },
+    },
+    nodes: {},
+  });
+
+  return (
+    <PreviewCanvas
+      interactionMode="editor"
+      pages={[
+        {
+          id: "page_1",
+          name: "页面一",
+          order: 0,
+          code: "export default function Demo(){return null}",
+          previewSize: { width: 375, height: 812 },
+        },
+      ]}
+      canvasState={state}
+      onCanvasStateChange={setState}
+      onPageConfigEdit={onPageConfigEdit}
+    />
   );
 }
 
@@ -376,6 +407,49 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     expect(screen.queryByLabelText("结构化图层")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Excalidraw 标注验证")).not.toBeInTheDocument();
   });
+
+  it("editor 模式点击页面更新画布选择态，并触发配置编辑回调", async () => {
+    const onPageConfigEdit = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback onPageConfigEdit={onPageConfigEdit} />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 260,
+      pointerId: 21,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 220,
+      clientY: 260,
+      pointerId: 21,
+    });
+
+    await waitFor(() => {
+      expect(
+        container.querySelector("[data-page-id='page_1'] [data-canvas-selection-box='true']"),
+      ).toBeInTheDocument();
+    });
+    expect(onPageConfigEdit).toHaveBeenCalledWith("page_1");
+  });
+
   it("文字工具在画布目标位置点击后创建文字节点", async () => {
     const user = userEvent.setup();
     const { container } = render(<TestEditorCanvas />);

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "1",
+  "pages": {
+    "1": {
+      "pageId": "1_6b6f",
+      "title": "配置页 1"
+    },
+    "2": {
+      "pageId": "2_61mg",
+      "title": "配置页 2"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

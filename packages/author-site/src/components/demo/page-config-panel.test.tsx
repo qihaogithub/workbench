@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { PageConfigPanel } from "../../../../shared/src/demo/PageConfigPanel";
+import { PageConfigPanel } from "@opencode-workbench/demo-ui";
 
 const sharedSchema = JSON.stringify({
   type: "object",

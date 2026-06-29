@@ -7,6 +7,7 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@opencode-workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@opencode-workbench/demo-ui/src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     container: {

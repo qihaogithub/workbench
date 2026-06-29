@@ -5,11 +5,11 @@ import type {
   CanvasSaveStatus,
   CanvasState,
   PreviewMode,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 import {
   loadCanvasLayout,
   saveCanvasLayout,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 
 const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },

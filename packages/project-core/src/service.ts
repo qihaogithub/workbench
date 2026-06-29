@@ -16,7 +16,7 @@ import type {
   VersionInfo,
   VersionHistoryEntryType,
   WorkspaceTree,
-} from "@opencode-workbench/shared";
+} from "@opencode-workbench/shared/contracts";
 
 import type {
   AuditEvent,
@@ -61,7 +61,7 @@ import {
   getProjectAdminMode,
   getScreenshotServiceUrl,
   getViewerBaseUrl,
-} from "./config";
+} from "./config.js";
 
 const DEFAULT_DEMO_CODE = `import React from 'react';
 

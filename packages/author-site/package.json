@@ -22,6 +22,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@opencode-workbench/agent-client": "workspace:*",
+    "@opencode-workbench/demo-ui": "workspace:*",
     "@opencode-workbench/knowledge-service": "workspace:*",
     "@opencode-workbench/project-core": "workspace:*",
     "@opencode-workbench/project-scaffold": "workspace:*",

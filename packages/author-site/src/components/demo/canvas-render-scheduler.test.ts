@@ -2,7 +2,7 @@ import {
   computeCanvasRenderModes,
   type CanvasPageData,
   type CanvasPageLayout,
-} from "../../../../shared/src/demo";
+} from "@opencode-workbench/demo-ui";
 
 function makePage(id: string): CanvasPageData {
   return { id, name: id, order: 0 };

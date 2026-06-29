@@ -293,7 +293,7 @@ const result = transform(wrappedCode, {
 
 ## 案例参考
 
-- [预览区 React Error #31 问题分析](./预览区ReactError31问题解决方案.md)
+- 历史参考：预览区 React Error #31 问题分析
 - [iframe沙箱与动态CDN编译策略](../../../复盘文档/预览引擎/iframe沙箱与动态CDN编译策略.md)
 
 ---

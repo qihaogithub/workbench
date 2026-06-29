@@ -11,7 +11,7 @@ import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig } from '../core/types';
 import { logger } from '../utils/logger';
-import type { WorkspaceInfo } from '@opencode-workbench/shared';
+import type { WorkspaceInfo } from '@opencode-workbench/shared/contracts';
 import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
 
 interface SessionParams {

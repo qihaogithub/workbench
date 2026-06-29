@@ -1,0 +1,4 @@
+interface:
+  display_name: "UIWeb Page Migrator"
+  short_description: "Migrate uiweb-vue pages into project demos"
+  default_prompt: "Use -page-migrator to migrate a uiweb-vue page into an opencode-workbench project."

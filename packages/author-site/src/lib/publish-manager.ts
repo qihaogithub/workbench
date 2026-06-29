@@ -22,8 +22,8 @@ import type {
   DemoFolderMeta,
   AppGraph,
 } from "@opencode-workbench/shared";
-import type { CanvasState } from "@opencode-workbench/shared/demo";
-import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
+import type { CanvasState } from "@opencode-workbench/demo-ui";
+import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
 import { processImagesForPublish } from "@/lib/publish/image-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";

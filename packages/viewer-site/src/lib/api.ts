@@ -1,5 +1,5 @@
 import type { DemoFolderMeta } from "@opencode-workbench/shared";
-import type { CanvasState } from "@opencode-workbench/shared/demo";
+import type { CanvasState } from "@opencode-workbench/demo-ui";
 
 export interface PreviewSize {
   width?: string | number;
@@ -93,6 +93,10 @@ export function getCompiledJsUrl(
   compiledJsPath: string,
 ): string {
   return `${DATA_BASE}/data/${projectId}/${compiledJsPath}`;
+}
+
+export function getProjectScaffoldUrl(projectId: string): string {
+  return `${DATA_BASE}/api/viewer/${encodeURIComponent(projectId)}/scaffold`;
 }
 
 export interface ViewerAiHistoryMessage {

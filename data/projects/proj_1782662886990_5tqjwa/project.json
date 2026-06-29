@@ -1,0 +1,38 @@
+{
+  "id": "proj_1782662886990_5tqjwa",
+  "name": "配置功能回归-1782662883725",
+  "category": "未分类",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1782662886990_5tqjwa\\workspace",
+  "demoPages": [
+    {
+      "id": "1_aiom",
+      "name": "配置页 1",
+      "routeKey": "1",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "2_evi0",
+      "name": "配置页 2",
+      "routeKey": "2",
+      "order": 1,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1782662894853,
+      "savedBy": "qihao",
+      "sessionId": "session-1782662890342-crlgkdcks",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782662886990_5tqjwa\\v1",
+      "fileCount": 9,
+      "note": "配置功能 E2E 回归保存"
+    }
+  ],
+  "pageVersions": {},
+  "createdAt": 1782662886994,
+  "updatedAt": 1782662894857
+}

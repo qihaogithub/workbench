@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { DemoPageMeta, Project, WorkspaceTree } from "@opencode-workbench/shared";
+import type { DemoPageMeta, Project, WorkspaceTree } from "@opencode-workbench/shared/contracts";
 import { getSystemKnowledgeSnapshot } from "../config/system-knowledge";
 
 const MAX_TEXT_CHARS = 12000;

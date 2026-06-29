@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "1",
+  "pages": {
+    "1": {
+      "pageId": "1_aiom",
+      "title": "配置页 1"
+    },
+    "2": {
+      "pageId": "2_evi0",
+      "title": "配置页 2"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "id": "folder_1782677041072_j6m2it",
+      "name": "自动保存文件夹-58596c",
+      "parentId": null,
+      "order": 0
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_a7ko",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "page_miw7",
+      "name": "自动保存顺序页",
+      "routeKey": "page-2",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

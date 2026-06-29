@@ -1,6 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { act } from "react";
-import { PreviewPanel } from "../../../../shared/src/demo/PreviewPanel";
+import { PreviewPanel } from "@opencode-workbench/demo-ui";
 
 function dispatchIframeMessage(
   iframe: HTMLIFrameElement,

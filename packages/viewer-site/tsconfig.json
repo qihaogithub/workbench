@@ -21,7 +21,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@opencode-workbench/shared": ["../shared/src"]
+      "@opencode-workbench/shared": ["../shared/src"],
+      "@opencode-workbench/demo-ui": ["../demo-ui/src/index.ts"],
+      "@opencode-workbench/demo-ui/*": ["../demo-ui/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

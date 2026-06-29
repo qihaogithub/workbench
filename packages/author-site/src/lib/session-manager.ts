@@ -25,6 +25,35 @@ import type {
   VersionHistoryEntryType,
 } from "@opencode-workbench/shared";
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
+const DIRECTORY_REPLACE_RETRY_DELAYS_MS = [80, 160, 320, 640];
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function replaceDirectoryWithTemp(tempPath: string, targetPath: string): void {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= DIRECTORY_REPLACE_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+      fs.renameSync(tempPath, targetPath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < DIRECTORY_REPLACE_RETRY_DELAYS_MS.length) {
+        sleepSync(DIRECTORY_REPLACE_RETRY_DELAYS_MS[attempt]);
+      }
+    }
+  }
+
+  try {
+    fs.rmSync(targetPath, { recursive: true, force: true });
+    fs.cpSync(tempPath, targetPath, { recursive: true });
+    fs.rmSync(tempPath, { recursive: true, force: true });
+  } catch {
+    throw lastError;
+  }
+}
 
 export interface CreateSessionResult {
   sessionId: string;
@@ -505,8 +534,7 @@ export function saveEditSession(
         fs.rmSync(tempWsJson, { force: true });
       }
 
-      fs.rmSync(workspacePath, { recursive: true, force: true });
-      fs.renameSync(tempPath, workspacePath);
+      replaceDirectoryWithTemp(tempPath, workspacePath);
     } catch (e) {
       fs.rmSync(tempPath, { recursive: true, force: true });
       throw e;
@@ -632,8 +660,7 @@ export function syncEditSessionToProjectWorkspace(
       }
     }
 
-    fs.rmSync(workspacePath, { recursive: true, force: true });
-    fs.renameSync(tempPath, workspacePath);
+    replaceDirectoryWithTemp(tempPath, workspacePath);
     syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
     return { success: true, projectId, workspacePath };
   } catch (error) {

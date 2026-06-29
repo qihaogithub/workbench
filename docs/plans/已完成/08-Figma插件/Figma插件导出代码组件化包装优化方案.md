@@ -438,4 +438,4 @@ export default function StaticPage() {
 - [Figma插件导出格式改造方案](./Figma插件导出格式改造方案.md) — Markdown Code Block 输出格式规范
 - [代码生成引擎](../../../项目文档/figma插件/技术/代码生成引擎.md) — 插件代码生成流程
 - [标记系统](../../../项目文档/figma插件/技术/标记系统.md) — `#slot/#list` 标记规范
-- [Figma导入代码与预览界面不匹配-分析报告](./Figma导入代码与预览界面不匹配-分析报告.md) — 问题分析报告
+- Figma导入代码与预览界面不匹配-分析报告 — 问题分析报告

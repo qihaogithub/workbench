@@ -12,13 +12,13 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { normalizeCanvasStateLayers } from "@opencode-workbench/shared/demo";
+import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
 import type {
   CanvasFreeNode,
   CanvasLayersState,
   CanvasPageLayout,
   CanvasState,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 
 interface StoredCanvasLayout {
   version: 1;

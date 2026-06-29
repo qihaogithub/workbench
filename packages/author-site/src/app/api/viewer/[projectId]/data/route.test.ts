@@ -2,7 +2,7 @@ import fs from "fs";
 import type { NextRequest } from "next/server";
 import os from "os";
 import path from "path";
-import type { CanvasState } from "@opencode-workbench/shared/demo";
+import type { CanvasState } from "@opencode-workbench/demo-ui";
 
 class TestResponse {
   status: number;

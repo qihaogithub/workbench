@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "page_vlyt",
+      "title": "首页"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

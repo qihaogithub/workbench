@@ -235,10 +235,80 @@
       "sessionId": "session-1782440280905-naxmdvvlf",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460377/v28",
       "fileCount": 9
+    },
+    {
+      "versionId": "v29",
+      "type": "auto_checkpoint",
+      "savedAt": 1782644874795,
+      "savedBy": "qihao",
+      "sessionId": "session-1782644279943-c1k3nueco",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v29",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v30",
+      "type": "auto_checkpoint",
+      "savedAt": 1782645291074,
+      "savedBy": "qihao",
+      "sessionId": "session-1782644279943-c1k3nueco",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v30",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v31",
+      "type": "auto_checkpoint",
+      "savedAt": 1782645332266,
+      "savedBy": "qihao",
+      "sessionId": "session-1782644969621-ztf192wcd",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v31",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v32",
+      "type": "auto_checkpoint",
+      "savedAt": 1782646014847,
+      "savedBy": "qihao",
+      "sessionId": "session-1782645697007-7co7umxp4",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v32",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v33",
+      "type": "auto_checkpoint",
+      "savedAt": 1782646101393,
+      "savedBy": "qihao",
+      "sessionId": "session-1782645697085-jfj09sn2z",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v33",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v34",
+      "type": "auto_checkpoint",
+      "savedAt": 1782646700912,
+      "savedBy": "qihao",
+      "sessionId": "session-1782645697085-jfj09sn2z",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v34",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v35",
+      "type": "auto_checkpoint",
+      "savedAt": 1782660878313,
+      "savedBy": "qihao",
+      "sessionId": "session-1782660569111-kxa3ggvju",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460377\\v35",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1779608460377,
-  "updatedAt": 1782440420365,
+  "updatedAt": 1782660878313,
   "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
   "publishedVersion": "v28",
   "publishedAt": 1782440424755,

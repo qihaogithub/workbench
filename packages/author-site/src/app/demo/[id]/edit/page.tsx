@@ -74,6 +74,7 @@ import {
   MessageSquarePlus,
   Settings2,
   Users,
+  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -112,7 +113,7 @@ import type {
   CanvasKnowledgeDocument,
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -235,6 +236,31 @@ function getRestoredPageTitle(version: VersionInfo): string {
   const sessionMatch = /^restore-page-(.+)-v\d+$/.exec(version.sessionId);
   const pageName = noteMatch?.[1] || sessionMatch?.[1] || "页面";
   return `恢复了${pageName}`;
+}
+
+function mergeLoadedPageSchemas(
+  current: Record<string, string>,
+  loaded: Record<string, string>,
+): Record<string, string> {
+  let changed = false;
+  const next = { ...current };
+
+  for (const [pageId, loadedSchema] of Object.entries(loaded)) {
+    const existingSchema = current[pageId];
+    if (
+      existingSchema &&
+      !isSchemaEmpty(existingSchema) &&
+      (!loadedSchema || isSchemaEmpty(loadedSchema))
+    ) {
+      continue;
+    }
+    if (existingSchema !== loadedSchema) {
+      next[pageId] = loadedSchema;
+      changed = true;
+    }
+  }
+
+  return changed ? next : current;
 }
 
 type HistoryEvent =
@@ -361,8 +387,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     Record<string, Record<string, unknown>>
   >({});
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>({});
+  const pageSchemaMapRef = useRef(pageSchemaMap);
+  pageSchemaMapRef.current = pageSchemaMap;
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
-  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/shared/demo").PreviewSize>>({});
+  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/demo-ui").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
   const handlePositionableSizes = useCallback(
     (sizes: Record<string, PositionableSizeItem>) => {
@@ -387,7 +415,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspaceId, setWorkspaceId] = useState("");
   const [tempWorkspace, setTempWorkspace] = useState("");
   const [previewSize, setPreviewSize] =
-    useState<import("@opencode-workbench/shared/demo").PreviewSize>();
+    useState<import("@opencode-workbench/demo-ui").PreviewSize>();
 
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -412,6 +440,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [projectConfigSchema, setProjectConfigSchema] = useState<
     string | undefined
   >(undefined);
+  const projectConfigSchemaRef = useRef<string | undefined>(projectConfigSchema);
+  projectConfigSchemaRef.current = projectConfigSchema;
   const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
 
   const {
@@ -1056,19 +1086,51 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   useEffect(() => {
     if (activeSchemaCollab.status !== "synced") return;
     if (activeSchemaCollab.value === schemaRef.current) return;
+    const currentPageId = activeDemoIdRef.current;
+    const knownPageSchema = currentPageId
+      ? pageSchemaMapRef.current[currentPageId]
+      : undefined;
+    if (
+      activeSchemaCollab.value === "" &&
+      knownPageSchema &&
+      !isSchemaEmpty(knownPageSchema)
+    ) {
+      replaceCollabText(activeSchemaCollab.ytext, knownPageSchema);
+      return;
+    }
     applyDemoSnapshot({
       schema: activeSchemaCollab.value,
       source: "collab",
     });
     markWorkspaceChanged();
-  }, [activeSchemaCollab.status, activeSchemaCollab.value, applyDemoSnapshot, markWorkspaceChanged]);
+  }, [
+    activeSchemaCollab.status,
+    activeSchemaCollab.value,
+    activeSchemaCollab.ytext,
+    applyDemoSnapshot,
+    markWorkspaceChanged,
+  ]);
 
   useEffect(() => {
     if (projectSchemaCollab.status !== "synced") return;
     if (projectSchemaCollab.value === projectConfigSchema) return;
+    if (
+      projectSchemaCollab.value === "" &&
+      projectConfigSchemaRef.current &&
+      !isSchemaEmpty(projectConfigSchemaRef.current)
+    ) {
+      replaceCollabText(projectSchemaCollab.ytext, projectConfigSchemaRef.current);
+      return;
+    }
     setProjectConfigSchema(projectSchemaCollab.value);
     markWorkspaceChanged();
-  }, [markWorkspaceChanged, projectConfigSchema, projectSchemaCollab.status, projectSchemaCollab.value]);
+  }, [
+    markWorkspaceChanged,
+    projectConfigSchema,
+    projectSchemaCollab.status,
+    projectSchemaCollab.value,
+    projectSchemaCollab.ytext,
+  ]);
 
   const syncWorkspaceFileToCollab = useCallback(
     async (
@@ -1335,9 +1397,13 @@ ${context.details}
         setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
+        projectConfigSchemaRef.current = multi.projectConfigSchema;
+        if (multi.projectConfigSchema) {
+          replaceCollabText(projectSchemaCollab.ytext, multi.projectConfigSchema);
+        }
 
         // 记录每个页面的 previewSize
-        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
         for (const page of pagesWithSize) {
           if (page.previewSize) {
             previewSizeMap[page.id] = page.previewSize;
@@ -1395,7 +1461,7 @@ ${context.details}
         }
         setConfigDataMap(allDefaults);
         setPageCodes(codes);
-        setPageSchemaMap(schemas);
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -1586,9 +1652,20 @@ ${context.details}
     [activeSchemaCollab.ytext, code],
   );
 
+  const handlePageSchemaChange = useCallback(
+    (pageId: string, nextSchema: string) => {
+      setPageSchemaMap((prev) => ({ ...prev, [pageId]: nextSchema }));
+      if (pageId === activeDemoIdRef.current) {
+        handleSchemaChange(nextSchema);
+      }
+    },
+    [handleSchemaChange],
+  );
+
   const handleProjectSchemaChange = useCallback((newSchema: string) => {
     replaceCollabText(projectSchemaCollab.ytext, newSchema);
     setProjectConfigSchema(newSchema);
+    projectConfigSchemaRef.current = newSchema;
   }, [projectSchemaCollab.ytext]);
 
   // 安全合并项目级 + 页面级 Schema 默认值
@@ -1610,8 +1687,22 @@ ${context.details}
     [projectConfigSchema],
   );
 
+  const updatePageSchemaMapFromLoad = useCallback((pageId: string, loadedSchema: string) => {
+    setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, { [pageId]: loadedSchema }));
+  }, []);
+
+  const rememberActivePageSchema = useCallback(() => {
+    const currentPageId = activeDemoIdRef.current;
+    const currentSchema = schemaRef.current;
+    if (!currentPageId || !currentSchema || isSchemaEmpty(currentSchema)) return;
+    setPageSchemaMap((prev) =>
+      mergeLoadedPageSchemas(prev, { [currentPageId]: currentSchema }),
+    );
+  }, []);
+
   const handleConfigPanelPageSelect = useCallback(
     async (pageId: string) => {
+      rememberActivePageSchema();
       setActiveDemoId(pageId);
       activeDemoIdRef.current = pageId;
       if (pagePreviewSizeMap[pageId]) {
@@ -1632,10 +1723,7 @@ ${context.details}
           }));
           setCode(data.data.code);
           setSchema(data.data.schema);
-          setPageSchemaMap((prev) => ({
-            ...prev,
-            [pageId]: data.data.schema,
-          }));
+          updatePageSchemaMapFromLoad(pageId, data.data.schema);
           setEditorContent(buildFigmaText(data.data.code, data.data.schema));
           setConfigDataMap((prev) => {
             if (prev[pageId]) return prev;
@@ -1654,8 +1742,10 @@ ${context.details}
       getSafeMergedDefaults,
       pagePreviewSizeMap,
       previewMode,
+      rememberActivePageSchema,
       sessionId,
       setCanvasEditingPageId,
+      updatePageSchemaMapFromLoad,
     ],
   );
 
@@ -1698,6 +1788,10 @@ ${context.details}
         setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
+        projectConfigSchemaRef.current = multi.projectConfigSchema;
+        if (multi.projectConfigSchema) {
+          replaceCollabText(projectSchemaCollab.ytext, multi.projectConfigSchema);
+        }
 
         const pageIds = rawPages.map((page: DemoPageMeta) => page.id);
         const newPageIds = pageIds.filter((pageId: string) => !previousPageIds.has(pageId));
@@ -1708,7 +1802,7 @@ ${context.details}
         const codes: Record<string, string> = {};
         const allDefaults: Record<string, Record<string, unknown>> = {};
         const schemas: Record<string, string> = {};
-        const previewSizeMap: Record<string, import("@opencode-workbench/shared/demo").PreviewSize> = {};
+        const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
@@ -1726,7 +1820,7 @@ ${context.details}
 
         setPageCodes(codes);
         setConfigDataMap(allDefaults);
-        setPageSchemaMap(schemas);
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
         setPagePreviewSizeMap(previewSizeMap);
 
         if (nextActiveId && multi.demos?.[nextActiveId]) {
@@ -1908,6 +2002,17 @@ ${context.details}
     [activeDemoId, applyDemoSnapshot, markWorkspaceChanged],
   );
 
+  const activePreviewSize = useMemo(() => {
+    if (activeDemoId) {
+      const schemaForActivePage = pageSchemaMap[activeDemoId];
+      const sizeFromSchema = schemaForActivePage
+        ? getPreviewSize(schemaForActivePage)
+        : undefined;
+      return sizeFromSchema ?? pagePreviewSizeMap[activeDemoId] ?? previewSize;
+    }
+    return schema ? getPreviewSize(schema) ?? previewSize : previewSize;
+  }, [activeDemoId, pagePreviewSizeMap, pageSchemaMap, previewSize, schema]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -2071,6 +2176,17 @@ ${context.details}
               </div>
             )}
           </div>
+          <Button variant="outline" className="gap-2" asChild>
+            <a
+              href={`/api/projects/${encodeURIComponent(demoId)}/scaffold${
+                sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""
+              }`}
+              download
+            >
+              <Download className="h-4 w-4" />
+              导出代码
+            </a>
+          </Button>
           <Button
             onClick={async () => {
               await handlePublish();
@@ -2889,6 +3005,7 @@ ${context.details}
                       onUpdateKnowledgeDocument={updateCanvasKnowledgeDocument}
                       onReadKnowledgeDocument={readCanvasKnowledgeDocument}
                       onPageConfigEdit={(pageId) => {
+                        rememberActivePageSchema();
                         setCanvasEditingPageId(pageId);
                         setConfigPanelDetailPageId(pageId);
                         setActiveDemoId(pageId);
@@ -2904,10 +3021,10 @@ ${context.details}
                                 }));
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
-                                setPageSchemaMap((prev) => ({
-                                  ...prev,
-                                  [pageId]: data.data.schema,
-                                }));
+                                updatePageSchemaMapFromLoad(
+                                  pageId,
+                                  data.data.schema,
+                                );
                                 setEditorContent(
                                   buildFigmaText(data.data.code, data.data.schema),
                                 );
@@ -2927,6 +3044,8 @@ ${context.details}
                       }}
                       onCanvasClick={() => {
                         clearCanvasSelection();
+                        setCanvasEditingPageId(null);
+                        setConfigPanelDetailPageId(null);
                       }}
                     />
                   </div>
@@ -3060,7 +3179,7 @@ ${context.details}
                       sessionId={sessionId}
                       demoId={activeDemoId}
                       configData={configData}
-                      previewSize={previewSize}
+                      previewSize={activePreviewSize}
                       placeholderScreenshotUrl={
                         pageScreenshots[activeDemoId]?.screenshotUrl
                       }
@@ -3131,7 +3250,9 @@ ${context.details}
                   id: page.id,
                   name: page.name,
                   order: page.order,
-                  schema: pageSchemaMap[page.id],
+                  schema:
+                    pageSchemaMap[page.id] ||
+                    (page.id === activeDemoId ? schema : undefined),
                   configData: configDataMap[page.id],
                 }))}
                 activePageId={activeDemoId}
@@ -3149,9 +3270,7 @@ ${context.details}
                 onProjectConfigChange={handleProjectConfigPanelChange}
                 onProjectSchemaChange={handleProjectSchemaChange}
                 onPageConfigChange={handlePageConfigPanelChange}
-                onPageSchemaChange={(_pageId, nextSchema) =>
-                  handleSchemaChange(nextSchema)
-                }
+                onPageSchemaChange={handlePageSchemaChange}
                 sessionId={sessionId}
                 positionableItemSizes={positionableItemSizes}
                 hideDetailHeader={previewMode === "single"}

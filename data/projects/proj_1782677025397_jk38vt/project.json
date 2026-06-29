@@ -1,0 +1,55 @@
+{
+  "id": "proj_1782677025397_jk38vt",
+  "name": "画布退出恢复回归-e7f03989",
+  "category": "未分类",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1782677025397_jk38vt\\workspace",
+  "demoPages": [
+    {
+      "id": "page_miw7",
+      "name": "自动保存顺序页",
+      "routeKey": "page-2",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "page_a7ko",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [
+    {
+      "id": "folder_1782677041072_j6m2it",
+      "name": "自动保存文件夹-58596c",
+      "parentId": null,
+      "order": 0
+    }
+  ],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1782677031078,
+      "savedBy": "qihao",
+      "sessionId": "session-1782677028402-2jq25yukg",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782677025397_jk38vt\\v1",
+      "fileCount": 6,
+      "note": "画布退出恢复回归测试准备页面"
+    },
+    {
+      "versionId": "v2",
+      "type": "named_version",
+      "savedAt": 1782677045459,
+      "savedBy": "qihao",
+      "sessionId": "session-1782677033671-fmhpbf1o8",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782677025397_jk38vt\\v2",
+      "fileCount": 9,
+      "note": "画布退出恢复回归测试准备页面"
+    }
+  ],
+  "pageVersions": {},
+  "createdAt": 1782677025400,
+  "updatedAt": 1782677045463
+}

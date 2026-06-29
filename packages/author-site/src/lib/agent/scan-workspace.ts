@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { summarizeCanvasTextNodes } from "@opencode-workbench/shared/demo";
+import { summarizeCanvasTextNodes } from "@opencode-workbench/demo-ui";
 import type { SystemPromptContext } from "./system-prompt";
 import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
 import { listDemoPages } from "../fs-utils";

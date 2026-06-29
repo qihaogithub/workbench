@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_2ebx",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

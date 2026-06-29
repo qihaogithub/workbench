@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket from "ws";
 
-import type { CollabResourceKind } from "@opencode-workbench/shared";
+import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
 import { collabRoomManager } from "../collab/collab-room-manager";
 
 interface CollabParams {

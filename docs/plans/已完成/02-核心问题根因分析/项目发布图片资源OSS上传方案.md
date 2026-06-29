@@ -217,14 +217,25 @@ function extractImageReferences(
   const references: ImageReference[] = [];
 
   // 匹配 <img src="..." />
-  const imgRegex = /<img[^>]+src=["']([^"']+)["']/g;
+  const imgRegex = new RegExp(
+    "<img[^>]+src=" + "[\"']" + "([^\"']+)" + "[\"']",
+    "g"
+  );
 
   // 匹配 CSS url(...)
-  const cssUrlRegex = /url\(["']?([^"')]+)["']?\)/g;
+  const cssUrlRegex = new RegExp(
+    "url\\(" + "[\"']?" + "([^\"')]+)" + "[\"']?" + "\\)",
+    "g"
+  );
 
   // 匹配 import 语句
-  const importRegex =
-    /import\s+\w+\s+from\s+["']([^"']+\.png|jpg|jpeg|gif|webp|svg)["']/g;
+  const importRegex = new RegExp(
+    "import\\s+\\w+\\s+from\\s+" +
+      "[\"']" +
+      "([^\"']+\\.(?:png|jpg|jpeg|gif|webp|svg))" +
+      "[\"']",
+    "g"
+  );
 
   // 提取并过滤本地路径
   // ...

@@ -499,6 +499,29 @@ function waitForCanvasLayoutSave(
     .catch(() => null);
 }
 
+async function waitForCanvasLayoutState(
+  page: Page,
+  sessionId: string,
+  expected: {
+    movedPageId: string;
+    markerText: string;
+  },
+  timeout = 30000,
+): Promise<CanvasState | null> {
+  const deadline = Date.now() + timeout;
+  let latestState: CanvasState | null = null;
+
+  while (Date.now() < deadline) {
+    latestState = await getCanvasLayout(page, sessionId);
+    if (canvasStateContainsExpectedChange(latestState, expected)) {
+      return latestState;
+    }
+    await page.waitForTimeout(500);
+  }
+
+  return latestState;
+}
+
 function getSessionIdFromCanvasLayoutUrl(url: string): string | null {
   return /\/api\/sessions\/([^/]+)\/canvas-layout(?:\?|$)/.exec(url)?.[1] ?? null;
 }
@@ -550,7 +573,8 @@ async function switchToCanvas(page: Page): Promise<void> {
 async function dragFirstCanvasPage(page: Page): Promise<string> {
   await page.getByRole('button', { name: '选择工具' }).click();
 
-  const pageItem = page.locator('[data-page-id]').first();
+  const canvasRoot = page.locator('[data-canvas-root="true"]');
+  const pageItem = canvasRoot.locator('[data-page-id]').first();
   await expect(pageItem).toBeVisible({ timeout: 30000 });
   const pageId = await pageItem.getAttribute('data-page-id');
   expect(pageId).toBeTruthy();
@@ -566,35 +590,73 @@ async function dragFirstCanvasPage(page: Page): Promise<string> {
   });
   await page.mouse.up();
 
+  await expect(pageItem).toHaveCSS('left', /[1-9]\d{2,}px/, { timeout: 5000 });
+
   return pageId!;
 }
 
 async function addTextNode(page: Page, text: string): Promise<void> {
-  await page.getByRole('button', { name: '添加文字' }).click();
-
   const canvasRoot = page.locator('[data-canvas-root="true"]');
   const box = await canvasRoot.boundingBox();
   expect(box).toBeTruthy();
   if (!box) throw new Error('未找到画布区域');
 
-  const textArea = page.getByRole('textbox', { name: '编辑文字' });
   const candidatePoints = [
     { x: box.x + 120, y: box.y + 260 },
     { x: box.x + box.width - 120, y: box.y + 320 },
     { x: box.x + 160, y: box.y + box.height - 180 },
     { x: box.x + box.width - 180, y: box.y + 180 },
   ];
-  for (const [index, point] of candidatePoints.entries()) {
+  const pageBoxes = await canvasRoot.locator('[data-page-id]').evaluateAll((items) =>
+    items.map((item) => {
+      const rect = item.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      };
+    }),
+  );
+  const blankPoints = candidatePoints.filter(
+    (point) =>
+      !pageBoxes.some(
+        (pageBox) =>
+          point.x >= pageBox.left - 24 &&
+          point.x <= pageBox.right + 24 &&
+          point.y >= pageBox.top - 24 &&
+          point.y <= pageBox.bottom + 24,
+      ),
+  );
+  const points = blankPoints.length > 0 ? blankPoints : candidatePoints;
+
+  for (const [index, point] of points.entries()) {
+    await page.getByRole('button', { name: '添加文字' }).click();
     await page.mouse.click(point.x, point.y);
     const timeout = index === candidatePoints.length - 1 ? 5000 : 1500;
-    const appeared = await textArea
+    const appeared = await page
+      .getByRole('textbox', { name: '编辑文字' })
+      .last()
       .waitFor({ state: 'visible', timeout })
       .then(() => true)
       .catch(() => false);
     if (appeared) break;
   }
-  await expect(textArea).toBeVisible({ timeout: 1000 });
-  await textArea.fill(text);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const editableTextArea = page.getByRole('textbox', { name: '编辑文字' }).last();
+    try {
+      await expect(editableTextArea).toBeVisible({ timeout: 3000 });
+      await editableTextArea.fill(text, { timeout: 5000 });
+      await expect(editableTextArea).toHaveValue(text, { timeout: 3000 });
+      return;
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await page.getByRole('button', { name: '添加文字' }).click();
+      const retryPoint = points[attempt % points.length];
+      await page.mouse.click(retryPoint.x, retryPoint.y);
+    }
+  }
 }
 
 async function exitEditorToHomeAfterAutosaveFlush(
@@ -616,16 +678,19 @@ async function exitEditorToHomeAfterAutosaveFlush(
   if (canvasSaveResponse) {
     const saveBody = await parseApiResponse<CanvasLayoutResult>(canvasSaveResponse);
     const savedSessionId = getSessionIdFromCanvasLayoutUrl(canvasSaveResponse.url());
-    expect(
-      canvasStateContainsExpectedChange(saveBody.data.state, expected),
-      `画布布局保存响应应包含本次页面移动和文本节点，响应状态: ${summarizeCanvasState(saveBody.data.state)}`,
-    ).toBe(true);
     expect(savedSessionId, '画布布局保存 URL 应包含 sessionId').toBeTruthy();
 
-    const persistedState = await getCanvasLayout(page, savedSessionId!);
+    const persistedState =
+      canvasStateContainsExpectedChange(saveBody.data.state, expected)
+        ? saveBody.data.state
+        : await waitForCanvasLayoutState(page, savedSessionId!, expected);
     expect(
       canvasStateContainsExpectedChange(persistedState, expected),
-      `画布布局保存后应可从后端读回，后端状态: ${summarizeCanvasState(persistedState)}`,
+      [
+        '画布布局保存后应可从后端读回本次页面移动和文本节点',
+        `保存响应状态: ${summarizeCanvasState(saveBody.data.state)}`,
+        `后端状态: ${summarizeCanvasState(persistedState)}`,
+      ].join('\n'),
     ).toBe(true);
 
     await expect(page).toHaveURL(

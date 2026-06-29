@@ -1,8 +1,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { normalizeCanvasStateLayers } from "@opencode-workbench/shared/demo";
-import type { CanvasState } from "@opencode-workbench/shared/demo";
+import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
+import type { CanvasState } from "@opencode-workbench/demo-ui";
 
 class TestResponse {
   status: number;

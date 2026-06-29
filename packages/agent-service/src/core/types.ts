@@ -1,7 +1,7 @@
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
-} from "@opencode-workbench/shared";
+} from "@opencode-workbench/shared/contracts";
 
 // ============================================================
 // 基础类型

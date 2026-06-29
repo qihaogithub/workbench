@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { RefObject } from "react";
 import { useConsoleBuffer } from "./useConsoleBuffer";
 import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
-import type { ConsoleLogPayload } from "@opencode-workbench/shared/demo";
+import type { ConsoleLogPayload } from "@opencode-workbench/demo-ui";
 
 describe("useConsoleBuffer", () => {
   beforeEach(() => {
