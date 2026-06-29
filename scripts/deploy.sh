@@ -13,6 +13,12 @@ SSH_KEY="${HOME}/.ssh/figma-mirror-deploy-key"
 LOCAL_ENV_FILE="${PROJECT_DIR}/.env.docker"
 DEPLOY_ENV_FILE="${PROJECT_DIR}/.deploy.env"
 
+# 部署范围与构建资源保护。
+# 默认跳过 screenshot-service，避免 Chromium 系统依赖安装拖垮正式机。
+DEPLOY_SERVICES="${DEPLOY_SERVICES:-agent-service author-site viewer-site}"
+INCLUDE_SCREENSHOT_SERVICE="${INCLUDE_SCREENSHOT_SERVICE:-false}"
+COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
+
 # 颜色输出
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -71,6 +77,33 @@ GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo -e "${BLUE}📋 构建信息: commit=${GIT_COMMIT}, branch=${GIT_BRANCH}, time=${BUILD_TIME}${NC}"
+
+if [ "${INCLUDE_SCREENSHOT_SERVICE}" = "true" ] && [[ " ${DEPLOY_SERVICES} " != *" screenshot-service "* ]]; then
+    DEPLOY_SERVICES="${DEPLOY_SERVICES} screenshot-service"
+fi
+
+for service in ${DEPLOY_SERVICES}; do
+    case "${service}" in
+        agent-service|author-site|screenshot-service|viewer-site)
+            ;;
+        *)
+            echo -e "${RED}❌ 不支持的部署服务名: ${service}${NC}"
+            echo -e "${YELLOW}   允许值: agent-service author-site screenshot-service viewer-site${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+if ! [[ "${COMPOSE_PARALLEL_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+    echo -e "${RED}❌ COMPOSE_PARALLEL_LIMIT 必须是正整数，当前值: ${COMPOSE_PARALLEL_LIMIT}${NC}"
+    exit 1
+fi
+
+echo -e "${BLUE}📦 部署服务: ${DEPLOY_SERVICES}${NC}"
+echo -e "${BLUE}🧯 Compose 构建并发: COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT}${NC}"
+if [[ " ${DEPLOY_SERVICES} " != *" screenshot-service "* ]]; then
+    echo -e "${YELLOW}⚠️  本次不会重建 screenshot-service。如需更新截图服务，执行 INCLUDE_SCREENSHOT_SERVICE=true scripts/deploy.sh${NC}"
+fi
 
 # ================= 1. 检查 SSH Key =================
 echo -e "${BLUE}🔍 [1/4] 检查 SSH 连接...${NC}"
@@ -153,17 +186,22 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     # 复制部署环境文件
     cp -f .deploy.env .env.docker
 
-    # 构建并启动全部服务
+    export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
+    DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+
+    echo \"📦 构建服务: \${DEPLOY_SERVICES}\"
+    echo \"🧯 COMPOSE_PARALLEL_LIMIT=\${COMPOSE_PARALLEL_LIMIT}\"
+
     docker compose --env-file .env.docker build \
         --build-arg GIT_COMMIT='${GIT_COMMIT}' \
         --build-arg GIT_BRANCH='${GIT_BRANCH}' \
         --build-arg BUILD_TIME='${BUILD_TIME}' \
-        agent-service author-site screenshot-service viewer-site
+        \${DEPLOY_SERVICES}
 
     docker compose --env-file .env.docker up -d --force-recreate \
-        agent-service author-site screenshot-service viewer-site
+        \${DEPLOY_SERVICES}
 
-    echo '✅ 全部服务已启动'
+    echo \"✅ 已启动服务: \${DEPLOY_SERVICES}\"
 "
 
 # ================= 5. 部署后自检 =================
@@ -172,6 +210,25 @@ echo -e "${BLUE}🩺 部署后自检...${NC}"
 ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     set -e
     cd ${REMOTE_DIR}
+
+    DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+
+    service_in_deploy() {
+        case \" \${DEPLOY_SERVICES} \" in
+            *\" \$1 \"*) return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+
+    container_for_service() {
+        case \"\$1\" in
+            agent-service) echo 'opencode-workbench-agent-service-1' ;;
+            author-site) echo 'opencode-workbench-author-site-1' ;;
+            screenshot-service) echo 'opencode-workbench-screenshot-service-1' ;;
+            viewer-site) echo 'opencode-workbench-viewer-site-1' ;;
+            *) echo \"\" ;;
+        esac
+    }
 
     check_container_running() {
         local name=\"\$1\"
@@ -201,7 +258,8 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     echo '⏳ 等待容器启动...'
     for i in \$(seq 1 60); do
         all_running=true
-        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1 opencode-workbench-viewer-site-1; do
+        for service in \${DEPLOY_SERVICES}; do
+            name=\$(container_for_service \"\$service\")
             status=\$(docker inspect -f '{{.State.Status}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$status\" != 'running' ]; then
                 all_running=false
@@ -220,16 +278,20 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     done
 
     # 检查容器运行状态
-    check_container_running opencode-workbench-agent-service-1
-    check_container_running opencode-workbench-author-site-1
-    check_container_running opencode-workbench-screenshot-service-1
-    check_container_running opencode-workbench-viewer-site-1
+    for service in \${DEPLOY_SERVICES}; do
+        check_container_running \"\$(container_for_service \"\$service\")\"
+    done
 
     # 等待健康检查（最多 90 秒）
     echo '⏳ 等待健康检查...'
     for i in \$(seq 1 90); do
         all_healthy=true
-        for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1; do
+        for service in \${DEPLOY_SERVICES}; do
+            case \"\$service\" in
+                agent-service|author-site|screenshot-service) ;;
+                *) continue ;;
+            esac
+            name=\$(container_for_service \"\$service\")
             health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \"\$name\" 2>/dev/null || echo 'missing')
             if [ \"\$health\" != 'healthy' ]; then
                 all_healthy=false
@@ -241,8 +303,12 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
         fi
         if [ \"\$i\" -eq 90 ]; then
             echo '❌ 健康检查超时'
-            for name in opencode-workbench-agent-service-1 opencode-workbench-author-site-1 opencode-workbench-screenshot-service-1; do
-                check_container_healthy \"\$name\"
+            for service in \${DEPLOY_SERVICES}; do
+                case \"\$service\" in
+                    agent-service|author-site|screenshot-service) ;;
+                    *) continue ;;
+                esac
+                check_container_healthy \"\$(container_for_service \"\$service\")\"
             done
             exit 1
         fi
@@ -250,62 +316,74 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     done
 
     # 健康检查
-    check_container_healthy opencode-workbench-agent-service-1
-    check_container_healthy opencode-workbench-author-site-1
-    check_container_healthy opencode-workbench-screenshot-service-1
+    for service in \${DEPLOY_SERVICES}; do
+        case \"\$service\" in
+            agent-service|author-site|screenshot-service) ;;
+            *) continue ;;
+        esac
+        check_container_healthy \"\$(container_for_service \"\$service\")\"
+    done
 
     # API 端点检查（重试 30 秒）
-    for i in \$(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3200 >/dev/null 2>&1; then
-            echo '✅ author-site 健康检查通过'
-            break
-        fi
-        if [ \"\$i\" -eq 30 ]; then
-            echo '❌ author-site 健康检查失败: http://127.0.0.1:3200'
-            docker logs --tail=120 opencode-workbench-author-site-1 2>/dev/null || true
-            exit 1
-        fi
-        sleep 1
-    done
+    if service_in_deploy author-site; then
+        for i in \$(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3200 >/dev/null 2>&1; then
+                echo '✅ author-site 健康检查通过'
+                break
+            fi
+            if [ \"\$i\" -eq 30 ]; then
+                echo '❌ author-site 健康检查失败: http://127.0.0.1:3200'
+                docker logs --tail=120 opencode-workbench-author-site-1 2>/dev/null || true
+                exit 1
+            fi
+            sleep 1
+        done
+    fi
 
-    for i in \$(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3201/health >/dev/null 2>&1; then
-            echo '✅ agent-service 健康检查通过'
-            break
-        fi
-        if [ \"\$i\" -eq 30 ]; then
-            echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
-            docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
-            exit 1
-        fi
-        sleep 1
-    done
+    if service_in_deploy agent-service; then
+        for i in \$(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3201/health >/dev/null 2>&1; then
+                echo '✅ agent-service 健康检查通过'
+                break
+            fi
+            if [ \"\$i\" -eq 30 ]; then
+                echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
+                docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
+                exit 1
+            fi
+            sleep 1
+        done
+    fi
 
-    for i in \$(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3202/health >/dev/null 2>&1; then
-            echo '✅ screenshot-service 健康检查通过'
-            break
-        fi
-        if [ \"\$i\" -eq 30 ]; then
-            echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
-            docker logs --tail=120 opencode-workbench-screenshot-service-1 2>/dev/null || true
-            exit 1
-        fi
-        sleep 1
-    done
+    if service_in_deploy screenshot-service; then
+        for i in \$(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3202/health >/dev/null 2>&1; then
+                echo '✅ screenshot-service 健康检查通过'
+                break
+            fi
+            if [ \"\$i\" -eq 30 ]; then
+                echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
+                docker logs --tail=120 opencode-workbench-screenshot-service-1 2>/dev/null || true
+                exit 1
+            fi
+            sleep 1
+        done
+    fi
 
-    for i in \$(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3300 >/dev/null 2>&1; then
-            echo '✅ viewer-site 健康检查通过'
-            break
-        fi
-        if [ \"\$i\" -eq 30 ]; then
-            echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
-            docker logs --tail=120 opencode-workbench-viewer-site-1 2>/dev/null || true
-            exit 1
-        fi
-        sleep 1
-    done
+    if service_in_deploy viewer-site; then
+        for i in \$(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3300 >/dev/null 2>&1; then
+                echo '✅ viewer-site 健康检查通过'
+                break
+            fi
+            if [ \"\$i\" -eq 30 ]; then
+                echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
+                docker logs --tail=120 opencode-workbench-viewer-site-1 2>/dev/null || true
+                exit 1
+            fi
+            sleep 1
+        done
+    fi
 "
 
 echo ""
