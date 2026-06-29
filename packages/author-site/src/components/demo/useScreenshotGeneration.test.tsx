@@ -38,6 +38,7 @@ describe("useScreenshotGeneration", () => {
   const originalWindowFetch = window.fetch;
 
   afterEach(() => {
+    jest.useRealTimers();
     global.fetch = originalFetch;
     window.fetch = originalWindowFetch;
   });
@@ -621,6 +622,113 @@ describe("useScreenshotGeneration", () => {
         loading: false,
       });
     });
+
+    unmount();
+  });
+
+  it("批量轮询会使用服务端 retryAfterMs 调整节奏", async () => {
+    jest.useFakeTimers();
+    let statusCalls = 0;
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+      const url = getFetchUrl(input);
+      if (url.includes("/api/screenshots/health")) {
+        return jsonFetchResponse({ success: true });
+      }
+      if (url.includes("/api/screenshots/generate-batch")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            batchId: "batch_1",
+            results: [
+              {
+                pageId: "page_1",
+                hash: "1111111111111111",
+                status: "pending",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/status/proj_1/batch_1")) {
+        statusCalls += 1;
+        if (statusCalls === 1) {
+          return jsonFetchResponse({
+            success: true,
+            data: {
+              status: "running",
+              cancelled: false,
+              retryAfterMs: 300,
+              results: [
+                {
+                  pageId: "page_1",
+                  hash: "1111111111111111",
+                  status: "rendering",
+                },
+              ],
+            },
+          });
+        }
+
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            status: "completed",
+            cancelled: false,
+            retryAfterMs: 0,
+            results: [
+              {
+                pageId: "page_1",
+                url: "/api/screenshots/file/proj_1/page_1",
+                hash: "1111111111111111",
+                renderBox,
+                status: "done",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/cancel/proj_1/batch_1")) {
+        return jsonFetchResponse({ success: true });
+      }
+      return jsonFetchResponse({ success: false }, { status: 404 });
+    }) as jest.Mock;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result, unmount } = renderHook(() =>
+      useScreenshotGeneration({ projectId: "proj_1" }),
+    );
+
+    await act(async () => {
+      await result.current.startBatchGeneration([
+        {
+          pageId: "page_1",
+          code: "export default function Demo() { return null; }",
+          configData: {},
+        },
+      ]);
+    });
+
+    expect(statusCalls).toBe(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(299);
+    });
+    expect(statusCalls).toBe(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+
+    await waitFor(() => {
+      expect(result.current.pageScreenshots.page_1).toMatchObject({
+        screenshotUrl:
+          "/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
+        loading: false,
+      });
+    });
+    expect(statusCalls).toBe(2);
 
     unmount();
   });

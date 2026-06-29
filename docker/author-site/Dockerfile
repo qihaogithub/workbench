@@ -41,6 +41,7 @@ COPY packages/project-core/ ./packages/project-core/
 COPY packages/project-scaffold/ ./packages/project-scaffold/
 COPY packages/shared/ ./packages/shared/
 COPY packages/author-site/ ./packages/author-site/
+COPY scripts/ ./scripts/
 
 RUN pnpm --filter @opencode-workbench/author-site build
 

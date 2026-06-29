@@ -2,6 +2,7 @@
 covers:
   - packages/author-site/src/lib/auth/jwt.ts
   - packages/author-site/src/lib/auth/password.ts
+  - docker-compose.yml
 ---
 
 # JWT 认证机制
@@ -187,7 +188,7 @@ HMACSHA256(
 | name | auth_token | Cookie 名称 |
 | value | JWT Token | Cookie 值 |
 | httpOnly | true | 防止 JavaScript 读取，避免 XSS 攻击 |
-| secure | 生产环境为 true | 仅通过 HTTPS 传输 |
+| secure | 生产环境默认受 `USE_SECURE_COOKIE` 控制 | HTTPS 部署应启用；HTTP 内网部署需关闭，否则浏览器不会保留或发送登录 Cookie |
 | sameSite | lax | 防止 CSRF 攻击 |
 | maxAge | 7 天 | Cookie 有效期（秒） |
 | path | / | Cookie 作用路径 |
@@ -213,12 +214,14 @@ HMACSHA256(
 ```
 cookies().set("auth_token", token, {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: process.env.NODE_ENV === "production" && process.env.USE_SECURE_COOKIE !== "false",
   sameSite: "lax",
   maxAge: 7 * 24 * 60 * 60,
   path: "/"
 })
 ```
+
+Docker Compose 默认面向局域网 HTTP 访问，因此 `USE_SECURE_COOKIE` 默认值为 `false`；如果服务放在 HTTPS 域名后，应在环境变量中显式改为 `true`。
 
 ### 4.3 Cookie 读取
 

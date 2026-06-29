@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,75 +40,174 @@ interface ProjectNameCategoryDialogProps {
 }
 
 const DEFAULT_CATEGORY = "未分类";
+const CUSTOM_CATEGORY_LABEL = "自定义分类";
+
+function normalizeCategoryPath(raw: string): { value?: string; error?: string } {
+  const trimmed = raw.trim();
+
+  if (!trimmed) {
+    return { error: "请输入项目分类" };
+  }
+
+  const parts = trimmed.split("/").map((part) => part.trim());
+  if (parts.some((part) => !part)) {
+    return { error: "分类路径不能以 / 开头或结尾，也不能包含连续的 /" };
+  }
+
+  return { value: parts.join("/") };
+}
 
 function ProjectCategoryCombobox({
   value,
   categories,
   autoFocus,
+  resetKey,
+  resetValue,
   onChange,
+  onValidationChange,
 }: {
   value: string;
   categories: string[];
   autoFocus?: boolean;
+  resetKey: string;
+  resetValue: string;
   onChange: (value: string) => void;
+  onValidationChange: (error: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"select" | "custom">("select");
+  const [customValue, setCustomValue] = useState(value);
+  const [error, setError] = useState<string | null>(null);
   const currentCategory = value.trim() || DEFAULT_CATEGORY;
 
-  return (
-    <div className="relative">
-      <Input
-        id="project-category"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={DEFAULT_CATEGORY}
-        autoFocus={autoFocus}
-        className="pr-11"
-      />
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
+  useEffect(() => {
+    setMode("select");
+    setCustomValue(resetValue);
+    setError(null);
+    onValidationChange(null);
+  }, [onValidationChange, resetKey, resetValue]);
+
+  const handleCustomChange = (nextValue: string) => {
+    setCustomValue(nextValue);
+    const result = normalizeCategoryPath(nextValue);
+    if (result.error) {
+      setError(result.error);
+      onValidationChange(result.error);
+      onChange(nextValue);
+      return;
+    }
+
+    setError(null);
+    onValidationChange(null);
+    onChange(result.value ?? DEFAULT_CATEGORY);
+  };
+
+  if (mode === "custom") {
+    return (
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            id="project-category"
+            value={customValue}
+            onChange={(event) => handleCustomChange(event.target.value)}
+            placeholder="APP资源位/弹窗"
+            autoFocus
+          />
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1 h-8 w-8 text-muted-foreground hover:text-foreground"
-            aria-label="选择已有项目分类"
+            variant="outline"
+            className="shrink-0 px-4"
+            aria-label="返回选择已有分类"
+            onClick={() => {
+              setMode("select");
+              setCustomValue(value);
+              setError(null);
+              onValidationChange(null);
+              onChange(resetValue || DEFAULT_CATEGORY);
+            }}
           >
-            <ChevronDown className="h-4 w-4" />
+            取消
           </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 p-1">
-          <div className="max-h-56 overflow-y-auto">
-            {categories.map((item) => {
-              const selected = item === currentCategory;
+        </div>
+        <p className="text-xs text-muted-foreground">
+          用 / 添加子分类，例如 APP资源位/弹窗
+        </p>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+    );
+  }
 
-              return (
-                <button
-                  key={item}
-                  type="button"
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id="project-category"
+          type="button"
+          variant="outline"
+          className="h-10 w-full justify-between px-3 text-left font-normal"
+          autoFocus={autoFocus}
+        >
+          <span className="min-w-0 truncate">{currentCategory}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] p-1"
+      >
+        <div className="max-h-56 overflow-y-auto">
+          {categories.map((item) => {
+            const selected = item === currentCategory;
+
+            return (
+              <button
+                key={item}
+                type="button"
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                  selected ? "text-foreground" : "text-muted-foreground",
+                )}
+                onClick={() => {
+                  onChange(item);
+                  setError(null);
+                  onValidationChange(null);
+                  setOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{item}</span>
+                <Check
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                    selected ? "text-foreground" : "text-muted-foreground",
+                    "h-4 w-4 shrink-0",
+                    selected ? "opacity-100" : "opacity-0",
                   )}
-                  onClick={() => {
-                    onChange(item);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="min-w-0 flex-1 truncate">{item}</span>
-                  <Check
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      selected ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+                />
+              </button>
+            );
+          })}
+          <div className="my-1 border-t" />
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={() => {
+              const initialValue =
+                currentCategory === DEFAULT_CATEGORY ? "" : currentCategory;
+              const initialResult = normalizeCategoryPath(initialValue);
+              setMode("custom");
+              setCustomValue(initialValue);
+              setError(initialResult.error ?? null);
+              onValidationChange(initialResult.error ?? null);
+              onChange(initialResult.value ?? "");
+              setOpen(false);
+            }}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {CUSTOM_CATEGORY_LABEL}
+            </span>
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -127,11 +226,13 @@ export function ProjectNameCategoryDialog({
 }: ProjectNameCategoryDialogProps) {
   const [name, setName] = useState(defaultName);
   const [category, setCategory] = useState(defaultCategory);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setName(defaultName);
     setCategory(defaultCategory || DEFAULT_CATEGORY);
+    setCategoryError(null);
   }, [defaultCategory, defaultName, open]);
 
   const normalizedCategories = Array.from(
@@ -141,14 +242,20 @@ export function ProjectNameCategoryDialog({
     fields === "name"
       ? name.trim().length > 0
       : fields === "category"
-        ? category.trim().length > 0
-        : name.trim().length > 0 && category.trim().length > 0;
+        ? category.trim().length > 0 && !categoryError
+        : name.trim().length > 0 && category.trim().length > 0 && !categoryError;
 
   const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return;
+    const normalizedCategory = normalizeCategoryPath(category);
+    if (normalizedCategory.error) {
+      setCategoryError(normalizedCategory.error);
+      return;
+    }
+
     await onSubmit({
       name: name.trim(),
-      category: category.trim() || DEFAULT_CATEGORY,
+      category: normalizedCategory.value ?? DEFAULT_CATEGORY,
     });
   };
 
@@ -184,7 +291,10 @@ export function ProjectNameCategoryDialog({
                 value={category}
                 categories={normalizedCategories}
                 autoFocus={fields === "category"}
+                resetKey={`${open}:${defaultCategory}:${fields}`}
+                resetValue={defaultCategory || DEFAULT_CATEGORY}
                 onChange={setCategory}
+                onValidationChange={setCategoryError}
               />
             </div>
           )}

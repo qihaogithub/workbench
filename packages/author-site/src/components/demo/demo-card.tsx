@@ -69,6 +69,14 @@ function normalizeCategory(category?: string): string {
   return category?.trim() || DEFAULT_CATEGORY;
 }
 
+function formatCategoryPath(category?: string): string {
+  return normalizeCategory(category)
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" / ");
+}
+
 function clampScreenshotAspectRatio(ratio: number): number {
   if (!Number.isFinite(ratio) || ratio <= 0) {
     return DEFAULT_SCREENSHOT_ASPECT_RATIO;
@@ -335,7 +343,7 @@ export function DemoCard({
                 variant="secondary"
                 className="shrink-0 px-1.5 py-0 text-[10px]"
               >
-                {normalizeCategory(demo.category)}
+                {formatCategoryPath(demo.category)}
               </Badge>
               <span className="shrink-0 whitespace-nowrap">
                 {formatShortDate(demo.updatedAt)}
@@ -488,7 +496,7 @@ export function TemplateProjectCard({
                 variant="secondary"
                 className="shrink-0 px-1.5 py-0 text-[10px]"
               >
-                {normalizeCategory(template.category)}
+                {formatCategoryPath(template.category)}
               </Badge>
               <span className="shrink-0 whitespace-nowrap">
                 {formatShortDate(template.updatedAt)}

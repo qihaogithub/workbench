@@ -474,6 +474,37 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     () => new Set(visibleCanvasPageIds),
     [visibleCanvasPageIds],
   );
+  const nearbyCanvasPageIdSet = useMemo(() => {
+    const nearby = new Set<string>();
+    if (previewMode !== "canvas") return nearby;
+
+    const orderedPageIds = demoPages.map((page) => page.id);
+    const seedPageIds = new Set(
+      [
+        ...visibleCanvasPageIds,
+        canvasEditingPageId ?? activeDemoId,
+      ].filter(Boolean),
+    );
+
+    for (const seedPageId of seedPageIds) {
+      const index = orderedPageIds.indexOf(seedPageId);
+      if (index === -1) continue;
+
+      const before = orderedPageIds[index - 1];
+      const after = orderedPageIds[index + 1];
+      if (before && !visibleCanvasPageIdSet.has(before)) nearby.add(before);
+      if (after && !visibleCanvasPageIdSet.has(after)) nearby.add(after);
+    }
+
+    return nearby;
+  }, [
+    activeDemoId,
+    canvasEditingPageId,
+    demoPages,
+    previewMode,
+    visibleCanvasPageIds,
+    visibleCanvasPageIdSet,
+  ]);
 
   const {
     pageScreenshots,
@@ -533,9 +564,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (previewMode === "canvas" && visibleCanvasPageIdSet.has(pageId)) {
         return "visible";
       }
+      if (previewMode === "canvas" && nearbyCanvasPageIdSet.has(pageId)) {
+        return "nearby";
+      }
       return "background";
     },
-    [activeDemoId, canvasEditingPageId, previewMode, visibleCanvasPageIdSet],
+    [
+      activeDemoId,
+      canvasEditingPageId,
+      nearbyCanvasPageIdSet,
+      previewMode,
+      visibleCanvasPageIdSet,
+    ],
   );
 
   const getScreenshotRenderMode = useCallback(

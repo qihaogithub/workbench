@@ -128,6 +128,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 - `SCREENSHOT_SERVICE_URL` 在容器内使用 `http://screenshot-service:3202`
 - `CORS_ORIGINS` 必须同时包含创作端、使用端的真实访问来源和必要的 localhost 来源
 - `author-site` 的 CORS 中间件会读取 `CORS_ORIGINS`，并在认证逻辑之前响应 API/viewer 路由的 OPTIONS 预检
+- `docker-compose.yml` 默认 `USE_SECURE_COOKIE=false`，匹配 `http://<IP>:3200` 的内网访问方式；若改为 HTTPS 域名访问，应显式设置为 `true`。
 
 ### 3.4 Docker 构建上下文约束
 

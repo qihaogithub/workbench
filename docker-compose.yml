@@ -57,7 +57,7 @@ services:
       - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
       - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
-      - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-true}
+      - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}

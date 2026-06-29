@@ -45,9 +45,9 @@ import type { DemoMeta, ProjectTemplateMeta } from "@opencode-workbench/shared";
 const DEFAULT_CATEGORY = "未分类";
 type SelectedNav =
   | { type: "all" }
-  | { type: "project-category"; category: string }
+  | { type: "project-category"; category: string; exact?: boolean }
   | { type: "templates" }
-  | { type: "template-category"; category: string };
+  | { type: "template-category"; category: string; exact?: boolean };
 
 type DialogAction =
   | { type: "blank" }
@@ -63,9 +63,95 @@ function normalizeCategory(category?: string): string {
   return category?.trim() || DEFAULT_CATEGORY;
 }
 
+function normalizeCategoryPath(raw: string): { value?: string; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { error: "分类不能为空" };
+  }
+
+  const parts = trimmed.split("/").map((part) => part.trim());
+  if (parts.some((part) => !part)) {
+    return { error: "分类路径不能包含空层级" };
+  }
+
+  return { value: parts.join("/") };
+}
+
+function formatCategoryPath(value: string): string {
+  const normalized = normalizeCategoryPath(value);
+  return (normalized.value ?? normalizeCategory(value))
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" / ");
+}
+
+interface CategoryTreeNode {
+  label: string;
+  value: string;
+  children: Array<{ label: string; value: string }>;
+}
+
+function buildCategoryTree(categories: string[]): CategoryTreeNode[] {
+  const nodeMap = new Map<string, CategoryTreeNode>();
+
+  categories.forEach((category) => {
+    const normalized =
+      normalizeCategoryPath(category).value ?? normalizeCategory(category);
+    const [parent, ...rest] = normalized.split("/");
+    if (!parent) return;
+
+    const node =
+      nodeMap.get(parent) ??
+      {
+        label: parent,
+        value: parent,
+        children: [],
+      };
+
+    if (rest.length > 0) {
+      node.children.push({
+        label: rest.join(" / "),
+        value: normalized,
+      });
+    }
+
+    nodeMap.set(parent, node);
+  });
+
+  return Array.from(nodeMap.values())
+    .map((node) => ({
+      ...node,
+      children: Array.from(
+        new Map(node.children.map((child) => [child.value, child])).values(),
+      ).sort((a, b) => a.label.localeCompare(b.label, "zh-CN")),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "zh-CN"));
+}
+
 function uniqueCategories(categories: string[]): string[] {
-  return Array.from(new Set(categories.map(normalizeCategory))).sort((a, b) =>
-    a.localeCompare(b, "zh-CN"),
+  return Array.from(
+    new Set(
+      categories.map((category) => {
+        const normalized = normalizeCategoryPath(normalizeCategory(category));
+        return normalized.value ?? normalizeCategory(category);
+      }),
+    ),
+  ).sort((a, b) => a.localeCompare(b, "zh-CN"));
+}
+
+function matchesCategorySelection(
+  category: string | undefined,
+  selected: { category: string; exact?: boolean },
+): boolean {
+  const normalized = normalizeCategory(category);
+  if (selected.exact) {
+    return normalized === selected.category;
+  }
+
+  return (
+    normalized === selected.category ||
+    normalized.startsWith(`${selected.category}/`)
   );
 }
 
@@ -158,6 +244,14 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     () => uniqueCategories([...projectCategories, ...templateCategories]),
     [projectCategories, templateCategories],
   );
+  const projectCategoryTree = useMemo(
+    () => buildCategoryTree(projectCategories),
+    [projectCategories],
+  );
+  const templateCategoryTree = useMemo(
+    () => buildCategoryTree(templateCategories),
+    [templateCategories],
+  );
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredDemos = useMemo(() => {
@@ -166,10 +260,13 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       const matchesNav =
         selectedNav.type === "all" ||
         (selectedNav.type === "project-category" &&
-          category === selectedNav.category);
+          matchesCategorySelection(category, selectedNav));
       const matchesSearch =
         !normalizedQuery ||
-        [demo.name, category].join(" ").toLowerCase().includes(normalizedQuery);
+        [demo.name, category, formatCategoryPath(category)]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
       return matchesNav && matchesSearch;
     });
   }, [demos, normalizedQuery, selectedNav]);
@@ -180,10 +277,15 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         selectedNav.type === "all" ||
         selectedNav.type === "templates" ||
         (selectedNav.type === "template-category" &&
-          template.category === selectedNav.category);
+          matchesCategorySelection(template.category, selectedNav));
       const matchesSearch =
         !normalizedQuery ||
-        [template.name, template.description, template.category]
+        [
+          template.name,
+          template.description,
+          template.category,
+          formatCategoryPath(template.category),
+        ]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery);
@@ -639,24 +741,66 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                 count={demos.length}
                 onClick={() => setSelectedNav({ type: "all" })}
               />
-              {projectCategories.map((category) => (
-                <NavButton
-                  key={category}
-                  active={
-                    selectedNav.type === "project-category" &&
-                    selectedNav.category === category
-                  }
-                  icon={<Folder className="h-4 w-4 shrink-0" />}
-                  label={category}
-                  count={
-                    demos.filter(
-                      (demo) => normalizeCategory(demo.category) === category,
-                    ).length
-                  }
-                  onClick={() =>
-                    setSelectedNav({ type: "project-category", category })
-                  }
-                />
+              {projectCategoryTree.map((category) => (
+                <div key={category.value} className="min-w-max md:min-w-0">
+                  <NavButton
+                    active={
+                      selectedNav.type === "project-category" &&
+                      selectedNav.category === category.value &&
+                      !selectedNav.exact
+                    }
+                    icon={<Folder className="h-4 w-4 shrink-0" />}
+                    label={category.label}
+                    count={
+                      demos.filter((demo) =>
+                        matchesCategorySelection(demo.category, {
+                          category: category.value,
+                        }),
+                      ).length
+                    }
+                    onClick={() =>
+                      setSelectedNav({
+                        type: "project-category",
+                        category: category.value,
+                      })
+                    }
+                  />
+                  {category.children.map((child) => (
+                    <button
+                      key={child.value}
+                      type="button"
+                      onClick={() =>
+                        setSelectedNav({
+                          type: "project-category",
+                          category: child.value,
+                          exact: true,
+                        })
+                      }
+                      className={cn(
+                        "mt-1 flex h-8 w-full min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:ml-5 md:min-w-0",
+                        selectedNav.type === "project-category" &&
+                          selectedNav.category === child.value &&
+                          selectedNav.exact
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {child.label}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {
+                          demos.filter((demo) =>
+                            matchesCategorySelection(demo.category, {
+                              category: child.value,
+                              exact: true,
+                            }),
+                          ).length
+                        }
+                      </span>
+                    </button>
+                  ))}
+                </div>
               ))}
               <button
                 type="button"
@@ -683,30 +827,75 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                 </span>
               </button>
               {templatesExpanded &&
-                templateCategories.map((category) => (
+                templateCategoryTree.map((category) => (
+                  <div key={category.value} className="min-w-max md:min-w-0">
                   <button
-                    key={category}
                     type="button"
                     onClick={() =>
-                      setSelectedNav({ type: "template-category", category })
+                      setSelectedNav({
+                        type: "template-category",
+                        category: category.value,
+                      })
                     }
                     className={cn(
                       "flex h-8 min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:ml-5 md:min-w-0",
                       selectedNav.type === "template-category" &&
-                        selectedNav.category === category
+                        selectedNav.category === category.value &&
+                        !selectedNav.exact
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground",
                     )}
                   >
-                    <span className="min-w-0 flex-1 truncate">{category}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {category.label}
+                    </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {
                         templates.filter(
-                          (template) => template.category === category,
+                          (template) =>
+                            matchesCategorySelection(template.category, {
+                              category: category.value,
+                            }),
                         ).length
                       }
                     </span>
                   </button>
+                    {category.children.map((child) => (
+                      <button
+                        key={child.value}
+                        type="button"
+                        onClick={() =>
+                          setSelectedNav({
+                            type: "template-category",
+                            category: child.value,
+                            exact: true,
+                          })
+                        }
+                        className={cn(
+                          "mt-1 flex h-8 min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:ml-9 md:min-w-0",
+                          selectedNav.type === "template-category" &&
+                            selectedNav.category === child.value &&
+                            selectedNav.exact
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {child.label}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {
+                            templates.filter((template) =>
+                              matchesCategorySelection(template.category, {
+                                category: child.value,
+                                exact: true,
+                              }),
+                            ).length
+                          }
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
             </nav>
           </aside>

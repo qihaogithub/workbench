@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 import { HomePage } from "./home-page";
 import {
@@ -131,9 +137,9 @@ describe("HomePage", () => {
     fireEvent.change(screen.getByLabelText("项目名称"), {
       target: { value: "新活动" },
     });
-    fireEvent.change(screen.getByLabelText("项目分类"), {
-      target: { value: "活动" },
-    });
+    expect(screen.getByLabelText("项目分类").tagName).toBe("BUTTON");
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "活动" }));
     fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
 
     await waitFor(() => {
@@ -148,13 +154,54 @@ describe("HomePage", () => {
     fireEvent.change(screen.getByLabelText("项目名称"), {
       target: { value: "模板同类项目" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "选择已有项目分类" }));
+    fireEvent.click(screen.getByLabelText("项目分类"));
     fireEvent.click(await screen.findByRole("button", { name: "知识库验证" }));
     fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
 
     await waitFor(() => {
       expect(mockCreateDemo).toHaveBeenCalledWith("模板同类项目", "知识库验证");
     });
+  });
+
+  it("分类字段点击自定义后才允许输入新分类路径", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "添加空白项目" }));
+    fireEvent.change(screen.getByLabelText("项目名称"), {
+      target: { value: "资源位弹窗" },
+    });
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
+    fireEvent.change(screen.getByLabelText("项目分类"), {
+      target: { value: "APP资源位 / 弹窗" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
+
+    await waitFor(() => {
+      expect(mockCreateDemo).toHaveBeenCalledWith(
+        "资源位弹窗",
+        "APP资源位/弹窗",
+      );
+    });
+  });
+
+  it("自定义分类路径不能包含空层级", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "添加空白项目" }));
+    fireEvent.change(screen.getByLabelText("项目名称"), {
+      target: { value: "非法分类项目" },
+    });
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
+    fireEvent.change(screen.getByLabelText("项目分类"), {
+      target: { value: "/弹窗" },
+    });
+
+    expect(
+      screen.getByText("分类路径不能以 / 开头或结尾，也不能包含连续的 /"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建项目" })).toBeDisabled();
   });
 
   it("模板更多菜单中使用此模板新建会带上输入的项目分类", async () => {
@@ -170,6 +217,8 @@ describe("HomePage", () => {
     fireEvent.change(screen.getByLabelText("项目名称"), {
       target: { value: "模板生成项目" },
     });
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
     fireEvent.change(screen.getByLabelText("项目分类"), {
       target: { value: "模板项目" },
     });
@@ -253,6 +302,8 @@ describe("HomePage", () => {
       screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: /修改分类/ }));
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
     fireEvent.change(screen.getByLabelText("项目分类"), {
       target: { value: "新模板分类" },
     });
@@ -307,6 +358,8 @@ describe("HomePage", () => {
       screen.getByRole("button", { name: "打开项目 活动页 的更多操作" }),
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: /修改分类/ }));
+    fireEvent.click(screen.getByLabelText("项目分类"));
+    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
     fireEvent.change(screen.getByLabelText("项目分类"), {
       target: { value: "新分类" },
     });
@@ -317,5 +370,53 @@ describe("HomePage", () => {
         category: "新分类",
       });
     });
+  });
+
+  it("首页父分类包含子分类项目，子分类只展示完整匹配项目", () => {
+    mockUseDemos.mockReturnValue({
+      demos: [
+        {
+          id: "proj-parent",
+          name: "资源位首页",
+          category: "APP资源位",
+          createdAt: 1,
+          updatedAt: 2,
+          demoPages: [],
+        },
+        {
+          id: "proj-child",
+          name: "弹窗页",
+          category: "APP资源位/弹窗",
+          createdAt: 1,
+          updatedAt: 2,
+          demoPages: [],
+        },
+      ],
+      isLoading: false,
+      error: null,
+      revalidate: jest.fn(),
+    });
+
+    render(<HomePage initialDemos={[]} />);
+
+    const nav = screen.getByRole("navigation", { name: "项目目录" });
+    fireEvent.click(within(nav).getByRole("button", { name: /APP资源位\s+2/ }));
+
+    expect(
+      screen.getByRole("link", { name: "打开项目 资源位首页" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "打开项目 弹窗页" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("APP资源位 / 弹窗")).toBeInTheDocument();
+
+    fireEvent.click(within(nav).getByRole("button", { name: /弹窗\s+1/ }));
+
+    expect(
+      screen.queryByRole("link", { name: "打开项目 资源位首页" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "打开项目 弹窗页" }),
+    ).toBeInTheDocument();
   });
 });

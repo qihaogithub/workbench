@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { ScreenshotRenderBox } from "@opencode-workbench/demo-ui";
 
 const POLL_INTERVAL = 1500;
+const MIN_POLL_INTERVAL_MS = 300;
+const MAX_POLL_INTERVAL_MS = 5_000;
 const MAX_POLL_DURATION_MS = 60_000;
 const MAX_POLL_FAILURES = 3;
 const INVALIDATED_SCREENSHOT_HASH = "__invalidated__";
@@ -59,6 +61,13 @@ interface BatchResult {
   error?: string;
 }
 
+interface BatchStatusResponseData {
+  status?: "running" | "completed" | "cancelled";
+  cancelled?: boolean;
+  retryAfterMs?: number;
+  results?: BatchResult[];
+}
+
 interface ScreenshotMetaResponse {
   currentHash?: string;
   renderBox?: ScreenshotRenderBox;
@@ -68,6 +77,16 @@ function isServiceUnavailable(result: unknown): boolean {
   if (!result || typeof result !== "object") return false;
   const error = (result as { error?: { code?: string } }).error;
   return error?.code === "SCREENSHOT_SERVICE_UNAVAILABLE";
+}
+
+function normalizeRetryAfterMs(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return POLL_INTERVAL;
+  }
+  return Math.min(
+    MAX_POLL_INTERVAL_MS,
+    Math.max(MIN_POLL_INTERVAL_MS, Math.round(value)),
+  );
 }
 
 export function useScreenshotGeneration(
@@ -83,7 +102,7 @@ export function useScreenshotGeneration(
   const [serviceAvailable, setServiceAvailable] = useState<boolean | null>(
     null,
   );
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const batchIdRef = useRef<string | null>(null);
   const pollStartedAtRef = useRef<number | null>(null);
   const pollFailuresRef = useRef(0);
@@ -156,7 +175,7 @@ export function useScreenshotGeneration(
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
+      clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
     }
     pollStartedAtRef.current = null;
@@ -250,6 +269,17 @@ export function useScreenshotGeneration(
       if (!projectId) return;
       if (batchIdRef.current !== currentBatchId) return;
 
+      const scheduleNextPoll = (retryAfterMs?: number) => {
+        if (batchIdRef.current !== currentBatchId) return;
+        if (pollTimerRef.current) {
+          clearTimeout(pollTimerRef.current);
+        }
+        pollTimerRef.current = setTimeout(
+          () => void pollBatchStatus(currentBatchId),
+          normalizeRetryAfterMs(retryAfterMs),
+        );
+      };
+
       if (
         pollStartedAtRef.current &&
         Date.now() - pollStartedAtRef.current > MAX_POLL_DURATION_MS
@@ -267,6 +297,9 @@ export function useScreenshotGeneration(
         );
         if (!response.ok) {
           markPollingFailure();
+          if (pollFailuresRef.current < MAX_POLL_FAILURES) {
+            scheduleNextPoll();
+          }
           return;
         }
 
@@ -275,14 +308,17 @@ export function useScreenshotGeneration(
 
         if (!result.success) {
           markPollingFailure();
+          if (pollFailuresRef.current < MAX_POLL_FAILURES) {
+            scheduleNextPoll();
+          }
           return;
         }
 
         pollFailuresRef.current = 0;
         setServiceAvailable(true);
-        const { data } = result;
+        const data = result.data as BatchStatusResponseData;
         const statusResults = Array.isArray(data.results)
-          ? (data.results as BatchResult[])
+          ? data.results
           : [];
 
         for (const pageResult of statusResults) {
@@ -343,9 +379,14 @@ export function useScreenshotGeneration(
 
         if (data.status === "completed" || data.cancelled) {
           stopPolling();
+        } else {
+          scheduleNextPoll(data.retryAfterMs);
         }
       } catch {
         markPollingFailure();
+        if (pollFailuresRef.current < MAX_POLL_FAILURES) {
+          scheduleNextPoll();
+        }
       }
     },
     [projectId, getScreenshotUrl, markPollingFailure, stopPolling],
@@ -414,12 +455,9 @@ export function useScreenshotGeneration(
           });
 
           if (pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
+            clearTimeout(pollTimerRef.current);
+            pollTimerRef.current = null;
           }
-          pollTimerRef.current = setInterval(
-            () => pollBatchStatus(newBatchId),
-            POLL_INTERVAL,
-          );
 
           pollBatchStatus(newBatchId);
         } else {
@@ -569,7 +607,7 @@ export function useScreenshotGeneration(
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
+        clearTimeout(pollTimerRef.current);
         pollTimerRef.current = null;
       }
       pollStartedAtRef.current = null;
