@@ -30,6 +30,9 @@ services:
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
     volumes:
       - app-data:/app/data
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 512
     restart: unless-stopped
 
   author-site:
@@ -66,6 +69,9 @@ services:
       - app-data:/app/data
     depends_on:
       - agent-service
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 512
     restart: unless-stopped
 
   screenshot-service:
@@ -85,6 +91,10 @@ services:
       - app-data:/app/data
     depends_on:
       - author-site
+    cpus: "1.0"
+    mem_limit: 1536m
+    pids_limit: 768
+    shm_size: 256m
     restart: unless-stopped
 
   viewer-site:
@@ -100,6 +110,9 @@ services:
       - app-data:/app/data:ro
     depends_on:
       - author-site
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 256
     restart: unless-stopped
 
 volumes:
