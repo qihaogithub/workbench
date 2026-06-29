@@ -1,0 +1,28 @@
+{
+  "id": "proj_1782718595285_h4lda7",
+  "name": "我的页面",
+  "category": "APP资源位",
+  "description": "资源预览",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782718595285_h4lda7/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779934698596_dvvk55",
+      "name": "demo",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "demo"
+    },
+    {
+      "id": "demo_1779935678404_lxsasc",
+      "name": "demo",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "demo-2"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "pageVersions": {},
+  "createdAt": 1782718595290,
+  "updatedAt": 1782723637869
+}

@@ -27,7 +27,6 @@ import {
   Sparkles,
   RotateCcw,
   Undo2,
-  ListChecks,
   ExternalLink,
   RefreshCw,
   Link2,
@@ -508,7 +507,7 @@ export function AssistantMessage({
     return null;
   }
 
-  const showInitialLoading = isStreaming && renderBlocks.length === 0;
+  const showRunProgressPanel = isStreaming && renderBlocks.length === 0;
 
   const allTextContent = renderBlocks
     .filter((b) => b.type === "text")
@@ -530,13 +529,6 @@ export function AssistantMessage({
         className,
       )}
     >
-      {showInitialLoading && (
-        <Reasoning isStreaming={true}>
-          <ReasoningTrigger />
-          <ReasoningContent>{""}</ReasoningContent>
-        </Reasoning>
-      )}
-
       {renderBlocks.map((block, index) => {
         if (block.type === "reasoning-group") {
           const lastDuration =
@@ -706,11 +698,7 @@ export function AssistantMessage({
         return null;
       })}
 
-      {isStreaming && (
-        <RunProgressPanel
-          isStreaming={isStreaming}
-        />
-      )}
+      {showRunProgressPanel && <RunProgressPanel />}
 
       {allTextContent && (
         <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1023,22 +1011,52 @@ function SubagentStatusBar({
   );
 }
 
-function RunProgressPanel({
-  isStreaming,
-}: {
-  isStreaming: boolean;
-}) {
-  if (!isStreaming) return null;
+const WORKING_DOT_PATH = [
+  1, 2, 3, 8, 13, 18, 23, 22, 21, 16, 11, 6, 5, 10, 15, 20, 12, 7, 0,
+] as const;
 
+const WORKING_DOT_ORDER: Map<number, number> = new Map<number, number>(
+  WORKING_DOT_PATH.map((dotIndex, order): [number, number] => [
+    dotIndex,
+    order,
+  ]),
+);
+
+function DotMatrixWorkingIndicator() {
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border/35 bg-muted/15 px-3 py-2 text-xs">
-      <ListChecks className="h-3.5 w-3.5 flex-shrink-0 animate-pulse text-muted-foreground" />
-      <span className="font-medium text-foreground/80">AI 正在处理</span>
-      <span className="inline-flex items-center gap-1 text-muted-foreground/60">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
-      </span>
+    <div className="grid grid-cols-5 gap-[2px]" aria-hidden="true">
+      {Array.from({ length: 25 }, (_, index) => {
+        const order = WORKING_DOT_ORDER.get(index);
+        return (
+          <span
+            key={index}
+            data-testid="ai-working-dot"
+            className={cn(
+              "ai-working-dot h-[3px] w-[3px] rounded-full",
+              order === undefined && "ai-working-dot-idle",
+              order === 0 && "ai-working-dot-current",
+            )}
+            style={
+              order === undefined
+                ? undefined
+                : { animationDelay: `${order * -76}ms` }
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function RunProgressPanel() {
+  return (
+    <div
+      role="status"
+      aria-label="AI 正在处理"
+      data-testid="ai-working-indicator"
+      className="flex justify-start px-1 py-0.5"
+    >
+      <DotMatrixWorkingIndicator />
     </div>
   );
 }

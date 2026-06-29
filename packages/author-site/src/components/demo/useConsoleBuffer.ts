@@ -40,6 +40,13 @@ export function useConsoleBuffer(
 
   const handleConsoleEntry = useCallback(
     (entry: ConsoleLogPayload) => {
+      if (entry.args.includes('"source":"preview-runtime"')) {
+        try {
+          console.info("[PreviewRuntime]", JSON.parse(entry.args));
+        } catch {
+          console.info("[PreviewRuntime]", entry.args);
+        }
+      }
       pendingRef.current.push(entry);
       if (!timerRef.current) {
         timerRef.current = setTimeout(flush, FLUSH_INTERVAL);

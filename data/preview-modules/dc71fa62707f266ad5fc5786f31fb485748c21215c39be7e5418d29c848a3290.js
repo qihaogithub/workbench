@@ -1,0 +1,1 @@
+import {jsx as _jsx} from "http://127.0.0.1:3210/preview-runtime/vendor/react-jsx-runtime.js";export default function Demo(){return _jsx('div', { children: "Hello"})}

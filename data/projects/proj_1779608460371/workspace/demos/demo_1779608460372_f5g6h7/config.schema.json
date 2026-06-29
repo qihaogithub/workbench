@@ -8,31 +8,5 @@
   },
   "title": "伴读广告 - 手机版配置",
   "type": "object",
-  "properties": {
-    "mainTitle": {
-      "type": "string",
-      "title": "主标题",
-      "default": "专业老师伴读，学习更高效"
-    },
-    "subTitle": {
-      "type": "string",
-      "title": "副标题",
-      "default": "1对1指导，帮助孩子养成良好学习习惯"
-    },
-    "primaryBtnText": {
-      "type": "string",
-      "title": "主按钮文案",
-      "default": "立即体验"
-    },
-    "secondaryBtnText": {
-      "type": "string",
-      "title": "次按钮文案",
-      "default": "了解更多"
-    },
-    "showTitles": {
-      "type": "boolean",
-      "title": "显示标题",
-      "default": true
-    }
-  }
+  "properties": {}
 }

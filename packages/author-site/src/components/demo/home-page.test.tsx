@@ -141,6 +141,22 @@ describe("HomePage", () => {
     });
   });
 
+  it("分类字段可以从已有分类下拉列表中选择", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "添加空白项目" }));
+    fireEvent.change(screen.getByLabelText("项目名称"), {
+      target: { value: "模板同类项目" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "选择已有项目分类" }));
+    fireEvent.click(await screen.findByRole("button", { name: "知识库验证" }));
+    fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
+
+    await waitFor(() => {
+      expect(mockCreateDemo).toHaveBeenCalledWith("模板同类项目", "知识库验证");
+    });
+  });
+
   it("模板更多菜单中使用此模板新建会带上输入的项目分类", async () => {
     render(<HomePage initialDemos={demos} />);
 

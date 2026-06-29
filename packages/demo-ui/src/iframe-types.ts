@@ -73,13 +73,68 @@ export interface VisualNodeInfo {
     color?: string;
     backgroundColor?: string;
     borderColor?: string;
+    borderWidth?: string;
+    borderStyle?: string;
+    borderRadius?: string;
+    borderTopLeftRadius?: string;
+    borderTopRightRadius?: string;
+    borderBottomRightRadius?: string;
+    borderBottomLeftRadius?: string;
+    boxShadow?: string;
+    boxSizing?: string;
+    filter?: string;
+    overflow?: string;
+    opacity?: string;
+    fontFamily?: string;
+    fontSize?: string;
+    fontWeight?: string;
+    lineHeight?: string;
+    letterSpacing?: string;
+    textAlign?: string;
+    width?: string;
+    height?: string;
+    padding?: string;
+    paddingTop?: string;
+    paddingRight?: string;
+    paddingBottom?: string;
+    paddingLeft?: string;
+    margin?: string;
+    marginTop?: string;
+    marginRight?: string;
+    marginBottom?: string;
+    marginLeft?: string;
+    display?: string;
+    flexDirection?: string;
+    justifyContent?: string;
+    alignItems?: string;
+    gap?: string;
   };
   sourceFile?: string;
   sourceStart?: number;
   sourceEnd?: number;
   sourceLine?: number;
   sourceColumn?: number;
-  editCapabilities: Array<'annotate' | 'text' | 'className' | 'structure'>;
+  editCapabilities: Array<'annotate' | 'text' | 'image' | 'link' | 'style' | 'className' | 'structure'>;
+}
+
+export type VisualPropertyChangeKind = 'text' | 'style' | 'attribute';
+
+export interface VisualPropertyChange {
+  id: string;
+  nodeId: string;
+  domPath: string;
+  kind: VisualPropertyChangeKind;
+  property: string;
+  label: string;
+  value: string;
+  previousValue?: string;
+  resource?: {
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    temporary?: boolean;
+  };
 }
 
 export interface VisualStyleChange {

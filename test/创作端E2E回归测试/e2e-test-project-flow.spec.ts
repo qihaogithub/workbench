@@ -1,11 +1,33 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+
+import {
+  E2E_PROJECT_CATEGORY,
+  e2eProjectName,
+  ensureE2EProjectCategory,
+} from './support/e2e-projects';
 
 const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
 const E2E_USER = process.env.E2E_USER ?? 'qihao';
 const E2E_PASSWORD = process.env.E2E_PASSWORD ?? '130015';
+
+type ApiEnvelope<T> = {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+};
+
+type ProjectMeta = {
+  id: string;
+  name: string;
+  category?: string;
+  createdAt?: number;
+  updatedAt?: number;
+};
 
 const TEMPLATE_CODE = `=== DEMO CODE ===
 
@@ -157,7 +179,7 @@ class TestLogger {
   }
 }
 
-async function doLogin(page: any, logger: TestLogger): Promise<boolean> {
+async function doLogin(page: Page, logger: TestLogger): Promise<boolean> {
   const currentUrl = page.url();
   if (currentUrl.includes('/login')) {
     logger.log('检测到登录页面，正在登录...');
@@ -177,7 +199,7 @@ async function doLogin(page: any, logger: TestLogger): Promise<boolean> {
     const loginButton = page.getByRole('button', { name: /^登录$/i }).first();
     await loginButton.waitFor({ state: 'visible', timeout: 10000 });
     const loginResponsePromise = page.waitForResponse(
-      (response: any) =>
+      (response) =>
         response.url().includes('/api/auth/login') &&
         response.request().method() === 'POST',
       { timeout: 15000 },
@@ -245,7 +267,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       const createDialog = page.getByRole('dialog');
       await createDialog.waitFor({ state: 'visible', timeout: 10000 });
 
-      projectName = `测试项目-${crypto.randomBytes(4).toString('hex')}`;
+      projectName = e2eProjectName('项目创建和代码编辑完整流程');
       logger.log(`项目名称: ${projectName}`);
 
       const nameInput = createDialog.locator('#project-name');
@@ -253,9 +275,29 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await nameInput.fill(projectName);
       logger.log('已填写项目名称');
 
+      const categoryInput = createDialog.locator('#project-category');
+      if (await categoryInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await categoryInput.fill(E2E_PROJECT_CATEGORY);
+        logger.log('已填写 E2E 项目分类');
+      }
+
+      const createResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/demos') &&
+          response.request().method() === 'POST',
+      );
       const createButton = createDialog.getByRole('button', { name: /创建|创建项目/i });
       await createButton.click();
       logger.success('已创建项目');
+
+      const createResponse = await createResponsePromise;
+      const createBody = (await createResponse.json()) as ApiEnvelope<ProjectMeta>;
+      if (!createResponse.ok() || !createBody.success || !createBody.data) {
+        throw new Error(`创建项目请求失败: ${JSON.stringify(createBody)}`);
+      }
+      createdProjectId = createBody.data.id;
+      await ensureE2EProjectCategory(page.request, createBody.data);
+      logger.log(`项目 ID: ${createdProjectId}`);
 
       await page.waitForTimeout(3000);
 
@@ -265,14 +307,10 @@ test.describe('项目创建和代码编辑完整流程', () => {
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
-      // 从 URL 中提取项目 ID
+      // 从 URL 中校验项目 ID
       const currentUrl = page.url();
       const match = currentUrl.match(/\/demo\/(proj_[^/]+)\/edit/);
-      if (match) {
-        createdProjectId = match[1];
-        logger.log(`项目 ID: ${createdProjectId}`);
-      }
-      if (!createdProjectId) {
+      if (!match || match[1] !== createdProjectId) {
         throw new Error(`未能从 URL 获取项目 ID: ${currentUrl}`);
       }
 

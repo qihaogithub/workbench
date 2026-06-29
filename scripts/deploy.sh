@@ -22,72 +22,48 @@ NC='\033[0m'
 
 echo -e "${BLUE}🚀 开始一键部署流程...${NC}"
 
-# ================= 0. 读取本地环境变量并生成部署环境文件 =================
+# ================= 0. 生成部署环境文件 =================
 if [ ! -f "${LOCAL_ENV_FILE}" ]; then
     echo -e "${RED}❌ 未找到环境变量文件: ${LOCAL_ENV_FILE}${NC}"
     echo -e "${YELLOW}   请复制 .env.docker 为模板并填写实际配置${NC}"
     exit 1
 fi
 
-read_env_value() {
-    local key="$1"
-    python3 - "${LOCAL_ENV_FILE}" "${key}" <<'PY'
+python3 - "${LOCAL_ENV_FILE}" "${DEPLOY_ENV_FILE}" <<'PY'
 import sys
 
 env_path = sys.argv[1]
-target_key = sys.argv[2]
-value = ""
+out_path = sys.argv[2]
+values = {}
+order = []
 with open(env_path, "r", encoding="utf-8") as f:
     for raw_line in f:
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, val = line.split("=", 1)
-        if key.strip() == target_key:
-            value = val.strip().strip('"').strip("'")
-            break
-print(value)
-PY
+        key = key.strip()
+        if not key.replace("_", "").isalnum() or key[0].isdigit():
+            continue
+        if key not in values:
+            order.append(key)
+        values[key] = val.strip()
+
+defaults = {
+    "USE_SECURE_COOKIE": "false",
 }
+for key, value in defaults.items():
+    if key not in values:
+        order.append(key)
+        values[key] = value
 
-NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES="$(read_env_value "NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES")"
-NEXT_PUBLIC_MODEL_NAME_FILTERS="$(read_env_value "NEXT_PUBLIC_MODEL_NAME_FILTERS")"
-NEXT_PUBLIC_AGENT_SERVICE_URL="$(read_env_value "NEXT_PUBLIC_AGENT_SERVICE_URL")"
-NEXT_PUBLIC_WEB_URL="$(read_env_value "NEXT_PUBLIC_WEB_URL")"
-CORS_ORIGINS="$(read_env_value "CORS_ORIGINS")"
-JWT_SECRET="$(read_env_value "JWT_SECRET")"
-USE_SECURE_COOKIE="$(read_env_value "USE_SECURE_COOKIE")"
-INTERNAL_API_TOKEN="$(read_env_value "INTERNAL_API_TOKEN")"
-ADMIN_SECRET="$(read_env_value "ADMIN_SECRET")"
-PI_AGENT_PROVIDER="$(read_env_value "PI_AGENT_PROVIDER")"
-PI_AGENT_API_KEY="$(read_env_value "PI_AGENT_API_KEY")"
-PI_AGENT_MODEL="$(read_env_value "PI_AGENT_MODEL")"
-PI_AGENT_BASE_URL="$(read_env_value "PI_AGENT_BASE_URL")"
-
-NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="$(read_env_value "NEXT_PUBLIC_SCREENSHOT_SERVICE_URL")"
-NEXT_PUBLIC_VIEWER_URL="$(read_env_value "NEXT_PUBLIC_VIEWER_URL")"
-
-# 生成部署环境文件
-cat > "${DEPLOY_ENV_FILE}" <<EOF
-NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
-NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
-NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
-NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL}
-NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL}
-NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
-CORS_ORIGINS=${CORS_ORIGINS}
-JWT_SECRET=${JWT_SECRET}
-USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
-INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
-ADMIN_SECRET=${ADMIN_SECRET}
-PI_AGENT_PROVIDER=${PI_AGENT_PROVIDER}
-PI_AGENT_API_KEY=${PI_AGENT_API_KEY}
-PI_AGENT_MODEL=${PI_AGENT_MODEL}
-PI_AGENT_BASE_URL=${PI_AGENT_BASE_URL}
-EOF
+with open(out_path, "w", encoding="utf-8") as f:
+    for key in order:
+        f.write(f"{key}={values[key]}\n")
+PY
 
 trap 'rm -f "${DEPLOY_ENV_FILE}"' EXIT
-echo -e "${GREEN}✅ 已读取部署配置并生成环境文件${NC}"
+echo -e "${GREEN}✅ 已从 .env.docker 生成部署环境文件${NC}"
 
 # ================= 获取 Git 版本信息 =================
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -139,17 +115,27 @@ rsync -avz --progress --delete \
     --exclude '/.codegraph/' \
     --exclude '/.env' \
     --exclude '/.env.docker' \
+    --exclude '/.tmp/' \
+    --exclude '/.pnpm-store/' \
     --exclude '/.venv/' \
+    --exclude '/data/' \
     --exclude '/node_modules/' \
+    --exclude '/OPS/CLI/dist/' \
+    --exclude '/OPS/CLI/node_modules/' \
     --exclude '/packages/*/node_modules/' \
+    --exclude '/packages/*/dist/' \
+    --exclude '/packages/*/out/' \
+    --exclude '/packages/*/tsconfig.tsbuildinfo' \
     --exclude '/packages/author-site/.next/' \
     --exclude '/packages/viewer-site/.next/' \
-    --exclude '/packages/agent-service/dist/' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
+    --exclude '*.png' \
     --exclude '.DS_Store' \
     --exclude '/docs/' \
+    --exclude '/test/' \
     --exclude '/tests/' \
+    --exclude '/tmp/' \
     --exclude 'deploy.sh' \
     -e "ssh -p ${SERVER_PORT} -i ${SSH_KEY} -o StrictHostKeyChecking=no" \
     ./ \

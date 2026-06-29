@@ -2,6 +2,9 @@
 import { expect, type APIResponse, type Page, test } from '@playwright/test';
 import * as crypto from 'crypto';
 
+import { loginE2EUser } from './support/e2e-auth';
+import { createE2EProject } from './support/e2e-projects';
+
 const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
 const E2E_USER = process.env.E2E_USER ?? 'qihao';
 const E2E_PASSWORD = process.env.E2E_PASSWORD ?? '130015';
@@ -126,25 +129,13 @@ async function parseApiResponse<T>(response: APIResponse): Promise<ApiSuccess<T>
   return body as ApiSuccess<T>;
 }
 
-async function loginIfNeeded(page: Page): Promise<void> {
-  if (!page.url().includes('/login')) return;
-
-  await page.locator('#username').fill(E2E_USER);
-  await page.locator('#password').fill(E2E_PASSWORD);
-
-  const loginResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/auth/login') &&
-      response.request().method() === 'POST',
-  );
-  await page.getByRole('button', { name: /^登录$/ }).click();
-  await parseApiResponse(await loginResponsePromise);
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'));
-}
-
 async function openHome(page: Page): Promise<void> {
+  await loginE2EUser(page, {
+    baseURL: E2E_BASE_URL,
+    username: E2E_USER,
+    password: E2E_PASSWORD,
+  });
   await page.goto(E2E_BASE_URL, { waitUntil: 'domcontentloaded' });
-  await loginIfNeeded(page);
   await page.waitForLoadState('networkidle');
 }
 
@@ -163,53 +154,15 @@ function waitForEditSession(page: Page, projectId?: string): Promise<APIResponse
   });
 }
 
-async function createProjectFromUi(page: Page, projectName: string): Promise<DemoMeta> {
-  const newProjectButton = page.getByRole('button', {
-    name: /添加空白项目|新建 Demo|添加项目|新建项目/,
-  });
-  await expect(newProjectButton).toBeVisible();
-  await newProjectButton.click();
-
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.locator('#project-name').fill(projectName);
-
-  const createResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/demos') &&
-      response.request().method() === 'POST',
-  );
-  await dialog.getByRole('button', { name: /创建|创建项目/ }).click();
-
-  const createBody = await parseApiResponse<DemoMeta>(await createResponsePromise);
-  expect(createBody.data.name).toBe(projectName);
-
-  await page.waitForURL(
-    (url) =>
-      url.pathname === `/demo/${createBody.data.id}/edit` ||
-      url.pathname.startsWith('/login'),
-    { timeout: 30000 },
-  );
-  await loginIfNeeded(page);
-  await page.waitForURL((url) => url.pathname === `/demo/${createBody.data.id}/edit`, {
-    timeout: 30000,
-  });
-  await expect(page.getByRole('heading', { name: projectName })).toBeVisible({
-    timeout: 30000,
-  });
-
-  return createBody.data;
-}
-
 async function createAutosaveProject(
   page: Page,
-  projectName: string,
+  caseName: string,
 ): Promise<AutosaveProjectContext> {
-  const sessionPromise = waitForEditSession(page);
-  const project = await createProjectFromUi(page, projectName);
-  const sessionBody = await parseApiResponse<SessionCreateResult>(
-    await sessionPromise,
-  );
+  const project = await createE2EProject(page, caseName);
+  const response = await page.request.post('/api/sessions', {
+    data: { demoId: project.id, forceNew: true },
+  });
+  const sessionBody = await parseApiResponse<SessionCreateResult>(response);
 
   return {
     project,
@@ -526,11 +479,6 @@ function getSessionIdFromCanvasLayoutUrl(url: string): string | null {
   return /\/api\/sessions\/([^/]+)\/canvas-layout(?:\?|$)/.exec(url)?.[1] ?? null;
 }
 
-async function deleteProject(page: Page, projectId: string): Promise<void> {
-  const response = await page.request.delete(`/api/demos/${projectId}`);
-  await parseApiResponse<null>(response);
-}
-
 function summarizeCanvasState(state: CanvasState | null): string {
   if (!state) return 'null';
   return JSON.stringify({
@@ -741,102 +689,93 @@ test.describe('画布自动保存与重新打开回归', () => {
   test.describe.configure({ timeout: 150000 });
 
   test('移动页面、编辑工作区内容后直接退出，重新打开应恢复自动保存改动', async ({ page }) => {
-    const projectName = `画布退出恢复回归-${crypto.randomBytes(4).toString('hex')}`;
     const markerText = `exit-reopen-text-${crypto.randomBytes(3).toString('hex')}`;
     const codeMarker = crypto.randomBytes(3).toString('hex');
     const memoryMarker = crypto.randomBytes(3).toString('hex');
     const knowledgeMarker = crypto.randomBytes(3).toString('hex');
     const folderName = `自动保存文件夹-${crypto.randomBytes(3).toString('hex')}`;
-    let projectId: string | undefined;
 
-    try {
-      await openHome(page);
+    await openHome(page);
 
-      const { project, sessionId } = await createAutosaveProject(page, projectName);
-      projectId = project.id;
-      const editSessionId = await ensureProjectHasCanvasPage(page, project, sessionId);
-      const filesBeforeEdits = await getSessionFiles(page, editSessionId);
-      const firstPage = filesBeforeEdits.demoPages[0];
-      expect(firstPage, '测试项目应有第一个页面').toBeTruthy();
+    const { project, sessionId } = await createAutosaveProject(page, '画布退出恢复回归');
+    const editSessionId = await ensureProjectHasCanvasPage(page, project, sessionId);
+    const filesBeforeEdits = await getSessionFiles(page, editSessionId);
+    const firstPage = filesBeforeEdits.demoPages[0];
+    expect(firstPage, '测试项目应有第一个页面').toBeTruthy();
 
-      const secondPage = await createDemoPage(
-        page,
-        project.id,
-        editSessionId,
-        '自动保存顺序页',
-      );
-      await updateDemoPageCode(page, editSessionId, firstPage.id, codeMarker);
-      const folder = await createDemoFolder(page, project.id, editSessionId, folderName);
-      await reorderPagesAndFolders(
-        page,
-        project.id,
-        editSessionId,
-        [
-          { id: secondPage.id, order: 0, parentId: null },
-          { id: firstPage.id, order: 1, parentId: null },
-        ],
-        [{ id: folder.id, order: 0, parentId: null }],
-      );
-      await updateMemoryFile(page, editSessionId, memoryMarker);
-      const knowledgeItem = await createKnowledgeDocument(
-        page,
-        filesBeforeEdits.workspacePath,
+    const secondPage = await createDemoPage(
+      page,
+      project.id,
+      editSessionId,
+      '自动保存顺序页',
+    );
+    await updateDemoPageCode(page, editSessionId, firstPage.id, codeMarker);
+    const folder = await createDemoFolder(page, project.id, editSessionId, folderName);
+    await reorderPagesAndFolders(
+      page,
+      project.id,
+      editSessionId,
+      [
+        { id: secondPage.id, order: 0, parentId: null },
+        { id: firstPage.id, order: 1, parentId: null },
+      ],
+      [{ id: folder.id, order: 0, parentId: null }],
+    );
+    await updateMemoryFile(page, editSessionId, memoryMarker);
+    const knowledgeItem = await createKnowledgeDocument(
+      page,
+      filesBeforeEdits.workspacePath,
+      knowledgeMarker,
+    );
+    await saveSession(page, editSessionId);
+
+    const canvasSessionPromise = waitForEditSession(page, project.id);
+    await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByRole('heading', { name: project.name })).toBeVisible({
+      timeout: 30000,
+    });
+    await parseApiResponse<SessionCreateResult>(await canvasSessionPromise);
+
+    await switchToCanvas(page);
+    const canvasSaveResponsePromise = waitForCanvasLayoutSave(page);
+    const movedPageId = await dragFirstCanvasPage(page);
+    await addTextNode(page, markerText);
+
+    await exitEditorToHomeAfterAutosaveFlush(page, canvasSaveResponsePromise, {
+      movedPageId,
+      markerText,
+    });
+
+    const reopenedSessionPromise = waitForEditSession(page, project.id);
+    await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByRole('heading', { name: project.name })).toBeVisible({
+      timeout: 30000,
+    });
+
+    const reopenedSessionBody = await parseApiResponse<SessionCreateResult>(
+      await reopenedSessionPromise,
+    );
+    await assertCanvasLayoutPersisted(
+      page,
+      reopenedSessionBody.data.sessionId,
+      { movedPageId, markerText },
+    );
+    await assertExtendedAutosaveContentPersisted(
+      page,
+      reopenedSessionBody.data.sessionId,
+      {
+        codePageId: firstPage.id,
+        codeMarker,
+        firstPageIdAfterReorder: secondPage.id,
+        folderName,
+        memoryMarker,
+        knowledgeTitle: knowledgeItem.title,
         knowledgeMarker,
-      );
-      await saveSession(page, editSessionId);
-
-      const canvasSessionPromise = waitForEditSession(page, project.id);
-      await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
-        waitUntil: 'domcontentloaded',
-      });
-      await expect(page.getByRole('heading', { name: projectName })).toBeVisible({
-        timeout: 30000,
-      });
-      await parseApiResponse<SessionCreateResult>(await canvasSessionPromise);
-
-      await switchToCanvas(page);
-      const canvasSaveResponsePromise = waitForCanvasLayoutSave(page);
-      const movedPageId = await dragFirstCanvasPage(page);
-      await addTextNode(page, markerText);
-
-      await exitEditorToHomeAfterAutosaveFlush(page, canvasSaveResponsePromise, {
-        movedPageId,
-        markerText,
-      });
-
-      const reopenedSessionPromise = waitForEditSession(page, project.id);
-      await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
-        waitUntil: 'domcontentloaded',
-      });
-      await expect(page.getByRole('heading', { name: projectName })).toBeVisible({
-        timeout: 30000,
-      });
-
-      const reopenedSessionBody = await parseApiResponse<SessionCreateResult>(
-        await reopenedSessionPromise,
-      );
-      await assertCanvasLayoutPersisted(
-        page,
-        reopenedSessionBody.data.sessionId,
-        { movedPageId, markerText },
-      );
-      await assertExtendedAutosaveContentPersisted(
-        page,
-        reopenedSessionBody.data.sessionId,
-        {
-          codePageId: firstPage.id,
-          codeMarker,
-          firstPageIdAfterReorder: secondPage.id,
-          folderName,
-          memoryMarker,
-          knowledgeTitle: knowledgeItem.title,
-          knowledgeMarker,
-        },
-      );
-    } finally {
-      if (projectId) {
-        await deleteProject(page, projectId).catch(() => undefined);
-      }
-    }
+      },
+    );
   });
 });

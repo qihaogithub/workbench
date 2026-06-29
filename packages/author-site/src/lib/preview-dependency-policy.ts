@@ -1,6 +1,11 @@
 import * as LucideIcons from "lucide-react";
 
 import { getCdnBaseUrl } from "./cdn-config";
+import {
+  PREVIEW_RUNTIME_MANIFEST_VERSION,
+  type PreviewRuntimeResolveOptions,
+  getPreviewRuntimeUrl,
+} from "./preview-runtime-manifest";
 
 export type PreviewDependencyKind = "core" | "internal" | "sdk";
 
@@ -42,7 +47,7 @@ export class PreviewRuntimeContractError extends Error {
   }
 }
 
-export const PREVIEW_DEPENDENCY_POLICY_VERSION = "2026-06-preview-runtime-v3";
+export const PREVIEW_DEPENDENCY_POLICY_VERSION = PREVIEW_RUNTIME_MANIFEST_VERSION;
 
 export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefinition> = {
   react: { version: "18.3.1", kind: "core" },
@@ -220,9 +225,26 @@ function buildCdnPackageUrl(packageName: string): string {
   return `${ESM_SH_BASE}/${packageName}@${dependency.version}`;
 }
 
-function createPreviewSdkSource(): string {
-  const reactUrl = buildCdnPackageUrl("react");
-  const lucideUrl = buildCdnPackageUrl("lucide-react");
+function buildLocalPackageUrl(
+  packageName: string,
+  options: PreviewRuntimeResolveOptions = {},
+): string | null {
+  const directUrl = getPreviewRuntimeUrl(packageName, options);
+  if (directUrl) return directUrl;
+
+  if (packageName.startsWith("react/")) {
+    return getPreviewRuntimeUrl(packageName, options);
+  }
+  if (packageName.startsWith("react-dom/")) {
+    return getPreviewRuntimeUrl(packageName, options);
+  }
+
+  return null;
+}
+
+function createPreviewSdkSource(options: PreviewRuntimeResolveOptions = {}): string {
+  const reactUrl = getPreviewDependencyUrl("react", options);
+  const lucideUrl = getPreviewDependencyUrl("lucide-react", options);
 
   return `
 import React from '${reactUrl}';
@@ -503,9 +525,21 @@ export function Carousel(props) {
 `;
 }
 
-export function getPreviewDependencyUrl(packageName: string): string {
+export function getPreviewDependencyUrl(
+  packageName: string,
+  options: PreviewRuntimeResolveOptions = {},
+): string {
+  if (!options.preferCdn) {
+    const localUrl = buildLocalPackageUrl(packageName, options);
+    if (localUrl) return localUrl;
+  }
+
   if (packageName === "@preview/sdk") {
-    return `data:application/javascript;charset=utf-8,${encodeURIComponent(createPreviewSdkSource())}`;
+    if (!options.preferCdn) {
+      const localUrl = buildLocalPackageUrl(packageName, options);
+      if (localUrl) return localUrl;
+    }
+    return `data:application/javascript;charset=utf-8,${encodeURIComponent(createPreviewSdkSource(options))}`;
   }
   return buildCdnPackageUrl(packageName);
 }

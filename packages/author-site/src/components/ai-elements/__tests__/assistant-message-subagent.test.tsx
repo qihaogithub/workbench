@@ -343,7 +343,24 @@ describe("AssistantMessage 子 Agent 展示", () => {
     expect(screen.getByText("连接 钉钉")).toBeInTheDocument();
   });
 
-  it("展示轻量处理中动效且不暴露日志入口", () => {
+  it("空窗期展示紧凑点阵处理中动效且不暴露日志入口", () => {
+    render(<AssistantMessage isStreaming />);
+
+    expect(screen.getByTestId("ai-working-indicator")).toHaveClass(
+      "justify-start",
+    );
+    expect(
+      screen.getByRole("status", { name: "AI 正在处理" }),
+    ).toBeInTheDocument();
+    const dots = screen.getAllByTestId("ai-working-dot");
+    expect(dots).toHaveLength(25);
+    expect(dots[0]).toHaveClass("h-[3px]", "w-[3px]");
+    expect(screen.queryByText("思考中...")).not.toBeInTheDocument();
+    expect(screen.queryByText("模型响应")).not.toBeInTheDocument();
+    expect(screen.queryByText("日志")).not.toBeInTheDocument();
+  });
+
+  it("已有可见处理过程时隐藏点阵处理中动效", () => {
     render(
       <AssistantMessage
         isStreaming
@@ -360,7 +377,7 @@ describe("AssistantMessage 子 Agent 展示", () => {
       />,
     );
 
-    expect(screen.getByText("AI 正在处理")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-working-indicator")).not.toBeInTheDocument();
     expect(document.body).toHaveTextContent("检查页面问题");
     expect(screen.queryByText("模型响应")).not.toBeInTheDocument();
     expect(screen.queryByText("日志")).not.toBeInTheDocument();

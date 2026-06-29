@@ -41,6 +41,7 @@
     "lint": "echo 'No lint script'"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
     "@types/react": "^18.2.52",
     "@types/react-dom": "^18.2.18"
   }

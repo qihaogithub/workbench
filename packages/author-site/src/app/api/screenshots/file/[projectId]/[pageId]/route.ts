@@ -11,6 +11,7 @@ const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
 
 interface ScreenshotMeta {
   currentHash: string;
+  renderBoxes?: Record<string, unknown>;
 }
 
 function normalizeHash(hash?: string | null): string | null {
@@ -61,6 +62,34 @@ async function proxyScreenshotFile(
   }
 }
 
+async function proxyScreenshotMeta(
+  projectId: string,
+  pageId: string,
+): Promise<Response | null> {
+  try {
+    const response = await fetchScreenshotService(
+      `/api/screenshots/file/${encodeURIComponent(
+        projectId,
+      )}/${encodeURIComponent(pageId)}?meta=1`,
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
+      headers: {
+        "Content-Type":
+          response.headers.get("Content-Type") || "application/json",
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 function readLocalScreenshot(
   projectId: string,
   pageId: string,
@@ -93,6 +122,43 @@ export async function GET(
   { params }: { params: { projectId: string; pageId: string } },
 ) {
   const { projectId, pageId } = params;
+  if (request.nextUrl.searchParams.get("meta") === "1") {
+    const proxiedMeta = await proxyScreenshotMeta(projectId, pageId);
+    if (proxiedMeta) return proxiedMeta;
+
+    const meta = readScreenshotMeta(projectId, pageId);
+    if (!meta?.currentHash) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Screenshot meta not found" },
+        },
+        { status: 404 },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          currentHash: meta.currentHash,
+          url: `/api/screenshots/file/${encodeURIComponent(
+            projectId,
+          )}/${encodeURIComponent(pageId)}?hash=${encodeURIComponent(
+            meta.currentHash,
+          )}`,
+          renderBox: meta.renderBoxes?.[meta.currentHash],
+        },
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
+
   const proxied = await proxyScreenshotFile(
     projectId,
     pageId,

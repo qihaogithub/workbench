@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export interface ProjectNameCategoryValue {
   name: string;
@@ -34,6 +41,77 @@ interface ProjectNameCategoryDialogProps {
 
 const DEFAULT_CATEGORY = "未分类";
 
+function ProjectCategoryCombobox({
+  value,
+  categories,
+  autoFocus,
+  onChange,
+}: {
+  value: string;
+  categories: string[];
+  autoFocus?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const currentCategory = value.trim() || DEFAULT_CATEGORY;
+
+  return (
+    <div className="relative">
+      <Input
+        id="project-category"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={DEFAULT_CATEGORY}
+        autoFocus={autoFocus}
+        className="pr-11"
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1 h-8 w-8 text-muted-foreground hover:text-foreground"
+            aria-label="选择已有项目分类"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72 p-1">
+          <div className="max-h-56 overflow-y-auto">
+            {categories.map((item) => {
+              const selected = item === currentCategory;
+
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                    selected ? "text-foreground" : "text-muted-foreground",
+                  )}
+                  onClick={() => {
+                    onChange(item);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate">{item}</span>
+                  <Check
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      selected ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export function ProjectNameCategoryDialog({
   open,
   title,
@@ -47,7 +125,6 @@ export function ProjectNameCategoryDialog({
   onOpenChange,
   onSubmit,
 }: ProjectNameCategoryDialogProps) {
-  const categoryListId = useId();
   const [name, setName] = useState(defaultName);
   const [category, setCategory] = useState(defaultCategory);
 
@@ -103,19 +180,12 @@ export function ProjectNameCategoryDialog({
           {fields !== "name" && (
             <div className="space-y-2">
               <Label htmlFor="project-category">项目分类</Label>
-              <Input
-                id="project-category"
-                list={categoryListId}
+              <ProjectCategoryCombobox
                 value={category}
-                onChange={(event) => setCategory(event.target.value)}
-                placeholder={DEFAULT_CATEGORY}
+                categories={normalizedCategories}
                 autoFocus={fields === "category"}
+                onChange={setCategory}
               />
-              <datalist id={categoryListId}>
-                {normalizedCategories.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
             </div>
           )}
         </div>

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n author,agent,viewer,sshot -c blue,green,cyan,yellow \"corepack pnpm --filter @opencode-workbench/author-site dev\" \"corepack pnpm --filter @opencode-workbench/agent-service dev\" \"corepack pnpm --filter @opencode-workbench/viewer-site dev\" \"corepack pnpm --filter @opencode-workbench/screenshot-service dev\"",
+    "dev": "node scripts/dev-restart.mjs",
+    "dev:services": "concurrently -n author,agent,viewer,sshot -c blue,green,cyan,yellow \"corepack pnpm --filter @opencode-workbench/author-site dev\" \"corepack pnpm --filter @opencode-workbench/agent-service dev\" \"corepack pnpm --filter @opencode-workbench/viewer-site dev\" \"corepack pnpm --filter @opencode-workbench/screenshot-service dev\"",
     "dev:author": "corepack pnpm --filter @opencode-workbench/author-site dev",
     "dev:preview": "concurrently -n author,sshot -c blue,yellow \"corepack pnpm --filter @opencode-workbench/author-site dev\" \"corepack pnpm --filter @opencode-workbench/screenshot-service dev\"",
     "dev:agent": "corepack pnpm --filter @opencode-workbench/agent-service dev",
@@ -11,6 +12,7 @@
     "dev:snapshot:legacy": "corepack pnpm --filter @opencode-workbench/snapshot-service dev",
     "dev:screenshot": "corepack pnpm --filter @opencode-workbench/screenshot-service dev",
     "build": "corepack pnpm --filter @opencode-workbench/author-site build",
+    "build:preview-runtime": "node scripts/build-preview-runtime.mjs",
     "build:viewer": "corepack pnpm --filter @opencode-workbench/viewer-site build",
     "lint": "corepack pnpm --filter @opencode-workbench/author-site lint",
     "typecheck": "corepack pnpm --filter @opencode-workbench/author-site typecheck",

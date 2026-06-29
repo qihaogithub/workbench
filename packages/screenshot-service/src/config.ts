@@ -7,6 +7,8 @@ export const config = {
 
   authorSiteUrl:
     process.env.AUTHOR_SITE_URL || "http://localhost:3200",
+  cdnBaseUrl: process.env.CDN_BASE_URL || "https://esm.sh",
+  previewRuntimeSource: process.env.PREVIEW_RUNTIME_SOURCE || "local",
 
   dataDir:
     process.env.DATA_DIR ||
@@ -33,6 +35,7 @@ export const config = {
     10,
   ),
   screenshotDeepHealth: process.env.SCREENSHOT_DEEP_HEALTH === "true",
+  screenshotWarmup: process.env.SCREENSHOT_WARMUP === "true",
   waitForSelector: "#root",
   waitForNetworkIdleTimeout: 10000,
 

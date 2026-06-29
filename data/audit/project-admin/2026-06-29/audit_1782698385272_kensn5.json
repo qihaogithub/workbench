@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782698385272_kensn5",
+  "at": 1782698385272,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782698385271_g68cfd",
+  "inputSummary": {
+    "name": "E2E:20260629T015936792Z-z48wyw:核心流程回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782698385271_g68cfd"
+    ]
+  }
+}

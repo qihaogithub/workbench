@@ -1,13 +1,26 @@
 export interface IframeTemplateOptions {
   cssImports?: string[];
   compiledCode?: string;
+  compiledCodeUrl?: string;
   configData?: Record<string, unknown>;
   cdnBaseUrl?: string;
+  runtimeBaseUrl?: string;
+  useCdnRuntime?: boolean;
   supportUrlMode?: boolean;
   baseOrigin?: string;
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
+const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
+  react: "/preview-runtime/vendor/react.js",
+  "react-dom": "/preview-runtime/vendor/react-dom.js",
+  "react-dom/client": "/preview-runtime/vendor/react-dom-client.js",
+  "react/jsx-runtime": "/preview-runtime/vendor/react-jsx-runtime.js",
+  "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
+  "lucide-react": "/preview-runtime/vendor/lucide-react.js",
+  "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+  "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
+};
 
 const consoleInterceptScript = `
 (function() {
@@ -908,21 +921,61 @@ function generateCssLinks(cssImports: string[], cdnBase: string): string {
     .join("\n");
 }
 
+function resolveRuntimeUrl(url: string, runtimeBaseUrl?: string): string {
+  if (/^https?:\/\//.test(url) || url.startsWith("data:") || url.startsWith("blob:")) {
+    return url;
+  }
+  if (!runtimeBaseUrl) return url;
+  const base = runtimeBaseUrl.replace(/\/+$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+function buildRuntimeImports(
+  cdnBase: string,
+  runtimeBaseUrl: string | undefined,
+  useCdnRuntime: boolean | undefined,
+): Record<string, string> {
+  if (useCdnRuntime) {
+    return {
+      react: `${cdnBase}/react@18.3.1`,
+      "react-dom": `${cdnBase}/react-dom@18.3.1`,
+      "react-dom/client": `${cdnBase}/react-dom@18.3.1/client`,
+      "react/jsx-runtime": `${cdnBase}/react@18.3.1/jsx-runtime`,
+      "react/jsx-dev-runtime": `${cdnBase}/react@18.3.1/jsx-dev-runtime`,
+      "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
+      "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
+      "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
+    };
+  }
+
+  return Object.fromEntries(
+    Object.entries(DEFAULT_RUNTIME_IMPORTS).map(([specifier, url]) => [
+      specifier,
+      resolveRuntimeUrl(url, runtimeBaseUrl),
+    ]),
+  );
+}
+
 export function generateIframeHtml(
   options: IframeTemplateOptions = {},
 ): string {
   const {
     cssImports = [],
     compiledCode,
+    compiledCodeUrl,
     configData,
     cdnBaseUrl,
+    runtimeBaseUrl,
+    useCdnRuntime,
     supportUrlMode = true,
     baseOrigin,
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
+  const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
+  const initialCodeUrl = compiledCodeUrl ? JSON.stringify(compiledCodeUrl) : "null";
   const initialConfig = JSON.stringify(configData || {});
 
   const loadModuleFn = `
@@ -941,13 +994,77 @@ export function generateIframeHtml(
       window.parent.postMessage({ type: 'RUNTIME_ERROR', ...safePayload }, '*');
     }
 
+    function reportRuntimeTiming(stage, details) {
+      try {
+        var now = performance.now();
+        var payload = Object.assign({
+          source: 'preview-runtime',
+          stage: stage,
+          sinceShellStart: Math.round(now - shellStartedAt)
+        }, details || {});
+        try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
+        window.parent.postMessage({
+          type: 'CONSOLE_LOG',
+          payload: {
+            level: 'info',
+            args: JSON.stringify(payload),
+            timestamp: Date.now()
+          }
+        }, '*');
+      } catch (_err) {}
+    }
+
+    function summarizeResourceTimings() {
+      try {
+        var entries = performance.getEntriesByType('resource') || [];
+        var relevant = entries
+          .filter(function(entry) {
+            return entry.name.indexOf('${cdnBase}') === 0 ||
+              entry.name.indexOf('https://cdn.jsdelivr.net/') === 0 ||
+              entry.name.indexOf('blob:') === 0;
+          })
+          .slice(-12)
+          .map(function(entry) {
+            return {
+              name: entry.name
+                .replace('${cdnBase}', '<cdn>')
+                .replace('https://cdn.jsdelivr.net/', '<jsdelivr>/')
+                .slice(0, 180),
+              initiatorType: entry.initiatorType,
+              durationMs: Math.round(entry.duration),
+              startMs: Math.round(entry.startTime),
+              transferSize: entry.transferSize || 0,
+              encodedBodySize: entry.encodedBodySize || 0
+            };
+          });
+        return {
+          count: entries.length,
+          relevantCount: relevant.length,
+          relevant: relevant
+        };
+      } catch (err) {
+        return { error: err && err.message ? err.message : String(err) };
+      }
+    }
+
     function loadModuleFromCode(code, thisVersion) {
       const blob = new Blob([code], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeBytes: code.length
+      });
       import(moduleUrl)
         .then((module) => {
           if (thisVersion !== updateVersion) return;
           currentComponent = module.default || null;
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
@@ -964,7 +1081,10 @@ export function generateIframeHtml(
 
   const updateCodeHandler = supportUrlMode
     ? `
-      if (type === 'UPDATE_CODE') {
+      if (type === 'UPDATE_CODE' || type === 'UPDATE_MODULE') {
+        var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
+        var incomingCode = moduleUrl || code;
+        reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
@@ -972,8 +1092,8 @@ export function generateIframeHtml(
 
         const thisVersion = ++updateVersion;
 
-        if (isUrl) {
-          fetch(code)
+        if (isModuleUrl) {
+          fetch(incomingCode)
             .then(res => {
               if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
               return res.text();
@@ -987,11 +1107,12 @@ export function generateIframeHtml(
               reportRuntimeError({ stage: 'dependency_import', error: err.message });
             });
         } else {
-          loadModuleFromCode(code, thisVersion);
+          loadModuleFromCode(incomingCode, thisVersion);
         }
       }`
     : `
       if (type === 'UPDATE_CODE') {
+        reportRuntimeTiming('update_code_received', { isUrl: false });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
@@ -1001,11 +1122,22 @@ export function generateIframeHtml(
 
         const blob = new Blob([code], { type: 'application/javascript' });
         const moduleUrl = URL.createObjectURL(blob);
+        var importStart = performance.now();
+        reportRuntimeTiming('module_import_start', {
+          version: thisVersion,
+          codeBytes: code.length
+        });
 
         import(moduleUrl)
           .then((module) => {
             if (thisVersion !== updateVersion) return;
             currentComponent = module.default || null;
+            reportRuntimeTiming('module_import_done', {
+              version: thisVersion,
+              importMs: Math.round(performance.now() - importStart),
+              hasDefaultExport: !!module.default,
+              resources: summarizeResourceTimings()
+            });
             renderComponent();
             URL.revokeObjectURL(moduleUrl);
             if (module.default) {
@@ -1038,12 +1170,7 @@ export function generateIframeHtml(
 ${cssLinks}
   <script type="importmap">
   {
-    "imports": {
-      "react": "${cdnBase}/react@18.3.1",
-      "react-dom": "${cdnBase}/react-dom@18.3.1/client",
-      "react/jsx-runtime": "${cdnBase}/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "${cdnBase}/react@18.3.1/jsx-dev-runtime"
-    }
+    "imports": ${JSON.stringify(runtimeImports, null, 6)}
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
@@ -1055,8 +1182,8 @@ ${cssLinks}
     ${consoleInterceptScript}
     ${visualEditScript}
 
-    import React from '${cdnBase}/react@18.3.1';
-    import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
 
     let currentRoot = null;
     let currentConfig = ${initialConfig};
@@ -1132,6 +1259,7 @@ ${cssLinks}
           React.createElement(currentComponent, currentConfig)
         )
       );
+      reportRuntimeTiming('render_invoked', { version: updateVersion });
     }
 
     function updateCssLinks(cssUrls) {
@@ -1146,11 +1274,16 @@ ${cssLinks}
     }
 
     ${loadModuleFn}
+    const shellStartedAt = performance.now();
+    reportRuntimeTiming('shell_start', {
+      cdnBase: '${cdnBase}',
+      resources: summarizeResourceTimings()
+    });
 
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -1369,19 +1502,47 @@ ${cssLinks}
       });
     });
 
+    reportRuntimeTiming('ready_sent');
     window.parent.postMessage({ type: 'READY' }, '*');
 
     const initialCode = ${initialCode};
+    const initialCodeUrl = ${initialCodeUrl};
     if (initialCode) {
       window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var initialImportStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: updateVersion,
+        codeBytes: initialCode.length,
+        initial: true
+      });
       import(moduleUrl)
         .then((module) => {
           currentComponent = module.default;
+          reportRuntimeTiming('module_import_done', {
+            version: updateVersion,
+            importMs: Math.round(performance.now() - initialImportStart),
+            hasDefaultExport: !!module.default,
+            initial: true,
+            resources: summarizeResourceTimings()
+          });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
           window.parent.postMessage({ type: 'COMPONENT_READY' }, '*');
+        })
+        .catch((err) => {
+          reportRuntimeError({ stage: 'dependency_import', error: err.message });
+        });
+    } else if (initialCodeUrl) {
+      window.__DEMO_PROPS__ = currentConfig;
+      fetch(initialCodeUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
+          return res.text();
+        })
+        .then(function(jsCode) {
+          loadModuleFromCode(jsCode, updateVersion);
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });

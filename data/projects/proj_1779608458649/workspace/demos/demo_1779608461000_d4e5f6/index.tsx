@@ -1,10 +1,13 @@
 import { ChevronRight } from 'lucide-react';
 
-interface DemoProps {}
+interface DemoProps {
+  /** 手机和平板共用的广告图（项目级配置） */
+  bannerImage?: string;
+}
 
-export default function PadAfterSchool(props: DemoProps) {
-  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props as Record<string, unknown>;
-
+export default function PadAfterSchool({
+  bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png',
+}: DemoProps) {
   const featureRows = [
     [
       {
@@ -33,7 +36,8 @@ export default function PadAfterSchool(props: DemoProps) {
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        maxWidth: 1024,
+        height: '100vh',
+        maxWidth: 1133,
         margin: '0 auto',
       }}
     >
@@ -47,9 +51,9 @@ export default function PadAfterSchool(props: DemoProps) {
       </div>
 
       {/* 主要内容区域 */}
-      <div className="flex-1 px-16 lg:px-24 xl:px-32 flex flex-col gap-8 mt-5 overflow-y-auto">
+      <div className="flex-1 px-[137px] flex flex-col gap-10 mt-5 overflow-y-auto">
         {/* Banner 广告图 */}
-        <div className="w-full h-[160px] rounded-[10px] overflow-hidden flex-shrink-0">
+        <div className="w-full h-[112px] rounded-[10px] overflow-hidden flex-shrink-0">
           <img
             src={bannerImage}
             alt="banner"

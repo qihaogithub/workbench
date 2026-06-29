@@ -3,11 +3,14 @@ import { ChevronRight } from 'lucide-react';
 interface DemoProps {
   /** 课后服务包名称（页面级配置） */
   serviceTitle?: string;
+  /** 手机和平板共用的广告图（项目级配置） */
+  bannerImage?: string;
 }
 
-export default function PhoneAfterSchool({ serviceTitle = '全年系统包-L1', ...restProps }: DemoProps) {
-  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = restProps as Record<string, unknown>;
-
+export default function PhoneAfterSchool({
+  serviceTitle = '全年系统包-L1',
+  bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png',
+}: DemoProps) {
   const features = [
     {
       name: '学习报告',
@@ -32,6 +35,7 @@ export default function PhoneAfterSchool({ serviceTitle = '全年系统包-L1', 
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        height: '100vh',
         maxWidth: 375,
         margin: '0 auto',
       }}

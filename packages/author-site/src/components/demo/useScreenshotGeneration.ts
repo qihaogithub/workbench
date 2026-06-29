@@ -8,10 +8,20 @@ const MAX_POLL_DURATION_MS = 60_000;
 const MAX_POLL_FAILURES = 3;
 const INVALIDATED_SCREENSHOT_HASH = "__invalidated__";
 
+export type ScreenshotPriority =
+  | "active"
+  | "visible"
+  | "nearby"
+  | "thumbnail"
+  | "background";
+
+export type ScreenshotRenderMode = "strict" | "fast";
+
 export interface PageScreenshotState {
   screenshotUrl?: string;
   hash?: string;
   expectedHash?: string;
+  variant?: ScreenshotRenderMode;
   renderBox?: ScreenshotRenderBox;
   loading: boolean;
   error?: string;
@@ -21,6 +31,7 @@ interface UseScreenshotGenerationOptions {
   projectId?: string;
   sessionId?: string;
   enabled?: boolean;
+  pageIds?: string[];
 }
 
 interface BatchPageInput {
@@ -30,15 +41,27 @@ interface BatchPageInput {
   width?: number;
   height?: number;
   fullPage?: boolean;
+  priority?: ScreenshotPriority;
+  renderMode?: ScreenshotRenderMode;
+  measuredHeight?: number;
 }
 
 interface BatchResult {
   pageId: string;
   url?: string;
+  assetUrl?: string;
   hash?: string;
   renderBox?: ScreenshotRenderBox;
+  priority?: ScreenshotPriority;
+  variant?: ScreenshotRenderMode;
+  quality?: ScreenshotRenderMode;
   status: "pending" | "rendering" | "done" | "failed";
   error?: string;
+}
+
+interface ScreenshotMetaResponse {
+  currentHash?: string;
+  renderBox?: ScreenshotRenderBox;
 }
 
 function isServiceUnavailable(result: unknown): boolean {
@@ -50,7 +73,7 @@ function isServiceUnavailable(result: unknown): boolean {
 export function useScreenshotGeneration(
   options: UseScreenshotGenerationOptions,
 ) {
-  const { projectId, sessionId, enabled = true } = options;
+  const { projectId, sessionId, enabled = true, pageIds = [] } = options;
 
   const [pageScreenshots, setPageScreenshots] = useState<
     Record<string, PageScreenshotState>
@@ -67,12 +90,17 @@ export function useScreenshotGeneration(
   const pageRequestVersionsRef = useRef<Record<string, number>>({});
 
   const getScreenshotUrl = useCallback(
-    (pageId: string, hash?: string) => {
+    (pageId: string, hash?: string, variant: ScreenshotRenderMode = "strict") => {
       if (!projectId) return "";
       const base = `/api/screenshots/file/${encodeURIComponent(
         projectId,
       )}/${encodeURIComponent(pageId)}`;
-      return hash ? `${base}?hash=${encodeURIComponent(hash)}` : base;
+      if (!hash) return base;
+      const params = new URLSearchParams({ hash });
+      if (variant !== "strict") {
+        params.set("variant", variant);
+      }
+      return `${base}?${params.toString()}`;
     },
     [projectId],
   );
@@ -140,6 +168,7 @@ export function useScreenshotGeneration(
     async (targetBatchId?: string | null) => {
       const id = targetBatchId || batchIdRef.current;
       if (!projectId || !id) return;
+      if (typeof fetch !== "function") return;
 
       await fetch(
         `/api/screenshots/cancel/${encodeURIComponent(
@@ -173,6 +202,48 @@ export function useScreenshotGeneration(
       return false;
     }
   }, []);
+
+  const preloadScreenshotMeta = useCallback(
+    async (targetPageIds: string[]) => {
+      if (!projectId || !enabled || targetPageIds.length === 0) return;
+
+      const uniquePageIds = Array.from(new Set(targetPageIds)).filter(Boolean);
+      await Promise.all(
+        uniquePageIds.map(async (pageId) => {
+          try {
+            const response = await fetch(
+              `${getScreenshotUrl(pageId)}?meta=1`,
+              { cache: "no-store" },
+            );
+            if (!response.ok) return;
+            const result = await response.json();
+            if (!result.success || !result.data?.currentHash) return;
+            const data = result.data as ScreenshotMetaResponse;
+
+            setPageScreenshots((prev) => {
+              const existing = prev[pageId];
+              if (existing?.loading || existing?.screenshotUrl) return prev;
+
+              return {
+                ...prev,
+                [pageId]: {
+                  screenshotUrl: getScreenshotUrl(pageId, data.currentHash),
+                  hash: data.currentHash,
+                  expectedHash: data.currentHash,
+                  variant: "strict",
+                  renderBox: data.renderBox,
+                  loading: false,
+                },
+              };
+            });
+          } catch {
+            // 本地 meta 只是首屏弱占位，读取失败不影响主预览链路。
+          }
+        }),
+      );
+    },
+    [enabled, getScreenshotUrl, projectId],
+  );
 
   const pollBatchStatus = useCallback(
     async (currentBatchId: string) => {
@@ -215,7 +286,11 @@ export function useScreenshotGeneration(
           : [];
 
         for (const pageResult of statusResults) {
-          if (pageResult.status === "done" && pageResult.url && pageResult.hash) {
+          if (
+            pageResult.status === "done" &&
+            (pageResult.assetUrl || pageResult.url) &&
+            pageResult.hash
+          ) {
             setPageScreenshots((prev) => {
               const existing = prev[pageResult.pageId];
               if (
@@ -228,12 +303,16 @@ export function useScreenshotGeneration(
               return {
                 ...prev,
                 [pageResult.pageId]: {
-                  screenshotUrl: getScreenshotUrl(
-                    pageResult.pageId,
-                    pageResult.hash,
-                  ),
+                  screenshotUrl:
+                    pageResult.assetUrl ||
+                    getScreenshotUrl(
+                      pageResult.pageId,
+                      pageResult.hash,
+                      pageResult.variant || "strict",
+                    ),
                   hash: pageResult.hash,
                   expectedHash: pageResult.hash,
+                  variant: pageResult.variant || "strict",
                   renderBox: pageResult.renderBox,
                   loading: false,
                 },
@@ -296,6 +375,9 @@ export function useScreenshotGeneration(
               width: p.width,
               height: p.height,
               fullPage: p.fullPage,
+              priority: p.priority,
+              renderMode: p.renderMode,
+              measuredHeight: p.measuredHeight,
             })),
             sessionId,
           }),
@@ -322,6 +404,7 @@ export function useScreenshotGeneration(
               next[pageResult.pageId] = {
                 screenshotUrl: existing?.screenshotUrl,
                 hash: existing?.hash,
+                variant: existing?.variant,
                 renderBox: existing?.renderBox,
                 expectedHash: pageResult.hash,
                 loading: true,
@@ -383,6 +466,9 @@ export function useScreenshotGeneration(
       width?: number,
       height?: number,
       fullPage?: boolean,
+      priority: ScreenshotPriority = "active",
+      renderMode: ScreenshotRenderMode = "strict",
+      measuredHeight?: number,
     ) => {
       if (!projectId || !enabled) return;
 
@@ -411,6 +497,9 @@ export function useScreenshotGeneration(
             width,
             height,
             fullPage,
+            priority,
+            renderMode,
+            measuredHeight,
             sessionId,
           }),
         });
@@ -423,9 +512,16 @@ export function useScreenshotGeneration(
           setPageScreenshots((prev) => ({
             ...prev,
             [pageId]: {
-              screenshotUrl: getScreenshotUrl(pageId, result.data.hash),
+              screenshotUrl:
+                result.data.assetUrl ||
+                getScreenshotUrl(
+                  pageId,
+                  result.data.hash,
+                  result.data.variant || "strict",
+                ),
               hash: result.data.hash,
               expectedHash: result.data.hash,
+              variant: result.data.variant || "strict",
               renderBox: result.data.renderBox,
               loading: false,
             },
@@ -467,6 +563,10 @@ export function useScreenshotGeneration(
   }, [checkServiceHealth]);
 
   useEffect(() => {
+    void preloadScreenshotMeta(pageIds);
+  }, [pageIds, preloadScreenshotMeta]);
+
+  useEffect(() => {
     return () => {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
@@ -484,6 +584,7 @@ export function useScreenshotGeneration(
     batchId,
     serviceAvailable,
     checkServiceHealth,
+    preloadScreenshotMeta,
     startBatchGeneration,
     regeneratePage,
     invalidatePageScreenshot,

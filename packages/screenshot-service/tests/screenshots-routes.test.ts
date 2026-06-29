@@ -217,10 +217,178 @@ describe("screenshot routes", () => {
     expect(response.json().data.results).toEqual([
       {
         pageId: "page_1",
+        priority: "background",
+        variant: "strict",
+        quality: "strict",
         hash: "hash-a-320-640-false",
         status: "pending",
       },
     ]);
+    expect(response.json().data.priorityStats.background.total).toBe(1);
+    await app.close();
+  });
+
+  it("批量任务按 priority 排序并汇总性能指标", async () => {
+    const renderOrder: string[] = [];
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(async () => ({
+        compiledCode: "function Demo(){return null}",
+        cssImports: [],
+      })),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({
+        renderPage: vi.fn(
+          async (
+            _html: string,
+            _width: number,
+            _height: number,
+            _fullPage: boolean,
+            priority: string,
+          ) => {
+            renderOrder.push(priority);
+            return {
+              buffer: Buffer.from("png"),
+              renderBox,
+              queueWaitMs: priority === "active" ? 2 : 5,
+              renderMs: priority === "active" ? 7 : 11,
+            };
+          },
+        ),
+      }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn((code: string) => `hash-${code}`),
+      screenshotExists: vi.fn(async () => false),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot: vi.fn(),
+      writeScreenshot: vi.fn(),
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate-batch",
+      payload: {
+        projectId: "proj_1",
+        pages: [
+          {
+            pageId: "page_background",
+            code: "background",
+            configData: {},
+            priority: "background",
+          },
+          {
+            pageId: "page_active",
+            code: "active",
+            configData: {},
+            priority: "active",
+          },
+        ],
+      },
+    });
+    const batchId = response.json().data.batchId;
+
+    await vi.waitFor(() => {
+      expect(renderOrder).toEqual(["active", "background"]);
+    });
+
+    let data: {
+      priorityStats: {
+        active: { completed: number };
+        background: { completed: number };
+      };
+      metrics: { rendered: number; totalQueueWaitMs: number };
+      results: Array<{ pageId: string }>;
+    } | undefined;
+    await vi.waitFor(async () => {
+      const statusResponse = await app.inject({
+        method: "GET",
+        url: `/api/screenshots/status/proj_1/${batchId}`,
+      });
+      data = statusResponse.json().data;
+      expect(data?.priorityStats.active.completed).toBe(1);
+    });
+
+    expect(data?.priorityStats.background.completed).toBe(1);
+    expect(data?.metrics.rendered).toBe(2);
+    expect(data?.metrics.totalQueueWaitMs).toBe(7);
+    expect(data?.results.map((item: { pageId: string }) => item.pageId)).toEqual([
+      "page_active",
+      "page_background",
+    ]);
+    await app.close();
+  });
+
+  it("单页 fast 截图写入独立 variant 并返回 assetUrl", async () => {
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.from("png"),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+    }));
+    const writeScreenshot = vi.fn();
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(async () => ({
+        compiledCode: "function Demo(){return null}",
+        cssImports: [],
+      })),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({
+        renderPage,
+      }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => false),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot: vi.fn(),
+      writeScreenshot,
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "page_1",
+        code: "export default function Demo() { return null; }",
+        configData: {},
+        renderMode: "fast",
+        measuredHeight: 900,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(renderPage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Number),
+      expect.any(Number),
+      false,
+      "active",
+      "fast",
+      900,
+    );
+    expect(writeScreenshot).toHaveBeenCalledWith(
+      "proj_1",
+      "page_1",
+      "1111111111111111",
+      Buffer.from("png"),
+      expect.any(Number),
+      renderBox,
+      "fast",
+    );
+    expect(response.json().data).toMatchObject({
+      hash: "1111111111111111",
+      variant: "fast",
+      quality: "fast",
+      assetUrl:
+        "/api/screenshots/file/proj_1/page_1?hash=1111111111111111&variant=fast",
+    });
     await app.close();
   });
 
@@ -252,6 +420,43 @@ describe("screenshot routes", () => {
       "proj_1",
       "page_1",
       "abcdef1234567890",
+      "strict",
+    );
+    expect(response.headers["cache-control"]).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    await app.close();
+  });
+
+  it("文件接口按 variant 精确读取 fast 产物", async () => {
+    const readScreenshot = vi.fn(async () => Buffer.from("png"));
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: vi.fn(),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(),
+      screenshotExists: vi.fn(),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot,
+      writeScreenshot: vi.fn(),
+      cleanupOldScreenshots: vi.fn(),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/screenshots/file/proj_1/page_1?hash=ABCDEF1234567890&variant=fast",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(readScreenshot).toHaveBeenCalledWith(
+      "proj_1",
+      "page_1",
+      "abcdef1234567890",
+      "fast",
     );
     expect(response.headers["cache-control"]).toBe(
       "public, max-age=31536000, immutable",

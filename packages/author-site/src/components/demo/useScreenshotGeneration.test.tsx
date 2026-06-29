@@ -117,6 +117,45 @@ describe("useScreenshotGeneration", () => {
     unmount();
   });
 
+  it("初始化时读取本地截图 meta 并预填页面占位", async () => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+      const url = getFetchUrl(input);
+      if (url.includes("/api/screenshots/health")) {
+        return jsonFetchResponse({ success: true });
+      }
+      if (url.includes("/api/screenshots/file/proj_1/page_1?meta=1")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            currentHash: "1111111111111111",
+            renderBox,
+          },
+        });
+      }
+      return jsonFetchResponse({ success: false }, { status: 404 });
+    }) as jest.Mock;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result, unmount } = renderHook(() =>
+      useScreenshotGeneration({ projectId: "proj_1", pageIds: ["page_1"] }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.pageScreenshots.page_1).toMatchObject({
+        screenshotUrl:
+          "/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
+        hash: "1111111111111111",
+        expectedHash: "1111111111111111",
+        renderBox,
+        loading: false,
+      });
+    });
+
+    unmount();
+  });
+
   it("批量状态 hash 与 expectedHash 不一致时忽略旧结果", async () => {
     const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
       const url = getFetchUrl(input);
@@ -392,6 +431,7 @@ describe("useScreenshotGeneration", () => {
         375,
         812,
         true,
+        "visible",
       );
     });
 
@@ -406,6 +446,7 @@ describe("useScreenshotGeneration", () => {
       width: 375,
       height: 812,
       fullPage: true,
+      priority: "visible",
     });
 
     unmount();
@@ -463,6 +504,7 @@ describe("useScreenshotGeneration", () => {
           configData: {},
           width: 750,
           height: 1624,
+          priority: "active",
         },
       ]);
     });
@@ -479,8 +521,105 @@ describe("useScreenshotGeneration", () => {
           pageId: "page_1",
           width: 750,
           height: 1624,
+          priority: "active",
         },
       ],
+    });
+
+    unmount();
+  });
+
+  it("批量截图会透传 renderMode 并优先使用服务端 assetUrl", async () => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+      const url = getFetchUrl(input);
+      if (url.includes("/api/screenshots/health")) {
+        return jsonFetchResponse({ success: true });
+      }
+      if (url.includes("/api/screenshots/generate-batch")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            batchId: "batch_1",
+            results: [
+              {
+                pageId: "page_1",
+                hash: "1111111111111111",
+                variant: "fast",
+                status: "pending",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/status/proj_1/batch_1")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            status: "completed",
+            cancelled: false,
+            results: [
+              {
+                pageId: "page_1",
+                assetUrl:
+                  "/api/screenshots/file/proj_1/page_1?hash=1111111111111111&variant=fast",
+                hash: "1111111111111111",
+                variant: "fast",
+                renderBox,
+                status: "done",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/cancel/proj_1/batch_1")) {
+        return jsonFetchResponse({ success: true });
+      }
+      return jsonFetchResponse({ success: false }, { status: 404 });
+    }) as jest.Mock;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result, unmount } = renderHook(() =>
+      useScreenshotGeneration({ projectId: "proj_1" }),
+    );
+
+    await act(async () => {
+      await result.current.startBatchGeneration([
+        {
+          pageId: "page_1",
+          code: "export default function Demo() { return null; }",
+          configData: {},
+          renderMode: "fast",
+          measuredHeight: 960,
+        },
+      ]);
+    });
+
+    const generateCall = fetchMock.mock.calls.find(([input]) =>
+      getFetchUrl(input).includes("/api/screenshots/generate-batch"),
+    );
+    const requestInit = generateCall?.[1] as RequestInit;
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      pages: [
+        {
+          pageId: "page_1",
+          renderMode: "fast",
+          measuredHeight: 960,
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.pageScreenshots.page_1).toMatchObject({
+        screenshotUrl:
+          "/api/screenshots/file/proj_1/page_1?hash=1111111111111111&variant=fast",
+        hash: "1111111111111111",
+        expectedHash: "1111111111111111",
+        variant: "fast",
+        renderBox,
+        loading: false,
+      });
     });
 
     unmount();

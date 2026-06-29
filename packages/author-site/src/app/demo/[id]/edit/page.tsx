@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
-  ConfigForm,
   PreviewCanvas,
   PageConfigPanel,
   invalidateCompileCache,
@@ -14,13 +13,13 @@ import type {
   PositionableSizeItem,
   PreviewSize,
   ScreenshotRenderBox,
-  VisualAnnotation,
-  VisualEditPatch,
-  VisualInlineEditPayload,
   VisualNodeInfo,
-  VisualStyleChange,
 } from "../../../../../components/demo";
-import { useScreenshotGeneration } from "@/components/demo/useScreenshotGeneration";
+import {
+  useScreenshotGeneration,
+  type ScreenshotPriority,
+  type ScreenshotRenderMode,
+} from "@/components/demo/useScreenshotGeneration";
 import { useCanvasWorkspace } from "@/components/demo/useCanvasWorkspace";
 import {
   parseFigmaText,
@@ -71,8 +70,6 @@ import {
   RefreshCw,
   FolderOpen,
   ArrowLeft,
-  MessageSquarePlus,
-  Settings2,
   Users,
   Download,
 } from "lucide-react";
@@ -106,6 +103,7 @@ import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
+import { VisualPropertyPanel } from "./components/VisualPropertyPanel";
 import { useVisualEditState } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import type {
@@ -126,12 +124,6 @@ import type {
 } from "@opencode-workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
-import {
-  buildVisualConfigCandidates,
-  suggestVisualConfigFieldKey,
-  type VisualConfigCandidate,
-  type VisualConfigureResult,
-} from "@/lib/visual-configurator";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -466,6 +458,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const canvasStateRef = useRef(canvasState);
   canvasStateRef.current = canvasState;
   const lastAppliedCanvasCollabValueRef = useRef<string | null>(null);
+  const [fitCanvasToScreenOnMount, setFitCanvasToScreenOnMount] = useState(false);
+  const initialCanvasFitRequestedRef = useRef(false);
+  const handleInitialCanvasFitComplete = useCallback(() => {
+    setFitCanvasToScreenOnMount(false);
+  }, []);
+  const [singlePreviewLoaded, setSinglePreviewLoaded] = useState(false);
+  const initialScreenshotBatchStartedRef = useRef(false);
+  const screenshotPageIds = useMemo(
+    () => demoPages.map((page) => page.id),
+    [demoPages],
+  );
+  const [visibleCanvasPageIds, setVisibleCanvasPageIds] = useState<string[]>([]);
+  const visibleCanvasPageIdSet = useMemo(
+    () => new Set(visibleCanvasPageIds),
+    [visibleCanvasPageIds],
+  );
 
   const {
     pageScreenshots,
@@ -480,6 +488,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     projectId: demoId,
     sessionId,
     enabled: true, // 截图常驻生成，不再仅限画布模式
+    pageIds: screenshotPageIds,
   });
   const canvasScreenshotUrls = useMemo(
     () =>
@@ -516,6 +525,73 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [pageScreenshots, pagePreviewSizeMap],
   );
 
+  const getScreenshotPriority = useCallback(
+    (pageId: string): ScreenshotPriority => {
+      if (pageId === (canvasEditingPageId ?? activeDemoId)) {
+        return "active";
+      }
+      if (previewMode === "canvas" && visibleCanvasPageIdSet.has(pageId)) {
+        return "visible";
+      }
+      return "background";
+    },
+    [activeDemoId, canvasEditingPageId, previewMode, visibleCanvasPageIdSet],
+  );
+
+  const getScreenshotRenderMode = useCallback(
+    (pageId: string): ScreenshotRenderMode => {
+      const priority = getScreenshotPriority(pageId);
+      return priority === "active" || priority === "visible" ? "fast" : "strict";
+    },
+    [getScreenshotPriority],
+  );
+
+  const buildScreenshotBatchPages = useCallback(() => {
+    const priorityWeight: Record<ScreenshotPriority, number> = {
+      active: 0,
+      visible: 1,
+      nearby: 2,
+      thumbnail: 3,
+      background: 4,
+    };
+
+    return demoPages
+      .filter((p) => pageCodes[p.id] || code)
+      .map((p, index) => {
+        const { width, height } = getScreenshotRequestSize(
+          pagePreviewSizeMap[p.id],
+        );
+        const priority = getScreenshotPriority(p.id);
+        const renderMode = getScreenshotRenderMode(p.id);
+        return {
+          pageId: p.id,
+          code: pageCodes[p.id] || code,
+          configData: configDataMap[p.id] || {},
+          width,
+          height,
+          fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
+          priority,
+          renderMode,
+          measuredHeight: pageScreenshots[p.id]?.renderBox?.height,
+          index,
+        };
+      })
+      .sort((a, b) => {
+        const priorityDiff = priorityWeight[a.priority] - priorityWeight[b.priority];
+        return priorityDiff === 0 ? a.index - b.index : priorityDiff;
+      })
+      .map(({ index: _index, ...page }) => page);
+  }, [
+    code,
+    configDataMap,
+    demoPages,
+    getScreenshotRenderMode,
+    getScreenshotPriority,
+    pageCodes,
+    pageScreenshots,
+    pagePreviewSizeMap,
+  ]);
+
   // 截图 debounce 再生定时器
   const configDataMapRef = useRef(configDataMap);
   configDataMapRef.current = configDataMap;
@@ -539,64 +615,50 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         width,
         height,
         CANVAS_SCREENSHOT_FULL_PAGE,
+        getScreenshotPriority(pageId),
+        getScreenshotRenderMode(pageId),
+        pageScreenshots[pageId]?.renderBox?.height,
       );
       delete timers[pageId];
     }, 3000);
-  }, [regeneratePage, pagePreviewSizeMap]);
+  }, [
+    getScreenshotPriority,
+    getScreenshotRenderMode,
+    pageScreenshots,
+    regeneratePage,
+    pagePreviewSizeMap,
+  ]);
 
   const regenerateCanvasScreenshots = useCallback(async () => {
     const available = await checkServiceHealth();
     if (!available || demoPages.length === 0) return;
 
-    const pages = demoPages
-      .filter((p) => pageCodes[p.id] || code)
-      .map((p) => {
-        const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
-        return {
-          pageId: p.id,
-          code: pageCodes[p.id] || code,
-          configData: configDataMap[p.id] || {},
-          width,
-          height,
-          fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
-        };
-      });
+    const pages = buildScreenshotBatchPages();
 
     if (pages.length > 0) {
       startBatchGeneration(pages);
     }
   }, [
+    buildScreenshotBatchPages,
     checkServiceHealth,
-    code,
-    configDataMap,
     demoPages,
-    pageCodes,
-    pagePreviewSizeMap,
     startBatchGeneration,
   ]);
 
-  // 切换到画布模式时触发批量截图，或首次加载时生成截图
+  // 首屏优先加载单页 iframe；批量截图延后到预览 ready 或用户进入画布后。
   useEffect(() => {
-    if (demoPages.length > 0 && !isScreenshotGenerating) {
-      const pages = demoPages
-        .filter((p) => pageCodes[p.id] || code)
-        .map((p) => {
-          const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[p.id]);
-          return {
-            pageId: p.id,
-            code: pageCodes[p.id] || code,
-            configData: configDataMap[p.id] || {},
-            width,
-            height,
-            fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
-          };
-        });
+    if (initialScreenshotBatchStartedRef.current) return;
+    const canStartBatch =
+      previewMode === "canvas" || (previewMode === "single" && singlePreviewLoaded);
+    if (canStartBatch && demoPages.length > 0 && !isScreenshotGenerating) {
+      const pages = buildScreenshotBatchPages();
       if (pages.length > 0) {
+        initialScreenshotBatchStartedRef.current = true;
         startBatchGeneration(pages);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode]);
+  }, [previewMode, singlePreviewLoaded, buildScreenshotBatchPages]);
 
   // 页面管理编辑状态
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -723,6 +785,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
+  const [rightPanelTab, setRightPanelTab] = useState("property");
+  const [visualLayerPickerOpenToken, setVisualLayerPickerOpenToken] = useState<number | null>(null);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
   // visualEditMode and related state moved to useVisualEditState hook
@@ -976,14 +1040,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setTriggerAutoSend,
   });
   const {
-    visualEditMode,
-    setVisualEditMode,
-    visualAnnotationMode,
-    setVisualAnnotationMode,
     hoveredVisualNode,
     setHoveredVisualNode,
     selectedVisualNode,
     setSelectedVisualNode,
+    visualNodeStack,
+    visualPanelHoverNodeId,
+    setVisualPanelHoverNodeId,
+    visualPropertyChanges,
+    visualConfigMarks,
+    visualAiInstruction,
+    setVisualAiInstruction,
+    visualPropertySending,
     visualAnnotations,
     setVisualAnnotations,
     visualPatches,
@@ -1009,6 +1077,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigDialogOpen,
     handleVisualConfigCandidateChange,
     handleVisualSelect,
+    handleVisualStackSelect,
+    handleVisualPropertyChange,
+    handleRestoreVisualProperty,
+    handleClearVisualProperties,
+    handleMarkVisualConfig,
+    handleUpdateVisualConfigMark,
+    handleRemoveVisualConfigMark,
+    handleSendVisualPropertiesToAI,
+    confirmDiscardVisualPropertyWork,
     handleStartVisualConfig,
     handleApplyVisualConfig,
     handleCloseVisualConfigDialog,
@@ -1018,6 +1095,29 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleVisualInlineEdit,
     handleCreateVisualAnnotation,
   } = visualEditState;
+
+  const propertyPanelActive = previewMode === "single" && rightPanelTab === "property";
+
+  useEffect(() => {
+    if (propertyPanelActive) return;
+    setVisualPanelHoverNodeId(null);
+  }, [propertyPanelActive, setVisualPanelHoverNodeId]);
+
+  useEffect(() => {
+    const hasPendingVisualWork =
+      visualPropertyChanges.length > 0 ||
+      visualConfigMarks.length > 0 ||
+      visualAiInstruction.trim().length > 0;
+    if (!hasPendingVisualWork) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [visualAiInstruction, visualConfigMarks.length, visualPropertyChanges.length]);
 
   // Version control hook
   const versionControl = useVersionControl({
@@ -2032,7 +2132,8 @@ ${context.details}
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
   const hasAnyConfig = showProjectConfig || showPageConfig;
-  const isConfigPanelVisible = hasAnyConfig;
+  const isConfigPanelVisible = previewMode === "single" || hasAnyConfig;
+  const visualConfigUsedKeys = getSchemaPropertyKeys(schema, projectConfigSchema);
   const activePageName =
     demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
   const projectVersions = versionHistory?.versions ?? [];
@@ -2994,6 +3095,7 @@ ${context.details}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
                       focusPageId={focusCanvasPageId}
+                      onVisiblePageIdsChange={setVisibleCanvasPageIds}
                       editingPageId={canvasEditingPageId ?? undefined}
                       screenshotUrls={canvasScreenshotUrls}
                       screenshotRenderBoxes={canvasScreenshotRenderBoxes}
@@ -3001,6 +3103,8 @@ ${context.details}
                       onError={handlePreviewError}
                       onPositionableSizes={handlePositionableSizes}
                       knowledgeDocuments={canvasKnowledgeDocuments}
+                      fitToScreenOnMount={fitCanvasToScreenOnMount}
+                      onFitToScreenOnMountComplete={handleInitialCanvasFitComplete}
                       onCreateKnowledgeDocument={createCanvasKnowledgeDocument}
                       onUpdateKnowledgeDocument={updateCanvasKnowledgeDocument}
                       onReadKnowledgeDocument={readCanvasKnowledgeDocument}
@@ -3063,7 +3167,15 @@ ${context.details}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPreviewMode("canvas")}
+                        onClick={() => {
+                          if (!confirmDiscardVisualPropertyWork()) return;
+                          handleClearVisualProperties();
+                          if (!initialCanvasFitRequestedRef.current) {
+                            initialCanvasFitRequestedRef.current = true;
+                            setFitCanvasToScreenOnMount(true);
+                          }
+                          setPreviewMode("canvas");
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
                       >
                         <Map className="h-3.5 w-3.5" />
@@ -3071,44 +3183,12 @@ ${context.details}
                       </button>
                     </div>
                     <div className="flex-1" />
-                    <Button
-                      type="button"
-                      variant={visualConfigMode ? "default" : "outline"}
-                      size="sm"
-                      className="h-8 gap-1.5"
-                      onClick={handleStartVisualConfig}
-                    >
-                      <Settings2 className="h-3.5 w-3.5" />
-                      {visualConfigMode ? "退出配置化" : "配置化"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={visualAnnotationMode ? "default" : "outline"}
-                      size="sm"
-                      className="h-8 gap-1.5"
-                      onClick={handleStartVisualAnnotation}
-                    >
-                      <MessageSquarePlus className="h-3.5 w-3.5" />
-                      {visualAnnotationMode ? "取消批注" : "批注"}
-                    </Button>
-                    {visualAnnotationMode && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8"
-                        disabled={visualAnnotations.filter((item) => !item.resolved).length === 0}
-                        onClick={handleSendVisualAnnotationsToAI}
-                      >
-                        发送批注
-                        {visualAnnotations.filter((item) => !item.resolved).length > 0
-                          ? ` (${visualAnnotations.filter((item) => !item.resolved).length})`
-                          : ""}
-                      </Button>
-                    )}
                     {demoPages.length > 1 && (
                       <Select
                         value={activeDemoId}
                         onValueChange={async (pageId) => {
+                          if (!confirmDiscardVisualPropertyWork()) return;
+                          handleClearVisualProperties();
                           setActiveDemoId(pageId);
                           // 同步设置 previewSize，避免 fetch 期间用旧尺寸渲染
                           if (pagePreviewSizeMap[pageId]) {
@@ -3184,18 +3264,37 @@ ${context.details}
                         pageScreenshots[activeDemoId]?.screenshotUrl
                       }
                       onConsoleEntry={handleConsoleEntry}
+                      onContentLoaded={() => setSinglePreviewLoaded(true)}
                       onPositionableSizes={handlePositionableSizes}
-                      visualEditMode={visualEditMode}
+                      visualEditMode={propertyPanelActive}
+                      visualHoverNodeId={
+                        propertyPanelActive ? visualPanelHoverNodeId : null
+                      }
                       selectedVisualNodeId={
                         selectedVisualNode?.domPath ||
                         selectedVisualNode?.nodeId ||
                         null
                       }
+                      visualPropertyChanges={visualPropertyChanges}
                       visualAnnotations={visualAnnotations}
                       onVisualHover={setHoveredVisualNode}
                       onVisualSelect={handleVisualSelect}
+                      onVisualSelectStack={(nodes) => {
+                        if (nodes.length > 0) {
+                          handleVisualSelect(nodes[nodes.length - 1], nodes);
+                        } else {
+                          handleVisualSelect(null, []);
+                        }
+                      }}
+                      onVisualLayerMenu={(nodes) => {
+                        setRightPanelTab("property");
+                        if (nodes.length > 0) {
+                          handleVisualSelect(nodes[nodes.length - 1], nodes);
+                        }
+                        setVisualLayerPickerOpenToken((value) => (value ?? 0) + 1);
+                      }}
                       onVisualInlineEdit={handleVisualInlineEdit}
-                      visualAnnotationMode={visualAnnotationMode}
+                      visualAnnotationMode={false}
                       onVisualAnnotationCreate={(
                         node,
                         text,
@@ -3245,36 +3344,97 @@ ${context.details}
 
           {isConfigPanelVisible && (
             <ResizablePanel className="border-l bg-card flex flex-col">
-              <PageConfigPanel
-                pages={demoPages.map((page) => ({
-                  id: page.id,
-                  name: page.name,
-                  order: page.order,
-                  schema:
-                    pageSchemaMap[page.id] ||
-                    (page.id === activeDemoId ? schema : undefined),
-                  configData: configDataMap[page.id],
-                }))}
-                activePageId={activeDemoId}
-                detailPageId={
-                  previewMode === "single" ? activeDemoId : configPanelDetailPageId
-                }
-                onDetailPageIdChange={(pageId) => {
-                  setConfigPanelDetailPageId(pageId);
-                  if (pageId === null && previewMode === "canvas") {
-                    clearCanvasSelection();
-                  }
-                }}
-                onPageSelect={handleConfigPanelPageSelect}
-                projectConfigSchema={projectConfigSchema}
-                onProjectConfigChange={handleProjectConfigPanelChange}
-                onProjectSchemaChange={handleProjectSchemaChange}
-                onPageConfigChange={handlePageConfigPanelChange}
-                onPageSchemaChange={handlePageSchemaChange}
-                sessionId={sessionId}
-                positionableItemSizes={positionableItemSizes}
-                hideDetailHeader={previewMode === "single"}
-              />
+              {previewMode === "single" ? (
+                <Tabs
+                  value={rightPanelTab}
+                  onValueChange={setRightPanelTab}
+                  className="flex h-full min-h-0 flex-col"
+                >
+                  <TabsList className="grid h-11 w-full grid-cols-2 rounded-none border-b bg-transparent px-2">
+                    <TabsTrigger value="config">配置</TabsTrigger>
+                    <TabsTrigger value="property">属性</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="config" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                    <PageConfigPanel
+                      pages={demoPages.map((page) => ({
+                        id: page.id,
+                        name: page.name,
+                        order: page.order,
+                        schema:
+                          pageSchemaMap[page.id] ||
+                          (page.id === activeDemoId ? schema : undefined),
+                        configData: configDataMap[page.id],
+                      }))}
+                      activePageId={activeDemoId}
+                      detailPageId={activeDemoId}
+                      onDetailPageIdChange={(pageId) => {
+                        setConfigPanelDetailPageId(pageId);
+                      }}
+                      onPageSelect={handleConfigPanelPageSelect}
+                      projectConfigSchema={projectConfigSchema}
+                      onProjectConfigChange={handleProjectConfigPanelChange}
+                      onProjectSchemaChange={handleProjectSchemaChange}
+                      onPageConfigChange={handlePageConfigPanelChange}
+                      onPageSchemaChange={handlePageSchemaChange}
+                      sessionId={sessionId}
+                      positionableItemSizes={positionableItemSizes}
+                      hideDetailHeader
+                    />
+                  </TabsContent>
+                  <TabsContent value="property" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                    <VisualPropertyPanel
+                      selectedNode={selectedVisualNode}
+                      sessionId={sessionId}
+                      nodeStack={visualNodeStack}
+                      hoverNodeId={visualPanelHoverNodeId}
+                      propertyChanges={visualPropertyChanges}
+                      configMarks={visualConfigMarks}
+                      aiInstruction={visualAiInstruction}
+                      sending={visualPropertySending}
+                      usedConfigKeys={visualConfigUsedKeys}
+                      layerPickerOpenToken={visualLayerPickerOpenToken}
+                      onHoverNodeIdChange={setVisualPanelHoverNodeId}
+                      onSelectNode={handleVisualStackSelect}
+                      onPropertyChange={handleVisualPropertyChange}
+                      onRestoreProperty={handleRestoreVisualProperty}
+                      onClearChanges={handleClearVisualProperties}
+                      onMarkConfig={handleMarkVisualConfig}
+                      onUpdateConfigMark={handleUpdateVisualConfigMark}
+                      onRemoveConfigMark={handleRemoveVisualConfigMark}
+                      onAiInstructionChange={setVisualAiInstruction}
+                      onSendToAI={handleSendVisualPropertiesToAI}
+                    />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <PageConfigPanel
+                  pages={demoPages.map((page) => ({
+                    id: page.id,
+                    name: page.name,
+                    order: page.order,
+                    schema:
+                      pageSchemaMap[page.id] ||
+                      (page.id === activeDemoId ? schema : undefined),
+                    configData: configDataMap[page.id],
+                  }))}
+                  activePageId={activeDemoId}
+                  detailPageId={configPanelDetailPageId}
+                  onDetailPageIdChange={(pageId) => {
+                    setConfigPanelDetailPageId(pageId);
+                    if (pageId === null && previewMode === "canvas") {
+                      clearCanvasSelection();
+                    }
+                  }}
+                  onPageSelect={handleConfigPanelPageSelect}
+                  projectConfigSchema={projectConfigSchema}
+                  onProjectConfigChange={handleProjectConfigPanelChange}
+                  onProjectSchemaChange={handleProjectSchemaChange}
+                  onPageConfigChange={handlePageConfigPanelChange}
+                  onPageSchemaChange={handlePageSchemaChange}
+                  sessionId={sessionId}
+                  positionableItemSizes={positionableItemSizes}
+                />
+              )}
             </ResizablePanel>
           )}
         </ResizablePanelGroup>

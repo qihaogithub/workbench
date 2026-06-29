@@ -11,6 +11,10 @@ test/创作端E2E回归测试/
 ├── e2e-test-project-flow.spec.ts    # 主测试脚本
 ├── author-core-flow-regression.spec.ts # 创作端核心流程回归脚本
 ├── playwright.config.ts              # Playwright 配置文件
+├── global-setup.ts                   # 生成 E2E runId 和项目登记文件
+├── global-teardown.ts                # 清理本轮和过期 E2E 测试项目
+├── support/e2e-auth.ts               # E2E 登录 helper
+├── support/e2e-projects.ts           # E2E 测试项目创建、登记和清理 helper
 └── AGENTS.md                         # 本文件
 ```
 
@@ -82,6 +86,30 @@ pnpm test:e2e -- e2e-test-project-flow.spec.ts
 # 运行特定测试用例
 pnpm test:e2e -- -t "完整流程"
 ```
+
+## 测试项目治理
+
+所有会创建创作端项目的回归脚本都必须使用统一 E2E 项目 helper，避免测试项目长期残留在首页。
+
+### 命名和分类
+
+- 测试项目分类固定为 `__e2e__`。
+- 测试项目名称固定为 `E2E:<runId>:<caseName>`。
+- `runId` 由 `global-setup.ts` 生成，并写入 `test-outputs/e2e-run.json`。
+- 本轮创建的项目会登记到 `test-outputs/e2e-projects-<runId>.json`。
+
+### 创建方式
+
+- 普通业务回归使用 `support/e2e-projects.ts` 的 `createE2EProject(page, caseName)` 创建项目。
+- 专门验证“从首页新建项目 UI”的用例可以继续走 UI，但创建成功后必须调用 `ensureE2EProjectCategory(page.request, project)`，确保项目被标记为 `__e2e__` 并写入登记文件。
+- 不要在新 spec 中复制 `deleteProject` 或 `createProjectFromUi` 这类本地生命周期 helper。
+
+### 清理方式
+
+- `global-teardown.ts` 会删除本轮登记项目。
+- `global-teardown.ts` 还会扫描并删除超过 24 小时的 `__e2e__` 历史残留项目。
+- 删除接口返回 404 时视为已清理。
+- 全局清理只触碰 `category === "__e2e__"` 的项目，不清理历史前缀类项目，避免误删人工数据。
 
 ## 日志与报告
 

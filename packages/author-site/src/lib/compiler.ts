@@ -12,11 +12,14 @@ import {
   getPreviewDependencyUrl,
   isNpmPackage,
 } from './preview-dependency-policy';
+import type { PreviewRuntimeResolveOptions } from './preview-runtime-manifest';
 
 export interface CompileResult {
   compiledCode: string;
   dependencies: string[];
   cssImports: string[];
+  moduleHash: string;
+  moduleUrl?: string;
 }
 
 // 服务端编译缓存
@@ -74,8 +77,11 @@ function isCssImport(moduleName: string): boolean {
  * 将 npm 包名映射到 esm.sh CDN URL
  * 只允许使用 previewDependencyPolicy 中登记的固定版本或虚拟模块
  */
-function toCdnUrl(packageName: string): string {
-  return getPreviewDependencyUrl(packageName);
+function toRuntimeUrl(
+  packageName: string,
+  options?: PreviewRuntimeResolveOptions,
+): string {
+  return getPreviewDependencyUrl(packageName, options);
 }
 
 /**
@@ -97,13 +103,14 @@ export function rewriteImportsToCdn(
   compiledCode: string,
   dependencies: string[],
   _lockedDependencies?: Record<string, string>,
+  runtimeOptions?: PreviewRuntimeResolveOptions,
 ): string {
   let result = compiledCode;
 
   for (const dep of dependencies) {
     if (!isNpmPackage(dep) || isCssImport(dep)) continue;
 
-    const cdnUrl = toCdnUrl(dep);
+    const cdnUrl = toRuntimeUrl(dep, runtimeOptions);
     
     // 替换 from 'package' 和 from "package"
     const fromPattern = new RegExp(
@@ -154,6 +161,7 @@ function autoWrapIfNoDefaultExport(code: string): string {
 export function compileCode(
   code: string,
   lockedDependencies?: Record<string, string>,
+  runtimeOptions?: PreviewRuntimeResolveOptions,
 ): CompileResult {
   const wrappedCode = autoWrapIfNoDefaultExport(code);
   assertPreviewRuntimeContract(wrappedCode);
@@ -161,7 +169,8 @@ export function compileCode(
   const cacheKey = getCodeHash(
     wrappedCode +
       PREVIEW_DEPENDENCY_POLICY_VERSION +
-      JSON.stringify(lockedDependencies || {}),
+      JSON.stringify(lockedDependencies || {}) +
+      JSON.stringify(runtimeOptions || {}),
   );
   const cached = compileCache.get(cacheKey);
   if (cached) {
@@ -182,12 +191,19 @@ export function compileCode(
   const cssImports = dependencies.filter(isCssImport);
 
   // 4. 将 npm 包 import 路径替换为 CDN URL
-  const compiledCode = rewriteImportsToCdn(result.code, dependencies, lockedDependencies);
+  const compiledCode = rewriteImportsToCdn(
+    result.code,
+    dependencies,
+    lockedDependencies,
+    runtimeOptions,
+  );
+  const moduleHash = createHash('sha256').update(compiledCode).digest('hex');
 
   const compileResult: CompileResult = {
     compiledCode,
     dependencies,
     cssImports,
+    moduleHash,
   };
 
   // 5. 写入缓存
@@ -248,6 +264,7 @@ export async function resolveDependencyVersions(
 export function compileSession(
   sessionId: string,
   demoId?: string,
+  runtimeOptions?: PreviewRuntimeResolveOptions,
 ): CompileResult | null {
   let code: string | undefined;
 
@@ -280,7 +297,7 @@ export function compileSession(
     // 忽略元数据读取错误，使用默认版本
   }
 
-  const result = compileCode(code, lockedDependencies);
+  const result = compileCode(code, lockedDependencies, runtimeOptions);
 
   return result;
 }

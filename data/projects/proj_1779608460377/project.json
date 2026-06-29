@@ -1,6 +1,7 @@
 {
   "id": "proj_1779608460377",
   "name": "通用弹窗",
+  "category": "APP资源位",
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460377/workspace",
   "demoPages": [
     {
@@ -307,11 +308,6 @@
       "note": "停止编辑后自动保存记录"
     }
   ],
-  "createdAt": 1779608460377,
-  "updatedAt": 1782660878313,
-  "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
-  "publishedVersion": "v28",
-  "publishedAt": 1782440424755,
   "pageVersions": {
     "pad-popup_a3f2": [
       {
@@ -326,5 +322,10 @@
         "note": "修改了通用弹窗 - 平板版"
       }
     ]
-  }
+  },
+  "createdAt": 1779608460377,
+  "updatedAt": 1782723559336,
+  "thumbnail": "/thumbnails/proj_1779608460377_cover.webp",
+  "publishedVersion": "v28",
+  "publishedAt": 1782440424755
 }

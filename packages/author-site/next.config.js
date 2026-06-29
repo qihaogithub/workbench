@@ -26,7 +26,24 @@ if (fs.existsSync(rootEnvPath)) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  transpilePackages: ["@opencode-workbench/shared", "@opencode-workbench/demo-ui", "@opencode-workbench/project-core", "@opencode-workbench/agent-client", "shiki"],
+  env: {
+    NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:
+      process.env.CDN_BASE_URL || "https://esm.sh",
+    NEXT_PUBLIC_PREVIEW_RUNTIME_SOURCE:
+      process.env.PREVIEW_RUNTIME_SOURCE || "local",
+    NEXT_PUBLIC_PREVIEW_SHELL_MODE:
+      process.env.PREVIEW_SHELL_MODE || "fixed",
+  },
+  transpilePackages: [
+    "@opencode-workbench/agent-client",
+    "@opencode-workbench/demo-ui",
+    "@opencode-workbench/knowledge-core",
+    "@opencode-workbench/knowledge-service",
+    "@opencode-workbench/project-core",
+    "@opencode-workbench/project-scaffold",
+    "@opencode-workbench/shared",
+    "shiki",
+  ],
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

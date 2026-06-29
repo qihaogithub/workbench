@@ -1,6 +1,7 @@
 {
   "id": "proj_1779608460378",
   "name": "广场页面",
+  "category": "APP资源位",
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460378/workspace",
   "demoPages": [
     {
@@ -424,10 +425,6 @@
       "fileCount": 9
     }
   ],
-  "createdAt": 1779608460378,
-  "updatedAt": 1782405320646,
-  "publishedVersion": "v65",
-  "publishedAt": 1782405323927,
   "pageVersions": {
     "demo_1780550141175_a79047": [
       {
@@ -510,5 +507,9 @@
         "note": "修改了广场页面-手机"
       }
     ]
-  }
+  },
+  "createdAt": 1779608460378,
+  "updatedAt": 1782723606862,
+  "publishedVersion": "v65",
+  "publishedAt": 1782405323927
 }

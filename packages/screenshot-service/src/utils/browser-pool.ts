@@ -19,6 +19,15 @@ export interface RenderPageResult {
   renderMs: number;
 }
 
+export type ScreenshotPriority =
+  | "active"
+  | "visible"
+  | "nearby"
+  | "thumbnail"
+  | "background";
+
+export type ScreenshotRenderMode = "strict" | "fast";
+
 export interface ScreenshotRenderBox {
   width: number;
   height: number;
@@ -51,11 +60,23 @@ interface RenderTask {
   width: number;
   height: number;
   fullPage: boolean;
+  priority: ScreenshotPriority;
+  renderMode: ScreenshotRenderMode;
+  measuredHeight?: number;
+  sequence: number;
   enqueuedAt: number;
   timeout: ReturnType<typeof setTimeout>;
   resolve: (result: RenderPageResult) => void;
   reject: (error: unknown) => void;
 }
+
+const PRIORITY_WEIGHT: Record<ScreenshotPriority, number> = {
+  active: 0,
+  visible: 1,
+  nearby: 2,
+  thumbnail: 3,
+  background: 4,
+};
 
 class BrowserPool {
   private browser: Browser | null = null;
@@ -64,6 +85,7 @@ class BrowserPool {
   private launchPromise: Promise<Browser> | null = null;
   private queue: RenderTask[] = [];
   private lastError: string | null = null;
+  private taskSequence = 0;
 
   async getBrowser(): Promise<Browser> {
     if (this.browser && this.browser.connected) {
@@ -156,6 +178,9 @@ class BrowserPool {
     width: number,
     height: number,
     fullPage = false,
+    priority: ScreenshotPriority = "background",
+    renderMode: ScreenshotRenderMode = "strict",
+    measuredHeight?: number,
   ): Promise<RenderPageResult> {
     return new Promise((resolve, reject) => {
       const task: RenderTask = {
@@ -163,6 +188,10 @@ class BrowserPool {
         width,
         height,
         fullPage,
+        priority,
+        renderMode,
+        measuredHeight,
+        sequence: this.taskSequence++,
         enqueuedAt: Date.now(),
         resolve,
         reject,
@@ -181,6 +210,10 @@ class BrowserPool {
       };
 
       this.queue.push(task);
+      this.queue.sort((a, b) => {
+        const priorityDiff = PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority];
+        return priorityDiff === 0 ? a.sequence - b.sequence : priorityDiff;
+      });
       this.drainQueue();
     });
   }
@@ -214,10 +247,12 @@ class BrowserPool {
     const renderStart = Date.now();
     const result = await this.renderPageNow(
       task.html,
-      task.width,
-      task.height,
-      task.fullPage,
-    );
+        task.width,
+        task.height,
+        task.fullPage,
+        task.renderMode,
+        task.measuredHeight,
+      );
     return {
       ...result,
       queueWaitMs,
@@ -230,6 +265,8 @@ class BrowserPool {
     width: number,
     height: number,
     fullPage: boolean,
+    renderMode: ScreenshotRenderMode,
+    measuredHeight?: number,
   ): Promise<Omit<RenderPageResult, "queueWaitMs" | "renderMs">> {
     const browser = await this.getBrowser();
     let page: Page | null = null;
@@ -248,7 +285,15 @@ class BrowserPool {
         }, config.screenshotTaskTimeout);
       });
 
-      const renderPromise = this.capturePage(page, html, width, height, fullPage);
+      const renderPromise = this.capturePage(
+        page,
+        html,
+        width,
+        height,
+        fullPage,
+        renderMode,
+        measuredHeight,
+      );
       return await Promise.race([renderPromise, timeoutPromise]);
     } finally {
       if (timeout) {
@@ -266,6 +311,8 @@ class BrowserPool {
     viewportWidth: number,
     viewportHeight: number,
     fullPage: boolean,
+    renderMode: ScreenshotRenderMode,
+    measuredHeight?: number,
   ): Promise<Omit<RenderPageResult, "queueWaitMs" | "renderMs">> {
     try {
       await page.setContent(html, {
@@ -285,12 +332,16 @@ class BrowserPool {
         );
       }
 
-      try {
-        await page.waitForNetworkIdle({
-          timeout: config.waitForNetworkIdleTimeout,
-        });
-      } catch {
-        // Network idle timeout is acceptable — page may have ongoing requests
+      if (renderMode === "strict") {
+        try {
+          await page.waitForNetworkIdle({
+            timeout: config.waitForNetworkIdleTimeout,
+          });
+        } catch {
+          // Network idle timeout is acceptable — page may have ongoing requests
+        }
+      } else {
+        await this.waitForAnimationFramePair(page);
       }
 
       const runtimeError = await this.readPreviewRuntimeError(page);
@@ -303,7 +354,10 @@ class BrowserPool {
         );
       }
 
-      const measurement = await this.waitForStableMeasurement(page);
+      const measurement =
+        renderMode === "strict"
+          ? await this.waitForStableMeasurement(page, measuredHeight)
+          : await this.measureFastPage(page, measuredHeight);
       const captureWidth = viewportWidth;
       const captureHeight = fullPage
         ? Math.max(viewportHeight, measurement.bodyHeight, measurement.documentHeight)
@@ -378,7 +432,10 @@ class BrowserPool {
     return { error: raw };
   }
 
-  private async waitForStableMeasurement(page: Page): Promise<PageMeasurement> {
+  private async waitForStableMeasurement(
+    page: Page,
+    measuredHeight?: number,
+  ): Promise<PageMeasurement> {
     await page.evaluate(async () => {
       const browserGlobal = globalThis as unknown as {
         document: {
@@ -419,6 +476,9 @@ class BrowserPool {
     let previous: PageMeasurement | null = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       const current = await this.measurePage(page);
+      if (measuredHeight && Math.abs(current.documentHeight - measuredHeight) <= 4) {
+        return current;
+      }
       if (
         previous &&
         previous.bodyWidth === current.bodyWidth &&
@@ -433,6 +493,37 @@ class BrowserPool {
     }
 
     return previous ?? this.measurePage(page);
+  }
+
+  private async measureFastPage(
+    page: Page,
+    measuredHeight?: number,
+  ): Promise<PageMeasurement> {
+    await this.waitForAnimationFramePair(page);
+    const measurement = await this.measurePage(page);
+    if (!measuredHeight || measuredHeight <= 0) {
+      return measurement;
+    }
+
+    const hintedHeight = Math.ceil(measuredHeight);
+    return {
+      ...measurement,
+      bodyHeight: Math.max(measurement.bodyHeight, hintedHeight),
+      documentHeight: Math.max(measurement.documentHeight, hintedHeight),
+    };
+  }
+
+  private async waitForAnimationFramePair(page: Page): Promise<void> {
+    await page.evaluate(async () => {
+      const browserGlobal = globalThis as unknown as {
+        requestAnimationFrame: (callback: () => void) => void;
+      };
+      await new Promise<void>((resolve) => {
+        browserGlobal.requestAnimationFrame(() => {
+          browserGlobal.requestAnimationFrame(() => resolve());
+        });
+      });
+    });
   }
 
   private async measurePage(page: Page): Promise<PageMeasurement> {
@@ -522,6 +613,20 @@ class BrowserPool {
     try {
       const html = "<!doctype html><html><body><div id=\"root\">ok</div></body></html>";
       await this.renderPage(html, 120, 80, false);
+      return { ok: true, elapsed: Date.now() - start };
+    } catch (error) {
+      return {
+        ok: false,
+        elapsed: Date.now() - start,
+        error: getErrorMessage(error),
+      };
+    }
+  }
+
+  async warmup(): Promise<{ ok: boolean; elapsed: number; error?: string }> {
+    const start = Date.now();
+    try {
+      await this.getBrowser();
       return { ok: true, elapsed: Date.now() - start };
     } catch (error) {
       return {

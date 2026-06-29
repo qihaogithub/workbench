@@ -1,0 +1,28 @@
+{
+  "id": "proj_1782718596686_wmv9yu",
+  "name": "App通用广告弹窗",
+  "category": "APP资源位",
+  "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782718596686_wmv9yu/workspace",
+  "demoPages": [
+    {
+      "id": "pad-popup_a3f2",
+      "name": "通用弹窗 - 平板版",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "phone-popup_k8m2",
+      "name": "通用弹窗 - 手机版",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page-2"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "pageVersions": {},
+  "createdAt": 1782718596693,
+  "updatedAt": 1782723647578
+}

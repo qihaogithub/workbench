@@ -1,5 +1,6 @@
 import {
   computeCanvasRenderModes,
+  computePreviewRuntimePoolPlan,
   type CanvasPageData,
   type CanvasPageLayout,
 } from "@opencode-workbench/demo-ui";
@@ -137,5 +138,36 @@ describe("computeCanvasRenderModes", () => {
 
     expect(result.modes.page_1).toBe("iframe");
     expect(result.modes.page_2).toBe("loading");
+  });
+
+  it("PreviewRuntimePool 统一返回 active 与 sleeping 的保留集合", () => {
+    const pages = Array.from({ length: 6 }, (_, index) =>
+      makePage(`page_${index}`),
+    );
+    const layouts = Object.fromEntries(
+      pages.map((page, index) => [page.id, makeLayout(index)]),
+    );
+
+    const result = computePreviewRuntimePoolPlan({
+      pages,
+      layouts,
+      visiblePageIds: new Set(pages.map((page) => page.id)),
+      viewport: { x: 0, y: 0, zoom: 1 },
+      containerWidth: 220,
+      containerHeight: 200,
+      recentRuntimeAccess: new Map([
+        ["page_3", 300],
+        ["page_4", 400],
+      ]),
+      maxActiveRuntimes: 2,
+      maxSleepingRuntimes: 1,
+    });
+
+    expect(result.activePageIds).toHaveLength(2);
+    expect(result.sleepingPageIds).toEqual(["page_4"]);
+    expect(result.retainedRuntimePageIds).toEqual([
+      ...result.activePageIds,
+      "page_4",
+    ]);
   });
 });

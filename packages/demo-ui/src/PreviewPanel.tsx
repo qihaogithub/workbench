@@ -12,6 +12,7 @@ const DEFAULT_PREVIEW_SIZE: PreviewSize = {
 };
 
 const CONTAINER_PADDING = 32;
+const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
 
 function parseSizeValue(value: string | number | undefined): number | null {
   if (typeof value === "number") return value;
@@ -256,10 +257,20 @@ function isValidCode(code: string): boolean {
   );
 }
 
+function getPreviewCdnBaseUrl(explicitBaseUrl?: string): string {
+  return (
+    explicitBaseUrl ||
+    process.env.NEXT_PUBLIC_PREVIEW_CDN_BASE_URL ||
+    DEFAULT_PREVIEW_CDN_BASE
+  );
+}
+
 interface CompileResult {
   compiledCode: string;
   dependencies: string[];
   cssImports: string[];
+  moduleHash?: string;
+  moduleUrl?: string;
 }
 
 interface CompileApiResponse {
@@ -315,6 +326,7 @@ export function PreviewPanel({
   onError,
   previewSize,
   placeholderScreenshotUrl,
+  cdnBaseUrl,
   fillContainer = false,
   onConsoleEntry,
   onAppAction,
@@ -325,10 +337,14 @@ export function PreviewPanel({
   onPositionableSizes,
   visualEditMode = false,
   visualAnnotationMode = false,
+  visualHoverNodeId,
   selectedVisualNodeId,
+  visualPropertyChanges = [],
   visualAnnotations = [],
   onVisualHover,
   onVisualSelect,
+  onVisualSelectStack,
+  onVisualLayerMenu,
   onVisualInlineEdit,
   onVisualAnnotationCreate,
 }: PreviewPanelProps) {
@@ -348,18 +364,25 @@ export function PreviewPanel({
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
   const [contentLoaded, setContentLoaded] = useState(false);
   const [placeholderFailed, setPlaceholderFailed] = useState(false);
+  const timingStartRef = useRef<number>(0);
+  const compileStartRef = useRef<number | null>(null);
+  const updateCodeSentAtRef = useRef<number | null>(null);
 
   const isUrlMode = !!compiledJsUrl;
   const visualEditStateRef = useRef({
     enabled: visualEditMode,
     annotationMode: visualAnnotationMode,
+    hoverNodeId: visualHoverNodeId ?? null,
     selectedNodeId: selectedVisualNodeId ?? null,
+    propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,
   });
   visualEditStateRef.current = {
     enabled: visualEditMode,
     annotationMode: visualAnnotationMode,
+    hoverNodeId: visualHoverNodeId ?? null,
     selectedNodeId: selectedVisualNodeId ?? null,
+    propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,
   };
 
@@ -375,6 +398,34 @@ export function PreviewPanel({
   activityStateRef.current = activityState;
 
   const isSleeping = activityState === "sleeping";
+  const resolvedCdnBaseUrl = getPreviewCdnBaseUrl(cdnBaseUrl);
+
+  const reportTiming = useCallback(
+    (stage: string, details: Record<string, unknown> = {}) => {
+      if (!onConsoleEntry || typeof performance === "undefined") return;
+      const now = performance.now();
+      if (timingStartRef.current === 0) {
+        timingStartRef.current = now;
+      }
+      const sinceStart =
+        timingStartRef.current > 0 ? Math.round(now - timingStartRef.current) : 0;
+      const payload = {
+        source: "preview-runtime",
+        stage,
+        sinceStart,
+        ...details,
+      };
+      if (typeof console !== "undefined") {
+        console.info("[PreviewRuntime]", payload);
+      }
+      onConsoleEntry({
+        level: "info",
+        args: JSON.stringify(payload),
+        timestamp: Date.now(),
+      });
+    },
+    [onConsoleEntry],
+  );
 
   const sendLifecycleMessage = useCallback((type: "SLEEP" | "WAKE") => {
     const iframe = iframeRef.current;
@@ -382,8 +433,13 @@ export function PreviewPanel({
     iframe.contentWindow.postMessage({ type }, "*");
   }, []);
 
-  const sendUpdateCode = useCallback(
-    (result: CompileResult, config: Record<string, unknown> = {}) => {
+  const sendUpdateCodeUrl = useCallback(
+    (
+      url: string,
+      cssList: string[],
+      config: Record<string, unknown> = {},
+      messageType: "UPDATE_CODE" | "UPDATE_MODULE" = "UPDATE_CODE",
+    ) => {
       const iframe = iframeRef.current;
       if (!iframe || !iframe.contentWindow) {
         return;
@@ -393,6 +449,51 @@ export function PreviewPanel({
       }
 
       const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+      updateCodeSentAtRef.current =
+        typeof performance !== "undefined" ? performance.now() : null;
+      reportTiming("parent_update_code_url_sent", {
+        cssImports: cssList.length,
+      });
+
+      iframe.contentWindow.postMessage(
+        {
+          type: messageType,
+          code: url,
+          moduleUrl: url,
+          isUrl: true,
+          configData: resolvedConfig,
+          appState: appStateRef.current || {},
+          routeParams: routeParamsRef.current || {},
+          cssImports: cssList,
+        },
+        "*",
+      );
+    },
+    [sessionId, demoId, reportTiming],
+  );
+
+  const sendUpdateCode = useCallback(
+    (result: CompileResult, config: Record<string, unknown> = {}) => {
+      if (result.moduleUrl) {
+        sendUpdateCodeUrl(result.moduleUrl, result.cssImports, config, "UPDATE_MODULE");
+        return;
+      }
+
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+      if (activityStateRef.current === "sleeping") {
+        return;
+      }
+
+      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+      updateCodeSentAtRef.current =
+        typeof performance !== "undefined" ? performance.now() : null;
+      reportTiming("parent_update_code_sent", {
+        cssImports: result.cssImports.length,
+        codeBytes: result.compiledCode.length,
+      });
 
       iframe.contentWindow.postMessage(
         {
@@ -406,35 +507,7 @@ export function PreviewPanel({
         "*",
       );
     },
-    [sessionId, demoId],
-  );
-
-  const sendUpdateCodeUrl = useCallback(
-    (url: string, cssList: string[], config: Record<string, unknown> = {}) => {
-      const iframe = iframeRef.current;
-      if (!iframe || !iframe.contentWindow) {
-        return;
-      }
-      if (activityStateRef.current === "sleeping") {
-        return;
-      }
-
-      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
-
-      iframe.contentWindow.postMessage(
-        {
-          type: "UPDATE_CODE",
-          code: url,
-          isUrl: true,
-          configData: resolvedConfig,
-          appState: appStateRef.current || {},
-          routeParams: routeParamsRef.current || {},
-          cssImports: cssList,
-        },
-        "*",
-      );
-    },
-    [sessionId, demoId],
+    [sessionId, demoId, reportTiming, sendUpdateCodeUrl],
   );
 
   const sendUpdateConfig = useCallback((config: Record<string, unknown>) => {
@@ -484,7 +557,9 @@ export function PreviewPanel({
         type: "UPDATE_VISUAL_EDIT_STATE",
         enabled: state.enabled,
         annotationMode: state.annotationMode,
+        hoverNodeId: state.hoverNodeId,
         selectedNodeId: state.selectedNodeId,
+        propertyChanges: state.propertyChanges,
         annotations: state.annotations,
       },
       "*",
@@ -525,6 +600,15 @@ export function PreviewPanel({
     }
 
     let cancelled = false;
+    if (typeof performance !== "undefined") {
+      compileStartRef.current = performance.now();
+      if (timingStartRef.current === 0) {
+        timingStartRef.current = compileStartRef.current;
+      }
+    }
+    reportTiming("compile_start", {
+      cacheScope: sessionId && demoId ? "session-demo" : "request",
+    });
     setContentLoaded(false);
     setIsCompiling(true);
     setCompileError(null);
@@ -537,6 +621,11 @@ export function PreviewPanel({
           const cached = getCachedCompile(sessionId, demoId, code);
           if (cached) {
             const compileResult: CompileResult = cached;
+            const compileMs =
+              compileStartRef.current != null && typeof performance !== "undefined"
+                ? Math.round(performance.now() - compileStartRef.current)
+                : undefined;
+            reportTiming("compile_done", { cacheHit: true, compileMs });
             setLastSuccessfulResult(compileResult);
             const currentConfig = configDataRef.current || {};
             if (iframeReadyRef.current) {
@@ -573,10 +662,20 @@ export function PreviewPanel({
           setPendingCompileResult(null);
           setLastSuccessfulResult(null);
           setIsCompiling(false);
+          const compileMs =
+            compileStartRef.current != null && typeof performance !== "undefined"
+              ? Math.round(performance.now() - compileStartRef.current)
+              : undefined;
+          reportTiming("compile_error", { compileMs, message });
           return;
         }
 
         const compileResult: CompileResult = result.data;
+        const compileMs =
+          compileStartRef.current != null && typeof performance !== "undefined"
+            ? Math.round(performance.now() - compileStartRef.current)
+            : undefined;
+        reportTiming("compile_done", { cacheHit: false, compileMs });
         setLastSuccessfulResult(compileResult);
 
         // 写入编译缓存
@@ -600,6 +699,11 @@ export function PreviewPanel({
         setPendingCompileResult(null);
         setLastSuccessfulResult(null);
         setIsCompiling(false);
+        const compileMs =
+          compileStartRef.current != null && typeof performance !== "undefined"
+            ? Math.round(performance.now() - compileStartRef.current)
+            : undefined;
+        reportTiming("compile_error", { compileMs, message });
       }
     };
 
@@ -619,6 +723,7 @@ export function PreviewPanel({
     sendUpdateCode,
     sendUpdateCodeUrl,
     onError,
+    reportTiming,
   ]);
 
   useEffect(() => {
@@ -707,6 +812,7 @@ export function PreviewPanel({
 
       switch (type) {
         case "READY":
+          reportTiming("iframe_ready");
           iframeReadyRef.current = true;
           setIframeReady(true);
           if (isUrlMode && compiledJsUrl) {
@@ -721,6 +827,13 @@ export function PreviewPanel({
           break;
 
         case "LOADED":
+          reportTiming("iframe_loaded", {
+            updateToLoadedMs:
+              updateCodeSentAtRef.current != null &&
+              typeof performance !== "undefined"
+                ? Math.round(performance.now() - updateCodeSentAtRef.current)
+                : undefined,
+          });
           setRuntimeError(null);
           setContentLoaded(true);
           onContentLoaded?.();
@@ -776,6 +889,12 @@ export function PreviewPanel({
 
         case "VISUAL_SELECT":
           onVisualSelect?.(event.data?.node ?? null);
+          if (Array.isArray(event.data?.nodeStack)) {
+            onVisualSelectStack?.(event.data.nodeStack);
+            if (event.data?.openLayerPicker === true) {
+              onVisualLayerMenu?.(event.data.nodeStack);
+            }
+          }
           break;
 
         case "VISUAL_INLINE_EDIT":
@@ -818,15 +937,26 @@ export function PreviewPanel({
     sendVisualEditState,
     onVisualHover,
     onVisualSelect,
+    onVisualSelectStack,
+    onVisualLayerMenu,
     onVisualInlineEdit,
     onVisualAnnotationCreate,
     demoId,
+    reportTiming,
   ]);
 
   useEffect(() => {
     if (!iframeReadyRef.current) return;
     sendVisualEditState();
-  }, [visualEditMode, visualAnnotationMode, selectedVisualNodeId, visualAnnotations, sendVisualEditState]);
+  }, [
+    visualEditMode,
+    visualAnnotationMode,
+    visualHoverNodeId,
+    selectedVisualNodeId,
+    visualPropertyChanges,
+    visualAnnotations,
+    sendVisualEditState,
+  ]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -874,12 +1004,13 @@ export function PreviewPanel({
     if (!iframe) return;
 
     const handleLoad = () => {
+      reportTiming("iframe_load_event");
       hideIframeScrollbar(iframe);
     };
 
     iframe.addEventListener("load", handleLoad);
     return () => iframe.removeEventListener("load", handleLoad);
-  }, [iframeSrcUrl]);
+  }, [iframeSrcUrl, reportTiming]);
 
   const { wrapperStyle, iframeStyle } = computePreviewScale(
     previewSize,
@@ -895,20 +1026,32 @@ export function PreviewPanel({
     showPreviewLoading && !showPlaceholder;
 
   useEffect(() => {
-    const html = generateIframeHtml({ supportUrlMode: isUrlMode, baseOrigin: window.location.origin });
-    const blob = new Blob([html], { type: "text/html" });
-    const canCreateObjectUrl = typeof URL.createObjectURL === "function";
-    const url = canCreateObjectUrl
-      ? URL.createObjectURL(blob)
-      : `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    reportTiming("iframe_html_create_start", {
+      cdnBase: resolvedCdnBaseUrl,
+      urlMode: isUrlMode,
+    });
+    const runtimeSource = process.env.NEXT_PUBLIC_PREVIEW_RUNTIME_SOURCE === "cdn" ? "cdn" : "local";
+    const shellMode = process.env.NEXT_PUBLIC_PREVIEW_SHELL_MODE || "fixed";
+    const canUseFixedShell =
+      shellMode !== "inline" &&
+      typeof window !== "undefined" &&
+      !!window.location?.origin;
+    const url = canUseFixedShell
+        ? `${window.location.origin}/api/preview-runtime/shell?runtimeSource=${runtimeSource}`
+        : `data:text/html;charset=utf-8,${encodeURIComponent(generateIframeHtml({
+            supportUrlMode: true,
+            cdnBaseUrl: resolvedCdnBaseUrl,
+            runtimeBaseUrl: window.location.origin,
+            useCdnRuntime: runtimeSource === "cdn",
+          }))}`;
     setIframeSrcUrl(url);
-
-    return () => {
-      if (canCreateObjectUrl && typeof URL.revokeObjectURL === "function") {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, [isUrlMode]);
+    reportTiming("iframe_html_created", {
+      cdnBase: resolvedCdnBaseUrl,
+      transport: canUseFixedShell ? "fixed-shell" : "data-url",
+      runtimeSource,
+      shellMode,
+    });
+  }, [isUrlMode, resolvedCdnBaseUrl]);
 
   useEffect(() => {
     setContentLoaded(false);

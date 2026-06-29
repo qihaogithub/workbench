@@ -4,6 +4,7 @@ import type {
   VisualAnnotation,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualPropertyChange,
   VisualStyleChange,
   AppActionPayload,
 } from "./iframe-types";
@@ -18,6 +19,8 @@ export type {
   VisualInlineEditPayload,
   VisualNodeInfo,
   VisualNodeRect,
+  VisualPropertyChange,
+  VisualPropertyChangeKind,
   VisualStyleChange,
   AppActionPayload,
 } from "./iframe-types";
@@ -71,6 +74,7 @@ export interface PreviewPanelProps {
   onError?: (error: Error) => void;
   previewSize?: PreviewSize;
   placeholderScreenshotUrl?: string;
+  cdnBaseUrl?: string;
   fillContainer?: boolean;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onAppAction?: (action: AppActionPayload & { pageId?: string }) => void;
@@ -80,10 +84,14 @@ export interface PreviewPanelProps {
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
   visualEditMode?: boolean;
+  visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
+  visualPropertyChanges?: VisualPropertyChange[];
   visualAnnotations?: VisualAnnotation[];
   onVisualHover?: (node: VisualNodeInfo | null) => void;
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
+  onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
+  onVisualLayerMenu?: (nodes: VisualNodeInfo[]) => void;
   onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
   visualAnnotationMode?: boolean;
   onVisualAnnotationCreate?: (
@@ -303,6 +311,9 @@ export interface PreviewCanvasProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onError?: (error: Error) => void;
   focusPageId?: string;
+  onVisiblePageIdsChange?: (pageIds: string[]) => void;
+  fitToScreenOnMount?: boolean;
+  onFitToScreenOnMountComplete?: () => void;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
   knowledgeDocuments?: CanvasKnowledgeDocument[];
   onCreateKnowledgeDocument?: (

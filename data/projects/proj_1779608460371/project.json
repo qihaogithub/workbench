@@ -1,6 +1,7 @@
 {
   "id": "proj_1779608460371",
   "name": "伴读广告页面",
+  "category": "APP资源位",
   "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608460371\\workspace",
   "demoPages": [
     {
@@ -22,6 +23,7 @@
   ],
   "demoFolders": [],
   "versions": [],
+  "pageVersions": {},
   "createdAt": 1779608460371,
-  "updatedAt": 1779608460371
+  "updatedAt": 1782723628152
 }

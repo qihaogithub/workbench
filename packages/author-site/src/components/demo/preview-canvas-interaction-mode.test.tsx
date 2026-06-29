@@ -78,6 +78,60 @@ function TestEditorCanvas() {
   );
 }
 
+function TestEditorCanvasWithFirstEntryFit() {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: {
+      page_1: { x: 100, y: 120, width: 375, height: 812 },
+    },
+    nodes: {},
+  });
+  const [showCanvas, setShowCanvas] = useState(false);
+  const [fitToScreenOnMount, setFitToScreenOnMount] = useState(false);
+  const [initialFitRequested, setInitialFitRequested] = useState(false);
+
+  const enterCanvas = () => {
+    if (!initialFitRequested) {
+      setInitialFitRequested(true);
+      setFitToScreenOnMount(true);
+    }
+    setShowCanvas(true);
+  };
+
+  return (
+    <>
+      <button type="button" onClick={enterCanvas}>
+        显示画布
+      </button>
+      <button type="button" onClick={() => setShowCanvas(false)}>
+        隐藏画布
+      </button>
+      {showCanvas && (
+        <PreviewCanvas
+          interactionMode="editor"
+          pages={[
+            {
+              id: "page_1",
+              name: "页面一",
+              order: 0,
+              code: "export default function Demo(){return null}",
+              previewSize: { width: 375, height: 812 },
+            },
+          ]}
+          canvasState={state}
+          onCanvasStateChange={setState}
+          fitToScreenOnMount={fitToScreenOnMount}
+          onFitToScreenOnMountComplete={() => setFitToScreenOnMount(false)}
+        />
+      )}
+      <output data-testid="fit-to-screen-on-mount">
+        {String(fitToScreenOnMount)}
+      </output>
+      <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
 function TestEditorCanvasWithConfigCallback({
   onPageConfigEdit,
 }: {
@@ -385,6 +439,31 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     expect(screen.queryByLabelText("Excalidraw 标注验证")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("自动排版")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("重置布局")).not.toBeInTheDocument();
+  });
+
+  it("向上层回传当前可见页面集合", async () => {
+    const handleVisibleChange = jest.fn();
+    render(
+      <PreviewCanvas
+        interactionMode="viewer"
+        pages={[
+          {
+            id: "page_1",
+            name: "页面一",
+            order: 0,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 375, height: 812 },
+          },
+        ]}
+        canvasState={initialState}
+        onCanvasStateChange={jest.fn()}
+        onVisiblePageIdsChange={handleVisibleChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handleVisibleChange).toHaveBeenCalledWith(["page_1"]);
+    });
   });
 
   it("editor 妯″紡榛樿閫変腑閫夋嫨宸ュ叿", () => {
@@ -996,6 +1075,41 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(state.viewport.x).toBeCloseTo(expected.x, 5);
       expect(state.viewport.y).toBeCloseTo(expected.y, 5);
       expect(state.pages.page_1).toEqual(initialState.pages.page_1);
+    });
+  });
+
+  it("editor 首次进入画布时适应屏幕，后续重新进入不重置用户缩放", async () => {
+    render(<TestEditorCanvasWithFirstEntryFit />);
+
+    fireEvent.click(screen.getByText("显示画布"));
+
+    const expected = getExpectedFitViewport();
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.viewport.zoom).toBeCloseTo(expected.zoom, 5);
+      expect(state.viewport.x).toBeCloseTo(expected.x, 5);
+      expect(state.viewport.y).toBeCloseTo(expected.y, 5);
+      expect(screen.getByTestId("fit-to-screen-on-mount")).toHaveTextContent(
+        "false",
+      );
+    });
+
+    fireEvent.click(screen.getByLabelText("放大"));
+
+    let zoomAfterManualChange = expected.zoom;
+    await waitFor(() => {
+      zoomAfterManualChange = getCanvasState().viewport.zoom;
+      expect(zoomAfterManualChange).toBeGreaterThan(expected.zoom);
+    });
+
+    fireEvent.click(screen.getByText("隐藏画布"));
+    fireEvent.click(screen.getByText("显示画布"));
+
+    await waitFor(() => {
+      expect(getCanvasState().viewport.zoom).toBeCloseTo(
+        zoomAfterManualChange,
+        5,
+      );
     });
   });
 

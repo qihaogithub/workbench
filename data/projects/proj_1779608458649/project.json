@@ -1,6 +1,7 @@
 {
   "id": "proj_1779608458649",
   "name": "学习页-课后",
+  "category": "APP资源位",
   "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608458649\\workspace",
   "demoPages": [
     {
@@ -101,10 +102,21 @@
       "sessionId": "session-1779781461510-h6jgitom3",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v10",
       "fileCount": 5
+    },
+    {
+      "versionId": "v11",
+      "type": "auto_checkpoint",
+      "savedAt": 1782716791246,
+      "savedBy": "qihao",
+      "sessionId": "session-1782716476223-xffftcacx",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v11",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
     }
   ],
+  "pageVersions": {},
   "createdAt": 1779608458652,
-  "updatedAt": 1779785298719,
+  "updatedAt": 1782723552829,
   "publishedVersion": "v10",
   "publishedAt": 1780063578252
 }

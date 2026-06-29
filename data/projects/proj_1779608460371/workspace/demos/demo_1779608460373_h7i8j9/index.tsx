@@ -1,84 +1,64 @@
 interface DemoProps {
-  mainTitle?: string;
-  subTitle?: string;
-  primaryBtnText?: string;
-  secondaryBtnText?: string;
-  showTitles?: boolean;
+  /** 对应 uiweb-vue updateImage2：平板广告图，1行1个 */
+  padSingleAdImage?: string;
+  /** 对应 uiweb-vue updateImage3：轮播广告图 */
+  carouselAdImage?: string;
 }
 
+const padAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad';
+const sharedPhoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
+
 export default function PadBanduAd({
-  mainTitle = '专业老师伴读，学习更高效',
-  subTitle = '1对1指导，帮助孩子养成良好学习习惯',
-  primaryBtnText = '立即体验',
-  secondaryBtnText = '了解更多',
-  showTitles = true,
-  ...restProps
+  padSingleAdImage = `${padAssetBase}/一行1个.png`,
+  carouselAdImage = `${sharedPhoneAssetBase}/广告图.png`,
 }: DemoProps) {
-  const {
-    adImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/伴读广告图.png',
-    padBgImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/伴读广告背景.png',
-  } = restProps as Record<string, unknown>;
+  const sideImages = ['配图-3.png', '配图-4.png', '配图-5.png', '配图-6.png'];
 
   return (
     <div
-      className="w-full min-h-screen flex flex-col overflow-hidden"
-      style={{
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        maxWidth: 1024,
-        margin: '0 auto',
-        backgroundImage: `url(${padBgImage as string})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
+      className="relative mx-auto overflow-hidden bg-white"
+      style={{ width: 1133, maxWidth: '100%', height: '100vh', minHeight: 749 }}
     >
-      <div
-        className="flex-1 flex justify-center items-center w-full h-full"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-      >
-        <div className="flex flex-col items-center gap-5 w-[600px] px-10">
-          <img
-            src={adImage as string}
-            alt="ad"
-            className="w-full max-w-[400px] h-auto rounded-[16px] object-cover"
-            style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-          />
+      <img
+        src={`${padAssetBase}/底部吸顶内容.png`}
+        alt="顶部吸顶内容"
+        className="absolute left-px top-0 z-20 h-[90px] w-[1132px]"
+      />
 
-          {showTitles && (
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div
-                className="text-[32px] font-semibold text-[#1a1a1a] leading-[140%]"
-                style={{ fontFamily: '"PingFang SC", sans-serif' }}
-              >
-                {mainTitle}
-              </div>
-              <div
-                className="text-[20px] text-[#666] leading-[150%]"
-                style={{ fontFamily: '"PingFang SC", sans-serif' }}
-              >
-                {subTitle}
-              </div>
-            </div>
-          )}
+      <div className="absolute left-0 top-[90px] flex h-[592px] w-[1133px] flex-col items-center bg-white">
+        <img src={`${padAssetBase}/1.png`} alt="顶部区域" className="h-[188px] w-[1133px] shrink-0 object-cover" />
 
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div
-              className="flex justify-center items-center w-[280px] h-14 rounded-[24px] text-white text-[20px] font-medium cursor-pointer transition-all duration-300"
-              style={{
-                background: 'linear-gradient(135deg, #ff6b6b, #ff5252)',
-                boxShadow: '0 4px 15px rgba(255, 82, 82, 0.3)',
-              }}
-            >
-              {primaryBtnText}
-            </div>
-            <div
-              className="text-[18px] text-[#666] underline cursor-pointer transition-colors duration-300 hover:text-[#333]"
-              style={{ fontFamily: '"PingFang SC", sans-serif' }}
-            >
-              {secondaryBtnText}
-            </div>
+        <div className="shrink-0 overflow-hidden rounded-[12px] bg-white">
+          <img src={padSingleAdImage} alt="平板广告图" className="h-[180px] w-[1005px] object-cover" />
+        </div>
+
+        <div className="flex w-[1133px] shrink-0 flex-col items-start">
+          <img src={`${padAssetBase}/配图-1.png`} alt="活动标题" className="h-[61px] w-[1133px]" />
+
+          <div className="flex h-[100px] w-full items-center gap-[10px] px-[64px]">
+            <img
+              src={carouselAdImage}
+              alt="轮播广告图"
+              className="h-full w-[210px] rounded-[9px] bg-[#d9d9d9] object-cover"
+            />
+
+            {sideImages.map((imageName) => (
+              <img
+                key={imageName}
+                src={`${padAssetBase}/${imageName}`}
+                alt=""
+                className="h-[100px] rounded-[9px]"
+              />
+            ))}
           </div>
         </div>
       </div>
+
+      <img
+        src={`${padAssetBase}/吸底标签栏.png`}
+        alt="底部标签栏"
+        className="absolute bottom-0 left-px z-20 h-[62px] w-[1132px]"
+      />
     </div>
   );
 }
