@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, useEffect } from "react";
 import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
-import type { ConsoleLogPayload } from "@opencode-workbench/shared/demo";
+import type { ConsoleLogPayload } from "@opencode-workbench/demo-ui";
 
 const MAX_ENTRIES = 500;
 const FLUSH_INTERVAL = 100; // 100ms throttling

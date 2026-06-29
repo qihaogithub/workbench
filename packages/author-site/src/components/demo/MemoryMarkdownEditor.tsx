@@ -1,6 +1,6 @@
 "use client";
 
-import { DocumentEditor } from "@opencode-workbench/shared/demo";
+import { DocumentEditor } from "@opencode-workbench/demo-ui";
 
 interface MemoryMarkdownEditorProps {
   value: string;

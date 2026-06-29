@@ -596,7 +596,7 @@ register("project update", "修改项目名称或描述", (args, pos, { service,
 );
 
 register("project duplicate", "复制项目为独立项目", (args, pos, { service, actor }) =>
-  service.duplicateProject(stringArg(args, "projectId", pos[0]), optionalStringArg(args, "name", pos[1]), actor),
+  service.duplicateProject(stringArg(args, "projectId", pos[0]), optionalStringArg(args, "name", pos[1]), undefined, actor),
   ["project_duplicate"],
 );
 

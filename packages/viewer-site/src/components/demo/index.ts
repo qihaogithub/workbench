@@ -9,7 +9,7 @@ export type {
   CanvasViewportState,
   CanvasPageLayout,
   PreviewCanvasProps,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 export {
   PreviewPanel,
   ConfigForm,
@@ -44,7 +44,7 @@ export {
   CanvasToolbar,
   PageSkeleton,
   saveCanvasLayout,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 export type {
   PreviewPanelProps,
   ConfigFormProps,
@@ -57,4 +57,4 @@ export type {
   FileUploadWidgetProps,
   DemoMeta,
   DemoSchema,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";

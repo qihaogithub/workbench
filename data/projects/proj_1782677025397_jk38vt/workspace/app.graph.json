@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page-2": {
+      "pageId": "page_miw7",
+      "title": "自动保存顺序页"
+    },
+    "page": {
+      "pageId": "page_a7ko",
+      "title": "首页"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

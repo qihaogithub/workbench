@@ -14,6 +14,7 @@ import {
   FileText,
   Map as MapIcon,
   MessageCircle,
+  Download,
 } from "lucide-react";
 import {
   getProjects,
@@ -21,6 +22,7 @@ import {
   getDemoSchema,
   getThumbnailUrl,
   getCompiledJsUrl,
+  getProjectScaffoldUrl,
 } from "@/lib/api";
 import type {
   ProjectsIndex,
@@ -34,7 +36,7 @@ import {
   isSchemaEmpty,
 } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
-import type { PreviewSize } from "@opencode-workbench/shared/demo";
+import type { PreviewSize } from "@opencode-workbench/demo-ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ViewerAiDrawer } from "@/components/ViewerAiDrawer";
@@ -558,7 +560,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col h-full">
-      <Header name={project.name} onBack={() => router.push("/")} />
+      <Header
+        name={project.name}
+        onBack={() => router.push("/")}
+        exportHref={getProjectScaffoldUrl(projectId)}
+      />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project && activePage && (
           <ViewerAiDrawer
@@ -794,9 +800,11 @@ function TreeList({
 function Header({
   name,
   onBack,
+  exportHref,
 }: {
   name: string;
   onBack: () => void;
+  exportHref?: string;
 }) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
@@ -808,6 +816,15 @@ function Header({
         <span className="text-sm">返回</span>
       </button>
       {name && <h1 className="text-sm font-semibold">{name}</h1>}
+      <div className="flex-1" />
+      {exportHref && (
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <a href={exportHref} download>
+            <Download className="h-4 w-4" />
+            导出代码
+          </a>
+        </Button>
+      )}
     </header>
   );
 }

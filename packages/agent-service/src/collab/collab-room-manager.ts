@@ -5,7 +5,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 
-import type { CollabResourceKind } from "@opencode-workbench/shared";
+import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
 import { logger } from "../utils/logger";
 import { WorkspaceFilePersistence } from "./workspace-file-persistence";
 

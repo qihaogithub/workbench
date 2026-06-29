@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { CodeEditor } from "./CodeEditor";
-import { DocumentEditor } from "@opencode-workbench/shared/demo";
+import { DocumentEditor } from "@opencode-workbench/demo-ui";
 import type { CollabResourceKind, CollabRoomDescriptor } from "@opencode-workbench/shared";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { getFileLanguage, getFileEditorType } from "@/lib/workspace-file-utils";

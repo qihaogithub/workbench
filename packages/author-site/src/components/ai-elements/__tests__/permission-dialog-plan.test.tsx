@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 
 import { PermissionDialog } from "../permission-dialog";
 
-jest.mock("@opencode-workbench/shared/demo", () => ({
+jest.mock("@opencode-workbench/demo-ui", () => ({
   DocumentEditor: ({
     value,
     onChange,

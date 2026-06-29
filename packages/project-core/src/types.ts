@@ -7,7 +7,7 @@ import type {
   Project,
   ProjectTemplateMeta,
   VersionInfo,
-} from "@opencode-workbench/shared";
+} from "@opencode-workbench/shared/contracts";
 
 export type ProjectAdminRole = "admin" | "creator" | "readonly";
 

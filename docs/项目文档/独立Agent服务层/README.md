@@ -1,8 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.7
+> 版本：v2.8
 > 创建日期：2026-04-05
-> 更新日期：2026-06-27
+> 更新日期：2026-06-28
 
 ---
 
@@ -73,7 +73,8 @@
 | `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify Agent 服务、项目管理 API、Pi Agent 后端、WebSocket 事件流 |
 | `@opencode-workbench/agent-client` | `packages/agent-client/` | 浏览器端 AgentClient/AgentStream SDK |
 | `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer 截图服务，支持同步单页和异步批量截图 |
-| `@opencode-workbench/shared` | `packages/shared/` | 共享类型、校验器、预览 iframe 模板和 shared demo 组件 |
+| `@opencode-workbench/shared` | `packages/shared/` | 共享契约类型、校验器和预览 iframe 模板 |
+| `@opencode-workbench/demo-ui` | `packages/demo-ui/` | 创作端与使用端复用的 React 预览、配置和画布组件 |
 
 关键源码入口：
 
@@ -119,3 +120,4 @@
 | 2026-06-26 | v2.5 | 新增 Pi Agent `webSearch` 联网搜索能力说明，采用 Brave Search API 免费额度方案 |
 | 2026-06-26 | v2.6 | 新增 Pi Agent `webRead` 网页正文读取能力和公网 URL 安全边界 |
 | 2026-06-27 | v2.7 | 新增创作端 Agent 预装 `design-taste-frontend` Skill 与按需读取工具说明 |
+| 2026-06-28 | v2.8 | 补充模型列表 route/service 分层和 shared/demo-ui 包边界 |

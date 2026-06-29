@@ -14,6 +14,9 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@opencode-workbench/project-core$': '<rootDir>/../project-core/src/index.ts',
     '^@opencode-workbench/shared$': '<rootDir>/../shared/src/index.ts',
+    '^@opencode-workbench/demo-ui$': '<rootDir>/../demo-ui/src/index.ts',
+    '^@opencode-workbench/demo-ui/(.*)$': '<rootDir>/../demo-ui/src/$1',
+    '^\\./config\\.js$': '<rootDir>/../project-core/src/config.ts',
   },
   transform: {
     '^.+\\.md$': '<rootDir>/jest-md-transform.js',

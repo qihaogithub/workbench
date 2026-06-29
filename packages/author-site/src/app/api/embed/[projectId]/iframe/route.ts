@@ -10,7 +10,7 @@ import {
   listDemoPages,
 } from "@/lib/fs-utils";
 import { compileCode } from "@/lib/compiler";
-import { generateIframeHtml } from '@opencode-workbench/shared/demo/iframe-template';
+import { generateIframeHtml } from '@opencode-workbench/demo-ui/iframe-template';
 import { getCdnBaseUrl } from '@/lib/cdn-config';
 import {
   mergeConfigToProps,

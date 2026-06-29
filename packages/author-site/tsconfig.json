@@ -23,6 +23,8 @@
       "@/*": ["./src/*"],
       "@opencode-workbench/project-core": ["../project-core/src"],
       "@opencode-workbench/shared": ["../shared/src"],
+      "@opencode-workbench/demo-ui": ["../demo-ui/src/index.ts"],
+      "@opencode-workbench/demo-ui/*": ["../demo-ui/src/*"],
       "@opencode-workbench/shared/agent-prompts": ["../shared/src/agent-prompts/index.ts"],
       "@opencode-workbench/agent-client": ["../agent-client/src"]
     }

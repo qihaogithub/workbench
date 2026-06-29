@@ -1,23 +1,19 @@
 interface DemoProps {
-  mainTitle?: string;
-  subtitle?: string;
+  popupImage?: string;
   mainButtonText?: string;
   secondaryButtonText?: string;
 }
 
 export default function PhoneBottomPopup({
-  mainTitle = '孩子已完成第1节课程',
-  subtitle = '快来成长计划看看孩子的进步吧～',
+  popupImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png',
   mainButtonText = '去看看',
   secondaryButtonText = '下次再说',
-  ...restProps
 }: DemoProps) {
-  const { popupImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png' } = restProps as Record<string, unknown>;
-
   return (
     <div
-      className="relative w-full h-full overflow-hidden bg-white"
+      className="relative w-full overflow-hidden bg-white"
       style={{
+        height: '100vh',
         maxWidth: 375,
         margin: '0 auto',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -33,20 +29,6 @@ export default function PhoneBottomPopup({
         <div className="w-full flex flex-col">
           <img src={popupImage} alt="" className="w-full block object-cover" />
           <div className="flex flex-col items-center gap-5 px-4 pb-5 pt-2 bg-white">
-            <div className="flex flex-col items-center gap-1 w-full">
-              <div
-                className="text-[#404040] text-center text-xl font-medium leading-[150%]"
-                style={{ fontFamily: '"PingFang SC", sans-serif' }}
-              >
-                {mainTitle}
-              </div>
-              <div
-                className="text-[#666] text-center text-lg font-normal leading-[150%]"
-                style={{ fontFamily: '"PingFang SC", sans-serif' }}
-              >
-                {subtitle}
-              </div>
-            </div>
             <div className="flex flex-col items-center gap-4 w-full">
               <div
                 className="flex justify-center items-center w-[280px] h-11 rounded-[30px] cursor-pointer"

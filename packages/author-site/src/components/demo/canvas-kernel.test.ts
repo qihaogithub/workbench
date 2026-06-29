@@ -4,8 +4,8 @@ import {
   routeCanvasPointerLayer,
   screenPointToCanvasPoint,
   withCanvasAnnotationNodes,
-} from "../../../../shared/src/demo/canvas-kernel";
-import type { CanvasFreeNode, CanvasState } from "../../../../shared/src/demo/types";
+} from "@opencode-workbench/demo-ui";
+import type { CanvasFreeNode, CanvasState } from "@opencode-workbench/demo-ui";
 
 describe("Canvas Kernel 插件化基础能力", () => {
   it("将旧 nodes 迁移到 annotations 图层并保持旧字段兼容", () => {

@@ -1,7 +1,7 @@
 import type {
   SystemKnowledgeDocument,
   SystemKnowledgeSnapshot,
-} from "@opencode-workbench/shared";
+} from "@opencode-workbench/shared/contracts";
 
 interface KnowledgeSnapshotState {
   snapshot: SystemKnowledgeSnapshot;

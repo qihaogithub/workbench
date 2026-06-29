@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { HomePage } from "./home-page";
 import {
+  convertProjectTemplate,
   createDemo,
   duplicateDemo,
   updateDemo,
@@ -22,6 +23,7 @@ jest.mock("@/components/ui/toast-provider", () => ({
 
 jest.mock("@/lib/api", () => ({
   createDemo: jest.fn(),
+  convertProjectTemplate: jest.fn(),
   deleteDemo: jest.fn(),
   deleteProjectTemplate: jest.fn(),
   deleteTemplateCover: jest.fn(),
@@ -39,6 +41,9 @@ const mockUseProjectTemplates = useProjectTemplates as jest.MockedFunction<
   typeof useProjectTemplates
 >;
 const mockCreateDemo = createDemo as jest.MockedFunction<typeof createDemo>;
+const mockConvertProjectTemplate = convertProjectTemplate as jest.MockedFunction<
+  typeof convertProjectTemplate
+>;
 const mockDuplicateDemo = duplicateDemo as jest.MockedFunction<typeof duplicateDemo>;
 const mockUpdateDemo = updateDemo as jest.MockedFunction<typeof updateDemo>;
 const mockUpdateProjectTemplate = updateProjectTemplate as jest.MockedFunction<
@@ -91,6 +96,10 @@ describe("HomePage", () => {
     mockDuplicateDemo.mockResolvedValue({
       success: true,
       data: { id: "copied", name: "复制项目", createdAt: 1, updatedAt: 2 },
+    });
+    mockConvertProjectTemplate.mockResolvedValue({
+      success: true,
+      data: { id: "converted", name: "验证模板", category: "知识库验证", createdAt: 1, updatedAt: 2 },
     });
     mockUpdateDemo.mockResolvedValue({
       success: true,
@@ -159,7 +168,7 @@ describe("HomePage", () => {
     });
   });
 
-  it("模板更多菜单提供名称、分类、封面、删除和新建入口", async () => {
+  it("模板更多菜单提供名称、分类、封面、转普通项目、删除和新建入口", async () => {
     render(<HomePage initialDemos={demos} />);
 
     fireEvent.click(
@@ -172,15 +181,32 @@ describe("HomePage", () => {
       "修改名称",
       "修改分类",
       "修改封面",
+      "转为普通项目",
       "删除",
     ]);
     expect(screen.getByRole("menuitem", { name: /修改名称/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改分类/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改封面/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /转为普通项目/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /使用此模板新建/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /^删除$/ })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /保存为模板/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /复制当前项目/ })).not.toBeInTheDocument();
+  });
+
+  it("模板更多菜单支持转为普通项目", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /转为普通项目/ }),
+    );
+
+    await waitFor(() => {
+      expect(mockConvertProjectTemplate).toHaveBeenCalledWith("tmpl-1");
+    });
   });
 
   it("模板项目卡片不显示页数", () => {

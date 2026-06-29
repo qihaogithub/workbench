@@ -1,4 +1,4 @@
-import type { PreviewSize } from "@opencode-workbench/shared/demo";
+import type { PreviewSize } from "@opencode-workbench/demo-ui";
 
 export type {
   ValidationErrorType,
@@ -23,6 +23,6 @@ export {
   getPositionable,
   getDefaultValues,
   getPreviewSize,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 
 export type { PreviewSize };

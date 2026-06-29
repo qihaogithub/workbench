@@ -5,7 +5,7 @@ import type {
   OpenProjectEditRequest,
   SaveProjectChangesRequest,
   RestoreVersionRequest,
-} from '@opencode-workbench/shared';
+} from '@opencode-workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
 /**

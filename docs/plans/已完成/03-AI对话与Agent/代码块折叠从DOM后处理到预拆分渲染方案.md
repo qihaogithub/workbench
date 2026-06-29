@@ -3,7 +3,7 @@
 > 版本：v3.0  
 > 创建日期：2026-06-03  
 > 更新：2026-06-03 — 视觉升级为 GitHub 风格统一卡片，利用 Streamdown 公开 DOM API 隐藏内部标题  
-> 关联方案：[AI对话区消息展示效果优化方案](./AI对话区消息展示效果优化方案.md) 3.4 方案 3：代码块简化展示（P1）  
+> 关联方案：AI对话区消息展示效果优化方案 3.4 方案 3：代码块简化展示（P1）  
 > 状态：已实施
 
 ---
@@ -322,6 +322,6 @@ function SplitContentRenderer({ content, isStreaming }: SplitContentRendererProp
 
 ## 七、相关文档
 
-- [AI对话区消息展示效果优化方案](./AI对话区消息展示效果优化方案.md) — 方案 3.4
+- AI对话区消息展示效果优化方案 — 方案 3.4
 - [Streamdown 源码](file:///packages/author-site/node_modules/streamdown/dist/index.d.ts)
 - [collapsible-code-block.tsx](file:///packages/author-site/src/components/ai-elements/collapsible-code-block.tsx) — 当前实现（待替换）

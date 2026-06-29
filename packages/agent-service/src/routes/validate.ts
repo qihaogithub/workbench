@@ -5,7 +5,7 @@ import { getSessionStore } from "../session/session-store";
 import {
   validateAll,
   formatValidateDemoResult,
-} from "@opencode-workbench/shared";
+} from "@opencode-workbench/shared/contracts";
 import { logger } from "../utils/logger";
 
 interface ValidateDemoParams {

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Shield, AlertTriangle, FileText, X } from 'lucide-react'
-import { DocumentEditor } from '@opencode-workbench/shared/demo'
+import { DocumentEditor } from '@opencode-workbench/demo-ui'
 
 interface PermissionRequestData {
   sessionId: string

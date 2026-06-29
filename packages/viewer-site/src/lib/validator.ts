@@ -4,6 +4,6 @@ export {
   getPositionable,
   getDefaultValues,
   getPreviewSize,
-} from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
 
-export type { PreviewSize } from "@opencode-workbench/shared/demo";
+export type { PreviewSize } from "@opencode-workbench/demo-ui";

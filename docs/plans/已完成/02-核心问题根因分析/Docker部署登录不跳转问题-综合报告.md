@@ -45,7 +45,7 @@
 
 #### 2.1.1 登录流程代码追踪
 
-**入口文件**: [packages/author-site/src/app/(auth)/login/page.tsx](<file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/app/(auth)/login/page.tsx#L16-L40>)
+**入口文件**: `packages/author-site/src/app/(auth)/login/page.tsx#L16-L40`
 
 ```typescript
 const handleLogin = async (username: string, password: string) => {
@@ -211,7 +211,7 @@ export function setAuthCookie(token: string): void {
 
 **问题机制**:
 
-1. 登录页执行 `router.push(redirect)` 和 `router.refresh()`（[login/page.tsx:29-30](<file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/app/(auth)/login/page.tsx#L29-L30>)）
+1. 登录页执行 `router.push(redirect)` 和 `router.refresh()`（`packages/author-site/src/app/(auth)/login/page.tsx#L29-L30`）
 2. 由于 `auth_token` 未设置（根因 1）
 3. [middleware.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/middleware.ts#L19-L34) 第 19 行读取 `request.cookies.get("auth_token")?.value` 为 undefined
 4. 第 20 行 `verifyToken(token)` 返回 null
@@ -677,7 +677,7 @@ docker-compose up -d
 
 | 文件                                                                                                                                                                   | 作用                   | 关键行                     |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
-| [packages/author-site/src/app/(auth)/login/page.tsx](<file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/app/(auth)/login/page.tsx>)   | 登录页面 UI 与跳转逻辑 | L28-L30                    |
+| `packages/author-site/src/app/(auth)/login/page.tsx`   | 登录页面 UI 与跳转逻辑 | L28-L30                    |
 | [packages/author-site/src/app/api/auth/login/route.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/app/api/auth/login/route.ts) | 登录 API 路由          | L25-L29                    |
 | [packages/author-site/src/lib/auth/jwt.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/lib/auth/jwt.ts)                         | JWT 创建与 Cookie 设置 | L39-L47（根因位置）        |
 | [packages/author-site/src/middleware.ts](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/packages/author-site/src/middleware.ts)                             | 路由守卫与重定向逻辑   | L28-L34                    |

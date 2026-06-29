@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Save, Loader2, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import { DocumentEditor } from "@opencode-workbench/shared/demo";
+import { DocumentEditor } from "@opencode-workbench/demo-ui";
 import type { CollabRoomDescriptor } from "@opencode-workbench/shared";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";

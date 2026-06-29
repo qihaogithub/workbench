@@ -238,7 +238,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
       // ========== 步骤 2: 新建项目 ==========
       logger.step('2', '点击新建项目按钮');
 
-      const newProjectButton = page.getByRole('button', { name: /新建 Demo|添加项目|新建项目/i });
+      const newProjectButton = page.getByRole('button', { name: /添加空白项目|新建 Demo|添加项目|新建项目/i });
       await newProjectButton.click();
       logger.success('已点击新建项目按钮');
 
@@ -290,7 +290,7 @@ test.describe('项目创建和代码编辑完整流程', () => {
         undefined,
         { timeout: 90000 },
       );
-      await page.getByRole('button', { name: /^保存$/i }).waitFor({
+      await page.getByRole('button', { name: /同步并发布|创建版本并发布|保存/i }).waitFor({
         state: 'visible',
         timeout: 30000,
       });

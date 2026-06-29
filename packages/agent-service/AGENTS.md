@@ -14,7 +14,14 @@
 src/
 ├── backends/               # Agent 后端适配器
 │   ├── base.ts             # 后端适配器接口（IBackendAdapter）
-│   ├── pi-agent.ts         # Pi Agent 后端实现
+│   ├── pi-agent.ts         # Pi Agent 后端实现（协调者，委托各管理器）
+│   ├── managers/           # PiAgentBackend 的专职管理器（职责分离）
+│   │   ├── pi-agent-deps.ts          # 动态依赖加载器（pi-agent-core/pi-ai）
+│   │   ├── assistant-text-utils.ts   # Assistant 消息解析工具函数
+│   │   ├── model-manager.ts          # 模型管理（解析、API密钥、提供商配置）
+│   │   ├── permission-manager.ts     # 权限管理（路径校验、知识库保护、确认机制）
+│   │   ├── tool-hook-manager.ts      # 工具钩子（文件变更捕获、文件操作事件、计划更新）
+│   │   └── event-mapper.ts           # 事件映射（AgentHarness 事件 → 应用层 AgentEvent）
 │   ├── pi-tools/           # Pi Agent 工具集
 │   │   ├── index.ts        # 工具导出与能力集版本
 │   │   ├── file-tools.ts   # 文件操作工具
@@ -230,6 +237,7 @@ pnpm typecheck
 | 测试类型 | 描述 | 文件位置 |
 |:---------|:-----|:---------|
 | **单元测试** | 纯逻辑测试，无需外部依赖 | `tests/unit/*.test.ts` |
+| **管理器单元测试** | 各管理器（Model/Permission/ToolHook/EventMapper）独立测试 | `tests/unit/{model,permission,tool-hook,event-mapper}-manager.test.ts` |
 | **集成测试** | 测试 Pi Agent 后端初始化/事件/配置 | `tests/integration/*.test.ts` |
 
 ## 代码风格与约定
@@ -263,10 +271,15 @@ pnpm typecheck
 ## 注意事项
 
 - **单后端架构**：仅支持 Pi Agent，无外部服务依赖
-- **进程内嵌入**：`@earendil-works/pi-agent-core` 以动态导入方式加载
+- **进程内嵌入**：`@earendil-works/pi-agent-core` 以动态导入方式加载（统一由 `managers/pi-agent-deps.ts` 管理）
 - **超时处理**：`MESSAGE_TIMEOUT_MS = 300000`（5 分钟）— `src/routes/websocket.ts:59`
-- **文件操作**：`afterToolCall` 钩子捕获 `writeFile` 变更存入 `this.files`
-- **路径安全**：`beforeToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
+- **管理器架构**：`PiAgentBackend` 作为协调者，将职责委托给 `managers/` 下的专职管理器：
+  - `ModelManager`：模型解析、API 密钥获取、提供商配置、模型切换
+  - `PermissionManager`：路径权限校验、知识库写保护、deletePage 权限确认、计划审批
+  - `ToolHookManager`：文件变更捕获、文件操作事件发射、计划更新、知识库读取追踪
+  - `EventMapper`：AgentHarness 底层事件 → 应用层 AgentEvent 的映射
+- **文件操作**：`ToolHookManager` 在 `tool_result` hook 中捕获 `writeFile/editFile` 变更
+- **路径安全**：`PermissionManager.validateToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
 
 ## 相关文档
 

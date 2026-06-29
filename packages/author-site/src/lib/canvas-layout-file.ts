@@ -5,8 +5,8 @@ import type {
   CanvasLayersState,
   CanvasPageLayout,
   CanvasState,
-} from "@opencode-workbench/shared/demo";
-import { normalizeCanvasStateLayers } from "@opencode-workbench/shared/demo";
+} from "@opencode-workbench/demo-ui";
+import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

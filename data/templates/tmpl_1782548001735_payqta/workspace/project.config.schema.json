@@ -1,1 +1,0 @@
-{"type":"object","title":"全局活动配置","properties":{"campaignName":{"type":"string","default":"知识库验证活动"},"rewardPolicy":{"type":"string","default":"积分兑换抽奖机会，中奖后需填写收货信息"}}}

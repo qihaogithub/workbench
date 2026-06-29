@@ -1,0 +1,30 @@
+{
+  "id": "proj_1782676385727_6q1gft",
+  "name": "测试项目-ee383ff8",
+  "category": "未分类",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1782676385727_6q1gft\\workspace",
+  "demoPages": [
+    {
+      "id": "page_u82z",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1782676394466,
+      "savedBy": "qihao",
+      "sessionId": "session-1782676392976-9ch9kvh1u",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782676385727_6q1gft\\v1",
+      "fileCount": 6
+    }
+  ],
+  "pageVersions": {},
+  "createdAt": 1782676385730,
+  "updatedAt": 1782676394470
+}

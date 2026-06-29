@@ -12,7 +12,7 @@
  * - 支持运行时热更新（已有 agent 的模型选择会失效，但不会崩溃）
  */
 
-import type { BackendProvider, BackendProvidersConfig } from "@opencode-workbench/shared";
+import type { BackendProvider, BackendProvidersConfig } from "@opencode-workbench/shared/contracts";
 import { logger } from "../utils/logger";
 
 class BackendProvidersManager {

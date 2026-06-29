@@ -28,6 +28,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
 import {
   createDemo,
+  convertProjectTemplate,
   deleteDemo,
   deleteProjectTemplate,
   deleteTemplateCover,
@@ -477,6 +478,25 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     setTemplateDeleteTarget(null);
   };
 
+  const handleConvertTemplateToProject = async (template: ProjectTemplateMeta) => {
+    const response = await convertProjectTemplate(template.id);
+    if (response.success) {
+      toast({
+        title: "转换成功",
+        description: `模板「${template.name}」已转为普通项目`,
+      });
+      revalidate();
+      revalidateTemplates();
+      return;
+    }
+
+    toast({
+      variant: "destructive",
+      title: "转换失败",
+      description: response.error.message,
+    });
+  };
+
   const dialogTitle =
     dialogAction?.type === "rename-project"
       ? "修改项目名称"
@@ -747,6 +767,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                           })
                         }
                         onChangeCover={(item) => setTemplateCoverTarget(item)}
+                        onConvertToProject={handleConvertTemplateToProject}
                         onDelete={(item) => setTemplateDeleteTarget(item)}
                       />
                     ))}

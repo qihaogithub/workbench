@@ -11,6 +11,11 @@ jest.mock("@/lib/auth/jwt", () => ({
   })),
 }));
 
+jest.mock("@/lib/session-manager", () => ({
+  getEditSession: jest.fn(),
+  syncEditSessionToProjectWorkspace: jest.fn(),
+}));
+
 class TestResponse {
   status: number;
   headers: Headers;
@@ -48,6 +53,27 @@ class TestResponse {
   }
 }
 
+function mockRequest(url = "http://localhost/api"): NextRequest {
+  return { nextUrl: new URL(url) } as NextRequest;
+}
+
+function mockSession(projectId: string, userId = "user_scaffold_test") {
+  return {
+    sessionId: "session_export",
+    demoId: projectId,
+    userId,
+    workspaceId: "workspace_export",
+    status: "editing",
+    basedOnVersion: "v0",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 1000,
+    code: "",
+    schema: "",
+    workspacePath: "",
+    demos: { demos: {}, projectConfigSchema: undefined },
+  };
+}
+
 describe("project scaffold download route", () => {
   const originalDataDir = process.env.DATA_DIR;
   const originalResponse = global.Response;
@@ -68,24 +94,29 @@ describe("project scaffold download route", () => {
     global.Response = originalResponse;
   });
 
-  it("导出项目脚手架 zip", async () => {
+  async function createExportableProject(): Promise<string> {
     const { ProjectAdminService } = await import("@opencode-workbench/project-core");
     const service = new ProjectAdminService({ dataDir: tempDir });
-    const created = service.createProject({ name: "下载项目" });
+    const created = service.createProject({ name: "Download project" });
     const projectId = created.data?.id ?? "";
     const edit = service.beginEdit(projectId);
     const editId = edit.data?.editId ?? "";
     const page = service.createPage({
       editId,
-      name: "首页",
+      name: "Home",
       code: "export default function Demo(){ return <div>zip page</div>; }",
       schema: JSON.stringify({ type: "object", properties: {} }, null, 2),
     });
     expect(page.ok).toBe(true);
-    expect(service.commitEdit(editId, "准备 zip 下载").ok).toBe(true);
+    expect(service.commitEdit(editId, "prepare zip download").ok).toBe(true);
+    return projectId;
+  }
+
+  it("exports project scaffold zip", async () => {
+    const projectId = await createExportableProject();
 
     const { GET } = await import("./route");
-    const response = await GET({} as NextRequest, { params: { projectId } });
+    const response = await GET(mockRequest(), { params: { projectId } });
     const body = Buffer.from(await response.arrayBuffer());
 
     expect(response.status).toBe(200);
@@ -94,5 +125,41 @@ describe("project scaffold download route", () => {
     expect(body.readUInt32LE(0)).toBe(0x04034b50);
     expect(body.includes(Buffer.from("opencode.project.json", "utf-8"))).toBe(true);
     expect(body.includes(Buffer.from("src/pages/", "utf-8"))).toBe(true);
+  });
+
+  it("syncs a valid edit session before exporting", async () => {
+    const projectId = await createExportableProject();
+    const sessionManager = await import("@/lib/session-manager");
+    jest.mocked(sessionManager.getEditSession).mockReturnValue(mockSession(projectId));
+    jest
+      .mocked(sessionManager.syncEditSessionToProjectWorkspace)
+      .mockReturnValue({ success: true, projectId });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      mockRequest("http://localhost/api?sessionId=session_export"),
+      { params: { projectId } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(sessionManager.syncEditSessionToProjectWorkspace).toHaveBeenCalledWith(
+      "session_export",
+    );
+  });
+
+  it("rejects exporting another user's session", async () => {
+    const sessionManager = await import("@/lib/session-manager");
+    jest
+      .mocked(sessionManager.getEditSession)
+      .mockReturnValue(mockSession("project_forbidden", "other_user"));
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      mockRequest("http://localhost/api?sessionId=session_export"),
+      { params: { projectId: "project_forbidden" } },
+    );
+
+    expect(response.status).toBe(403);
+    expect(sessionManager.syncEditSessionToProjectWorkspace).not.toHaveBeenCalled();
   });
 });

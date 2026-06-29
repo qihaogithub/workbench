@@ -4,7 +4,7 @@ import {
   extractPreviewImageUrls,
   getPreviewResourceCacheStats,
   prewarmPreviewImageUrls,
-} from "../../../../shared/src/demo/preview-resource-cache";
+} from "@opencode-workbench/demo-ui";
 
 class MockImage {
   onload: (() => void) | null = null;

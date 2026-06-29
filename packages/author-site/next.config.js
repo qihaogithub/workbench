@@ -26,7 +26,7 @@ if (fs.existsSync(rootEnvPath)) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  transpilePackages: ["@opencode-workbench/shared", "@opencode-workbench/agent-client", "shiki"],
+  transpilePackages: ["@opencode-workbench/shared", "@opencode-workbench/demo-ui", "@opencode-workbench/project-core", "@opencode-workbench/agent-client", "shiki"],
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
@@ -35,6 +35,10 @@ const nextConfig = {
     serverComponentsExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'bcrypt'],
   },
   webpack: (config, { isServer }) => {
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      ".js": [".ts", ".tsx", ".js"],
+    };
     // 让 .md 文件可以 import 为纯文本字符串
     config.module.rules.push({
       test: /\.md$/,

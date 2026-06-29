@@ -21,7 +21,39 @@
     }
   ],
   "demoFolders": [],
-  "versions": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1782663835868,
+      "savedBy": "qihao",
+      "sessionId": "session-1782663338810-31j83va7d",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460372\\v1",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1782675118825,
+      "savedBy": "qihao",
+      "sessionId": "session-1782674750733-wvk2bw1kf",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460372\\v2",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "auto_checkpoint",
+      "savedAt": 1782677434734,
+      "savedBy": "qihao",
+      "sessionId": "session-1782674750733-wvk2bw1kf",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608460372\\v3",
+      "fileCount": 9,
+      "note": "持续编辑自动保存记录"
+    }
+  ],
   "createdAt": 1779608460372,
-  "updatedAt": 1779608460372
+  "updatedAt": 1782677434734,
+  "pageVersions": {}
 }

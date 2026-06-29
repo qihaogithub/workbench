@@ -1,12 +1,12 @@
 {
   "version": 1,
   "projectId": "proj_1779608460377",
-  "updatedAt": 1782440418816,
+  "updatedAt": 1782652547376,
   "state": {
     "viewport": {
-      "x": 112.20703125,
-      "y": 37.17578125,
-      "zoom": 0.5
+      "x": 91.8497477213541,
+      "y": 157.1585174560546,
+      "zoom": 0.5500000000000002
     },
     "pages": {
       "phone-popup_k8m2": {
@@ -23,6 +23,14 @@
         "height": 811.953125
       }
     },
-    "nodes": {}
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
   }
 }

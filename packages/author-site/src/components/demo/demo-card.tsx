@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type SyntheticEvent,
+} from "react";
 import Link from "next/link";
 import {
   Copy,
@@ -10,6 +16,7 @@ import {
   Lock,
   MoreVertical,
   Pencil,
+  Repeat2,
   Save,
   Trash2,
 } from "lucide-react";
@@ -24,6 +31,10 @@ import {
 import type { DemoMeta, ProjectTemplateMeta } from "@opencode-workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
+const MAX_SCREENSHOT_COVER_ITEMS = 10;
+const DEFAULT_SCREENSHOT_ASPECT_RATIO = 9 / 16;
+const MIN_SCREENSHOT_ASPECT_RATIO = 0.45;
+const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 
 interface DemoCardProps {
   demo: DemoMeta;
@@ -41,6 +52,7 @@ interface TemplateProjectCardProps {
   onRename: (template: ProjectTemplateMeta) => void;
   onChangeCategory: (template: ProjectTemplateMeta) => void;
   onChangeCover: (template: ProjectTemplateMeta) => void;
+  onConvertToProject: (template: ProjectTemplateMeta) => void;
   onDelete: (template: ProjectTemplateMeta) => void;
 }
 
@@ -57,11 +69,15 @@ function normalizeCategory(category?: string): string {
   return category?.trim() || DEFAULT_CATEGORY;
 }
 
-function getGridClass(count: number): string {
-  if (count === 1) return "grid-cols-1 grid-rows-1";
-  if (count === 2) return "grid-cols-2 grid-rows-1";
-  if (count === 3) return "grid-cols-2 grid-rows-2";
-  return "grid-cols-2 grid-rows-2";
+function clampScreenshotAspectRatio(ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return DEFAULT_SCREENSHOT_ASPECT_RATIO;
+  }
+
+  return Math.min(
+    MAX_SCREENSHOT_ASPECT_RATIO,
+    Math.max(MIN_SCREENSHOT_ASPECT_RATIO, ratio),
+  );
 }
 
 function PageScreenshotCell({
@@ -69,11 +85,17 @@ function PageScreenshotCell({
   page,
   showOverlay,
   overlayText,
+  className,
+  style,
+  onAspectRatio,
 }: {
   projectId: string;
   page: { id: string; name: string };
   showOverlay: boolean;
   overlayText?: string;
+  className?: string;
+  style?: CSSProperties;
+  onAspectRatio?: (pageId: string, aspectRatio: number) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const url = `/api/screenshots/file/${projectId}/${page.id}`;
@@ -82,14 +104,28 @@ function PageScreenshotCell({
     setFailed(true);
   }, []);
 
+  const handleLoad = useCallback(
+    (event: SyntheticEvent<HTMLImageElement>) => {
+      const { naturalWidth, naturalHeight } = event.currentTarget;
+      if (naturalWidth > 0 && naturalHeight > 0) {
+        onAspectRatio?.(page.id, naturalWidth / naturalHeight);
+      }
+    },
+    [onAspectRatio, page.id],
+  );
+
   return (
-    <div className="relative flex items-center justify-center overflow-hidden bg-muted/40">
+    <div
+      className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-sm bg-muted/35 ${className ?? ""}`}
+      style={style}
+    >
       {!failed ? (
         <img
           src={url}
           alt={page.name}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
           loading="lazy"
+          onLoad={handleLoad}
           onError={handleError}
         />
       ) : (
@@ -112,30 +148,109 @@ function PageScreenshotCell({
 }
 
 function ScreenshotCover({ demo }: { demo: DemoMeta }) {
+  const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
   const pages = demo.demoPages ?? [];
-  const displayPages = pages.slice(0, 4);
-  const extraCount = pages.length - 4;
+  const displayPages = pages.slice(0, MAX_SCREENSHOT_COVER_ITEMS);
+  const extraCount = pages.length - displayPages.length;
+
+  const weightedPages = useMemo(
+    () =>
+      displayPages.map((page) => ({
+        page,
+        aspectRatio: clampScreenshotAspectRatio(
+          aspectRatios[page.id] ?? DEFAULT_SCREENSHOT_ASPECT_RATIO,
+        ),
+      })),
+    [aspectRatios, displayPages],
+  );
+  const rowGroups = useMemo(() => {
+    if (weightedPages.length <= 2) {
+      return [weightedPages];
+    }
+
+    const totalWeight = weightedPages.reduce(
+      (sum, item) => sum + item.aspectRatio,
+      0,
+    );
+    let bestSplitIndex = Math.ceil(weightedPages.length / 2);
+    let bestBalanceGap = Number.POSITIVE_INFINITY;
+    let leadingWeight = 0;
+
+    for (let index = 1; index < weightedPages.length; index += 1) {
+      leadingWeight += weightedPages[index - 1].aspectRatio;
+      const trailingWeight = totalWeight - leadingWeight;
+      const balanceGap = Math.abs(leadingWeight - trailingWeight);
+
+      if (balanceGap <= bestBalanceGap) {
+        bestBalanceGap = balanceGap;
+        bestSplitIndex = index;
+      }
+    }
+
+    return [
+      weightedPages.slice(0, bestSplitIndex),
+      weightedPages.slice(bestSplitIndex),
+    ].filter((row) => row.length > 0);
+  }, [weightedPages]);
+
+  const handleAspectRatio = useCallback(
+    (pageId: string, aspectRatio: number) => {
+      const normalizedRatio = clampScreenshotAspectRatio(aspectRatio);
+      setAspectRatios((current) => {
+        if (current[pageId] === normalizedRatio) {
+          return current;
+        }
+        return { ...current, [pageId]: normalizedRatio };
+      });
+    },
+    [],
+  );
 
   if (displayPages.length === 0) {
     return <PlaceholderIcon />;
   }
 
   return (
-    <div
-      className={`grid ${getGridClass(displayPages.length)} h-full w-full gap-0.5`}
-    >
-      {displayPages.map((page, index) => {
-        const isLast = index === displayPages.length - 1;
+    <div className="flex h-full w-full flex-col justify-center gap-1 p-1.5">
+      {rowGroups.map((row, rowIndex) => {
+        const previousRowsCount = rowGroups
+          .slice(0, rowIndex)
+          .reduce((sum, currentRow) => sum + currentRow.length, 0);
+
         return (
-          <PageScreenshotCell
-            key={page.id}
-            projectId={demo.id}
-            page={page}
-            showOverlay={isLast && extraCount > 0}
-            overlayText={
-              isLast && extraCount > 0 ? `+${extraCount}` : undefined
-            }
-          />
+          <div
+            key={row.map(({ page }) => page.id).join("-")}
+            className="flex min-h-0 flex-1 justify-center gap-1"
+          >
+            {row.map(({ page, aspectRatio }, index) => {
+              const displayIndex = previousRowsCount + index;
+              const isLast = displayIndex === displayPages.length - 1;
+              const isDenseLayout = displayPages.length >= 3;
+
+              return (
+                <PageScreenshotCell
+                  key={page.id}
+                  projectId={demo.id}
+                  page={page}
+                  className={
+                    isDenseLayout
+                      ? "min-w-0"
+                      : "h-full max-w-[48%] shrink-0"
+                  }
+                  style={
+                    isDenseLayout
+                      ? { flex: `${aspectRatio} 1 0` }
+                      : { aspectRatio }
+                  }
+                  showOverlay={isLast && extraCount > 0}
+                  overlayText={
+                    isLast && extraCount > 0 ? `+${extraCount}` : undefined
+                  }
+                  onAspectRatio={handleAspectRatio}
+                />
+              );
+            })}
+          </div>
         );
       })}
     </div>
@@ -188,10 +303,10 @@ export function DemoCard({
               <img
                 src={demo.thumbnail}
                 alt={demo.name}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-contain"
               />
             ) : demo.demoPages && demo.demoPages.length > 0 ? (
-              <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+              <div className="h-full w-full">
                 <ScreenshotCover demo={demo} />
               </div>
             ) : (
@@ -328,6 +443,7 @@ export function TemplateProjectCard({
   onRename,
   onChangeCategory,
   onChangeCover,
+  onConvertToProject,
   onDelete,
 }: TemplateProjectCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -345,10 +461,10 @@ export function TemplateProjectCard({
               <img
                 src={template.thumbnail}
                 alt={template.name}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-contain"
               />
             ) : template.demoPages && template.demoPages.length > 0 ? (
-              <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+              <div className="h-full w-full">
                 <ScreenshotCover
                   demo={{ ...template, category: template.category }}
                 />
@@ -443,6 +559,18 @@ export function TemplateProjectCard({
           >
             <Image className="mr-2 h-3.5 w-3.5" />
             修改封面
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-xs"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen(false);
+              onConvertToProject(template);
+            }}
+          >
+            <Repeat2 className="mr-2 h-3.5 w-3.5" />
+            转为普通项目
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs text-destructive focus:text-destructive"

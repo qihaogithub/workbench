@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { ScreenshotRenderBox } from "@opencode-workbench/shared/demo";
+import type { ScreenshotRenderBox } from "@opencode-workbench/demo-ui";
 
 const POLL_INTERVAL = 1500;
 const MAX_POLL_DURATION_MS = 60_000;

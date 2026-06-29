@@ -153,6 +153,21 @@ export async function deleteProjectTemplate(id: string): Promise<ApiResponse<voi
   return response
 }
 
+export async function convertProjectTemplate(
+  id: string,
+): Promise<ApiResponse<DemoMeta>> {
+  const response = await fetch(`/api/templates/${id}/convert`, {
+    method: 'POST',
+  }).then((res) => res.json())
+
+  if (response.success) {
+    mutate('/api/demos')
+    mutate('/api/templates')
+  }
+
+  return response
+}
+
 export async function recommendProjectTemplate(
   description: string,
 ): Promise<ApiResponse<{

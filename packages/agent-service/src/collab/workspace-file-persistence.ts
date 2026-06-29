@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import type { CollabResourceKind } from "@opencode-workbench/shared";
+import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
 
 export interface SessionValidation {
   ok: boolean;

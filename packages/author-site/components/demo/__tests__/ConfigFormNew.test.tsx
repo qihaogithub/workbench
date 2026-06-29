@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { ConfigForm } from '@opencode-workbench/shared/demo';
+import { ConfigForm } from '@opencode-workbench/demo-ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const mockSchema = JSON.stringify({

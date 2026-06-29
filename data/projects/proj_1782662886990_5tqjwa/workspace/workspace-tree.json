@@ -1,0 +1,19 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "1_aiom",
+      "name": "配置页 1",
+      "routeKey": "1",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "2_evi0",
+      "name": "配置页 2",
+      "routeKey": "2",
+      "order": 1,
+      "parentId": null
+    }
+  ]
+}
