@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782697450464_kleoo5",
+  "at": 1782697450464,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1782676111405_droy3a",
+  "resourceId": "proj_1782676111405_droy3a",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1782676111405_droy3a"
+    ]
+  }
+}

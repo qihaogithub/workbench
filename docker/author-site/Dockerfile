@@ -11,16 +11,35 @@ ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
 ARG NEXT_PUBLIC_MODEL_BLACKLIST=
 ARG NEXT_PUBLIC_DEFAULT_MODEL_IDS=
 ARG NEXT_PUBLIC_MODEL_NAME_FILTERS=
+ARG NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201
+ARG NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=http://localhost:3202
+
+ENV NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
+ENV NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST}
+ENV NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS}
+ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
+ENV NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
+ENV NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL}
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-client/package.json ./packages/agent-client/
+COPY packages/demo-ui/package.json ./packages/demo-ui/
+COPY packages/knowledge-core/package.json ./packages/knowledge-core/
+COPY packages/knowledge-service/package.json ./packages/knowledge-service/
+COPY packages/project-core/package.json ./packages/project-core/
+COPY packages/project-scaffold/package.json ./packages/project-scaffold/
+COPY packages/shared/package.json ./packages/shared/
 COPY packages/author-site/package.json ./packages/author-site/
 
 RUN pnpm install --no-frozen-lockfile
 
-COPY packages/shared/ ./packages/shared/
 COPY packages/agent-client/ ./packages/agent-client/
+COPY packages/demo-ui/ ./packages/demo-ui/
+COPY packages/knowledge-core/ ./packages/knowledge-core/
+COPY packages/knowledge-service/ ./packages/knowledge-service/
+COPY packages/project-core/ ./packages/project-core/
+COPY packages/project-scaffold/ ./packages/project-scaffold/
+COPY packages/shared/ ./packages/shared/
 COPY packages/author-site/ ./packages/author-site/
 
 RUN pnpm --filter @opencode-workbench/author-site build

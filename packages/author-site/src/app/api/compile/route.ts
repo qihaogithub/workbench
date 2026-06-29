@@ -2,16 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
 import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
 import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
+import { registerPreviewModule } from '@/lib/preview-module-store';
+import { shouldUsePreviewRuntimeCdn } from '@/lib/preview-runtime-manifest';
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+  let requestKind = 'unknown';
+  let codeLength = 0;
   try {
     const body = await request.json();
     const { code, sessionId, demoId } = body;
+    const runtimeBaseUrl = request.headers.get('origin') || request.nextUrl.origin;
+    const runtimeOptions = {
+      baseUrl: runtimeBaseUrl,
+      preferCdn: shouldUsePreviewRuntimeCdn(),
+    };
 
     let result;
     let projectId: string | undefined;
 
     if (code && typeof code === 'string') {
+      requestKind = 'inline-code';
+      codeLength = code.length;
       let lockedDependencies: Record<string, string> | undefined;
       if (sessionId && typeof sessionId === 'string') {
         try {
@@ -27,8 +39,9 @@ export async function POST(request: NextRequest) {
           // 忽略元数据读取错误
         }
       }
-      result = compileCode(code, lockedDependencies);
+      result = compileCode(code, lockedDependencies, runtimeOptions);
     } else if (sessionId) {
+      requestKind = 'session';
       if (typeof sessionId !== 'string') {
         return NextResponse.json(
           createApiError('INVALID_REQUEST', 'sessionId 必须为字符串'),
@@ -37,7 +50,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 多页面模式下需要 demoId
-      result = compileSession(sessionId, demoId);
+      result = compileSession(sessionId, demoId, runtimeOptions);
       if (!result) {
         return NextResponse.json(
           createApiError('SESSION_NOT_FOUND', '无法读取 Session 文件'),
@@ -61,6 +74,12 @@ export async function POST(request: NextRequest) {
     if (result && sessionId && typeof sessionId === 'string') {
       // 图片已通过图床绝对 URL 直接访问，无需路径重写
     }
+
+    registerPreviewModule(result.moduleHash, result.compiledCode);
+    const resultWithModuleUrl = {
+      ...result,
+      moduleUrl: `/api/preview-modules/${result.moduleHash}.js`,
+    };
 
     // 异步解析并锁定依赖版本（不阻塞响应）
     if (projectId && result.dependencies.length > 0) {
@@ -88,9 +107,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(createApiSuccess(result));
+    console.info('[PreviewRuntime][compile-api]', {
+      requestKind,
+      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+      demoId: typeof demoId === 'string' ? demoId : undefined,
+      codeLength,
+      dependencies: resultWithModuleUrl.dependencies.length,
+      cssImports: resultWithModuleUrl.cssImports.length,
+      moduleHash: resultWithModuleUrl.moduleHash,
+      elapsedMs: Date.now() - startedAt,
+    });
+
+    return NextResponse.json(createApiSuccess(resultWithModuleUrl));
   } catch (error) {
-    console.error('编译错误:', error);
+    console.error('编译错误:', {
+      error,
+      requestKind,
+      codeLength,
+      elapsedMs: Date.now() - startedAt,
+    });
 
     if (error instanceof PreviewRuntimeContractError) {
       return NextResponse.json(

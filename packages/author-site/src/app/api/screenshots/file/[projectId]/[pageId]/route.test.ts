@@ -11,6 +11,7 @@ class TestResponse {
   status: number;
   headers: { get: (name: string) => string | null };
   private readonly buffer: Buffer;
+  private readonly streamBody?: ReadableStream<Uint8Array>;
 
   constructor(body?: BodyInit | null, init?: ResponseInit) {
     this.status = init?.status ?? 200;
@@ -26,7 +27,10 @@ class TestResponse {
       get: (name: string) => headers.get(name.toLowerCase()) ?? null,
     };
 
-    if (body instanceof Uint8Array) {
+    if (body && typeof body === "object" && "getReader" in body) {
+      this.buffer = Buffer.alloc(0);
+      this.streamBody = body as ReadableStream<Uint8Array>;
+    } else if (body instanceof Uint8Array) {
       this.buffer = Buffer.from(body);
     } else if (typeof body === "string") {
       this.buffer = Buffer.from(body);
@@ -36,11 +40,22 @@ class TestResponse {
   }
 
   async arrayBuffer(): Promise<ArrayBuffer> {
+    if (this.streamBody) {
+      const chunks: Uint8Array[] = [];
+      const reader = this.streamBody.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      return new Uint8Array(Buffer.concat(chunks)).buffer;
+    }
     return new Uint8Array(this.buffer).buffer;
   }
 
   async json(): Promise<unknown> {
-    return JSON.parse(this.buffer.toString("utf-8"));
+    const buffer = Buffer.from(await this.arrayBuffer());
+    return JSON.parse(buffer.toString("utf-8"));
   }
 
   static json(body: unknown, init?: ResponseInit): TestResponse {
@@ -135,5 +150,38 @@ describe("screenshot file route", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("meta 查询返回本地 currentHash 与 renderBox", async () => {
+    const projectDir = path.join(tempDir, "screenshots", "proj_1");
+    fs.mkdirSync(projectDir, { recursive: true });
+    const renderBox = { width: 375, height: 960, fullPage: true };
+    fs.writeFileSync(
+      path.join(projectDir, "page_1.meta.json"),
+      JSON.stringify({
+        currentHash: "1111111111111111",
+        renderBoxes: {
+          "1111111111111111": renderBox,
+        },
+      }),
+    );
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      createRequest(
+        "http://localhost/api/screenshots/file/proj_1/page_1?meta=1",
+      ),
+      { params: { projectId: "proj_1", pageId: "page_1" } },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: {
+        currentHash: "1111111111111111",
+        url: "/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
+        renderBox,
+      },
+    });
   });
 });

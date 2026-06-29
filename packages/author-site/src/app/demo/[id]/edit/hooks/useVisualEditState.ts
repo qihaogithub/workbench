@@ -7,6 +7,8 @@ import type {
   VisualEditPatch,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualPropertyChange,
+  VisualPropertyChangeKind,
   VisualStyleChange,
 } from "../../../../../../components/demo";
 import {
@@ -57,6 +59,50 @@ function getSchemaPropertyKeys(
   return Array.from(keys);
 }
 
+export interface VisualConfigMark {
+  id: string;
+  changeId: string;
+  nodeId: string;
+  domPath: string;
+  property: string;
+  label: string;
+  fieldTitle: string;
+  fieldKey: string;
+  defaultValue: string;
+  scope: "page" | "project";
+}
+
+function getChangeId(
+  node: VisualNodeInfo,
+  property: string,
+  kind: VisualPropertyChangeKind,
+): string {
+  return `${node.domPath || node.nodeId}:${kind}:${property}`;
+}
+
+function getNodeSummary(node: VisualNodeInfo): string {
+  const text = node.textContent ? ` 文本：${node.textContent}` : "";
+  const cls = node.className ? ` class：${node.className}` : "";
+  return `<${node.tagName}> ${node.domPath}${text}${cls}`;
+}
+
+function formatChangeValue(change: VisualPropertyChange): string {
+  if (change.resource) {
+    const parts = [
+      change.resource.fileName ? `文件：${change.resource.fileName}` : null,
+      change.resource.url ? `资源地址：${change.resource.url}` : null,
+      change.resource.mimeType ? `类型：${change.resource.mimeType}` : null,
+      typeof change.resource.size === "number" ? `大小：${change.resource.size} bytes` : null,
+      change.resource.temporary ? "临时 data URL 预览，正式落地时请保存到项目资源目录" : null,
+    ].filter(Boolean);
+    return parts.join("；") || change.value;
+  }
+  if (change.value.startsWith("data:")) {
+    return "临时 data URL 预览，正式落地时请保存到项目资源目录";
+  }
+  return change.value;
+}
+
 export interface ApplyDemoSnapshotFn {
   (params: {
     code?: string;
@@ -103,6 +149,14 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     useState<VisualNodeInfo | null>(null);
   const [selectedVisualNode, setSelectedVisualNode] =
     useState<VisualNodeInfo | null>(null);
+  const [visualNodeStack, setVisualNodeStack] = useState<VisualNodeInfo[]>([]);
+  const [visualPanelHoverNodeId, setVisualPanelHoverNodeId] = useState<string | null>(null);
+  const [visualPropertyChanges, setVisualPropertyChanges] = useState<
+    VisualPropertyChange[]
+  >([]);
+  const [visualConfigMarks, setVisualConfigMarks] = useState<VisualConfigMark[]>([]);
+  const [visualAiInstruction, setVisualAiInstruction] = useState("");
+  const [visualPropertySending, setVisualPropertySending] = useState(false);
   const [visualAnnotations, setVisualAnnotations] = useState<
     VisualAnnotation[]
   >([]);
@@ -177,8 +231,10 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleVisualSelect = useCallback(
-    (node: VisualNodeInfo | null) => {
+    (node: VisualNodeInfo | null, nodeStack?: VisualNodeInfo[]) => {
       setSelectedVisualNode(node);
+      setVisualNodeStack(nodeStack ?? (node ? [node] : []));
+      setVisualPanelHoverNodeId(null);
       if (!node) return;
 
       if (visualConfigMode) {
@@ -187,6 +243,186 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     },
     [initializeVisualConfigDialog, visualConfigMode],
   );
+
+  const handleVisualStackSelect = useCallback((node: VisualNodeInfo) => {
+    setSelectedVisualNode(node);
+    setVisualPanelHoverNodeId(null);
+  }, []);
+
+  const handleVisualPropertyChange = useCallback(
+    (
+      node: VisualNodeInfo,
+      property: string,
+      label: string,
+      value: string,
+      kind: VisualPropertyChangeKind = "style",
+      previousValue?: string,
+      resource?: VisualPropertyChange["resource"],
+    ) => {
+      const id = getChangeId(node, property, kind);
+      const change: VisualPropertyChange = {
+        id,
+        nodeId: node.nodeId,
+        domPath: node.domPath,
+        kind,
+        property,
+        label,
+        value,
+        previousValue,
+        resource,
+      };
+      setVisualPropertyChanges((prev) => {
+        const index = prev.findIndex((item) => item.id === id);
+        if (index === -1) return [...prev, change];
+        const next = [...prev];
+        next[index] = change;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleRestoreVisualProperty = useCallback((changeId: string) => {
+    setVisualPropertyChanges((prev) => prev.filter((item) => item.id !== changeId));
+    setVisualConfigMarks((prev) => prev.filter((item) => item.changeId !== changeId));
+  }, []);
+
+  const handleClearVisualProperties = useCallback(() => {
+    setVisualPropertyChanges([]);
+    setVisualConfigMarks([]);
+    setVisualAiInstruction("");
+  }, []);
+
+  const handleMarkVisualConfig = useCallback(
+    (
+      node: VisualNodeInfo,
+      property: string,
+      label: string,
+      value: string,
+      kind: VisualPropertyChangeKind = "style",
+    ) => {
+      const changeId = getChangeId(node, property, kind);
+      const usedKeys = getSchemaPropertyKeys(schemaRef.current, projectConfigSchema);
+      const fieldTitle = label;
+      const mark: VisualConfigMark = {
+        id: createVisualId("config-mark"),
+        changeId,
+        nodeId: node.nodeId,
+        domPath: node.domPath,
+        property,
+        label,
+        fieldTitle,
+        fieldKey: suggestVisualConfigFieldKey(fieldTitle, usedKeys),
+        defaultValue: value,
+        scope: "page",
+      };
+      setVisualConfigMarks((prev) => {
+        const index = prev.findIndex((item) => item.changeId === changeId);
+        if (index === -1) return [...prev, mark];
+        const next = [...prev];
+        next[index] = { ...prev[index], ...mark, id: prev[index].id };
+        return next;
+      });
+    },
+    [projectConfigSchema, schemaRef],
+  );
+
+  const handleUpdateVisualConfigMark = useCallback(
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "scope">>) => {
+      setVisualConfigMarks((prev) =>
+        prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
+      );
+    },
+    [],
+  );
+
+  const handleRemoveVisualConfigMark = useCallback((markId: string) => {
+    setVisualConfigMarks((prev) => prev.filter((item) => item.id !== markId));
+  }, []);
+
+  const handleSendVisualPropertiesToAI = useCallback(
+    (singleChange?: VisualPropertyChange) => {
+      const changes = singleChange ? [singleChange] : visualPropertyChanges;
+      const instruction = visualAiInstruction.trim();
+      if (!selectedVisualNode && changes.length === 0 && !instruction) {
+        toast({ title: "请先在预览区选择一个元素" });
+        return;
+      }
+      if (changes.length === 0 && visualConfigMarks.length === 0 && !instruction) {
+        toast({ title: "请先修改属性或填写补充说明" });
+        return;
+      }
+
+      setVisualPropertySending(true);
+      const stackContext = visualNodeStack.length
+        ? visualNodeStack.map((node, index) => `${index + 1}. ${getNodeSummary(node)}`).join("\n")
+        : selectedVisualNode
+          ? getNodeSummary(selectedVisualNode)
+          : "无";
+      const changeContext =
+        changes.length > 0
+          ? changes
+              .map(
+                (change, index) =>
+                  `${index + 1}. ${change.label}（${change.kind}:${change.property}）：${change.previousValue ?? "未设置"} -> ${formatChangeValue(change)}`,
+              )
+              .join("\n")
+          : "无明确属性变更";
+      const configContext =
+        visualConfigMarks.length > 0
+          ? visualConfigMarks
+              .map(
+                (mark, index) =>
+                  `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}`,
+              )
+              .join("\n")
+          : "无";
+      const prompt = `请根据右侧属性面板中的结构化变更修改当前页面。
+
+页面文件：demos/${activeDemoIdRef.current}/index.tsx
+
+【点击位置图层】
+${stackContext}
+
+【最终选中元素】
+${selectedVisualNode ? getNodeSummary(selectedVisualNode) : "无"}
+
+【属性变更】
+${changeContext}
+
+【需要设为配置项的属性】
+${configContext}
+
+【补充说明】
+${instruction || "无"}
+
+请优先只修改当前页面相关代码。临时预览已经在 iframe 中验证，但不要把它视为已写回源码；如果新增配置项，请同步处理页面 Schema、默认值和预览数据。`;
+
+      setTabValue("ai");
+      setTriggerAutoSend(prompt);
+      setVisualPropertySending(false);
+    },
+    [
+      activeDemoIdRef,
+      selectedVisualNode,
+      setTabValue,
+      setTriggerAutoSend,
+      toast,
+      visualAiInstruction,
+      visualConfigMarks,
+      visualNodeStack,
+      visualPropertyChanges,
+    ],
+  );
+
+  const confirmDiscardVisualPropertyWork = useCallback(() => {
+    const hasPending =
+      visualPropertyChanges.length > 0 ||
+      visualConfigMarks.length > 0 ||
+      visualAiInstruction.trim().length > 0;
+    if (!hasPending) return true;
+    return window.confirm("当前有未发送的属性修改，确定丢弃并继续吗？");
+  }, [visualAiInstruction, visualConfigMarks.length, visualPropertyChanges.length]);
 
   const handleStartVisualConfig = useCallback(() => {
     if (visualConfigMode) {
@@ -522,6 +758,18 @@ ${context}
     setHoveredVisualNode,
     selectedVisualNode,
     setSelectedVisualNode,
+    visualNodeStack,
+    setVisualNodeStack,
+    visualPanelHoverNodeId,
+    setVisualPanelHoverNodeId,
+    visualPropertyChanges,
+    setVisualPropertyChanges,
+    visualConfigMarks,
+    setVisualConfigMarks,
+    visualAiInstruction,
+    setVisualAiInstruction,
+    visualPropertySending,
+    setVisualPropertySending,
     visualAnnotations,
     setVisualAnnotations,
     visualPatches,
@@ -550,6 +798,15 @@ ${context}
     initializeVisualConfigDialog,
     handleVisualConfigCandidateChange,
     handleVisualSelect,
+    handleVisualStackSelect,
+    handleVisualPropertyChange,
+    handleRestoreVisualProperty,
+    handleClearVisualProperties,
+    handleMarkVisualConfig,
+    handleUpdateVisualConfigMark,
+    handleRemoveVisualConfigMark,
+    handleSendVisualPropertiesToAI,
+    confirmDiscardVisualPropertyWork,
     handleStartVisualConfig,
     handleApplyVisualConfig,
     handleCloseVisualConfigDialog,

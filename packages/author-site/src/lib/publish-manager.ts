@@ -25,6 +25,10 @@ import type {
 import type { CanvasState } from "@opencode-workbench/demo-ui";
 import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
+import {
+  PREVIEW_RUNTIME_MANIFEST_VERSION,
+  shouldUsePreviewRuntimeCdn,
+} from "@/lib/preview-runtime-manifest";
 import { processImagesForPublish } from "@/lib/publish/image-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
@@ -56,6 +60,11 @@ export interface PublishedProject {
   appGraph?: AppGraph;
   projectConfigSchema?: string;
   canvasState?: CanvasState;
+  previewRuntime?: {
+    version: string;
+    source: "local" | "cdn";
+    basePath?: string;
+  };
 }
 
 export interface ProjectsIndex {
@@ -91,6 +100,20 @@ export function getPublishedDir(): string {
 
 function getViewerBaseUrl(): string {
   return process.env.VIEWER_CLOUDFLARE_URL || process.env.VIEWER_LAN_URL || "";
+}
+
+function copyPreviewRuntimeForPublish(projectId: string, publishDir: string): string | undefined {
+  const runtimeSourceDir = path.join(process.cwd(), "public", "preview-runtime");
+  if (!fs.existsSync(runtimeSourceDir)) {
+    return undefined;
+  }
+
+  const runtimeBasePath = `/data/${projectId}/preview-runtime`;
+  fs.cpSync(runtimeSourceDir, path.join(publishDir, "preview-runtime"), {
+    recursive: true,
+    force: true,
+  });
+  return runtimeBasePath;
 }
 
 function extractSchemaDefaults(schemaContent: string): Record<string, unknown> {
@@ -177,6 +200,14 @@ export async function publishProject(
 
   const viewerBaseUrl = getViewerBaseUrl();
   const totalPages = demoPages.length;
+  const useCdnRuntime = shouldUsePreviewRuntimeCdn();
+  const publishedRuntimeBasePath = useCdnRuntime
+    ? undefined
+    : copyPreviewRuntimeForPublish(projectId, publishedProjectDir);
+  const compileRuntimeOptions = {
+    baseUrl: publishedRuntimeBasePath,
+    preferCdn: useCdnRuntime,
+  };
 
   for (let i = 0; i < demoPages.length; i++) {
     const page = demoPages[i];
@@ -187,7 +218,11 @@ export async function publishProject(
     if (!fs.existsSync(codePath)) continue;
 
     const tsxSource = fs.readFileSync(codePath, "utf-8");
-    const compileResult = compileCode(tsxSource, project.lockedDependencies);
+    const compileResult = compileCode(
+      tsxSource,
+      project.lockedDependencies,
+      compileRuntimeOptions,
+    );
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
@@ -217,6 +252,8 @@ export async function publishProject(
       cssImports: compileResult.cssImports,
       configData: mergedConfigData,
       cdnBaseUrl: getCdnBaseUrl(),
+      runtimeBaseUrl: publishedRuntimeBasePath,
+      useCdnRuntime,
     });
     const iframeHtmlPath = `demos/${page.id}/iframe.html`;
     fs.writeFileSync(path.join(demoPublishDir, "iframe.html"), iframeHtml);
@@ -305,6 +342,11 @@ export async function publishProject(
     appGraph,
     projectConfigSchema: projectConfigSchema ?? undefined,
     canvasState,
+    previewRuntime: {
+      version: PREVIEW_RUNTIME_MANIFEST_VERSION,
+      source: useCdnRuntime ? "cdn" : "local",
+      basePath: publishedRuntimeBasePath,
+    },
   };
 
   fs.writeFileSync(

@@ -17,12 +17,11 @@ describe("AI 页面预览运行时策略", () => {
 
     expect(result.dependencies).toContain("@preview/sdk");
     expect(result.compiledCode).not.toContain("from '@preview/sdk'");
-    expect(result.compiledCode).toContain('from "data:application/javascript');
-    expect(result.compiledCode).not.toContain("from 'data:application/javascript");
-    expect(result.compiledCode).toContain("data:application/javascript");
+    expect(result.compiledCode).toContain('from "/preview-runtime/vendor/preview-sdk.js"');
+    expect(result.moduleHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("为登记依赖生成固定版本 CDN URL", () => {
+  it("为登记依赖生成同源 runtime URL", () => {
     const result = compileCode(`
       import { Trophy } from "lucide-react";
 
@@ -31,8 +30,25 @@ describe("AI 页面预览运行时策略", () => {
       }
     `);
 
-    expect(result.compiledCode).toContain("lucide-react@0.323.0");
+    expect(result.compiledCode).toContain("/preview-runtime/vendor/lucide-react.js");
     expect(result.compiledCode).not.toContain("lucide-react?deps=");
+  });
+
+  it("支持紧急 CDN 回退", () => {
+    const result = compileCode(
+      `
+        import { Trophy } from "lucide-react";
+
+        export default function Demo() {
+          return <Trophy />;
+        }
+      `,
+      undefined,
+      { preferCdn: true },
+    );
+
+    expect(result.compiledCode).toContain("lucide-react@0.323.0");
+    expect(result.compiledCode).toContain("react@18.3.1");
   });
 
   it("拒绝未登记 npm 依赖", () => {

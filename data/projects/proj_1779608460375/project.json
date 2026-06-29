@@ -1,6 +1,7 @@
 {
   "id": "proj_1779608460375",
   "name": "我的页面",
+  "category": "APP资源位",
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460375/workspace",
   "demoPages": [
     {
@@ -111,7 +112,8 @@
       "fileCount": 5
     }
   ],
+  "pageVersions": {},
   "createdAt": 1779608460375,
-  "updatedAt": 1780020854632,
+  "updatedAt": 1782723614460,
   "thumbnail": "/thumbnails/proj_1779608460375_cover.png"
 }

@@ -14,12 +14,18 @@ import {
   computeScreenshotHash,
   screenshotExists,
   readScreenshot,
+  readScreenshotMeta,
   readScreenshotRenderBox,
   writeScreenshot,
   cleanupOldScreenshots,
+  type ScreenshotVariant,
 } from "../utils/screenshot-store";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
-import type { ScreenshotRenderBox } from "../utils/browser-pool";
+import type {
+  ScreenshotPriority,
+  ScreenshotRenderBox,
+  ScreenshotRenderMode,
+} from "../utils/browser-pool";
 
 // --- Request schemas ---
 
@@ -32,6 +38,9 @@ interface GenerateRequest {
   height?: number;
   fullPage?: boolean;
   sessionId?: string;
+  priority?: ScreenshotPriority;
+  renderMode?: ScreenshotRenderMode;
+  measuredHeight?: number;
 }
 
 interface BatchPage {
@@ -41,6 +50,9 @@ interface BatchPage {
   width?: number;
   height?: number;
   fullPage?: boolean;
+  priority?: ScreenshotPriority;
+  renderMode?: ScreenshotRenderMode;
+  measuredHeight?: number;
 }
 
 interface GenerateBatchRequest {
@@ -53,14 +65,39 @@ interface GenerateBatchRequest {
 
 interface BatchResult {
   pageId: string;
+  priority?: ScreenshotPriority;
+  variant?: ScreenshotVariant;
+  quality?: ScreenshotVariant;
   url?: string;
+  assetUrl?: string;
   hash?: string;
   elapsed?: number;
   cached?: boolean;
+  queueWaitMs?: number;
+  timings?: ScreenshotTimings;
   renderBox?: ScreenshotRenderBox;
   status: "pending" | "rendering" | "done" | "failed";
   errorCode?: ScreenshotErrorCode;
   error?: string;
+}
+
+interface BatchPriorityStats {
+  total: number;
+  completed: number;
+  failed: number;
+  cached: number;
+}
+
+interface BatchMetrics {
+  totalElapsedMs: number;
+  totalCompileMs: number;
+  totalRenderMs: number;
+  totalWriteMs: number;
+  totalQueueWaitMs: number;
+  rendered: number;
+  screenshotCacheHits: number;
+  compileCacheHits: number;
+  inFlightHits: number;
 }
 
 interface BatchState {
@@ -77,6 +114,8 @@ interface BatchState {
   expiresAt: string;
   cancelled: boolean;
   errorsByCode: Partial<Record<ScreenshotErrorCode, number>>;
+  priorityStats: Record<ScreenshotPriority, BatchPriorityStats>;
+  metrics: BatchMetrics;
 }
 
 const batchStore = new Map<string, BatchState>();
@@ -89,6 +128,12 @@ interface ScreenshotTimings {
   totalMs: number;
 }
 
+interface ScreenshotCacheStats {
+  screenshotHit: boolean;
+  compileHit: boolean;
+  inFlightHit: boolean;
+}
+
 interface GenerateScreenshotResult {
   url: string;
   hash: string;
@@ -98,7 +143,27 @@ interface GenerateScreenshotResult {
   queueWaitMs: number;
   timings: ScreenshotTimings;
   renderBox: ScreenshotRenderBox;
+  cache: ScreenshotCacheStats;
+  variant: ScreenshotVariant;
+  quality: ScreenshotVariant;
+  assetUrl: string;
 }
+
+const SCREENSHOT_PRIORITIES: ScreenshotPriority[] = [
+  "active",
+  "visible",
+  "nearby",
+  "thumbnail",
+  "background",
+];
+
+const PRIORITY_WEIGHT: Record<ScreenshotPriority, number> = {
+  active: 0,
+  visible: 1,
+  nearby: 2,
+  thumbnail: 3,
+  background: 4,
+};
 
 function generateBatchId(): string {
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -131,19 +196,130 @@ function incrementBatchError(
   batch.errorsByCode[code] = (batch.errorsByCode[code] || 0) + 1;
 }
 
+function normalizePriority(priority?: string): ScreenshotPriority {
+  return SCREENSHOT_PRIORITIES.includes(priority as ScreenshotPriority)
+    ? (priority as ScreenshotPriority)
+    : "background";
+}
+
+function normalizeRenderMode(renderMode?: string): ScreenshotRenderMode {
+  return renderMode === "fast" ? "fast" : "strict";
+}
+
+function normalizeVariant(variant?: string): ScreenshotVariant {
+  return variant === "fast" ? "fast" : "strict";
+}
+
 function normalizeHash(hash?: string): string | undefined {
   if (!hash) return undefined;
   return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : undefined;
 }
 
-function computeBatchPageHash(page: BatchPage): string {
+function buildScreenshotUrl(
+  projectId: string,
+  pageId: string,
+  hash?: string,
+  variant: ScreenshotVariant = "strict",
+): string {
+  const base = `/api/screenshots/file/${projectId}/${pageId}`;
+  if (!hash) return base;
+  const params = new URLSearchParams({ hash });
+  if (variant !== "strict") {
+    params.set("variant", variant);
+  }
+  return `${base}?${params.toString()}`;
+}
+
+function createPriorityStats(): Record<ScreenshotPriority, BatchPriorityStats> {
+  return {
+    active: { total: 0, completed: 0, failed: 0, cached: 0 },
+    visible: { total: 0, completed: 0, failed: 0, cached: 0 },
+    nearby: { total: 0, completed: 0, failed: 0, cached: 0 },
+    thumbnail: { total: 0, completed: 0, failed: 0, cached: 0 },
+    background: { total: 0, completed: 0, failed: 0, cached: 0 },
+  };
+}
+
+function createBatchMetrics(): BatchMetrics {
+  return {
+    totalElapsedMs: 0,
+    totalCompileMs: 0,
+    totalRenderMs: 0,
+    totalWriteMs: 0,
+    totalQueueWaitMs: 0,
+    rendered: 0,
+    screenshotCacheHits: 0,
+    compileCacheHits: 0,
+    inFlightHits: 0,
+  };
+}
+
+function sortBatchPages(pages: BatchPage[]): BatchPage[] {
+  return pages
+    .map((page, index) => ({
+      ...page,
+      priority: normalizePriority(page.priority),
+      index,
+    }))
+    .sort((a, b) => {
+      const priorityDiff =
+        PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority];
+      return priorityDiff === 0 ? a.index - b.index : priorityDiff;
+    })
+    .map(({ index: _index, ...page }) => page);
+}
+
+function recordBatchSuccess(
+  batch: BatchState,
+  priority: ScreenshotPriority,
+  result: GenerateScreenshotResult,
+): void {
+  const stats = batch.priorityStats[priority];
+  stats.completed++;
+  if (result.cached) stats.cached++;
+
+  batch.metrics.totalElapsedMs += result.elapsed;
+  batch.metrics.totalCompileMs += result.timings.compileMs;
+  batch.metrics.totalRenderMs += result.timings.renderMs;
+  batch.metrics.totalWriteMs += result.timings.writeMs;
+  batch.metrics.totalQueueWaitMs += result.queueWaitMs;
+  if (!result.cached) batch.metrics.rendered++;
+  if (result.cache.screenshotHit) batch.metrics.screenshotCacheHits++;
+  if (result.cache.compileHit) batch.metrics.compileCacheHits++;
+  if (result.cache.inFlightHit) batch.metrics.inFlightHits++;
+}
+
+function recordBatchFailure(
+  batch: BatchState,
+  priority: ScreenshotPriority,
+): void {
+  const stats = batch.priorityStats[priority];
+  stats.completed++;
+  stats.failed++;
+}
+
+function createScreenshotIdentity(sessionId?: string): Record<string, unknown> {
+  return {
+    sessionScope: sessionId || "global",
+    previewRuntimeSource: config.previewRuntimeSource,
+    runtimeBaseUrl: config.authorSiteUrl,
+    cdnBaseUrl: config.cdnBaseUrl,
+  };
+}
+
+function computePageHash(page: BatchPage, sessionId?: string): string {
   return computeScreenshotHash(
     page.code,
     page.configData || {},
     page.width || config.viewport.width,
     page.height || config.viewport.height,
     page.fullPage ?? false,
+    createScreenshotIdentity(sessionId),
   );
+}
+
+function getPageVariant(page: Pick<BatchPage, "renderMode">): ScreenshotVariant {
+  return normalizeRenderMode(page.renderMode);
 }
 
 // --- Screenshot generation ---
@@ -157,18 +333,36 @@ async function generateScreenshot(
   height: number,
   fullPage: boolean,
   requestId: string,
+  priority: ScreenshotPriority,
+  renderMode: ScreenshotRenderMode,
+  measuredHeight?: number,
   sessionId?: string,
 ): Promise<GenerateScreenshotResult> {
   const startTime = Date.now();
 
-  const hash = computeScreenshotHash(code, configData, width, height, fullPage);
+  const hash = computeScreenshotHash(
+    code,
+    configData,
+    width,
+    height,
+    fullPage,
+    createScreenshotIdentity(sessionId),
+  );
+  const variant: ScreenshotVariant = renderMode;
 
   // Check cache
-  if (await screenshotExists(projectId, pageId, hash)) {
-    const renderBox = await readScreenshotRenderBox(projectId, pageId, hash);
+  if (await screenshotExists(projectId, pageId, hash, variant)) {
+    const renderBox = await readScreenshotRenderBox(
+      projectId,
+      pageId,
+      hash,
+      variant,
+    );
     if (renderBox) {
+      const assetUrl = buildScreenshotUrl(projectId, pageId, hash, variant);
       return {
         url: `/api/screenshots/file/${projectId}/${pageId}`,
+        assetUrl,
         hash,
         elapsed: Date.now() - startTime,
         cached: true,
@@ -181,15 +375,29 @@ async function generateScreenshot(
           writeMs: 0,
           totalMs: Date.now() - startTime,
         },
+        cache: {
+          screenshotHit: true,
+          compileHit: false,
+          inFlightHit: false,
+        },
+        variant,
+        quality: variant,
       };
     }
   }
 
-  const inFlightKey = `${projectId}:${pageId}:${hash}`;
+  const inFlightKey = `${projectId}:${pageId}:${hash}:${variant}`;
   const inFlight = inFlightScreenshots.get(inFlightKey);
   if (inFlight) {
     const result = await inFlight;
-    return { ...result, requestId };
+    return {
+      ...result,
+      requestId,
+      cache: {
+        ...result.cache,
+        inFlightHit: true,
+      },
+    };
   }
 
   const generatePromise = generateScreenshotUncached(
@@ -201,6 +409,9 @@ async function generateScreenshot(
     height,
     fullPage,
     requestId,
+    priority,
+    renderMode,
+    measuredHeight,
     hash,
     startTime,
     sessionId,
@@ -221,6 +432,9 @@ async function generateScreenshotUncached(
   height: number,
   fullPage: boolean,
   requestId: string,
+  priority: ScreenshotPriority,
+  renderMode: ScreenshotRenderMode,
+  measuredHeight: number | undefined,
   hash: string,
   startTime: number,
   sessionId?: string,
@@ -229,6 +443,7 @@ async function generateScreenshotUncached(
   const cacheScope = sessionId || "global";
   const compileStart = Date.now();
   let compileResult = compileCache.get(code, cacheScope);
+  const compileHit = Boolean(compileResult);
 
   if (!compileResult) {
     try {
@@ -246,16 +461,28 @@ async function generateScreenshotUncached(
 
   // Generate HTML
   const html = generateIframeHtml({
-    compiledCode: compileResult.compiledCode,
+    compiledCode: compileResult.moduleUrl ? undefined : compileResult.compiledCode,
+    compiledCodeUrl: compileResult.moduleUrl,
     cssImports: compileResult.cssImports,
     configData,
-    supportUrlMode: false,
+    cdnBaseUrl: config.cdnBaseUrl,
+    runtimeBaseUrl: config.authorSiteUrl,
+    useCdnRuntime: config.previewRuntimeSource === "cdn",
+    supportUrlMode: true,
     baseOrigin: config.authorSiteUrl,
   });
 
   // Render screenshot
   const pool = getBrowserPool();
-  const renderResult = await pool.renderPage(html, width, height, fullPage);
+  const renderResult = await pool.renderPage(
+    html,
+    width,
+    height,
+    fullPage,
+    priority,
+    renderMode,
+    measuredHeight,
+  );
 
   // Save to disk
   const writeStart = Date.now();
@@ -266,6 +493,7 @@ async function generateScreenshotUncached(
     renderResult.buffer,
     Date.now() - startTime,
     renderResult.renderBox,
+    renderMode,
   );
   const writeMs = Date.now() - writeStart;
 
@@ -273,8 +501,10 @@ async function generateScreenshotUncached(
   cleanupOldScreenshots(projectId, pageId).catch(() => {});
 
   const elapsed = Date.now() - startTime;
+  const assetUrl = buildScreenshotUrl(projectId, pageId, hash, renderMode);
   return {
     url: `/api/screenshots/file/${projectId}/${pageId}`,
+    assetUrl,
     hash,
     elapsed,
     cached: false,
@@ -287,6 +517,13 @@ async function generateScreenshotUncached(
       writeMs,
       totalMs: elapsed,
     },
+    cache: {
+      screenshotHit: false,
+      compileHit,
+      inFlightHit: false,
+    },
+    variant: renderMode,
+    quality: renderMode,
   };
 }
 
@@ -297,8 +534,19 @@ async function handleGenerate(
   reply: FastifyReply,
 ) {
   const requestId = getRequestId(request);
-  const { projectId, pageId, code, configData, width, height, fullPage, sessionId } =
-    request.body;
+  const {
+    projectId,
+    pageId,
+    code,
+    configData,
+    width,
+    height,
+    fullPage,
+    sessionId,
+    priority,
+    renderMode,
+    measuredHeight,
+  } = request.body;
 
   if (!projectId || !pageId || !code) {
     return reply.status(400).send({
@@ -320,11 +568,24 @@ async function handleGenerate(
       h,
       fullPage ?? false,
       requestId,
+      normalizePriority(priority || "active"),
+      normalizeRenderMode(renderMode),
+      measuredHeight,
       sessionId,
     );
 
     request.log.info(
-      { requestId, projectId, pageId, cached: result.cached, ...result.timings },
+      {
+        requestId,
+        projectId,
+        pageId,
+        priority: normalizePriority(priority || "active"),
+        variant: result.variant,
+        cached: result.cached,
+        queueWaitMs: result.queueWaitMs,
+        cache: result.cache,
+        ...result.timings,
+      },
       "screenshot generated",
     );
 
@@ -369,9 +630,19 @@ async function handleGenerateBatch(
   const batchId = generateBatchId();
   const now = Date.now();
 
-  const results: BatchResult[] = pages.map((page) => ({
+  const sortedPages = sortBatchPages(pages);
+  const priorityStats = createPriorityStats();
+
+  for (const page of sortedPages) {
+    priorityStats[normalizePriority(page.priority)].total++;
+  }
+
+  const results: BatchResult[] = sortedPages.map((page) => ({
     pageId: page.pageId,
-    hash: computeBatchPageHash(page),
+    priority: normalizePriority(page.priority),
+    variant: getPageVariant(page),
+    quality: getPageVariant(page),
+    hash: computePageHash(page, sessionId),
     status: "pending" as const,
   }));
 
@@ -389,13 +660,17 @@ async function handleGenerateBatch(
     expiresAt: new Date(now + config.screenshotBatchTtlMs).toISOString(),
     cancelled: false,
     errorsByCode: {},
+    priorityStats,
+    metrics: createBatchMetrics(),
   };
 
   const initialResults = results.map((result) => ({ ...result }));
   batchStore.set(batchId, batch);
 
   // Process in background
-  processBatch(batch, pages, getRequestId(request), sessionId).catch(() => {});
+  processBatch(batch, sortedPages, getRequestId(request), sessionId, request.log).catch(
+    () => {},
+  );
 
   return reply.send({
     success: true,
@@ -403,6 +678,8 @@ async function handleGenerateBatch(
       batchId,
       total: batch.total,
       cached: 0,
+      priorityStats: batch.priorityStats,
+      metrics: batch.metrics,
       results: initialResults,
     },
   });
@@ -413,6 +690,7 @@ async function processBatch(
   pages: BatchPage[],
   requestId: string,
   sessionId?: string,
+  logger?: FastifyRequest["log"],
 ): Promise<void> {
   const queue = [...pages];
   const concurrency = config.maxConcurrentPages;
@@ -422,6 +700,7 @@ async function processBatch(
       if (batch.cancelled) break;
       const page = queue.shift();
       if (!page) break;
+      const priority = normalizePriority(page.priority);
 
       const resultIndex = batch.results.findIndex(
         (r) => r.pageId === page.pageId,
@@ -429,6 +708,7 @@ async function processBatch(
       if (resultIndex === -1) continue;
 
       batch.results[resultIndex].status = "rendering";
+      batch.results[resultIndex].priority = priority;
       touchBatch(batch);
 
       try {
@@ -444,6 +724,9 @@ async function processBatch(
           h,
           page.fullPage ?? false,
           requestId,
+          priority,
+          normalizeRenderMode(page.renderMode),
+          page.measuredHeight,
           sessionId,
         );
 
@@ -451,28 +734,39 @@ async function processBatch(
 
         batch.results[resultIndex] = {
           pageId: page.pageId,
+          priority,
+          variant: result.variant,
+          quality: result.quality,
           url: result.url,
+          assetUrl: result.assetUrl,
           hash: result.hash,
           elapsed: result.elapsed,
           cached: result.cached,
+          queueWaitMs: result.queueWaitMs,
+          timings: result.timings,
           renderBox: result.renderBox,
           status: "done",
         };
 
         batch.completed++;
         if (result.cached) batch.cached++;
+        recordBatchSuccess(batch, priority, result);
         touchBatch(batch);
       } catch (err) {
         const message = getErrorMessage(err);
         const errorCode = getScreenshotErrorCode(err);
         batch.results[resultIndex] = {
           pageId: page.pageId,
-          hash: computeBatchPageHash(page),
+          priority,
+          variant: getPageVariant(page),
+          quality: getPageVariant(page),
+          hash: computePageHash(page, sessionId),
           status: "failed",
           errorCode,
           error: message,
         };
         incrementBatchError(batch, errorCode);
+        recordBatchFailure(batch, priority);
         batch.failed++;
         batch.completed++;
         touchBatch(batch);
@@ -489,6 +783,22 @@ async function processBatch(
   batch.status = batch.cancelled ? "cancelled" : "completed";
   touchBatch(batch);
 
+  logger?.info(
+    {
+      requestId,
+      batchId: batch.batchId,
+      projectId: batch.projectId,
+      total: batch.total,
+      completed: batch.completed,
+      failed: batch.failed,
+      cached: batch.cached,
+      status: batch.status,
+      priorityStats: batch.priorityStats,
+      metrics: batch.metrics,
+    },
+    "screenshot batch completed",
+  );
+
   // Clean up batch state after 5 minutes
   setTimeout(() => {
     batchStore.delete(batch.batchId);
@@ -498,13 +808,33 @@ async function processBatch(
 async function handleFile(
   request: FastifyRequest<{
     Params: { projectId: string; pageId: string };
-    Querystring: { hash?: string; t?: string };
+    Querystring: { hash?: string; t?: string; meta?: string; variant?: string };
   }>,
   reply: FastifyReply,
 ) {
   const { projectId, pageId } = request.params;
-  const { hash } = request.query;
+  const { hash, meta: metaQuery } = request.query;
+  const variant = normalizeVariant(request.query.variant);
   const normalizedHash = normalizeHash(hash);
+
+  if (metaQuery === "1") {
+    const meta = await readScreenshotMeta(projectId, pageId);
+    if (!meta?.currentHash) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: "NOT_FOUND", message: "截图元数据不存在" },
+      });
+    }
+
+    return reply.header("Cache-Control", "no-store").send({
+      success: true,
+      data: {
+        currentHash: meta.currentHash,
+        url: `/api/screenshots/file/${projectId}/${pageId}?hash=${meta.currentHash}`,
+        renderBox: meta.renderBoxes?.[meta.currentHash],
+      },
+    });
+  }
 
   if (hash && !normalizedHash) {
     return reply.status(404).send({
@@ -513,7 +843,7 @@ async function handleFile(
     });
   }
 
-  const buffer = await readScreenshot(projectId, pageId, normalizedHash);
+  const buffer = await readScreenshot(projectId, pageId, normalizedHash, variant);
 
   if (!buffer) {
     return reply.status(404).send({
@@ -561,6 +891,8 @@ async function handleStatus(
       updatedAt: batch.updatedAt,
       expiresAt: batch.expiresAt,
       errorsByCode: batch.errorsByCode,
+      priorityStats: batch.priorityStats,
+      metrics: batch.metrics,
       cancelled: batch.cancelled,
       results: batch.results,
     },

@@ -97,6 +97,78 @@ describe("BrowserPool", () => {
     await Promise.allSettled(tasks.slice(0, 3));
   });
 
+  it("队列有空位时优先执行高优先级截图任务", async () => {
+    let releaseBlockingTasks: (() => void) | null = null;
+    const blockingGate = new Promise<void>((resolve) => {
+      releaseBlockingTasks = resolve;
+    });
+    const setContentOrder: string[] = [];
+
+    vi.doMock("puppeteer-core", () => ({
+      default: {
+        launch: vi.fn(async () => ({
+          connected: true,
+          on: vi.fn(),
+          newPage: vi.fn(() => ({
+            setViewport: vi.fn(),
+            setContent: vi.fn(async (html: string) => {
+              setContentOrder.push(html);
+              if (html.includes("blocking")) {
+                await blockingGate;
+              }
+            }),
+            waitForSelector: vi.fn(),
+            waitForNetworkIdle: vi.fn(),
+            evaluate: vi.fn(async (fn: () => unknown) => {
+              if (String(fn).includes("bodyWidth")) {
+                return {
+                  bodyWidth: 100,
+                  bodyHeight: 180,
+                  documentWidth: 100,
+                  documentHeight: 180,
+                };
+              }
+              return undefined;
+            }),
+            screenshot: vi.fn(() => Buffer.from("png")),
+            close: vi.fn(() => Promise.resolve()),
+          })),
+          close: vi.fn(),
+        })),
+      },
+    }));
+
+    const { getBrowserPool } = await import("../src/utils/browser-pool");
+    const pool = getBrowserPool();
+    const blockingTasks = Array.from({ length: 3 }, (_, index) =>
+      pool.renderPage(`<div id="root">blocking-${index}</div>`, 100, 100, false),
+    );
+    const backgroundTask = pool.renderPage(
+      "<div id=\"root\">background</div>",
+      100,
+      100,
+      false,
+      "background",
+    );
+    const activeTask = pool.renderPage(
+      "<div id=\"root\">active</div>",
+      100,
+      100,
+      false,
+      "active",
+    );
+
+    await vi.waitFor(() => {
+      expect(setContentOrder).toHaveLength(3);
+    });
+    releaseBlockingTasks?.();
+    await Promise.all([...blockingTasks, backgroundTask, activeTask]);
+
+    expect(setContentOrder.findIndex((html) => html.includes("active"))).toBeLessThan(
+      setContentOrder.findIndex((html) => html.includes("background")),
+    );
+  });
+
   it("页面写入运行时错误标记时返回 RUNTIME_ERROR", async () => {
     const counters = { active: 0, max: 0 };
     const screenshot = vi.fn(() => Buffer.from("png"));

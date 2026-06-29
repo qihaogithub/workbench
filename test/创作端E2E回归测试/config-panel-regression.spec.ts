@@ -1,6 +1,9 @@
 // maintained-by: h5-test
 import { expect, type APIResponse, type Page, test } from '@playwright/test';
 
+import { loginE2EUser } from './support/e2e-auth';
+import { createE2EProject } from './support/e2e-projects';
+
 const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
 const USERNAME = process.env.E2E_USER ?? process.env.E2E_USERNAME ?? 'qihao';
 const PASSWORD = process.env.E2E_PASSWORD ?? '130015';
@@ -22,11 +25,6 @@ type DemoPageMeta = {
 
 type SessionInfo = {
   sessionId: string;
-};
-
-type ProjectInfo = {
-  id: string;
-  name: string;
 };
 
 type SessionFiles = {
@@ -106,59 +104,6 @@ async function parseApiResponse<T>(response: APIResponse): Promise<T> {
   return body.data;
 }
 
-async function loginIfNeeded(page: Page): Promise<void> {
-  if (page.url() === 'about:blank') {
-    await page.goto(E2E_BASE_URL, { waitUntil: 'domcontentloaded' });
-  }
-  if (!page.url().includes('/login')) {
-    return;
-  }
-
-  await page.waitForLoadState('networkidle');
-  await page.locator('#username').fill(USERNAME);
-  await page.locator('#password').fill(PASSWORD);
-
-  const loginResponsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/auth/login') && response.request().method() === 'POST',
-    { timeout: 15000 },
-  );
-  await page.getByRole('button', { name: /^登录$/ }).click();
-
-  const loginResponse = await loginResponsePromise;
-  await parseApiResponse(loginResponse);
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 });
-}
-
-async function createProjectFromUi(page: Page, projectName: string): Promise<ProjectInfo> {
-  const newProjectButton = page.getByRole('button', {
-    name: /添加空白项目|新建 Demo|添加项目|新建项目/,
-  });
-  await expect(newProjectButton).toBeVisible();
-  await newProjectButton.click();
-
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.locator('#project-name').fill(projectName);
-
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/demos') && response.request().method() === 'POST',
-  );
-  await dialog.getByRole('button', { name: /创建|创建项目/ }).click();
-
-  const response = await responsePromise;
-  const project = await parseApiResponse<ProjectInfo>(response);
-
-  await page.waitForURL(
-    (url) => url.pathname === `/demo/${project.id}/edit` || url.pathname.startsWith('/login'),
-    { timeout: 30000 },
-  );
-  await loginIfNeeded(page);
-  await page.waitForURL((url) => url.pathname === `/demo/${project.id}/edit`, { timeout: 30000 });
-  await expect(page.getByRole('heading', { name: projectName })).toBeVisible({ timeout: 30000 });
-
-  return project;
-}
-
 async function createSession(page: Page, projectId: string): Promise<SessionInfo> {
   const response = await page.request.post(`${E2E_BASE_URL}/api/sessions`, {
     data: { demoId: projectId, forceNew: true },
@@ -207,17 +152,6 @@ async function saveSession(page: Page, sessionId: string): Promise<void> {
   });
   const body = await response.text();
   expect(response.ok(), body).toBeTruthy();
-}
-
-async function deleteProject(page: Page, projectId: string): Promise<void> {
-  try {
-    const response = await page.request.delete(`${E2E_BASE_URL}/api/demos/${projectId}`, {
-      timeout: 15000,
-    });
-    expect([200, 404]).toContain(response.status());
-  } catch (error) {
-    console.warn(`配置功能 E2E 清理项目失败，需后续清理 ${projectId}:`, error);
-  }
 }
 
 async function ensureTwoPages(page: Page, projectId: string, sessionId: string): Promise<[DemoPageMeta, DemoPageMeta]> {
@@ -275,79 +209,74 @@ test.describe('创作端配置功能回归', () => {
   test.describe.configure({ timeout: 180000 });
 
   test('覆盖项目级配置、页面级配置、画布选中联动、空白选择和 schema 冲突', async ({ page }) => {
-    const projectName = `配置功能回归-${Date.now()}`;
-    let project: ProjectInfo | undefined;
+    await loginE2EUser(page, {
+      baseURL: E2E_BASE_URL,
+      username: USERNAME,
+      password: PASSWORD,
+    });
 
-    await loginIfNeeded(page);
+    await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
 
-    try {
-      await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
+    const project = await createE2EProject(page, '配置功能回归');
+    const initialSession = await createSession(page, project.id);
 
-      project = await createProjectFromUi(page, projectName);
-      const initialSession = await createSession(page, project.id);
+    const [firstPage, secondPage] = await ensureTwoPages(page, project.id, initialSession.sessionId);
+    await seedConfigPages(page, initialSession.sessionId, firstPage, secondPage);
 
-      const [firstPage, secondPage] = await ensureTwoPages(page, project.id, initialSession.sessionId);
-      await seedConfigPages(page, initialSession.sessionId, firstPage, secondPage);
+    const conflictResponse = await updateProjectConfigSchema(page, project.id, initialSession.sessionId, conflictingProjectSchema);
+    expect(conflictResponse.status()).toBe(400);
+    const conflictBody = (await conflictResponse.json()) as ApiEnvelope<unknown>;
+    expect(conflictBody.success).toBe(false);
+    expect(conflictBody.error?.code).toBe('SCHEMA_CONFLICT');
 
-      const conflictResponse = await updateProjectConfigSchema(page, project.id, initialSession.sessionId, conflictingProjectSchema);
-      expect(conflictResponse.status()).toBe(400);
-      const conflictBody = (await conflictResponse.json()) as ApiEnvelope<unknown>;
-      expect(conflictBody.success).toBe(false);
-      expect(conflictBody.error?.code).toBe('SCHEMA_CONFLICT');
+    const projectConfigResponse = await updateProjectConfigSchema(page, project.id, initialSession.sessionId, sharedConfigSchema);
+    expect(projectConfigResponse.ok()).toBeTruthy();
+    await saveSession(page, initialSession.sessionId);
 
-      const projectConfigResponse = await updateProjectConfigSchema(page, project.id, initialSession.sessionId, sharedConfigSchema);
-      expect(projectConfigResponse.ok()).toBeTruthy();
-      await saveSession(page, initialSession.sessionId);
+    const persistedProjectConfig = await getProjectConfig(page, project.id);
+    expect(persistedProjectConfig.exists).toBe(true);
+    expect(persistedProjectConfig.schema).toContain('Shared Title E2E');
 
-      const persistedProjectConfig = await getProjectConfig(page, project.id);
-      expect(persistedProjectConfig.exists).toBe(true);
-      expect(persistedProjectConfig.schema).toContain('Shared Title E2E');
+    const reopenedSession = await createSession(page, project.id);
+    await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, { waitUntil: 'domcontentloaded' });
+    const reopenedFiles = await getSessionFiles(page, reopenedSession.sessionId);
+    expect(reopenedFiles.projectConfigSchema).toContain('Shared Title E2E');
+    expect(reopenedFiles.demos[firstPage.id].schema).toContain('Page One Title E2E');
+    expect(reopenedFiles.demos[secondPage.id].schema).toContain('Page Two CTA E2E');
 
-      const reopenedSession = await createSession(page, project.id);
-      await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, { waitUntil: 'domcontentloaded' });
-      const reopenedFiles = await getSessionFiles(page, reopenedSession.sessionId);
-      expect(reopenedFiles.projectConfigSchema).toContain('Shared Title E2E');
-      expect(reopenedFiles.demos[firstPage.id].schema).toContain('Page One Title E2E');
-      expect(reopenedFiles.demos[secondPage.id].schema).toContain('Page Two CTA E2E');
+    await expect(page.getByText('Shared Title E2E')).toBeVisible({ timeout: 30000 });
+    await selectPreviewPage(page, secondPage.name);
+    await expect(page.getByText('Page Two CTA E2E')).toBeVisible({ timeout: 30000 });
 
-      await expect(page.getByText('Shared Title E2E')).toBeVisible({ timeout: 30000 });
-      await selectPreviewPage(page, secondPage.name);
-      await expect(page.getByText('Page Two CTA E2E')).toBeVisible({ timeout: 30000 });
+    const sharedTitleInput = page.getByPlaceholder('请输入Shared Title E2E');
+    const pageTitleInput = page.getByPlaceholder('请输入Page Two CTA E2E');
+    await sharedTitleInput.fill('shared-updated-e2e', { timeout: 5000 });
+    await pageTitleInput.fill('page-two-updated-e2e', { timeout: 5000 });
+    await expect(sharedTitleInput).toHaveValue('shared-updated-e2e');
+    await expect(pageTitleInput).toHaveValue('page-two-updated-e2e');
 
-      const sharedTitleInput = page.getByPlaceholder('请输入Shared Title E2E');
-      const pageTitleInput = page.getByPlaceholder('请输入Page Two CTA E2E');
-      await sharedTitleInput.fill('shared-updated-e2e', { timeout: 5000 });
-      await pageTitleInput.fill('page-two-updated-e2e', { timeout: 5000 });
-      await expect(sharedTitleInput).toHaveValue('shared-updated-e2e');
-      await expect(pageTitleInput).toHaveValue('page-two-updated-e2e');
+    await switchToCanvas(page);
+    await clickCanvasBlank(page);
+    await expect(page.getByRole('button', { name: firstPage.name }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: secondPage.name }).first()).toBeVisible();
+    await expect(page.getByText('Page One Title E2E')).toBeHidden();
+    await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
 
-      await switchToCanvas(page);
-      await clickCanvasBlank(page);
-      await expect(page.getByRole('button', { name: firstPage.name }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: secondPage.name }).first()).toBeVisible();
-      await expect(page.getByText('Page One Title E2E')).toBeHidden();
-      await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
+    const canvasRoot = page.locator('[data-canvas-root="true"]');
+    await canvasRoot.locator(`[data-page-id="${firstPage.id}"]`).click();
+    await expect(page.getByText('Shared Title E2E')).toBeVisible();
+    await expect(page.getByText('Page One Title E2E')).toBeVisible();
+    await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
 
-      const canvasRoot = page.locator('[data-canvas-root="true"]');
-      await canvasRoot.locator(`[data-page-id="${firstPage.id}"]`).click();
-      await expect(page.getByText('Shared Title E2E')).toBeVisible();
-      await expect(page.getByText('Page One Title E2E')).toBeVisible();
-      await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
+    await canvasRoot.locator(`[data-page-id="${secondPage.id}"]`).click();
+    await expect(page.getByText('Shared Title E2E')).toBeVisible();
+    await expect(page.getByText('Page Two CTA E2E')).toBeVisible();
+    await expect(page.getByText('Page One Title E2E')).toBeHidden();
 
-      await canvasRoot.locator(`[data-page-id="${secondPage.id}"]`).click();
-      await expect(page.getByText('Shared Title E2E')).toBeVisible();
-      await expect(page.getByText('Page Two CTA E2E')).toBeVisible();
-      await expect(page.getByText('Page One Title E2E')).toBeHidden();
-
-      await clickCanvasBlank(page);
-      await expect(page.getByRole('button', { name: firstPage.name }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: secondPage.name }).first()).toBeVisible();
-      await expect(page.getByText('Page One Title E2E')).toBeHidden();
-      await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
-    } finally {
-      if (project) {
-        await deleteProject(page, project.id);
-      }
-    }
+    await clickCanvasBlank(page);
+    await expect(page.getByRole('button', { name: firstPage.name }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: secondPage.name }).first()).toBeVisible();
+    await expect(page.getByText('Page One Title E2E')).toBeHidden();
+    await expect(page.getByText('Page Two CTA E2E')).toBeHidden();
   });
 });

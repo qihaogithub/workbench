@@ -17,11 +17,11 @@ import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { DocumentEditor } from "./DocumentEditor";
 import {
-  computeCanvasRenderModes,
   DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
   DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
   MIN_CANVAS_SCREENSHOT_PAGE_COUNT,
 } from "./canvas-render-scheduler";
+import { computePreviewRuntimePoolPlan } from "./preview-runtime-pool";
 import {
   computeAutoCanvasLayout,
   computeFitCanvasViewport,
@@ -333,6 +333,9 @@ export function PreviewCanvas({
   onConsoleEntry,
   onError,
   focusPageId,
+  onVisiblePageIdsChange,
+  fitToScreenOnMount = false,
+  onFitToScreenOnMountComplete,
   onPositionableSizes,
   knowledgeDocuments,
   onCreateKnowledgeDocument,
@@ -383,6 +386,7 @@ export function PreviewCanvas({
   const recentIframeAccessRef = useRef<Map<string, number>>(new Map());
   const prewarmedResourceFingerprintsRef = useRef<Set<string>>(new Set());
   const initialViewerFitSignatureRef = useRef<string | null>(null);
+  const fitToScreenOnMountAppliedRef = useRef(false);
   const multiDragStartLayoutsRef = useRef<Record<string, CanvasPageLayout> | null>(
     null,
   );
@@ -994,10 +998,18 @@ export function PreviewCanvas({
       ),
     [effectivePages, canvasState.viewport, containerSize],
   );
+  const visiblePageIdList = useMemo(
+    () => Array.from(visiblePageIds).sort(),
+    [visiblePageIds],
+  );
+
+  useEffect(() => {
+    onVisiblePageIdsChange?.(visiblePageIdList);
+  }, [onVisiblePageIdsChange, visiblePageIdList]);
 
   const pageRenderPlan = useMemo(
     () =>
-      computeCanvasRenderModes({
+      computePreviewRuntimePoolPlan({
         pages,
         layouts: effectivePages,
         visiblePageIds,
@@ -1006,9 +1018,9 @@ export function PreviewCanvas({
         containerHeight: containerSize.height,
         editingPageId,
         screenshotUrls,
-        recentIframeAccess: recentIframeAccessRef.current,
-        maxActiveIframes: DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
-        maxSleepingIframes: DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
+        recentRuntimeAccess: recentIframeAccessRef.current,
+        maxActiveRuntimes: DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
+        maxSleepingRuntimes: DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
       }),
     [
       canvasState.viewport,
@@ -1031,10 +1043,7 @@ export function PreviewCanvas({
       recentIframeAccessRef.current.set(pageId, currentTime);
     }
 
-    const retainedPageIds = new Set([
-      ...pageRenderPlan.activePageIds,
-      ...pageRenderPlan.sleepingPageIds,
-    ]);
+    const retainedPageIds = new Set(pageRenderPlan.retainedRuntimePageIds);
     for (const pageId of Array.from(recentIframeAccessRef.current.keys())) {
       if (!retainedPageIds.has(pageId) && !visiblePageIds.has(pageId)) {
         recentIframeAccessRef.current.delete(pageId);
@@ -1042,6 +1051,7 @@ export function PreviewCanvas({
     }
   }, [
     pageRenderPlan.activePageIds,
+    pageRenderPlan.retainedRuntimePageIds,
     pageRenderPlan.sleepingPageIds,
     visiblePageIds,
   ]);
@@ -1093,18 +1103,46 @@ export function PreviewCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPageId]);
 
-  const handleFitToScreen = useCallback(() => {
+  const fitCanvasToScreen = useCallback(() => {
     const viewport = computeFitCanvasViewport(allItemLayouts, {
       containerWidth: containerSize.width,
       containerHeight: containerSize.height,
     });
-    if (!viewport) return;
+    if (!viewport) return false;
 
     updateState((prev) => ({
       ...prev,
       viewport,
     }));
+    return true;
   }, [allItemLayouts, containerSize, updateState]);
+
+  const handleFitToScreen = useCallback(() => {
+    fitCanvasToScreen();
+  }, [fitCanvasToScreen]);
+
+  useEffect(() => {
+    if (!fitToScreenOnMount) {
+      fitToScreenOnMountAppliedRef.current = false;
+      return;
+    }
+    if (fitToScreenOnMountAppliedRef.current) {
+      return;
+    }
+    if (!allItemLayoutSignature) {
+      return;
+    }
+    if (!fitCanvasToScreen()) {
+      return;
+    }
+    fitToScreenOnMountAppliedRef.current = true;
+    onFitToScreenOnMountComplete?.();
+  }, [
+    allItemLayoutSignature,
+    fitCanvasToScreen,
+    fitToScreenOnMount,
+    onFitToScreenOnMountComplete,
+  ]);
 
   useEffect(() => {
     if (resolvedInteractionMode !== "viewer") {

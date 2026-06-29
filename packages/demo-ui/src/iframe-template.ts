@@ -1,13 +1,26 @@
 export interface IframeTemplateOptions {
   cssImports?: string[];
   compiledCode?: string;
+  compiledCodeUrl?: string;
   configData?: Record<string, unknown>;
   cdnBaseUrl?: string;
+  runtimeBaseUrl?: string;
+  useCdnRuntime?: boolean;
   supportUrlMode?: boolean;
   baseOrigin?: string;
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
+const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
+  react: "/preview-runtime/vendor/react.js",
+  "react-dom": "/preview-runtime/vendor/react-dom.js",
+  "react-dom/client": "/preview-runtime/vendor/react-dom-client.js",
+  "react/jsx-runtime": "/preview-runtime/vendor/react-jsx-runtime.js",
+  "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
+  "lucide-react": "/preview-runtime/vendor/lucide-react.js",
+  "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+  "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
+};
 
 const consoleInterceptScript = `
 (function() {
@@ -43,7 +56,7 @@ const consoleInterceptScript = `
 
 const visualEditScript = `
 (function() {
-  var state = { enabled: false, selectedNodeId: null, annotations: [] };
+  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, annotations: [], propertyChanges: [] };
   var hoverBox = null;
   var selectedBox = null;
   var label = null;
@@ -63,6 +76,7 @@ const visualEditScript = `
   var suppressStyleRestoreOnHide = false;
   var editingAnnotationId = null;
   var lastHoverId = null;
+  var appliedPropertyOriginals = {};
 
   function ensureLayer() {
     if (!hoverBox) {
@@ -192,14 +206,18 @@ const visualEditScript = `
   function getNodeInfo(el) {
     var rect = el.getBoundingClientRect();
     var domPath = getDomPath(el);
-    var text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+    var ownText = getOwnText(el);
+    var aggregateText = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+    var text = el.children.length === 0 ? aggregateText : ownText;
     if (text.length > 180) text = text.slice(0, 177) + '...';
     var className = '';
     if (el instanceof HTMLElement && el.className) {
       className = typeof el.className === 'string' ? el.className : String(el.className);
     }
-    var caps = ['annotate'];
+    var caps = ['annotate', 'style'];
     if (text && el.children.length === 0) caps.push('text');
+    if (el instanceof HTMLImageElement || el.getAttribute('src')) caps.push('image');
+    if (el instanceof HTMLAnchorElement || el.getAttribute('href')) caps.push('link');
     if (className) caps.push('className');
     caps.push('structure');
     var style = window.getComputedStyle ? window.getComputedStyle(el) : null;
@@ -223,7 +241,42 @@ const visualEditScript = `
       computedStyle: style ? {
         color: style.color || undefined,
         backgroundColor: style.backgroundColor || undefined,
-        borderColor: style.borderColor || undefined
+        borderColor: style.borderColor || undefined,
+        borderWidth: style.borderWidth || undefined,
+        borderStyle: style.borderStyle || undefined,
+        borderRadius: style.borderRadius || undefined,
+        borderTopLeftRadius: style.borderTopLeftRadius || undefined,
+        borderTopRightRadius: style.borderTopRightRadius || undefined,
+        borderBottomRightRadius: style.borderBottomRightRadius || undefined,
+        borderBottomLeftRadius: style.borderBottomLeftRadius || undefined,
+        boxShadow: style.boxShadow || undefined,
+        boxSizing: style.boxSizing || undefined,
+        filter: style.filter || undefined,
+        overflow: style.overflow || undefined,
+        opacity: style.opacity || undefined,
+        fontFamily: style.fontFamily || undefined,
+        fontSize: style.fontSize || undefined,
+        fontWeight: style.fontWeight || undefined,
+        lineHeight: style.lineHeight || undefined,
+        letterSpacing: style.letterSpacing || undefined,
+        textAlign: style.textAlign || undefined,
+        width: style.width || undefined,
+        height: style.height || undefined,
+        padding: style.padding || undefined,
+        paddingTop: style.paddingTop || undefined,
+        paddingRight: style.paddingRight || undefined,
+        paddingBottom: style.paddingBottom || undefined,
+        paddingLeft: style.paddingLeft || undefined,
+        margin: style.margin || undefined,
+        marginTop: style.marginTop || undefined,
+        marginRight: style.marginRight || undefined,
+        marginBottom: style.marginBottom || undefined,
+        marginLeft: style.marginLeft || undefined,
+        display: style.display || undefined,
+        flexDirection: style.flexDirection || undefined,
+        justifyContent: style.justifyContent || undefined,
+        alignItems: style.alignItems || undefined,
+        gap: style.gap || undefined
       } : undefined,
       sourceFile: el.getAttribute('data-source-file') || undefined,
       sourceStart: Number(el.getAttribute('data-source-start')) || undefined,
@@ -266,6 +319,74 @@ const visualEditScript = `
     return el;
   }
 
+  function getElementForChange(change) {
+    if (!change) return null;
+    return getElementForNode({
+      domPath: change.domPath,
+      nodeId: change.nodeId
+    });
+  }
+
+  function getChangeKey(change) {
+    return [change.domPath || change.nodeId || '', change.kind || 'style', change.property || ''].join('::');
+  }
+
+  function restoreAppliedPropertyChanges() {
+    Object.keys(appliedPropertyOriginals).forEach(function(key) {
+      var original = appliedPropertyOriginals[key];
+      if (!original || !original.element) return;
+      if (original.kind === 'text') {
+        original.element.textContent = original.value || '';
+      } else if (original.kind === 'attribute') {
+        if (original.value == null) original.element.removeAttribute(original.property);
+        else original.element.setAttribute(original.property, original.value);
+      } else {
+        original.element.style[original.property] = original.value || '';
+      }
+    });
+    appliedPropertyOriginals = {};
+  }
+
+  function applyPropertyChanges() {
+    restoreAppliedPropertyChanges();
+    (state.propertyChanges || []).forEach(function(change) {
+      var el = getElementForChange(change);
+      if (!el || !change || typeof change.property !== 'string') return;
+      var key = getChangeKey(change);
+      if (change.kind === 'text') {
+        appliedPropertyOriginals[key] = {
+          kind: 'text',
+          element: el,
+          property: change.property,
+          value: el.textContent || ''
+        };
+        el.textContent = change.value || '';
+        return;
+      }
+      if (change.kind === 'attribute') {
+        var attrName = change.property;
+        appliedPropertyOriginals[key] = {
+          kind: 'attribute',
+          element: el,
+          property: attrName,
+          value: el.getAttribute(attrName)
+        };
+        if (change.value == null || change.value === '') el.removeAttribute(attrName);
+        else el.setAttribute(attrName, change.value);
+        return;
+      }
+      appliedPropertyOriginals[key] = {
+        kind: 'style',
+        element: el,
+        property: change.property,
+        value: el.style[change.property] || ''
+      };
+      el.style[change.property] = normalizeStyleValue(change.property, change.value);
+    });
+    redrawSelection();
+    redrawHoverFromState();
+  }
+
   function getOwnText(el) {
     if (!el) return '';
     var text = '';
@@ -300,6 +421,7 @@ const visualEditScript = `
       property === 'fontSize' ||
       property === 'fontWeight' ||
       property === 'lineHeight' ||
+      property === 'letterSpacing' ||
       property === 'textAlign';
   }
 
@@ -315,11 +437,30 @@ const visualEditScript = `
     if ((property === 'fontSize' ||
       property === 'width' ||
       property === 'height' ||
+      property === 'paddingTop' ||
+      property === 'paddingRight' ||
+      property === 'paddingBottom' ||
+      property === 'paddingLeft' ||
       property === 'padding' ||
+      property === 'marginTop' ||
+      property === 'marginRight' ||
+      property === 'marginBottom' ||
+      property === 'marginLeft' ||
       property === 'margin' ||
       property === 'gap' ||
+      property === 'borderWidth' ||
       property === 'borderRadius' ||
+      property === 'borderTopLeftRadius' ||
+      property === 'borderTopRightRadius' ||
+      property === 'borderBottomRightRadius' ||
+      property === 'borderBottomLeftRadius' ||
+      property === 'letterSpacing' ||
       property === 'lineHeight') && /^\\d+(\\.\\d+)?$/.test(trimmed)) return trimmed + 'px';
+    if (property === 'opacity' && /^\\d+(\\.\\d+)?%?$/.test(trimmed)) {
+      var numeric = Number(trimmed.replace('%', ''));
+      if (numeric > 1) return String(Math.max(0, Math.min(100, numeric)) / 100);
+      return String(Math.max(0, Math.min(1, numeric)));
+    }
     return trimmed;
   }
 
@@ -762,6 +903,31 @@ const visualEditScript = `
     drawBox(selectedBox, getNodeInfo(selected));
   }
 
+  function redrawHoverFromState() {
+    ensureLayer();
+    if (!state.hoverNodeId) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      if (label) label.style.display = 'none';
+      return;
+    }
+    var hovered = getElementByPath(state.hoverNodeId);
+    if (!hovered) {
+      try {
+        hovered = document.querySelector('[data-visual-node-id="' + state.hoverNodeId.replace(/"/g, '\\\\"') + '"]');
+      } catch (_err) {
+        hovered = null;
+      }
+    }
+    if (!hovered || !isEditableElement(hovered)) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      if (label) label.style.display = 'none';
+      return;
+    }
+    var node = getNodeInfo(hovered);
+    drawBox(hoverBox, node);
+    drawLabel(node);
+  }
+
   function renderAnnotations() {
     ensureLayer();
     if (!annotationLayer) return;
@@ -794,7 +960,9 @@ const visualEditScript = `
     state = {
       enabled: !!next.enabled,
       annotationMode: !!next.annotationMode,
+      hoverNodeId: next.hoverNodeId || null,
       selectedNodeId: next.selectedNodeId || null,
+      propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
     ensureLayer();
@@ -803,7 +971,9 @@ const visualEditScript = `
       hideCommentBubble();
       if (selectedBox) selectedBox.style.display = 'none';
     }
+    applyPropertyChanges();
     redrawSelection();
+    redrawHoverFromState();
     renderAnnotations();
   }
 
@@ -814,6 +984,30 @@ const visualEditScript = `
       el = el.parentElement;
     }
     return null;
+  }
+
+  function collectElementStack(clientX, clientY, fallbackEl) {
+    var elements = [];
+    if (document.elementsFromPoint) {
+      elements = document.elementsFromPoint(clientX, clientY);
+    }
+    if ((!elements || elements.length === 0) && fallbackEl) {
+      var node = fallbackEl;
+      while (node && node !== document.body) {
+        elements.push(node);
+        node = node.parentElement;
+      }
+    }
+    var seen = {};
+    var editable = [];
+    (elements || []).forEach(function(item) {
+      if (!item || !isEditableElement(item)) return;
+      var path = getDomPath(item);
+      if (!path || seen[path]) return;
+      seen[path] = true;
+      editable.push(getNodeInfo(item));
+    });
+    return editable.reverse();
   }
 
   function resolveAnnotationTarget(el) {
@@ -856,18 +1050,36 @@ const visualEditScript = `
     event.preventDefault();
     event.stopPropagation();
     if (!el) {
-      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null }, '*');
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
       return;
     }
-    var node = getNodeInfo(el);
+    var stack = collectElementStack(event.clientX, event.clientY, el);
+    var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
     state.selectedNodeId = node.domPath;
     drawBox(selectedBox, node);
     if (state.annotationMode) {
       showCommentBubble(node);
-      window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
       return;
     }
-    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
+  }, true);
+
+  document.addEventListener('contextmenu', function(event) {
+    if (!state.enabled || state.annotationMode) return;
+    if (isOverlay(event.target)) return;
+    var el = closestEditable(event.target);
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el) {
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [], openLayerPicker: true }, '*');
+      return;
+    }
+    var stack = collectElementStack(event.clientX, event.clientY, el);
+    var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
+    state.selectedNodeId = node.domPath;
+    drawBox(selectedBox, node);
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack, openLayerPicker: true }, '*');
   }, true);
 
   window.addEventListener('blur', function() {
@@ -894,7 +1106,7 @@ const visualEditScript = `
     window.parent.postMessage({ type: 'VISUAL_INLINE_EDIT', payload: { node: getNodeInfo(el), before: before, after: after } }, '*');
   }, true);
 
-  window.__VISUAL_EDIT__ = { setState: setState, redrawSelection: redrawSelection, renderAnnotations: renderAnnotations };
+  window.__VISUAL_EDIT__ = { setState: setState, redrawSelection: redrawSelection, renderAnnotations: renderAnnotations, applyPropertyChanges: applyPropertyChanges };
 })();
 `;
 
@@ -908,21 +1120,61 @@ function generateCssLinks(cssImports: string[], cdnBase: string): string {
     .join("\n");
 }
 
+function resolveRuntimeUrl(url: string, runtimeBaseUrl?: string): string {
+  if (/^https?:\/\//.test(url) || url.startsWith("data:") || url.startsWith("blob:")) {
+    return url;
+  }
+  if (!runtimeBaseUrl) return url;
+  const base = runtimeBaseUrl.replace(/\/+$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+function buildRuntimeImports(
+  cdnBase: string,
+  runtimeBaseUrl: string | undefined,
+  useCdnRuntime: boolean | undefined,
+): Record<string, string> {
+  if (useCdnRuntime) {
+    return {
+      react: `${cdnBase}/react@18.3.1`,
+      "react-dom": `${cdnBase}/react-dom@18.3.1`,
+      "react-dom/client": `${cdnBase}/react-dom@18.3.1/client`,
+      "react/jsx-runtime": `${cdnBase}/react@18.3.1/jsx-runtime`,
+      "react/jsx-dev-runtime": `${cdnBase}/react@18.3.1/jsx-dev-runtime`,
+      "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
+      "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
+      "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
+    };
+  }
+
+  return Object.fromEntries(
+    Object.entries(DEFAULT_RUNTIME_IMPORTS).map(([specifier, url]) => [
+      specifier,
+      resolveRuntimeUrl(url, runtimeBaseUrl),
+    ]),
+  );
+}
+
 export function generateIframeHtml(
   options: IframeTemplateOptions = {},
 ): string {
   const {
     cssImports = [],
     compiledCode,
+    compiledCodeUrl,
     configData,
     cdnBaseUrl,
+    runtimeBaseUrl,
+    useCdnRuntime,
     supportUrlMode = true,
     baseOrigin,
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
+  const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
+  const initialCodeUrl = compiledCodeUrl ? JSON.stringify(compiledCodeUrl) : "null";
   const initialConfig = JSON.stringify(configData || {});
 
   const loadModuleFn = `
@@ -941,13 +1193,77 @@ export function generateIframeHtml(
       window.parent.postMessage({ type: 'RUNTIME_ERROR', ...safePayload }, '*');
     }
 
+    function reportRuntimeTiming(stage, details) {
+      try {
+        var now = performance.now();
+        var payload = Object.assign({
+          source: 'preview-runtime',
+          stage: stage,
+          sinceShellStart: Math.round(now - shellStartedAt)
+        }, details || {});
+        try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
+        window.parent.postMessage({
+          type: 'CONSOLE_LOG',
+          payload: {
+            level: 'info',
+            args: JSON.stringify(payload),
+            timestamp: Date.now()
+          }
+        }, '*');
+      } catch (_err) {}
+    }
+
+    function summarizeResourceTimings() {
+      try {
+        var entries = performance.getEntriesByType('resource') || [];
+        var relevant = entries
+          .filter(function(entry) {
+            return entry.name.indexOf('${cdnBase}') === 0 ||
+              entry.name.indexOf('https://cdn.jsdelivr.net/') === 0 ||
+              entry.name.indexOf('blob:') === 0;
+          })
+          .slice(-12)
+          .map(function(entry) {
+            return {
+              name: entry.name
+                .replace('${cdnBase}', '<cdn>')
+                .replace('https://cdn.jsdelivr.net/', '<jsdelivr>/')
+                .slice(0, 180),
+              initiatorType: entry.initiatorType,
+              durationMs: Math.round(entry.duration),
+              startMs: Math.round(entry.startTime),
+              transferSize: entry.transferSize || 0,
+              encodedBodySize: entry.encodedBodySize || 0
+            };
+          });
+        return {
+          count: entries.length,
+          relevantCount: relevant.length,
+          relevant: relevant
+        };
+      } catch (err) {
+        return { error: err && err.message ? err.message : String(err) };
+      }
+    }
+
     function loadModuleFromCode(code, thisVersion) {
       const blob = new Blob([code], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeBytes: code.length
+      });
       import(moduleUrl)
         .then((module) => {
           if (thisVersion !== updateVersion) return;
           currentComponent = module.default || null;
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
@@ -964,7 +1280,10 @@ export function generateIframeHtml(
 
   const updateCodeHandler = supportUrlMode
     ? `
-      if (type === 'UPDATE_CODE') {
+      if (type === 'UPDATE_CODE' || type === 'UPDATE_MODULE') {
+        var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
+        var incomingCode = moduleUrl || code;
+        reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
@@ -972,8 +1291,8 @@ export function generateIframeHtml(
 
         const thisVersion = ++updateVersion;
 
-        if (isUrl) {
-          fetch(code)
+        if (isModuleUrl) {
+          fetch(incomingCode)
             .then(res => {
               if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
               return res.text();
@@ -987,11 +1306,12 @@ export function generateIframeHtml(
               reportRuntimeError({ stage: 'dependency_import', error: err.message });
             });
         } else {
-          loadModuleFromCode(code, thisVersion);
+          loadModuleFromCode(incomingCode, thisVersion);
         }
       }`
     : `
       if (type === 'UPDATE_CODE') {
+        reportRuntimeTiming('update_code_received', { isUrl: false });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
@@ -1001,11 +1321,22 @@ export function generateIframeHtml(
 
         const blob = new Blob([code], { type: 'application/javascript' });
         const moduleUrl = URL.createObjectURL(blob);
+        var importStart = performance.now();
+        reportRuntimeTiming('module_import_start', {
+          version: thisVersion,
+          codeBytes: code.length
+        });
 
         import(moduleUrl)
           .then((module) => {
             if (thisVersion !== updateVersion) return;
             currentComponent = module.default || null;
+            reportRuntimeTiming('module_import_done', {
+              version: thisVersion,
+              importMs: Math.round(performance.now() - importStart),
+              hasDefaultExport: !!module.default,
+              resources: summarizeResourceTimings()
+            });
             renderComponent();
             URL.revokeObjectURL(moduleUrl);
             if (module.default) {
@@ -1038,12 +1369,7 @@ export function generateIframeHtml(
 ${cssLinks}
   <script type="importmap">
   {
-    "imports": {
-      "react": "${cdnBase}/react@18.3.1",
-      "react-dom": "${cdnBase}/react-dom@18.3.1/client",
-      "react/jsx-runtime": "${cdnBase}/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "${cdnBase}/react@18.3.1/jsx-dev-runtime"
-    }
+    "imports": ${JSON.stringify(runtimeImports, null, 6)}
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
@@ -1055,8 +1381,8 @@ ${cssLinks}
     ${consoleInterceptScript}
     ${visualEditScript}
 
-    import React from '${cdnBase}/react@18.3.1';
-    import ReactDOM from '${cdnBase}/react-dom@18.3.1/client';
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
 
     let currentRoot = null;
     let currentConfig = ${initialConfig};
@@ -1132,6 +1458,12 @@ ${cssLinks}
           React.createElement(currentComponent, currentConfig)
         )
       );
+      reportRuntimeTiming('render_invoked', { version: updateVersion });
+      setTimeout(function() {
+        if (window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.applyPropertyChanges) {
+          window.__VISUAL_EDIT__.applyPropertyChanges();
+        }
+      }, 0);
     }
 
     function updateCssLinks(cssUrls) {
@@ -1146,11 +1478,16 @@ ${cssLinks}
     }
 
     ${loadModuleFn}
+    const shellStartedAt = performance.now();
+    reportRuntimeTiming('shell_start', {
+      cdnBase: '${cdnBase}',
+      resources: summarizeResourceTimings()
+    });
 
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -1369,19 +1706,47 @@ ${cssLinks}
       });
     });
 
+    reportRuntimeTiming('ready_sent');
     window.parent.postMessage({ type: 'READY' }, '*');
 
     const initialCode = ${initialCode};
+    const initialCodeUrl = ${initialCodeUrl};
     if (initialCode) {
       window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var initialImportStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: updateVersion,
+        codeBytes: initialCode.length,
+        initial: true
+      });
       import(moduleUrl)
         .then((module) => {
           currentComponent = module.default;
+          reportRuntimeTiming('module_import_done', {
+            version: updateVersion,
+            importMs: Math.round(performance.now() - initialImportStart),
+            hasDefaultExport: !!module.default,
+            initial: true,
+            resources: summarizeResourceTimings()
+          });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
           window.parent.postMessage({ type: 'COMPONENT_READY' }, '*');
+        })
+        .catch((err) => {
+          reportRuntimeError({ stage: 'dependency_import', error: err.message });
+        });
+    } else if (initialCodeUrl) {
+      window.__DEMO_PROPS__ = currentConfig;
+      fetch(initialCodeUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
+          return res.text();
+        })
+        .then(function(jsCode) {
+          loadModuleFromCode(jsCode, updateVersion);
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });

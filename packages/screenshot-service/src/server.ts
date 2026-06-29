@@ -83,6 +83,22 @@ async function start() {
   fastify.log.info(
     `Screenshot service started on http://${config.host}:${config.port}`,
   );
+
+  if (config.screenshotWarmup) {
+    void getBrowserPool().warmup().then((result) => {
+      if (result.ok) {
+        fastify.log.info(
+          { elapsed: result.elapsed },
+          "screenshot browser warmup completed",
+        );
+        return;
+      }
+      fastify.log.warn(
+        { elapsed: result.elapsed, error: result.error },
+        "screenshot browser warmup failed",
+      );
+    });
+  }
 }
 
 start().catch((err) => {

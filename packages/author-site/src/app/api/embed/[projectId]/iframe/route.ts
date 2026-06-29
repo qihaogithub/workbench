@@ -12,6 +12,7 @@ import {
 import { compileCode } from "@/lib/compiler";
 import { generateIframeHtml } from '@opencode-workbench/demo-ui/iframe-template';
 import { getCdnBaseUrl } from '@/lib/cdn-config';
+import { shouldUsePreviewRuntimeCdn } from "@/lib/preview-runtime-manifest";
 import {
   mergeConfigToProps,
   SchemaConflictError,
@@ -26,6 +27,11 @@ export async function GET(
 
     const url = new URL(request.url);
     const page = url.searchParams.get("page");
+    const useCdnRuntime = shouldUsePreviewRuntimeCdn();
+    const runtimeOptions = {
+      baseUrl: url.origin,
+      preferCdn: useCdnRuntime,
+    };
 
     if (!projectExists(projectId)) {
       return new NextResponse("Project not found", { status: 404 });
@@ -50,7 +56,7 @@ export async function GET(
       const code = fs.readFileSync(singleCodePath, "utf-8");
       const project = readProjectMeta(projectId);
       const lockedDependencies = project?.lockedDependencies;
-      const compileResult = compileCode(code, lockedDependencies);
+      const compileResult = compileCode(code, lockedDependencies, runtimeOptions);
 
       const projectSchemaStr = getProjectConfigSchema(workspacePath);
       let configData: Record<string, unknown> = {};
@@ -71,6 +77,8 @@ export async function GET(
         cssImports: compileResult.cssImports,
         configData,
         cdnBaseUrl: getCdnBaseUrl(),
+        runtimeBaseUrl: url.origin,
+        useCdnRuntime,
       });
 
       return new NextResponse(html, {
@@ -94,7 +102,7 @@ export async function GET(
     const project = readProjectMeta(projectId);
     const lockedDependencies = project?.lockedDependencies;
 
-    const compileResult = compileCode(code, lockedDependencies);
+    const compileResult = compileCode(code, lockedDependencies, runtimeOptions);
 
     const projectSchemaStr = getProjectConfigSchema(workspacePath);
     const pageSchemaStr = fs.existsSync(pageSchemaPath)
@@ -119,6 +127,8 @@ export async function GET(
       cssImports: compileResult.cssImports,
       configData: mergedProps,
       cdnBaseUrl: getCdnBaseUrl(),
+      runtimeBaseUrl: url.origin,
+      useCdnRuntime,
     });
 
     return new NextResponse(html, {

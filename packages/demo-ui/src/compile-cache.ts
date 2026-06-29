@@ -2,6 +2,8 @@ interface CompileResult {
   compiledCode: string
   dependencies: string[]
   cssImports: string[]
+  moduleHash?: string
+  moduleUrl?: string
 }
 
 interface CacheEntry {
@@ -44,11 +46,15 @@ export function getCachedCompile(sessionId: string, demoId: string, code?: strin
 
 export function setCachedCompile(sessionId: string, demoId: string, result: CompileResult, code?: string): void {
   const key = buildKey(sessionId, demoId, code)
+  const cacheableResult: CompileResult = {
+    ...result,
+    moduleUrl: undefined,
+  }
   if (compileCache.size >= MAX_CACHE_SIZE) {
     const oldest = compileCache.keys().next().value
     if (oldest) compileCache.delete(oldest)
   }
-  compileCache.set(key, { result, timestamp: Date.now() })
+  compileCache.set(key, { result: cacheableResult, timestamp: Date.now() })
 }
 
 export function invalidateCompileCache(sessionId: string, demoId?: string): void {

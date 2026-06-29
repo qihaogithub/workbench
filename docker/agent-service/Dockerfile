@@ -5,11 +5,15 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 WORKDIR /app
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/knowledge-core/package.json ./packages/knowledge-core/
+COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-service/package.json ./packages/agent-service/
 
 RUN pnpm install --no-frozen-lockfile
 
+COPY packages/knowledge-core/ ./packages/knowledge-core/
+COPY packages/knowledge-service/ ./packages/knowledge-service/
 COPY packages/shared/ ./packages/shared/
 COPY packages/agent-service/ ./packages/agent-service/
 

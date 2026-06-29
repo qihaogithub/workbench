@@ -4,12 +4,20 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app
 
+ARG NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201
+ARG NEXT_PUBLIC_DATA_BASE=
+
+ENV NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
+ENV NEXT_PUBLIC_DATA_BASE=${NEXT_PUBLIC_DATA_BASE}
+
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/demo-ui/package.json ./packages/demo-ui/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/viewer-site/package.json ./packages/viewer-site/
 
 RUN pnpm install --no-frozen-lockfile
 
+COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/shared/ ./packages/shared/
 COPY packages/viewer-site/ ./packages/viewer-site/
 

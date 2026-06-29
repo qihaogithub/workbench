@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3300",
-    "build": "next build",
+    "build": "corepack pnpm --workspace-root build:preview-runtime && next build",
+    "preview-runtime:build": "corepack pnpm --workspace-root build:preview-runtime",
     "start": "next start -p 3300",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"

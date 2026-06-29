@@ -4,6 +4,8 @@ export interface CompileResult {
   compiledCode: string;
   cssImports: string[];
   dependencies?: string[];
+  moduleHash?: string;
+  moduleUrl?: string;
 }
 
 export interface CompileServiceErrorDetails {
@@ -69,5 +71,7 @@ export async function compileCode(
     compiledCode: result.data.compiledCode,
     cssImports: result.data.cssImports || [],
     dependencies: result.data.dependencies,
+    moduleHash: result.data.moduleHash,
+    moduleUrl: result.data.moduleUrl,
   };
 }

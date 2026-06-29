@@ -198,6 +198,220 @@ describe("PreviewPanel", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it("应通过控制台回调记录预览加载阶段耗时", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    );
+
+    const handleConsoleEntry = jest.fn();
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        onConsoleEntry={handleConsoleEntry}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handleConsoleEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: "info",
+          args: expect.stringContaining('"stage":"compile_done"'),
+        }),
+      );
+    });
+
+    const iframe = screen.getByTitle("预览") as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "READY" },
+          source: iframe.contentWindow,
+        }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "LOADED" },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+
+    expect(handleConsoleEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "info",
+        args: expect.stringContaining('"stage":"iframe_ready"'),
+      }),
+    );
+    expect(handleConsoleEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "info",
+        args: expect.stringContaining('"stage":"iframe_loaded"'),
+      }),
+    );
+  });
+
+  it("应向 iframe 同步右侧属性面板的临时状态", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    );
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        visualEditMode
+        visualHoverNodeId="main>h1:nth-of-type(1)"
+        selectedVisualNodeId="main>h1:nth-of-type(1)"
+        visualPropertyChanges={[
+          {
+            id: "change-1",
+            nodeId: "main>h1:nth-of-type(1)",
+            domPath: "main>h1:nth-of-type(1)",
+            kind: "style",
+            property: "color",
+            label: "颜色",
+            value: "#ff0000",
+            previousValue: "rgb(0, 0, 0)",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    const iframe = screen.getByTitle("预览") as HTMLIFrameElement;
+    const postMessage = jest.spyOn(iframe.contentWindow!, "postMessage");
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "READY" },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "UPDATE_VISUAL_EDIT_STATE",
+          enabled: true,
+          hoverNodeId: "main>h1:nth-of-type(1)",
+          selectedNodeId: "main>h1:nth-of-type(1)",
+          propertyChanges: expect.arrayContaining([
+            expect.objectContaining({
+              property: "color",
+              value: "#ff0000",
+            }),
+          ]),
+        }),
+        "*",
+      );
+    });
+  });
+
+  it("应在 iframe 请求打开图层菜单时通知父级", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    );
+
+    const handleVisualLayerMenu = jest.fn();
+    const node = {
+      nodeId: "main>button:nth-of-type(1)",
+      domPath: "main>button:nth-of-type(1)",
+      tagName: "button",
+      textContent: "去看看",
+      rect: { x: 10, y: 20, width: 120, height: 40 },
+      editCapabilities: ["annotate", "text", "style"],
+    };
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        visualEditMode
+        onVisualLayerMenu={handleVisualLayerMenu}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    const iframe = screen.getByTitle("预览") as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            type: "VISUAL_SELECT",
+            node,
+            nodeStack: [node],
+            openLayerPicker: true,
+          },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+
+    expect(handleVisualLayerMenu).toHaveBeenCalledWith([node]);
+  });
+
+  it("应在 iframe 上报空白点击时清空选中和图层栈", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        data: { compiledCode: "compiled", dependencies: [], cssImports: [] },
+      }),
+    );
+
+    const handleVisualSelect = jest.fn();
+    const handleVisualSelectStack = jest.fn();
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        visualEditMode
+        onVisualSelect={handleVisualSelect}
+        onVisualSelectStack={handleVisualSelectStack}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    const iframe = screen.getByTitle("预览") as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            type: "VISUAL_SELECT",
+            node: null,
+            nodeStack: [],
+          },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+
+    expect(handleVisualSelect).toHaveBeenCalledWith(null);
+    expect(handleVisualSelectStack).toHaveBeenCalledWith([]);
+  });
+
   it("应支持 sessionId 模式", async () => {
     mockFetch.mockResolvedValue(
       jsonResponse({

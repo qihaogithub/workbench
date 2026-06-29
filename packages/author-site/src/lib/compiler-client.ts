@@ -1,6 +1,9 @@
 export interface CompileResult {
   compiledCode: string;
   dependencies: string[];
+  cssImports?: string[];
+  moduleHash?: string;
+  moduleUrl?: string;
 }
 
 export interface CompileError {
@@ -11,7 +14,7 @@ export interface CompileError {
 
 const MAX_CACHE_SIZE = 50;
 const compileCache = new Map<string, CompileResult>();
-const COMPILE_CLIENT_CACHE_VERSION = "2026-06-preview-runtime-v3";
+const COMPILE_CLIENT_CACHE_VERSION = "2026-06-preview-runtime-v4";
 
 function getCacheKey(code: string): string {
   return `${COMPILE_CLIENT_CACHE_VERSION}_${code.length}_${code.slice(0, 200)}`;
@@ -46,7 +49,7 @@ export async function compileCode(code: string): Promise<CompileResult> {
       compileCache.delete(firstKey);
     }
   }
-  compileCache.set(cacheKey, data);
+  compileCache.set(cacheKey, { ...data, moduleUrl: undefined });
 
   return data;
 }

@@ -5,13 +5,15 @@
       "id": "demo_1779608460500_a1b2c3",
       "name": "demo",
       "order": 0,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "demo"
     },
     {
       "id": "demo_1779608461000_d4e5f6",
       "name": "demo",
       "order": 1,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "demo-2"
     }
   ]
 }
