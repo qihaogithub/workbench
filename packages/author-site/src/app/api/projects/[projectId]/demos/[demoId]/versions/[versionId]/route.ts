@@ -11,6 +11,10 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import {
+  flushWorkspaceBeforeCriticalAction,
+  getWorkspaceFlushErrorResponse,
+} from "@/lib/workspace-flush";
 
 async function getAuthenticatedUser() {
   const token = getAuthCookie();
@@ -97,6 +101,19 @@ export async function POST(
         return NextResponse.json(createApiError("SESSION_EXPIRED"), {
           status: 410,
         });
+      }
+      try {
+        await flushWorkspaceBeforeCriticalAction({
+          projectId,
+          workspaceId: meta.workspaceId,
+          sessionId,
+        });
+      } catch (error) {
+        const flushError = getWorkspaceFlushErrorResponse(error);
+        return NextResponse.json(
+          createApiError(flushError.code, flushError.message),
+          { status: flushError.status },
+        );
       }
     }
 

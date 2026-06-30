@@ -16,6 +16,18 @@ jest.mock("@/lib/session-manager", () => ({
   syncEditSessionToProjectWorkspace: jest.fn(),
 }));
 
+jest.mock("@/lib/workspace-flush", () => ({
+  flushWorkspaceBeforeCriticalAction: jest.fn(async () => ({
+    status: "no_active_room",
+    flushedRooms: 0,
+  })),
+  getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
+    code: "COLLAB_FLUSH_FAILED",
+    message: error instanceof Error ? error.message : "flush failed",
+    status: 502,
+  })),
+}));
+
 class TestResponse {
   status: number;
   headers: Headers;
@@ -130,6 +142,7 @@ describe("project scaffold download route", () => {
   it("syncs a valid edit session before exporting", async () => {
     const projectId = await createExportableProject();
     const sessionManager = await import("@/lib/session-manager");
+    const workspaceFlush = await import("@/lib/workspace-flush");
     jest.mocked(sessionManager.getEditSession).mockReturnValue(mockSession(projectId));
     jest
       .mocked(sessionManager.syncEditSessionToProjectWorkspace)
@@ -142,6 +155,11 @@ describe("project scaffold download route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(workspaceFlush.flushWorkspaceBeforeCriticalAction).toHaveBeenCalledWith({
+      projectId,
+      workspaceId: "workspace_export",
+      sessionId: "session_export",
+    });
     expect(sessionManager.syncEditSessionToProjectWorkspace).toHaveBeenCalledWith(
       "session_export",
     );

@@ -7,6 +7,10 @@ import {
   createProjectVersionSnapshot,
 } from "@/lib/fs-utils";
 import { getEditSession } from "@/lib/session-manager";
+import {
+  flushWorkspaceBeforeCriticalAction,
+  getWorkspaceFlushErrorResponse,
+} from "@/lib/workspace-flush";
 
 export async function POST(
   request: Request,
@@ -49,6 +53,20 @@ export async function POST(
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "Session 未绑定 workspace"),
         { status: 400 },
+      );
+    }
+
+    try {
+      await flushWorkspaceBeforeCriticalAction({
+        projectId: session.demoId,
+        workspaceId: session.workspaceId,
+        sessionId: params.sessionId,
+      });
+    } catch (error) {
+      const flushError = getWorkspaceFlushErrorResponse(error);
+      return NextResponse.json(
+        createApiError(flushError.code, flushError.message),
+        { status: flushError.status },
       );
     }
 

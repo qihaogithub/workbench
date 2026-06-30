@@ -9,6 +9,10 @@ import {
   syncEditSessionToProjectWorkspace,
 } from "@/lib/session-manager";
 import {
+  flushWorkspaceBeforeCriticalAction,
+  getWorkspaceFlushErrorResponse,
+} from "@/lib/workspace-flush";
+import {
   projectScaffoldErrorResponse,
   projectScaffoldZipResponse,
 } from "./scaffold-response";
@@ -44,6 +48,20 @@ export async function GET(
         return NextResponse.json(
           createApiError("FORBIDDEN", "Cannot export another user's session"),
           { status: 403 },
+        );
+      }
+
+      try {
+        await flushWorkspaceBeforeCriticalAction({
+          projectId: params.projectId,
+          workspaceId: session.workspaceId,
+          sessionId,
+        });
+      } catch (error) {
+        const flushError = getWorkspaceFlushErrorResponse(error);
+        return NextResponse.json(
+          createApiError(flushError.code, flushError.message),
+          { status: flushError.status },
         );
       }
 
