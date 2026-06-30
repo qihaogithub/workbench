@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-06-29
+> 更新日期：2026-06-30
 
 ## 用途
 
@@ -76,6 +76,9 @@ covers:
 | page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新页面代码 |
 | page.update.schema | 页面 | `page update-schema` | 中 | L4 | 已覆盖 | 更新页面 Schema |
 | page.update.meta | 页面 | `page update-meta` | 中 | L4 | 已覆盖 | 修改页面元信息 |
+| page.version.list | 页面 | `page version-list` | 低 | L3 | 已覆盖 | 查询页面历史版本列表 |
+| page.version.get | 页面 | `page version-get` | 低 | L3 | 已覆盖 | 读取单个页面历史版本内容 |
+| page.version.create | 页面 | `page version-create` | 中 | L4 | 已覆盖 | 创建命名页面版本快照 |
 | page.delete | 页面 | `page delete-preview`、`page delete-execute` | 高 | L5 | 已覆盖 | 删除页面必须保留预览和确认 |
 | page.reorder | 页面 | `page reorder` | 中 | L4 | 已覆盖 | 页面和文件夹排序 |
 | page.restore | 页面 | `page restore-version` | 高 | L5 | 已覆盖 | 恢复历史版本可能覆盖现状 |

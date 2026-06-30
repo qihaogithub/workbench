@@ -773,6 +773,25 @@ register("page get", "获取单页代码、Schema 和元信息", (args, pos, { s
   ["page_get"],
 );
 
+register("page version-list", "列出页面历史版本", (args, pos, { service, actor }) =>
+  service.pageVersionList(
+    stringArg(args, "projectId", pos[0]),
+    stringArg(args, "pageId", pos[1]),
+    actor,
+  ),
+  ["page_version_list"],
+);
+
+register("page version-get", "读取页面历史版本内容", (args, pos, { service, actor }) =>
+  service.pageVersionGet(
+    stringArg(args, "projectId", pos[0]),
+    stringArg(args, "pageId", pos[1]),
+    stringArg(args, "versionId", pos[2]),
+    actor,
+  ),
+  ["page_version_get"],
+);
+
 register("page create", "新建页面", (args, _pos, { service, actor }) => {
   const input: PageCreateInput = {
     editId: stringArg(args, "editId"),
@@ -860,6 +879,19 @@ register("page reorder", "页面和文件夹混合排序", (args, pos, { service
     actor,
   ),
   ["page_reorder"],
+);
+
+register("page version-create", "创建页面历史版本快照", (args, pos, { service, actor }) =>
+  service.createPageVersion(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      pageId: stringArg(args, "pageId", pos[1]),
+      editId: optionalStringArg(args, "editId"),
+      note: optionalStringArg(args, "note", pos.slice(2).join(" ")),
+    },
+    actor,
+  ),
+  ["page_version_create"],
 );
 
 register("page restore-version", "恢复页面历史版本", (args, pos, { service, actor }) =>

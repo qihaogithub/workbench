@@ -136,6 +136,53 @@ describe("ProjectAdminService", () => {
     expect(detail.data?.versions).toHaveLength(2);
   });
 
+  it("创建并读取页面历史版本，且版本号与项目版本共享递增序列", () => {
+    const created = service.createProject({ name: "页面版本项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "首页",
+      code: "export default function Demo(){ return <div>page-version</div>; }",
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+
+    const committed = service.commitEdit(editId, "初始版本");
+    expect(committed.ok).toBe(true);
+    expect(committed.data?.version.versionId).toBe("v1");
+
+    const pageVersion = service.createPageVersion({
+      projectId,
+      pageId,
+      note: "命名页面版本",
+    });
+    expect(pageVersion.ok).toBe(true);
+    expect(pageVersion.data?.versionId).toBe("v2");
+
+    const listed = service.pageVersionList(projectId, pageId);
+    expect(listed.ok).toBe(true);
+    expect(listed.data?.totalVersions).toBe(1);
+    expect(listed.data?.versions[0]?.versionId).toBe("v2");
+
+    const loaded = service.pageVersionGet(projectId, pageId, "v2");
+    expect(loaded.ok).toBe(true);
+    expect(loaded.data?.version.note).toBe("命名页面版本");
+    expect(loaded.data?.files.code).toContain("page-version");
+
+    const followupEdit = service.beginEdit(projectId);
+    const followupEditId = (followupEdit.data as EditTransaction).editId;
+    const updated = service.updatePage({
+      editId: followupEditId,
+      pageId,
+      code: "export default function Demo(){ return <div>page-version-updated</div>; }",
+    });
+    expect(updated.ok).toBe(true);
+    const recommitted = service.commitEdit(followupEditId, "再次提交");
+    expect(recommitted.ok).toBe(true);
+    expect(recommitted.data?.version.versionId).toBe("v3");
+  });
+
   it("阻止项目级 Schema 与页面 Schema 字段冲突", () => {
     const created = service.createProject({ name: "配置项目" });
     const edit = service.beginEdit(created.data?.id ?? "");

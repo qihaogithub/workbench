@@ -73,42 +73,6 @@ function createSessionFixture(projectId: string): string {
   return sessionId;
 }
 
-function createPageVersionFixture(projectId: string, pageId: string): string {
-  const versionId = "pv_cli_all";
-  const snapshotPath = path.join(tempDir, "snapshots", projectId, "pages", pageId, versionId);
-  fs.mkdirSync(snapshotPath, { recursive: true });
-  fs.writeFileSync(
-    path.join(snapshotPath, "index.tsx"),
-    "export default function Demo(){ return <div>restored</div>; }",
-    "utf-8",
-  );
-  fs.writeFileSync(
-    path.join(snapshotPath, "config.schema.json"),
-    JSON.stringify({ type: "object", properties: { restoredTitle: { type: "string", default: "restored" } } }, null, 2),
-    "utf-8",
-  );
-
-  const projectPath = path.join(tempDir, "projects", projectId, "project.json");
-  const project = JSON.parse(fs.readFileSync(projectPath, "utf-8")) as JsonObject;
-  project.pageVersions = {
-    [pageId]: [
-      {
-        versionId,
-        demoId: pageId,
-        demoName: "首页",
-        savedAt: Date.now(),
-        savedBy: "cli-all-test",
-        sessionId: "session_cli_all",
-        snapshotPath,
-        fileCount: 2,
-        note: "CLI 全功能测试页面版本",
-      },
-    ],
-  };
-  writeJson(projectPath, project);
-  return versionId;
-}
-
 const originalRole = process.env.PROJECT_ADMIN_ROLE;
 process.env.PROJECT_ADMIN_ROLE = "admin";
 
@@ -247,10 +211,21 @@ try {
   await runCommand("edit validate", ["edit", "validate", editId]);
   await runCommand("edit commit", ["edit", "commit", editId, "CLI 全功能提交"]);
 
+  const createdPageVersion = await runCommand("page version-create", [
+    "page",
+    "version-create",
+    projectId,
+    pageId,
+    "--note",
+    "CLI 全功能页面版本",
+  ]);
+  const pageVersionId = dataOf<{ versionId: string }>(createdPageVersion).versionId;
+  await runCommand("page version-list", ["page", "version-list", projectId, pageId]);
+  await runCommand("page version-get", ["page", "version-get", projectId, pageId, pageVersionId]);
+
   const discardEdit = await runCommand("edit begin", ["edit", "begin", projectId]);
   await runCommand("edit discard", ["edit", "discard", dataOf<{ editId: string }>(discardEdit).editId]);
 
-  const pageVersionId = createPageVersionFixture(projectId, pageId);
   await runCommand("page restore-version", ["page", "restore-version", projectId, pageId, pageVersionId]);
 
   await runCommand("publish check", ["publish", "check", projectId]);
