@@ -4,6 +4,7 @@ import type {
   DemoMeta,
   DemoPageMeta,
   AppGraph,
+  PageVersionInfo,
   Project,
   ProjectTemplateMeta,
   VersionInfo,
@@ -82,6 +83,28 @@ export interface ProjectDetail {
 export interface PageDetail {
   meta: DemoPageMeta;
   files: DemoFiles;
+}
+
+export interface PageVersionHistory {
+  projectId: string;
+  pageId: string;
+  currentVersion: string;
+  versions: PageVersionInfo[];
+  totalVersions: number;
+}
+
+export interface PageVersionDetail {
+  projectId: string;
+  pageId: string;
+  version: PageVersionInfo;
+  files: DemoFiles;
+}
+
+export interface PageVersionCreateInput {
+  projectId: string;
+  pageId: string;
+  editId?: string;
+  note?: string;
 }
 
 export interface ExportedAsset {

@@ -11,6 +11,7 @@ import type {
   DemoMeta,
   DemoPageMeta,
   AppGraph,
+  PageVersionInfo,
   Project,
   ProjectTemplateMeta,
   VersionInfo,
@@ -36,6 +37,9 @@ import type {
   FolderUpdateInput,
   PageCreateInput,
   PageDetail,
+  PageVersionCreateInput,
+  PageVersionDetail,
+  PageVersionHistory,
   PageRestoreResult,
   ProjectPackageExport,
   PageUpdateInput,
@@ -1068,6 +1072,42 @@ export class ProjectAdminService {
     return ok({ meta: page, files });
   }
 
+  pageVersionList(
+    projectId: string,
+    pageId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageVersionHistory> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const versions = [...(project.pageVersions?.[pageId] ?? [])].reverse();
+    return ok({
+      projectId,
+      pageId,
+      currentVersion: versions[0]?.versionId ?? "v0",
+      versions,
+      totalVersions: versions.length,
+    });
+  }
+
+  pageVersionGet(
+    projectId: string,
+    pageId: string,
+    versionId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageVersionDetail> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const version = project.pageVersions?.[pageId]?.find((item) => item.versionId === versionId);
+    if (!version) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
+    const files = this.readPageVersionFiles(project, pageId, versionId);
+    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本快照已丢失: ${versionId}`);
+    return ok({ projectId, pageId, version, files });
+  }
+
   createPage(input: PageCreateInput, actor = this.defaultActor()): ProjectAdminResult<PageDetail> {
     const transaction = this.requireEditable(input.editId);
     if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
@@ -1198,6 +1238,92 @@ export class ProjectAdminService {
       schema: input.schema ?? "",
     };
     return ok({ meta: nextMeta, files }, { auditId, diffSummary: diff, validation });
+  }
+
+  createPageVersion(
+    input: PageVersionCreateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageVersionInfo> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (this.isProjectLocked(input.projectId) && actor.role !== "admin") {
+      return fail("PROJECT_LOCKED", "项目已被管理员锁定，当前不能创建页面版本");
+    }
+
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+
+    let sourceWorkspacePath = this.projectWorkspacePath(input.projectId);
+    if (input.editId) {
+      const transaction = this.requireEditable(input.editId);
+      if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+      if (transaction.data.projectId !== input.projectId) {
+        return fail("INVALID_REQUEST", "editId 与 projectId 不匹配");
+      }
+      sourceWorkspacePath = transaction.data.workspacePath;
+    }
+
+    const page =
+      this.findPage(sourceWorkspacePath, input.pageId) ??
+      this.findPage(this.projectWorkspacePath(input.projectId), input.pageId);
+    if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+
+    const files = this.readPageFiles(sourceWorkspacePath, input.pageId);
+    if (!files) return fail("FILE_READ_ERROR", "页面文件不存在");
+
+    const validation = this.validateSchemaPair(this.readProjectConfig(sourceWorkspacePath), files.schema);
+    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+
+    const savedAt = Date.now();
+    const versionId = this.generateVersionId(project);
+    const snapshotPath = path.join(this.snapshotsDir, input.projectId, "pages", input.pageId, versionId);
+    fs.rmSync(snapshotPath, { recursive: true, force: true });
+    ensureDir(snapshotPath);
+    fs.writeFileSync(path.join(snapshotPath, "index.tsx"), files.code, "utf-8");
+    fs.writeFileSync(path.join(snapshotPath, "config.schema.json"), files.schema, "utf-8");
+
+    const version: PageVersionInfo = {
+      versionId,
+      type: "named_version",
+      demoId: input.pageId,
+      demoName: page.name,
+      savedAt,
+      savedBy: actor.name,
+      sessionId: input.editId ?? `page-${input.pageId}`,
+      snapshotPath,
+      fileCount: 2,
+      note: input.note,
+    };
+
+    const existingVersions = project.pageVersions?.[input.pageId] ?? [];
+    const overflow = Math.max(existingVersions.length + 1 - MAX_VERSIONS_KEEP, 0);
+    for (const stale of existingVersions.slice(0, overflow)) {
+      fs.rmSync(stale.snapshotPath, { recursive: true, force: true });
+    }
+    const nextVersions = [...existingVersions.slice(overflow), version];
+    const updatedProject: Project = {
+      ...project,
+      pageVersions: {
+        ...(project.pageVersions ?? {}),
+        [input.pageId]: nextVersions,
+      },
+      updatedAt: savedAt,
+    };
+    this.writeProject(input.projectId, updatedProject);
+
+    const auditId = this.audit("page_create_version", actor, "L2", true, {
+      projectId: input.projectId,
+      resourceId: input.pageId,
+      diffSummary: { created: [`page-version:${input.pageId}:${versionId}`] },
+      validation,
+    });
+    return ok(version, {
+      auditId,
+      diffSummary: { created: [`page-version:${input.pageId}:${versionId}`] },
+      validation,
+      nextActions: ["page_version_list", "page_version_get"],
+    });
   }
 
   deletePagePreview(editId: string, pageIds: string[]): ProjectAdminResult<PreviewPlan> {
@@ -2306,11 +2432,7 @@ export class ProjectAdminService {
     note?: string,
     type: VersionHistoryEntryType = "named_version",
   ): VersionInfo {
-    const maxVersion = project.versions.reduce((max, version) => {
-      const match = /^v(\d+)$/.exec(version.versionId);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-    const versionId = `v${maxVersion + 1}`;
+    const versionId = this.generateVersionId(project);
     const snapshotPath = path.join(this.snapshotsDir, project.id, versionId);
     ensureDir(path.dirname(snapshotPath));
     fs.rmSync(snapshotPath, { recursive: true, force: true });
@@ -2325,6 +2447,15 @@ export class ProjectAdminService {
       fileCount: countFiles(workspacePath),
       note,
     };
+  }
+
+  private generateVersionId(project: Project): string {
+    const pageVersions = Object.values(project.pageVersions ?? {}).flat();
+    const maxVersion = [...project.versions, ...pageVersions].reduce((max, version) => {
+      const match = /^v(\d+)$/.exec(version.versionId);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    return `v${maxVersion + 1}`;
   }
 
   private compactProjectVersions(versions: VersionInfo[]): VersionInfo[] {
