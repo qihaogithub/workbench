@@ -7,7 +7,7 @@ import { getPublishStatus } from "@/lib/publish-manager";
 import {
   projectScaffoldErrorResponse,
   projectScaffoldZipResponse,
-} from "../../../projects/[projectId]/scaffold/scaffold-response";
+} from "@/lib/project-scaffold-response";
 
 export async function GET(
   _request: NextRequest,

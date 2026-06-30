@@ -202,9 +202,9 @@ export function useVersionControl(params: UseVersionControlParams) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
       const publishResult = await projectApiClient.publishProject(demoId, {
         sessionId,
+        workspaceId,
       });
       setPublishStatus("published");
       setPublishedVersion(publishResult.publishedVersion);

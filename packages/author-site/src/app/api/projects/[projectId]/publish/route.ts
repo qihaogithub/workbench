@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { publishProject } from '@/lib/publish-manager';
-import { createApiSuccess, createApiError } from '@/lib/fs-utils';
+import { createApiSuccess, createApiError, getWorkspaceMeta } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
-import { getEditSession, syncEditSessionToProjectWorkspace } from '@/lib/session-manager';
+import {
+  createEditSession,
+  getEditSession,
+  syncEditSessionToProjectWorkspace,
+} from '@/lib/session-manager';
 import {
   flushWorkspaceBeforeCriticalAction,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
+
+interface PublishRequestBody {
+  sessionId?: unknown;
+  workspaceId?: unknown;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
 
 export async function POST(
   request: NextRequest,
@@ -23,14 +36,25 @@ export async function POST(
       return NextResponse.json(createApiError('UNAUTHORIZED', '登录已过期'), { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const sessionId =
-      typeof body.sessionId === "string" && body.sessionId.trim()
-        ? body.sessionId
-        : undefined;
-    if (sessionId) {
-      const session = getEditSession(sessionId);
-      if (!session || session.demoId !== params.projectId) {
+    const body = (await request.json().catch(() => ({}))) as PublishRequestBody;
+    let sessionId = readNonEmptyString(body.sessionId);
+    const workspaceId = readNonEmptyString(body.workspaceId);
+    if (workspaceId) {
+      let session = sessionId ? getEditSession(sessionId) : null;
+      if (!session) {
+        const workspaceMeta = getWorkspaceMeta(workspaceId);
+        if (!workspaceMeta || workspaceMeta.demoId !== params.projectId) {
+          return NextResponse.json(createApiError('SESSION_NOT_FOUND'), { status: 404 });
+        }
+        if (workspaceMeta.userId && workspaceMeta.userId !== payload.userId) {
+          return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Workspace'), { status: 403 });
+        }
+
+        const resumed = await createEditSession(payload.userId, params.projectId, workspaceId);
+        sessionId = resumed.sessionId;
+        session = getEditSession(sessionId);
+      }
+      if (!session || !sessionId || session.demoId !== params.projectId) {
         return NextResponse.json(createApiError('SESSION_NOT_FOUND'), { status: 404 });
       }
       if (session.userId && session.userId !== payload.userId) {
@@ -56,6 +80,8 @@ export async function POST(
           { status: 500 },
         );
       }
+    } else {
+      sessionId = undefined;
     }
 
     const result = await publishProject(params.projectId);

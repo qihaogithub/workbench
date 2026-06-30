@@ -6,19 +6,17 @@
   "demoPages": [
     {
       "id": "demo_1779934698596_dvvk55",
-      "name": "我的页面-手机",
+      "name": "demo",
       "order": 0,
       "parentId": null,
-      "createdAt": 1779934698596,
-      "updatedAt": 1780020853768
+      "routeKey": "demo"
     },
     {
       "id": "demo_1779935678404_lxsasc",
-      "name": "我的页面-平板",
-      "order": 2,
+      "name": "demo",
+      "order": 1,
       "parentId": null,
-      "createdAt": 1779935678406,
-      "updatedAt": 1779948642636
+      "routeKey": "demo-2"
     }
   ],
   "demoFolders": [],
@@ -120,10 +118,32 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460375/v12",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v13",
+      "type": "auto_checkpoint",
+      "savedAt": 1782830155918,
+      "savedBy": "qihao",
+      "sessionId": "session-1782829180381-nqc9eqnts",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460375/v13",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v14",
+      "type": "publish_snapshot",
+      "savedAt": 1782830809394,
+      "savedBy": "system",
+      "sessionId": "publish-1782830809391",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460375/v14",
+      "fileCount": 9,
+      "note": "发布快照"
     }
   ],
   "pageVersions": {},
   "createdAt": 1779608460375,
-  "updatedAt": 1782796509449,
-  "thumbnail": "/thumbnails/proj_1779608460375_cover.png"
+  "updatedAt": 1782830809394,
+  "thumbnail": "/thumbnails/proj_1779608460375_cover.png",
+  "publishedVersion": "v14",
+  "publishedAt": 1782830809395
 }

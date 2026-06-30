@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-30",
+  "description": "Long-lived engineering tools that Codex automation can discover and maintain.",
+  "items": [
+    {
+      "id": "ops-cli-agent-diagnostics",
+      "kind": "ops-cli",
+      "title": "Agent Service diagnostics CLI",
+      "path": "OPS/CLI/src/index.ts",
+      "packagePath": "OPS/CLI/package.json",
+      "command": "corepack pnpm --filter @opencode-workbench/cli-tools dev -- --help",
+      "ownerArea": "agent-service",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/CLI/README.md",
+        "OPS/CLI/QUICKSTART.md"
+      ],
+      "notes": "Used for Agent Service health, session, log, model, workspace and file-change diagnostics."
+    },
+    {
+      "id": "automation-registry-checker",
+      "kind": "automation-cli",
+      "title": "Automation registry checker",
+      "path": "OPS/automations/bin/automation.mjs",
+      "command": "corepack pnpm check:automation",
+      "ownerArea": "ops-automations",
+      "status": "active",
+      "automationLevel": "auto-fix-low-risk",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/automations/README.md",
+        "OPS/automations/AGENTS.md"
+      ],
+      "notes": "Validates automation registry paths, root script references and documentation references."
+    },
+    {
+      "id": "automation-stale-issues",
+      "kind": "automation-cli",
+      "title": "In-progress plan stale issue scanner",
+      "path": "OPS/automations/bin/automation.mjs",
+      "command": "corepack pnpm ops:automation stale-issues",
+      "ownerArea": "ops-automations",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/automations/README.md",
+        "OPS/automations/runbooks/weekly-cleanup.md"
+      ],
+      "notes": "Reports stale, completed-in-progress, duplicate-title and broken-link candidates under docs/plans/进行中 without modifying files."
+    }
+  ]
+}

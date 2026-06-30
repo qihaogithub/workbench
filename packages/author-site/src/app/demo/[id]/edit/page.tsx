@@ -86,7 +86,6 @@ import {
   FolderOpen,
   ArrowLeft,
   Users,
-  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -2548,17 +2547,6 @@ ${context.details}
               </div>
             )}
           </div>
-          <Button variant="outline" className="gap-2" asChild>
-            <a
-              href={`/api/projects/${encodeURIComponent(demoId)}/scaffold${
-                sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""
-              }`}
-              download
-            >
-              <Download className="h-4 w-4" />
-              导出代码
-            </a>
-          </Button>
           <Button
             onClick={async () => {
               await handlePublish();

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-30",
+  "description": "Development diagnostic scripts that are useful to Codex but are not formal regression tests by default.",
+  "items": [
+    {
+      "id": "sync-status-flap",
+      "kind": "development-diagnostic",
+      "title": "Sync status flap detector",
+      "path": "scripts/development/detect-sync-status-flap.mjs",
+      "command": "corepack pnpm test:sync-status-flap",
+      "ownerArea": "author-site:sync",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [
+        "author-site",
+        "agent-service"
+      ],
+      "writes": [
+        "tmp/sync-status-flap/"
+      ],
+      "docs": [
+        "scripts/development/README.md"
+      ],
+      "notes": "Samples visible sync status text, probes workspace flush, and reports repeated online/offline flapping or visible sync failure."
+    },
+    {
+      "id": "knowledge-validation-metrics",
+      "kind": "development-diagnostic",
+      "title": "Knowledge validation metrics",
+      "path": "scripts/development/knowledge-validation-suite.mjs",
+      "command": "corepack pnpm test:knowledge-validation",
+      "ownerArea": "knowledge",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [
+        ".tmp/knowledge-validation-suite/"
+      ],
+      "docs": [
+        "scripts/development/README.md"
+      ],
+      "notes": "Collects static knowledge validation metrics through Project CLI fixtures."
+    },
+    {
+      "id": "knowledge-validation-run",
+      "kind": "development-diagnostic",
+      "title": "Knowledge validation local run",
+      "path": "scripts/development/knowledge-validation-suite.mjs",
+      "command": "corepack pnpm test:knowledge-validation:run",
+      "ownerArea": "knowledge",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [
+        ".tmp/knowledge-validation-suite/"
+      ],
+      "docs": [
+        "scripts/development/README.md"
+      ],
+      "notes": "Runs fixture, template, instantiate and metrics checks; may modify the configured test project."
+    },
+    {
+      "id": "ai-workspace-refresh",
+      "kind": "development-diagnostic",
+      "title": "AI workspace refresh diagnostic",
+      "path": "scripts/development/test-ai-workspace-refresh.mjs",
+      "command": "corepack pnpm test:ai-workspace-refresh",
+      "ownerArea": "agent-service:workspace",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [
+        "tmp/ai-workspace-refresh-test/"
+      ],
+      "docs": [
+        "scripts/development/README.md"
+      ],
+      "notes": "Static checks plus targeted agent-service unit tests for AI file-write workspace refresh."
+    }
+  ]
+}

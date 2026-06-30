@@ -47,6 +47,58 @@ afterEach(() => {
 });
 
 describe("WorkspaceFilePersistence", () => {
+  it("从包目录启动且未设置 DATA_DIR 时解析到仓库根 data", () => {
+    const originalCwd = process.cwd();
+    const originalDataDir = process.env.DATA_DIR;
+    const repoRoot = path.join(tempDir, "repo");
+    const packageDir = path.join(repoRoot, "packages", "agent-service");
+    const dataDir = path.join(repoRoot, "data");
+    const workspacePath = path.join(dataDir, "workspaces", "user-1", "proj-1", "ws-root");
+
+    fs.mkdirSync(path.join(workspacePath, "demos", "page-1"), { recursive: true });
+    fs.mkdirSync(packageDir, { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf-8");
+    fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "index.tsx"), "root", "utf-8");
+    writeJson(path.join(workspacePath, ".workspace.json"), {
+      workspaceId: "ws-root",
+      demoId: "proj-1",
+      userId: "user-1",
+      updatedAt: 1,
+    });
+    writeJson(path.join(dataDir, "sessions", "user-1", "proj-1", "session-root", ".session.json"), {
+      sessionId: "session-root",
+      demoId: "proj-1",
+      userId: "user-1",
+      workspaceId: "ws-root",
+      expiresAt: Date.now() + 60_000,
+    });
+
+    try {
+      delete process.env.DATA_DIR;
+      process.chdir(packageDir);
+
+      const persistence = new WorkspaceFilePersistence();
+      const result = persistence.validateWorkspaceSession({
+        projectId: "proj-1",
+        workspaceId: "ws-root",
+        sessionId: "session-root",
+      });
+
+      expect(fs.realpathSync(persistence.dataDir)).toBe(fs.realpathSync(dataDir));
+      expect(result.ok).toBe(true);
+      expect(result.workspacePath ? fs.realpathSync(result.workspacePath) : "").toBe(
+        fs.realpathSync(workspacePath),
+      );
+    } finally {
+      process.chdir(originalCwd);
+      if (originalDataDir === undefined) {
+        delete process.env.DATA_DIR;
+      } else {
+        process.env.DATA_DIR = originalDataDir;
+      }
+    }
+  });
+
   it("校验 session 与 workspace 归属后允许页面代码协同", () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
 

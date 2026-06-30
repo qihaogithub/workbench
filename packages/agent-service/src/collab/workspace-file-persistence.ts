@@ -26,10 +26,25 @@ interface WorkspaceMetaFile {
   userId?: string;
 }
 
+function findProjectRoot(cwd: string): string {
+  let current = path.resolve(cwd);
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return cwd;
+}
+
+function getDefaultDataDir(): string {
+  return process.env.DATA_DIR ?? path.join(findProjectRoot(process.cwd()), "data");
+}
+
 export class WorkspaceFilePersistence {
   readonly dataDir: string;
 
-  constructor(dataDir = process.env.DATA_DIR ?? path.join(process.cwd(), "data")) {
+  constructor(dataDir = getDefaultDataDir()) {
     this.dataDir = dataDir;
   }
 
