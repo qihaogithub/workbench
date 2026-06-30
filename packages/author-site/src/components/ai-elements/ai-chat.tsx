@@ -21,6 +21,16 @@ import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { X, FileText, ArrowDown } from "lucide-react";
 
+export interface AutoRepairTrigger {
+  kind: "auto_repair";
+  visibleTitle: string;
+  visibleSummary: string;
+  hiddenPrompt: string;
+  debugDetail?: string;
+}
+
+type TriggerAutoSend = string | AutoRepairTrigger;
+
 interface AIChatProps {
   sessionId: string;
   agentSessionId: string;
@@ -45,7 +55,7 @@ interface AIChatProps {
   onNewSession?: (workspaceId?: string) => void;
   onSelectSession?: (sessionId: string, workspaceId?: string) => void;
   currentSessionId?: string;
-  triggerAutoSend?: string | null;
+  triggerAutoSend?: TriggerAutoSend | null;
   onTriggerAutoSendHandled?: () => void;
   /** 错误提示横幅，渲染在输入框上方 */
   errorBanner?: React.ReactNode;
@@ -130,6 +140,7 @@ export function AIChat({
     handleEditResend,
     handlePermissionResponse,
     handlePermissionCancel,
+    handleUserChoiceResponse,
   } = useChatStream({
     sessionId,
     agentSessionId,
@@ -248,7 +259,20 @@ export function AIChat({
 
   useEffect(() => {
     if (triggerAutoSend && !isStreaming) {
-      handleSendRef.current(triggerAutoSend);
+      if (typeof triggerAutoSend === "string") {
+        handleSendRef.current(triggerAutoSend);
+      } else {
+        handleSendRef.current(triggerAutoSend.hiddenPrompt, undefined, {
+          source: "system_auto_repair",
+          displayMessage: {
+            status: "running",
+            title: triggerAutoSend.visibleTitle,
+            summary: triggerAutoSend.visibleSummary,
+            debugDetail: triggerAutoSend.debugDetail,
+            hiddenPrompt: triggerAutoSend.hiddenPrompt,
+          },
+        });
+      }
       onTriggerAutoSendHandledRef.current?.();
     }
   }, [triggerAutoSend, isStreaming]);
@@ -271,6 +295,7 @@ export function AIChat({
             messagesRef={messagesRef}
             setMessages={setMessages}
             handleSend={handleSend}
+            onUserChoiceResponse={handleUserChoiceResponse}
           />
         </ConversationContent>
       </Conversation>

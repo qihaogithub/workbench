@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +49,7 @@ export function WorkspaceCodeDialog({
   const [editContent, setEditContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const hasLocalEditRef = useRef(false);
   const { toast } = useToast();
 
   const language = getFileLanguage(filePath);
@@ -73,6 +74,7 @@ export function WorkspaceCodeDialog({
   // 打开弹窗时重置状态
   useEffect(() => {
     if (open) {
+      hasLocalEditRef.current = false;
       setEditContent(content);
       setHasChanges(false);
     }
@@ -80,13 +82,42 @@ export function WorkspaceCodeDialog({
 
   useEffect(() => {
     if (!open || !useCollab) return;
+    if (
+      collab.status === "synced" &&
+      collab.value === "" &&
+      content !== "" &&
+      !hasLocalEditRef.current
+    ) {
+      replaceCollabText(collab.ytext, content);
+      return;
+    }
+    if (collab.status !== "synced" && collab.value === "") return;
     if (collab.value === editContent) return;
     setEditContent(collab.value);
     setHasChanges(true);
     onSaved?.({ filePath, content: collab.value });
-  }, [collab.value, editContent, filePath, onSaved, open, useCollab]);
+  }, [
+    collab.status,
+    collab.value,
+    collab.ytext,
+    content,
+    editContent,
+    filePath,
+    onSaved,
+    open,
+    useCollab,
+  ]);
 
   const handleChange = (value: string) => {
+    const isInitialCollabEmpty =
+      useCollab &&
+      collab.status !== "synced" &&
+      value === "" &&
+      editContent !== "" &&
+      !hasLocalEditRef.current;
+    if (isInitialCollabEmpty) return;
+
+    hasLocalEditRef.current = true;
     setEditContent(value);
     setHasChanges(value !== content);
     if (useCollab) {
@@ -225,6 +256,15 @@ export function WorkspaceCodeDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function replaceCollabText(
+  ytext: { toString: () => string; delete: (index: number, length: number) => void; insert: (index: number, text: string) => void } | null,
+  value: string,
+): void {
+  if (!ytext || ytext.toString() === value) return;
+  ytext.delete(0, ytext.toString().length);
+  if (value) ytext.insert(0, value);
 }
 
 function getCollabResourceKind(filePath: string): CollabResourceKind | null {

@@ -146,6 +146,7 @@ rsync -avz --progress --delete \
     --exclude '/.gitignore' \
     --exclude '/.agents/' \
     --exclude '/.codegraph/' \
+    --exclude '/.opencode/' \
     --exclude '/.env' \
     --exclude '/.env.docker' \
     --exclude '/.tmp/' \
@@ -155,6 +156,11 @@ rsync -avz --progress --delete \
     --exclude '/node_modules/' \
     --exclude '/OPS/CLI/dist/' \
     --exclude '/OPS/CLI/node_modules/' \
+    --exclude '/packages/web/' \
+    --exclude '/packages/snapshot-service/' \
+    --exclude '/packages/*/.next/' \
+    --exclude '/packages/*/.opencode/' \
+    --exclude '/packages/*/data/' \
     --exclude '/packages/*/node_modules/' \
     --exclude '/packages/*/dist/' \
     --exclude '/packages/*/out/' \

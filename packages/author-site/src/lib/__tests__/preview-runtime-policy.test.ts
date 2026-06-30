@@ -1,8 +1,11 @@
 import { compileCode } from "../compiler";
+import fs from "node:fs";
+import path from "node:path";
 import {
   PreviewRuntimeContractError,
   validatePreviewRuntimeContract,
 } from "../preview-dependency-policy";
+import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
 
 describe("AI 页面预览运行时策略", () => {
   it("将 @preview/sdk 映射为受控虚拟模块", () => {
@@ -32,6 +35,38 @@ describe("AI 页面预览运行时策略", () => {
 
     expect(result.compiledCode).toContain("/preview-runtime/vendor/lucide-react.js");
     expect(result.compiledCode).not.toContain("lucide-react?deps=");
+  });
+
+  it("本地 JSX runtime vendor 暴露 React 自动 JSX 转换需要的 named exports", () => {
+    const runtimeDir = path.join(
+      process.cwd(),
+      "public",
+      "preview-runtime",
+      "vendor",
+    );
+    const jsxRuntime = fs.readFileSync(
+      path.join(runtimeDir, "react-jsx-runtime.js"),
+      "utf8",
+    );
+    const jsxDevRuntime = fs.readFileSync(
+      path.join(runtimeDir, "react-jsx-dev-runtime.js"),
+      "utf8",
+    );
+
+    expect(jsxRuntime).toContain(" as jsx");
+    expect(jsxRuntime).toContain(" as jsxs");
+    expect(jsxRuntime).toContain(" as Fragment");
+    expect(jsxDevRuntime).toContain(" as jsxDEV");
+    expect(jsxDevRuntime).toContain(" as Fragment");
+  });
+
+  it("iframe 可通过可视化编辑脚本采集正式图层树", () => {
+    const html = generateIframeHtml();
+
+    expect(html).toContain("collectVisualNodeTree: function()");
+    expect(html).toContain("window.__VISUAL_EDIT__.collectVisualNodeTree()");
+    expect(html).toContain("type === 'COLLECT_VISUAL_NODE_TREE'");
+    expect(html).toContain("type: 'VISUAL_NODE_TREE_RESULT'");
   });
 
   it("支持紧急 CDN 回退", () => {

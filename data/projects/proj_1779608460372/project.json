@@ -6,19 +6,17 @@
   "demoPages": [
     {
       "id": "demo_1779608460501_abc123",
-      "name": "底部弹窗-手机",
-      "order": 1,
-      "parentId": null,
-      "createdAt": 1779608460501,
-      "updatedAt": 1779608460501
+      "name": "手机",
+      "routeKey": "demo",
+      "order": 0,
+      "parentId": null
     },
     {
       "id": "demo_1779608460502_def456",
-      "name": "底部弹窗-平板",
-      "order": 2,
-      "parentId": null,
-      "createdAt": 1779608460502,
-      "updatedAt": 1779608460502
+      "name": "平板",
+      "routeKey": "demo-2",
+      "order": 1,
+      "parentId": null
     }
   ],
   "demoFolders": [],
@@ -172,9 +170,63 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/v15",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v16",
+      "type": "auto_checkpoint",
+      "savedAt": 1782793731802,
+      "savedBy": "qihao",
+      "sessionId": "session-1782790398107-hegdjr21v",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/v16",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v17",
+      "type": "auto_checkpoint",
+      "savedAt": 1782794599953,
+      "savedBy": "qihao",
+      "sessionId": "session-1782790398107-hegdjr21v",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/v17",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v18",
+      "type": "auto_checkpoint",
+      "savedAt": 1782795144053,
+      "savedBy": "qihao",
+      "sessionId": "session-1782794751713-v4posy897",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/v18",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v20",
+      "type": "named_version",
+      "savedAt": 1782796947416,
+      "savedBy": "qihao",
+      "sessionId": "session-1782796675350-cfs1bhq9f",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/v20",
+      "fileCount": 9
     }
   ],
-  "pageVersions": {},
+  "pageVersions": {
+    "demo_1779608460502_def456": [
+      {
+        "versionId": "v19",
+        "type": "named_version",
+        "demoId": "demo_1779608460502_def456",
+        "demoName": "平板",
+        "savedAt": 1782796945683,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460502_def456",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460372/pages/demo_1779608460502_def456/v19",
+        "fileCount": 2,
+        "note": "修改了平板"
+      }
+    ]
+  },
   "createdAt": 1779608460372,
-  "updatedAt": 1782724157929
+  "updatedAt": 1782796947417
 }

@@ -3,17 +3,17 @@
   "pages": [
     {
       "id": "demo_1779608460501_abc123",
-      "name": "demo",
+      "name": "手机",
+      "routeKey": "demo",
       "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
+      "parentId": null
     },
     {
       "id": "demo_1779608460502_def456",
-      "name": "demo",
+      "name": "平板",
+      "routeKey": "demo-2",
       "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
+      "parentId": null
     }
   ]
 }

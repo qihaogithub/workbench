@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef } from "react";
+import type { ImageAttachment } from "@opencode-workbench/agent-client";
+import type { UserChoiceResponse } from "./services/stream-service";
 import {
   Message,
   AssistantMessage,
@@ -37,7 +39,15 @@ interface ChatMessagesProps {
   onEditResend: (targetMessageId: string, newContent: string) => void;
   messagesRef: React.MutableRefObject<ChatMessage[]>;
   setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
-  handleSend: (content: string) => void;
+  handleSend: (
+    content: string,
+    images?: ImageAttachment[],
+    options?: {
+      source: "system_auto_repair";
+      displayMessage: NonNullable<ChatMessage["autoRepair"]>;
+    },
+  ) => void;
+  onUserChoiceResponse: (requestId: string, choice: UserChoiceResponse) => void;
 }
 
 export function ChatMessages({
@@ -54,6 +64,7 @@ export function ChatMessages({
   messagesRef,
   setMessages,
   handleSend,
+  onUserChoiceResponse,
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +101,7 @@ export function ChatMessages({
   return (
     <>
       {messages.map((msg) => {
-        if (msg.role === "user") {
+        if (msg.role === "user" || msg.kind === "auto_repair") {
           return (
             <Message
               key={msg.id}
@@ -117,6 +128,7 @@ export function ChatMessages({
             onExternalAuthConnected={onExternalAuthConnected}
             onRollback={onRollback}
             externalAuthSessionId={externalAuthSessionId}
+            onUserChoiceResponse={onUserChoiceResponse}
           />
         );
       })}
@@ -131,6 +143,7 @@ export function ChatMessages({
           isStreaming={true}
           onExternalAuthConnected={onExternalAuthConnected}
           externalAuthSessionId={externalAuthSessionId}
+          onUserChoiceResponse={onUserChoiceResponse}
         />
       )}
 

@@ -45,6 +45,8 @@ import {
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
 import { SplitContentRenderer } from "./split-content-renderer";
 import { type MessagePart } from "./message";
+import { UserChoiceCard } from "./user-choice-card";
+import type { UserChoiceResponse } from "./chat/services/stream-service";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +80,7 @@ interface AssistantMessageProps {
   onRegenerate?: (targetAssistantId: string) => void;
   onRollback?: (targetAssistantId: string) => void;
   onExternalAuthConnected?: (targetAssistantId: string) => void;
+  onUserChoiceResponse?: (requestId: string, choice: UserChoiceResponse) => void;
   externalAuthSessionId?: string;
 }
 
@@ -112,12 +115,14 @@ function getToolKind(toolName?: string): "read" | "edit" | "execute" | "delegate
 
 type ReasoningPart = Extract<MessagePart, { type: "reasoning" }>;
 type ToolPart = Extract<MessagePart, { type: "tool" }>;
+type UserChoicePart = Extract<MessagePart, { type: "user_choice" }>;
 
 type RenderBlock =
   | { type: "text"; content: string }
   | { type: "reasoning-group"; reasonings: ReasoningPart[] }
   | { type: "tool-group"; parts: ToolPart[]; toolKind: string }
   | { type: "tool-single"; part: ToolPart }
+  | { type: "user-choice"; part: UserChoicePart }
   | { type: "image"; url: string; alt?: string }
   | { type: "file"; name: string; url: string; size?: number }
   | { type: "execution-phase"; parts: MessagePart[] };
@@ -354,6 +359,7 @@ export function AssistantMessage({
   onRegenerate,
   onRollback,
   onExternalAuthConnected,
+  onUserChoiceResponse,
   externalAuthSessionId,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
@@ -479,6 +485,11 @@ export function AssistantMessage({
         if (part.content?.trim()) {
           blocks.push({ type: "text", content: part.content });
         }
+      } else if (part.type === "user_choice") {
+        flushExecution();
+        flushReasonings();
+        flushTools();
+        blocks.push({ type: "user-choice", part });
       } else if (part.type === "image") {
         flushExecution();
         flushReasonings();
@@ -590,6 +601,16 @@ export function AssistantMessage({
               key={`text-${index}`}
               content={block.content}
               isStreaming={isStreaming && isLastText}
+            />
+          );
+        }
+
+        if (block.type === "user-choice") {
+          return (
+            <UserChoiceCard
+              key={`user-choice-${block.part.requestId}`}
+              part={block.part}
+              onRespond={onUserChoiceResponse}
             />
           );
         }

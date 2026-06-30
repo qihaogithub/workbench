@@ -152,6 +152,11 @@ function getCanvasLayoutSignature(
     .join("|");
 }
 
+function areStringListsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
 function getLayoutBounds(layouts: CanvasPageLayout[]): CanvasRect | null {
   if (layouts.length === 0) return null;
   const left = Math.min(...layouts.map((layout) => layout.x));
@@ -1002,8 +1007,19 @@ export function PreviewCanvas({
     () => Array.from(visiblePageIds).sort(),
     [visiblePageIds],
   );
+  const lastEmittedVisiblePageIdListRef = useRef<string[] | null>(null);
 
   useEffect(() => {
+    if (
+      lastEmittedVisiblePageIdListRef.current &&
+      areStringListsEqual(
+        lastEmittedVisiblePageIdListRef.current,
+        visiblePageIdList,
+      )
+    ) {
+      return;
+    }
+    lastEmittedVisiblePageIdListRef.current = visiblePageIdList;
     onVisiblePageIdsChange?.(visiblePageIdList);
   }, [onVisiblePageIdsChange, visiblePageIdList]);
 

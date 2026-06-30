@@ -92,6 +92,9 @@ describe("sessions route external auth reuse", () => {
       enforceSessionLimit: jest.fn(),
       findActiveSession: jest.fn(() => null),
     }));
+    jest.doMock("@/lib/workspace-manager", () => ({
+      findActiveWorkspace: jest.fn(() => null),
+    }));
     jest.doMock("@/lib/agent-providers", () => ({
       pushSessionExternalAuthToAgent: jest.fn(async () => ({
         ok: true,
@@ -125,6 +128,7 @@ describe("sessions route external auth reuse", () => {
     jest.dontMock("@/lib/auth/jwt");
     jest.dontMock("@/lib/fs-utils");
     jest.dontMock("@/lib/session-manager");
+    jest.dontMock("@/lib/workspace-manager");
     jest.dontMock("@/lib/agent-providers");
     jest.dontMock("@/lib/external-auth");
     jest.dontMock("@/lib/model-config");
@@ -166,6 +170,42 @@ describe("sessions route external auth reuse", () => {
     expect(agentProviders.pushSessionExternalAuthToAgent).toHaveBeenCalledWith(
       "session-existing",
       externalAuthConfig,
+    );
+  });
+
+  it("没有活跃会话时默认从最近 workspace 续开，避免丢失实时保存草稿", async () => {
+    jest.doMock("@/lib/workspace-manager", () => ({
+      findActiveWorkspace: jest.fn(() => "workspace-latest"),
+    }));
+    const { POST } = await import("./route");
+    const sessionManager = await import("@/lib/session-manager");
+
+    const response = await POST(createJsonRequest({ demoId: "project-1" }) as never);
+
+    expect(response.status).toBe(201);
+    expect(sessionManager.createEditSession).toHaveBeenCalledWith(
+      "user-1",
+      "project-1",
+      "workspace-latest",
+    );
+  });
+
+  it("显式 forceNew 且未指定 workspace 时仍创建全新 workspace", async () => {
+    jest.doMock("@/lib/workspace-manager", () => ({
+      findActiveWorkspace: jest.fn(() => "workspace-latest"),
+    }));
+    const { POST } = await import("./route");
+    const sessionManager = await import("@/lib/session-manager");
+
+    const response = await POST(
+      createJsonRequest({ demoId: "project-1", forceNew: true }) as never,
+    );
+
+    expect(response.status).toBe(201);
+    expect(sessionManager.createEditSession).toHaveBeenCalledWith(
+      "user-1",
+      "project-1",
+      undefined,
     );
   });
 });

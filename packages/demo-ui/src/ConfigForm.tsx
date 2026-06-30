@@ -93,6 +93,44 @@ interface FieldGroup {
   color?: string;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function areConfigValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length &&
+      left.every((item, index) => areConfigValuesEqual(item, right[index]))
+    );
+  }
+
+  if (isPlainRecord(left) && isPlainRecord(right)) {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    return (
+      leftKeys.length === rightKeys.length &&
+      leftKeys.every((key) => areConfigValuesEqual(left[key], right[key]))
+    );
+  }
+
+  return false;
+}
+
+function areConfigRecordsEqual(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => areConfigValuesEqual(left[key], right[key]))
+  );
+}
+
 function parseSchemaToFields(schema: string): FieldGroup[] {
   try {
     const parsed = JSON.parse(schema);
@@ -1251,11 +1289,14 @@ export function ConfigForm({
       console.log("[ConfigForm] initialData changed, syncing...");
       setFormData((prev) => {
         const merged = { ...prev };
+        let changed = false;
         for (const [key, value] of Object.entries(initialData)) {
           if (!(key in merged)) {
             merged[key] = value;
+            changed = true;
           }
         }
+        if (!changed) return prev;
         console.log(
           "[ConfigForm] Merged formData after initialData sync:",
           merged,
@@ -1267,7 +1308,7 @@ export function ConfigForm({
 
   useEffect(() => {
     console.log("[ConfigForm] Schema changed, reinitializing form...");
-    if (schema && initialData) {
+    if (schema) {
       try {
         const parsed = JSON.parse(schema);
         console.log(
@@ -1289,6 +1330,7 @@ export function ConfigForm({
             ...newDefaults,
             ...prev,
           };
+          if (areConfigRecordsEqual(prev, merged)) return prev;
           console.log(
             "[ConfigForm] Merged formData after schema change:",
             merged,
@@ -1299,7 +1341,7 @@ export function ConfigForm({
         console.warn("[ConfigForm] Failed to parse schema for form reset:", e);
       }
     }
-  }, [schema, initialData]);
+  }, [schema]);
 
   const handleFieldChange = useCallback(
     (key: string, value: unknown) => {

@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "projectId": "proj_1779608460377",
-  "updatedAt": 1782440418816,
+  "projectId": "proj_1782718596686_wmv9yu",
+  "updatedAt": 1782808320794,
   "state": {
     "viewport": {
-      "x": 112.20703125,
-      "y": 37.17578125,
-      "zoom": 0.5
+      "x": 36.64999999999998,
+      "y": 115.02371922878888,
+      "zoom": 0.4406507006582152
     },
     "pages": {
       "phone-popup_k8m2": {
@@ -23,6 +23,14 @@
         "height": 811.953125
       }
     },
-    "nodes": {}
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
   }
 }

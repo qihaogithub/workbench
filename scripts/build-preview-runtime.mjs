@@ -25,11 +25,18 @@ const entries = {
   },
   "react/jsx-runtime": {
     file: "react-jsx-runtime.js",
-    source: `export * from "react/jsx-runtime";`,
+    source: `import runtime from "react/jsx-runtime";
+export const Fragment = runtime.Fragment;
+export const jsx = runtime.jsx;
+export const jsxs = runtime.jsxs;
+export default runtime;`,
   },
   "react/jsx-dev-runtime": {
     file: "react-jsx-dev-runtime.js",
-    source: `export * from "react/jsx-dev-runtime";`,
+    source: `import runtime from "react/jsx-dev-runtime";
+export const Fragment = runtime.Fragment;
+export const jsxDEV = runtime.jsxDEV;
+export default runtime;`,
   },
   "lucide-react": {
     file: "lucide-react.js",

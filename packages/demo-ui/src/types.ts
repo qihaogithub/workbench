@@ -4,6 +4,7 @@ import type {
   VisualAnnotation,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualNodeTreeItem,
   VisualPropertyChange,
   VisualStyleChange,
   AppActionPayload,
@@ -18,6 +19,7 @@ export type {
   VisualEditPatch,
   VisualInlineEditPayload,
   VisualNodeInfo,
+  VisualNodeTreeItem,
   VisualNodeRect,
   VisualPropertyChange,
   VisualPropertyChangeKind,
@@ -91,6 +93,9 @@ export interface PreviewPanelProps {
   onVisualHover?: (node: VisualNodeInfo | null) => void;
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
+  visualNodeTreeRequestKey?: number;
+  onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
+  /** @deprecated 右键图层菜单已由 PreviewPanel 在预览位置内渲染，仅保留兼容旧调用方。 */
   onVisualLayerMenu?: (nodes: VisualNodeInfo[]) => void;
   onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
   visualAnnotationMode?: boolean;

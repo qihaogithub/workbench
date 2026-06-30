@@ -1,5 +1,5 @@
 import { IBackendAdapter, BackendStatus } from './base';
-import { AgentConfig, AgentEvent, FileChange, ImageAttachment } from '../core/types';
+import { AgentConfig, AgentEvent, FileChange, ImageAttachment, UserChoiceResponse } from '../core/types';
 import { createWorkbenchTools, type SubagentRunResult } from './pi-tools';
 import type { PreinstalledSkill } from './preinstalled-skills';
 import {
@@ -14,6 +14,7 @@ import {
   getServiceConfig,
 } from './managers/model-manager';
 import { PermissionManager } from './managers/permission-manager';
+import { UserInteractionManager } from './managers/user-interaction-manager';
 import { ToolHookManager } from './managers/tool-hook-manager';
 import { EventMapper } from './managers/event-mapper';
 import {
@@ -66,6 +67,7 @@ export class PiAgentBackend implements IBackendAdapter {
   // 管理器
   private modelManager: ModelManager;
   private permissionManager: PermissionManager;
+  private userInteractionManager: UserInteractionManager;
   private toolHookManager: ToolHookManager;
   private eventMapper: EventMapper;
 
@@ -73,6 +75,7 @@ export class PiAgentBackend implements IBackendAdapter {
     this.config = config;
     this.modelManager = new ModelManager(this.config);
     this.permissionManager = new PermissionManager(this.config);
+    this.userInteractionManager = new UserInteractionManager(this.config);
     this.toolHookManager = new ToolHookManager(this.config);
     this.eventMapper = new EventMapper(
       this.config.sessionId,
@@ -97,6 +100,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private syncEventCallback(): void {
     this.eventMapper.setEventCallback(this.eventCallback);
     this.permissionManager.setEventCallback(this.eventCallback);
+    this.userInteractionManager.setEventCallback(this.eventCallback);
     this.toolHookManager.setEventCallback(this.eventCallback);
   }
 
@@ -131,6 +135,7 @@ export class PiAgentBackend implements IBackendAdapter {
           includeDelegateTask: this.areSubagentsEnabled(),
           subagentRunner: (params, signal) => this.runSubagent(params, signal),
           planApprovalHandler: this.permissionManager.requestPlanApproval,
+          userChoiceHandler: this.userInteractionManager.requestUserChoice,
         },
       );
 
@@ -383,7 +388,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       const tools = createWorkbenchTools(
         this.config,
         this.permissionManager.requestPermission,
-        { includeDelegateTask: false, includePlanApproval: false },
+        { includeDelegateTask: false, includePlanApproval: false, includeUserChoice: false },
       );
       const model = this.modelManager.getModel();
       const resources = { skills: getPreinstalledSkills() };
@@ -631,6 +636,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
     this.sessionRepo = null;
     this.toolHookManager.resetForNewMessage();
     this.permissionManager.clearPendingPermissions();
+    this.userInteractionManager.clearPendingChoices();
     this.status = "idle";
     logger.info("Pi Agent backend destroyed");
   }
@@ -699,6 +705,10 @@ Keep the final response concise: summarize what you changed, what you verified, 
    */
   resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
     this.permissionManager.resolvePermission(toolCallId, approved, responseContent);
+  }
+
+  resolveUserChoice(requestId: string, choice: UserChoiceResponse): void {
+    this.userInteractionManager.resolveUserChoice(requestId, choice);
   }
 
   /**

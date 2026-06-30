@@ -21,6 +21,7 @@ import { createFigmaMcpTool } from "./figma-mcp-tool";
 import { createWebSearchTool, isWebSearchEnabled } from "./web-search-tool";
 import { createWebReadTool, isWebReadEnabled } from "./web-read-tool";
 import { createRequestPlanApprovalTool, type PlanApprovalHandler } from "./plan-approval-tool";
+import { createRequestUserChoiceTool, type UserChoiceHandler } from "./user-choice-tool";
 import { createUpdatePlanTool } from "./plan-tool";
 import {
   createDeletePageTool,
@@ -33,7 +34,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 12;
+export const WORKBENCH_TOOL_VERSION = 13;
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -43,6 +44,8 @@ export interface WorkbenchToolsOptions {
   subagentRunner?: SubagentRunner;
   includePlanApproval?: boolean;
   planApprovalHandler?: PlanApprovalHandler;
+  includeUserChoice?: boolean;
+  userChoiceHandler?: UserChoiceHandler;
   mode?: "workbench" | "viewer-readonly";
 }
 
@@ -83,6 +86,9 @@ export function createWorkbenchTools(
     ...(options.includePlanApproval === false
       ? []
       : [createRequestPlanApprovalTool(options.planApprovalHandler)]),
+    ...(options.includeUserChoice === false
+      ? []
+      : [createRequestUserChoiceTool(options.userChoiceHandler)]),
     createUpdatePlanTool(),
     createListPagesTool(config),
     createPreviewDeletePagesTool(config, deletionPlanStore),

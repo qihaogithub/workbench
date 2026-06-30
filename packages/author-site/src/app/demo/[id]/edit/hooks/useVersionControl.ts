@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
+import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
 import { projectApiClient } from "@/lib/project-api";
 import type {
   DemoFiles,
@@ -16,25 +17,6 @@ import type { ValidationResult } from "../../../../../../lib/validator";
 
 const IDLE_AUTO_CHECKPOINT_MS = 5 * 60 * 1000;
 const CONTINUOUS_AUTO_CHECKPOINT_MS = 30 * 60 * 1000;
-
-async function flushWorkspaceCollab(
-  projectId: string,
-  workspaceId: string,
-  sessionId: string,
-): Promise<void> {
-  if (!projectId || !workspaceId || !sessionId) return;
-  const baseUrl = (
-    process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201"
-  ).replace(/\/$/, "");
-  const params = new URLSearchParams({ sessionId });
-  const response = await fetch(
-    `${baseUrl}/api/collab/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspaceId)}/flush-all?${params.toString()}`,
-    { method: "POST" },
-  );
-  if (!response.ok) {
-    throw new Error("协同草稿同步失败");
-  }
-}
 
 export type PublishStatus =
   | "never_published"

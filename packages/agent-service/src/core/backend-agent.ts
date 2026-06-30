@@ -1,5 +1,5 @@
 import { BaseAgent } from "./agent";
-import { AgentConfig, AgentResult, SendMessageOptions } from "./types";
+import { AgentConfig, AgentResult, SendMessageOptions, UserChoiceResponse } from "./types";
 import { IBackendAdapter } from "../backends/base";
 import { logger } from "../utils/logger";
 
@@ -27,6 +27,7 @@ interface BackendWithModelSupport extends IBackendAdapter {
   getLastResponseDebug?: () => unknown;
   cancelPrompt?: () => void;
   resolvePermission?: (toolCallId: string, approved: boolean, responseContent?: string) => void;
+  resolveUserChoice?: (requestId: string, choice: UserChoiceResponse) => void;
   updateConfig?: (config: Partial<AgentConfig>) => void;
 }
 
@@ -221,6 +222,14 @@ export class BackendAgent extends BaseAgent {
       this.backend.resolvePermission(toolCallId, approved, responseContent);
     } else {
       logger.warn({ toolCallId }, 'Backend does not support resolvePermission');
+    }
+  }
+
+  resolveUserChoice(requestId: string, choice: UserChoiceResponse): void {
+    if (this.backend.resolveUserChoice) {
+      this.backend.resolveUserChoice(requestId, choice);
+    } else {
+      logger.warn({ requestId }, 'Backend does not support resolveUserChoice');
     }
   }
 }

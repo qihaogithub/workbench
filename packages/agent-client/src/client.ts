@@ -209,6 +209,7 @@ export interface StreamEvent {
     | "pong"
     | "status"
     | "permission_request"
+    | "user_choice_request"
     | "file_operation"
     | "models";
   id?: string;
@@ -243,6 +244,19 @@ export interface StreamEvent {
       editable?: boolean;
       initialContent?: string;
     };
+  };
+  userChoiceRequest?: {
+    requestId: string;
+    sessionId: string;
+    question: string;
+    description?: string;
+    options: Array<{
+      optionId: string;
+      label: string;
+      value?: string;
+      description?: string;
+    }>;
+    allowCustom: boolean;
   };
   fileOperation?: {
     method: string;

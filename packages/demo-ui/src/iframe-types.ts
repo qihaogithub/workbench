@@ -72,6 +72,7 @@ export interface VisualNodeInfo {
   computedStyle?: {
     color?: string;
     backgroundColor?: string;
+    backgroundImage?: string;
     borderColor?: string;
     borderWidth?: string;
     borderStyle?: string;
@@ -115,6 +116,10 @@ export interface VisualNodeInfo {
   sourceLine?: number;
   sourceColumn?: number;
   editCapabilities: Array<'annotate' | 'text' | 'image' | 'link' | 'style' | 'className' | 'structure'>;
+}
+
+export interface VisualNodeTreeItem extends VisualNodeInfo {
+  children: VisualNodeTreeItem[];
 }
 
 export type VisualPropertyChangeKind = 'text' | 'style' | 'attribute';

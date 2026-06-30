@@ -6,6 +6,7 @@ import {
   AgentConfig,
   AgentResult,
   ImageAttachment,
+  UserChoiceResponse,
 } from "../core/types";
 import { logger } from "../utils/logger";
 import {
@@ -35,7 +36,7 @@ interface StreamParams {
 }
 
 interface ClientMessage {
-  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response" | "console_data";
+  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response" | "user_choice_response" | "console_data";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -56,6 +57,9 @@ interface ClientMessage {
   permissionId?: string;
   optionId?: string;
   responseContent?: string;
+  /** user_choice_response: 需求确认响应 */
+  requestId?: string;
+  choice?: UserChoiceResponse;
 }
 
 interface ActiveConnection {
@@ -670,6 +674,45 @@ export async function registerWebSocketRoutes(
               }
             } catch (error) {
               logger.error({ error, permissionId }, "Failed to resolve permission");
+            }
+            break;
+          }
+
+          case "user_choice_response": {
+            const requestId = message.requestId;
+            const choice = message.choice;
+            const validChoice =
+              choice?.type === "cancel" ||
+              (choice?.type === "option" && typeof choice.optionId === "string" && choice.optionId.length > 0) ||
+              (choice?.type === "custom" && typeof choice.text === "string" && choice.text.trim().length > 0);
+
+            if (!requestId || !validChoice) {
+              sendMessage({
+                type: "error",
+                id: message.id || "unknown",
+                error: {
+                  code: "INVALID_PARAMS",
+                  message: "user_choice_response 需要 requestId 和有效 choice",
+                },
+              });
+              return;
+            }
+            const userChoice = choice as UserChoiceResponse;
+
+            logger.info(
+              { sessionId, requestId, choiceType: userChoice.type },
+              "WebSocket user_choice_response received",
+            );
+
+            try {
+              const agent = manager.get(sessionId);
+              if (agent && agent instanceof BackendAgent) {
+                agent.resolveUserChoice(requestId, userChoice);
+              } else {
+                logger.warn({ sessionId }, "No agent found for user_choice_response");
+              }
+            } catch (error) {
+              logger.error({ error, requestId }, "Failed to resolve user choice");
             }
             break;
           }
