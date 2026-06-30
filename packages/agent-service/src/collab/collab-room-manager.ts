@@ -128,18 +128,33 @@ export class CollabRoomManager {
     return { flushed: true };
   }
 
-  async flushWorkspace(projectId: string, workspaceId: string, sessionId: string): Promise<number> {
+  async flushWorkspace(
+    projectId: string,
+    workspaceId: string,
+    sessionId: string,
+  ): Promise<{ flushedRooms: number; status: "flushed" | "no_active_room" }> {
+    const validation = this.persistence.validateWorkspaceSession({
+      projectId,
+      workspaceId,
+      sessionId,
+    });
+    if (!validation.ok || !validation.workspacePath) {
+      throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    }
+
     const matched = Array.from(this.rooms.values()).filter((room) => {
       return (
         room.descriptor.projectId === projectId &&
-        room.descriptor.workspaceId === workspaceId &&
-        room.descriptor.sessionId === sessionId
+        room.descriptor.workspaceId === workspaceId
       );
     });
     for (const room of matched) {
       await this.flushRoom(room);
     }
-    return matched.length;
+    return {
+      flushedRooms: matched.length,
+      status: matched.length > 0 ? "flushed" : "no_active_room",
+    };
   }
 
   private getOrCreateRoom(descriptor: RoomDescriptor, workspacePath: string): CollabRoom {

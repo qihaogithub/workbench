@@ -3,6 +3,10 @@ import { publishProject } from '@/lib/publish-manager';
 import { createApiSuccess, createApiError } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import { getEditSession, syncEditSessionToProjectWorkspace } from '@/lib/session-manager';
+import {
+  flushWorkspaceBeforeCriticalAction,
+  getWorkspaceFlushErrorResponse,
+} from "@/lib/workspace-flush";
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +35,19 @@ export async function POST(
       }
       if (session.userId && session.userId !== payload.userId) {
         return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Session'), { status: 403 });
+      }
+      try {
+        await flushWorkspaceBeforeCriticalAction({
+          projectId: params.projectId,
+          workspaceId: session.workspaceId,
+          sessionId,
+        });
+      } catch (error) {
+        const flushError = getWorkspaceFlushErrorResponse(error);
+        return NextResponse.json(
+          createApiError(flushError.code, flushError.message),
+          { status: flushError.status },
+        );
       }
       const synced = syncEditSessionToProjectWorkspace(sessionId);
       if (!synced.success) {

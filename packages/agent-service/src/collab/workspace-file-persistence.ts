@@ -40,6 +40,20 @@ export class WorkspaceFilePersistence {
     resourcePath: string;
     kind: CollabResourceKind;
   }): SessionValidation {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok || !validation.workspacePath) return validation;
+
+    const safePath = this.resolveResourcePath(validation.workspacePath, input.resourcePath, input.kind);
+    if (!safePath) return { ok: false, reason: "INVALID_RESOURCE_PATH" };
+
+    return validation;
+  }
+
+  validateWorkspaceSession(input: {
+    projectId: string;
+    workspaceId: string;
+    sessionId: string;
+  }): SessionValidation {
     const session = this.findSessionMeta(input.sessionId);
     if (!session) return { ok: false, reason: "SESSION_NOT_FOUND" };
     if (session.expiresAt && Date.now() > session.expiresAt) {
@@ -59,12 +73,6 @@ export class WorkspaceFilePersistence {
     if (workspaceMeta?.demoId && workspaceMeta.demoId !== input.projectId) {
       return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };
     }
-    if (workspaceMeta?.userId && session.userId && workspaceMeta.userId !== session.userId) {
-      return { ok: false, reason: "WORKSPACE_USER_MISMATCH" };
-    }
-
-    const safePath = this.resolveResourcePath(workspacePath, input.resourcePath, input.kind);
-    if (!safePath) return { ok: false, reason: "INVALID_RESOURCE_PATH" };
 
     return {
       ok: true,

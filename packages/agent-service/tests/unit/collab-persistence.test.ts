@@ -33,6 +33,13 @@ beforeEach(() => {
     workspaceId: "ws-1",
     expiresAt: Date.now() + 60_000,
   });
+  writeJson(path.join(tempDir, "sessions", "user-2", "proj-1", "session-2", ".session.json"), {
+    sessionId: "session-2",
+    demoId: "proj-1",
+    userId: "user-2",
+    workspaceId: "ws-1",
+    expiresAt: Date.now() + 60_000,
+  });
 });
 
 afterEach(() => {
@@ -52,6 +59,22 @@ describe("WorkspaceFilePersistence", () => {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
+  });
+
+  it("允许不同用户通过各自 session 协作同一个 workspace", () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+
+    const result = persistence.validateSession({
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-2",
+      resourcePath: "demos/page-1/index.tsx",
+      kind: "page-code",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.userId).toBe("user-2");
     expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
   });
 

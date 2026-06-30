@@ -113,14 +113,14 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const flushedRooms = await collabRoomManager.flushWorkspace(
+        const result = await collabRoomManager.flushWorkspace(
           request.params.projectId,
           request.params.workspaceId,
           sessionId,
         );
-        return { success: true, data: { flushedRooms } };
+        return { success: true, data: result };
       } catch (error) {
-        reply.status(500);
+        reply.status(403);
         return {
           success: false,
           error: {
