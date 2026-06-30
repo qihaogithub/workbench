@@ -43,6 +43,7 @@
 - 共享包：`@opencode-workbench/shared`
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
 - 环境变量文件：`.env` 被 git 忽略，`.env.docker` 用于 Docker 部署覆盖
+- Codex 定时任务上下文：`OPS/automations/`
 - `CLAUDE.md` 仅包含 `@AGENTS.md` 转引，根目录 `AGENTS.md` 是主要工作指南。
 
 ## 工作流程
@@ -110,6 +111,19 @@
 - 更新模块文档时同步更新对应 `INDEX.md`。
 - 当前项目文档入口是 `docs/项目文档/INDEX.md`；`doc-maintainer` 技能里提到的 `docs/INDEX.md` 在本项目中映射为 `docs/项目文档/INDEX.md`，除非后续专门建立全局 `docs/INDEX.md`。
 - `docs/plans/进行中/` 是任务追踪区，新增或更新计划文档不需要同步 `docs/项目文档/INDEX.md`；任务完成后按 `docs/plans/已完成/AGENTS.md` 的归档规则移动。
+
+## OPS 自动任务上下文
+
+`OPS/automations/` 用于维护 Codex 定时任务和维护型自动任务的运行上下文，包括 context、runbook 和当前状态账本。它的目标读者是自动任务中的 AI，优先保证可执行、可复查和低噪声更新。
+
+维护规则：
+
+- `OPS/automations/` 不属于 `docs/项目文档/` 知识库，不套用需求文档/技术文档拆分规范。
+- 修改 `OPS/automations/` 时优先读取 `OPS/automations/AGENTS.md` 和 `OPS/automations/README.md`。
+- `contexts/` 放长期任务上下文，`runbooks/` 放按触发频率组织的执行手册，`state/` 放覆盖式当前状态。
+- `state/` 只保留当前仍成立的结论，不追加逐次流水账。
+- 自动任务发现业务规则、接口契约或架构边界变化时，仍需更新 `docs/项目文档/` 对应模块。
+- 自动任务发现具体缺陷、测试缺口或实施事项时，记录到 `docs/plans/进行中/`，不要只写在 `OPS/automations/state/`。
 
 ## Monorepo 结构
 

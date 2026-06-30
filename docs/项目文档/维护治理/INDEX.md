@@ -1,10 +1,9 @@
 # 维护治理
 
-## 需求文档
+## 说明文档
 
-- [Codex 协作维护需求](./Codex协作维护_需求文档.md)
+- [自动化维护治理说明](./自动化维护治理_说明.md)
 
-## 技术文档
+## 自动任务上下文
 
-- [01 Codex 改动验收矩阵](./技术/01_Codex改动验收矩阵.md)
-- [02 配置入口治理](./技术/02_配置入口治理.md)
+- [OPS automations](../../../OPS/automations/README.md) — Codex 定时任务的 context、runbook 和 state

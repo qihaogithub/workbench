@@ -8,7 +8,7 @@
 
 | 脚本 | 根目录快捷命令 | 用途 |
 |---|---|---|
-| `detect-sync-status-flap.mjs` | `pnpm test:sync-status-flap` | 用 Playwright 打开编辑页，持续采样页面上的协同同步状态，检测“连接中”和“离线待同步”之间是否反复抖动。 |
+| `detect-sync-status-flap.mjs` | `pnpm test:sync-status-flap` | 用 Playwright 打开编辑页，采样协同同步状态，并调用 Workspace flush 探针复现“同步失败”或连接状态抖动。 |
 | `knowledge-validation-suite.mjs` | `pnpm test:knowledge-validation` / `pnpm test:knowledge-validation:run` | 通过 Project CLI 构造知识库验证场景、创建模板、实例化项目，并可选调用 Agent 评估知识库回答质量。 |
 | `test-ai-workspace-refresh.mjs` | `pnpm test:ai-workspace-refresh` | 验证 AI 写入 `demos/` 文件后，author-site 是否能刷新工作区状态，并运行相关 agent-service 单测。 |
 
@@ -28,14 +28,16 @@
 
 ### 功能
 
-该脚本用于排查编辑页右上角或页面可见区域中的协同同步状态是否发生异常抖动。脚本会：
+该脚本用于排查编辑页右上角或页面可见区域中的协同同步状态是否发生异常抖动，或 Workspace flush 是否失败并导致“同步失败”。脚本会：
 
 1. 使用 Playwright Chromium 打开目标编辑页。
 2. 如果被重定向到登录页，则调用登录 API 完成登录。
-3. 按固定间隔采样页面中可见的同步状态文案。
-4. 统计状态出现次数和状态切换记录。
-5. 生成 JSON 报告和页面截图。
-6. 如果检测到“连接中”和“离线待同步”之间多次来回切换，则以失败退出。
+3. 从目标编辑页 URL 解析项目 ID，读取或创建当前用户在该项目下的编辑 Session。
+4. 调用 `/api/sessions/:sessionId/workspace-flush`，记录 flush 状态码和响应体。
+5. 按固定间隔采样页面中可见的同步状态文案。
+6. 统计状态出现次数和状态切换记录。
+7. 生成 JSON 报告和页面截图。
+8. 如果 flush 失败、页面出现“同步失败”，或检测到“连接中”和“离线待同步”之间多次来回切换，则以失败退出。
 
 ### 运行方式
 
@@ -64,6 +66,8 @@ node scripts/development/detect-sync-status-flap.mjs
 
 - 报告：`tmp/sync-status-flap/report.json`
 - 截图：`tmp/sync-status-flap/last-page.png`
+
+报告中的 `flushProbe` 字段记录项目 ID、Session 来源、Session/Workspace、`workspace-flush` 响应和错误信息；`trackedResponses` 会摘要 `/api/sessions`、`/api/collab` 和 `/api/agent` 相关请求。脚本可能像正常打开编辑页一样创建或复用编辑 Session，但只写入 `tmp/sync-status-flap/` 诊断产物。
 
 ## knowledge-validation-suite.mjs
 
@@ -163,7 +167,7 @@ node scripts/development/test-ai-workspace-refresh.mjs
 ## 使用注意事项
 
 - 这些脚本默认依赖本地开发数据，例如 `data/projects/`、`data/agent-run-logs/` 和默认项目 ID；在新环境中可能需要先准备对应项目。
-- `detect-sync-status-flap.mjs` 需要 author-site 正在运行，并且目标 URL 可访问。
+- `detect-sync-status-flap.mjs` 需要 author-site 和 agent-service 正在运行，并且目标 URL 可访问。
 - `knowledge-validation-suite.mjs ai` 需要 agent-service 正在运行，并通过 `--agent-url` 指定服务地址。
 - `knowledge-validation-suite.mjs fixture` 和 `run` 会通过 Project CLI 修改目标项目，请只在可接受修改测试项目数据时使用。
 - `tmp/` 和 `.tmp/` 下的报告、截图和临时文件是诊断产物，不应提交到版本库。

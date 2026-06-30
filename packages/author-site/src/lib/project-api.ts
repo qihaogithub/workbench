@@ -417,13 +417,17 @@ export class ProjectApiClient {
 
   // ============ 发布管理 ============
 
-  async publishProject(projectId: string, request?: { sessionId?: string }): Promise<{
+  async publishProject(projectId: string, request?: { sessionId?: string; workspaceId?: string }): Promise<{
     projectId: string;
     publishedVersion: string;
     publishedAt: number;
     demoCount: number;
     duration: number;
   }> {
+    const body = {
+      ...(request?.sessionId ? { sessionId: request.sessionId } : {}),
+      ...(request?.workspaceId ? { workspaceId: request.workspaceId } : {}),
+    };
     const response = await this.localRequest<{
       projectId: string;
       publishedVersion: string;
@@ -434,7 +438,7 @@ export class ProjectApiClient {
       `/api/projects/${projectId}/publish`,
       {
         method: 'POST',
-        body: JSON.stringify(request ?? {}),
+        body: JSON.stringify(body),
       }
     );
     if (!response.success || !response.data) {

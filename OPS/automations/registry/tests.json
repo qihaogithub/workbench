@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-30",
+  "description": "Stable validation entrypoints that Codex automation should understand before running tests.",
+  "items": [
+    {
+      "id": "repo-health-check",
+      "kind": "root-check",
+      "title": "Repository hygiene check",
+      "path": "scripts/check-repo.mjs",
+      "command": "corepack pnpm check:repo",
+      "ownerArea": "repo",
+      "status": "active",
+      "automationLevel": "auto-run",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "AGENTS.md"
+      ],
+      "notes": "Fast no-service check for required files, gitignore suggestions, markdown links and root script paths."
+    },
+    {
+      "id": "automation-registry-check",
+      "kind": "root-check",
+      "title": "Automation registry consistency check",
+      "path": "OPS/automations/bin/automation.mjs",
+      "command": "corepack pnpm check:automation",
+      "ownerArea": "ops-automations",
+      "status": "active",
+      "automationLevel": "auto-run",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/automations/README.md"
+      ],
+      "notes": "Fast no-service check for registry path and command consistency."
+    },
+    {
+      "id": "automation-stale-issues-report",
+      "kind": "automation-report",
+      "title": "In-progress plan stale issue report",
+      "path": "OPS/automations/bin/automation.mjs",
+      "command": "corepack pnpm ops:automation stale-issues",
+      "ownerArea": "ops-automations",
+      "status": "active",
+      "automationLevel": "report-only",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/automations/runbooks/weekly-cleanup.md",
+        "OPS/automations/templates/cleanup-report.md"
+      ],
+      "notes": "Static report used by weekly cleanup automation. It does not move, delete or edit plan files."
+    },
+    {
+      "id": "project-cli-check",
+      "kind": "package-check",
+      "title": "Project CLI check",
+      "path": "packages/project-cli/src/index.ts",
+      "command": "corepack pnpm check:project-cli",
+      "ownerArea": "project-cli",
+      "status": "active",
+      "automationLevel": "auto-run",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "docs/项目文档/创作端/10-CLI/INDEX.md"
+      ],
+      "notes": "Primary validation for project admin CLI command changes."
+    },
+    {
+      "id": "author-core-e2e",
+      "kind": "e2e",
+      "title": "Author core E2E regression",
+      "path": "test/创作端E2E回归测试/author-core-flow-regression.spec.ts",
+      "command": "corepack pnpm test:e2e:core-flow",
+      "ownerArea": "author-site",
+      "status": "active",
+      "automationLevel": "manual-or-weekly",
+      "requiresServices": [
+        "author-site"
+      ],
+      "writes": [
+        "test/创作端E2E回归测试/test-outputs/"
+      ],
+      "docs": [
+        "test/创作端E2E回归测试/AGENTS.md"
+      ],
+      "notes": "Requires running author-site and browser dependencies. Prefer weekly or targeted runs."
+    },
+    {
+      "id": "full-e2e",
+      "kind": "e2e",
+      "title": "Author E2E regression suite",
+      "path": "test/创作端E2E回归测试/playwright.config.ts",
+      "command": "corepack pnpm test:e2e",
+      "ownerArea": "author-site",
+      "status": "active",
+      "automationLevel": "manual-or-weekly",
+      "requiresServices": [
+        "author-site"
+      ],
+      "writes": [
+        "test/创作端E2E回归测试/test-outputs/"
+      ],
+      "docs": [
+        "test/创作端E2E回归测试/AGENTS.md"
+      ],
+      "notes": "Full browser regression. Classify failures before editing tests."
+    }
+  ]
+}

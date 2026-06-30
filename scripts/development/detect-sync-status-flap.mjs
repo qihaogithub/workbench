@@ -20,6 +20,7 @@ const e2eUser = process.env.E2E_USER ?? 'qihao';
 const e2ePassword = process.env.E2E_PASSWORD ?? '130015';
 
 const statusLabels = [
+  { key: 'flush-error', labels: ['同步失败'] },
   { key: 'offline', labels: ['离线待同步', '绂荤嚎寰呭悓姝?'] },
   { key: 'connecting', labels: ['连接中', '杩炴帴涓?'] },
   { key: 'saving', labels: ['同步中', '鍚屾涓?'] },
@@ -38,6 +39,155 @@ function normalizeStatus(label) {
     }
   }
   return 'unknown';
+}
+
+function getProjectIdFromUrl(urlString) {
+  const url = new URL(urlString);
+  const match = /^\/demo\/([^/]+)\/edit\/?$/.exec(url.pathname);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+async function parseJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+function pickSessionWithWorkspace(sessions) {
+  if (!Array.isArray(sessions)) return null;
+  return sessions.find((session) => {
+    return (
+      session &&
+      typeof session.sessionId === 'string' &&
+      typeof session.workspaceId === 'string' &&
+      session.workspaceId &&
+      !session.isExpired
+    );
+  }) ?? null;
+}
+
+async function getSessionFromProjectList(page, projectId) {
+  const response = await page.request.get(
+    new URL(`/api/sessions/project/${encodeURIComponent(projectId)}`, targetUrl).toString(),
+    { timeout: 15000 },
+  );
+  const body = await parseJsonResponse(response);
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    body,
+    session: pickSessionWithWorkspace(body?.data),
+  };
+}
+
+async function createOrResumeSession(page, projectId) {
+  const response = await page.request.post(
+    new URL('/api/sessions', targetUrl).toString(),
+    {
+      data: { demoId: projectId },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 20000,
+    },
+  );
+  const body = await parseJsonResponse(response);
+  const data = body?.data;
+  const session =
+    data &&
+    typeof data.sessionId === 'string' &&
+    typeof data.workspaceId === 'string' &&
+    data.workspaceId
+      ? {
+          sessionId: data.sessionId,
+          workspaceId: data.workspaceId,
+          demoId: projectId,
+        }
+      : null;
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    body,
+    session,
+  };
+}
+
+async function runWorkspaceFlushProbe(page) {
+  const projectId = getProjectIdFromUrl(page.url()) ?? getProjectIdFromUrl(targetUrl);
+  if (!projectId) {
+    return {
+      ok: false,
+      error: `cannot resolve project id from ${page.url()}`,
+    };
+  }
+
+  const projectSessions = await getSessionFromProjectList(page, projectId).catch((error) => ({
+    ok: false,
+    status: null,
+    body: null,
+    session: null,
+    error: error instanceof Error ? error.stack ?? error.message : String(error),
+  }));
+  let session = projectSessions.session;
+  let sessionSource = 'project-session-list';
+  let sessionCreate = null;
+
+  if (!session) {
+    sessionCreate = await createOrResumeSession(page, projectId);
+    session = sessionCreate.session;
+    sessionSource = 'create-or-resume-session';
+  }
+
+  if (!session) {
+    return {
+      ok: false,
+      projectId,
+      sessionSource,
+      projectSessions,
+      sessionCreate,
+      error: 'no active session with workspaceId was found or created',
+    };
+  }
+
+  const response = await page.request.post(
+    new URL(`/api/sessions/${encodeURIComponent(session.sessionId)}/workspace-flush`, targetUrl).toString(),
+    {
+      data: {
+        projectId,
+        workspaceId: session.workspaceId,
+      },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 20000,
+    },
+  );
+  const body = await parseJsonResponse(response);
+  const apiSuccess = body?.success !== false;
+
+  return {
+    ok: response.ok() && apiSuccess,
+    projectId,
+    sessionSource,
+    session: {
+      sessionId: session.sessionId,
+      workspaceId: session.workspaceId,
+    },
+    projectSessions: {
+      status: projectSessions.status,
+      ok: projectSessions.ok,
+      sessionCount: Array.isArray(projectSessions.body?.data)
+        ? projectSessions.body.data.length
+        : null,
+      body: projectSessions.body,
+    },
+    sessionCreate,
+    flush: {
+      status: response.status(),
+      ok: response.ok(),
+      body,
+    },
+  };
 }
 
 async function loginIfNeeded(page) {
@@ -159,6 +309,7 @@ const consoleEvents = [];
 const pageErrors = [];
 const failedRequests = [];
 const websocketResponses = [];
+const trackedResponses = [];
 
 const browser = await chromium.launch({ headless });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -194,6 +345,19 @@ page.on('response', (response) => {
       requestMethod: response.request().method(),
     });
   }
+  if (
+    url.includes('/api/collab/') ||
+    url.includes('/api/agent/') ||
+    url.includes('/api/sessions/') ||
+    url.includes('/api/sessions?') ||
+    url.endsWith('/api/sessions')
+  ) {
+    trackedResponses.push({
+      url,
+      status: response.status(),
+      requestMethod: response.request().method(),
+    });
+  }
 });
 
 let report;
@@ -206,6 +370,11 @@ try {
 
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
+
+  const flushProbe = await runWorkspaceFlushProbe(page).catch((error) => ({
+    ok: false,
+    error: error instanceof Error ? error.stack ?? error.message : String(error),
+  }));
 
   const samples = [];
   const startedAt = Date.now();
@@ -231,6 +400,7 @@ try {
   }
 
   const summary = summarizeSamples(samples);
+  const flushErrorVisible = (summary.statusCounts['flush-error'] ?? 0) > 0;
   const runtimeErrors = consoleEvents.filter((event) => {
     const text = event.text.toLowerCase();
     return (
@@ -245,6 +415,8 @@ try {
 
   report = {
     ok:
+      flushProbe.ok &&
+      !flushErrorVisible &&
       !summary.flapDetected &&
       !statusMissing &&
       runtimeErrors.length === 0 &&
@@ -255,6 +427,8 @@ try {
     durationMs,
     screenshotPath: path.relative(repoRoot, screenshotPath),
     summary,
+    flushProbe,
+    flushErrorVisible,
     statusMissing,
     runtimeErrors: runtimeErrors.slice(-10),
     pageErrors: pageErrors.slice(-10),
@@ -263,6 +437,7 @@ try {
     pageErrors: pageErrors.slice(-10),
     failedRequests: failedRequests.slice(-50),
     websocketResponses: websocketResponses.slice(-80),
+    trackedResponses: trackedResponses.slice(-120),
   };
 } catch (error) {
   await page.screenshot({ path: screenshotPath, fullPage: false }).catch(() => {});
@@ -277,6 +452,7 @@ try {
     consoleEvents: consoleEvents.slice(-50),
     failedRequests: failedRequests.slice(-50),
     websocketResponses: websocketResponses.slice(-80),
+    trackedResponses: trackedResponses.slice(-120),
   };
 } finally {
   await browser.close();
@@ -294,6 +470,24 @@ const summary = report.summary;
 console.log(`Target: ${targetUrl}`);
 console.log(`Duration: ${durationMs}ms, sample interval: ${sampleMs}ms`);
 console.log(`Status counts: ${JSON.stringify(summary.statusCounts)}`);
+if (report.flushProbe) {
+  console.log(`Flush probe: ${report.flushProbe.ok ? 'PASS' : 'FAIL'}`);
+  if (report.flushProbe.flush) {
+    console.log(
+      `Flush response: ${report.flushProbe.flush.status} ${JSON.stringify(report.flushProbe.flush.body)}`,
+    );
+  } else if (report.flushProbe.error) {
+    console.log(`Flush error: ${String(report.flushProbe.error).split('\n')[0]}`);
+  }
+}
+if (report.flushProbe && !report.flushProbe.ok) {
+  console.log('FAIL workspace flush probe failed.');
+  process.exit(1);
+}
+if (report.flushErrorVisible) {
+  console.log('FAIL visible sync status shows 同步失败.');
+  process.exit(1);
+}
 if (report.statusMissing) {
   console.log('FAIL sync status text was not found in the rendered page.');
   if (report.runtimeErrors.length > 0) {
