@@ -8,5 +8,87 @@
     "4c569d8242248673",
     "2fd33421fd27f0cd",
     "29b47fc9b2b2cf6d"
-  ]
+  ],
+  "variants": {
+    "2b53491fb638a77e:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-06-30T09:59:06.303Z",
+      "elapsed": 7040,
+      "renderBox": {
+        "width": 1024,
+        "height": 768,
+        "viewportWidth": 1024,
+        "viewportHeight": 768,
+        "bodyWidth": 1024,
+        "bodyHeight": 768,
+        "documentWidth": 1024,
+        "documentHeight": 768,
+        "fullPage": true
+      }
+    },
+    "a5c67a8e6f3e372b:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-06-30T07:07:13.565Z",
+      "elapsed": 5321,
+      "renderBox": {
+        "width": 1024,
+        "height": 768,
+        "viewportWidth": 1024,
+        "viewportHeight": 768,
+        "bodyWidth": 1024,
+        "bodyHeight": 768,
+        "documentWidth": 1024,
+        "documentHeight": 768,
+        "fullPage": true
+      }
+    },
+    "447faee8ac18fa60:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-06-30T06:57:48.672Z",
+      "elapsed": 4092,
+      "renderBox": {
+        "width": 1024,
+        "height": 768,
+        "viewportWidth": 1024,
+        "viewportHeight": 768,
+        "bodyWidth": 1024,
+        "bodyHeight": 768,
+        "documentWidth": 1024,
+        "documentHeight": 768,
+        "fullPage": true
+      }
+    },
+    "1bb444b994ee0bf1:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-06-30T06:44:36.725Z",
+      "elapsed": 8415,
+      "renderBox": {
+        "width": 1024,
+        "height": 768,
+        "viewportWidth": 1024,
+        "viewportHeight": 768,
+        "bodyWidth": 1024,
+        "bodyHeight": 768,
+        "documentWidth": 1024,
+        "documentHeight": 768,
+        "fullPage": true
+      }
+    },
+    "0b6f04c48ab03617:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-06-30T06:17:43.443Z",
+      "elapsed": 6719,
+      "renderBox": {
+        "width": 1024,
+        "height": 768,
+        "viewportWidth": 1024,
+        "viewportHeight": 768,
+        "bodyWidth": 1024,
+        "bodyHeight": 768,
+        "documentWidth": 1024,
+        "documentHeight": 768,
+        "fullPage": true
+      }
+    }
+  }
 }

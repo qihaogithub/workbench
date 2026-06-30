@@ -132,6 +132,39 @@ function TestEditorCanvasWithFirstEntryFit() {
   );
 }
 
+function TestCanvasWithParentVisibleState({
+  onVisibleChange,
+}: {
+  onVisibleChange: (pageIds: string[]) => void;
+}) {
+  const [state, setState] = useState<CanvasState>(initialState);
+  const [visiblePageIds, setVisiblePageIds] = useState<string[]>([]);
+
+  return (
+    <>
+      <PreviewCanvas
+        interactionMode="editor"
+        pages={[
+          {
+            id: "page_1",
+            name: "页面一",
+            order: 0,
+            code: "export default function Demo(){return null}",
+            previewSize: { width: 375, height: 812 },
+          },
+        ]}
+        canvasState={state}
+        onCanvasStateChange={setState}
+        onVisiblePageIdsChange={(pageIds) => {
+          onVisibleChange(pageIds);
+          setVisiblePageIds(pageIds);
+        }}
+      />
+      <output data-testid="visible-page-ids">{visiblePageIds.join(",")}</output>
+    </>
+  );
+}
+
 function TestEditorCanvasWithConfigCallback({
   onPageConfigEdit,
 }: {
@@ -463,6 +496,19 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
 
     await waitFor(() => {
       expect(handleVisibleChange).toHaveBeenCalledWith(["page_1"]);
+    });
+  });
+
+  it("可见页面集合内容不变时不重复回调父级，避免进入画布后循环更新", async () => {
+    const handleVisibleChange = jest.fn();
+    render(<TestCanvasWithParentVisibleState onVisibleChange={handleVisibleChange} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("visible-page-ids")).toHaveTextContent("page_1");
+    });
+
+    await waitFor(() => {
+      expect(handleVisibleChange).toHaveBeenCalledTimes(1);
     });
   });
 

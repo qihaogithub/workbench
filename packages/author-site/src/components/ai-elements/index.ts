@@ -78,3 +78,5 @@ export { Timeline, TimelineItem } from "./timeline";
 export { AgentProcessGroup } from "./agent-process-group";
 
 export { PermissionDialog } from "./permission-dialog";
+
+export { UserChoiceCard } from "./user-choice-card";

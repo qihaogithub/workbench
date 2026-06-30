@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "demo_1779000000100_text",
+      "title": "文本输入"
+    },
+    "page-2": {
+      "pageId": "demo_1779000000200_number",
+      "title": "数字与范围"
+    },
+    "page-3": {
+      "pageId": "demo_1779000000300_switch",
+      "title": "开关与选择"
+    },
+    "page-4": {
+      "pageId": "demo_1779000000400_color",
+      "title": "颜色与图片"
+    },
+    "page-5": {
+      "pageId": "demo_1779000000500_array",
+      "title": "数据列表"
+    },
+    "page-6": {
+      "pageId": "demo_1779000000600_position",
+      "title": "位置与排序"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

@@ -19,8 +19,6 @@ FROM node:20-bookworm
 
 WORKDIR /app
 
-COPY --from=builder /app/packages/screenshot-service/dist/server.js ./server.js
-
 # 安装 Chromium
 RUN apt-get update && apt-get install -y \
     chromium \
@@ -30,6 +28,8 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 RUN npm install --no-save fastify @fastify/cors pino pino-pretty puppeteer-core
+
+COPY --from=builder /app/packages/screenshot-service/dist/server.js ./server.js
 
 EXPOSE 3202
 

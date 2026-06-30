@@ -9,7 +9,9 @@ export async function persistMessages(
     const messagesToSave = messages.map((m, i) => ({
       id: m.id,
       role: m.role,
+      kind: m.kind,
       content: m.content,
+      autoRepair: m.autoRepair,
       timestamp: now - (messages.length - i) * 1000,
     }));
     await fetch(`/api/sessions/${sessionId}/messages`, {

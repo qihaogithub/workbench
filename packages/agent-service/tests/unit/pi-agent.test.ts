@@ -915,7 +915,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(25);
+      expect(tools).toHaveLength(26);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -936,6 +936,7 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('figmaMcp');
       expect(toolNames).toContain('dingtalk');
       expect(toolNames).toContain('requestPlanApproval');
+      expect(toolNames).toContain('requestUserChoice');
       expect(toolNames).toContain('updatePlan');
       expect(toolNames).toContain('listPages');
       expect(toolNames).toContain('previewDeletePages');
@@ -949,8 +950,9 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(24);
+      expect(tools).toHaveLength(25);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
+      expect(tools.map(tool => tool.name)).toContain('requestUserChoice');
     });
 
     it('delegateTask 应拒绝空任务', async () => {

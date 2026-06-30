@@ -100,6 +100,35 @@ export interface PermissionRequest {
   };
 }
 
+export interface UserChoiceOption {
+  optionId: string;
+  label: string;
+  value?: string;
+  description?: string;
+}
+
+export interface UserChoiceRequest {
+  requestId: string;
+  sessionId: string;
+  question: string;
+  description?: string;
+  options: UserChoiceOption[];
+  allowCustom: boolean;
+}
+
+export type UserChoiceResponse =
+  | {
+      type: "option";
+      optionId: string;
+    }
+  | {
+      type: "custom";
+      text: string;
+    }
+  | {
+      type: "cancel";
+    };
+
 export interface FileOperation {
   method: string;
   path: string;
@@ -123,6 +152,7 @@ export interface StreamEventHandlers {
   onToolCall?: (toolCall: ReturnType<typeof parseToolCallFromEvent>) => void;
   onToolUpdate?: (update: ToolUpdateEvent) => void;
   onPermission?: (request: PermissionRequest) => void;
+  onUserChoice?: (request: UserChoiceRequest) => void;
   onFileOperation?: (operation: FileOperation) => void;
   onFinish?: (result: StreamResult) => void;
   onError?: (error: {
@@ -273,6 +303,19 @@ export class StreamService {
     }
   }
 
+  sendUserChoiceResponse(requestId: string, choice: UserChoiceResponse): void {
+    const ws = (this.stream as any)?.ws;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "user_choice_response",
+          requestId,
+          choice,
+        }),
+      );
+    }
+  }
+
   sendModelChange(modelId: string): void {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
@@ -383,6 +426,15 @@ export class StreamService {
       if (event.permissionRequest) {
         this.handlers.onPermission?.(
           event.permissionRequest as PermissionRequest,
+        );
+      }
+    });
+
+    this.stream.on("user_choice_request", (event: StreamEvent) => {
+      if (this.currentSessionId !== streamId) return;
+      if (event.userChoiceRequest) {
+        this.handlers.onUserChoice?.(
+          event.userChoiceRequest as UserChoiceRequest,
         );
       }
     });

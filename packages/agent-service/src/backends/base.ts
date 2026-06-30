@@ -1,4 +1,4 @@
-import { AgentConfig, AgentEvent, ImageAttachment } from '../core/types';
+import { AgentConfig, AgentEvent, ImageAttachment, UserChoiceResponse } from '../core/types';
 
 export type BackendStatus = 'idle' | 'initializing' | 'ready' | 'busy' | 'error';
 
@@ -19,6 +19,8 @@ export interface IBackendAdapter {
   setPromptTimeout?(seconds: number): void;
   cancelPrompt?(): void;
   getWorkingDir?(): string | null;
+  resolvePermission?(toolCallId: string, approved: boolean, responseContent?: string): void;
+  resolveUserChoice?(requestId: string, choice: UserChoiceResponse): void;
   /**
    * v3.2: 运行时更新 system prompt（仅静态部分 L2 + L4）
    * 不重建 Agent，保留 messages 历史

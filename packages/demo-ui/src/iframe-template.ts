@@ -241,6 +241,7 @@ const visualEditScript = `
       computedStyle: style ? {
         color: style.color || undefined,
         backgroundColor: style.backgroundColor || undefined,
+        backgroundImage: style.backgroundImage || undefined,
         borderColor: style.borderColor || undefined,
         borderWidth: style.borderWidth || undefined,
         borderStyle: style.borderStyle || undefined,
@@ -1010,6 +1011,59 @@ const visualEditScript = `
     return editable.reverse();
   }
 
+  function buildVisualNodeTree(rootEl, options) {
+    var maxNodes = options && options.maxNodes ? options.maxNodes : 220;
+    var count = 0;
+
+    function walk(el) {
+      if (!el || !isEditableElement(el) || count >= maxNodes) return null;
+      count += 1;
+      var info = getNodeInfo(el);
+      var children = [];
+      var child = el.firstElementChild;
+      while (child && count < maxNodes) {
+        var childTree = walk(child);
+        if (childTree) children.push(childTree);
+        child = child.nextElementSibling;
+      }
+      info.children = children;
+      return info;
+    }
+
+    return walk(rootEl);
+  }
+
+  function collectVisualNodeTree(rootEl, options) {
+    var roots = [];
+    var maxNodes = options && options.maxNodes ? options.maxNodes : 260;
+    var count = 0;
+
+    function walk(el) {
+      if (!el || count >= maxNodes) return null;
+      if (!isEditableElement(el)) return null;
+      count += 1;
+      var info = getNodeInfo(el);
+      var children = [];
+      var child = el.firstElementChild;
+      while (child && count < maxNodes) {
+        var childTree = walk(child);
+        if (childTree) children.push(childTree);
+        child = child.nextElementSibling;
+      }
+      info.children = children;
+      return info;
+    }
+
+    var root = rootEl || document.body;
+    var child = root.firstElementChild;
+    while (child && count < maxNodes) {
+      var tree = walk(child);
+      if (tree) roots.push(tree);
+      child = child.nextElementSibling;
+    }
+    return roots;
+  }
+
   function resolveAnnotationTarget(el) {
     if (!el) return el;
     if (findTextEditElement(el)) return el;
@@ -1072,14 +1126,27 @@ const visualEditScript = `
     event.preventDefault();
     event.stopPropagation();
     if (!el) {
-      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [], openLayerPicker: true }, '*');
+      window.parent.postMessage({
+        type: 'VISUAL_SELECT',
+        node: null,
+        nodeStack: [],
+        openLayerPicker: true,
+        contextMenuPoint: { x: event.clientX, y: event.clientY }
+      }, '*');
       return;
     }
     var stack = collectElementStack(event.clientX, event.clientY, el);
     var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
     state.selectedNodeId = node.domPath;
     drawBox(selectedBox, node);
-    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack, openLayerPicker: true }, '*');
+    window.parent.postMessage({
+      type: 'VISUAL_SELECT',
+      node: node,
+      nodeStack: stack,
+      nodeTree: buildVisualNodeTree(el, { maxNodes: 160 }),
+      openLayerPicker: true,
+      contextMenuPoint: { x: event.clientX, y: event.clientY }
+    }, '*');
   }, true);
 
   window.addEventListener('blur', function() {
@@ -1106,7 +1173,15 @@ const visualEditScript = `
     window.parent.postMessage({ type: 'VISUAL_INLINE_EDIT', payload: { node: getNodeInfo(el), before: before, after: after } }, '*');
   }, true);
 
-  window.__VISUAL_EDIT__ = { setState: setState, redrawSelection: redrawSelection, renderAnnotations: renderAnnotations, applyPropertyChanges: applyPropertyChanges };
+  window.__VISUAL_EDIT__ = {
+    setState: setState,
+    redrawSelection: redrawSelection,
+    renderAnnotations: renderAnnotations,
+    applyPropertyChanges: applyPropertyChanges,
+    collectVisualNodeTree: function() {
+      return collectVisualNodeTree(document.body, { maxNodes: 260 });
+    }
+  };
 })();
 `;
 
@@ -1190,7 +1265,7 @@ export function generateIframeHtml(
           timestamp: Date.now()
         }));
       } catch (_err) {}
-      window.parent.postMessage({ type: 'RUNTIME_ERROR', ...safePayload }, '*');
+      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, ...safePayload }, '*');
     }
 
     function reportRuntimeTiming(stage, details) {
@@ -1267,7 +1342,7 @@ export function generateIframeHtml(
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED' }, '*');
+            window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1283,6 +1358,7 @@ export function generateIframeHtml(
       if (type === 'UPDATE_CODE' || type === 'UPDATE_MODULE') {
         var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
         var incomingCode = moduleUrl || code;
+        currentRequestId = typeof requestId === 'number' ? requestId : null;
         reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
@@ -1311,6 +1387,7 @@ export function generateIframeHtml(
       }`
     : `
       if (type === 'UPDATE_CODE') {
+        currentRequestId = typeof requestId === 'number' ? requestId : null;
         reportRuntimeTiming('update_code_received', { isUrl: false });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
@@ -1340,7 +1417,7 @@ export function generateIframeHtml(
             renderComponent();
             URL.revokeObjectURL(moduleUrl);
             if (module.default) {
-              window.parent.postMessage({ type: 'LOADED' }, '*');
+              window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
             } else {
               reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
             }
@@ -1390,6 +1467,7 @@ ${cssLinks}
     let currentRouteParams = {};
     let currentComponent = null;
     let updateVersion = 0;
+    let currentRequestId = null;
     let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
@@ -1487,7 +1565,7 @@ ${cssLinks}
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, requestId${supportUrlMode ? ", isUrl" : ""} } = event.data;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -1497,7 +1575,7 @@ ${cssLinks}
       if (type === 'WAKE') {
         isSleeping = false;
         requestAnimationFrame(function() {
-          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height, requestId: currentRequestId }, '*');
         });
         return;
       }
@@ -1546,7 +1624,7 @@ ${cssLinks}
                   sizes2[key2] = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 }
               }
-              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2 }, '*');
+              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId }, '*');
             }
             if (pendingImages.length > 0) {
               // 等待所有图片加载完成后再测量
@@ -1573,7 +1651,7 @@ ${cssLinks}
               measureAndReport();
             }
           } catch (err) {
-            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {} }, '*');
+            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId }, '*');
           }
         });
       }
@@ -1659,21 +1737,9 @@ ${cssLinks}
       if (type === 'COLLECT_VISUAL_NODE_TREE') {
         if (isSleeping) return;
         try {
-          var nodes = [];
-          var allVisualNodes = document.body.querySelectorAll('*');
-          for (var vn = 0; vn < allVisualNodes.length; vn++) {
-            var candidate = allVisualNodes[vn];
-            if (candidate && candidate.getBoundingClientRect) {
-              var r = candidate.getBoundingClientRect();
-              if (r.width > 0 && r.height > 0 && candidate !== document.body && candidate !== document.documentElement) {
-                nodes.push({
-                  tagName: candidate.tagName.toLowerCase(),
-                  textContent: (candidate.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80),
-                  className: candidate instanceof HTMLElement ? candidate.className.toString() : undefined
-                });
-              }
-            }
-          }
+          var nodes = window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.collectVisualNodeTree
+            ? window.__VISUAL_EDIT__.collectVisualNodeTree()
+            : [];
           window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: nodes }, '*');
         } catch (err) {
           window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: [] }, '*');
@@ -1685,7 +1751,7 @@ ${cssLinks}
       if (isSleeping) return;
       for (const entry of entries) {
         const height = entry.contentRect.height;
-        window.parent.postMessage({ type: 'RESIZE', height }, '*');
+        window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
       }
     });
     resizeObserver.observe(document.body);
@@ -1733,7 +1799,7 @@ ${cssLinks}
           });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
-          window.parent.postMessage({ type: 'COMPONENT_READY' }, '*');
+          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId }, '*');
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });

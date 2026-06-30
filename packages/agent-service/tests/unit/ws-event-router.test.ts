@@ -152,6 +152,44 @@ describe('WebSocketEventRouter', () => {
     expect(activities).toEqual([thoughtEvent]);
   });
 
+  it('应转发用户单选确认请求', () => {
+    const messages: ServerMessage[] = [];
+    const router = new WebSocketEventRouter('session-1', (message) => {
+      messages.push(message);
+    });
+    const agent = new TestAgent({ sessionId: 'session-1' });
+
+    router.bindAgent(agent);
+    router.startMessage('message-1');
+
+    agent.fire({
+      type: 'user_choice_request',
+      sessionId: 'session-1',
+      userChoiceRequest: {
+        requestId: 'choice-1',
+        sessionId: 'session-1',
+        question: '选择布局？',
+        options: [
+          { optionId: 'option_1', label: '左右布局' },
+          { optionId: 'option_2', label: '上下布局' },
+        ],
+        allowCustom: true,
+      },
+    });
+
+    expect(messages).toEqual([
+      expect.objectContaining({
+        type: 'user_choice_request',
+        id: 'message-1',
+        sessionId: 'session-1',
+        userChoiceRequest: expect.objectContaining({
+          requestId: 'choice-1',
+          question: '选择布局？',
+        }),
+      }),
+    ]);
+  });
+
   it('应将本轮执行事件保存到 JSONL 日志文件', () => {
     const router = new WebSocketEventRouter('session-1', () => undefined);
     const agent = new TestAgent({ sessionId: 'session-1' });

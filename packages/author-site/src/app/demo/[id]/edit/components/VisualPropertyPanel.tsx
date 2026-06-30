@@ -18,7 +18,6 @@ import {
   Copy,
   Grid3X3,
   ImageIcon,
-  Layers,
   Link2,
   LinkIcon,
   MoreVertical,
@@ -44,11 +43,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -71,15 +65,11 @@ interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
   sessionId?: string;
   nodeStack: VisualNodeInfo[];
-  hoverNodeId: string | null;
   propertyChanges: VisualPropertyChange[];
   configMarks: VisualConfigMark[];
   aiInstruction: string;
   sending: boolean;
   usedConfigKeys: string[];
-  layerPickerOpenToken?: number | null;
-  onHoverNodeIdChange: (nodeId: string | null) => void;
-  onSelectNode: (node: VisualNodeInfo) => void;
   onPropertyChange: (
     node: VisualNodeInfo,
     property: string,
@@ -572,15 +562,11 @@ export function VisualPropertyPanel({
   selectedNode,
   sessionId,
   nodeStack,
-  hoverNodeId,
   propertyChanges,
   configMarks,
   aiInstruction,
   sending,
   usedConfigKeys,
-  layerPickerOpenToken,
-  onHoverNodeIdChange,
-  onSelectNode,
   onPropertyChange,
   onRestoreProperty,
   onClearChanges,
@@ -593,7 +579,6 @@ export function VisualPropertyPanel({
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
-  const [layerPickerOpen, setLayerPickerOpen] = useState(false);
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
   const specsBySection = useMemo(() => {
     if (!selectedNode) return [];
@@ -623,11 +608,6 @@ export function VisualPropertyPanel({
         aiInstruction,
       })
     : "";
-
-  useEffect(() => {
-    if (layerPickerOpenToken == null) return;
-    setLayerPickerOpen(true);
-  }, [layerPickerOpenToken]);
 
   const copyExportText = () => {
     if (!exportText || !navigator.clipboard) return;
@@ -723,8 +703,6 @@ export function VisualPropertyPanel({
   }
 
   const layers = nodeStack.length ? nodeStack : [selectedNode];
-  const visibleLayerItems = getVisibleLayerItems(layers, selectedNode);
-  const hiddenLayerCount = Math.max(0, layers.length - visibleLayerItems.length);
   const selectedLayerIndex = Math.max(0, layers.findIndex((node) => node.domPath === selectedNode.domPath));
   const selectedLayerName = getContextualLayerName(selectedNode, layers, selectedLayerIndex);
   const styleRecord = selectedNode.computedStyle as Record<string, string | undefined> | undefined;
@@ -1384,88 +1362,10 @@ export function VisualPropertyPanel({
     );
   };
 
-  const renderLayerPicker = () => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2 text-xs font-medium">
-          <Layers className="h-3.5 w-3.5" />
-          可选对象
-        </div>
-        <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-          {visibleLayerItems.length} 个
-        </Badge>
-      </div>
-      {hiddenLayerCount > 0 && (
-        <p className="px-1 text-[11px] text-muted-foreground">
-          已自动收起 {hiddenLayerCount} 个辅助结构
-        </p>
-      )}
-      <div className="max-h-[360px] space-y-1 overflow-y-auto pr-1">
-        {visibleLayerItems.map(({ node, index, name, purpose, kind }) => {
-          const active = node.domPath === selectedNode.domPath;
-          const hovering = hoverNodeId === node.domPath;
-          const depth = Math.min(index, 2);
-          return (
-            <button
-              key={node.domPath}
-              type="button"
-              onClick={() => {
-                onSelectNode(node);
-                setLayerPickerOpen(false);
-              }}
-              onMouseEnter={() => onHoverNodeIdChange(node.domPath)}
-              onMouseLeave={() => onHoverNodeIdChange(null)}
-              className={cn(
-                "grid w-full cursor-pointer grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-2.5 text-left text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "bg-primary/10 text-primary" : "text-foreground",
-                hovering && !active ? "bg-sky-50 text-sky-700" : "",
-              )}
-              style={{ paddingLeft: `${10 + depth * 12}px` }}
-            >
-              <span className="flex h-6 w-4 items-center justify-center">
-                <span
-                  className={cn(
-                    "h-2 w-2 rounded-full border bg-card",
-                    active ? "border-primary bg-primary" : "border-muted-foreground/50",
-                  )}
-                />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{name}</span>
-                <span className="block truncate text-[10px] text-muted-foreground">{purpose}</span>
-              </span>
-              <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
-                {kind}
-              </Badge>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex h-full flex-col bg-card">
       <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">属性编辑</h2>
-          <Popover open={layerPickerOpen} onOpenChange={setLayerPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="选择对象"
-              >
-                <Layers className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-[320px] p-2">
-              {renderLayerPicker()}
-            </PopoverContent>
-          </Popover>
-        </div>
+        <h2 className="text-sm font-medium">属性编辑</h2>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">

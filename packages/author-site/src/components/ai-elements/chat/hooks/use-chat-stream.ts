@@ -7,6 +7,8 @@ import {
   MissingTransactionalDeleteToolsError,
   StreamService,
   type PermissionRequest,
+  type UserChoiceRequest,
+  type UserChoiceResponse,
 } from "../services/stream-service";
 import type { PlanItem, PlanItemStatus, PlanState } from "../chat-plan";
 import {
@@ -84,10 +86,102 @@ function parsePlanContent(content: string): PlanState | null {
   }
 }
 
+function addUserChoicePart(
+  parts: NonNullable<ChatMessage["parts"]>,
+  request: UserChoiceRequest,
+): NonNullable<ChatMessage["parts"]> {
+  if (parts.some((part) => part.type === "user_choice" && part.requestId === request.requestId)) {
+    return parts;
+  }
+  return [
+    ...parts,
+    {
+      type: "user_choice",
+      requestId: request.requestId,
+      question: request.question,
+      description: request.description,
+      options: request.options,
+      allowCustom: request.allowCustom,
+      status: "pending",
+    },
+  ];
+}
+
+function updateUserChoicePart(
+  parts: NonNullable<ChatMessage["parts"]>,
+  requestId: string,
+  choice: UserChoiceResponse,
+): NonNullable<ChatMessage["parts"]> {
+  return parts.map((part) => {
+    if (part.type !== "user_choice" || part.requestId !== requestId) {
+      return part;
+    }
+
+    if (choice.type === "cancel") {
+      return {
+        ...part,
+        status: "cancelled" as const,
+        selected: undefined,
+      };
+    }
+
+    if (choice.type === "custom") {
+      return {
+        ...part,
+        status: "answered" as const,
+        selected: {
+          type: "custom" as const,
+          text: choice.text,
+        },
+      };
+    }
+
+    const option = part.options.find((item) => item.optionId === choice.optionId);
+    return {
+      ...part,
+      status: "answered" as const,
+      selected: {
+        type: "option" as const,
+        optionId: choice.optionId,
+        label: option?.label || choice.optionId,
+        value: option?.value,
+      },
+    };
+  });
+}
+
 function isBulkPageDeletionRequest(message: string): boolean {
   return /删|删除|清理/.test(message) &&
     /页面|页/.test(message) &&
     /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message);
+}
+
+interface SendMessageRunOptions {
+  source?: "user" | "system_auto_repair";
+  displayMessage?: NonNullable<ChatMessage["autoRepair"]>;
+}
+
+function updateAutoRepairStatus(
+  messages: ChatMessage[],
+  messageId: string | undefined,
+  status: NonNullable<ChatMessage["autoRepair"]>["status"],
+): ChatMessage[] {
+  if (!messageId) return messages;
+
+  let changed = false;
+  const nextMessages = messages.map((message) => {
+    if (message.id !== messageId || !message.autoRepair) return message;
+    changed = true;
+    return {
+      ...message,
+      autoRepair: {
+        ...message.autoRepair,
+        status,
+      },
+    };
+  });
+
+  return changed ? nextMessages : messages;
 }
 
 interface UseChatStreamOptions {
@@ -219,21 +313,54 @@ export function useChatStream(options: UseChatStreamOptions) {
   ]);
 
   const handleSend = useCallback(
-    async (userMessage: string, images?: ImageAttachment[]) => {
+    async (
+      userMessage: string,
+      images?: ImageAttachment[],
+      runOptions?: SendMessageRunOptions,
+    ) => {
       if (!userMessage.trim() || !agentSessionId) return;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `user-${Date.now()}`,
-          role: "user",
-          content: userMessage.trim(),
-          parts: images?.map((img) => ({
-            type: "image" as const,
-            url: `data:${img.mimeType};base64,${img.data}`,
-          })) || [],
-        },
-      ]);
+      const source = runOptions?.source ?? "user";
+      const isSystemAutoRepair = source === "system_auto_repair";
+      const isFirstUserMessage =
+        !isSystemAutoRepair &&
+        messagesRef.current.every((message) => message.role !== "user");
+      const autoRepairMessageId = isSystemAutoRepair
+        ? `auto-repair-${Date.now()}`
+        : undefined;
+
+      setMessages((prev) => {
+        const nextMessage: ChatMessage = isSystemAutoRepair
+          ? {
+              id: autoRepairMessageId,
+              role: "system",
+              kind: "auto_repair",
+              content:
+                runOptions?.displayMessage?.title ||
+                "检测到预览异常，正在自动修复",
+              autoRepair: {
+                status: "running",
+                title:
+                  runOptions?.displayMessage?.title ||
+                  "检测到预览异常，正在自动修复",
+                summary:
+                  runOptions?.displayMessage?.summary ||
+                  "AI 将尝试恢复当前页面预览",
+                debugDetail: runOptions?.displayMessage?.debugDetail,
+                hiddenPrompt: userMessage.trim(),
+              },
+            }
+          : {
+              id: `user-${Date.now()}`,
+              role: "user",
+              content: userMessage.trim(),
+              parts: images?.map((img) => ({
+                type: "image" as const,
+                url: `data:${img.mimeType};base64,${img.data}`,
+              })) || [],
+            };
+        return [...prev, nextMessage];
+      });
 
       try {
         const assistantMessageId = `assistant-${Date.now()}`;
@@ -344,6 +471,14 @@ export function useChatStream(options: UseChatStreamOptions) {
             setPendingPermissionRequest(request);
           },
 
+          onUserChoice: (request) => {
+            markActivity();
+            setCurrentMessage((prev) => ({
+              ...prev,
+              parts: addUserChoicePart(prev.parts || [], request),
+            }));
+          },
+
           onFileOperation: (operation) => {
             markActivity();
             if (operation.path) {
@@ -371,17 +506,27 @@ export function useChatStream(options: UseChatStreamOptions) {
             streamService.stopKeepalive();
             stopSilenceTracking();
             const currentMsg = currentMessageRef.current;
+            const hasStructuredParts =
+              currentMsg.parts !== undefined && currentMsg.parts.length > 0;
             const assistantMessage: ChatMessage = {
               id: currentMsg.id || assistantMessageId,
               role: "assistant",
               content:
                 accumulatedContent ||
                 result.content ||
-                "抱歉，我没有收到有效的回复。",
+                (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
               parts: currentMsg.parts,
             };
 
-            const updatedMessages = [...messagesRef.current, assistantMessage];
+            const messagesWithAutoRepairStatus = updateAutoRepairStatus(
+              messagesRef.current,
+              autoRepairMessageId,
+              "completed",
+            );
+            const updatedMessages = [
+              ...messagesWithAutoRepairStatus,
+              assistantMessage,
+            ];
             setMessages(updatedMessages);
             setCurrentMessage({
               role: "assistant",
@@ -391,11 +536,13 @@ export function useChatStream(options: UseChatStreamOptions) {
             setStreamContent("");
 
             await persistMessages(sessionId, updatedMessages);
-            await updateSessionTitle(
-              sessionId,
-              userMessage,
-              messagesRef.current.length === 0,
-            );
+            if (!isSystemAutoRepair) {
+              await updateSessionTitle(
+                sessionId,
+                userMessage,
+                isFirstUserMessage,
+              );
+            }
 
             // ── 1. 清除 pending timer（不调用 processRealtimeFiles，避免路径 A 重复触发） ──
             if (fileUpdateTimer) {
@@ -511,7 +658,10 @@ export function useChatStream(options: UseChatStreamOptions) {
               content:
                 "WebSocket 连接失败，请检查 Agent Service 是否运行（http://localhost:3201）",
             };
-            setMessages((prev) => [...prev, errorMessage]);
+            setMessages((prev) => [
+              ...updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+              errorMessage,
+            ]);
           },
 
           onError: (error) => {
@@ -537,7 +687,10 @@ export function useChatStream(options: UseChatStreamOptions) {
               role: "assistant",
               content: `错误: ${error.message}`,
             };
-            setMessages((prev) => [...prev, errorMessage]);
+            setMessages((prev) => [
+              ...updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+              errorMessage,
+            ]);
             setStreamContent("");
             setIsStreaming(false);
             stopSilenceTracking();
@@ -564,7 +717,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             role: "assistant",
             content: error.message,
           };
-          setMessages((prev) => [...prev, errorMessage]);
+          setMessages((prev) => [
+            ...updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+            errorMessage,
+          ]);
           setStreamContent("");
           setIsStreaming(false);
           stopSilenceTracking();
@@ -579,7 +735,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             role: "assistant",
             content: "当前无法建立安全的事务化删除通道。请确认 Agent Service 已重启并刷新页面后再试。",
           };
-          setMessages((prev) => [...prev, errorMessage]);
+          setMessages((prev) => [
+            ...updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+            errorMessage,
+          ]);
           setStreamContent("");
           setIsStreaming(false);
           stopSilenceTracking();
@@ -623,7 +782,11 @@ export function useChatStream(options: UseChatStreamOptions) {
           };
 
           const httpUpdatedMessages = [
-            ...messagesRef.current,
+            ...updateAutoRepairStatus(
+              messagesRef.current,
+              autoRepairMessageId,
+              "completed",
+            ),
             assistantMessage,
           ];
           setMessages(httpUpdatedMessages);
@@ -667,7 +830,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             role: "assistant",
             content: `错误: ${httpError instanceof Error ? httpError.message : "未知错误"}。请确保 Agent Service 已启动（http://localhost:3201）`,
           };
-          setMessages((prev) => [...prev, errorMessage]);
+          setMessages((prev) => [
+            ...updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+            errorMessage,
+          ]);
         } finally {
           setIsStreaming(false);
           stopSilenceTracking();
@@ -715,6 +881,26 @@ export function useChatStream(options: UseChatStreamOptions) {
   const handlePermissionCancel = useCallback(() => {
     handlePermissionResponse("reject_once");
   }, [handlePermissionResponse]);
+
+  const handleUserChoiceResponse = useCallback(
+    (requestId: string, choice: UserChoiceResponse) => {
+      const updateMessage = (message: ChatMessage): ChatMessage => {
+        const parts = message.parts || [];
+        if (!parts.some((part) => part.type === "user_choice" && part.requestId === requestId)) {
+          return message;
+        }
+        return {
+          ...message,
+          parts: updateUserChoicePart(parts, requestId, choice),
+        };
+      };
+
+      setCurrentMessage((prev) => updateMessage(prev));
+      setMessages((prev) => prev.map((message) => updateMessage(message)));
+      streamServiceRef.current?.sendUserChoiceResponse(requestId, choice);
+    },
+    [setCurrentMessage, setMessages],
+  );
 
   const handleCancel = useCallback(
     (streamContent: string, currentMessage: ChatMessage) => {
@@ -894,5 +1080,6 @@ export function useChatStream(options: UseChatStreamOptions) {
     handleEditResend,
     handlePermissionResponse,
     handlePermissionCancel,
+    handleUserChoiceResponse,
   };
 }

@@ -140,7 +140,8 @@ export type EventType =
   | "error"
   | "finish"
   | "status"
-  | "permission_request";
+  | "permission_request"
+  | "user_choice_request";
 
 export interface StreamEvent {
   type: "stream";
@@ -236,6 +237,39 @@ export interface PermissionRequestEvent {
   };
 }
 
+export interface UserChoiceOption {
+  optionId: string;
+  label: string;
+  value?: string;
+  description?: string;
+}
+
+export interface UserChoiceRequestEvent {
+  type: "user_choice_request";
+  sessionId: string;
+  userChoiceRequest: {
+    requestId: string;
+    sessionId: string;
+    question: string;
+    description?: string;
+    options: UserChoiceOption[];
+    allowCustom: boolean;
+  };
+}
+
+export type UserChoiceResponse =
+  | {
+      type: "option";
+      optionId: string;
+    }
+  | {
+      type: "custom";
+      text: string;
+    }
+  | {
+      type: "cancel";
+    };
+
 export interface ConfigUpdatedEvent {
   type: "config_updated";
   sessionId: string;
@@ -253,6 +287,7 @@ export type AgentEvent =
   | StatusEvent
   | FileOperationEvent
   | PermissionRequestEvent
+  | UserChoiceRequestEvent
   | ConfigUpdatedEvent;
 
 export type EventHandler<T extends AgentEvent = AgentEvent> = (

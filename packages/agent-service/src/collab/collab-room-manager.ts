@@ -160,7 +160,17 @@ export class CollabRoomManager {
   private getOrCreateRoom(descriptor: RoomDescriptor, workspacePath: string): CollabRoom {
     const key = this.roomKey(descriptor);
     const existing = this.rooms.get(key);
-    if (existing) return existing;
+    if (existing) {
+      const currentFileContent = this.persistence.readResource(
+        workspacePath,
+        descriptor.resourcePath,
+        descriptor.kind,
+      );
+      if (!existing.dirty && !existing.saving && existing.text.length === 0 && currentFileContent) {
+        existing.text.insert(0, currentFileContent);
+      }
+      return existing;
+    }
 
     const doc = new Y.Doc();
     const text = doc.getText("content");

@@ -16,6 +16,7 @@ const AGENT_EVENT_TYPES = [
   "error",
   "status",
   "permission_request",
+  "user_choice_request",
   "file_operation",
 ] as const;
 
@@ -31,6 +32,7 @@ export interface ServerMessage {
     | "status"
     | "pong"
     | "permission_request"
+    | "user_choice_request"
     | "models"
     | "file_operation";
   id?: string;
@@ -81,6 +83,19 @@ export interface ServerMessage {
       editable?: boolean;
       initialContent?: string;
     };
+  };
+  userChoiceRequest?: {
+    requestId: string;
+    sessionId: string;
+    question: string;
+    description?: string;
+    options: Array<{
+      optionId: string;
+      label: string;
+      value?: string;
+      description?: string;
+    }>;
+    allowCustom: boolean;
   };
   models?: Array<{
     id: string;
@@ -290,6 +305,22 @@ export class WebSocketEventRouter {
           id: messageId,
           sessionId: this.sessionId,
           permissionRequest: event.permissionRequest,
+        });
+        break;
+
+      case "user_choice_request":
+        logger.info(
+          {
+            event: "user_choice_request",
+            requestId: event.userChoiceRequest.requestId,
+          },
+          "[WebSocket] Forwarding user_choice_request event to client",
+        );
+        this.sendMessage({
+          type: "user_choice_request",
+          id: messageId,
+          sessionId: this.sessionId,
+          userChoiceRequest: event.userChoiceRequest,
         });
         break;
 

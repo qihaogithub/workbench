@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
   PreviewCanvas,
+  LayerTreeMenu,
   PageConfigPanel,
   invalidateCompileCache,
   isSchemaEmpty,
@@ -14,6 +23,7 @@ import type {
   PreviewSize,
   ScreenshotRenderBox,
   VisualNodeInfo,
+  VisualNodeTreeItem,
 } from "../../../../../components/demo";
 import {
   useScreenshotGeneration,
@@ -38,13 +48,18 @@ import {
   mergeConfigWithUserValues,
   SchemaConflictError,
 } from "@/lib/runtime-props";
+import {
+  hasPreviewPageCode,
+  resolvePreviewPageCode,
+} from "@/lib/preview-page-code";
+import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { AIChat } from "@/components/ai-elements/ai-chat";
+import { AIChat, type AutoRepairTrigger } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
 import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
@@ -86,6 +101,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ErrorBanner } from "@/components/demo/ErrorBanner";
 import {
   Dialog,
@@ -307,6 +327,8 @@ function replaceCollabText(ytext: { toString: () => string; delete: (index: numb
   if (value) ytext.insert(0, value);
 }
 
+const WORKSPACE_FLUSH_DELAY_MS = 1200;
+
 function serializeCanvasLayout(projectId: string, state: CanvasState): string {
   return JSON.stringify(
     {
@@ -346,19 +368,6 @@ function arePositionableSizesEqual(
       currentItem?.height === nextItem?.height
     );
   });
-}
-
-async function flushWorkspaceCollab(projectId: string, workspaceId: string, sessionId: string): Promise<void> {
-  if (!projectId || !workspaceId || !sessionId) return;
-  const baseUrl = (process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201").replace(/\/$/, "");
-  const params = new URLSearchParams({ sessionId });
-  const response = await fetch(
-    `${baseUrl}/api/collab/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspaceId)}/flush-all?${params.toString()}`,
-    { method: "POST" },
-  );
-  if (!response.ok) {
-    throw new Error("协同草稿同步失败");
-  }
 }
 
 export default function DemoEditPage({ params }: DemoEditPageProps) {
@@ -415,11 +424,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasPendingWorkspaceFlush, setHasPendingWorkspaceFlush] = useState(false);
+  const [workspaceFlushRevision, setWorkspaceFlushRevision] = useState(0);
+  const [workspaceFlushError, setWorkspaceFlushError] = useState<string | null>(null);
+  const workspaceFlushRevisionRef = useRef(0);
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
   );
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
+    setHasPendingWorkspaceFlush(true);
+    setWorkspaceFlushError(null);
+    setWorkspaceFlushRevision((current) => {
+      const next = current + 1;
+      workspaceFlushRevisionRef.current = next;
+      return next;
+    });
   }, []);
 
   // 多页面状态
@@ -596,8 +616,23 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     };
 
     return demoPages
-      .filter((p) => pageCodes[p.id] || code)
+      .filter((p) =>
+        hasPreviewPageCode({
+          pageId: p.id,
+          pageCodes,
+          activeCodePageId:
+            pageCodes[activeDemoId] === code ? activeDemoId : undefined,
+          activeCode: code,
+        }),
+      )
       .map((p, index) => {
+        const pageCode = resolvePreviewPageCode({
+          pageId: p.id,
+          pageCodes,
+          activeCodePageId:
+            pageCodes[activeDemoId] === code ? activeDemoId : undefined,
+          activeCode: code,
+        });
         const { width, height } = getScreenshotRequestSize(
           pagePreviewSizeMap[p.id],
         );
@@ -605,7 +640,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         const renderMode = getScreenshotRenderMode(p.id);
         return {
           pageId: p.id,
-          code: pageCodes[p.id] || code,
+          code: pageCode,
           configData: configDataMap[p.id] || {},
           width,
           height,
@@ -623,6 +658,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       .map(({ index: _index, ...page }) => page);
   }, [
     code,
+    activeDemoId,
     configDataMap,
     demoPages,
     getScreenshotRenderMode,
@@ -826,9 +862,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [rightPanelTab, setRightPanelTab] = useState("property");
-  const [visualLayerPickerOpenToken, setVisualLayerPickerOpenToken] = useState<number | null>(null);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
-  const [triggerAutoSend, setTriggerAutoSend] = useState<string | null>(null);
+  const [triggerAutoSend, setTriggerAutoSend] = useState<string | AutoRepairTrigger | null>(null);
   // visualEditMode and related state moved to useVisualEditState hook
 
   // Console buffer for forwarding iframe console logs to agent-service
@@ -962,7 +997,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (pageId && !autoPreviewRepairPageIdsRef.current.has(pageId)) {
         autoPreviewRepairPageIdsRef.current.add(pageId);
         setTabValue("ai");
-        setTriggerAutoSend(`当前页面预览运行失败，请自动修复一次。
+        const hiddenPrompt = `当前页面预览运行失败，请自动修复一次。
 
 页面: ${pageId}
 文件: demos/${pageId}/index.tsx
@@ -971,7 +1006,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 要求:
 - 保持页面原有产品意图、视觉结构和配置字段不变。
 - 优先使用 @preview/sdk 的受控能力，避免未登记依赖和不存在的 named import。
-- 修复后不要新增无关文件。`);
+- 修复后不要新增无关文件。`;
+        setTriggerAutoSend({
+          kind: "auto_repair",
+          visibleTitle: "检测到预览异常，正在自动修复",
+          visibleSummary: "AI 将尝试恢复当前页面预览",
+          hiddenPrompt,
+          debugDetail: [
+            `页面: ${pageId}`,
+            `文件: demos/${pageId}/index.tsx`,
+            `错误: ${error.message || "组件运行时发生错误"}`,
+          ].join("\n"),
+        });
       }
     },
     [activeDemoId, canvasEditingPageId, previewMode],
@@ -1059,11 +1105,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       if (source === "ai-realtime" || source === "ai-finish") {
-        setHasUnsavedChanges(true);
+        markWorkspaceChanged();
       }
     },
-    [activeCodeCollab.ytext, activeSchemaCollab.ytext, sessionId, activeDemoId],
+    [
+      activeCodeCollab.ytext,
+      activeSchemaCollab.ytext,
+      markWorkspaceChanged,
+      sessionId,
+      activeDemoId,
+    ],
   );
+
+  const setStringTriggerAutoSend: Dispatch<SetStateAction<string | null>> =
+    useCallback((nextValue) => {
+      setTriggerAutoSend((prev) => {
+        const stringPrev = typeof prev === "string" ? prev : null;
+        return typeof nextValue === "function"
+          ? nextValue(stringPrev)
+          : nextValue;
+      });
+    }, []);
 
   // Visual edit state hook
   const visualEditState = useVisualEditState({
@@ -1077,7 +1139,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     markWorkspaceChanged,
     setConfigDataMap,
     setTabValue,
-    setTriggerAutoSend,
+    setTriggerAutoSend: setStringTriggerAutoSend,
   });
   const {
     hoveredVisualNode,
@@ -1117,7 +1179,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigDialogOpen,
     handleVisualConfigCandidateChange,
     handleVisualSelect,
-    handleVisualStackSelect,
     handleVisualPropertyChange,
     handleRestoreVisualProperty,
     handleClearVisualProperties,
@@ -1136,12 +1197,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleCreateVisualAnnotation,
   } = visualEditState;
 
+  const [visualLayerTreeOpen, setVisualLayerTreeOpen] = useState(false);
+  const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
+  const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<VisualNodeTreeItem[]>([]);
+
   const propertyPanelActive = previewMode === "single" && rightPanelTab === "property";
 
   useEffect(() => {
     if (propertyPanelActive) return;
     setVisualPanelHoverNodeId(null);
+    setVisualLayerTreeOpen(false);
   }, [propertyPanelActive, setVisualPanelHoverNodeId]);
+
+  useEffect(() => {
+    setVisualLayerTreeNodes([]);
+    setVisualLayerTreeOpen(false);
+  }, [activeDemoId]);
 
   useEffect(() => {
     const hasPendingVisualWork =
@@ -1216,12 +1287,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   useEffect(() => {
     if (activeCodeCollab.status !== "synced") return;
     if (activeCodeCollab.value === codeRef.current) return;
+    if (activeCodeCollab.value === "" && codeRef.current.trim()) {
+      replaceCollabText(activeCodeCollab.ytext, codeRef.current);
+      return;
+    }
     applyDemoSnapshot({
       code: activeCodeCollab.value,
       source: "collab",
     });
     markWorkspaceChanged();
-  }, [activeCodeCollab.status, activeCodeCollab.value, applyDemoSnapshot, markWorkspaceChanged]);
+  }, [
+    activeCodeCollab.status,
+    activeCodeCollab.value,
+    activeCodeCollab.ytext,
+    applyDemoSnapshot,
+    markWorkspaceChanged,
+  ]);
 
   useEffect(() => {
     if (activeSchemaCollab.status !== "synced") return;
@@ -1489,7 +1570,7 @@ ${context.details}
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demoId, forceNew: true }),
+          body: JSON.stringify({ demoId }),
         });
 
         if (!sessionRes.ok) {
@@ -1591,9 +1672,7 @@ ${context.details}
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
             schemas[pageId] = demo.schema;
-            if (demo.code) {
-              codes[pageId] = demo.code;
-            }
+            codes[pageId] = demo.code;
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
@@ -1730,7 +1809,15 @@ ${context.details}
           [pageId]: nextPageConfig,
         };
         const currentCode =
-          pageCodes[pageId] || (pageId === activeDemoIdRef.current ? codeRef.current : "");
+          resolvePreviewPageCode({
+            pageId,
+            pageCodes,
+            activeCodePageId:
+              pageCodes[activeDemoIdRef.current] === codeRef.current
+                ? activeDemoIdRef.current
+                : undefined,
+            activeCode: codeRef.current,
+          });
         if (currentCode) {
           scheduleScreenshotRegenerate(pageId, currentCode, nextPageConfig);
         }
@@ -1756,7 +1843,13 @@ ${context.details}
           }
         }
         for (const page of demoPages) {
-          const pageCode = pageCodes[page.id] || code;
+          const pageCode = resolvePreviewPageCode({
+            pageId: page.id,
+            pageCodes,
+            activeCodePageId:
+              pageCodes[activeDemoId] === code ? activeDemoId : undefined,
+            activeCode: code,
+          });
           if (!pageCode) continue;
           scheduleScreenshotRegenerate(
             page.id,
@@ -1839,6 +1932,83 @@ ${context.details}
       mergeLoadedPageSchemas(prev, { [currentPageId]: currentSchema }),
     );
   }, []);
+
+  useEffect(() => {
+    if (previewMode !== "canvas" || !sessionId || demoPages.length === 0) return;
+
+    const missingPageIds = demoPages
+      .map((page) => page.id)
+      .filter((pageId) => pageCodes[pageId] === undefined);
+    if (missingPageIds.length === 0) return;
+
+    let cancelled = false;
+
+    const loadMissingPageCodes = async () => {
+      try {
+        const loadedPages = await Promise.all(
+          missingPageIds.map(async (pageId) => {
+            const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
+            const data = await res.json();
+            if (!data.success) return null;
+            return {
+              pageId,
+              code: data.data.code ?? "",
+              schema: data.data.schema ?? "",
+            };
+          }),
+        );
+        if (cancelled) return;
+
+        const nextCodes: Record<string, string> = {};
+        const nextSchemas: Record<string, string> = {};
+        const nextDefaults: Record<string, Record<string, unknown>> = {};
+        const nextPreviewSizes: Record<
+          string,
+          import("@opencode-workbench/demo-ui").PreviewSize
+        > = {};
+
+        for (const page of loadedPages) {
+          if (!page) continue;
+          nextCodes[page.pageId] = page.code;
+          nextSchemas[page.pageId] = page.schema;
+          nextDefaults[page.pageId] = getSafeMergedDefaults(page.schema);
+          const size = getPreviewSize(page.schema);
+          if (size) {
+            nextPreviewSizes[page.pageId] = size;
+          }
+        }
+
+        if (Object.keys(nextCodes).length === 0) return;
+
+        setPageCodes((prev) => ({ ...prev, ...nextCodes }));
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, nextSchemas));
+        setConfigDataMap((prev) => {
+          const next = { ...prev };
+          for (const [pageId, defaults] of Object.entries(nextDefaults)) {
+            if (!next[pageId]) {
+              next[pageId] = defaults;
+            }
+          }
+          return next;
+        });
+        setPagePreviewSizeMap((prev) => ({ ...prev, ...nextPreviewSizes }));
+      } catch (err) {
+        console.error("加载画布页面代码失败:", err);
+      }
+    };
+
+    void loadMissingPageCodes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    demoPages,
+    getSafeMergedDefaults,
+    pageCodes,
+    previewMode,
+    sessionId,
+  ]);
 
   const handleConfigPanelPageSelect = useCallback(
     async (pageId: string) => {
@@ -2048,6 +2218,42 @@ ${context.details}
   // handleCreateVersion moved to useVersionControl hook
   // hasPendingChanges moved to useVersionControl hook
 
+  useEffect(() => {
+    if (!sessionId || !workspaceId) {
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+      return;
+    }
+  }, [sessionId, workspaceId]);
+
+  useEffect(() => {
+    if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
+
+    const revisionAtStart = workspaceFlushRevision;
+    const timer = window.setTimeout(() => {
+      flushWorkspaceCollab(demoId, workspaceId, sessionId)
+        .then(() => {
+          if (workspaceFlushRevisionRef.current !== revisionAtStart) return;
+          setHasPendingWorkspaceFlush(false);
+          setWorkspaceFlushError(null);
+        })
+        .catch((error) => {
+          if (workspaceFlushRevisionRef.current !== revisionAtStart) return;
+          setWorkspaceFlushError(
+            error instanceof Error ? error.message : "协同草稿同步失败",
+          );
+        });
+    }, WORKSPACE_FLUSH_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    demoId,
+    hasPendingWorkspaceFlush,
+    sessionId,
+    workspaceFlushRevision,
+    workspaceId,
+  ]);
+
   const exitSyncStatuses = [
     activeCodeCollab.status,
     activeSchemaCollab.status,
@@ -2056,20 +2262,40 @@ ${context.details}
     canvasLayoutCollab.status,
   ];
   const hasExitSyncRisk =
-    hasUnsavedChanges &&
-    exitSyncStatuses.some((status) =>
-      status === "error" ||
-      status === "offline" ||
-      status === "saving" ||
-      status === "connecting",
-    );
+    hasPendingWorkspaceFlush ||
+    workspaceFlushError !== null ||
+    (hasUnsavedChanges &&
+      exitSyncStatuses.some((status) =>
+        status === "error" ||
+        status === "offline" ||
+        status === "saving" ||
+        status === "connecting",
+      ));
 
   const flushBeforeExit = useCallback(async () => {
-    await flushCanvasState();
-    if (hasUnsavedChanges) {
-      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+    if (hasUnsavedCanvasChanges) {
+      await flushCanvasState();
     }
-  }, [demoId, flushCanvasState, hasUnsavedChanges, sessionId, workspaceId]);
+    if (hasPendingWorkspaceFlush) {
+      try {
+        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+        setHasPendingWorkspaceFlush(false);
+        setWorkspaceFlushError(null);
+      } catch (error) {
+        setWorkspaceFlushError(
+          error instanceof Error ? error.message : "协同草稿同步失败",
+        );
+        throw error;
+      }
+    }
+  }, [
+    demoId,
+    flushCanvasState,
+    hasPendingWorkspaceFlush,
+    hasUnsavedCanvasChanges,
+    sessionId,
+    workspaceId,
+  ]);
 
   const handleBackClick = useCallback(async () => {
     if (hasExitSyncRisk) {
@@ -2081,7 +2307,7 @@ ${context.details}
       await flushBeforeExit();
       router.push("/");
     } catch (error) {
-      console.error("[Exit] Failed to flush before exit:", error);
+      console.warn("[Exit] Failed to flush before exit:", error);
       setShowExitDialog(true);
     }
   }, [flushBeforeExit, hasExitSyncRisk, router]);
@@ -2244,15 +2470,20 @@ ${context.details}
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
-  const collabStatusLabel = collabStatuses.includes("error")
-    ? "协同异常"
-    : collabStatuses.includes("offline")
-      ? "离线待同步"
-      : collabStatuses.includes("saving")
-        ? "同步中"
-        : collabStatuses.includes("connecting")
-          ? "连接中"
-          : "已自动保存";
+  let collabStatusLabel = "已自动保存";
+  if (workspaceFlushError) {
+    collabStatusLabel = "同步失败";
+  } else if (hasPendingWorkspaceFlush) {
+    collabStatusLabel = "同步中";
+  } else if (collabStatuses.includes("error")) {
+    collabStatusLabel = "协同异常";
+  } else if (collabStatuses.includes("offline")) {
+    collabStatusLabel = "离线待同步";
+  } else if (collabStatuses.includes("saving")) {
+    collabStatusLabel = "同步中";
+  } else if (collabStatuses.includes("connecting")) {
+    collabStatusLabel = "连接中";
+  }
   const collabUsers = workspaceTreeCollab.awareness.filter(
     (presence) => presence.userId !== sessionId,
   );
@@ -3128,7 +3359,15 @@ ${context.details}
                         id: p.id,
                         name: p.name,
                         order: p.order,
-                        code: pageCodes[p.id] || code,
+                        code: resolvePreviewPageCode({
+                          pageId: p.id,
+                          pageCodes,
+                          activeCodePageId:
+                            pageCodes[activeDemoId] === code
+                              ? activeDemoId
+                              : undefined,
+                          activeCode: code,
+                        }),
                         configData: configDataMap[p.id],
                         previewSize: pagePreviewSizeMap[p.id],
                       }))}
@@ -3223,6 +3462,51 @@ ${context.details}
                       </button>
                     </div>
                     <div className="flex-1" />
+                    <Popover
+                      open={visualLayerTreeOpen}
+                      onOpenChange={(open) => {
+                        setVisualLayerTreeOpen(open);
+                        if (open) {
+                          setRightPanelTab("property");
+                          setVisualLayerTreeRequestKey((key) => key + 1);
+                        } else {
+                          setVisualPanelHoverNodeId(null);
+                        }
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="图层"
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="w-auto border-0 bg-transparent p-0 shadow-none"
+                      >
+                        <LayerTreeMenu
+                          title="当前页面图层"
+                          nodes={visualLayerTreeNodes}
+                          scrollClassName="layer-tree-menu-scrollbar"
+                          selectedNodeId={
+                            selectedVisualNode?.domPath ||
+                            selectedVisualNode?.nodeId ||
+                            null
+                          }
+                          emptyText="正在采集页面图层..."
+                          onHoverNodeIdChange={setVisualPanelHoverNodeId}
+                          onSelectNode={(node, path) => {
+                            handleVisualSelect(node, path);
+                            setVisualLayerTreeOpen(false);
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
                     {demoPages.length > 1 && (
                       <Select
                         value={activeDemoId}
@@ -3286,10 +3570,33 @@ ${context.details}
                   <div
                     className="relative flex-1 overflow-y-auto p-4 preview-single-scroll"
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                    onClick={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      handleVisualSelect(null, []);
+                      setVisualLayerTreeOpen(false);
+                      setVisualPanelHoverNodeId(null);
+                    }}
                   >
                     <style>{`
                       .preview-single-scroll::-webkit-scrollbar {
                         display: none;
+                      }
+                      .layer-tree-menu-scrollbar {
+                        scrollbar-width: thin;
+                        scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+                      }
+                      .layer-tree-menu-scrollbar::-webkit-scrollbar {
+                        width: 6px;
+                      }
+                      .layer-tree-menu-scrollbar::-webkit-scrollbar-track {
+                        background: transparent;
+                      }
+                      .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb {
+                        background: hsl(var(--muted-foreground) / 0.35);
+                        border-radius: 999px;
+                      }
+                      .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb:hover {
+                        background: hsl(var(--muted-foreground) / 0.55);
                       }
                     `}</style>
                     <PreviewPanel
@@ -3326,13 +3633,8 @@ ${context.details}
                           handleVisualSelect(null, []);
                         }
                       }}
-                      onVisualLayerMenu={(nodes) => {
-                        setRightPanelTab("property");
-                        if (nodes.length > 0) {
-                          handleVisualSelect(nodes[nodes.length - 1], nodes);
-                        }
-                        setVisualLayerPickerOpenToken((value) => (value ?? 0) + 1);
-                      }}
+                      visualNodeTreeRequestKey={visualLayerTreeRequestKey}
+                      onVisualNodeTreeChange={setVisualLayerTreeNodes}
                       onVisualInlineEdit={handleVisualInlineEdit}
                       visualAnnotationMode={false}
                       onVisualAnnotationCreate={(
@@ -3426,15 +3728,11 @@ ${context.details}
                       selectedNode={selectedVisualNode}
                       sessionId={sessionId}
                       nodeStack={visualNodeStack}
-                      hoverNodeId={visualPanelHoverNodeId}
                       propertyChanges={visualPropertyChanges}
                       configMarks={visualConfigMarks}
                       aiInstruction={visualAiInstruction}
                       sending={visualPropertySending}
                       usedConfigKeys={visualConfigUsedKeys}
-                      layerPickerOpenToken={visualLayerPickerOpenToken}
-                      onHoverNodeIdChange={setVisualPanelHoverNodeId}
-                      onSelectNode={handleVisualStackSelect}
                       onPropertyChange={handleVisualPropertyChange}
                       onRestoreProperty={handleRestoreVisualProperty}
                       onClearChanges={handleClearVisualProperties}

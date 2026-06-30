@@ -15,6 +15,7 @@ import {
   StatusEvent,
   FileOperationEvent,
   PermissionRequestEvent,
+  UserChoiceRequestEvent,
   ConfigUpdatedEvent,
 } from "./types";
 import { EventEmitter } from "events";
@@ -122,6 +123,7 @@ interface EventMap {
   status: StatusEvent;
   file_operation: FileOperationEvent;
   permission_request: PermissionRequestEvent;
+  user_choice_request: UserChoiceRequestEvent;
   config_updated: ConfigUpdatedEvent;
 }
 

@@ -127,6 +127,45 @@ describe('ConfigFormNew', () => {
     }
   });
 
+  it('等价 initialData 重新传入时不应触发额外状态合并', () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const { rerender } = renderConfigForm(
+        <ConfigForm
+          schema={mockSchema}
+          onChange={jest.fn()}
+          initialData={{ title: '初始标题' }}
+        />,
+      );
+
+      consoleSpy.mockClear();
+
+      rerender(
+        <TooltipProvider>
+          <ConfigForm
+            schema={mockSchema}
+            onChange={jest.fn()}
+            initialData={{ title: '初始标题' }}
+          />
+        </TooltipProvider>,
+      );
+
+      const renderLogs = consoleSpy.mock.calls.filter(
+        ([message]) => message === '[ConfigForm] Rendered with schema length:',
+      );
+      const mergeLogs = consoleSpy.mock.calls.filter(([message]) =>
+        typeof message === 'string' &&
+        message.startsWith('[ConfigForm] Merged formData after'),
+      );
+
+      expect(renderLogs).toHaveLength(1);
+      expect(mergeLogs).toHaveLength(0);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   it('应在 schema 无效时显示空状态', () => {
     renderConfigForm(
       <ConfigForm

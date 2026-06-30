@@ -17,6 +17,7 @@ import {
   enforceSessionLimit,
   findActiveSession,
 } from "@/lib/session-manager";
+import { findActiveWorkspace } from "@/lib/workspace-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
   pushSessionExternalAuthToAgent,
@@ -140,7 +141,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await createEditSession(userId, projectId, workspaceId);
+    const resumeWorkspaceId =
+      typeof workspaceId === "string"
+        ? workspaceId
+        : forceNew
+          ? undefined
+          : findActiveWorkspace(userId, projectId) ?? undefined;
+    const result = await createEditSession(userId, projectId, resumeWorkspaceId);
     await pushUserModelConfig(userId, result.sessionId);
     await pushUserExternalAuth(userId, result.sessionId);
     enforceSessionLimit(userId, projectId, 5);

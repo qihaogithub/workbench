@@ -223,6 +223,16 @@ export class AgentRunLog {
         });
         break;
 
+      case 'user_choice_request':
+        this.append({
+          level: 'info',
+          source: 'system',
+          eventType: 'user_choice_request',
+          title: 'User choice requested',
+          payload: event.userChoiceRequest,
+        });
+        break;
+
       case 'file_operation':
         this.fileOperationCount += 1;
         this.append({

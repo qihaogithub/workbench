@@ -110,10 +110,20 @@
       "sessionId": "session-1780019856913-351p4hr3v",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460375/v11",
       "fileCount": 5
+    },
+    {
+      "versionId": "v12",
+      "type": "auto_checkpoint",
+      "savedAt": 1782796509449,
+      "savedBy": "qihao",
+      "sessionId": "session-1782795820605-xdiod6ye3",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460375/v12",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "pageVersions": {},
   "createdAt": 1779608460375,
-  "updatedAt": 1782723614460,
+  "updatedAt": 1782796509449,
   "thumbnail": "/thumbnails/proj_1779608460375_cover.png"
 }

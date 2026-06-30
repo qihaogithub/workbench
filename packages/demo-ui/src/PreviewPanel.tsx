@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { PreviewPanelProps, PreviewSize, PositionableSizeItem } from "./types";
-import type { AppActionPayload, ConsoleLogPayload } from "./iframe-types";
+import type { AppActionPayload, ConsoleLogPayload, VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
+import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
 
@@ -13,6 +14,7 @@ const DEFAULT_PREVIEW_SIZE: PreviewSize = {
 
 const CONTAINER_PADDING = 32;
 const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
+const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
 
 function parseSizeValue(value: string | number | undefined): number | null {
   if (typeof value === "number") return value;
@@ -192,6 +194,24 @@ function computePreviewScale(
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
 
+interface VisualContextMenuState {
+  x: number;
+  y: number;
+  tree: VisualNodeTreeItem[];
+}
+
+function buildVisualTreeFromStack(nodes: VisualNodeInfo[]): VisualNodeTreeItem[] {
+  if (nodes.length === 0) return [];
+  let child: VisualNodeTreeItem | null = null;
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    child = {
+      ...nodes[index],
+      children: child ? [child] : [],
+    };
+  }
+  return child ? [child] : [];
+}
+
 function resolveRelativePath(relativePath: string, basePath: string): string {
   const parts = basePath.split('/').filter(p => p !== '');
   const relativeParts = relativePath.split('/');
@@ -344,7 +364,8 @@ export function PreviewPanel({
   onVisualHover,
   onVisualSelect,
   onVisualSelectStack,
-  onVisualLayerMenu,
+  visualNodeTreeRequestKey,
+  onVisualNodeTreeChange,
   onVisualInlineEdit,
   onVisualAnnotationCreate,
 }: PreviewPanelProps) {
@@ -357,13 +378,17 @@ export function PreviewPanel({
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [iframeReady, setIframeReady] = useState(false);
   const iframeReadyRef = useRef(false);
+  const activePreviewRequestIdRef = useRef(0);
+  const nextPreviewRequestIdRef = useRef(0);
   const [pendingCompileResult, setPendingCompileResult] =
-    useState<CompileResult | null>(null);
+    useState<{ result: CompileResult; requestId: number } | null>(null);
   const [lastSuccessfulResult, setLastSuccessfulResult] =
     useState<CompileResult | null>(null);
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
   const [contentLoaded, setContentLoaded] = useState(false);
   const [placeholderFailed, setPlaceholderFailed] = useState(false);
+  const [visualContextMenu, setVisualContextMenu] =
+    useState<VisualContextMenuState | null>(null);
   const timingStartRef = useRef<number>(0);
   const compileStartRef = useRef<number | null>(null);
   const updateCodeSentAtRef = useRef<number | null>(null);
@@ -387,6 +412,13 @@ export function PreviewPanel({
   };
 
   const validCode = code ? isValidCode(code) : true;
+  const { designWidth, designHeight, wrapperStyle, iframeStyle } = computePreviewScale(
+    previewSize,
+    containerWidth,
+    containerHeight,
+    fillContainer,
+    effectiveHeight,
+  );
 
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
@@ -396,13 +428,18 @@ export function PreviewPanel({
   routeParamsRef.current = routeParams;
   const activityStateRef = useRef(activityState);
   activityStateRef.current = activityState;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const onConsoleEntryRef = useRef(onConsoleEntry);
+  onConsoleEntryRef.current = onConsoleEntry;
 
   const isSleeping = activityState === "sleeping";
   const resolvedCdnBaseUrl = getPreviewCdnBaseUrl(cdnBaseUrl);
 
   const reportTiming = useCallback(
     (stage: string, details: Record<string, unknown> = {}) => {
-      if (!onConsoleEntry || typeof performance === "undefined") return;
+      const handleConsoleEntry = onConsoleEntryRef.current;
+      if (!handleConsoleEntry || typeof performance === "undefined") return;
       const now = performance.now();
       if (timingStartRef.current === 0) {
         timingStartRef.current = now;
@@ -418,13 +455,13 @@ export function PreviewPanel({
       if (typeof console !== "undefined") {
         console.info("[PreviewRuntime]", payload);
       }
-      onConsoleEntry({
+      handleConsoleEntry({
         level: "info",
         args: JSON.stringify(payload),
         timestamp: Date.now(),
       });
     },
-    [onConsoleEntry],
+    [],
   );
 
   const sendLifecycleMessage = useCallback((type: "SLEEP" | "WAKE") => {
@@ -439,6 +476,7 @@ export function PreviewPanel({
       cssList: string[],
       config: Record<string, unknown> = {},
       messageType: "UPDATE_CODE" | "UPDATE_MODULE" = "UPDATE_CODE",
+      requestId = activePreviewRequestIdRef.current,
     ) => {
       const iframe = iframeRef.current;
       if (!iframe || !iframe.contentWindow) {
@@ -465,6 +503,7 @@ export function PreviewPanel({
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
           cssImports: cssList,
+          requestId,
         },
         "*",
       );
@@ -473,9 +512,20 @@ export function PreviewPanel({
   );
 
   const sendUpdateCode = useCallback(
-    (result: CompileResult, config: Record<string, unknown> = {}) => {
+    (
+      result: CompileResult,
+      config: Record<string, unknown> = {},
+      requestId = activePreviewRequestIdRef.current,
+    ) => {
+      activePreviewRequestIdRef.current = requestId;
       if (result.moduleUrl) {
-        sendUpdateCodeUrl(result.moduleUrl, result.cssImports, config, "UPDATE_MODULE");
+        sendUpdateCodeUrl(
+          result.moduleUrl,
+          result.cssImports,
+          config,
+          "UPDATE_MODULE",
+          requestId,
+        );
         return;
       }
 
@@ -503,6 +553,7 @@ export function PreviewPanel({
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
           cssImports: result.cssImports,
+          requestId,
         },
         "*",
       );
@@ -520,6 +571,7 @@ export function PreviewPanel({
     }
 
     const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+    const requestId = activePreviewRequestIdRef.current;
 
     iframe.contentWindow.postMessage(
       {
@@ -527,6 +579,7 @@ export function PreviewPanel({
         configData: resolvedConfig,
         appState: appStateRef.current || {},
         routeParams: routeParamsRef.current || {},
+        requestId,
       },
       "*",
     );
@@ -540,7 +593,24 @@ export function PreviewPanel({
     if (activityStateRef.current === "sleeping") {
       return;
     }
-    iframe.contentWindow.postMessage({ type: "COLLECT_POSITIONABLE_SIZES" }, "*");
+    iframe.contentWindow.postMessage(
+      {
+        type: "COLLECT_POSITIONABLE_SIZES",
+        requestId: activePreviewRequestIdRef.current,
+      },
+      "*",
+    );
+  }, []);
+
+  const sendCollectVisualNodeTree = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) {
+      return;
+    }
+    if (activityStateRef.current === "sleeping") {
+      return;
+    }
+    iframe.contentWindow.postMessage({ type: "COLLECT_VISUAL_NODE_TREE" }, "*");
   }, []);
 
   const sendVisualEditState = useCallback(() => {
@@ -566,22 +636,89 @@ export function PreviewPanel({
     );
   }, []);
 
+  const getVisualContextMenuPosition = useCallback(
+    (point: { x: number; y: number }) => {
+      const iframe = iframeRef.current;
+      const wrapper = iframe?.parentElement;
+      if (!iframe || !wrapper) return null;
+
+      const iframeRect = iframe.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const scaleX = iframeRect.width / designWidth;
+      const scaleY = iframeRect.height / designHeight;
+      const rawX = iframeRect.left - wrapperRect.left + point.x * scaleX;
+      const rawY = iframeRect.top - wrapperRect.top + point.y * scaleY;
+      const maxX = Math.max(8, wrapperRect.width - 236);
+      const maxY = Math.max(8, wrapperRect.height - 260);
+
+      return {
+        x: Math.min(Math.max(rawX, 8), maxX),
+        y: Math.min(Math.max(rawY, 8), maxY),
+      };
+    },
+    [designHeight, designWidth],
+  );
+
+  const updateVisualContextHover = useCallback(
+    (nodeId: string | null) => {
+      visualEditStateRef.current = {
+        ...visualEditStateRef.current,
+        hoverNodeId: nodeId ?? visualHoverNodeId ?? null,
+      };
+      sendVisualEditState();
+    },
+    [sendVisualEditState, visualHoverNodeId],
+  );
+
+  const closeVisualContextMenu = useCallback(() => {
+    setVisualContextMenu(null);
+    updateVisualContextHover(null);
+  }, [updateVisualContextHover]);
+
+  const clearVisualSelection = useCallback(() => {
+    visualEditStateRef.current = {
+      ...visualEditStateRef.current,
+      selectedNodeId: null,
+      hoverNodeId: null,
+    };
+    onVisualSelect?.(null);
+    onVisualSelectStack?.([]);
+    setVisualContextMenu(null);
+    sendVisualEditState();
+  }, [onVisualSelect, onVisualSelectStack, sendVisualEditState]);
+
   useEffect(() => {
+    setContentLoaded(false);
+
     if (isUrlMode) {
-      if (!compiledJsUrl) return;
+      if (!compiledJsUrl) {
+        activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+        return;
+      }
+
+      const requestId = nextPreviewRequestIdRef.current + 1;
+      nextPreviewRequestIdRef.current = requestId;
+      activePreviewRequestIdRef.current = requestId;
 
       setCompileError(null);
       setRuntimeError(null);
 
       const currentConfig = configDataRef.current || {};
       if (iframeReadyRef.current) {
-        sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], currentConfig);
+        sendUpdateCodeUrl(
+          compiledJsUrl,
+          externalCssImports || [],
+          currentConfig,
+          "UPDATE_CODE",
+          requestId,
+        );
       }
 
       return;
     }
 
     if (code !== undefined && !code) {
+      activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
       setContentLoaded(false);
       setIsCompiling(false);
       setCompileError(null);
@@ -592,12 +729,18 @@ export function PreviewPanel({
     }
 
     if (!sessionId && (!code || !validCode)) {
+      activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+      setContentLoaded(false);
       setIsCompiling(false);
       setCompileError(null);
       setPendingCompileResult(null);
       setLastSuccessfulResult(null);
       return;
     }
+
+    const requestId = nextPreviewRequestIdRef.current + 1;
+    nextPreviewRequestIdRef.current = requestId;
+    activePreviewRequestIdRef.current = requestId;
 
     let cancelled = false;
     if (typeof performance !== "undefined") {
@@ -613,6 +756,7 @@ export function PreviewPanel({
     setIsCompiling(true);
     setCompileError(null);
     setRuntimeError(null);
+    setLastSuccessfulResult(null);
 
     const compile = async () => {
       try {
@@ -629,9 +773,9 @@ export function PreviewPanel({
             setLastSuccessfulResult(compileResult);
             const currentConfig = configDataRef.current || {};
             if (iframeReadyRef.current) {
-              sendUpdateCode(compileResult, currentConfig);
+              sendUpdateCode(compileResult, currentConfig, requestId);
             } else {
-              setPendingCompileResult(compileResult);
+              setPendingCompileResult({ result: compileResult, requestId });
             }
             setIsCompiling(false);
             return;
@@ -658,7 +802,7 @@ export function PreviewPanel({
         if (!response.ok || !result.success || !result.data) {
           const message = result.error?.message || "编译失败";
           setCompileError(message);
-          onError?.(new Error(message));
+          onErrorRef.current?.(new Error(message));
           setPendingCompileResult(null);
           setLastSuccessfulResult(null);
           setIsCompiling(false);
@@ -685,9 +829,9 @@ export function PreviewPanel({
 
         const currentConfig = configDataRef.current || {};
         if (iframeReadyRef.current) {
-          sendUpdateCode(compileResult, currentConfig);
+          sendUpdateCode(compileResult, currentConfig, requestId);
         } else {
-          setPendingCompileResult(compileResult);
+          setPendingCompileResult({ result: compileResult, requestId });
         }
 
         setIsCompiling(false);
@@ -695,7 +839,7 @@ export function PreviewPanel({
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "编译失败";
         setCompileError(message);
-        onError?.(new Error(message));
+        onErrorRef.current?.(new Error(message));
         setPendingCompileResult(null);
         setLastSuccessfulResult(null);
         setIsCompiling(false);
@@ -722,7 +866,6 @@ export function PreviewPanel({
     validCode,
     sendUpdateCode,
     sendUpdateCodeUrl,
-    onError,
     reportTiming,
   ]);
 
@@ -776,7 +919,11 @@ export function PreviewPanel({
     if (isUrlMode && compiledJsUrl) {
       sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], currentConfig);
     } else if (pendingCompileResult) {
-      sendUpdateCode(pendingCompileResult, currentConfig);
+      sendUpdateCode(
+        pendingCompileResult.result,
+        currentConfig,
+        pendingCompileResult.requestId,
+      );
       setPendingCompileResult(null);
     } else if (lastSuccessfulResult) {
       sendUpdateCode(lastSuccessfulResult, currentConfig);
@@ -808,7 +955,10 @@ export function PreviewPanel({
       const iframe = iframeRef.current;
       if (!iframe || event.source !== iframe.contentWindow) return;
 
-      const { type, error } = event.data;
+      const { type, error, requestId } = event.data;
+      const isCurrentPreviewRequest =
+        typeof requestId === "number" &&
+        requestId === activePreviewRequestIdRef.current;
 
       switch (type) {
         case "READY":
@@ -818,7 +968,11 @@ export function PreviewPanel({
           if (isUrlMode && compiledJsUrl) {
             sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], configData || {});
           } else if (pendingCompileResult) {
-            sendUpdateCode(pendingCompileResult, configData || {});
+            sendUpdateCode(
+              pendingCompileResult.result,
+              configData || {},
+              pendingCompileResult.requestId,
+            );
             setPendingCompileResult(null);
           } else if (lastSuccessfulResult) {
             sendUpdateCode(lastSuccessfulResult, configData || {});
@@ -827,6 +981,7 @@ export function PreviewPanel({
           break;
 
         case "LOADED":
+          if (!isCurrentPreviewRequest) return;
           reportTiming("iframe_loaded", {
             updateToLoadedMs:
               updateCodeSentAtRef.current != null &&
@@ -841,15 +996,18 @@ export function PreviewPanel({
           break;
 
         case "COMPONENT_READY":
+          if (!isCurrentPreviewRequest) return;
           sendCollectPositionableSizes();
           break;
 
         case "RUNTIME_ERROR":
+          if (!isCurrentPreviewRequest) return;
           setRuntimeError(error || "组件运行时发生错误");
-          onError?.(new Error(error || "组件运行时发生错误"));
+          onErrorRef.current?.(new Error(error || "组件运行时发生错误"));
           break;
 
         case "RESIZE":
+          if (!isCurrentPreviewRequest) return;
           if (typeof event.data?.height === "number") {
             onContentHeightChange?.(event.data.height);
           }
@@ -857,7 +1015,7 @@ export function PreviewPanel({
 
         case "CONSOLE_LOG":
           if (event.data?.payload) {
-            onConsoleEntry?.(event.data.payload as ConsoleLogPayload);
+            onConsoleEntryRef.current?.(event.data.payload as ConsoleLogPayload);
           }
           break;
 
@@ -878,9 +1036,18 @@ export function PreviewPanel({
           break;
 
         case "POSITIONABLE_SIZES_RESULT":
+          if (!isCurrentPreviewRequest) return;
           if (event.data?.sizes) {
             onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
           }
+          break;
+
+        case "VISUAL_NODE_TREE_RESULT":
+          onVisualNodeTreeChange?.(
+            Array.isArray(event.data?.nodes)
+              ? (event.data.nodes as VisualNodeTreeItem[])
+              : [],
+          );
           break;
 
         case "VISUAL_HOVER":
@@ -890,10 +1057,34 @@ export function PreviewPanel({
         case "VISUAL_SELECT":
           onVisualSelect?.(event.data?.node ?? null);
           if (Array.isArray(event.data?.nodeStack)) {
-            onVisualSelectStack?.(event.data.nodeStack);
+            const nodeStack = event.data.nodeStack as VisualNodeInfo[];
+            onVisualSelectStack?.(nodeStack);
             if (event.data?.openLayerPicker === true) {
-              onVisualLayerMenu?.(event.data.nodeStack);
+              const point = event.data?.contextMenuPoint;
+              const hasPoint =
+                point &&
+                typeof point.x === "number" &&
+                typeof point.y === "number";
+              const position = hasPoint
+                ? getVisualContextMenuPosition(point)
+                : null;
+              if (position && nodeStack.length > 0) {
+                const nodeTree =
+                  event.data?.nodeTree && Array.isArray(event.data.nodeTree.children)
+                    ? (event.data.nodeTree as VisualNodeTreeItem)
+                    : null;
+                setVisualContextMenu({
+                  ...position,
+                  tree: nodeTree ? [nodeTree] : buildVisualTreeFromStack(nodeStack),
+                });
+              } else {
+                closeVisualContextMenu();
+              }
+            } else {
+              closeVisualContextMenu();
             }
+          } else {
+            closeVisualContextMenu();
           }
           break;
 
@@ -925,8 +1116,6 @@ export function PreviewPanel({
     pendingCompileResult,
     lastSuccessfulResult,
     configData,
-    onError,
-    onConsoleEntry,
     onAppAction,
     onContentHeightChange,
     onContentLoaded,
@@ -935,10 +1124,13 @@ export function PreviewPanel({
     sendUpdateCodeUrl,
     sendCollectPositionableSizes,
     sendVisualEditState,
+    sendCollectVisualNodeTree,
     onVisualHover,
     onVisualSelect,
     onVisualSelectStack,
-    onVisualLayerMenu,
+    onVisualNodeTreeChange,
+    getVisualContextMenuPosition,
+    closeVisualContextMenu,
     onVisualInlineEdit,
     onVisualAnnotationCreate,
     demoId,
@@ -957,6 +1149,12 @@ export function PreviewPanel({
     visualAnnotations,
     sendVisualEditState,
   ]);
+
+  useEffect(() => {
+    if (visualNodeTreeRequestKey == null) return;
+    if (!iframeReadyRef.current) return;
+    sendCollectVisualNodeTree();
+  }, [sendCollectVisualNodeTree, visualNodeTreeRequestKey]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -1012,18 +1210,19 @@ export function PreviewPanel({
     return () => iframe.removeEventListener("load", handleLoad);
   }, [iframeSrcUrl, reportTiming]);
 
-  const { wrapperStyle, iframeStyle } = computePreviewScale(
-    previewSize,
-    containerWidth,
-    containerHeight,
-    fillContainer,
-    effectiveHeight,
-  );
-  const showPreviewLoading = isCompiling || !contentLoaded;
+  const hasPreviewSource = isUrlMode || (typeof code === "string" && code.length > 0);
+  const showPreviewLoading = hasPreviewSource && (isCompiling || !contentLoaded);
   const showPlaceholder =
     !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;
   const showLoadingOverlay =
     showPreviewLoading && !showPlaceholder;
+  const showEmptyPreview = !hasPreviewSource && !compileError && !runtimeError;
+
+  useEffect(() => {
+    if (!visualEditMode) {
+      setVisualContextMenu(null);
+    }
+  }, [visualEditMode]);
 
   useEffect(() => {
     reportTiming("iframe_html_create_start", {
@@ -1105,6 +1304,11 @@ export function PreviewPanel({
       <div
         ref={containerRef}
         className="w-full h-full flex items-center justify-center"
+        onClick={(event) => {
+          if (!visualEditMode) return;
+          if (event.target !== event.currentTarget) return;
+          clearVisualSelection();
+        }}
       >
         {iframeSrcUrl && (
           <div style={wrapperStyle} className={fillContainer ? "relative" : "rounded-lg border border-border relative"}>
@@ -1128,6 +1332,11 @@ export function PreviewPanel({
                 />
               </div>
             )}
+            {showEmptyPreview && (
+              <div className="absolute inset-0 z-20 bg-muted/30 flex items-center justify-center rounded-lg px-4 text-center">
+                <p className="text-xs text-muted-foreground">等待页面代码加载</p>
+              </div>
+            )}
             <iframe
               ref={iframeRef}
               sandbox="allow-scripts allow-same-origin"
@@ -1139,6 +1348,34 @@ export function PreviewPanel({
               }}
               title="预览"
             />
+            {visualContextMenu && (
+              <div
+                className="absolute z-30"
+                style={{
+                  left: visualContextMenu.x,
+                  top: visualContextMenu.y,
+                }}
+              >
+                <LayerTreeMenu
+                  title="预览区图层"
+                  nodes={visualContextMenu.tree}
+                  scrollClassName="layer-tree-menu-scrollbar"
+                  selectedNodeId={selectedVisualNodeId}
+                  onHoverNodeIdChange={updateVisualContextHover}
+                  onSelectNode={(node, path) => {
+                    visualEditStateRef.current = {
+                      ...visualEditStateRef.current,
+                      selectedNodeId: node.domPath,
+                      hoverNodeId: null,
+                    };
+                    onVisualSelect?.(node);
+                    onVisualSelectStack?.(path);
+                    setVisualContextMenu(null);
+                    sendVisualEditState();
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
