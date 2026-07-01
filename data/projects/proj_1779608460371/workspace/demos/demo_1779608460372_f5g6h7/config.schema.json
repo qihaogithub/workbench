@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$demo": {
     "previewSize": {
-      "width": 1133,
-      "height": 749
+      "width": 375,
+      "height": 812
     }
   },
-  "title": "伴读广告 - 平板版配置",
+  "title": "伴读广告 - 手机版配置",
   "type": "object",
   "properties": {}
 }

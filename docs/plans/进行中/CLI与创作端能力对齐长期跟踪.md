@@ -18,7 +18,7 @@
 
 - 审计结论：`待审核改动`
 - 最近更新：`2026-07-01`
-- 主线结论：本轮已补齐 runtime contract 校验 CLI 对齐，`project validate-runtime`、`page validate-runtime`、`preview compile` / `edit validate` 的共享层能力、CLI 测试和能力清单已同步；当前未发现新的注册命令漏登记问题，也未发现全命令测试漏覆盖问题。剩余 4 个结构性缺口仍成立，但都缺少可直接复用的共享能力或跨越外部服务边界，本轮继续只保留报告。
+- 主线结论：本轮已恢复长期跟踪文档到 `docs/plans/进行中/`，修复 `check:automation` 所需链接链路；CLI 对账未发现新的注册命令漏登记问题，也未发现全命令测试漏覆盖问题。此前已补齐的 runtime contract 校验能力仍保持对齐，剩余 4 个结构性缺口继续维持只报告策略。
 
 ## 当前缺口
 
@@ -38,6 +38,8 @@
 
 ## 当前验证状态
 
+- `corepack pnpm check:automation`：通过（已恢复长期跟踪文档路径）
+- `corepack pnpm ops:automation report --json`：通过，当前仍为 13 个 active 入口（`tools.json` 3 / `tests.json` 6 / `scripts.json` 4）
 - `corepack pnpm check:project-core`：通过
 - `corepack pnpm check:project-cli`：通过
 - 未运行 `corepack pnpm check:author`：本轮未修改 author-site API 或 shared 契约
@@ -53,5 +55,5 @@
 
 ## 参考
 
-- 单次审计证据：[CLI自动维护-2026-06-30页面版本能力补齐.md](./CLI自动维护-2026-06-30页面版本能力补齐.md)
-- 单次审计证据：[CLI自动维护-2026-07-01运行契约校验对齐.md](./CLI自动维护-2026-07-01运行契约校验对齐.md)
+- 单次审计证据：[CLI自动维护-2026-06-30页面版本能力补齐.md](../已完成/06-项目管理与页面/CLI自动维护-2026-06-30页面版本能力补齐.md)
+- 单次审计证据：[CLI自动维护-2026-07-01运行契约校验对齐.md](../已完成/CLI自动维护-2026-07-01运行契约校验对齐.md)

@@ -1,4 +1,4 @@
-export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
+export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageSizeMode, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
@@ -27,8 +27,11 @@ export { PreviewCanvas } from './PreviewCanvas';
 export { CanvasViewport } from './CanvasViewport';
 export { CanvasPageItem } from './CanvasPageItem';
 export { CanvasFreeNodeItem } from './CanvasFreeNodeItem';
+export { CanvasDocumentContent } from './CanvasDocumentContent';
 export { CanvasToolbar } from './CanvasToolbar';
 export { PageSkeleton } from './PageSkeleton';
 export { loadCanvasLayout, saveCanvasLayout } from './canvas-utils';
+export { useCanvasDocumentMarkdown } from './useCanvasDocumentMarkdown';
+export { getCanvasPreviewSizeKey, normalizeCanvasPageLayout, normalizeCanvasPageLayouts, resolveCanvasContentHeightLayout, resolveCanvasPageSize } from './canvas-layout';
 export { getActiveCanvasDocumentEntry, getAnnotationsFromCanvasState, getCanvasDocumentEntries, normalizeCanvasStateLayers, routeCanvasPointerLayer, screenPointToCanvasPoint, summarizeCanvasTextNodes, withCanvasAnnotationNodes } from './canvas-kernel';
 export { cn, debounce } from './utils';

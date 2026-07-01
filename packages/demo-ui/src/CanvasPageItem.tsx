@@ -2,6 +2,10 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
+import {
+  getCanvasPreviewSizeKey,
+  resolveCanvasContentHeightLayout,
+} from "./canvas-layout";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import type {
@@ -224,7 +228,6 @@ export function CanvasPageItem({
   const handleContentHeightChange = useCallback(
     (newContentHeight: number, measuredWidth?: number) => {
       const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
-      const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
 
       if (newContentHeight <= designHeight) {
         if (contentHeight !== null) setContentHeight(null);
@@ -232,23 +235,17 @@ export function CanvasPageItem({
       }
 
       setContentHeight(newContentHeight);
-
       const currentLayout = layoutRef.current;
-      const sourceWidth =
-        measuredWidth && Number.isFinite(measuredWidth) && measuredWidth > 0
-          ? measuredWidth
-          : designWidth;
-      const scale = currentLayout.width / sourceWidth;
-      const newHeight = newContentHeight * scale;
+      const nextLayout = resolveCanvasContentHeightLayout(
+        page,
+        currentLayout,
+        newContentHeight,
+        measuredWidth,
+      );
 
-      if (Math.abs(newHeight - currentLayout.height) < 1) return;
-
-      onLayoutChange?.(page.id, {
-        ...currentLayout,
-        height: newHeight,
-      });
+      if (nextLayout) onLayoutChange?.(page.id, nextLayout);
     },
-    [page.id, page.previewSize, onLayoutChange, contentHeight],
+    [page, onLayoutChange, contentHeight],
   );
 
   const handleScreenshotLoad = useCallback(() => {
@@ -414,8 +411,13 @@ export function CanvasPageItem({
           MAX_SIZE,
           aspectRatio,
         );
-        onLayoutChange?.(page.id, newLayout);
-        onDragMove?.(page.id, newLayout, isResizing);
+        const customLayout: CanvasPageLayout = {
+          ...newLayout,
+          sizeMode: "custom",
+          previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+        };
+        onLayoutChange?.(page.id, customLayout);
+        onDragMove?.(page.id, customLayout, isResizing);
         return;
       }
 
@@ -548,7 +550,7 @@ export function CanvasPageItem({
           <img
             src={screenshotUrl}
             alt={page.name}
-            className="block w-full h-auto pointer-events-none"
+            className="block h-full w-full object-contain pointer-events-none"
             loading="lazy"
             draggable={false}
             onLoad={handleScreenshotLoad}
@@ -689,6 +691,8 @@ export function CanvasPageItem({
                   ...layout,
                   width: defaultSize.width,
                   height: defaultSize.height,
+                  sizeMode: "preview",
+                  previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
                 });
                 setContextMenu(null);
               }}

@@ -33,6 +33,16 @@ describe("preview contract", () => {
     expect(validation.issues[0]?.code).toBe("RELATIVE_IMPORT_UNSUPPORTED");
   });
 
+  it("忽略 type-only import，避免把类型依赖当作运行时依赖", () => {
+    const compiled = compilePreviewPageSource(
+      "import type { Props } from './types';\nexport default function Demo(_props: Props){ return <div>Hello</div>; }",
+      { resolveDependencyUrl },
+    );
+
+    expect(compiled.dependencies).not.toContain("./types");
+    expect(compiled.moduleHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("阻止未登记 npm 依赖", () => {
     const validation = validatePreviewPageSource("import dayjs from 'dayjs';\nexport default function Demo(){ return <div>{dayjs().format()}</div>; }");
 
@@ -61,6 +71,22 @@ describe("preview contract", () => {
 
     expect(validation.ok).toBe(false);
     expect(validation.issues[0]?.code).toBe("EMPTY_RENDER_RISK");
+  });
+
+  it("允许非默认渲染 helper 内部 return null", () => {
+    const validation = validatePreviewPageSource(
+      "function optionalLabel(){ return null; }\nexport default function Demo(){ return <div>Visible</div>; }",
+    );
+
+    expect(validation.ok).toBe(true);
+  });
+
+  it("字符串中的双斜线不影响默认导出识别", () => {
+    const validation = validatePreviewPageSource(
+      "const imageUrl = 'https://example.com/a.png'; export default function Demo(){ return <img src={imageUrl} />; }",
+    );
+
+    expect(validation.ok).toBe(true);
   });
 
   it("裸 JSX 可自动包装", () => {
@@ -120,6 +146,23 @@ describe("preview contract", () => {
     expect(validation.issues[0]?.stage).toBe("module_parse");
     expect(validation.issues[0]?.code).toBe("DUPLICATE_TOP_LEVEL_DECLARATION");
     expect(validation.issues[0]?.message).toContain("accentMap");
+  });
+
+  it("module preflight 不把重复 var 当作导入阶段错误", () => {
+    const validation = validateCompiledPreviewModule(
+      "var cache = 1;\nvar cache = 2;\nexport default function Demo(){ return cache; }",
+    );
+
+    expect(validation.ok).toBe(true);
+  });
+
+  it("module preflight 仍识别 var 与词法绑定冲突", () => {
+    const validation = validateCompiledPreviewModule(
+      "var cache = 1;\nconst cache = 2;\nexport default function Demo(){ return cache; }",
+    );
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues[0]?.code).toBe("DUPLICATE_TOP_LEVEL_DECLARATION");
   });
 
   it("module preflight 识别多个默认导出", () => {

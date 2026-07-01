@@ -11,7 +11,7 @@
 - AI 回复中，用户仍可在输入框输入新消息。
 - 用户点击发送或按 Enter 时，新消息进入待发送队列。
 - 当前 AI 回复完成后，系统自动按顺序发送队列中的下一条消息。
-- 队列消息应像普通用户消息一样显示在聊天历史里，并明确处于“等待发送”状态。
+- 队列消息应吸附展示在输入框上方，并明确处于“等待发送”状态。
 - 用户应能取消尚未发送的排队消息。
 
 ## 范围
@@ -122,6 +122,8 @@
 - `sending`：显示“正在发送”或移除标识。
 - `cancelled`：可从历史移除，或保留为“已取消”等弱提示；第一版建议直接移除，减少噪音。
 
+2026-07-01 调整：排队消息不再混入 `ChatMessages` 历史滚动流，而是由 `AIChat` 在输入框上方渲染吸附式队列栏，参考 Codex 的贴底等待消息体验。
+
 相关渲染路径：
 
 - `packages/author-site/src/components/ai-elements/chat/chat-messages.tsx`
@@ -187,11 +189,17 @@
 ### 2026-06-30 实施完成
 
 - `use-chat-stream.ts` 已将用户提交入口与实际 Agent 运行拆开：空闲时直接启动，流式回复中提交的普通用户消息进入本地队列。
-- 排队消息以用户气泡展示“等待发送”状态，并提供取消入口；启动下一轮发送时会清除排队标记。
+- 当时排队消息以用户气泡展示“等待发送”状态，并提供取消入口；2026-07-01 已调整为输入框上方吸附队列栏。
 - 当前轮 `finish`、连接错误、Agent 错误、事务化工具缺失、HTTP fallback 和用户手动停止都会释放运行锁并尝试发送下一条队列消息。
 - `PromptInput` 在 streaming 状态下仍允许输入、粘贴图片和提交；有内容时提交消息，空内容且正在 streaming 时才停止当前回复。
-- `ChatMessages` 渲染顺序调整为：普通历史、当前流式回复、排队气泡，避免排队消息插到当前 AI 回复上方。
+- 当时 `ChatMessages` 渲染顺序调整为：普通历史、当前流式回复、排队气泡；2026-07-01 已改为 `ChatMessages` 不渲染排队消息。
 - 已补充 Jest 覆盖输入组件 streaming 提交、排队消息取消、hook 自动 drain。
+
+### 2026-07-01 输入区吸附展示调整
+
+- 排队消息展示从 `ChatMessages` 历史流移出，改由 `AIChat` 在输入框上方渲染 `QueuedMessagesTray`。
+- 队列栏右对齐展示排队内容、“等待发送”状态和取消入口，最大高度受控，超出后内部滚动。
+- 新增 `AIChat` 级别测试，确认排队内容只出现在输入框上方队列栏，并且取消按钮仍调用队列取消逻辑。
 
 ## 验收标准
 
@@ -207,6 +215,7 @@
 
 - 2026-06-30：`corepack pnpm --filter @opencode-workbench/author-site test -- --runTestsByPath src/components/ai-elements/__tests__/prompt-input.test.tsx src/components/ai-elements/__tests__/message.test.tsx src/components/ai-elements/__tests__/use-chat-stream-auto-repair.test.tsx` 通过，3 个测试文件共 12 个用例通过。
 - 2026-06-30：`corepack pnpm check:author` 通过，包含 author-site typecheck 和全部 Jest；61 个测试套件、463 个用例通过。
+- 2026-07-01：`corepack pnpm --filter @opencode-workbench/author-site test -- --runTestsByPath src/components/ai-elements/__tests__/ai-chat-queued-tray.test.tsx src/components/ai-elements/__tests__/prompt-input.test.tsx src/components/ai-elements/__tests__/message.test.tsx src/components/ai-elements/__tests__/use-chat-stream-auto-repair.test.tsx` 通过，4 个测试文件共 13 个用例通过。
 
 ## 风险点
 

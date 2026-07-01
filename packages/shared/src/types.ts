@@ -51,6 +51,7 @@ export type ErrorCode =
   | "SESSION_EXPIRED"
   | "VALIDATION_ERROR"
   | "AGENT_SERVICE_ERROR"
+  | "WORKSPACE_STALE"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "INTERNAL_ERROR"
@@ -70,6 +71,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   SESSION_EXPIRED: "Session 已过期",
   VALIDATION_ERROR: "数据校验失败",
   AGENT_SERVICE_ERROR: "Agent 服务请求失败",
+  WORKSPACE_STALE: "当前工作区已过期，请刷新项目后重试",
   UNAUTHORIZED: "未授权访问",
   FORBIDDEN: "无权访问",
   INTERNAL_ERROR: "内部服务器错误",

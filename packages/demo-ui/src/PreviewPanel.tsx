@@ -103,8 +103,8 @@ function computePreviewScale(
           height: designHeight,
           border: "none",
           position: "absolute",
-          top: offsetY / scale,
-          left: offsetX / scale,
+          top: offsetY,
+          left: offsetX,
           transform: `scale(${scale})`,
           transformOrigin: "top left",
         },
@@ -1383,7 +1383,7 @@ export function PreviewPanel({
                 <img
                   src={placeholderScreenshotUrl}
                   alt="preview placeholder"
-                  className="max-w-full max-h-full object-contain"
+                  className="h-full w-full object-contain"
                   draggable={false}
                   onError={() => setPlaceholderFailed(true)}
                 />

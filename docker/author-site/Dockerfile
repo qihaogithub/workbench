@@ -26,6 +26,7 @@ COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
 COPY packages/knowledge-core/package.json ./packages/knowledge-core/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
+COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/project-scaffold/package.json ./packages/project-scaffold/
 COPY packages/shared/package.json ./packages/shared/
@@ -37,6 +38,7 @@ COPY packages/agent-client/ ./packages/agent-client/
 COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/
+COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
 COPY packages/project-scaffold/ ./packages/project-scaffold/
 COPY packages/shared/ ./packages/shared/

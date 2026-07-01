@@ -171,11 +171,11 @@ export interface Project {
   name: string;                // 项目名称
   category?: string;           // 首页项目分类
   description?: string;        // 项目描述
-  workspacePath: string;       // 正式工作空间绝对路径
+  workspacePath: string;       // 项目基准工作区绝对路径（canonical Workspace）
   activeWorkspaceId?: string;  // 项目级共享当前工作空间 ID
   activeWorkspaceUpdatedAt?: number; // 项目级共享当前工作空间更新时间
-  canonicalSyncedWorkspaceId?: string; // 最近同步到正式工作空间的 Workspace ID
-  canonicalSyncedAt?: number;  // 最近同步到正式工作空间的时间
+  canonicalSyncedWorkspaceId?: string; // 最近同步到项目基准工作区的 Workspace ID
+  canonicalSyncedAt?: number;  // 最近同步到项目基准工作区的时间
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
   demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
   versions: VersionInfo[];     // 版本历史（最多 50 个）
@@ -280,7 +280,8 @@ export interface EditSession {
   sessionId: string;           // 会话唯一标识
   projectId: string;           // 关联的项目 ID
   username: string;            // 当前编辑者用户名
-  tempWorkspace: string;       // 临时工作空间绝对路径
+  workspacePath?: string;      // 工作区绝对路径
+  tempWorkspace: string;       // @deprecated 兼容旧调用方，等同于 workspacePath
   basedOnVersion: string;      // 基于的版本号
   status: 'editing' | 'saved' | 'discarded';
   createdAt: number;           // 创建时间戳
@@ -312,7 +313,7 @@ export interface OpenProjectEditResponse {
   workspaceScope?: "live" | "branch" | "snapshot-source" | "legacy";
   workspacePath?: string;      // 工作空间绝对路径
   isSharedWorkspace?: boolean; // 是否为项目级共享工作空间
-  tempWorkspace: string;       // 临时工作空间路径
+  tempWorkspace: string;       // @deprecated 兼容旧调用方，等同于 workspacePath
   basedOnVersion: string;      // 基于的版本号
   warning?: string;            // 警告信息（如多人编辑）
 }

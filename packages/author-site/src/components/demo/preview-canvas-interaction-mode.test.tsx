@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
+  CanvasDocumentContent,
   PreviewCanvas,
   type CanvasKnowledgeDocument,
   type CanvasState,
@@ -94,6 +95,27 @@ const documentB: CanvasKnowledgeDocument = {
   fileName: "b.md",
 };
 
+describe("CanvasDocumentContent", () => {
+  it("渲染单个 Markdown 文档内容", () => {
+    render(
+      <CanvasDocumentContent
+        node={{
+          id: "doc_single",
+          kind: "document",
+          title: "说明文档",
+          markdown: "# 说明文档\n\n- 第一项",
+          layout: { x: 0, y: 0, width: 420, height: 360 },
+          createdAt: 1,
+          updatedAt: 1,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "说明文档" })).toBeInTheDocument();
+    expect(screen.getByText("第一项")).toBeInTheDocument();
+  });
+});
+
 function TestEditorCanvasWithKnowledgeDocuments({
   aggregate = false,
 }: {
@@ -156,6 +178,48 @@ function TestEditorCanvasWithKnowledgeDocuments({
       />
       <output data-testid="canvas-state">{JSON.stringify(state)}</output>
     </>
+  );
+}
+
+function TestEditorCanvasWithOffscreenKnowledgeDocuments({
+  onReadKnowledgeDocument,
+}: {
+  onReadKnowledgeDocument: (document: CanvasKnowledgeDocument) => Promise<string>;
+}) {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    pages: {},
+    nodes: {
+      doc_a: {
+        id: "doc_a",
+        kind: "document",
+        title: documentA.title,
+        knowledgeDocument: documentA,
+        layout: { x: 100, y: 100, width: 420, height: 360 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      doc_b: {
+        id: "doc_b",
+        kind: "document",
+        title: documentB.title,
+        knowledgeDocument: documentB,
+        layout: { x: 5000, y: 100, width: 420, height: 360 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    },
+  });
+
+  return (
+    <PreviewCanvas
+      interactionMode="editor"
+      pages={[]}
+      canvasState={state}
+      onCanvasStateChange={setState}
+      knowledgeDocuments={[documentA, documentB]}
+      onReadKnowledgeDocument={onReadKnowledgeDocument}
+    />
   );
 }
 
@@ -1505,6 +1569,23 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       );
       expect(screen.getByText("Beta content")).toBeInTheDocument();
     });
+  });
+
+  it("画布只读取可见文档正文，离屏文档不抢占首屏资源", async () => {
+    const onReadKnowledgeDocument = jest
+      .fn<Promise<string>, [CanvasKnowledgeDocument]>()
+      .mockImplementation(async (document) => `# ${document.title}`);
+
+    render(
+      <TestEditorCanvasWithOffscreenKnowledgeDocuments
+        onReadKnowledgeDocument={onReadKnowledgeDocument}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onReadKnowledgeDocument).toHaveBeenCalledWith(documentA);
+    });
+    expect(onReadKnowledgeDocument).not.toHaveBeenCalledWith(documentB);
   });
 
   it("鏀寔鎷栧叆鏈湴鍥剧墖骞舵寜钀界偣鍒涘缓鍥剧墖鑺傜偣", async () => {

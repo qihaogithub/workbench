@@ -37,6 +37,7 @@
 - [x] 补充自动检查点和普通持久化 API 测试。
 - [x] 运行相关验证。
 - [x] 更新项目文档。
+- [x] 补充 AI 文件写入后当前页协同文本刷新，避免后续 flush 把旧内容写回 canonical workspace。
 
 ## 进度记录
 
@@ -46,6 +47,7 @@
 - 2026-07-01：已补充 checkpoint route 测试，覆盖同步成功和同步失败两条路径。
 - 2026-07-01：复查发现第一版修复只覆盖自动检查点触发后的情况；用户可以在检查点触发前看到右上角“已自动保存”并立刻返回首页。已新增 `/api/sessions/[sessionId]/persist-workspace`，用于不创建版本记录地把 Session Workspace 同步到项目当前 Workspace。
 - 2026-07-01：编辑页延迟协同自动保存成功后会调用普通持久化接口；返回首页前如果仍有待同步或未保存工作区变更，也会先同步项目当前 Workspace。只有该步骤成功后才清除同步状态。
+- 2026-07-01：用户截图复现同一项目反复触发 `DUPLICATE_TOP_LEVEL_DECLARATION` 自动修复。排查发现 active Workspace 中目标文件已是单份组件，但项目 canonical `workspace/` 曾保留重复块；风险点在 AI 文件写入后，编辑页刷新了页面状态但没有确保当前页 Yjs 协同文本同步到修复后的磁盘内容，后续 Workspace flush 可能把旧协同文本再次写回。已调整 `handleAiFilesChange`：当刷新到的 active page 未切换时，通过 `applyDemoSnapshot(..., source: "ai-finish")` 应用代码和 Schema，同时更新协同文本、refs、预览缓存和待同步标记；页面切换兜底路径也同步维护 `codeRef` / `schemaRef`。
 
 ## 验证方式
 

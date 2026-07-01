@@ -65,10 +65,12 @@ export interface CreateSessionResult {
   workspaceId: string;
   workspaceScope: "live" | "branch" | "snapshot-source" | "legacy";
   isSharedWorkspace: boolean;
+  workspacePath: string;
   /** 第一个 demo 页面的代码（兼容字段，Stage 2 将由前端切换为 demos 字段） */
   code: string;
   /** 第一个 demo 页面的 Schema（兼容字段） */
   schema: string;
+  /** @deprecated 兼容旧调用方，等同于 workspacePath */
   tempWorkspace: string;
   /** 多页面文件集合 + 项目级配置 Schema */
   demos: MultiDemoFiles;
@@ -483,6 +485,7 @@ export async function createEditSession(
     workspaceId,
     workspaceScope,
     isSharedWorkspace: workspaceScope === "live",
+    workspacePath,
     code,
     schema,
     tempWorkspace: workspacePath,

@@ -30,22 +30,18 @@ jest.mock("@/lib/session-manager", () => ({
     createdAt: 1,
     expiresAt: Date.now() + 1000,
   })),
-  syncEditSessionToProjectWorkspace: jest.fn(() => ({
-    success: true,
-    projectId: "project-1",
-    workspacePath: "/tmp/project-1/workspace",
-  })),
 }));
 
 jest.mock("@/lib/workspace-flush", () => ({
-  flushWorkspaceBeforeCriticalAction: jest.fn(async () => ({
+  flushAndSyncProjectWorkspace: jest.fn(async () => ({
     status: "no_active_room",
     flushedRooms: 0,
+    workspacePath: "/tmp/project-1/workspace",
   })),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
-    code: "AGENT_SERVICE_ERROR",
+    code: "FILE_WRITE_ERROR",
     message: error instanceof Error ? error.message : "协同草稿同步失败",
-    status: 502,
+    status: 500,
   })),
 }));
 
@@ -88,7 +84,6 @@ describe("session persist workspace route", () => {
 
   it("先 flush 协同草稿，再把 Session Workspace 同步到项目当前工作区", async () => {
     const { POST } = await import("./route");
-    const sessionManager = await import("@/lib/session-manager");
     const workspaceFlush = await import("@/lib/workspace-flush");
 
     const response = await POST(emptyRequest(), {
@@ -106,25 +101,19 @@ describe("session persist workspace route", () => {
         persistedAt: expect.any(Number),
       },
     });
-    expect(workspaceFlush.flushWorkspaceBeforeCriticalAction).toHaveBeenCalledWith({
+    expect(workspaceFlush.flushAndSyncProjectWorkspace).toHaveBeenCalledWith({
       projectId: "project-1",
       workspaceId: "workspace-1",
       sessionId: "session-1",
     });
-    expect(sessionManager.syncEditSessionToProjectWorkspace).toHaveBeenCalledWith(
-      "session-1",
-    );
   });
 
   it("同步项目当前工作区失败时返回 FILE_WRITE_ERROR", async () => {
     const { POST } = await import("./route");
-    const sessionManager = await import("@/lib/session-manager");
+    const workspaceFlush = await import("@/lib/workspace-flush");
     jest
-      .mocked(sessionManager.syncEditSessionToProjectWorkspace)
-      .mockReturnValueOnce({
-        success: false,
-        error: "Workspace source not found",
-      });
+      .mocked(workspaceFlush.flushAndSyncProjectWorkspace)
+      .mockRejectedValueOnce(new Error("Workspace source not found"));
 
     const response = await POST(emptyRequest(), {
       params: { sessionId: "session-1" },

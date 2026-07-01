@@ -37,22 +37,18 @@ jest.mock("@/lib/session-manager", () => ({
     createdAt: 1,
     expiresAt: Date.now() + 1000,
   })),
-  syncEditSessionToProjectWorkspace: jest.fn(() => ({
-    success: true,
-    projectId: "project-1",
-    workspacePath: "/tmp/project-1/workspace",
-  })),
 }));
 
 jest.mock("@/lib/workspace-flush", () => ({
-  flushWorkspaceBeforeCriticalAction: jest.fn(async () => ({
+  flushAndSyncProjectWorkspace: jest.fn(async () => ({
     status: "no_active_room",
     flushedRooms: 0,
+    workspacePath: "/tmp/project-1/workspace",
   })),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
-    code: "AGENT_SERVICE_ERROR",
+    code: "FILE_WRITE_ERROR",
     message: error instanceof Error ? error.message : "协同草稿同步失败",
-    status: 502,
+    status: 500,
   })),
 }));
 
@@ -102,7 +98,7 @@ describe("session checkpoint route", () => {
   it("创建自动检查点前会先把 Session Workspace 同步到项目当前工作区", async () => {
     const { POST } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
-    const sessionManager = await import("@/lib/session-manager");
+    const workspaceFlush = await import("@/lib/workspace-flush");
 
     const response = await POST(jsonRequest({ note: "停止编辑后自动保存记录" }), {
       params: { sessionId: "session-1" },
@@ -118,9 +114,11 @@ describe("session checkpoint route", () => {
         savedAt: 100,
       },
     });
-    expect(sessionManager.syncEditSessionToProjectWorkspace).toHaveBeenCalledWith(
-      "session-1",
-    );
+    expect(workspaceFlush.flushAndSyncProjectWorkspace).toHaveBeenCalledWith({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+    });
     expect(fsUtils.createProjectVersionSnapshot).toHaveBeenCalledWith(
       "project-1",
       "测试用户",
@@ -135,13 +133,10 @@ describe("session checkpoint route", () => {
   it("同步项目当前工作区失败时不会创建自动检查点版本", async () => {
     const { POST } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
-    const sessionManager = await import("@/lib/session-manager");
+    const workspaceFlush = await import("@/lib/workspace-flush");
     jest
-      .mocked(sessionManager.syncEditSessionToProjectWorkspace)
-      .mockReturnValueOnce({
-        success: false,
-        error: "Workspace source not found",
-      });
+      .mocked(workspaceFlush.flushAndSyncProjectWorkspace)
+      .mockRejectedValueOnce(new Error("Workspace source not found"));
 
     const response = await POST(jsonRequest({}), {
       params: { sessionId: "session-1" },

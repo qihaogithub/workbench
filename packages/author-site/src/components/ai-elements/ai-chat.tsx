@@ -31,6 +31,57 @@ export interface AutoRepairTrigger {
 
 type TriggerAutoSend = string | AutoRepairTrigger;
 
+function QueuedMessagesTray({
+  messages,
+  onCancelQueuedMessage,
+}: {
+  messages: ChatMessage[];
+  onCancelQueuedMessage: (queueId: string) => void;
+}) {
+  if (messages.length === 0) return null;
+
+  return (
+    <div
+      data-testid="queued-messages-tray"
+      className="flex max-h-48 flex-col items-end gap-2 overflow-y-auto px-4 pb-2"
+    >
+      {messages.map((message) => {
+        const imageCount =
+          message.parts?.filter((part) => part.type === "image").length ?? 0;
+
+        return (
+          <div
+            key={message.id || message.queueId}
+            className="w-fit max-w-[min(82%,34rem)] rounded-lg border border-border/60 bg-muted px-3 py-2.5 text-sm text-foreground shadow-sm"
+          >
+            <div className="max-w-full truncate font-medium leading-5">
+              {message.content || (imageCount > 0 ? "处理附件图片" : "待发送消息")}
+            </div>
+            {imageCount > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                已附加 {imageCount} 张图片
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span>等待发送</span>
+              {message.queueId && (
+                <button
+                  type="button"
+                  onClick={() => onCancelQueuedMessage(message.queueId!)}
+                  className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-3 w-3" />
+                  取消
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface AIChatProps {
   sessionId: string;
   agentSessionId: string;
@@ -61,6 +112,13 @@ interface AIChatProps {
   errorBanner?: React.ReactNode;
   /** AI 更新了 .md 记忆文件时的回调，用于打开编辑器查看 */
   onMemoryUpdate?: (filePath: string) => void;
+  /** 编辑页诊断事件回调，不参与 Agent 协议 */
+  onDiagnosticEvent?: (event: {
+    name: string;
+    traceId?: string;
+    level?: "info" | "warn" | "error";
+    details?: Record<string, unknown>;
+  }) => void;
   /** 外部 StreamService 引用，用于控制台数据转发等场景 */
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
@@ -91,6 +149,7 @@ export function AIChat({
   onTriggerAutoSendHandled,
   errorBanner,
   onMemoryUpdate,
+  onDiagnosticEvent,
   externalStreamServiceRef,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -159,6 +218,7 @@ export function AIChat({
     setCurrentMessage,
     onModelsEvent: handleModelsEvent,
     onModelStateError: handleModelError,
+    onDiagnosticEvent,
     externalStreamServiceRef,
   });
 
@@ -278,6 +338,8 @@ export function AIChat({
     }
   }, [triggerAutoSend, isStreaming]);
 
+  const queuedMessages = messages.filter((message) => message.queueStatus);
+
   return (
     <div className="flex flex-col h-full">
       <Conversation className="flex-1 min-h-0">
@@ -296,7 +358,6 @@ export function AIChat({
             messagesRef={messagesRef}
             setMessages={setMessages}
             handleSend={handleSend}
-            onCancelQueuedMessage={handleCancelQueuedMessage}
             onUserChoiceResponse={handleUserChoiceResponse}
           />
         </ConversationContent>
@@ -358,6 +419,11 @@ export function AIChat({
       <ChatPlan plan={plan} isStreaming={isStreaming} />
 
       {errorBanner}
+
+      <QueuedMessagesTray
+        messages={queuedMessages}
+        onCancelQueuedMessage={handleCancelQueuedMessage}
+      />
 
       <ChatInput
         onSubmit={handleSend}

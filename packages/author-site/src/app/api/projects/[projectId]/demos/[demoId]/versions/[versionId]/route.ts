@@ -136,9 +136,10 @@ export async function POST(
       updateWorkspaceDemoFiles(meta.workspaceId, demoId, result.files);
       const synced = syncActiveWorkspaceToCanonical(projectId, meta.workspaceId);
       if (!synced.success) {
+        const code = synced.code === "WORKSPACE_STALE" ? "WORKSPACE_STALE" : "FILE_WRITE_ERROR";
         return NextResponse.json(
-          createApiError("FILE_WRITE_ERROR", synced.error || "同步项目当前工作区失败"),
-          { status: 500 },
+          createApiError(code, synced.error || "同步项目当前工作区失败"),
+          { status: code === "WORKSPACE_STALE" ? 409 : 500 },
         );
       }
     }

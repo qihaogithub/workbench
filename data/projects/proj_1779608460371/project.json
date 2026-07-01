@@ -2,7 +2,7 @@
   "id": "proj_1779608460371",
   "name": "伴读广告页面",
   "category": "APP资源位",
-  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608460371\\workspace",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1779608460371/workspace",
   "demoPages": [
     {
       "id": "demo_1779608460372_f5g6h7",
@@ -68,6 +68,34 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v7",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v8",
+      "type": "named_version",
+      "savedAt": 1782898057486,
+      "savedBy": "qh2",
+      "sessionId": "edit_1782897968856_qj38nt",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v8",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v9",
+      "type": "named_version",
+      "savedAt": 1782898286507,
+      "savedBy": "qh2",
+      "sessionId": "edit_1782898197534_h5ydlt",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v9",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v10",
+      "type": "restore_snapshot",
+      "savedAt": 1782900361330,
+      "savedBy": "qihao",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v10",
+      "fileCount": 10,
+      "note": "从 v1 恢复"
     }
   ],
   "pageVersions": {
@@ -97,15 +125,27 @@
         "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/pages/demo_1779608460372_f5g6h7/v5",
         "fileCount": 2,
         "note": "修改了手机"
+      },
+      {
+        "versionId": "v11",
+        "type": "named_version",
+        "demoId": "demo_1779608460372_f5g6h7",
+        "demoName": "手机",
+        "savedAt": 1782900510576,
+        "savedBy": "qihao",
+        "sessionId": "page-demo_1779608460372_f5g6h7",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/pages/demo_1779608460372_f5g6h7/v11",
+        "fileCount": 2,
+        "note": "修改了手机"
       }
     ]
   },
   "createdAt": 1779608460371,
-  "updatedAt": 1782892316969,
+  "updatedAt": 1782900958821,
   "publishedVersion": "v1",
   "publishedAt": 1782838591293,
-  "activeWorkspaceId": "live-1782891781169-e508q0ni4",
-  "activeWorkspaceUpdatedAt": 1782892312587,
-  "canonicalSyncedWorkspaceId": "live-1782891781169-e508q0ni4",
-  "canonicalSyncedAt": 1782892316940
+  "activeWorkspaceId": "live-1782900854472-ett8bhihh",
+  "activeWorkspaceUpdatedAt": 1782900916758,
+  "canonicalSyncedWorkspaceId": "live-1782900854472-ett8bhihh",
+  "canonicalSyncedAt": 1782900958821
 }

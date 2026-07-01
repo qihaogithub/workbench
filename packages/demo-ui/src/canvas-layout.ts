@@ -34,17 +34,156 @@ interface FitViewportOptions {
   maxZoom?: number;
 }
 
+function parsePreviewDimension(
+  value: string | number | undefined,
+  fallback: number,
+): number {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.replace(/px$/, ""));
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
 export function resolveCanvasPageSize(
   previewSize?: CanvasPageData["previewSize"],
 ): { width: number; height: number } {
-  const width =
-    previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
-  const height =
-    previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
+  return {
+    width: parsePreviewDimension(previewSize?.width, DEFAULT_PAGE_SIZE.width),
+    height: parsePreviewDimension(previewSize?.height, DEFAULT_PAGE_SIZE.height),
+  };
+}
+
+export function getCanvasPreviewSizeKey(
+  previewSize?: CanvasPageData["previewSize"],
+): string {
+  const size = resolveCanvasPageSize(previewSize);
+  return `${size.width}x${size.height}`;
+}
+
+function isSameCanvasSize(
+  layout: Pick<CanvasPageLayout, "width" | "height">,
+  size: { width: number; height: number },
+): boolean {
+  return (
+    Math.abs(layout.width - size.width) < 1 &&
+    Math.abs(layout.height - size.height) < 1
+  );
+}
+
+export function normalizeCanvasPageLayout(
+  page: CanvasPageData,
+  layout: CanvasPageLayout | undefined,
+  fallbackLayout?: CanvasPageLayout,
+): CanvasPageLayout {
+  const size = resolveCanvasPageSize(page.previewSize);
+  const previewSizeKey = getCanvasPreviewSizeKey(page.previewSize);
+  const positionSource = layout ?? fallbackLayout;
+  const baseLayout: CanvasPageLayout = {
+    x: positionSource?.x ?? 0,
+    y: positionSource?.y ?? 0,
+    width: size.width,
+    height: size.height,
+    zIndex: positionSource?.zIndex,
+    sizeMode: "preview",
+    previewSizeKey,
+  };
+
+  if (!layout) {
+    return baseLayout;
+  }
+
+  if (layout.sizeMode === "custom" && layout.previewSizeKey === previewSizeKey) {
+    return layout;
+  }
+
+  if (layout.sizeMode === "preview" && layout.previewSizeKey === previewSizeKey) {
+    return {
+      ...layout,
+      width: size.width,
+      height: Math.max(layout.height, size.height),
+      sizeMode: "preview",
+      previewSizeKey,
+    };
+  }
+
+  if (layout.sizeMode === undefined && isSameCanvasSize(layout, size)) {
+    return {
+      ...layout,
+      sizeMode: "preview",
+      previewSizeKey,
+    };
+  }
+
+  if (
+    layout.sizeMode === undefined &&
+    Math.abs(layout.width - size.width) < 1 &&
+    layout.height > size.height
+  ) {
+    return {
+      ...layout,
+      width: size.width,
+      sizeMode: "preview",
+      previewSizeKey,
+    };
+  }
+
+  return baseLayout;
+}
+
+export function normalizeCanvasPageLayouts(
+  pages: CanvasPageData[],
+  savedLayout: Record<string, CanvasPageLayout>,
+): Record<string, CanvasPageLayout> {
+  const baseLayout = computeInitialCanvasLayout(pages);
+  return Object.fromEntries(
+    pages.map((page) => [
+      page.id,
+      normalizeCanvasPageLayout(page, savedLayout[page.id], baseLayout[page.id]),
+    ]),
+  );
+}
+
+export function resolveCanvasContentHeightLayout(
+  page: CanvasPageData,
+  layout: CanvasPageLayout,
+  contentHeight: number,
+  measuredWidth?: number,
+): CanvasPageLayout | null {
+  const size = resolveCanvasPageSize(page.previewSize);
+  if (contentHeight <= size.height) {
+    return null;
+  }
+
+  const previewSizeKey = getCanvasPreviewSizeKey(page.previewSize);
+  const sourceWidth =
+    measuredWidth && Number.isFinite(measuredWidth) && measuredWidth > 0
+      ? measuredWidth
+      : size.width;
+  const isCurrentCustomSize =
+    layout.sizeMode === "custom" && layout.previewSizeKey === previewSizeKey;
+  const targetWidth = isCurrentCustomSize ? layout.width : size.width;
+  const scale = targetWidth / sourceWidth;
+  const nextHeight = contentHeight * scale;
+
+  if (
+    Math.abs(targetWidth - layout.width) < 1 &&
+    Math.abs(nextHeight - layout.height) < 1
+  ) {
+    return null;
+  }
 
   return {
-    width: Number.isFinite(width) && width > 0 ? width : DEFAULT_PAGE_SIZE.width,
-    height: Number.isFinite(height) && height > 0 ? height : DEFAULT_PAGE_SIZE.height,
+    ...layout,
+    width: targetWidth,
+    height: nextHeight,
+    sizeMode: isCurrentCustomSize ? "custom" : "preview",
+    previewSizeKey,
   };
 }
 
@@ -70,6 +209,8 @@ export function computeInitialCanvasLayout(
       width: size.width,
       height: size.height,
       zIndex: index,
+      sizeMode: "preview",
+      previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
     };
   });
 
@@ -92,12 +233,14 @@ export function computeAutoCanvasLayout(
       return {
         page,
         index,
-        layout: {
-          x: existing?.x ?? index * (fallbackSize.width + AUTO_LAYOUT_GAP),
-          y: existing?.y ?? 0,
-          width: existing?.width ?? fallbackSize.width,
-          height: existing?.height ?? fallbackSize.height,
-          zIndex: existing?.zIndex ?? index,
+        layout: existing ?? {
+          x: index * (fallbackSize.width + AUTO_LAYOUT_GAP),
+          y: 0,
+          width: fallbackSize.width,
+          height: fallbackSize.height,
+          zIndex: index,
+          sizeMode: "preview",
+          previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
         },
       };
     })

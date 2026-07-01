@@ -166,7 +166,7 @@ describe("PreviewPanel", () => {
   });
 
   it("fillContainer 应在父级尺寸变化但 ResizeObserver 未回调时重新计算 iframe 缩放", async () => {
-    let measuredRect = { width: 1242, height: 821 };
+    let measuredRect = { width: 1200, height: 800 };
     getBoundingClientRectSpy = jest
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(
@@ -184,7 +184,7 @@ describe("PreviewPanel", () => {
           }) as DOMRect,
       );
 
-    const previewSize = { width: 1133, height: 749 };
+    const previewSize = { width: 1000, height: 500 };
     const { rerender } = render(
       <PreviewPanel
         compiledJsUrl="/preview/page.js"
@@ -195,12 +195,12 @@ describe("PreviewPanel", () => {
 
     const iframe = (await screen.findByTitle("预览")) as HTMLIFrameElement;
     await waitFor(() => {
-      expect(iframe.style.transform).toBe(
-        `scale(${Math.min(1242 / 1133, 821 / 749)})`,
-      );
+      expect(iframe.style.transform).toBe("scale(1.2)");
+      expect(iframe.style.top).toBe("100px");
+      expect(iframe.style.left).toBe("0px");
     });
 
-    measuredRect = { width: 1133, height: 749 };
+    measuredRect = { width: 1000, height: 500 };
     rerender(
       <PreviewPanel
         compiledJsUrl="/preview/page.js"

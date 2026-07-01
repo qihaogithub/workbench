@@ -23,6 +23,7 @@ export type RuntimeContractStage =
 export interface ImportDeclaration {
   moduleName: string;
   namedImports: string[];
+  typeOnly?: boolean;
 }
 
 export interface RuntimeContractIssue {
@@ -78,12 +79,6 @@ const LUCIDE_EXPORTS = new Set(Object.keys(LucideIcons));
 const MODULE_PARSE_TARGET = ts.ScriptTarget.ES2022;
 const MODULE_PARSE_KIND = ts.ModuleKind.ESNext;
 
-function removeComments(code: string): string {
-  return code
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 function isCssImport(moduleName: string): boolean {
   return moduleName.endsWith(".css") || moduleName.endsWith(".scss") || moduleName.endsWith(".less");
 }
@@ -103,45 +98,165 @@ export function isPreviewDependencyAllowed(moduleName: string): boolean {
   return PREVIEW_DEPENDENCY_POLICY[getPolicyPackageName(moduleName)] !== undefined;
 }
 
-function splitNamedImports(namedBlock: string): string[] {
-  return namedBlock
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => part.replace(/\s+as\s+\w+$/u, "").trim())
-    .filter(Boolean);
-}
-
 export function extractImportDeclarations(code: string): ImportDeclaration[] {
-  const cleanCode = removeComments(code);
+  const sourceFile = ts.createSourceFile(
+    "preview-source.tsx",
+    code,
+    MODULE_PARSE_TARGET,
+    true,
+    ts.ScriptKind.TSX,
+  );
   const declarations: ImportDeclaration[] = [];
 
-  const fromImportRegex = /import\s+(?:type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
-  let fromMatch: RegExpExecArray | null;
-  while ((fromMatch = fromImportRegex.exec(cleanCode)) !== null) {
-    const clause = fromMatch[1] || "";
-    const moduleName = fromMatch[2];
-    const namedBlockMatch = clause.match(/\{([\s\S]*?)\}/);
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
+      continue;
+    }
+    const moduleName = statement.moduleSpecifier.text;
+    const importClause = statement.importClause;
+    const namedImports: string[] = [];
+    const namedBindings = importClause?.namedBindings;
+    if (namedBindings && ts.isNamedImports(namedBindings)) {
+      for (const element of namedBindings.elements) {
+        if (!element.isTypeOnly) {
+          namedImports.push(element.name.text);
+        }
+      }
+    }
     declarations.push({
       moduleName,
-      namedImports: namedBlockMatch ? splitNamedImports(namedBlockMatch[1]) : [],
-    });
-  }
-
-  const sideEffectImportRegex = /import\s+['"]([^'"]+)['"]/g;
-  let sideEffectMatch: RegExpExecArray | null;
-  while ((sideEffectMatch = sideEffectImportRegex.exec(cleanCode)) !== null) {
-    declarations.push({
-      moduleName: sideEffectMatch[1],
-      namedImports: [],
+      namedImports,
+      typeOnly: Boolean(importClause?.isTypeOnly),
     });
   }
 
   return declarations;
 }
 
+function hasDefaultExport(source: string): boolean {
+  const sourceFile = ts.createSourceFile(
+    "preview-source.tsx",
+    source,
+    MODULE_PARSE_TARGET,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  for (const statement of sourceFile.statements) {
+    if (ts.isExportAssignment(statement)) return true;
+    if (hasDefaultModifier(statement)) return true;
+    if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+      if (statement.exportClause.elements.some((element) => element.name.text === "default")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isNullExpression(expression: ts.Expression | undefined): boolean {
+  return expression?.kind === ts.SyntaxKind.NullKeyword;
+}
+
+function bodyDirectlyReturnsNull(body: ts.ConciseBody | ts.Block | undefined): boolean {
+  if (!body) return false;
+  if (!ts.isBlock(body)) {
+    return isNullExpression(body);
+  }
+
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (node !== body && (ts.isFunctionLike(node) || ts.isClassLike(node))) {
+      return;
+    }
+    if (ts.isReturnStatement(node) && isNullExpression(node.expression)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return found;
+}
+
+function classRenderReturnsNull(node: ts.ClassDeclaration | ts.ClassExpression): boolean {
+  for (const member of node.members) {
+    if (
+      ts.isMethodDeclaration(member) &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === "render" &&
+      bodyDirectlyReturnsNull(member.body)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function declarationReturnsNull(statement: ts.Statement, name: string): boolean {
+  if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) {
+    return bodyDirectlyReturnsNull(statement.body);
+  }
+
+  if (ts.isClassDeclaration(statement) && statement.name?.text === name) {
+    return classRenderReturnsNull(statement);
+  }
+
+  if (ts.isVariableStatement(statement)) {
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== name) continue;
+      const initializer = declaration.initializer;
+      if (!initializer) continue;
+      if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+        return bodyDirectlyReturnsNull(initializer.body);
+      }
+      if (ts.isClassExpression(initializer)) {
+        return classRenderReturnsNull(initializer);
+      }
+    }
+  }
+
+  return false;
+}
+
+function hasDefaultRenderableReturnNull(source: string): boolean {
+  const sourceFile = ts.createSourceFile(
+    "preview-source.tsx",
+    source,
+    MODULE_PARSE_TARGET,
+    true,
+    ts.ScriptKind.TSX,
+  );
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && hasDefaultModifier(statement)) {
+      return bodyDirectlyReturnsNull(statement.body);
+    }
+
+    if (ts.isClassDeclaration(statement) && hasDefaultModifier(statement)) {
+      return classRenderReturnsNull(statement);
+    }
+
+    if (ts.isExportAssignment(statement)) {
+      const expression = statement.expression;
+      if (isNullExpression(expression)) return true;
+      if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
+        return bodyDirectlyReturnsNull(expression.body);
+      }
+      if (ts.isClassExpression(expression)) {
+        return classRenderReturnsNull(expression);
+      }
+      if (ts.isIdentifier(expression)) {
+        return sourceFile.statements.some((candidate) => declarationReturnsNull(candidate, expression.text));
+      }
+    }
+  }
+
+  return false;
+}
+
 export function wrapPreviewPageSource(source: string): string {
-  if (/\bexport\s+default\b/.test(removeComments(source))) {
+  if (hasDefaultExport(source)) {
     return source;
   }
 
@@ -168,6 +283,7 @@ export function validatePreviewPageSource(
   const declarations = extractImportDeclarations(wrappedSource);
 
   for (const declaration of declarations) {
+    if (declaration.typeOnly) continue;
     const { moduleName } = declaration;
     if (isCssImport(moduleName)) continue;
 
@@ -226,7 +342,7 @@ export function validatePreviewPageSource(
 
   issues.push(...collectTopLevelModuleIssues(wrappedSource, ts.ScriptKind.TSX));
 
-  if (!/\bexport\s+default\b/.test(removeComments(wrappedSource))) {
+  if (!hasDefaultExport(wrappedSource)) {
     issues.push({
       stage: "component_export",
       code: "NO_RENDERABLE_COMPONENT",
@@ -236,7 +352,7 @@ export function validatePreviewPageSource(
     });
   }
 
-  if (/\breturn\s+null\s*;?/.test(removeComments(wrappedSource))) {
+  if (hasDefaultRenderableReturnNull(wrappedSource)) {
     issues.push({
       stage: "render_contract",
       code: "EMPTY_RENDER_RISK",
@@ -315,6 +431,13 @@ function createMultipleDefaultExportsIssue(): RuntimeContractIssue {
   };
 }
 
+type TopLevelBindingKind = "lexical" | "var";
+
+interface TopLevelBindingState {
+  lexicalCount: number;
+  varCount: number;
+}
+
 function collectBindingNames(name: ts.BindingName, names: string[]): void {
   if (ts.isIdentifier(name)) {
     names.push(name.text);
@@ -328,21 +451,31 @@ function collectBindingNames(name: ts.BindingName, names: string[]): void {
 }
 
 function addBindingName(
-  names: Map<string, number>,
+  names: Map<string, TopLevelBindingState>,
   issues: RuntimeContractIssue[],
   name: string | undefined,
+  kind: TopLevelBindingKind,
   options: { generated?: boolean } = {},
 ): void {
   if (!name) return;
-  const count = names.get(name) ?? 0;
-  if (count === 1) {
+  const state = names.get(name) ?? { lexicalCount: 0, varCount: 0 };
+  const conflicts =
+    kind === "var"
+      ? state.lexicalCount > 0
+      : state.lexicalCount > 0 || state.varCount > 0;
+  if (conflicts) {
     issues.push(
       options.generated
         ? createGeneratedModuleBindingConflictIssue(name)
         : createDuplicateTopLevelDeclarationIssue(name),
     );
   }
-  names.set(name, count + 1);
+  if (kind === "var") {
+    state.varCount += 1;
+  } else {
+    state.lexicalCount += 1;
+  }
+  names.set(name, state);
 }
 
 function hasDefaultModifier(node: ts.Node): boolean {
@@ -363,23 +496,23 @@ function collectTopLevelModuleIssues(
     scriptKind,
   );
   const issues: RuntimeContractIssue[] = [];
-  const topLevelNames = new Map<string, number>();
+  const topLevelNames = new Map<string, TopLevelBindingState>();
   let defaultExportCount = 0;
 
   for (const statement of sourceFile.statements) {
     if (ts.isImportDeclaration(statement)) {
       const importClause = statement.importClause;
       if (!importClause || importClause.isTypeOnly) continue;
-      addBindingName(topLevelNames, issues, importClause.name?.text, options);
+      addBindingName(topLevelNames, issues, importClause.name?.text, "lexical", options);
       const namedBindings = importClause.namedBindings;
       if (namedBindings && ts.isNamedImports(namedBindings)) {
         for (const element of namedBindings.elements) {
           if (!element.isTypeOnly) {
-            addBindingName(topLevelNames, issues, element.name.text, options);
+            addBindingName(topLevelNames, issues, element.name.text, "lexical", options);
           }
         }
       } else if (namedBindings && ts.isNamespaceImport(namedBindings)) {
-        addBindingName(topLevelNames, issues, namedBindings.name.text, options);
+        addBindingName(topLevelNames, issues, namedBindings.name.text, "lexical", options);
       }
       continue;
     }
@@ -390,11 +523,15 @@ function collectTopLevelModuleIssues(
     }
 
     if (ts.isVariableStatement(statement)) {
+      const kind =
+        (statement.declarationList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) !== 0
+          ? "lexical"
+          : "var";
       for (const declaration of statement.declarationList.declarations) {
         const names: string[] = [];
         collectBindingNames(declaration.name, names);
         for (const name of names) {
-          addBindingName(topLevelNames, issues, name, options);
+          addBindingName(topLevelNames, issues, name, kind, options);
         }
       }
       continue;
@@ -404,7 +541,7 @@ function collectTopLevelModuleIssues(
       if (hasDefaultModifier(statement)) {
         defaultExportCount += 1;
       }
-      addBindingName(topLevelNames, issues, statement.name?.text, options);
+      addBindingName(topLevelNames, issues, statement.name?.text, "lexical", options);
     }
   }
 

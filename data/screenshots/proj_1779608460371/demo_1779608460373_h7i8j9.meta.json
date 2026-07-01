@@ -1,15 +1,37 @@
 {
-  "currentHash": "61376a540c06ee02",
-  "generatedAt": "2026-07-01T07:46:16.074Z",
-  "elapsed": 20467,
+  "currentHash": "b40fc5ba5f217053",
+  "generatedAt": "2026-07-01T10:15:25.683Z",
+  "elapsed": 7789,
   "history": [
+    "b40fc5ba5f217053",
+    "ef4434a984ef5c3b",
     "61376a540c06ee02",
     "4f1ddc8de8a3e5fd",
-    "7c9ab454d25b2e1d",
-    "76187acc7b754404",
-    "a03fc83970a2c17b"
+    "7c9ab454d25b2e1d"
   ],
   "renderBoxes": {
+    "b40fc5ba5f217053": {
+      "width": 1133,
+      "height": 749,
+      "viewportWidth": 1133,
+      "viewportHeight": 749,
+      "bodyWidth": 1133,
+      "bodyHeight": 749,
+      "documentWidth": 1133,
+      "documentHeight": 749,
+      "fullPage": true
+    },
+    "ef4434a984ef5c3b": {
+      "width": 1133,
+      "height": 749,
+      "viewportWidth": 1133,
+      "viewportHeight": 749,
+      "bodyWidth": 1133,
+      "bodyHeight": 749,
+      "documentWidth": 1133,
+      "documentHeight": 749,
+      "fullPage": true
+    },
     "61376a540c06ee02": {
       "width": 1133,
       "height": 749,
@@ -42,28 +64,24 @@
       "documentWidth": 1133,
       "documentHeight": 749,
       "fullPage": true
-    },
-    "76187acc7b754404": {
-      "width": 1133,
-      "height": 749,
-      "viewportWidth": 1133,
-      "viewportHeight": 749,
-      "bodyWidth": 1133,
-      "bodyHeight": 749,
-      "documentWidth": 1133,
-      "documentHeight": 749,
-      "fullPage": true
-    },
-    "a03fc83970a2c17b": {
-      "width": 1133,
-      "height": 749,
-      "viewportWidth": 1133,
-      "viewportHeight": 749,
-      "bodyWidth": 1133,
-      "bodyHeight": 749,
-      "documentWidth": 1133,
-      "documentHeight": 749,
-      "fullPage": true
+    }
+  },
+  "variants": {
+    "ef4434a984ef5c3b:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-01T09:34:46.298Z",
+      "elapsed": 2818,
+      "renderBox": {
+        "width": 1133,
+        "height": 749,
+        "viewportWidth": 1133,
+        "viewportHeight": 749,
+        "bodyWidth": 1133,
+        "bodyHeight": 749,
+        "documentWidth": 1133,
+        "documentHeight": 749,
+        "fullPage": true
+      }
     }
   }
 }

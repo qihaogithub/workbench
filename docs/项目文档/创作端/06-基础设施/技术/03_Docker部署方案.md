@@ -12,6 +12,7 @@ covers:
   - docker/viewer-site/Dockerfile
   - scripts/deploy.sh
   - scripts/deploy-fast.sh
+  - packages/preview-contract/package.json
   - packages/author-site/src/middleware.ts
   - scripts/build-preview-runtime.mjs
   - packages/author-site/public/preview-runtime/manifest.json
@@ -162,11 +163,11 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 | 镜像 | 需要复制的 workspace 包 |
 | ---- | ----------------------- |
-| `agent-service` | `agent-service`、`shared`、`knowledge-core`、`knowledge-service` |
-| `author-site` | `author-site`、`agent-client`、`demo-ui`、`knowledge-core`、`knowledge-service`、`project-core`、`project-scaffold`、`shared` |
+| `agent-service` | `agent-service`、`shared`、`knowledge-core`、`knowledge-service`、`preview-contract` |
+| `author-site` | `author-site`、`agent-client`、`demo-ui`、`knowledge-core`、`knowledge-service`、`preview-contract`、`project-core`、`project-scaffold`、`shared` |
 | `viewer-site` | `viewer-site`、`demo-ui`、`shared` |
 
-如果新增 workspace 依赖，只更新本地 `package.json` 不足以保证 Docker build 通过；必须同步更新对应 Dockerfile 的复制清单和 `next.config.js` 的 `transpilePackages`。
+如果新增 workspace 依赖，只更新本地 `package.json` 不足以保证 Docker build 通过；必须同步更新对应 Dockerfile 的复制清单和 `next.config.js` 的 `transpilePackages`。例如页面运行契约包 `preview-contract` 同时被 author-site、agent-service、project-core 和 project-cli 复用，相关服务镜像必须在 `pnpm install` 前复制它的 `package.json`，并在构建前复制源码目录。
 
 ### 3.6 preview runtime 构建约束
 

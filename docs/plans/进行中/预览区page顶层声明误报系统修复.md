@@ -24,6 +24,7 @@
 2. 增加单页 `const page` 兼容、单页真实重复 `const page` 阻断、多页面各自声明 `const page` 通过的测试。
 3. 增强编译 API / PreviewPanel 诊断中携带的页面定位与 hash 信息。
 4. 更新配置与预览模块技术文档，说明 module preflight 的诊断边界。
+5. 继续审计同类源码契约误报，优先处理仍依赖正则或忽略 TypeScript/ESM 语义的路径。
 
 ## 任务清单
 
@@ -31,6 +32,7 @@
 - [x] 修改 preview-contract 诊断边界与错误码归因。
 - [x] 补充 preview-contract、project-core/CLI、author-site 相关测试。
 - [x] 更新 `docs/项目文档/创作端/04-配置与预览/技术/02_实时预览机制.md`。
+- [x] 继续检查并修复 type-only import、字符串注释符号、helper `return null`、重复 `var` 等同类误报。
 - [x] 运行验证命令并记录结果。
 
 ## 进度记录
@@ -38,7 +40,8 @@
 - 2026-07-01：创建任务文档；已确认现有文档把页面代码、配置、截图任务参数定义为按页面 ID 隔离。
 - 2026-07-01：完成 preview-contract 分类调整：真实源码重复声明仍用 `DUPLICATE_TOP_LEVEL_DECLARATION`，编译生成产物冲突使用 `GENERATED_MODULE_BINDING_CONFLICT`；补充 preview-contract、project-core、project-cli、author-site 回归测试。
 - 2026-07-01：更新配置与预览技术文档，明确不同页面可各自使用普通顶层变量名。
-- 2026-07-01：验证结果：`check:project-cli` 通过；`check:project-core` 通过；`pnpm --filter @opencode-workbench/author-site typecheck` 通过；author-site 定向测试 `PreviewPanel.test.tsx` 与 `preview-runtime-policy.test.ts` 通过。全量 `check:author` 在既有 `user-choice-card`、`preview-canvas-interaction-mode`、`home-page` 测试超时/交互断言处失败，失败点与本次预览契约改动无直接关联。
+- 2026-07-01：继续检查同类误报，发现并修复四类边界：`import type` 不应作为运行时依赖；字符串里的 `//` 不应破坏默认导出和 import 判断；非默认渲染 helper 内部 `return null` 不应阻断页面；重复 `var` 不应被当作浏览器导入阶段错误。
+- 2026-07-01：验证结果：`pnpm --filter @opencode-workbench/preview-contract test` 通过；`check:project-core` 通过；`check:project-cli` 通过；author-site 定向测试 `PreviewPanel.test.tsx` 与 `preview-runtime-policy.test.ts` 通过。全量 `check:author` 的 typecheck 通过，Jest 在既有 UI 测试处失败：`preview-canvas-interaction-mode.test.tsx` 2 个文字工具用例超时，`home-page.test.tsx` 3 个首页项目/模板菜单用例超时，失败点与本次预览契约改动无直接关联。
 
 ## 验证方式
 

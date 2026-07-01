@@ -45,6 +45,12 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
   const width = readNumber(value, "width");
   const height = readNumber(value, "height");
   const zIndex = readNumber(value, "zIndex");
+  const sizeMode =
+    value.sizeMode === "preview" || value.sizeMode === "custom"
+      ? value.sizeMode
+      : undefined;
+  const previewSizeKey =
+    typeof value.previewSizeKey === "string" ? value.previewSizeKey : null;
 
   if (x === null || y === null || width === null || height === null) {
     return null;
@@ -59,6 +65,8 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
     width,
     height,
     ...(zIndex === null ? {} : { zIndex }),
+    ...(sizeMode ? { sizeMode } : {}),
+    ...(previewSizeKey ? { previewSizeKey } : {}),
   };
 }
 

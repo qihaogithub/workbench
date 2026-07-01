@@ -66,6 +66,7 @@ function toApiErrorCode(code: string): ErrorCodeType {
   if (code === "INVALID_REQUEST") return "INVALID_REQUEST";
   if (code === "FORBIDDEN") return "FORBIDDEN";
   if (code === "FILE_WRITE_ERROR") return "FILE_WRITE_ERROR";
+  if (code === "WORKSPACE_STALE") return "WORKSPACE_STALE";
   return "AGENT_SERVICE_ERROR";
 }
 
@@ -119,7 +120,10 @@ export async function flushAndSyncProjectWorkspace(
   if (!synced.success) {
     throw new WorkspaceFlushError(
       synced.error || "同步项目当前工作区失败",
-      { code: "FILE_WRITE_ERROR", status: 500 },
+      {
+        code: synced.code || "FILE_WRITE_ERROR",
+        status: synced.code === "WORKSPACE_STALE" ? 409 : 500,
+      },
     );
   }
   return {

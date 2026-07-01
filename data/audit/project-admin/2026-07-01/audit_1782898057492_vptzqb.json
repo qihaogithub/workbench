@@ -1,0 +1,29 @@
+{
+  "auditId": "audit_1782898057492_vptzqb",
+  "at": 1782898057492,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1779608460371",
+  "resourceId": "edit_1782897968856_qj38nt",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      ".workspace.json",
+      "demos/demo_1779608460372_f5g6h7/index.tsx",
+      "project.config.schema.json"
+    ],
+    "notes": [
+      "生成版本 v8"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}
