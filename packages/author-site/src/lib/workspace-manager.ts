@@ -10,6 +10,7 @@ import {
   findWorkspacePath,
   getWorkspaceMeta as getWorkspaceMetaFromFs,
   writeWorkspaceMeta,
+  markWorkspaceBasedOnVersion,
   getWorkspaceMultiDemoFiles,
   readProjectMeta,
   writeProjectMeta,
@@ -91,6 +92,27 @@ export function isLiveWorkspace(workspaceId: string | null | undefined): boolean
   if (!workspaceId) return false;
   const meta = getWorkspaceMetaFromFs(workspaceId);
   return meta?.scope === "live" && meta.status !== "archived";
+}
+
+export function advanceWorkspaceBaseIfLatestSessionVersion(
+  projectId: string,
+  workspaceId: string | null | undefined,
+  sessionId: string,
+): boolean {
+  if (!workspaceId || !sessionId) return false;
+
+  const project = readProjectMeta(projectId);
+  if (!project || project.activeWorkspaceId !== workspaceId) return false;
+
+  const meta = getWorkspaceMetaFromFs(workspaceId);
+  if (!meta || meta.projectId !== projectId || meta.status === "archived") {
+    return false;
+  }
+
+  const latestVersion = getLatestVersion(projectId);
+  if (!latestVersion || latestVersion.sessionId !== sessionId) return false;
+
+  return markWorkspaceBasedOnVersion(workspaceId, latestVersion.versionId);
 }
 
 export function getProjectActiveWorkspacePath(projectId: string): string | null {

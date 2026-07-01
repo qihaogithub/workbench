@@ -22,33 +22,15 @@ const accentMap = {
     red: { bg: "from-[#fee2e2] via-[#fff7ed] to-[#fde68a]", ink: "#7f1d1d", pill: "#dc2626", soft: "#fef2f2" },
 };
 const theme = accentMap[pageData.accent];
-export default function ChallengePrototypePage({ title = pageData.title }) {
-    return (<main className="min-h-screen w-full bg-[#f3f4f6] px-4 py-6 text-[#111827]">
-      <section className="mx-auto flex w-full max-w-[520px] flex-col items-center gap-3">
-        <div className="w-full text-left">
-          <p className="text-xs font-medium text-[#6b7280]">闯关活动 / 代码化还原</p>
-          <h1 className="mt-1 text-base font-semibold text-[#111827]">{title}</h1>
-        </div>
-        <PhoneShell tall={isLongPage()} wide={isWidePage()}>
-          {renderPage()}
-        </PhoneShell>
-      </section>
-    </main>);
+
+interface DemoProps {
+  title?: string;
 }
-function isLongPage() {
-    return pageData.kind === "longFlowA" || pageData.kind === "longFlowB" || pageData.kind === "materialList";
-}
-function isWidePage() {
-    return pageData.kind === "rules" || pageData.kind === "timeline" || pageData.kind === "taskDialog" || pageData.kind === "longFlowB";
-}
-function PhoneShell({ children, tall, wide }) {
-    const width = wide ? "max-w-[420px]" : "max-w-[360px]";
-    const minHeight = tall ? "min-h-[1120px]" : "min-h-[720px]";
-    return (<div className={`w-full ${width} overflow-hidden rounded-[26px] bg-white shadow-xl ring-1 ring-black/10`}>
-      <div className={`${minHeight} relative bg-gradient-to-br ${theme.bg}`}>
-        <StatusBar />
-        {children}
-      </div>
+
+export default function ChallengePrototypePage(_props: DemoProps) {
+    return (<div className={`min-h-screen bg-gradient-to-br ${theme.bg}`}>
+      <StatusBar />
+      {renderPage()}
     </div>);
 }
 function StatusBar() {

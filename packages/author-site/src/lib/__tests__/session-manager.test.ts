@@ -319,4 +319,49 @@ describe("项目级共享 Workspace", () => {
     expect(saved.error).toContain("当前工作区已过期");
     expect(fs.readFileSync(markerPath, "utf-8")).toBe("canonical-v2");
   });
+
+  it("同一 session 已创建新版本但未更新 baseVersion 时可恢复后继续保存", async () => {
+    const { fsUtils, sessionManager, workspaceManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("同会话基线恢复项目");
+    const projectWorkspacePath = path.join(dataDir, "projects", project.id, "workspace");
+    const markerPath = path.join(projectWorkspacePath, "_marker.txt");
+
+    fs.writeFileSync(markerPath, "canonical-v1", "utf-8");
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+
+    const session = await sessionManager.createEditSession("user-a", project.id);
+    const liveWorkspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+    expect(liveWorkspacePath).toBeTruthy();
+    fs.writeFileSync(path.join(liveWorkspacePath!, "_marker.txt"), "live-change", "utf-8");
+
+    expect(
+      workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId),
+    ).toMatchObject({ success: true });
+    const baseBeforeCheckpoint = fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion;
+    const checkpoint = fsUtils.createProjectVersionSnapshot(project.id, "tester", {
+      sessionId: session.sessionId,
+      type: "auto_checkpoint",
+      note: "模拟旧代码创建的自动保存记录",
+    });
+    expect(checkpoint.success).toBe(true);
+    const checkpointMeta = fsUtils.getWorkspaceMeta(session.workspaceId);
+    if (!checkpointMeta) throw new Error("workspace meta missing");
+    fsUtils.writeWorkspaceMeta(session.workspaceId, {
+      ...checkpointMeta,
+      baseVersion: baseBeforeCheckpoint,
+      updatedAt: checkpointMeta.updatedAt,
+    });
+    expect(fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion).not.toBe(
+      checkpoint.version?.versionId,
+    );
+
+    const saved = sessionManager.saveEditSession(session.sessionId);
+
+    expect(saved.success).toBe(true);
+    expect(saved.version).toMatch(/^v\d+$/);
+    expect(fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion).toBe(
+      saved.version,
+    );
+    expect(fs.readFileSync(markerPath, "utf-8")).toBe("live-change");
+  });
 });
