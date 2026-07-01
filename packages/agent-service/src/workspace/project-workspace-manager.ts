@@ -332,8 +332,13 @@ export class ProjectWorkspaceManager {
 
     return {
       sessionId,
+      workspaceId: sessionId,
+      workspaceScope: "legacy",
+      workspacePath: tempWorkspace,
+      isSharedWorkspace: false,
       tempWorkspace,
       basedOnVersion: currentVersion,
+      warning: "legacy_temp_workspace",
     };
   }
 

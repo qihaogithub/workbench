@@ -54,6 +54,14 @@ describe("ProjectAdminService", () => {
     const created = service.createProject({ name: "页面项目" });
     const edit = service.beginEdit(created.data?.id ?? "");
     const editId = (edit.data as EditTransaction).editId;
+    const transaction = edit.data as EditTransaction;
+    const workspaceMeta = JSON.parse(
+      fs.readFileSync(path.join(transaction.workspacePath, ".workspace.json"), "utf-8"),
+    );
+
+    expect(transaction.workspaceScope).toBe("branch");
+    expect(workspaceMeta.scope).toBe("branch");
+    expect(workspaceMeta.projectId).toBe(created.data?.id);
 
     const page = service.createPage({ editId, name: "首页" });
     expect(page.ok).toBe(true);
@@ -134,6 +142,32 @@ describe("ProjectAdminService", () => {
     const saved = service.getPage(editId, pageId);
     expect(saved.data?.files.code).toBe(duplicatedCode);
     expect(service.commitEdit(editId, "重复拼接页").ok).toBe(false);
+  });
+
+  it("允许多个页面各自使用 page 作为普通顶层变量", () => {
+    const created = service.createProject({ name: "多页面预览项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const first = service.createPage({
+      editId,
+      name: "首页",
+      code: "const page = { title: '首页' };\nexport default function Demo(){ return <div>{page.title}</div>; }",
+    });
+    const second = service.createPage({
+      editId,
+      name: "详情",
+      code: "const page = { title: '详情' };\nexport default function Demo(){ return <section>{page.title}</section>; }",
+    });
+
+    expect(first.runtimeValidation?.ok).toBe(true);
+    expect(second.runtimeValidation?.ok).toBe(true);
+
+    const validation = service.editValidate(editId);
+    expect(validation.data?.ok).toBe(true);
+    expect(validation.data?.issues).not.toContainEqual(expect.objectContaining({
+      code: "DUPLICATE_TOP_LEVEL_DECLARATION",
+    }));
   });
 
   it("旧项目未改页面的运行时契约问题只作为 warning", () => {

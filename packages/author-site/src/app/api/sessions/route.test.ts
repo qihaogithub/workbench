@@ -72,6 +72,15 @@ describe("sessions route external auth reuse", () => {
         workspaceId: "workspace-existing",
       })),
       findWorkspacePath: jest.fn(() => "/tmp/workspace"),
+      getWorkspaceMeta: jest.fn(() => ({
+        workspaceId: "workspace-existing",
+        demoId: "project-1",
+        projectId: "project-1",
+        scope: "live",
+        status: "active",
+        createdAt: 1,
+        updatedAt: 2,
+      })),
       getWorkspaceMultiDemoFiles: jest.fn(() => ({
         demos: {
           page_1: { code: "code", schema: "schema" },
@@ -84,16 +93,16 @@ describe("sessions route external auth reuse", () => {
       createEditSession: jest.fn(async () => ({
         sessionId: "session-new",
         workspaceId: "workspace-new",
+        workspaceScope: "live",
+        isSharedWorkspace: true,
         code: "",
         schema: "",
         tempWorkspace: "/tmp/workspace",
         demos: { demos: {}, projectConfigSchema: undefined },
       })),
       enforceSessionLimit: jest.fn(),
+      ensureSessionUsesProjectActiveWorkspace: jest.fn(),
       findActiveSession: jest.fn(() => null),
-    }));
-    jest.doMock("@/lib/workspace-manager", () => ({
-      findActiveWorkspace: jest.fn(() => null),
     }));
     jest.doMock("@/lib/agent-providers", () => ({
       pushSessionExternalAuthToAgent: jest.fn(async () => ({
@@ -128,7 +137,6 @@ describe("sessions route external auth reuse", () => {
     jest.dontMock("@/lib/auth/jwt");
     jest.dontMock("@/lib/fs-utils");
     jest.dontMock("@/lib/session-manager");
-    jest.dontMock("@/lib/workspace-manager");
     jest.dontMock("@/lib/agent-providers");
     jest.dontMock("@/lib/external-auth");
     jest.dontMock("@/lib/model-config");
@@ -159,6 +167,7 @@ describe("sessions route external auth reuse", () => {
       archiveActiveSession: jest.fn(),
       createEditSession: jest.fn(),
       enforceSessionLimit: jest.fn(),
+      ensureSessionUsesProjectActiveWorkspace: jest.fn(),
       findActiveSession: jest.fn(() => "session-existing"),
     }));
     const { POST } = await import("./route");
@@ -173,10 +182,28 @@ describe("sessions route external auth reuse", () => {
     );
   });
 
-  it("没有活跃会话时默认从最近 workspace 续开，避免丢失实时保存草稿", async () => {
-    jest.doMock("@/lib/workspace-manager", () => ({
-      findActiveWorkspace: jest.fn(() => "workspace-latest"),
+  it("复用活跃会话前会确保绑定项目级共享 workspace", async () => {
+    jest.doMock("@/lib/session-manager", () => ({
+      archiveActiveSession: jest.fn(),
+      createEditSession: jest.fn(),
+      enforceSessionLimit: jest.fn(),
+      ensureSessionUsesProjectActiveWorkspace: jest.fn(),
+      findActiveSession: jest.fn(() => "session-existing"),
     }));
+    const { POST } = await import("./route");
+    const sessionManager = await import("@/lib/session-manager");
+
+    const response = await POST(createJsonRequest({ demoId: "project-1" }) as never);
+
+    expect(response.status).toBe(200);
+    expect(sessionManager.ensureSessionUsesProjectActiveWorkspace).toHaveBeenCalledWith(
+      "user-1",
+      "project-1",
+      "session-existing",
+    );
+  });
+
+  it("没有活跃会话时创建绑定项目级共享 workspace 的新 Session", async () => {
     const { POST } = await import("./route");
     const sessionManager = await import("@/lib/session-manager");
 
@@ -186,14 +213,11 @@ describe("sessions route external auth reuse", () => {
     expect(sessionManager.createEditSession).toHaveBeenCalledWith(
       "user-1",
       "project-1",
-      "workspace-latest",
+      undefined,
     );
   });
 
-  it("显式 forceNew 且未指定 workspace 时仍创建全新 workspace", async () => {
-    jest.doMock("@/lib/workspace-manager", () => ({
-      findActiveWorkspace: jest.fn(() => "workspace-latest"),
-    }));
+  it("显式 forceNew 只归档当前对话，不创建用户私有 workspace", async () => {
     const { POST } = await import("./route");
     const sessionManager = await import("@/lib/session-manager");
 
@@ -202,6 +226,10 @@ describe("sessions route external auth reuse", () => {
     );
 
     expect(response.status).toBe(201);
+    expect(sessionManager.archiveActiveSession).toHaveBeenCalledWith(
+      "user-1",
+      "project-1",
+    );
     expect(sessionManager.createEditSession).toHaveBeenCalledWith(
       "user-1",
       "project-1",

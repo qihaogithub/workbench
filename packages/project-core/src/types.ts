@@ -187,6 +187,7 @@ export interface EditTransaction {
   projectId: string;
   workspaceId: string;
   workspacePath: string;
+  workspaceScope?: "branch";
   baseVersion: string;
   actor: ProjectAdminActor;
   createdAt: number;

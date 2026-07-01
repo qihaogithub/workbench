@@ -18,7 +18,12 @@ import {
   syncProjectDemoPagesFromWorkspace,
   listDemoPages,
 } from "./fs-utils";
-import { createWorkspace } from "./workspace-manager";
+import {
+  getOrCreateProjectActiveWorkspace,
+  isLiveWorkspace,
+  findActiveWorkspace,
+  syncActiveWorkspaceToCanonical,
+} from "./workspace-manager";
 import type {
   VersionInfo,
   MultiDemoFiles,
@@ -58,6 +63,8 @@ function replaceDirectoryWithTemp(tempPath: string, targetPath: string): void {
 export interface CreateSessionResult {
   sessionId: string;
   workspaceId: string;
+  workspaceScope: "live" | "branch" | "snapshot-source" | "legacy";
+  isSharedWorkspace: boolean;
   /** 第一个 demo 页面的代码（兼容字段，Stage 2 将由前端切换为 demos 字段） */
   code: string;
   /** 第一个 demo 页面的 Schema（兼容字段） */
@@ -231,7 +238,7 @@ export function findActiveSession(
         // 发现过期 session，归档而非删除（保留消息历史）
         if (Date.now() > meta.expiresAt) {
           // 仅清理 workspace 临时文件，保留 session 元数据和消息
-          if (meta.workspaceId) {
+          if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
             const wsPath = findWorkspacePath(meta.workspaceId);
             if (wsPath && fs.existsSync(wsPath)) {
               fs.rmSync(wsPath, { recursive: true, force: true });
@@ -340,6 +347,72 @@ export function listActiveSessionsForUser(userId: string): string[] {
   return sessionIds;
 }
 
+export function rebindProjectEditingSessionsToWorkspace(
+  projectId: string,
+  workspaceId: string,
+): number {
+  const sessionsDir = getSessionsDir();
+  if (!fs.existsSync(sessionsDir)) return 0;
+
+  let updated = 0;
+  const userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
+    const projectSessionDir = path.join(sessionsDir, userDir.name, projectId);
+    if (!fs.existsSync(projectSessionDir)) continue;
+
+    const sessionDirs = fs.readdirSync(projectSessionDir, { withFileTypes: true });
+    for (const sessionDir of sessionDirs) {
+      if (!sessionDir.isDirectory()) continue;
+      const metaPath = path.join(projectSessionDir, sessionDir.name, ".session.json");
+      if (!fs.existsSync(metaPath)) continue;
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        if (meta.demoId !== projectId) continue;
+        if ((meta.status || "editing") !== "editing") continue;
+        if (Date.now() > meta.expiresAt) continue;
+        if (meta.workspaceId === workspaceId) continue;
+        meta.workspaceId = workspaceId;
+        fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+        updated += 1;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return updated;
+}
+
+export function ensureSessionUsesProjectActiveWorkspace(
+  userId: string,
+  projectId: string,
+  sessionId: string,
+): { workspaceId: string; workspacePath: string } | null {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath) return null;
+  const metaPath = path.join(sessionPath, ".session.json");
+  if (!fs.existsSync(metaPath)) return null;
+
+  const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+  const migrationWorkspaceId =
+    typeof meta.workspaceId === "string" && !isLiveWorkspace(meta.workspaceId)
+      ? meta.workspaceId
+      : findActiveWorkspace(userId, projectId);
+  const active = getOrCreateProjectActiveWorkspace(projectId, {
+    migrationWorkspaceId,
+  });
+  if (meta.workspaceId !== active.workspaceId) {
+    meta.workspaceId = active.workspaceId;
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+  }
+  rebindProjectEditingSessionsToWorkspace(projectId, active.workspaceId);
+  return {
+    workspaceId: active.workspaceId,
+    workspacePath: active.workspacePath,
+  };
+}
+
 export async function createEditSession(
   userId: string,
   projectId: string,
@@ -352,6 +425,7 @@ export async function createEditSession(
   let workspaceId: string;
   let workspacePath: string;
   let demos: MultiDemoFiles;
+  let workspaceScope: CreateSessionResult["workspaceScope"] = "live";
 
   if (existingWorkspaceId) {
     const wsPath = findWorkspacePath(existingWorkspaceId);
@@ -360,15 +434,20 @@ export async function createEditSession(
     }
     workspaceId = existingWorkspaceId;
     workspacePath = wsPath;
+    workspaceScope = isLiveWorkspace(existingWorkspaceId) ? "live" : "branch";
     demos = getWorkspaceMultiDemoFiles(existingWorkspaceId) ?? {
       demos: {},
       projectConfigSchema: undefined,
     };
   } else {
-    const wsResult = createWorkspace(userId, projectId);
+    const wsResult = getOrCreateProjectActiveWorkspace(projectId, {
+      migrationWorkspaceId: findActiveWorkspace(userId, projectId),
+    });
     workspaceId = wsResult.workspaceId;
     workspacePath = wsResult.workspacePath;
     demos = wsResult.demos;
+    workspaceScope = wsResult.workspaceScope ?? "live";
+    rebindProjectEditingSessionsToWorkspace(projectId, workspaceId);
   }
 
   const sortedPageIds = listDemoPages(workspacePath).map(p => p.id);
@@ -402,6 +481,8 @@ export async function createEditSession(
   return {
     sessionId,
     workspaceId,
+    workspaceScope,
+    isSharedWorkspace: workspaceScope === "live",
     code,
     schema,
     tempWorkspace: workspacePath,
@@ -492,13 +573,27 @@ export function saveEditSession(
   }
 
   const { demoId: projectId, workspaceId } = sessionMeta;
-  const projectPath = getProjectPath(projectId);
-  const workspacePath = path.join(projectPath, "workspace");
-
-  const project = readProjectMeta(projectId);
+  let project = readProjectMeta(projectId);
   if (!project) {
     return { success: false, error: 'Project not found' };
   }
+
+  if (workspaceId) {
+    const synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+    if (!synced.success) {
+      return {
+        success: false,
+        error: synced.error || "Sync active workspace failed",
+      };
+    }
+    project = readProjectMeta(projectId);
+    if (!project) {
+      return { success: false, error: 'Project not found' };
+    }
+  }
+
+  const projectPath = getProjectPath(projectId);
+  const workspacePath = path.join(projectPath, "workspace");
 
   const versionId = generateVersionId(project);
   const snapshotPath = getSnapshotPath(projectId, versionId);
@@ -573,29 +668,33 @@ export function saveEditSession(
     const metaPath = path.join(sessionPath!, ".session.json");
     if (fs.existsSync(metaPath)) {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      meta.status = 'saved';
-      meta.savedAt = Date.now();
+      if (!isLiveWorkspace(workspaceId)) {
+        meta.status = 'saved';
+        meta.savedAt = Date.now();
+      }
       fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     }
 
-    // 归档而非删除：保留 .session.json 和 .messages.json 供历史对话查看
-    // 仅清理 workspace 临时文件以节省空间
-    try {
-      if (workspaceId) {
-        const wsPath = findWorkspacePath(workspaceId);
-        if (wsPath && fs.existsSync(wsPath)) {
-          fs.rmSync(wsPath, { recursive: true, force: true });
+    if (!isLiveWorkspace(workspaceId)) {
+      // 归档而非删除：保留 .session.json 和 .messages.json 供历史对话查看
+      // 仅清理 workspace 临时文件以节省空间
+      try {
+        if (workspaceId) {
+          const wsPath = findWorkspacePath(workspaceId);
+          if (wsPath && fs.existsSync(wsPath)) {
+            fs.rmSync(wsPath, { recursive: true, force: true });
+          }
         }
-      }
-      // 清理 session 目录下的 demos 和 assets 子目录（保留元数据和消息）
-      const sessionDirEntries = fs.readdirSync(sessionPath!, { withFileTypes: true });
-      for (const entry of sessionDirEntries) {
-        if (entry.isDirectory() && (entry.name === 'demos' || entry.name === 'assets')) {
-          fs.rmSync(path.join(sessionPath!, entry.name), { recursive: true, force: true });
+        // 清理 session 目录下的 demos 和 assets 子目录（保留元数据和消息）
+        const sessionDirEntries = fs.readdirSync(sessionPath!, { withFileTypes: true });
+        for (const entry of sessionDirEntries) {
+          if (entry.isDirectory() && (entry.name === 'demos' || entry.name === 'assets')) {
+            fs.rmSync(path.join(sessionPath!, entry.name), { recursive: true, force: true });
+          }
         }
+      } catch (e) {
+        console.warn(`[saveEditSession] 清理 workspace 失败，但保存已成功:`, e);
       }
-    } catch (e) {
-      console.warn(`[saveEditSession] 清理 workspace 失败，但保存已成功:`, e);
     }
 
     return {
@@ -640,47 +739,15 @@ export function syncEditSessionToProjectWorkspace(
   }
 
   const { demoId: projectId, workspaceId } = sessionMeta;
-  const projectPath = getProjectPath(projectId);
-  const workspacePath = path.join(projectPath, "workspace");
-
   const project = readProjectMeta(projectId);
   if (!project) {
     return { success: false, error: "Project not found" };
   }
 
-  const sourcePath = workspaceId ? findWorkspacePath(workspaceId) : "";
-  if (!sourcePath || !fs.existsSync(sourcePath)) {
-    return { success: false, error: `Workspace source not found: ${workspaceId}` };
-  }
-
-  const tempPath = `${workspacePath}.tmp`;
-  if (fs.existsSync(tempPath)) {
-    fs.rmSync(tempPath, { recursive: true, force: true });
-  }
-
-  try {
-    fs.cpSync(sourcePath, tempPath, {
-      recursive: true,
-      filter: (src: string) => !src.includes("node_modules"),
-    });
-
-    for (const filename of [".session.json", ".workspace.json"]) {
-      const filePath = path.join(tempPath, filename);
-      if (fs.existsSync(filePath)) {
-        fs.rmSync(filePath, { force: true });
-      }
-    }
-
-    replaceDirectoryWithTemp(tempPath, workspacePath);
-    syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
-    return { success: true, projectId, workspacePath };
-  } catch (error) {
-    fs.rmSync(tempPath, { recursive: true, force: true });
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Sync failed",
-    };
-  }
+  const synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+  return synced.success
+    ? { success: true, projectId, workspacePath: synced.workspacePath }
+    : { success: false, error: synced.error };
 }
 
 export function archiveSession(sessionId: string, status: 'discarded' | 'saved' | 'archived' = 'discarded'): boolean {
@@ -698,7 +765,7 @@ export function archiveSession(sessionId: string, status: 'discarded' | 'saved' 
     const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 
     // 清理 workspace 临时文件
-    if (meta.workspaceId) {
+    if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
       const wsPath = findWorkspacePath(meta.workspaceId);
       if (wsPath && fs.existsSync(wsPath)) {
         fs.rmSync(wsPath, { recursive: true, force: true });
@@ -768,7 +835,7 @@ export function cleanupExpiredSessions(userId: string): string[] {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         if (Date.now() > meta.expiresAt) {
           // 仅清理 workspace，保留 session 元数据和消息
-          if (meta.workspaceId) {
+          if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
             const wsPath = findWorkspacePath(meta.workspaceId);
             if (wsPath && fs.existsSync(wsPath)) {
               fs.rmSync(wsPath, { recursive: true, force: true });
@@ -834,7 +901,7 @@ export function cleanupAllExpiredSessions(): string[] {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           if (Date.now() > meta.expiresAt) {
             // 仅清理 workspace，保留 session 元数据和消息
-            if (meta.workspaceId) {
+            if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
               const wsPath = findWorkspacePath(meta.workspaceId);
               if (wsPath && fs.existsSync(wsPath)) {
                 fs.rmSync(wsPath, { recursive: true, force: true });
