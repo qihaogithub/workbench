@@ -1,4 +1,5 @@
 import fs from "fs";
+import crypto from "crypto";
 import path from "path";
 
 import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
@@ -9,6 +10,14 @@ export interface SessionValidation {
   userId?: string;
   username?: string;
   workspacePath?: string;
+}
+
+export interface ResourceFileState {
+  content: string;
+  hash: string;
+  exists: boolean;
+  mtimeMs: number;
+  size: number;
 }
 
 interface SessionMetaFile {
@@ -109,12 +118,32 @@ export class WorkspaceFilePersistence {
   }
 
   readResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind): string {
-    const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
-    if (!filePath || !fs.existsSync(filePath)) return "";
-    return fs.readFileSync(filePath, "utf-8");
+    return this.readResourceState(workspacePath, resourcePath, kind).content;
   }
 
-  writeResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind, content: string): void {
+  readResourceState(workspacePath: string, resourcePath: string, kind: CollabResourceKind): ResourceFileState {
+    const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return {
+        content: "",
+        hash: this.hashContent(""),
+        exists: false,
+        mtimeMs: 0,
+        size: 0,
+      };
+    }
+    const stat = fs.statSync(filePath);
+    const content = fs.readFileSync(filePath, "utf-8");
+    return {
+      content,
+      hash: this.hashContent(content),
+      exists: true,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+    };
+  }
+
+  writeResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind, content: string): ResourceFileState {
     const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
     if (!filePath) throw new Error("INVALID_RESOURCE_PATH");
 
@@ -123,6 +152,7 @@ export class WorkspaceFilePersistence {
     fs.writeFileSync(tmpPath, content, "utf-8");
     fs.renameSync(tmpPath, filePath);
     this.touchWorkspace(workspacePath);
+    return this.readResourceState(workspacePath, resourcePath, kind);
   }
 
   resolveResourcePath(
@@ -212,6 +242,10 @@ export class WorkspaceFilePersistence {
     } catch {
       /* Ignore malformed workspace metadata; the file content was already saved. */
     }
+  }
+
+  private hashContent(content: string): string {
+    return crypto.createHash("sha256").update(content).digest("hex");
   }
 
   private findJsonFile<T>(

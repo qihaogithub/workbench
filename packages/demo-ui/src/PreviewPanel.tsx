@@ -502,6 +502,13 @@ export function PreviewPanel({
   const measureContainer = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
+    const width = el.clientWidth;
+    const height = el.clientHeight;
+    if (width > 0 && height > 0) {
+      updateContainerSize(width, height);
+      return;
+    }
+
     const rect = el.getBoundingClientRect();
     updateContainerSize(rect.width, rect.height);
   }, [updateContainerSize]);

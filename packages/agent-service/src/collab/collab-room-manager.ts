@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import WebSocket from "ws";
 import * as Y from "yjs";
 import * as syncProtocol from "y-protocols/sync";
@@ -6,8 +8,9 @@ import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 
 import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
+import type { FileChange } from "../core/types";
 import { logger } from "../utils/logger";
-import { WorkspaceFilePersistence } from "./workspace-file-persistence";
+import { ResourceFileState, WorkspaceFilePersistence } from "./workspace-file-persistence";
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
@@ -15,6 +18,7 @@ const MESSAGE_QUERY_AWARENESS = 3;
 const DEFAULT_SAVE_DEBOUNCE_MS = 1000;
 const DEFAULT_ROOM_IDLE_TTL_MS = 5 * 60_000;
 const DEFAULT_MAX_CONNECTIONS_PER_WORKSPACE = 10;
+const SERVER_RELOAD_ORIGIN = Symbol("collab-server-reload");
 
 interface RoomDescriptor {
   projectId: string;
@@ -44,6 +48,7 @@ interface CollabRoom {
   lastActiveAt: number;
   dirty: boolean;
   saving: boolean;
+  baselineHash: string;
 }
 
 export class CollabRoomManager {
@@ -157,25 +162,55 @@ export class CollabRoomManager {
     };
   }
 
+  applyExternalFileChanges(
+    workspacePath: string,
+    changes: Array<Pick<FileChange, "path" | "action">>,
+  ): { reloadedRooms: number } {
+    const normalizedWorkspacePath = this.normalizeWorkspacePath(workspacePath);
+    let reloadedRooms = 0;
+
+    for (const change of changes) {
+      const resourcePath = this.normalizeResourcePath(change.path);
+      if (!resourcePath) continue;
+
+      for (const room of this.rooms.values()) {
+        if (this.normalizeWorkspacePath(room.workspacePath) !== normalizedWorkspacePath) continue;
+        if (this.normalizeResourcePath(room.descriptor.resourcePath) !== resourcePath) continue;
+        const state = this.persistence.readResourceState(
+          room.workspacePath,
+          room.descriptor.resourcePath,
+          room.descriptor.kind,
+        );
+        this.reloadRoomFromFileState(room, state);
+        reloadedRooms += 1;
+      }
+    }
+
+    return { reloadedRooms };
+  }
+
   private getOrCreateRoom(descriptor: RoomDescriptor, workspacePath: string): CollabRoom {
     const key = this.roomKey(descriptor);
     const existing = this.rooms.get(key);
     if (existing) {
-      const currentFileContent = this.persistence.readResource(
+      const currentFileState = this.persistence.readResourceState(
         workspacePath,
         descriptor.resourcePath,
         descriptor.kind,
       );
-      if (!existing.dirty && !existing.saving && existing.text.length === 0 && currentFileContent) {
-        existing.text.insert(0, currentFileContent);
+      if (currentFileState.hash !== existing.baselineHash && currentFileState.content !== existing.text.toString()) {
+        this.reloadRoomFromFileState(existing, currentFileState);
+      } else if (!existing.dirty && !existing.saving && existing.text.length === 0 && currentFileState.content) {
+        existing.text.insert(0, currentFileState.content);
+        existing.baselineHash = currentFileState.hash;
       }
       return existing;
     }
 
     const doc = new Y.Doc();
     const text = doc.getText("content");
-    const initial = this.persistence.readResource(workspacePath, descriptor.resourcePath, descriptor.kind);
-    if (initial) text.insert(0, initial);
+    const initial = this.persistence.readResourceState(workspacePath, descriptor.resourcePath, descriptor.kind);
+    if (initial.content) text.insert(0, initial.content);
 
     const awareness = new awarenessProtocol.Awareness(doc);
     const room: CollabRoom = {
@@ -191,12 +226,15 @@ export class CollabRoomManager {
       lastActiveAt: Date.now(),
       dirty: false,
       saving: false,
+      baselineHash: initial.hash,
     };
 
     doc.on("update", (update: Uint8Array, origin: unknown) => {
-      room.dirty = true;
       room.lastActiveAt = Date.now();
-      this.scheduleSave(room);
+      if (origin !== SERVER_RELOAD_ORIGIN) {
+        room.dirty = true;
+        this.scheduleSave(room);
+      }
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, MESSAGE_SYNC);
       syncProtocol.writeUpdate(encoder, update);
@@ -283,16 +321,65 @@ export class CollabRoomManager {
     if (!room.dirty || room.saving) return;
     room.saving = true;
     try {
-      this.persistence.writeResource(
+      const currentState = this.persistence.readResourceState(
         room.workspacePath,
         room.descriptor.resourcePath,
         room.descriptor.kind,
-        room.text.toString(),
       );
+      const roomContent = room.text.toString();
+
+      if (currentState.content === roomContent) {
+        room.baselineHash = currentState.hash;
+        room.dirty = false;
+        return;
+      }
+
+      if (currentState.hash !== room.baselineHash) {
+        logger.warn(
+          {
+            roomKey: room.key,
+            resourcePath: room.descriptor.resourcePath,
+          },
+          "Skipped stale collab flush because resource changed outside the room",
+        );
+        this.reloadRoomFromFileState(room, currentState);
+        return;
+      }
+
+      const writtenState = this.persistence.writeResource(
+        room.workspacePath,
+        room.descriptor.resourcePath,
+        room.descriptor.kind,
+        roomContent,
+      );
+      room.baselineHash = writtenState.hash;
       room.dirty = false;
     } finally {
       room.saving = false;
     }
+  }
+
+  private reloadRoomFromFileState(room: CollabRoom, state: ResourceFileState): void {
+    if (room.saveTimer) {
+      clearTimeout(room.saveTimer);
+      room.saveTimer = null;
+    }
+
+    const current = room.text.toString();
+    if (current !== state.content) {
+      room.doc.transact(() => {
+        if (room.text.length > 0) {
+          room.text.delete(0, room.text.length);
+        }
+        if (state.content) {
+          room.text.insert(0, state.content);
+        }
+      }, SERVER_RELOAD_ORIGIN);
+    }
+
+    room.baselineHash = state.hash;
+    room.dirty = false;
+    room.lastActiveAt = Date.now();
   }
 
   private async cleanupIdleRooms(): Promise<void> {
@@ -348,6 +435,19 @@ export class CollabRoomManager {
     return Array.from(this.rooms.values()).reduce((count, room) => {
       return room.workspaceKey === workspaceKey ? count + room.connections.size : count;
     }, 0);
+  }
+
+  private normalizeWorkspacePath(workspacePath: string): string {
+    const resolved = path.resolve(workspacePath);
+    try {
+      return fs.realpathSync(resolved);
+    } catch {
+      return resolved;
+    }
+  }
+
+  private normalizeResourcePath(resourcePath: string): string {
+    return resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
   }
 
   private roomKey(descriptor: RoomDescriptor): string {

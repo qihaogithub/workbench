@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { collabRoomManager } from '../../collab/collab-room-manager';
 import type { AgentConfig, AgentEvent, FileChange, PlanItem } from '../../core/types';
+import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';
 import { isKnowledgeBasePath } from './permission-manager';
 import {
@@ -232,6 +234,7 @@ export class ToolHookManager {
     },
   ): void {
     const changes = this.recordToolFileChange(toolName, input, isError, event);
+    this.reloadCollabRoomsForExternalChanges(changes);
     options?.onFileChanges?.(changes);
     if (options?.emitFileOperations) {
       this.emitFileOperationsForTool(toolName, input, isError, event, sessionId);
@@ -248,5 +251,18 @@ export class ToolHookManager {
 
   static getToolInput(event: any): any {
     return getToolInput(event);
+  }
+
+  private reloadCollabRoomsForExternalChanges(changes: FileChange[]): void {
+    if (changes.length === 0 || !this.config.workingDir) return;
+
+    try {
+      collabRoomManager.applyExternalFileChanges(this.config.workingDir, changes);
+    } catch (error) {
+      logger.warn(
+        { error, workingDir: this.config.workingDir },
+        'Failed to reload collab rooms after agent file changes',
+      );
+    }
   }
 }

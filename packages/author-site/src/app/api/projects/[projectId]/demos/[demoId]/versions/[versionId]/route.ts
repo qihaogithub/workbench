@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createApiError,
   createApiSuccess,
+  markWorkspaceBasedOnVersion,
   readPageVersionFiles,
   restorePageVersion,
   updateWorkspaceDemoFiles,
@@ -133,7 +134,23 @@ export async function POST(
     }
 
     if (meta?.workspaceId) {
-      updateWorkspaceDemoFiles(meta.workspaceId, demoId, result.files);
+      const workspaceUpdated = updateWorkspaceDemoFiles(
+        meta.workspaceId,
+        demoId,
+        result.files,
+      );
+      if (!workspaceUpdated) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "同步 Session Workspace 失败"),
+          { status: 500 },
+        );
+      }
+      if (!markWorkspaceBasedOnVersion(meta.workspaceId, result.newVersionId)) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "更新 Workspace 版本基线失败"),
+          { status: 500 },
+        );
+      }
       const synced = syncActiveWorkspaceToCanonical(projectId, meta.workspaceId);
       if (!synced.success) {
         const code = synced.code === "WORKSPACE_STALE" ? "WORKSPACE_STALE" : "FILE_WRITE_ERROR";

@@ -15,10 +15,59 @@ function dispatchIframeMessage(
 
 describe("PreviewPanel iframe sleep", () => {
   const originalFetch = global.fetch;
+  const originalResizeObserver = window.ResizeObserver;
 
   afterEach(() => {
     global.fetch = originalFetch;
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: originalResizeObserver,
+    });
     jest.restoreAllMocks();
+  });
+
+  it("fillContainer 在画布缩放下使用未变换的布局尺寸", async () => {
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: class MockResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    });
+    jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1133);
+    jest.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(749);
+    jest
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: 487,
+        bottom: 322,
+        width: 487,
+        height: 322,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+    const { getByTitle } = render(
+      <PreviewPanel
+        compiledJsUrl="/compiled.js"
+        previewSize={{ width: 1133, height: 749 }}
+        fillContainer
+      />,
+    );
+
+    const iframe = getByTitle("预览") as HTMLIFrameElement;
+
+    await waitFor(() => {
+      expect(iframe.style.width).toBe("1133px");
+      expect(iframe.style.height).toBe("749px");
+      expect(iframe.style.transform).toBe("scale(1)");
+    });
   });
 
   it("sleeping 时不推送配置，wake 后补发最新 code/config", async () => {
