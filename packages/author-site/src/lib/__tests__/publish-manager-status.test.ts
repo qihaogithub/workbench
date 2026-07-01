@@ -204,4 +204,66 @@ describe("getPublishStatus", () => {
       note: "发布快照",
     });
   });
+
+  it("发布快照创建后应推进已同步 live workspace 的版本基线", async () => {
+    setupPublishableProject("proj-publish-live-base");
+    const projectPath = path.join(tempDir, "projects", "proj-publish-live-base");
+    const workspacePath = path.join(projectPath, "workspace");
+    const liveWorkspaceId = "live-publish-base";
+    const liveWorkspacePath = path.join(
+      tempDir,
+      "workspaces",
+      "projects",
+      "proj-publish-live-base",
+      liveWorkspaceId,
+    );
+    const now = Date.now();
+
+    fs.mkdirSync(path.dirname(liveWorkspacePath), { recursive: true });
+    fs.cpSync(workspacePath, liveWorkspacePath, { recursive: true });
+    fs.writeFileSync(
+      path.join(liveWorkspacePath, ".workspace.json"),
+      JSON.stringify(
+        {
+          workspaceId: liveWorkspaceId,
+          demoId: "proj-publish-live-base",
+          projectId: "proj-publish-live-base",
+          scope: "live",
+          status: "active",
+          baseVersion: "v0",
+          createdAt: now,
+          updatedAt: now,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const projectFile = path.join(projectPath, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectFile, "utf-8"));
+    fs.writeFileSync(
+      projectFile,
+      JSON.stringify(
+        {
+          ...project,
+          activeWorkspaceId: liveWorkspaceId,
+          activeWorkspaceUpdatedAt: now,
+          canonicalSyncedWorkspaceId: liveWorkspaceId,
+          canonicalSyncedAt: now + 1,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const result = await publishProject("proj-publish-live-base");
+
+    expect(result.publishedVersion).toBe("v1");
+    const workspaceMeta = JSON.parse(
+      fs.readFileSync(path.join(liveWorkspacePath, ".workspace.json"), "utf-8"),
+    );
+    expect(workspaceMeta.baseVersion).toBe("v1");
+  });
 });

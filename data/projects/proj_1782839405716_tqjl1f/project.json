@@ -315,6 +315,26 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/v13",
       "fileCount": 85,
       "note": "修复闯关活动页面顶层page重复声明"
+    },
+    {
+      "versionId": "v14",
+      "type": "auto_checkpoint",
+      "savedAt": 1782918702708,
+      "savedBy": "qihao",
+      "sessionId": "session-1782918232668-3hyaawb7z",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/v14",
+      "fileCount": 85,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v16",
+      "type": "auto_checkpoint",
+      "savedAt": 1782920575978,
+      "savedBy": "qihao",
+      "sessionId": "session-1782918232668-3hyaawb7z",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/v16",
+      "fileCount": 85,
+      "note": "持续编辑自动保存记录"
     }
   ],
   "pageVersions": {
@@ -331,12 +351,26 @@
         "fileCount": 2,
         "note": "修改了01 首页弹窗-体验包领取"
       }
+    ],
+    "prototype-03": [
+      {
+        "versionId": "v15",
+        "type": "named_version",
+        "demoId": "prototype-03",
+        "demoName": "03 任务中心-活动入口",
+        "savedAt": 1782920026175,
+        "savedBy": "qihao",
+        "sessionId": "page-prototype-03",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/pages/prototype-03/v15",
+        "fileCount": 2,
+        "note": "修改了03 任务中心-活动入口"
+      }
     ]
   },
   "createdAt": 1782839405717,
-  "updatedAt": 1782918257254,
+  "updatedAt": 1782921097844,
   "activeWorkspaceId": "live-1782918232468-1hrvwux69",
-  "activeWorkspaceUpdatedAt": 1782918251756,
+  "activeWorkspaceUpdatedAt": 1782920985192,
   "canonicalSyncedWorkspaceId": "live-1782918232468-1hrvwux69",
-  "canonicalSyncedAt": 1782918257254
+  "canonicalSyncedAt": 1782921097844
 }

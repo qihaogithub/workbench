@@ -1,13 +1,13 @@
-import {jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment} from "http://localhost:3200/preview-runtime/vendor/react-jsx-runtime.js";// 代码化还原版本：保留 JSX，由创作端预览编译器统一转换；已去除 TypeScript 类型语法。
+import {jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment} from "http://localhost:3200/preview-runtime/vendor/react-jsx-runtime.js";// 代码化还原版本：保留 JSX，由创作端预览编译器统一转换；已去除 TypeScript 类型语法。
 const pageData = {
-    "n": 2,
-    "id": "prototype-02",
-    "title": "详情页-活动入口",
-    "kind": "detail",
-    "accent": "slate",
-    "hero": "叫叫小剧场",
-    "subtitle": "活动详情与课程入口",
-    "cta": "去参与"
+    "n": 25,
+    "id": "prototype-25",
+    "title": "竞速任务-可参与",
+    "kind": "raceAvailable",
+    "accent": "lime",
+    "hero": "竞速任务",
+    "subtitle": "可参与状态",
+    "cta": "去补卡"
 };
 const accentMap = {
     rose: { bg: "from-[#ffe2e8] via-[#fff5f1] to-[#ffd074]", ink: "#7f1d1d", pill: "#ef4444", soft: "#fff1f2" },
@@ -22,34 +22,16 @@ const accentMap = {
     red: { bg: "from-[#fee2e2] via-[#fff7ed] to-[#fde68a]", ink: "#7f1d1d", pill: "#dc2626", soft: "#fef2f2" },
 };
 const theme = accentMap[pageData.accent];
-export default function ChallengePrototypePage({ title = pageData.title }) {
-    return (_jsx('main', { className: "min-h-screen w-full bg-[#f3f4f6] px-4 py-6 text-[#111827]"     , children: 
-      _jsxs('section', { className: "mx-auto flex w-full max-w-[520px] flex-col items-center gap-3"      , children: [
-        _jsxs('div', { className: "w-full text-left" , children: [
-          _jsx('p', { className: "text-xs font-medium text-[#6b7280]"  , children: "闯关活动 / 代码化还原"  })
-          , _jsx('h1', { className: "mt-1 text-base font-semibold text-[#111827]"   , children: title})
-        ]})
-        , _jsx(PhoneShell, { tall: isLongPage(), wide: isWidePage(), children: 
-          renderPage()
-        })
-      ]})
-    }));
-}
-function isLongPage() {
-    return pageData.kind === "longFlowA" || pageData.kind === "longFlowB" || pageData.kind === "materialList";
-}
-function isWidePage() {
-    return pageData.kind === "rules" || pageData.kind === "timeline" || pageData.kind === "taskDialog" || pageData.kind === "longFlowB";
-}
-function PhoneShell({ children, tall, wide }) {
-    const width = wide ? "max-w-[420px]" : "max-w-[360px]";
-    const minHeight = tall ? "min-h-[1120px]" : "min-h-[720px]";
-    return (_jsx('div', { className: `w-full ${width} overflow-hidden rounded-[26px] bg-white shadow-xl ring-1 ring-black/10`, children: 
-      _jsxs('div', { className: `${minHeight} relative bg-gradient-to-br ${theme.bg}`, children: [
-        _jsx(StatusBar, {} )
-        , children
-      ]})
-    }));
+
+
+
+
+
+export default function ChallengePrototypePage(_props) {
+    return (_jsxs('div', { className: `min-h-screen bg-gradient-to-br ${theme.bg}`, children: [
+      _jsx(StatusBar, {} )
+      , renderPage()
+    ]}));
 }
 function StatusBar() {
     return (_jsxs('div', { className: "flex h-9 items-center justify-between px-5 text-[11px] font-semibold text-black/70"       , children: [
@@ -464,3 +446,4 @@ function LotteryPage() {
       , _jsx(BottomTabs, {} )
     ]}));
 }
+

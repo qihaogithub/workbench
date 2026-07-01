@@ -1,7 +1,10 @@
 import type { ErrorCodeType } from "@opencode-workbench/shared";
 
 import { getServerAgentServiceUrl } from "./runtime-config";
-import { syncActiveWorkspaceToCanonical } from "./workspace-manager";
+import {
+  advanceWorkspaceBaseIfLatestSessionVersion,
+  syncActiveWorkspaceToCanonical,
+} from "./workspace-manager";
 
 export type WorkspaceFlushStatus = "skipped" | "flushed" | "no_active_room";
 
@@ -113,10 +116,24 @@ export async function flushAndSyncProjectWorkspace(
   options: WorkspaceFlushOptions,
 ): Promise<WorkspaceFlushResult & { workspacePath?: string }> {
   const flushResult = await flushWorkspaceBeforeCriticalAction(options);
-  const synced = syncActiveWorkspaceToCanonical(
+  let synced = syncActiveWorkspaceToCanonical(
     options.projectId,
     options.workspaceId,
   );
+  if (
+    !synced.success &&
+    synced.code === "WORKSPACE_STALE" &&
+    advanceWorkspaceBaseIfLatestSessionVersion(
+      options.projectId,
+      options.workspaceId,
+      options.sessionId,
+    )
+  ) {
+    synced = syncActiveWorkspaceToCanonical(
+      options.projectId,
+      options.workspaceId,
+    );
+  }
   if (!synced.success) {
     throw new WorkspaceFlushError(
       synced.error || "同步项目当前工作区失败",

@@ -126,6 +126,7 @@ describe("session checkpoint route", () => {
         sessionId: "session-1",
         note: "停止编辑后自动保存记录",
         type: "auto_checkpoint",
+        advanceWorkspaceId: "workspace-1",
       },
     );
   });

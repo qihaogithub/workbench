@@ -1,7 +1,20 @@
 import {
+  flushAndSyncProjectWorkspace,
   flushWorkspaceBeforeCriticalAction,
   WorkspaceFlushError,
 } from "../workspace-flush";
+import {
+  advanceWorkspaceBaseIfLatestSessionVersion,
+  syncActiveWorkspaceToCanonical,
+} from "../workspace-manager";
+
+jest.mock("../workspace-manager", () => ({
+  syncActiveWorkspaceToCanonical: jest.fn(() => ({
+    success: true,
+    workspacePath: "/tmp/project/workspace",
+  })),
+  advanceWorkspaceBaseIfLatestSessionVersion: jest.fn(() => false),
+}));
 
 function mockJsonResponse(value: unknown, init: { status: number; ok: boolean }) {
   return {
@@ -16,6 +29,7 @@ describe("workspace-flush", () => {
   const originalAgentServiceUrl = process.env.AGENT_SERVICE_URL;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     process.env.AGENT_SERVICE_URL = "http://agent.test/";
     global.fetch = jest.fn();
   });
@@ -101,5 +115,49 @@ describe("workspace-flush", () => {
       status: 502,
       message: "connect ECONNREFUSED",
     } satisfies Partial<WorkspaceFlushError>);
+  });
+
+  it("repairs same-session stale workspace base before retrying project sync", async () => {
+    jest.mocked(global.fetch).mockResolvedValue(
+      mockJsonResponse(
+        {
+          success: true,
+          data: { status: "no_active_room", flushedRooms: 0 },
+        },
+        { status: 200, ok: true },
+      ),
+    );
+    jest
+      .mocked(syncActiveWorkspaceToCanonical)
+      .mockReturnValueOnce({
+        success: false,
+        code: "WORKSPACE_STALE",
+        error: "当前工作区已过期，请刷新项目后重试",
+      })
+      .mockReturnValueOnce({
+        success: true,
+        workspacePath: "/tmp/project/workspace",
+      });
+    jest
+      .mocked(advanceWorkspaceBaseIfLatestSessionVersion)
+      .mockReturnValueOnce(true);
+
+    const result = await flushAndSyncProjectWorkspace({
+      projectId: "proj-1",
+      workspaceId: "live-1",
+      sessionId: "session-1",
+    });
+
+    expect(result).toEqual({
+      status: "no_active_room",
+      flushedRooms: 0,
+      workspacePath: "/tmp/project/workspace",
+    });
+    expect(advanceWorkspaceBaseIfLatestSessionVersion).toHaveBeenCalledWith(
+      "proj-1",
+      "live-1",
+      "session-1",
+    );
+    expect(syncActiveWorkspaceToCanonical).toHaveBeenCalledTimes(2);
   });
 });

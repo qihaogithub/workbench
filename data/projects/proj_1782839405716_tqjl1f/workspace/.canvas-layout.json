@@ -1,20 +1,22 @@
 {
   "version": 1,
   "projectId": "proj_1782839405716_tqjl1f",
-  "updatedAt": 1782918256872,
+  "updatedAt": 1782921175396,
   "state": {
     "viewport": {
-      "x": 349.8887201996286,
-      "y": 62.313500353503,
-      "zoom": 0.0560150564874276
+      "x": 258.80062788859163,
+      "y": -219.75840607123212,
+      "zoom": 0.09923408948592378
     },
     "pages": {
       "prototype-01": {
         "x": 0,
         "y": 0,
         "width": 375,
-        "height": 824,
-        "zIndex": 0
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
       },
       "prototype-02": {
         "x": 776,
@@ -118,8 +120,10 @@
         "x": 0,
         "y": 6099.703125,
         "width": 444,
-        "height": 820,
-        "zIndex": 15
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
       },
       "prototype-17": {
         "x": 776,
@@ -160,8 +164,10 @@
         "x": 0,
         "y": 7881.203125,
         "width": 444,
-        "height": 816,
-        "zIndex": 21
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
       },
       "prototype-23": {
         "x": 776,
@@ -195,8 +201,10 @@
         "x": 1544,
         "y": 10039.5,
         "width": 444,
-        "height": 816,
-        "zIndex": 26
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
       }
     },
     "nodes": {
@@ -211,7 +219,7 @@
           "zIndex": 28
         },
         "createdAt": 1782871291246,
-        "updatedAt": 1782873618060,
+        "updatedAt": 1782920491207,
         "kind": "document",
         "documents": [
           {
@@ -254,7 +262,7 @@
               "zIndex": 28
             },
             "createdAt": 1782871291246,
-            "updatedAt": 1782873618060,
+            "updatedAt": 1782920491207,
             "kind": "document",
             "documents": [
               {
@@ -297,7 +305,7 @@
               "zIndex": 28
             },
             "createdAt": 1782871291246,
-            "updatedAt": 1782873618060,
+            "updatedAt": 1782920491207,
             "kind": "document",
             "documents": [
               {

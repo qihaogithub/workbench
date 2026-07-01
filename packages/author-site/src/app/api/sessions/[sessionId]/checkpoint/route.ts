@@ -87,6 +87,7 @@ export async function POST(
       sessionId: params.sessionId,
       note,
       type: "auto_checkpoint",
+      advanceWorkspaceId: session.workspaceId,
     });
 
     if (!result.success || !result.version) {

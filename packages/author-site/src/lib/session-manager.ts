@@ -13,6 +13,7 @@ import {
   generateVersionId,
   countFiles,
   cleanupOldVersions,
+  createProjectVersionSnapshot,
   findWorkspacePath,
   getWorkspaceMultiDemoFiles,
   syncProjectDemoPagesFromWorkspace,
@@ -23,6 +24,7 @@ import {
   isLiveWorkspace,
   findActiveWorkspace,
   syncActiveWorkspaceToCanonical,
+  advanceWorkspaceBaseIfLatestSessionVersion,
 } from "./workspace-manager";
 import type {
   VersionInfo,
@@ -582,7 +584,14 @@ export function saveEditSession(
   }
 
   if (workspaceId) {
-    const synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+    let synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+    if (
+      !synced.success &&
+      synced.code === "WORKSPACE_STALE" &&
+      advanceWorkspaceBaseIfLatestSessionVersion(projectId, workspaceId, sessionId)
+    ) {
+      synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+    }
     if (!synced.success) {
       return {
         success: false,
@@ -597,6 +606,31 @@ export function saveEditSession(
 
   const projectPath = getProjectPath(projectId);
   const workspacePath = path.join(projectPath, "workspace");
+
+  if (workspaceId) {
+    const result = createProjectVersionSnapshot(projectId, username || "未知用户", {
+      sessionId,
+      note,
+      type: versionType,
+      sourceWorkspacePath: workspacePath,
+      advanceWorkspaceId: workspaceId,
+    });
+
+    if (!result.success || !result.version) {
+      return {
+        success: false,
+        error: result.error || "Create project version snapshot failed",
+      };
+    }
+
+    syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
+
+    return {
+      success: true,
+      version: result.version.versionId,
+      savedAt: result.version.savedAt,
+    };
+  }
 
   const versionId = generateVersionId(project);
   const snapshotPath = getSnapshotPath(projectId, versionId);

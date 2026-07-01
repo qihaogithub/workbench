@@ -1428,6 +1428,7 @@ export function createProjectVersionSnapshot(
     note?: string;
     type?: VersionHistoryEntryType;
     sourceWorkspacePath?: string;
+    advanceWorkspaceId?: string | null;
   },
 ): { success: boolean; version?: VersionInfo; error?: string } {
   const project = readProjectMeta(projectId);
@@ -1439,6 +1440,12 @@ export function createProjectVersionSnapshot(
   const sourceWorkspacePath = options?.sourceWorkspacePath || workspacePath;
   if (!fs.existsSync(sourceWorkspacePath)) {
     return { success: false, error: "工作空间不存在" };
+  }
+  const workspaceToAdvance =
+    options?.advanceWorkspaceId ??
+    inferSyncedActiveWorkspaceForVersion(projectId, project, sourceWorkspacePath);
+  if (workspaceToAdvance && !canAdvanceWorkspaceBase(projectId, workspaceToAdvance)) {
+    return { success: false, error: "Workspace 版本基线不可更新" };
   }
 
   const versionId = generateVersionId(project);
@@ -1473,8 +1480,46 @@ export function createProjectVersionSnapshot(
   project.updatedAt = versionInfo.savedAt;
   cleanupOldVersions(project);
   writeProjectMeta(projectId, project);
+  if (workspaceToAdvance && !markWorkspaceBasedOnVersion(workspaceToAdvance, versionId)) {
+    return { success: false, error: "更新 Workspace 版本基线失败" };
+  }
 
   return { success: true, version: versionInfo };
+}
+
+function canAdvanceWorkspaceBase(projectId: string, workspaceId: string): boolean {
+  const project = readProjectMeta(projectId);
+  const meta = getWorkspaceMeta(workspaceId);
+  return Boolean(
+    project?.activeWorkspaceId === workspaceId &&
+      meta &&
+      meta.projectId === projectId &&
+      meta.status !== "archived",
+  );
+}
+
+function inferSyncedActiveWorkspaceForVersion(
+  projectId: string,
+  project: Project,
+  sourceWorkspacePath: string,
+): string | null {
+  if (!project.activeWorkspaceId) return null;
+  if (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId) return null;
+
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  if (path.resolve(sourceWorkspacePath) !== path.resolve(projectWorkspacePath)) {
+    return null;
+  }
+
+  const workspaceMeta = getWorkspaceMeta(project.activeWorkspaceId);
+  if (!workspaceMeta || workspaceMeta.projectId !== projectId || workspaceMeta.status === "archived") {
+    return null;
+  }
+  const activeUpdatedAt =
+    workspaceMeta.updatedAt ?? project.activeWorkspaceUpdatedAt ?? 0;
+  if (activeUpdatedAt > (project.canonicalSyncedAt ?? 0)) return null;
+
+  return project.activeWorkspaceId;
 }
 
 // ========================================
