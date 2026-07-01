@@ -22,6 +22,7 @@ import {
   extractAssistantText,
   summarizeAssistantMessageShape,
 } from './managers/assistant-text-utils';
+import { normalizeImageAttachments } from '../utils/image-attachments';
 
 function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; description?: string }>): string {
   if (!activeTools.length) return '';
@@ -519,7 +520,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
     this.status = "busy";
     this.toolHookManager.resetForNewMessage();
 
-    const images = options?.images;
+    const images = normalizeImageAttachments(options?.images);
     const model = this.modelManager.getModel();
     const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
 

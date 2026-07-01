@@ -74,6 +74,31 @@ describe('ModelManager', () => {
       expect(result.provider).toBe('openai');
       expect(result.modelId).toBe('gpt-4');
     });
+
+    it('AgentConfig.model 应优先于 backendProviders 默认模型', () => {
+      const m = new ModelManager({
+        sessionId: 'test-session',
+        model: 'jojo/kimi-k2.6',
+        backendProviders: {
+          providers: [
+            {
+              id: 'jojo',
+              name: 'jojo',
+              models: ['deepseek-v4-flash', 'kimi-k2.6'],
+              apiKey: 'sk-test',
+              baseURL: 'https://token.example.com/v1',
+            },
+          ],
+          activeProviderId: 'jojo',
+          activeModelId: 'jojo/deepseek-v4-flash',
+        },
+      });
+
+      expect(m.resolveProviderAndModel()).toEqual({
+        provider: 'jojo',
+        modelId: 'kimi-k2.6',
+      });
+    });
   });
 
   describe('getModel', () => {
@@ -107,6 +132,31 @@ describe('ModelManager', () => {
       expect(model.baseUrl).toBe('https://api.example.com/v1');
       expect(model.api).toBe('openai-completions');
       expect(model.apiKey).toBe('sk-test');
+    });
+
+    it('AgentConfig.model 命中 multimodalModels 时自定义模型应支持图片输入', () => {
+      const configWithMultimodalModel: AgentConfig = {
+        sessionId: 'test-session',
+        model: 'jojo/kimi-k2.6',
+        backendProviders: {
+          providers: [
+            {
+              id: 'jojo',
+              name: 'jojo',
+              models: ['deepseek-v4-flash', 'kimi-k2.6'],
+              apiKey: 'sk-test',
+              baseURL: 'https://token.example.com/v1',
+            },
+          ],
+          activeProviderId: 'jojo',
+          activeModelId: 'jojo/deepseek-v4-flash',
+          multimodalModels: ['jojo/kimi-k2.6'],
+        },
+      };
+      const m = new ModelManager(configWithMultimodalModel);
+      const model = m.getModel();
+      expect(model.id).toBe('kimi-k2.6');
+      expect(model.input).toEqual(['text', 'image']);
     });
   });
 

@@ -119,6 +119,7 @@ export function ChatInput({
       onSubmit={handleSubmit}
       onCancel={onCancel}
       status={isStreaming ? "streaming" : "idle"}
+      accept="image/*"
       className="flex-shrink-0"
       globalDrop
       multiple

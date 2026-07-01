@@ -38,6 +38,8 @@ export interface BackendProvidersConfig {
   activeProviderId?: string;
   /** 当前激活的模型 ID（格式：providerId/modelId）*/
   activeModelId?: string;
+  /** 支持图片输入的模型 ID 列表（格式：providerId/modelId）*/
+  multimodalModels?: string[];
 }
 
 /**

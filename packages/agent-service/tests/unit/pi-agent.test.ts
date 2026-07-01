@@ -52,7 +52,7 @@ const piAgentMocks = vi.hoisted(() => {
   return { harnesses, envs, MockAgentHarness, MockNodeExecutionEnv };
 });
 
-vi.mock('fs', () => ({
+const fsMocks = vi.hoisted(() => ({
   existsSync: vi.fn(() => true),
   readFileSync: vi.fn(() => 'edited file content'),
   promises: {
@@ -61,6 +61,11 @@ vi.mock('fs', () => ({
     mkdir: vi.fn(),
     readdir: vi.fn(),
   },
+}));
+
+vi.mock('fs', () => ({
+  ...fsMocks,
+  default: fsMocks,
 }));
 
 vi.mock('@earendil-works/pi-agent-core', () => ({
@@ -733,6 +738,15 @@ describe('PiAgentBackend', () => {
       },
     };
 
+    const multimodalConfig: AgentConfig = {
+      ...textOnlyConfig,
+      backendProviders: {
+        ...textOnlyConfig.backendProviders!,
+        activeModelId: 'custom/text-model',
+        multimodalModels: ['custom/text-model'],
+      },
+    };
+
     it('非多模态模型收到图片且未配置预描述时应报错', async () => {
       const backend = new PiAgentBackend(textOnlyConfig);
       Object.defineProperty(backend, 'harness', {
@@ -779,6 +793,90 @@ describe('PiAgentBackend', () => {
         '【图片内容】图片里有一个红色提交按钮\n\n【用户问题】这个按钮有什么问题？',
         { images: undefined },
       );
+    });
+
+    it('管理后台标记为多模态的自定义模型收到图片时应直传图片', async () => {
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(multimodalConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+
+      const image = {
+        data: Buffer.from('image').toString('base64'),
+        mimeType: 'image/png',
+        name: 'screen.png',
+      };
+
+      await expect(
+        backend.sendMessage('请看图', {
+          images: [image],
+        }),
+      ).resolves.toBe('ok');
+
+      expect(prompt).toHaveBeenCalledWith('请看图', {
+        images: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: image.data,
+            },
+          },
+        ],
+      });
+    });
+
+    it('图片数据带 data URL 前缀时应先剥离再直传', async () => {
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(multimodalConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+
+      const data = Buffer.from('image').toString('base64');
+
+      await expect(
+        backend.sendMessage('请看图', {
+          images: [
+            {
+              data: `data:image/jpeg;base64,${data}`,
+              mimeType: 'image/png',
+              name: 'screen.jpg',
+            },
+          ],
+        }),
+      ).resolves.toBe('ok');
+
+      expect(prompt).toHaveBeenCalledWith('请看图', {
+        images: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data,
+            },
+          },
+        ],
+      });
+    });
+
+    it('图片数据不是合法 base64 时应在调用模型前报错', async () => {
+      const prompt = vi.fn();
+      const backend = new PiAgentBackend(multimodalConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+
+      await expect(
+        backend.sendMessage('请看图', {
+          images: [
+            {
+              data: 'blob:http://localhost/image',
+              mimeType: 'image/png',
+              name: 'screen.png',
+            },
+          ],
+        }),
+      ).rejects.toThrow('图片附件 1 不是合法 base64 数据');
+
+      expect(prompt).not.toHaveBeenCalled();
     });
 
     it('通过环境变量启用预描述后应走真实 ImageDescriber 缓存路径', async () => {

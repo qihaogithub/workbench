@@ -365,6 +365,7 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
         providers: body.providers,
         activeProviderId: body.activeProviderId,
         activeModelId: body.activeModelId,
+        multimodalModels: body.multimodalModels,
       };
 
       getBackendProvidersManager().setConfig(config);
@@ -429,6 +430,7 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
         providers: body.providers,
         activeProviderId: body.activeProviderId,
         activeModelId: body.activeModelId,
+        multimodalModels: body.multimodalModels,
       };
 
       getSessionModelConfigs().set(request.params.sessionId, config);

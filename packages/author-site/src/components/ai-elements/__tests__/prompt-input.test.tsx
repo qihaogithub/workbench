@@ -9,6 +9,21 @@ import {
 } from "../prompt-input";
 
 describe("PromptInputTextarea", () => {
+  beforeEach(() => {
+    if (!URL.createObjectURL) {
+      Object.defineProperty(URL, "createObjectURL", {
+        value: jest.fn(() => "blob:test"),
+        configurable: true,
+      });
+    }
+    if (!URL.revokeObjectURL) {
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: jest.fn(),
+        configurable: true,
+      });
+    }
+  });
+
   it("长文本自动拉高到最大高度后启用内部滚动", () => {
     const scrollHeightSpy = jest
       .spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get")
@@ -85,5 +100,52 @@ describe("PromptInputTextarea", () => {
       files: [],
     });
     expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("全局拖拽遵守 accept 限制并过滤非图片附件", () => {
+    const onSubmit = jest.fn();
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const image = new File(["image"], "screen.png", { type: "image/png" });
+    const video = new File(["video"], "clip.mp4", { type: "video/mp4" });
+
+    const { container } = render(
+      <PromptInput accept="image/*" globalDrop onSubmit={onSubmit}>
+        <PromptInputBody>
+          <PromptInputTextarea />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputSubmit />
+        </PromptInputFooter>
+      </PromptInput>,
+    );
+
+    const form = container.querySelector("form");
+    if (!form) {
+      throw new Error("PromptInput form not found");
+    }
+
+    fireEvent.drop(form, {
+      dataTransfer: {
+        files: [image, video],
+      },
+    });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "根据图片调整 UI" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      text: "根据图片调整 UI",
+      files: [
+        expect.objectContaining({
+          name: "screen.png",
+          type: "image/png",
+        }),
+      ],
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      "File clip.mp4 does not match accepted types",
+    );
+    warnSpy.mockRestore();
   });
 });

@@ -1,11 +1,5156 @@
 {
   "version": 1,
   "projectId": "proj_1782839405716_tqjl1f",
-  "updatedAt": 1782921175396,
+  "updatedAt": 1782923299784,
   "state": {
     "viewport": {
       "x": 258.80062788859163,
-      "y": -219.75840607123212,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923299784,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
+      "zoom": 0.09923408948592378
+    },
+    "pages": {
+      "prototype-01": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 880,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "prototype-02": {
+        "x": 776,
+        "y": 0,
+        "width": 444,
+        "height": 884,
+        "zIndex": 1
+      },
+      "prototype-03": {
+        "x": 1544,
+        "y": 0,
+        "width": 444,
+        "height": 876,
+        "zIndex": 2
+      },
+      "prototype-04": {
+        "x": 0,
+        "y": 932,
+        "width": 444,
+        "height": 880,
+        "zIndex": 3
+      },
+      "prototype-05": {
+        "x": 776,
+        "y": 932,
+        "width": 448,
+        "height": 880,
+        "zIndex": 4
+      },
+      "prototype-06": {
+        "x": 1544,
+        "y": 932,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 5
+      },
+      "prototype-07": {
+        "x": 0,
+        "y": 1876.5625,
+        "width": 644,
+        "height": 880,
+        "zIndex": 6
+      },
+      "prototype-08": {
+        "x": 776,
+        "y": 1876.5625,
+        "width": 616,
+        "height": 971.15625,
+        "zIndex": 7
+      },
+      "prototype-09": {
+        "x": 1544,
+        "y": 1876.5625,
+        "width": 444,
+        "height": 900.28125,
+        "zIndex": 8
+      },
+      "prototype-10": {
+        "x": 0,
+        "y": 2895.71875,
+        "width": 444,
+        "height": 1200,
+        "zIndex": 9
+      },
+      "prototype-11": {
+        "x": 776,
+        "y": 2895.71875,
+        "width": 440,
+        "height": 896,
+        "zIndex": 10
+      },
+      "prototype-12": {
+        "x": 1544,
+        "y": 2895.71875,
+        "width": 732,
+        "height": 2187.640625,
+        "zIndex": 11
+      },
+      "prototype-13": {
+        "x": 0,
+        "y": 5131.359375,
+        "width": 648,
+        "height": 920.34375,
+        "zIndex": 12
+      },
+      "prototype-14": {
+        "x": 776,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 896.5625,
+        "zIndex": 13
+      },
+      "prototype-15": {
+        "x": 1544,
+        "y": 5131.359375,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 14
+      },
+      "prototype-16": {
+        "x": 0,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x820"
+      },
+      "prototype-17": {
+        "x": 776,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 844.609375,
+        "zIndex": 16
+      },
+      "prototype-18": {
+        "x": 1544,
+        "y": 6099.703125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 17
+      },
+      "prototype-19": {
+        "x": 0,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 18
+      },
+      "prototype-20": {
+        "x": 776,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 19
+      },
+      "prototype-21": {
+        "x": 1544,
+        "y": 6992.3125,
+        "width": 444,
+        "height": 840.890625,
+        "zIndex": 20
+      },
+      "prototype-22": {
+        "x": 0,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 824,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      },
+      "prototype-23": {
+        "x": 776,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 880,
+        "zIndex": 22
+      },
+      "prototype-24": {
+        "x": 1544,
+        "y": 7881.203125,
+        "width": 444,
+        "height": 2110.296875,
+        "zIndex": 23
+      },
+      "prototype-25": {
+        "x": 0,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 24
+      },
+      "prototype-26": {
+        "x": 776,
+        "y": 10039.5,
+        "width": 444,
+        "height": 880,
+        "zIndex": 25
+      },
+      "prototype-27": {
+        "x": 1544,
+        "y": 10039.5,
+        "width": 444,
+        "height": 824,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "444x816"
+      }
+    },
+    "nodes": {
+      "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+        "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+        "title": "竖版闯关活动 等 2 个文档",
+        "layout": {
+          "x": -1231.892453529531,
+          "y": -6.133898760084151,
+          "width": 882.3225626236931,
+          "height": 1122.9010648583758,
+          "zIndex": 28
+        },
+        "createdAt": 1782871291246,
+        "updatedAt": 1782920491207,
+        "kind": "document",
+        "documents": [
+          {
+            "id": "kb_1782871281231_z4ky63",
+            "title": "竖版闯关活动",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_z4ky63",
+              "title": "竖版闯关活动",
+              "fileName": "竖版闯关活动.md",
+              "description": "画布导入文档: 竖版闯关活动.md"
+            }
+          },
+          {
+            "id": "kb_1782871281231_7sj6gr",
+            "title": "集卡抽奖组件",
+            "knowledgeDocument": {
+              "id": "kb_1782871281231_7sj6gr",
+              "title": "集卡抽奖组件",
+              "fileName": "集卡抽奖组件.md",
+              "description": "画布导入文档: 集卡抽奖组件.md"
+            }
+          }
+        ],
+        "activeDocumentId": "kb_1782871281231_z4ky63",
+        "collapsed": false,
+        "expandedHeight": 1122.9010648583758
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145": {
+            "id": "doc-db8e71d0-b8ea-4714-80bb-6d8f75268145",
+            "title": "竖版闯关活动 等 2 个文档",
+            "layout": {
+              "x": -1231.892453529531,
+              "y": -6.133898760084151,
+              "width": 882.3225626236931,
+              "height": 1122.9010648583758,
+              "zIndex": 28
+            },
+            "createdAt": 1782871291246,
+            "updatedAt": 1782920491207,
+            "kind": "document",
+            "documents": [
+              {
+                "id": "kb_1782871281231_z4ky63",
+                "title": "竖版闯关活动",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_z4ky63",
+                  "title": "竖版闯关活动",
+                  "fileName": "竖版闯关活动.md",
+                  "description": "画布导入文档: 竖版闯关活动.md"
+                }
+              },
+              {
+                "id": "kb_1782871281231_7sj6gr",
+                "title": "集卡抽奖组件",
+                "knowledgeDocument": {
+                  "id": "kb_1782871281231_7sj6gr",
+                  "title": "集卡抽奖组件",
+                  "fileName": "集卡抽奖组件.md",
+                  "description": "画布导入文档: 集卡抽奖组件.md"
+                }
+              }
+            ],
+            "activeDocumentId": "kb_1782871281231_z4ky63",
+            "collapsed": false,
+            "expandedHeight": 1122.9010648583758
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1782871281231_z4ky63",
+      "kb_1782871281231_7sj6gr"
+    ]
+  }
+}{
+  "version": 1,
+  "projectId": "proj_1782839405716_tqjl1f",
+  "updatedAt": 1782923309492,
+  "state": {
+    "viewport": {
+      "x": 258.80062788859163,
+      "y": 79.45967254204913,
       "zoom": 0.09923408948592378
     },
     "pages": {
