@@ -3,13 +3,20 @@ import { PiAgentBackend } from '../../src/backends/pi-agent';
 import { BackendAgent } from '../../src/core/backend-agent';
 import { AgentConfig } from '../../src/core/types';
 
-vi.mock('fs', () => ({
+const fsMocks = vi.hoisted(() => ({
+  existsSync: vi.fn(() => true),
+  readFileSync: vi.fn(() => 'edited file content'),
   promises: {
     readFile: vi.fn(),
     writeFile: vi.fn(),
     mkdir: vi.fn(),
     readdir: vi.fn(),
   },
+}));
+
+vi.mock('fs', () => ({
+  ...fsMocks,
+  default: fsMocks,
 }));
 
 describe('PiAgentBackend - updateSystemPrompt (PI-4)', () => {

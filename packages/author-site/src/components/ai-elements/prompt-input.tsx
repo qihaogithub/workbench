@@ -60,6 +60,30 @@ const PromptInputContext = React.createContext<PromptInputContextValue | null>(
   null,
 )
 
+function fileMatchesAccept(file: File, accept: string): boolean {
+  const rules = accept
+    .split(',')
+    .map((rule) => rule.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (rules.length === 0 || rules.includes('*/*')) {
+    return true
+  }
+
+  const type = file.type.toLowerCase()
+  const name = file.name.toLowerCase()
+
+  return rules.some((rule) => {
+    if (rule.endsWith('/*')) {
+      return type.startsWith(rule.slice(0, -1))
+    }
+    if (rule.startsWith('.')) {
+      return name.endsWith(rule)
+    }
+    return type === rule
+  })
+}
+
 function usePromptInput() {
   const context = React.useContext(PromptInputContext)
   if (!context) {
@@ -133,6 +157,10 @@ export function PromptInput({
   const addFiles = React.useCallback(
     (newFiles: File[]) => {
       const validFiles = newFiles.filter((file) => {
+        if (!fileMatchesAccept(file, accept)) {
+          console.warn(`File ${file.name} does not match accepted types`)
+          return false
+        }
         if (file.size > maxSize) {
           console.warn(`File ${file.name} exceeds max size`)
           return false
@@ -155,7 +183,7 @@ export function PromptInput({
 
       setFiles((prev) => [...prev, ...promptFiles])
     },
-    [files.length, maxFiles, maxSize, multiple],
+    [accept, files.length, maxFiles, maxSize, multiple],
   )
 
   const removeFile = React.useCallback((id: string) => {

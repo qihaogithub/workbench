@@ -43,6 +43,10 @@ export function splitFullModelId(fullModelId: string | undefined): { provider?: 
   return provider && model ? { provider, model } : {};
 }
 
+function fullModelId(provider: string, modelId: string): string {
+  return `${provider}/${modelId}`;
+}
+
 /**
  * 模型管理器
  *
@@ -74,21 +78,40 @@ export class ModelManager {
     );
   }
 
+  private getMultimodalModels(): Set<string> {
+    return new Set([
+      ...(this.getSessionProvidersConfig()?.multimodalModels || []),
+      ...(getBackendProvidersManager().getConfig().multimodalModels || []),
+    ]);
+  }
+
+  private modelSupportsImages(provider: string, modelId: string): boolean {
+    return this.getMultimodalModels().has(fullModelId(provider, modelId));
+  }
+
   resolveProviderAndModel(): { provider: string; modelId: string } {
     const svc = getServiceConfig();
     const selected = this.selectedModel;
+    const configuredModel = splitFullModelId(this.config.model);
+    const configuredModelOnly =
+      this.config.model && !this.config.model.includes('/')
+        ? this.config.model
+        : undefined;
     const sessionActive = splitFullModelId(getActiveModelId(this.getSessionProvidersConfig()));
     const managerActive = splitFullModelId(getBackendProvidersManager().getActiveModelId());
 
     return {
       provider:
         selected?.provider ||
+        configuredModel.provider ||
         sessionActive.provider ||
         this.config.piAgent?.provider ||
         managerActive.provider ||
         svc.piAgent.provider,
       modelId:
         selected?.modelId ||
+        configuredModel.model ||
+        configuredModelOnly ||
         sessionActive.model ||
         this.config.piAgent?.model ||
         managerActive.model ||
@@ -103,9 +126,10 @@ export class ModelManager {
     const providerConfig = this.getProviderConfig(provider);
     const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
     const apiKeyFromProvider = providerConfig?.apiKey;
+    const supportsImages = this.modelSupportsImages(provider, modelId);
 
     logger.info(
-      { modelId, provider, baseUrl, hasProviderConfig: !!providerConfig },
+      { modelId, provider, baseUrl, hasProviderConfig: !!providerConfig, supportsImages },
       "Pi Agent getModel",
     );
 
@@ -118,7 +142,7 @@ export class ModelManager {
         baseUrl: baseUrl,
         ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
         reasoning: false,
-        input: ['text'] as const,
+        input: supportsImages ? (['text', 'image'] as const) : (['text'] as const),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 128000,
         maxTokens: 4096,
@@ -126,7 +150,12 @@ export class ModelManager {
     }
 
     const getModelFn = getGetModel();
-    return getModelFn(provider, modelId);
+    const model = getModelFn(provider, modelId);
+    if (!supportsImages) return model;
+    return {
+      ...model,
+      input: Array.from(new Set([...(model.input || []), 'image'])),
+    };
   }
 
   getVisionModel(fullModelId: string): any {

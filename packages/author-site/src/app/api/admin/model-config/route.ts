@@ -191,7 +191,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // 支持部分更新: frontend 和 backendProviders 都不是必填
+    // 支持部分更新: frontend、backendProviders 和 multimodalModels 都不是必填
     // 单独更新任一字段时,保留 DB 中其他字段不变
     if (body.frontend !== undefined && (typeof body.frontend !== "object" || body.frontend === null)) {
       return NextResponse.json(
@@ -217,13 +217,33 @@ export async function PUT(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (body.frontend === undefined && body.backendProviders === undefined) {
+    if (
+      body.multimodalModels !== undefined &&
+      !Array.isArray(body.multimodalModels)
+    ) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "INVALID_CONFIG",
-            message: "请求体至少需要包含 frontend 或 backendProviders 字段之一",
+            message: "multimodalModels 字段必须是数组",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    if (
+      body.frontend === undefined &&
+      body.backendProviders === undefined &&
+      body.multimodalModels === undefined
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_CONFIG",
+            message:
+              "请求体至少需要包含 frontend、backendProviders 或 multimodalModels 字段之一",
           },
         },
         { status: 400 },
@@ -304,7 +324,10 @@ export async function PUT(request: NextRequest) {
     let pushResult: { ok: boolean; message: string } | null = null;
     if (updatedConfig.backendProviders !== undefined) {
       pushResult = await syncBackendProvidersConfigToAgent(
-        updatedConfig.backendProviders,
+        {
+          ...updatedConfig.backendProviders,
+          multimodalModels: updatedConfig.multimodalModels,
+        },
         "save",
         { scheduleRetryOnFailure: true },
       );
