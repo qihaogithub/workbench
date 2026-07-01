@@ -47,6 +47,8 @@ interface CanvasPageLayout {
   width: number;
   height: number;
   zIndex?: number;
+  sizeMode?: 'preview' | 'custom';
+  previewSizeKey?: string;
 }
 
 interface CanvasViewportState {
@@ -219,6 +221,11 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
   const width = readNumber(value, 'width');
   const height = readNumber(value, 'height');
   const zIndex = readNumber(value, 'zIndex');
+  const sizeMode =
+    value.sizeMode === 'preview' || value.sizeMode === 'custom'
+      ? value.sizeMode
+      : undefined;
+  const previewSizeKey = typeof value.previewSizeKey === 'string' ? value.previewSizeKey : null;
 
   if (x === null || y === null || width === null || height === null) return null;
   if (width <= 0 || height <= 0) return null;
@@ -229,6 +236,8 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
     width,
     height,
     ...(zIndex === null ? {} : { zIndex }),
+    ...(sizeMode ? { sizeMode } : {}),
+    ...(previewSizeKey ? { previewSizeKey } : {}),
   };
 }
 
@@ -289,12 +298,46 @@ function readStoredCanvasLayout(workingDir: string): StoredCanvasLayout | null {
 }
 
 function resolveCanvasPageSize(previewSize?: PreviewSize): { width: number; height: number } {
-  const width = previewSize?.width != null ? Number(previewSize.width) : DEFAULT_PAGE_SIZE.width;
-  const height = previewSize?.height != null ? Number(previewSize.height) : DEFAULT_PAGE_SIZE.height;
+  const width =
+    previewSize?.width != null
+      ? Number.parseFloat(String(previewSize.width).replace(/px$/, ''))
+      : DEFAULT_PAGE_SIZE.width;
+  const height =
+    previewSize?.height != null
+      ? Number.parseFloat(String(previewSize.height).replace(/px$/, ''))
+      : DEFAULT_PAGE_SIZE.height;
 
   return {
     width: Number.isFinite(width) && width > 0 ? width : DEFAULT_PAGE_SIZE.width,
     height: Number.isFinite(height) && height > 0 ? height : DEFAULT_PAGE_SIZE.height,
+  };
+}
+
+function getCanvasPreviewSizeKey(previewSize?: PreviewSize): string {
+  const size = resolveCanvasPageSize(previewSize);
+  return `${size.width}x${size.height}`;
+}
+
+function withCanvasPageSizeMetadata(
+  layout: CanvasPageLayout,
+  previewSize: PreviewSize | undefined,
+  fallbackSizeMode: 'preview' | 'custom',
+): CanvasPageLayout {
+  const previewSizeKey = getCanvasPreviewSizeKey(previewSize);
+  const size = resolveCanvasPageSize(previewSize);
+  const matchesPreview =
+    Math.abs(layout.width - size.width) < 1 &&
+    Math.abs(layout.height - size.height) < 1;
+  const sizeMode =
+    layout.sizeMode === 'custom'
+      ? 'custom'
+      : matchesPreview
+        ? 'preview'
+        : fallbackSizeMode;
+  return {
+    ...layout,
+    sizeMode,
+    previewSizeKey,
   };
 }
 
@@ -348,17 +391,19 @@ function buildBaseLayout(
     const row = Math.floor(index / DEFAULT_INITIAL_COLUMNS);
     const size = pageSizes[index];
     const existing = currentLayout[page.id];
-    const effectiveSize =
-      sizeMode === 'preview' || !existing
-        ? size
-        : { width: existing.width, height: existing.height };
+    const existingLayout =
+      existing && sizeMode !== 'preview'
+        ? withCanvasPageSizeMetadata(existing, page.previewSize, 'custom')
+        : undefined;
 
     layout[page.id] = {
       x: existing?.x ?? col * (maxColWidth + DEFAULT_INITIAL_GAP),
       y: existing?.y ?? row * (DEFAULT_PAGE_SIZE.height + DEFAULT_INITIAL_GAP),
-      width: effectiveSize.width,
-      height: effectiveSize.height,
+      width: existingLayout?.width ?? size.width,
+      height: existingLayout?.height ?? size.height,
       zIndex: existing?.zIndex ?? index,
+      sizeMode: existingLayout?.sizeMode ?? 'preview',
+      previewSizeKey: existingLayout?.previewSizeKey ?? getCanvasPreviewSizeKey(page.previewSize),
     };
   });
 
@@ -480,20 +525,24 @@ function computeGridLayout(
   const existingBounds = getCanvasLayoutBounds(currentLayout);
   const startX = existingBounds?.minX ?? 0;
   const startY = existingBounds?.minY ?? 0;
-  const pageSizes = pages.map((page) => {
+  const pageLayouts = pages.map((page) => {
     const previewSize = resolveCanvasPageSize(page.previewSize);
     const existing = currentLayout[page.id];
     return sizeMode === 'preview' || !existing
-      ? previewSize
-      : { width: existing.width, height: existing.height };
+      ? {
+          ...previewSize,
+          sizeMode: 'preview' as const,
+          previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+        }
+      : withCanvasPageSizeMetadata(existing, page.previewSize, 'custom');
   });
-  const maxColWidth = Math.max(...pageSizes.map((size) => size.width));
+  const maxColWidth = Math.max(...pageLayouts.map((size) => size.width));
   const layout: Record<string, CanvasPageLayout> = {};
   const rowHeights: number[] = [];
 
   pages.forEach((_page, index) => {
     const row = Math.floor(index / columns);
-    const size = pageSizes[index];
+    const size = pageLayouts[index];
     rowHeights[row] = Math.max(rowHeights[row] ?? 0, size.height);
   });
 
@@ -505,13 +554,15 @@ function computeGridLayout(
   pages.forEach((page, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
-    const size = pageSizes[index];
+    const size = pageLayouts[index];
     layout[page.id] = {
       x: startX + col * (maxColWidth + gap),
       y: startY + rowYOffsets[row],
       width: size.width,
       height: size.height,
       zIndex: index,
+      sizeMode: size.sizeMode,
+      previewSizeKey: size.previewSizeKey,
     };
   });
 

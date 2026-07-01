@@ -79,6 +79,56 @@ describe("ProjectAdminService", () => {
     expect(detail.data?.versions).toHaveLength(1);
   });
 
+  it("提交分支事务后清空项目 active workspace 指针并剥离工作区元数据", () => {
+    const created = service.createProject({ name: "分支提交项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const transaction = edit.data as EditTransaction;
+    const editId = transaction.editId;
+
+    const projectPath = path.join(tempDir, "projects", projectId, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    fs.writeFileSync(
+      projectPath,
+      JSON.stringify(
+        {
+          ...project,
+          activeWorkspaceId: "live-stale",
+          activeWorkspaceUpdatedAt: Date.now(),
+          canonicalSyncedWorkspaceId: "live-stale",
+          canonicalSyncedAt: Date.now(),
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(transaction.workspacePath, ".session.json"),
+      JSON.stringify({ sessionId: "session-stale" }),
+      "utf-8",
+    );
+
+    const page = service.createPage({ editId, name: "首页" });
+    expect(page.ok).toBe(true);
+
+    const committed = service.commitEdit(editId, "提交分支事务");
+    expect(committed.ok).toBe(true);
+    expect(committed.diffSummary?.updated).not.toContain(".workspace.json");
+
+    const updatedProject = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    expect(updatedProject.activeWorkspaceId).toBeUndefined();
+    expect(updatedProject.activeWorkspaceUpdatedAt).toBeUndefined();
+    expect(updatedProject.canonicalSyncedWorkspaceId).toBeUndefined();
+    expect(typeof updatedProject.canonicalSyncedAt).toBe("number");
+
+    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    expect(fs.existsSync(path.join(workspacePath, ".workspace.json"))).toBe(false);
+    expect(fs.existsSync(path.join(workspacePath, ".session.json"))).toBe(false);
+    expect(fs.existsSync(path.join(committed.data!.version.snapshotPath, ".workspace.json"))).toBe(false);
+    expect(fs.existsSync(path.join(committed.data!.version.snapshotPath, ".session.json"))).toBe(false);
+  });
+
   it("阻止本事务新增或修改的不合规运行时页面", () => {
     const created = service.createProject({ name: "运行时契约项目" });
     const edit = service.beginEdit(created.data?.id ?? "");

@@ -1,4 +1,4 @@
-import { compileCode } from "../compiler";
+import { compileCode, extractImports } from "../compiler";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -127,6 +127,31 @@ describe("AI 页面预览运行时策略", () => {
 
     expect(result.moduleHash).toMatch(/^[a-f0-9]{64}$/);
     expect(result.compiledCode).toContain("user binding");
+  });
+
+  it("提取依赖时不会把字符串中的双斜线当作注释", () => {
+    const imports = extractImports(`
+      const imageUrl = "https://example.com/a.png";
+      import { Trophy } from "lucide-react";
+      export default function Demo() {
+        return <img src={imageUrl} alt="demo" />;
+      }
+    `);
+
+    expect(imports).toEqual(["lucide-react"]);
+  });
+
+  it("提取依赖时忽略 type-only import", () => {
+    const result = compileCode(`
+      import type { Props } from "./types";
+
+      export default function Demo(_props: Props) {
+        return <div>Hello</div>;
+      }
+    `);
+
+    expect(result.dependencies).not.toContain("./types");
+    expect(result.moduleHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("拒绝当前 lucide-react 版本不存在的 named import", () => {

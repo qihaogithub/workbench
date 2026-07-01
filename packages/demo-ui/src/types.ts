@@ -147,12 +147,16 @@ export type CanvasToolMode =
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
 
+export type CanvasPageSizeMode = "preview" | "custom";
+
 export interface CanvasPageLayout {
   x: number;
   y: number;
   width: number;
   height: number;
   zIndex?: number;
+  sizeMode?: CanvasPageSizeMode;
+  previewSizeKey?: string;
 }
 
 export interface CanvasViewportState {

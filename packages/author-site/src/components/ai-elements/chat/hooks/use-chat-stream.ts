@@ -243,6 +243,12 @@ interface UseChatStreamOptions {
   ) => void;
   onModelsEvent?: (event: StreamEvent) => void;
   onModelStateError?: () => void;
+  onDiagnosticEvent?: (event: {
+    name: string;
+    traceId?: string;
+    level?: "info" | "warn" | "error";
+    details?: Record<string, unknown>;
+  }) => void;
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
 
@@ -264,6 +270,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     setCurrentMessage,
     onModelsEvent,
     onModelStateError,
+    onDiagnosticEvent,
     externalStreamServiceRef,
   } = options;
 
@@ -378,6 +385,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       activeRunRef.current = true;
 
       const source = runOptions?.source ?? "user";
+      const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
       const isFirstUserMessage =
         !isSystemAutoRepair &&
@@ -385,6 +393,22 @@ export function useChatStream(options: UseChatStreamOptions) {
       const autoRepairMessageId = isSystemAutoRepair
         ? startOptions.displayMessageId || createLocalId("auto-repair")
         : undefined;
+      const displayMessageId =
+        autoRepairMessageId || startOptions.displayMessageId || createLocalId("user");
+      onDiagnosticEvent?.({
+        name: "ai.message_send_started",
+        traceId,
+        details: {
+          source,
+          messageId: displayMessageId,
+          agentSessionId,
+          sessionId,
+          demoId,
+          messageLength: userMessage.trim().length,
+          imageCount: images?.length ?? 0,
+          hasActiveViewContext: Boolean(activeViewContext),
+        },
+      });
 
       if (startOptions.appendDisplayMessage !== false) {
         setMessages((prev) => {
@@ -409,7 +433,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 },
               }
             : {
-                id: startOptions.displayMessageId || createLocalId("user"),
+                id: displayMessageId,
                 role: "user",
                 content: userMessage.trim(),
                 parts: images?.map((img) => ({
@@ -450,6 +474,14 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         const stream = await streamService.connect(agentSessionId, sessionId);
         streamSessionIdRef.current = sessionId;
+        onDiagnosticEvent?.({
+          name: "ai.websocket_connected",
+          traceId,
+          details: {
+            agentSessionId,
+            sessionId,
+          },
+        });
 
         let accumulatedContent = "";
 
@@ -571,6 +603,14 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onFinish: async (result) => {
             streamService.stopKeepalive();
+            onDiagnosticEvent?.({
+              name: "ai.stream_finish_event",
+              traceId,
+              details: {
+                contentLength: result.content?.length ?? 0,
+                fileCount: result.files?.length ?? 0,
+              },
+            });
             stopSilenceTracking();
             const currentMsg = currentMessageRef.current;
             const hasStructuredParts =
@@ -737,6 +777,16 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onError: (error) => {
             streamService.stopKeepalive();
+            onDiagnosticEvent?.({
+              name: "ai.stream_error",
+              traceId,
+              level: "error",
+              details: {
+                code: error.code,
+                message: error.message,
+                fileCount: error.files?.length ?? 0,
+              },
+            });
             const isModelError =
               error.code === "SESSION_NOT_FOUND" ||
               error.code === "GET_MODELS_ERROR";
@@ -781,9 +831,25 @@ export function useChatStream(options: UseChatStreamOptions) {
           demoId,
           activeViewContext,
         );
+        onDiagnosticEvent?.({
+          name: "ai.message_sent",
+          traceId,
+          details: {
+            messageId: displayMessageId,
+            mode: "websocket",
+          },
+        });
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
+        onDiagnosticEvent?.({
+          name: "ai.websocket_failed",
+          traceId,
+          level: "warn",
+          details: {
+            message: error instanceof Error ? error.message : "WebSocket 失败",
+          },
+        });
         if (error instanceof MissingTransactionalDeleteToolsError) {
           streamServiceRef.current?.close();
           const errorMessage: ChatMessage = {
@@ -845,6 +911,14 @@ export function useChatStream(options: UseChatStreamOptions) {
               },
             },
           );
+          onDiagnosticEvent?.({
+            name: "ai.message_sent",
+            traceId,
+            details: {
+              messageId: displayMessageId,
+              mode: "http_fallback",
+            },
+          });
 
           if (!result.success) {
             throw new Error(result.error?.message || "Agent 请求失败");
@@ -941,6 +1015,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       currentMessageRef,
       onModelsEvent,
       onModelStateError,
+      onDiagnosticEvent,
       markActivity,
       startSilenceTracking,
       stopSilenceTracking,

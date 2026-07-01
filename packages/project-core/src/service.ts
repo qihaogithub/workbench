@@ -174,6 +174,27 @@ function copyWorkspace(source: string, target: string): void {
   });
 }
 
+function isWorkspaceMetadataPath(filePath: string): boolean {
+  return [".workspace.json", ".session.json"].includes(path.basename(filePath));
+}
+
+function copyWorkspaceWithoutRuntimeMetadata(source: string, target: string): void {
+  fs.cpSync(source, target, {
+    recursive: true,
+    filter: (sourcePath) => {
+      const relative = path.relative(source, sourcePath);
+      if (!relative) return true;
+      const segments = relative.split(path.sep);
+      if (segments.some((segment) =>
+        ["node_modules", ".next", ".opencode", ".git"].includes(segment),
+      )) {
+        return false;
+      }
+      return !isWorkspaceMetadataPath(relative);
+    },
+  });
+}
+
 function countFiles(dir: string): number {
   if (!fs.existsSync(dir)) return 0;
   let count = 0;
@@ -1035,18 +1056,24 @@ export class ProjectAdminService {
     }
 
     const projectWorkspace = this.projectWorkspacePath(transaction.projectId);
-    const changedFiles = this.diffWorkspaceFiles(projectWorkspace, transaction.workspacePath);
+    const changedFiles = this.diffWorkspaceFiles(projectWorkspace, transaction.workspacePath)
+      .filter((file) => !isWorkspaceMetadataPath(file));
     fs.rmSync(projectWorkspace, { recursive: true, force: true });
-    copyWorkspace(transaction.workspacePath, projectWorkspace);
+    copyWorkspaceWithoutRuntimeMetadata(transaction.workspacePath, projectWorkspace);
     const version = this.createProjectVersion(project, projectWorkspace, actor.name, editId, note, "named_version");
     const tree = this.readWorkspaceTree(projectWorkspace);
+    const committedAt = Date.now();
     const updatedProject: Project = {
       ...project,
       workspacePath: projectWorkspace,
+      activeWorkspaceId: undefined,
+      activeWorkspaceUpdatedAt: undefined,
+      canonicalSyncedWorkspaceId: undefined,
+      canonicalSyncedAt: committedAt,
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
       versions: this.compactProjectVersions([...project.versions, version]),
-      updatedAt: Date.now(),
+      updatedAt: committedAt,
     };
     this.writeProject(project.id, updatedProject);
     transaction.status = "committed";
@@ -2507,7 +2534,7 @@ export class ProjectAdminService {
     const snapshotPath = path.join(this.snapshotsDir, project.id, versionId);
     ensureDir(path.dirname(snapshotPath));
     fs.rmSync(snapshotPath, { recursive: true, force: true });
-    copyWorkspace(workspacePath, snapshotPath);
+    copyWorkspaceWithoutRuntimeMetadata(workspacePath, snapshotPath);
     return {
       versionId,
       type,

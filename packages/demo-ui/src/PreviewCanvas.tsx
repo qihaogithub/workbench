@@ -17,6 +17,7 @@ import { CanvasPageItem } from "./CanvasPageItem";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { DocumentEditor } from "./DocumentEditor";
+import { useCanvasDocumentMarkdown } from "./useCanvasDocumentMarkdown";
 import {
   DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
   DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
@@ -27,6 +28,7 @@ import {
   computeAutoCanvasLayout,
   computeFitCanvasViewport,
   computeInitialCanvasLayout,
+  normalizeCanvasPageLayouts,
   resolveCanvasPageSize,
 } from "./canvas-layout";
 import {
@@ -388,9 +390,6 @@ export function PreviewCanvas({
     markdown: string;
     title?: string;
   } | null>(null);
-  const [knowledgeDocumentMarkdown, setKnowledgeDocumentMarkdown] = useState<
-    Record<string, string>
-  >({});
   const [documentSaving, setDocumentSaving] = useState(false);
   const [draggingFileOver, setDraggingFileOver] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -426,13 +425,62 @@ export function PreviewCanvas({
   canvasStateRef.current = canvasState;
 
   const effectivePages = useMemo(() => {
-    const baseLayout = computeInitialCanvasLayout(pages);
-    return { ...baseLayout, ...canvasState.pages };
+    return normalizeCanvasPageLayouts(pages, canvasState.pages);
   }, [canvasState.pages, pages]);
 
   const pageIds = useMemo(() => new Set(pages.map((page) => page.id)), [pages]);
 
   const effectiveNodes = getAnnotationsFromCanvasState(canvasState);
+  const documentNodes = useMemo(
+    () =>
+      Object.values(effectiveNodes).filter(
+        (node): node is CanvasDocumentNode => node.kind === "document",
+      ),
+    [effectiveNodes],
+  );
+  const visibleDocumentNodeIds = useMemo(() => {
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      return new Set<string>();
+    }
+    const documentLayouts = Object.fromEntries(
+      documentNodes.map((node) => [node.id, node.layout]),
+    );
+    return getVisiblePageIds(
+      documentLayouts,
+      canvasState.viewport,
+      containerSize.width,
+      containerSize.height,
+    );
+  }, [
+    canvasState.viewport,
+    containerSize.height,
+    containerSize.width,
+    documentNodes,
+  ]);
+  const readableDocumentNodes = useMemo(
+    () =>
+      documentNodes.filter(
+        (node) =>
+          visibleDocumentNodeIds.has(node.id) ||
+          selectedNodeId === node.id ||
+          selectedDocumentNodeIds.includes(node.id) ||
+          documentDraft?.nodeId === node.id,
+      ),
+    [
+      documentDraft?.nodeId,
+      documentNodes,
+      selectedDocumentNodeIds,
+      selectedNodeId,
+      visibleDocumentNodeIds,
+    ],
+  );
+  const {
+    markdownByDocumentId: knowledgeDocumentMarkdown,
+    setMarkdownByDocumentId: setKnowledgeDocumentMarkdown,
+  } = useCanvasDocumentMarkdown({
+    documentNodes: readableDocumentNodes,
+    onReadKnowledgeDocument,
+  });
   const knowledgeDocumentsById = useMemo(
     () =>
       new Map(
@@ -940,57 +988,6 @@ export function PreviewCanvas({
       return changed ? { ...prev, nodes: nextNodes } : prev;
     });
   }, [knowledgeDocuments, updateState]);
-
-  useEffect(() => {
-    if (!onReadKnowledgeDocument) return;
-
-    const documentsToLoad = Array.from(
-      new Map(
-        Object.values(effectiveNodes)
-          .filter(
-            (node): node is CanvasDocumentNode => node.kind === "document",
-          )
-          .flatMap((node) =>
-            getCanvasDocumentEntries(node).map((entry) => [
-              entry.knowledgeDocument.id,
-              entry.knowledgeDocument,
-            ] as const),
-          )
-          .filter(
-            ([documentId]) => knowledgeDocumentMarkdown[documentId] === undefined,
-          ),
-      ).values(),
-    );
-
-    if (documentsToLoad.length === 0) return;
-
-    let cancelled = false;
-    void Promise.all(
-      documentsToLoad.map(async (document) => {
-        try {
-          return {
-            id: document.id,
-            markdown: await onReadKnowledgeDocument(document),
-          };
-        } catch {
-          return { id: document.id, markdown: "文档内容加载失败" };
-        }
-      }),
-    ).then((results) => {
-      if (cancelled) return;
-      setKnowledgeDocumentMarkdown((prev) => {
-        const next = { ...prev };
-        for (const result of results) {
-          next[result.id] = result.markdown;
-        }
-        return next;
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveNodes, knowledgeDocumentMarkdown, onReadKnowledgeDocument]);
 
   useEffect(() => {
     if (

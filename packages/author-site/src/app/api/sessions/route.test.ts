@@ -95,6 +95,7 @@ describe("sessions route external auth reuse", () => {
         workspaceId: "workspace-new",
         workspaceScope: "live",
         isSharedWorkspace: true,
+        workspacePath: "/tmp/workspace",
         code: "",
         schema: "",
         tempWorkspace: "/tmp/workspace",

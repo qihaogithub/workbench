@@ -27,6 +27,13 @@ export interface CreateWorkspaceResult {
   workspaceScope?: WorkspaceMeta["scope"];
 }
 
+export interface WorkspaceSyncResult {
+  success: boolean;
+  workspacePath?: string;
+  code?: string;
+  error?: string;
+}
+
 function getProjectLiveWorkspaceDir(projectId: string): string {
   return path.join(getWorkspacesDir(), "projects", projectId);
 }
@@ -68,6 +75,16 @@ function readWorkspaceUpdatedAt(workspaceId: string): number {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath || !fs.existsSync(wsPath)) return 0;
   return fs.statSync(wsPath).mtimeMs;
+}
+
+function latestVersionId(projectId: string): string {
+  return getLatestVersion(projectId)?.versionId || "v0";
+}
+
+function isWorkspaceBasedOnLatest(projectId: string, meta: WorkspaceMeta | null): boolean {
+  const latest = latestVersionId(projectId);
+  if (!meta?.baseVersion) return latest === "v0";
+  return meta.baseVersion === latest;
 }
 
 export function isLiveWorkspace(workspaceId: string | null | undefined): boolean {
@@ -150,7 +167,15 @@ export function getOrCreateProjectActiveWorkspace(
     const activePath = findWorkspacePath(project.activeWorkspaceId);
     if (activePath && fs.existsSync(activePath)) {
       const meta = getWorkspaceMetaFromFs(project.activeWorkspaceId);
-      if (!meta) {
+      if (!isWorkspaceBasedOnLatest(projectId, meta)) {
+        writeProjectMeta(projectId, {
+          ...project,
+          activeWorkspaceId: undefined,
+          activeWorkspaceUpdatedAt: undefined,
+          canonicalSyncedWorkspaceId: undefined,
+          updatedAt: Date.now(),
+        });
+      } else if (!meta) {
         writeLiveWorkspaceMeta(activePath, project.activeWorkspaceId, projectId);
       } else if (meta.scope !== "live") {
         writeWorkspaceMeta(project.activeWorkspaceId, {
@@ -162,16 +187,18 @@ export function getOrCreateProjectActiveWorkspace(
           updatedAt: meta.updatedAt ?? Date.now(),
         });
       }
-      const demos = getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {
-        demos: {},
-        projectConfigSchema: undefined,
-      };
-      return {
-        workspaceId: project.activeWorkspaceId,
-        workspacePath: activePath,
-        demos,
-        workspaceScope: "live",
-      };
+      if (isWorkspaceBasedOnLatest(projectId, meta)) {
+        const demos = getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {
+          demos: {},
+          projectConfigSchema: undefined,
+        };
+        return {
+          workspaceId: project.activeWorkspaceId,
+          workspacePath: activePath,
+          demos,
+          workspaceScope: "live",
+        };
+      }
     }
   }
 
@@ -215,20 +242,48 @@ export function getOrCreateProjectActiveWorkspace(
 export function syncActiveWorkspaceToCanonical(
   projectId: string,
   workspaceId?: string | null,
-): { success: boolean; workspacePath?: string; error?: string } {
+): WorkspaceSyncResult {
   const project = readProjectMeta(projectId);
-  if (!project) return { success: false, error: "Project not found" };
+  if (!project) {
+    return {
+      success: false,
+      code: "PROJECT_NOT_FOUND",
+      error: "Project not found",
+    };
+  }
 
   const effectiveWorkspaceId = workspaceId || project.activeWorkspaceId;
   if (!effectiveWorkspaceId) {
-    return { success: false, error: "Project active workspace not found" };
+    return {
+      success: false,
+      code: "WORKSPACE_STALE",
+      error: "当前工作区已过期，请刷新项目后重试",
+    };
+  }
+
+  if (project.activeWorkspaceId !== effectiveWorkspaceId) {
+    return {
+      success: false,
+      code: "WORKSPACE_STALE",
+      error: "当前工作区已过期，请刷新项目后重试",
+    };
   }
 
   const sourcePath = findWorkspacePath(effectiveWorkspaceId);
   if (!sourcePath || !fs.existsSync(sourcePath)) {
     return {
       success: false,
+      code: "WORKSPACE_NOT_FOUND",
       error: `Workspace source not found: ${effectiveWorkspaceId}`,
+    };
+  }
+
+  const sourceMeta = getWorkspaceMetaFromFs(effectiveWorkspaceId);
+  if (!isWorkspaceBasedOnLatest(projectId, sourceMeta)) {
+    return {
+      success: false,
+      code: "WORKSPACE_STALE",
+      error: "当前工作区已过期，请刷新项目后重试",
     };
   }
 

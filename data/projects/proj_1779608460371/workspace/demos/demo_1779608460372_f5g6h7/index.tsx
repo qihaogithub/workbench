@@ -1,69 +1,45 @@
 interface DemoProps {
-  /** 对应 uiweb-vue updateImage2：平板广告图，1行1个 */
-  padSingleAdImage?: string;
+  /** 对应 uiweb-vue updateImage1：手机广告图，1行1个 */
+  phoneSingleAdImage?: string;
   /** 对应 uiweb-vue updateImage3：轮播广告图 */
   carouselAdImage?: string;
 }
 
-export default function PadBanduAd({
-  padSingleAdImage,
-  carouselAdImage,
+const phoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
+
+export default function PhoneBanduAd({
+  phoneSingleAdImage = `${phoneAssetBase}/一行一个广告图.png`,
+  carouselAdImage = `${phoneAssetBase}/广告图.png`,
 }: DemoProps) {
-  const padAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad';
-  const sharedPhoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
-
-  const defaultPadAd = `${padAssetBase}/一行1个.png`;
-  const defaultCarouselAd = `${sharedPhoneAssetBase}/广告图.png`;
-
-  const imgPadSingle = padSingleAdImage || defaultPadAd;
-  const imgCarousel = carouselAdImage || defaultCarouselAd;
-
-  const sideImages = ['配图-3.png', '配图-4.png', '配图-5.png', '配图-6.png'];
-
   return (
     <div
       className="relative mx-auto overflow-hidden bg-white"
-      style={{ width: 1133, maxWidth: '100%', height: '100vh', minHeight: 749 }}
+      style={{ width: 375, maxWidth: '100%', height: '100vh', minHeight: 812 }}
     >
       <img
-        src={`${padAssetBase}/底部吸顶内容.png`}
+        src={`${phoneAssetBase}/底部吸顶内容.png`}
         alt="顶部吸顶内容"
-        className="absolute left-px top-0 z-20 h-[90px] w-[1132px]"
+        className="absolute left-0 top-0 z-20 w-[375px]"
       />
 
-      <div className="absolute left-0 top-[90px] flex h-[592px] w-[1133px] flex-col items-center bg-white">
-        <img src={`${padAssetBase}/1.png`} alt="顶部区域" className="h-[188px] w-[1133px] shrink-0 object-cover" />
-
-        <div className="shrink-0 overflow-hidden rounded-[12px] bg-white">
-          <img src={imgPadSingle} alt="平板广告图" className="h-[180px] w-[1005px] object-cover" />
+      <div className="absolute left-0 top-[141px] flex h-[585px] w-[375px] flex-col items-center overflow-x-hidden overflow-y-auto bg-white">
+        <div className="flex flex-col items-center">
+          <img src={`${phoneAssetBase}/重磅更新标题.png`} alt="重磅更新" className="w-[344px]" />
+          <img src={phoneSingleAdImage} alt="手机广告图" className="h-[180px] w-[344px] object-cover" />
+          <img src={`${phoneAssetBase}/叫叫活动标题.png`} alt="叫叫活动" className="w-[344px]" />
         </div>
 
-        <div className="flex w-[1133px] shrink-0 flex-col items-start">
-          <img src={`${padAssetBase}/配图-1.png`} alt="活动标题" className="h-[61px] w-[1133px]" />
-
-          <div className="flex h-[100px] w-full items-center gap-[10px] px-[64px]">
-            <img
-              src={imgCarousel}
-              alt="轮播广告图"
-              className="h-full w-[210px] rounded-[9px] bg-[#d9d9d9] object-cover"
-            />
-
-            {sideImages.map((imageName) => (
-              <img
-                key={imageName}
-                src={`${padAssetBase}/${imageName}`}
-                alt=""
-                className="h-[100px] rounded-[9px]"
-              />
-            ))}
-          </div>
+        <div className="h-[180px] w-[344px] shrink-0 overflow-hidden rounded-[10px] bg-[#d9d9d9]">
+          <img src={carouselAdImage} alt="轮播广告图" className="h-full w-full object-cover" />
         </div>
+
+        <img src={`${phoneAssetBase}/下.png`} alt="底部内容" className="w-[375px] shrink-0" />
       </div>
 
       <img
-        src={`${padAssetBase}/吸底标签栏.png`}
+        src={`${phoneAssetBase}/吸底标签栏.png`}
         alt="底部标签栏"
-        className="absolute bottom-0 left-px z-20 h-[62px] w-[1132px]"
+        className="absolute bottom-0 left-0 z-20 h-[86px] w-[375px]"
       />
     </div>
   );

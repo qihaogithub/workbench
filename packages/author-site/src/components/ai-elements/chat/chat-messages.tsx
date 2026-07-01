@@ -47,7 +47,6 @@ interface ChatMessagesProps {
       displayMessage: NonNullable<ChatMessage["autoRepair"]>;
     },
   ) => void;
-  onCancelQueuedMessage: (queueId: string) => void;
   onUserChoiceResponse: (requestId: string, choice: UserChoiceResponse) => void;
 }
 
@@ -65,12 +64,10 @@ export function ChatMessages({
   messagesRef,
   setMessages,
   handleSend,
-  onCancelQueuedMessage,
   onUserChoiceResponse,
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeMessages = messages.filter((message) => !message.queueStatus);
-  const queuedMessages = messages.filter((message) => message.queueStatus);
 
   const renderMessage = (msg: ChatMessage) => {
     if (msg.role === "user" || msg.kind === "auto_repair") {
@@ -83,7 +80,6 @@ export function ChatMessages({
           allMessages={messages}
           setMessages={setMessages}
           handleSend={handleSend}
-          onCancelQueuedMessage={onCancelQueuedMessage}
         />
       );
     }
@@ -153,8 +149,6 @@ export function ChatMessages({
           onUserChoiceResponse={onUserChoiceResponse}
         />
       )}
-
-      {queuedMessages.map(renderMessage)}
 
       {isUserScrolling && isStreaming && (
         <div className="sticky bottom-0 flex justify-center pb-2">

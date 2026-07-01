@@ -1,18 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import MarkdownIt from "markdown-it";
 import {
   ALargeSmall,
   Edit3,
   Maximize2,
   Minimize2,
 } from "lucide-react";
+import { CanvasDocumentContent } from "./CanvasDocumentContent";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
-import {
-  getActiveCanvasDocumentEntry,
-  getCanvasDocumentEntries,
-} from "./canvas-kernel";
 import { cn } from "./utils";
 import type {
   CanvasFreeNode,
@@ -123,12 +119,6 @@ const EDGE_CURSORS: Record<ResizeEdge, string> = {
   se: "nwse-resize",
   sw: "nesw-resize",
 };
-
-const markdownRenderer = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-});
 
 function detectResizeEdge(
   localX: number,
@@ -421,15 +411,6 @@ export function CanvasFreeNodeItem({
     !isDragging &&
     !isResizing &&
     node.kind === "text";
-
-  const documentEntries =
-    node.kind === "document" ? getCanvasDocumentEntries(node) : [];
-  const activeDocumentEntry =
-    node.kind === "document" ? getActiveCanvasDocumentEntry(node) : undefined;
-  const renderedMarkdown =
-    node.kind === "document"
-      ? markdownRenderer.render(node.markdown || "文档内容加载中...")
-      : "";
 
   useEffect(() => {
     if (node.kind !== "text" || !selected || !editing || !canInteract) return;
@@ -762,43 +743,10 @@ export function CanvasFreeNodeItem({
           </div>
         )}
 
-        {node.kind === "document" && !node.collapsed && documentEntries.length > 1 && (
-          <div className="flex h-full min-h-0">
-            <div className="scrollbar-thin w-40 shrink-0 overflow-auto border-r bg-muted/30 py-2">
-              {documentEntries.map((entry) => {
-                const active = entry.id === activeDocumentEntry?.id;
-                return (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className={cn(
-                      "block w-full truncate px-3 py-2 text-left text-xs transition-colors hover:bg-background/80",
-                      active
-                        ? "bg-background font-medium text-foreground"
-                        : "text-muted-foreground",
-                    )}
-                    title={entry.title}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onActiveDocumentChange?.(node.id, entry.id);
-                    }}
-                  >
-                    {entry.title}
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              className="markdown-editor-content scrollbar-thin h-full min-w-0 flex-1 overflow-auto px-4 py-3 text-sm"
-              dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
-            />
-          </div>
-        )}
-
-        {node.kind === "document" && !node.collapsed && documentEntries.length <= 1 && (
-          <div
-            className="markdown-editor-content scrollbar-thin h-full overflow-auto px-4 py-3 text-sm"
-            dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+        {node.kind === "document" && !node.collapsed && (
+          <CanvasDocumentContent
+            node={node}
+            onActiveDocumentChange={onActiveDocumentChange}
           />
         )}
 

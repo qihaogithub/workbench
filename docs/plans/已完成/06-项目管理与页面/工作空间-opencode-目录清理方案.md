@@ -312,7 +312,7 @@ ls data/projects/proj_1779608460378/workspace/references/
 ### 7.1 相关文档
 
 - [全面迁移至Pi-Agent并移除多后端支持方案](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/plans/已完成/全面迁移至Pi-Agent并移除多后端支持方案.md) - Pi Agent 迁移方案（已完成）
-- [草稿工作区 v2](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/项目文档/创作端/03-项目管理/技术/03_草稿工作区_v2.md) - 工作空间架构文档
+- [草稿工作区 v2](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/项目文档/创作端/03-项目管理/技术/03_项目工作区_v2.md) - 工作空间架构文档
 - [工作空间对话解耦](file:///Users/qh2/Documents/PGM/1·Work/opencode-workbench/docs/项目文档/创作端/03-项目管理/技术/07_工作空间对话解耦.md) - workspace-manager 设计
 
 ### 7.2 关键代码路径

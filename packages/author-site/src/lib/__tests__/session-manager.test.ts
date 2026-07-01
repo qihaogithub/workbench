@@ -33,7 +33,8 @@ async function importProjectModules(dataDir: string) {
 
   const fsUtils = await import("../fs-utils");
   const sessionManager = await import("../session-manager");
-  return { fsUtils, sessionManager };
+  const workspaceManager = await import("../workspace-manager");
+  return { fsUtils, sessionManager, workspaceManager };
 }
 
 function writeSession(
@@ -262,5 +263,60 @@ describe("项目级共享 Workspace", () => {
     expect(workspacePath).toBeTruthy();
     expect(sessionManager.archiveSession(session.sessionId, "archived")).toBe(true);
     expect(fs.existsSync(workspacePath!)).toBe(true);
+  });
+
+  it("项目产生新版本后不复用旧 baseVersion 的 live workspace", async () => {
+    const { fsUtils, sessionManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("过期共享工作区项目");
+    const projectWorkspacePath = path.join(dataDir, "projects", project.id, "workspace");
+    const markerPath = path.join(projectWorkspacePath, "_marker.txt");
+
+    fs.writeFileSync(markerPath, "canonical-v1", "utf-8");
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+
+    const firstSession = await sessionManager.createEditSession("user-a", project.id);
+    const staleWorkspacePath = fsUtils.findWorkspacePath(firstSession.workspaceId);
+    expect(staleWorkspacePath).toBeTruthy();
+    fs.writeFileSync(path.join(staleWorkspacePath!, "_marker.txt"), "stale-live", "utf-8");
+
+    fs.writeFileSync(markerPath, "canonical-v2", "utf-8");
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+
+    const secondSession = await sessionManager.createEditSession("user-b", project.id);
+    const currentWorkspacePath = fsUtils.findWorkspacePath(secondSession.workspaceId);
+
+    expect(secondSession.workspaceId).not.toBe(firstSession.workspaceId);
+    expect(fs.existsSync(staleWorkspacePath!)).toBe(true);
+    expect(fs.readFileSync(path.join(currentWorkspacePath!, "_marker.txt"), "utf-8")).toBe("canonical-v2");
+  });
+
+  it("过期 live workspace 不能同步覆盖项目基准工作区", async () => {
+    const { fsUtils, sessionManager, workspaceManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("过期同步项目");
+    const projectWorkspacePath = path.join(dataDir, "projects", project.id, "workspace");
+    const markerPath = path.join(projectWorkspacePath, "_marker.txt");
+
+    fs.writeFileSync(markerPath, "canonical-v1", "utf-8");
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+
+    const session = await sessionManager.createEditSession("user-a", project.id);
+    const staleWorkspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+    expect(staleWorkspacePath).toBeTruthy();
+    fs.writeFileSync(path.join(staleWorkspacePath!, "_marker.txt"), "stale-live", "utf-8");
+
+    fs.writeFileSync(markerPath, "canonical-v2", "utf-8");
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+
+    const synced = workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId);
+    expect(synced).toMatchObject({
+      success: false,
+      code: "WORKSPACE_STALE",
+    });
+    expect(fs.readFileSync(markerPath, "utf-8")).toBe("canonical-v2");
+
+    const saved = sessionManager.saveEditSession(session.sessionId);
+    expect(saved.success).toBe(false);
+    expect(saved.error).toContain("当前工作区已过期");
+    expect(fs.readFileSync(markerPath, "utf-8")).toBe("canonical-v2");
   });
 });

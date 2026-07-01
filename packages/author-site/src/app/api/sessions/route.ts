@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       const meta = getSessionMeta(activeSessionId);
       let code = "";
       let schema = "";
-      let tempWorkspace = "";
+      let workspacePath = "";
 
       if (meta?.workspaceId) {
         const wsPath = findWorkspacePath(meta.workspaceId);
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           code = files?.code || "";
           schema = files?.schema || "";
         }
-        tempWorkspace = wsPath || getSessionPath(activeSessionId) || "";
+        workspacePath = wsPath || getSessionPath(activeSessionId) || "";
       } else {
         // 无 workspaceId 的 legacy session，尝试从 session 路径读取
         const sessionPath = getSessionPath(activeSessionId);
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         const schemaPath = path.join(sessionPath, "config.schema.json");
         if (fs.existsSync(codePath)) code = fs.readFileSync(codePath, "utf-8");
         if (fs.existsSync(schemaPath)) schema = fs.readFileSync(schemaPath, "utf-8");
-        tempWorkspace = sessionPath || "";
+        workspacePath = sessionPath || "";
       }
 
       return NextResponse.json(
@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
             : false,
           code,
           schema,
-          tempWorkspace,
+          workspacePath,
+          tempWorkspace: workspacePath,
         }),
       );
     }

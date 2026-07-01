@@ -37,20 +37,11 @@ function getCodeHash(code: string): string {
 }
 
 /**
- * 移除代码中的注释（单行和多行），避免正则误判
- */
-function removeComments(code: string): string {
-  return code
-    .replace(/\/\/.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-}
-
-/**
  * 从代码中提取 import 语句的模块名
  * 返回所有 import 的源模块，包括 npm 包和相对路径
  */
 export function extractImports(code: string): string[] {
-  return extractPreviewImports(removeComments(code));
+  return extractPreviewImports(code);
 }
 
 /**

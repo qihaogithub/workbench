@@ -24,6 +24,14 @@ jest.mock("@/lib/fs-utils", () => ({
     createdAt: 1,
     updatedAt: 2,
   })),
+  readProjectMeta: jest.fn(() => ({
+    id: "project-1",
+    name: "测试项目",
+    activeWorkspaceId: undefined,
+    activeWorkspaceUpdatedAt: undefined,
+    canonicalSyncedWorkspaceId: undefined,
+    canonicalSyncedAt: undefined,
+  })),
 }));
 
 jest.mock("@/lib/session-manager", () => ({
@@ -52,18 +60,10 @@ jest.mock("@/lib/session-manager", () => ({
       demos: { demos: {}, projectConfigSchema: undefined },
     };
   }),
-  syncEditSessionToProjectWorkspace: jest.fn(() => ({
-    success: true,
-    projectId: "project-1",
-    workspacePath: "",
-  })),
 }));
 
 jest.mock("@/lib/workspace-flush", () => ({
-  flushWorkspaceBeforeCriticalAction: jest.fn(async () => ({
-    status: "no_active_room",
-    flushedRooms: 0,
-  })),
+  flushAndSyncProjectWorkspace: jest.fn(async () => undefined),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
     code: "AGENT_SERVICE_ERROR",
     message: error instanceof Error ? error.message : "协同草稿同步失败",
@@ -148,14 +148,11 @@ describe("project publish route", () => {
       "project-1",
       "workspace-1",
     );
-    expect(workspaceFlush.flushWorkspaceBeforeCriticalAction).toHaveBeenCalledWith({
+    expect(workspaceFlush.flushAndSyncProjectWorkspace).toHaveBeenCalledWith({
       projectId: "project-1",
       workspaceId: "workspace-1",
       sessionId: "session-resumed",
     });
-    expect(sessionManager.syncEditSessionToProjectWorkspace).toHaveBeenCalledWith(
-      "session-resumed",
-    );
     expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
   });
 
@@ -185,8 +182,7 @@ describe("project publish route", () => {
     });
     expect(fsUtils.getWorkspaceMeta).not.toHaveBeenCalled();
     expect(sessionManager.createEditSession).not.toHaveBeenCalled();
-    expect(workspaceFlush.flushWorkspaceBeforeCriticalAction).not.toHaveBeenCalled();
-    expect(sessionManager.syncEditSessionToProjectWorkspace).not.toHaveBeenCalled();
+    expect(workspaceFlush.flushAndSyncProjectWorkspace).not.toHaveBeenCalled();
     expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
   });
 });
