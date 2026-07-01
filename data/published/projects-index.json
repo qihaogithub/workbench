@@ -1,6 +1,13 @@
 {
   "projects": [
     {
+      "id": "proj_1779608460371",
+      "name": "伴读广告页面",
+      "publishedAt": 1782838591292,
+      "publishedVersion": "v1",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1779608460375",
       "name": "我的页面",
       "thumbnail": "/data/proj_1779608460375/thumbnail.png",
@@ -39,5 +46,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1782830809396
+  "generatedAt": 1782838591294
 }

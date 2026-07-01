@@ -82,6 +82,35 @@ interface ModelConfigState {
   multimodalModels: string[];
 }
 
+interface BackendProvidersSyncStatus {
+  dbConfig: {
+    exists: boolean;
+    updatedAt?: number;
+    providerCount: number;
+    activeProviderId?: string;
+    activeModelId?: string;
+  };
+  syncState: {
+    inProgress: boolean;
+    attemptCount: number;
+    lastAttemptAt?: number;
+    lastSuccessAt?: number;
+    lastFailureAt?: number;
+    nextRetryAt?: number;
+    lastResult?: {
+      ok: boolean;
+      message: string;
+    };
+  };
+  agentConfig: {
+    reachable: boolean;
+    providerCount: number;
+    activeProviderId?: string;
+    activeModelId?: string;
+    message?: string;
+  };
+}
+
 /* ============================================================
    辅助函数
    ============================================================ */
@@ -165,6 +194,23 @@ function getGroupColor(group: string): string {
   return GROUP_COLORS[group];
 }
 
+function formatTimestamp(value: number | undefined): string {
+  if (!value) return "未记录";
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+async function readApiErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body = await response.json();
+    return body?.error?.message || body?.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /* ============================================================
    主页面
    ============================================================ */
@@ -236,8 +282,10 @@ function SuppliersTab() {
   const [activeModelId, setActiveModelId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<BackendProvidersSyncStatus | null>(null);
   const [pushResult, setPushResult] = useState<{
     ok: boolean;
     message: string;
@@ -248,6 +296,7 @@ function SuppliersTab() {
 
   useEffect(() => {
     loadConfig();
+    loadSyncStatus();
   }, []);
 
   async function loadConfig() {
@@ -255,7 +304,9 @@ function SuppliersTab() {
       setLoading(true);
       setError(null);
       const res = await fetch("/api/admin/model-config");
-      if (!res.ok) throw new Error("加载配置失败");
+      if (!res.ok) {
+        throw new Error(await readApiErrorMessage(res, "加载配置失败"));
+      }
       const { data } = await res.json();
       setProviders(data.backendProviders?.providers || []);
       setActiveProviderId(data.backendProviders?.activeProviderId || "");
@@ -264,6 +315,52 @@ function SuppliersTab() {
       setError(err instanceof Error ? err.message : "加载配置失败");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadSyncStatus() {
+    try {
+      const res = await fetch("/api/admin/backend-providers/sync");
+      const body = await res.json();
+      if (res.ok && body.success) {
+        setSyncStatus(body.data);
+      }
+    } catch {
+      // 状态读取失败不阻塞配置编辑。
+    }
+  }
+
+  async function handleRetrySync() {
+    try {
+      setSyncing(true);
+      setError(null);
+      setSuccess(null);
+      setPushResult(null);
+
+      const res = await fetch("/api/admin/backend-providers/sync", {
+        method: "POST",
+      });
+      const body = await res.json();
+      const result = {
+        ok: Boolean(body.success),
+        message: body.message || (body.success ? "已同步" : "同步失败"),
+      };
+      setPushResult(result);
+      if (body.syncStatus) {
+        setSyncStatus(body.syncStatus);
+      } else {
+        await loadSyncStatus();
+      }
+      if (result.ok) {
+        setSuccess("已同步已保存的供应商配置到 agent-service");
+      }
+    } catch (err) {
+      setPushResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "同步失败",
+      });
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -296,7 +393,9 @@ function SuppliersTab() {
       if (body.agentPushResult) {
         setPushResult(body.agentPushResult);
         if (body.agentPushResult.ok) {
-          setSuccess("配置已保存并推送到 agent-service，立即生效");
+          setSuccess("配置已保存并同步到 agent-service");
+        } else {
+          setSuccess("配置已保存，运行时同步失败，系统会自动重试");
         }
       } else {
         // fallback 调用 sync
@@ -310,7 +409,7 @@ function SuppliersTab() {
             message: j.message || (j.success ? "已推送" : "推送失败"),
           });
           if (j.success) {
-            setSuccess("配置已保存并推送到 agent-service，立即生效");
+            setSuccess("配置已保存并同步到 agent-service");
           }
         } catch {
           setPushResult({
@@ -319,6 +418,7 @@ function SuppliersTab() {
           });
         }
       }
+      await loadSyncStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
     } finally {
@@ -413,6 +513,85 @@ function SuppliersTab() {
 
   return (
     <div className="space-y-6">
+      {syncStatus && (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-neutral-50">配置保存与运行时同步</h3>
+              <p className="text-sm text-neutral-400 mt-1">
+                数据库是配置源，agent-service 使用同步后的运行时配置。
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadSyncStatus}
+              className="gap-1 bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+              刷新状态
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
+              <div className="text-xs text-neutral-500 mb-1">数据库保存</div>
+              <div className="text-sm font-medium text-neutral-100">
+                {syncStatus.dbConfig.exists
+                  ? `${syncStatus.dbConfig.providerCount} 个供应商`
+                  : "尚未保存供应商"}
+              </div>
+              <div className="text-xs text-neutral-500 mt-1">
+                {formatTimestamp(syncStatus.dbConfig.updatedAt)}
+              </div>
+            </div>
+            <div className="rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
+              <div className="text-xs text-neutral-500 mb-1">最近同步</div>
+              <div
+                className={cn(
+                  "text-sm font-medium",
+                  syncStatus.syncState.lastResult?.ok
+                    ? "text-emerald-300"
+                    : syncStatus.syncState.lastResult
+                      ? "text-amber-300"
+                      : "text-neutral-100",
+                )}
+              >
+                {syncStatus.syncState.inProgress
+                  ? "同步中"
+                  : syncStatus.syncState.lastResult?.message || "未记录"}
+              </div>
+              <div className="text-xs text-neutral-500 mt-1">
+                {syncStatus.syncState.lastSuccessAt
+                  ? `成功: ${formatTimestamp(syncStatus.syncState.lastSuccessAt)}`
+                  : syncStatus.syncState.lastFailureAt
+                    ? `失败: ${formatTimestamp(syncStatus.syncState.lastFailureAt)}`
+                    : "等待首次同步"}
+              </div>
+            </div>
+            <div className="rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
+              <div className="text-xs text-neutral-500 mb-1">agent-service</div>
+              <div
+                className={cn(
+                  "text-sm font-medium",
+                  syncStatus.agentConfig.reachable
+                    ? "text-emerald-300"
+                    : "text-amber-300",
+                )}
+              >
+                {syncStatus.agentConfig.reachable
+                  ? `${syncStatus.agentConfig.providerCount} 个运行时供应商`
+                  : "不可达"}
+              </div>
+              <div className="text-xs text-neutral-500 mt-1 truncate">
+                {syncStatus.agentConfig.reachable
+                  ? syncStatus.agentConfig.activeProviderId || "未设置激活供应商"
+                  : syncStatus.agentConfig.message}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 推送结果 */}
       {pushResult && (
         <div
@@ -432,10 +611,11 @@ function SuppliersTab() {
             <strong>agent-service 推送:</strong> {pushResult.message}
             {!pushResult.ok && (
               <button
-                onClick={handleSaveAndPush}
+                onClick={handleRetrySync}
+                disabled={syncing}
                 className="ml-2 underline hover:no-underline font-medium"
               >
-                点此重试
+                {syncing ? "同步中..." : "重试同步已保存配置"}
               </button>
             )}
           </div>
@@ -656,7 +836,7 @@ function SuppliersTab() {
           ) : (
             <Power className="h-5 w-5" />
           )}
-          保存并推送到 agent-service
+          保存并同步到 agent-service
         </Button>
       </div>
 
@@ -664,9 +844,10 @@ function SuppliersTab() {
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 text-sm text-neutral-400">
         <strong className="text-neutral-300">使用提示:</strong>
         <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>点击「保存并推送」后 agent-service 立即生效，无需重启</li>
+          <li>点击「保存并同步」后先写入数据库，再推送到 agent-service</li>
+          <li>agent-service 暂时不可达时配置仍会保存，后台会自动重试同步</li>
           <li>供应商 ID 决定模型 ID 前缀（如 jojo/deepseek-v4-flash）</li>
-          <li>保存推送后，切换到「模型白名单」标签页即可看到新模型</li>
+          <li>同步成功后，切换到「模型白名单」标签页即可看到新模型</li>
         </ul>
       </div>
     </div>
@@ -811,7 +992,9 @@ function ModelConfigTab() {
       setLoadingConfig(true);
       setError(null);
       const res = await fetch("/api/admin/model-config");
-      if (!res.ok) throw new Error("加载配置失败");
+      if (!res.ok) {
+        throw new Error(await readApiErrorMessage(res, "加载配置失败"));
+      }
       const { data } = await res.json();
       setConfig({
         enabledModels: data.frontend?.enabledModels || [],

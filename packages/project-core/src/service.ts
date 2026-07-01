@@ -5,6 +5,11 @@ import {
   KnowledgeFileStore,
   indexTemplateSnapshot,
 } from "@opencode-workbench/knowledge-service";
+import {
+  PreviewRuntimeContractError,
+  type RuntimeContractIssue,
+} from "@opencode-workbench/preview-contract/runtime";
+import { compilePreviewPageSource } from "@opencode-workbench/preview-contract/compiler";
 import type {
   DemoFiles,
   DemoFolderMeta,
@@ -51,6 +56,8 @@ import type {
   ProjectDetail,
   ProjectSummary,
   PublishStatus,
+  RuntimeValidationIssue,
+  RuntimeValidationResult,
   TemplateHealthReport,
   TemplateListFilter,
   TemplateMetaInput,
@@ -385,6 +392,13 @@ export class ProjectAdminService {
       return fail(detail.error?.code ?? "PROJECT_NOT_FOUND", detail.error?.message ?? "项目不存在");
     }
     const workspacePath = this.projectWorkspacePath(projectId);
+    const runtimeValidation = this.validateWorkspaceRuntime(workspacePath);
+    if (!runtimeValidation.ok) {
+      return fail("VALIDATION_BLOCKED", "项目运行契约校验失败，不能导出项目包", {
+        validation: this.runtimeToValidationResult(runtimeValidation),
+        runtimeValidation,
+      });
+    }
     const pages: PageDetail[] = [];
     for (const page of detail.data.pages) {
       const files = this.readPageFiles(workspacePath, page.id);
@@ -669,6 +683,13 @@ export class ProjectAdminService {
     }
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const runtimeValidation = this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId));
+    if (!runtimeValidation.ok) {
+      return fail("VALIDATION_BLOCKED", "项目运行契约校验失败，不能保存为模板", {
+        validation: this.runtimeToValidationResult(runtimeValidation),
+        runtimeValidation,
+      });
+    }
     const templateId = this.createTemplateSnapshot(projectId, input);
     const template = this.readTemplate(templateId);
     if (!template) return fail("FILE_WRITE_ERROR", "模板写入失败");
@@ -960,7 +981,7 @@ export class ProjectAdminService {
   editValidate(editId: string): ProjectAdminResult<ValidationResult> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    const validation = this.validateWorkspace(transaction.workspacePath);
+    const validation = this.validateEditTransaction(transaction);
     return ok(validation, { validation });
   }
 
@@ -996,7 +1017,7 @@ export class ProjectAdminService {
         },
       });
     }
-    const validation = this.validateWorkspace(transaction.workspacePath);
+    const validation = this.validateEditTransaction(transaction);
     if (!validation.ok) {
       return fail("VALIDATION_BLOCKED", "校验未通过，不能提交", { validation });
     }
@@ -1134,9 +1155,14 @@ export class ProjectAdminService {
       parentId,
     };
     if (input.dryRun) {
+      const files = { code: input.code ?? DEFAULT_DEMO_CODE, schema: input.schema ?? DEFAULT_DEMO_SCHEMA };
+      const runtimeValidation = this.validatePageRuntimeSource(pageId, files.code);
       return ok(
-        { meta, files: { code: input.code ?? DEFAULT_DEMO_CODE, schema: input.schema ?? DEFAULT_DEMO_SCHEMA } },
-        { diffSummary: { created: [`page:${pageId}`] } },
+        { meta, files },
+        {
+          diffSummary: { created: [`page:${pageId}`] },
+          runtimeValidation,
+        },
       );
     }
     const demoDir = this.pageDir(workspacePath, pageId);
@@ -1153,9 +1179,10 @@ export class ProjectAdminService {
       resourceId: pageId,
       diffSummary: { created: [`page:${pageId}`] },
     });
+    const runtimeValidation = this.validateWorkspaceRuntime(workspacePath, pageId);
     return ok(
       { meta, files: this.readPageFiles(workspacePath, pageId) ?? { code: "", schema: "" } },
-      { auditId, diffSummary: { created: [`page:${pageId}`] } },
+      { auditId, diffSummary: { created: [`page:${pageId}`] }, runtimeValidation },
     );
   }
 
@@ -1237,7 +1264,13 @@ export class ProjectAdminService {
       code: input.code ?? "",
       schema: input.schema ?? "",
     };
-    return ok({ meta: nextMeta, files }, { auditId, diffSummary: diff, validation });
+    const runtimeValidation = input.code !== undefined
+      ? this.validatePageRuntimeSource(input.pageId, files.code)
+      : undefined;
+    return ok(
+      { meta: nextMeta, files },
+      { auditId, diffSummary: diff, validation, runtimeValidation },
+    );
   }
 
   createPageVersion(
@@ -1274,6 +1307,13 @@ export class ProjectAdminService {
 
     const validation = this.validateSchemaPair(this.readProjectConfig(sourceWorkspacePath), files.schema);
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+    const runtimeValidation = this.validatePageRuntimeSource(input.pageId, files.code);
+    if (!runtimeValidation.ok) {
+      return fail("VALIDATION_BLOCKED", "页面运行契约校验失败，不能创建版本", {
+        validation: this.runtimeToValidationResult(runtimeValidation),
+        runtimeValidation,
+      });
+    }
 
     const savedAt = Date.now();
     const versionId = this.generateVersionId(project);
@@ -1322,6 +1362,7 @@ export class ProjectAdminService {
       auditId,
       diffSummary: { created: [`page-version:${input.pageId}:${versionId}`] },
       validation,
+      runtimeValidation,
       nextActions: ["page_version_list", "page_version_get"],
     });
   }
@@ -1823,16 +1864,31 @@ export class ProjectAdminService {
     );
   }
 
-  previewCompile(editId: string, pageId?: string): ProjectAdminResult<ValidationResult> {
+  previewCompile(editId: string, pageId?: string): ProjectAdminResult<RuntimeValidationResult> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    const validation = pageId
-      ? this.validatePageFiles(transaction.workspacePath, pageId)
-      : this.validateWorkspace(transaction.workspacePath);
+    const validation = this.validateWorkspaceRuntime(transaction.workspacePath, pageId);
     return ok(validation, {
-      validation,
-      warnings: ["CLI 本地骨架执行静态校验；完整编译仍通过 author-site /api/compile 或 screenshot-service 完成"],
+      validation: this.runtimeToValidationResult(validation),
+      warnings: ["CLI 已执行创作端页面源码契约校验；浏览器截图仍需通过 author-site / screenshot-service 验证"],
     });
+  }
+
+  validatePageRuntime(editId: string, pageId: string): ProjectAdminResult<RuntimeValidationResult> {
+    const transaction = this.readEdit(editId);
+    if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    return ok(this.validateWorkspaceRuntime(transaction.workspacePath, pageId));
+  }
+
+  validateProjectRuntime(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<RuntimeValidationResult> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    return ok(this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId)));
   }
 
   previewRender(editId: string, pageId: string): ProjectAdminResult<{ url?: string; html?: string }> {
@@ -1877,7 +1933,6 @@ export class ProjectAdminService {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
       const response = await fetch(`${serviceUrl}/health`, {
-        cache: "no-store",
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1892,12 +1947,16 @@ export class ProjectAdminService {
     const detail = this.getProject(projectId, actor);
     if (!detail.ok || !detail.data) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const validation = this.validateWorkspace(this.projectWorkspacePath(projectId));
-    const issues = [...validation.issues];
+    const runtimeValidation = this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId));
+    const issues = [
+      ...validation.issues,
+      ...this.runtimeToValidationResult(runtimeValidation).issues,
+    ];
     if (detail.data.pages.length === 0) {
       issues.push({ code: "NO_CONTENT_TO_PUBLISH", message: "项目没有可发布页面", severity: "blocking" });
     }
     const result = { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
-    return ok(result, { validation: result });
+    return ok(result, { validation: result, runtimeValidation });
   }
 
   private viewerBaseUrl(): string {
@@ -2507,6 +2566,144 @@ export class ProjectAdminService {
       if (entry.isFile()) result.push(entryPath);
     }
     return result;
+  }
+
+  private validateEditTransaction(transaction: EditTransaction): ValidationResult {
+    const structuralValidation = this.validateWorkspace(transaction.workspacePath);
+    const changedPageIds = this.getChangedCodePageIds(transaction);
+    const runtimeValidation = this.validateWorkspaceRuntime(transaction.workspacePath);
+    const runtimeIssues = this.runtimeToValidationResult(
+      runtimeValidation,
+      changedPageIds,
+    ).issues;
+    const issues = [...structuralValidation.issues, ...runtimeIssues];
+    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+  }
+
+  private getChangedCodePageIds(transaction: EditTransaction): Set<string> {
+    const changedFiles = this.diffWorkspaceFiles(
+      this.projectWorkspacePath(transaction.projectId),
+      transaction.workspacePath,
+    );
+    const pageIds = new Set<string>();
+    for (const file of changedFiles) {
+      const match = file.match(/^demos\/([^/]+)\/index\.tsx$/u);
+      if (match?.[1]) pageIds.add(match[1]);
+    }
+    return pageIds;
+  }
+
+  private validateWorkspaceRuntime(
+    workspacePath: string,
+    pageId?: string,
+  ): RuntimeValidationResult {
+    const tree = this.readWorkspaceTree(workspacePath);
+    const pages = pageId
+      ? tree.pages.filter((page) => page.id === pageId)
+      : tree.pages;
+    const issues: RuntimeValidationIssue[] = [];
+    const pageIds: string[] = [];
+
+    if (pageId && pages.length === 0) {
+      issues.push({
+        pageId,
+        severity: "error",
+        stage: "source_contract",
+        code: "DEMO_PAGE_NOT_FOUND",
+        message: `页面不存在: ${pageId}`,
+        instruction: "请先通过 page list 获取准确页面 ID。",
+      });
+      return { ok: false, issues, pageIds: [pageId] };
+    }
+
+    for (const page of pages) {
+      pageIds.push(page.id);
+      const files = this.readPageFiles(workspacePath, page.id);
+      if (!files) {
+        issues.push({
+          pageId: page.id,
+          severity: "error",
+          stage: "source_contract",
+          code: "FILE_READ_ERROR",
+          message: `页面文件不存在: ${page.id}`,
+          instruction: "请确认页面目录存在 index.tsx 和 config.schema.json。",
+        });
+        continue;
+      }
+      issues.push(...this.validatePageRuntimeSource(page.id, files.code).issues);
+    }
+
+    return { ok: issues.every((issue) => issue.severity !== "error"), issues, pageIds };
+  }
+
+  private validatePageRuntimeSource(pageId: string, code: string): RuntimeValidationResult {
+    try {
+      compilePreviewPageSource(code, {
+        resolveDependencyUrl: (specifier) => `/runtime/${specifier}.js`,
+      });
+      return { ok: true, issues: [], pageIds: [pageId] };
+    } catch (error) {
+      if (error instanceof PreviewRuntimeContractError) {
+        return {
+          ok: false,
+          issues: error.issues.map((issue) => this.toRuntimeValidationIssue(pageId, issue)),
+          pageIds: [pageId],
+        };
+      }
+      return {
+        ok: false,
+        issues: [
+          {
+            pageId,
+            severity: "error",
+            stage: "compile_transform",
+            code: "COMPILE_TRANSFORM_FAILED",
+            message: error instanceof Error ? error.message : "页面源码编译失败",
+            instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
+          },
+        ],
+        pageIds: [pageId],
+      };
+    }
+  }
+
+  private toRuntimeValidationIssue(
+    pageId: string,
+    issue: RuntimeContractIssue,
+  ): RuntimeValidationIssue {
+    return {
+      pageId,
+      severity: issue.severity,
+      stage: issue.stage,
+      code: issue.code,
+      message: issue.message,
+      instruction: issue.instruction,
+      moduleName: issue.moduleName,
+      importName: issue.importName,
+    };
+  }
+
+  private runtimeToValidationResult(
+    runtime: RuntimeValidationResult,
+    blockingPageIds?: Set<string>,
+  ): ValidationResult {
+    return {
+      ok: runtime.issues.every((issue) =>
+        issue.severity !== "error" || (blockingPageIds !== undefined && !blockingPageIds.has(issue.pageId))
+      ),
+      issues: runtime.issues.map((issue) => ({
+        code: issue.code,
+        message: issue.message,
+        resourceId: issue.pageId,
+        pageId: issue.pageId,
+        stage: issue.stage,
+        instruction: issue.instruction,
+        severity:
+          issue.severity === "error" && (blockingPageIds === undefined || blockingPageIds.has(issue.pageId))
+            ? "blocking"
+            : "warning",
+      })),
+    };
   }
 
   private validateWorkspace(workspacePath: string): ValidationResult {

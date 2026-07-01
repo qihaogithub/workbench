@@ -1,7 +1,13 @@
 import { spawn, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
+import { resolve } from "node:path";
 
 const PORTS = [3200, 3201, 3202, 3300];
 const SHUTDOWN_WAIT_MS = 1500;
+const NEXT_CACHE_DIRS = [
+  resolve("packages/author-site/.next"),
+  resolve("packages/viewer-site/.next"),
+];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,6 +95,13 @@ async function cleanPorts() {
   await terminatePids(pids);
 }
 
+function cleanNextCaches() {
+  for (const dir of NEXT_CACHE_DIRS) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  console.log("[dev-restart] Cleared Next.js dev caches.");
+}
+
 function startDevServices() {
   const child = spawn("corepack", ["pnpm", "run", "dev:services"], {
     stdio: "inherit",
@@ -115,6 +128,7 @@ function startDevServices() {
 
 try {
   await cleanPorts();
+  cleanNextCaches();
   startDevServices();
 } catch (error) {
   console.error(`[dev-restart] ${error instanceof Error ? error.message : String(error)}`);

@@ -72,6 +72,33 @@ export interface VisualConfigMark {
   scope: "page" | "project";
 }
 
+export type VisualPropertySubmissionStatus =
+  | "idle"
+  | "queued"
+  | "sending"
+  | "sent"
+  | "failed";
+
+export interface VisualPropertySubmission {
+  status: VisualPropertySubmissionStatus;
+  submittedAt: number | null;
+  changes: VisualPropertyChange[];
+  configMarks: VisualConfigMark[];
+  instruction: string;
+  prompt: string;
+  error: string | null;
+}
+
+const EMPTY_VISUAL_PROPERTY_SUBMISSION: VisualPropertySubmission = {
+  status: "idle",
+  submittedAt: null,
+  changes: [],
+  configMarks: [],
+  instruction: "",
+  prompt: "",
+  error: null,
+};
+
 function getChangeId(
   node: VisualNodeInfo,
   property: string,
@@ -101,6 +128,86 @@ function formatChangeValue(change: VisualPropertyChange): string {
     return "临时 data URL 预览，正式落地时请保存到项目资源目录";
   }
   return change.value;
+}
+
+function getChangeSignature(change: VisualPropertyChange): string {
+  return JSON.stringify({
+    id: change.id,
+    nodeId: change.nodeId,
+    domPath: change.domPath,
+    kind: change.kind,
+    property: change.property,
+    label: change.label,
+    value: change.value,
+    previousValue: change.previousValue ?? null,
+    resource: change.resource ?? null,
+  });
+}
+
+function getConfigMarkSignature(mark: VisualConfigMark): string {
+  return JSON.stringify({
+    changeId: mark.changeId,
+    nodeId: mark.nodeId,
+    domPath: mark.domPath,
+    property: mark.property,
+    label: mark.label,
+    fieldTitle: mark.fieldTitle,
+    fieldKey: mark.fieldKey,
+    defaultValue: mark.defaultValue,
+    scope: mark.scope,
+  });
+}
+
+function getPendingVisualPropertyChanges(
+  changes: VisualPropertyChange[],
+  submission: VisualPropertySubmission,
+): VisualPropertyChange[] {
+  if (submission.status === "idle") return changes;
+  const submittedById = new Map(
+    submission.changes.map((change) => [change.id, getChangeSignature(change)]),
+  );
+  return changes.filter(
+    (change) => submittedById.get(change.id) !== getChangeSignature(change),
+  );
+}
+
+function getPendingVisualConfigMarks(
+  marks: VisualConfigMark[],
+  submission: VisualPropertySubmission,
+): VisualConfigMark[] {
+  if (submission.status === "idle") return marks;
+  const submittedByChangeId = new Map(
+    submission.configMarks.map((mark) => [
+      mark.changeId,
+      getConfigMarkSignature(mark),
+    ]),
+  );
+  return marks.filter(
+    (mark) =>
+      submittedByChangeId.get(mark.changeId) !== getConfigMarkSignature(mark),
+  );
+}
+
+function mergeSubmittedChanges(
+  previous: VisualPropertyChange[],
+  changes: VisualPropertyChange[],
+): VisualPropertyChange[] {
+  const next = new Map(previous.map((change) => [change.id, change]));
+  for (const change of changes) {
+    next.set(change.id, change);
+  }
+  return Array.from(next.values());
+}
+
+function mergeSubmittedConfigMarks(
+  previous: VisualConfigMark[],
+  marks: VisualConfigMark[],
+): VisualConfigMark[] {
+  const next = new Map(previous.map((mark) => [mark.changeId, mark]));
+  for (const mark of marks) {
+    next.set(mark.changeId, mark);
+  }
+  return Array.from(next.values());
 }
 
 export interface ApplyDemoSnapshotFn {
@@ -156,6 +263,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   >([]);
   const [visualConfigMarks, setVisualConfigMarks] = useState<VisualConfigMark[]>([]);
   const [visualAiInstruction, setVisualAiInstruction] = useState("");
+  const [visualPropertySubmission, setVisualPropertySubmission] =
+    useState<VisualPropertySubmission>(EMPTY_VISUAL_PROPERTY_SUBMISSION);
   const [visualPropertySending, setVisualPropertySending] = useState(false);
   const [visualAnnotations, setVisualAnnotations] = useState<
     VisualAnnotation[]
@@ -185,6 +294,19 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     [visualConfigCandidateId, visualConfigCandidates],
   );
   const visualConfigDialogOpen = !!visualConfigNode;
+  const visualPendingPropertyChanges = useMemo(
+    () =>
+      getPendingVisualPropertyChanges(
+        visualPropertyChanges,
+        visualPropertySubmission,
+      ),
+    [visualPropertyChanges, visualPropertySubmission],
+  );
+  const visualPendingConfigMarks = useMemo(
+    () => getPendingVisualConfigMarks(visualConfigMarks, visualPropertySubmission),
+    [visualConfigMarks, visualPropertySubmission],
+  );
+  const hasPendingVisualAiInstruction = visualAiInstruction.trim().length > 0;
 
   const initializeVisualConfigDialog = useCallback(
     (node: VisualNodeInfo, preferredCandidate?: VisualConfigCandidate) => {
@@ -288,10 +410,22 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   }, []);
 
   const handleClearVisualProperties = useCallback(() => {
+    if (
+      visualPropertySubmission.status === "queued" ||
+      visualPropertySubmission.status === "sending" ||
+      visualPropertySubmission.status === "sent"
+    ) {
+      setVisualPropertyChanges(visualPropertySubmission.changes);
+      setVisualConfigMarks(visualPropertySubmission.configMarks);
+      setVisualAiInstruction("");
+      return;
+    }
+
     setVisualPropertyChanges([]);
     setVisualConfigMarks([]);
     setVisualAiInstruction("");
-  }, []);
+    setVisualPropertySubmission(EMPTY_VISUAL_PROPERTY_SUBMISSION);
+  }, [visualPropertySubmission]);
 
   const handleMarkVisualConfig = useCallback(
     (
@@ -342,13 +476,29 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
 
   const handleSendVisualPropertiesToAI = useCallback(
     (singleChange?: VisualPropertyChange) => {
-      const changes = singleChange ? [singleChange] : visualPropertyChanges;
+      const retryingFailedSubmission =
+        !singleChange &&
+        visualPropertySubmission.status === "failed" &&
+        visualPendingPropertyChanges.length === 0 &&
+        visualPendingConfigMarks.length === 0 &&
+        !visualAiInstruction.trim();
+      const changes = singleChange
+        ? [singleChange]
+        : retryingFailedSubmission
+          ? visualPropertySubmission.changes
+          : visualPendingPropertyChanges;
+      const configMarks = retryingFailedSubmission
+        ? visualPropertySubmission.configMarks
+        : visualPendingConfigMarks;
       const instruction = visualAiInstruction.trim();
-      if (!selectedVisualNode && changes.length === 0 && !instruction) {
+      const instructionForPrompt = retryingFailedSubmission
+        ? visualPropertySubmission.instruction
+        : instruction;
+      if (!selectedVisualNode && changes.length === 0 && !instructionForPrompt) {
         toast({ title: "请先在预览区选择一个元素" });
         return;
       }
-      if (changes.length === 0 && visualConfigMarks.length === 0 && !instruction) {
+      if (changes.length === 0 && configMarks.length === 0 && !instructionForPrompt) {
         toast({ title: "请先修改属性或填写补充说明" });
         return;
       }
@@ -369,8 +519,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
               .join("\n")
           : "无明确属性变更";
       const configContext =
-        visualConfigMarks.length > 0
-          ? visualConfigMarks
+        configMarks.length > 0
+          ? configMarks
               .map(
                 (mark, index) =>
                   `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}`,
@@ -394,12 +544,30 @@ ${changeContext}
 ${configContext}
 
 【补充说明】
-${instruction || "无"}
+${instructionForPrompt || "无"}
 
 请优先只修改当前页面相关代码。临时预览已经在 iframe 中验证，但不要把它视为已写回源码；如果新增配置项，请同步处理页面 Schema、默认值和预览数据。`;
 
       setTabValue("ai");
       setTriggerAutoSend(prompt);
+      setVisualPropertySubmission((previous) => ({
+        status: "queued",
+        submittedAt: Date.now(),
+        changes: retryingFailedSubmission
+          ? previous.changes
+          : singleChange
+            ? mergeSubmittedChanges(previous.changes, changes)
+            : visualPropertyChanges,
+        configMarks: retryingFailedSubmission
+          ? previous.configMarks
+          : singleChange
+            ? mergeSubmittedConfigMarks(previous.configMarks, configMarks)
+            : visualConfigMarks,
+        instruction: instructionForPrompt,
+        prompt,
+        error: null,
+      }));
+      setVisualAiInstruction("");
       setVisualPropertySending(false);
     },
     [
@@ -412,17 +580,56 @@ ${instruction || "无"}
       visualConfigMarks,
       visualNodeStack,
       visualPropertyChanges,
+      visualPendingConfigMarks,
+      visualPendingPropertyChanges,
+      visualPropertySubmission,
     ],
   );
 
   const confirmDiscardVisualPropertyWork = useCallback(() => {
     const hasPending =
-      visualPropertyChanges.length > 0 ||
-      visualConfigMarks.length > 0 ||
-      visualAiInstruction.trim().length > 0;
+      visualPendingPropertyChanges.length > 0 ||
+      visualPendingConfigMarks.length > 0 ||
+      hasPendingVisualAiInstruction;
     if (!hasPending) return true;
     return window.confirm("当前有未发送的属性修改，确定丢弃并继续吗？");
-  }, [visualAiInstruction, visualConfigMarks.length, visualPropertyChanges.length]);
+  }, [
+    hasPendingVisualAiInstruction,
+    visualPendingConfigMarks.length,
+    visualPendingPropertyChanges.length,
+  ]);
+
+  const handleVisualPropertyAutoSendHandled = useCallback(() => {
+    setVisualPropertySubmission((previous) => {
+      if (previous.status !== "queued") return previous;
+      return { ...previous, error: null };
+    });
+  }, []);
+
+  const handleVisualPropertySubmissionStreamingChange = useCallback(
+    (isStreaming: boolean) => {
+      setVisualPropertySubmission((previous) => {
+        if (isStreaming) {
+          if (previous.status === "queued") {
+            return { ...previous, status: "sending", error: null };
+          }
+          return previous;
+        }
+        if (previous.status === "sending") {
+          return { ...previous, status: "sent", error: null };
+        }
+        return previous;
+      });
+    },
+    [],
+  );
+
+  const handleVisualPropertySubmissionFailed = useCallback((message: string) => {
+    setVisualPropertySubmission((previous) => {
+      if (previous.status === "idle") return previous;
+      return { ...previous, status: "failed", error: message };
+    });
+  }, []);
 
   const handleStartVisualConfig = useCallback(() => {
     if (visualConfigMode) {
@@ -768,6 +975,11 @@ ${context}
     setVisualConfigMarks,
     visualAiInstruction,
     setVisualAiInstruction,
+    visualPropertySubmission,
+    setVisualPropertySubmission,
+    visualPendingPropertyChanges,
+    visualPendingConfigMarks,
+    hasPendingVisualAiInstruction,
     visualPropertySending,
     setVisualPropertySending,
     visualAnnotations,
@@ -807,6 +1019,9 @@ ${context}
     handleRemoveVisualConfigMark,
     handleSendVisualPropertiesToAI,
     confirmDiscardVisualPropertyWork,
+    handleVisualPropertyAutoSendHandled,
+    handleVisualPropertySubmissionStreamingChange,
+    handleVisualPropertySubmissionFailed,
     handleStartVisualConfig,
     handleApplyVisualConfig,
     handleCloseVisualConfigDialog,

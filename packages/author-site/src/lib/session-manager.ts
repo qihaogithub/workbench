@@ -254,6 +254,17 @@ export function findActiveSession(
           continue;
         }
 
+        if (meta.workspaceId && !findWorkspacePath(meta.workspaceId)) {
+          meta.status = 'orphaned';
+          try {
+            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+          } catch { /* ignore write error */ }
+          console.warn(
+            `[Session] Archived session with missing workspace: ${entry.name}`,
+          );
+          continue;
+        }
+
         if (meta.demoId === projectId) {
           // 返回目录名作为 sessionId，确保与文件系统一致
           // 同时更新 .session.json 中的 sessionId 字段以保持一致

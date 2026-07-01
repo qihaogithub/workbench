@@ -6,18 +6,189 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const reportDir = path.join(repoRoot, 'tmp', 'sync-status-flap');
+const defaultBaseUrl = 'http://localhost:3200';
+
+function printUsage() {
+  console.log(`Usage:
+  pnpm test:sync-status-flap -- [options]
+  node scripts/development/detect-sync-status-flap.mjs [options]
+
+Options:
+  --url <url>             Edit page URL to test.
+  --project-id <id>       Project ID. Builds <base-url>/demo/<id>/edit.
+  --base-url <url>        Author-site base URL. Default: ${defaultBaseUrl}
+  --duration <ms>         Sampling duration. Default: 20000.
+  --sample-ms <ms>        Sampling interval. Default: 500.
+  --headed                Run Chromium with a visible window.
+  --headless              Run Chromium headless.
+  --user <username>       Login username. Default: E2E_USER or qihao.
+  --password <password>   Login password. Default: E2E_PASSWORD or 130015.
+  --report-dir <path>     Output directory. Default: tmp/sync-status-flap.
+  --flush-only            Only run the workspace flush probe. Skips visible status assertions.
+  --list-projects         List local data/projects candidates and exit.
+  --help                  Show this help.
+
+Environment variables remain supported:
+  SYNC_STATUS_URL, SYNC_STATUS_BASE_URL, SYNC_STATUS_SAMPLE_MS, SYNC_STATUS_DURATION_MS,
+  HEADLESS, E2E_USER, E2E_PASSWORD`);
+}
+
+function readProjects() {
+  const projectsDir = path.join(repoRoot, 'data', 'projects');
+  if (!fs.existsSync(projectsDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(projectsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const metaPath = path.join(projectsDir, entry.name, 'project.json');
+      if (!fs.existsSync(metaPath)) return null;
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        const id = typeof meta.id === 'string' && meta.id ? meta.id : entry.name;
+        const name = typeof meta.name === 'string' && meta.name ? meta.name : '(unnamed)';
+        const updatedAt =
+          typeof meta.updatedAt === 'number'
+            ? meta.updatedAt
+            : fs.statSync(metaPath).mtimeMs;
+        const demoCount = Array.isArray(meta.demoPages) ? meta.demoPages.length : 0;
+        return { id, name, updatedAt, demoCount };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function parseArgs(argv) {
+  const options = {
+    url: process.env.SYNC_STATUS_URL,
+    projectId: undefined,
+    baseUrl: process.env.SYNC_STATUS_BASE_URL ?? defaultBaseUrl,
+    sampleMs: process.env.SYNC_STATUS_SAMPLE_MS ?? '500',
+    durationMs: process.env.SYNC_STATUS_DURATION_MS ?? '20000',
+    headless: process.env.HEADLESS !== '0',
+    user: process.env.E2E_USER ?? 'qihao',
+    password: process.env.E2E_PASSWORD ?? '130015',
+    reportDir: path.join(repoRoot, 'tmp', 'sync-status-flap'),
+    flushOnly: false,
+    listProjects: false,
+    help: false,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const readValue = () => {
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error(`${arg} requires a value`);
+      }
+      index += 1;
+      return value;
+    };
+
+    if (arg === '--') {
+      continue;
+    } else if (arg === '--help' || arg === '-h') {
+      options.help = true;
+    } else if (arg === '--list-projects') {
+      options.listProjects = true;
+    } else if (arg === '--url') {
+      options.url = readValue();
+    } else if (arg === '--project-id') {
+      options.projectId = readValue();
+    } else if (arg === '--base-url') {
+      options.baseUrl = readValue();
+    } else if (arg === '--duration' || arg === '--duration-ms') {
+      options.durationMs = readValue();
+    } else if (arg === '--sample-ms') {
+      options.sampleMs = readValue();
+    } else if (arg === '--headed') {
+      options.headless = false;
+    } else if (arg === '--headless') {
+      options.headless = true;
+    } else if (arg === '--user') {
+      options.user = readValue();
+    } else if (arg === '--password') {
+      options.password = readValue();
+    } else if (arg === '--report-dir') {
+      const value = readValue();
+      options.reportDir = path.isAbsolute(value) ? value : path.join(repoRoot, value);
+    } else if (arg === '--flush-only') {
+      options.flushOnly = true;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+  }
+
+  return options;
+}
+
+function toPositiveInteger(value, name) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function resolveTargetUrl(options, projects) {
+  if (options.url) return options.url;
+  const baseUrl = options.baseUrl.replace(/\/+$/, '');
+  const projectId = options.projectId ?? projects[0]?.id ?? 'proj_1782286923644';
+  return `${baseUrl}/demo/${encodeURIComponent(projectId)}/edit`;
+}
+
+let cliOptions;
+try {
+  cliOptions = parseArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  printUsage();
+  process.exit(2);
+}
+
+if (cliOptions.help) {
+  printUsage();
+  process.exit(0);
+}
+
+const localProjects = readProjects();
+
+if (cliOptions.listProjects) {
+  if (localProjects.length === 0) {
+    console.log('No local projects found under data/projects.');
+  } else {
+    for (const project of localProjects) {
+      console.log(
+        `${project.id}\t${project.name}\tdemos=${project.demoCount}\tupdatedAt=${project.updatedAt}`,
+      );
+    }
+  }
+  process.exit(0);
+}
+
+let sampleMs;
+let durationMs;
+try {
+  sampleMs = toPositiveInteger(cliOptions.sampleMs, 'sampleMs');
+  durationMs = toPositiveInteger(cliOptions.durationMs, 'durationMs');
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(2);
+}
+
+const targetUrl = resolveTargetUrl(cliOptions, localProjects);
+const selectedProjectId = getProjectIdFromUrl(targetUrl);
+const selectedProject = localProjects.find((project) => project.id === selectedProjectId) ?? null;
+const headless = cliOptions.headless;
+const e2eUser = cliOptions.user;
+const e2ePassword = cliOptions.password;
+const reportDir = cliOptions.reportDir;
 const reportPath = path.join(reportDir, 'report.json');
 const screenshotPath = path.join(reportDir, 'last-page.png');
-
-const targetUrl =
-  process.env.SYNC_STATUS_URL ??
-  'http://localhost:3200/demo/proj_1782286923644/edit';
-const sampleMs = Number.parseInt(process.env.SYNC_STATUS_SAMPLE_MS ?? '500', 10);
-const durationMs = Number.parseInt(process.env.SYNC_STATUS_DURATION_MS ?? '20000', 10);
-const headless = process.env.HEADLESS !== '0';
-const e2eUser = process.env.E2E_USER ?? 'qihao';
-const e2ePassword = process.env.E2E_PASSWORD ?? '130015';
 
 const statusLabels = [
   { key: 'flush-error', labels: ['同步失败'] },
@@ -303,6 +474,42 @@ function summarizeSamples(samples) {
   };
 }
 
+function getFailureHint(report) {
+  if (report.flushProbe && !report.flushProbe.ok) {
+    const message = report.flushProbe.flush?.body?.error?.message ?? report.flushProbe.error ?? '';
+    if (String(message).includes('WORKSPACE_NOT_FOUND')) {
+      return 'Workspace is missing or its metadata cannot be resolved. Check data/workspaces and active sessions.';
+    }
+    if (String(message).includes('SESSION_NOT_FOUND') || String(message).includes('SESSION_EXPIRED')) {
+      return 'The selected session is missing or expired. Reopen the edit page or create a new session.';
+    }
+    if (String(message).includes('PROJECT_NOT_FOUND')) {
+      return 'The target project does not exist. Run with --list-projects or pass --project-id.';
+    }
+    return 'Workspace flush failed. Inspect flushProbe in the JSON report.';
+  }
+  if (report.flushErrorVisible) {
+    return 'The page rendered 同步失败. Inspect trackedResponses and consoleEvents in the JSON report.';
+  }
+  const pageErrorMessages = (report.pageErrors ?? []).map((error) => error.message).join('\n');
+  if (pageErrorMessages.includes('ChunkLoadError') || pageErrorMessages.includes('Loading chunk')) {
+    return 'Next.js failed to load an edit-page chunk. Refresh the page or restart author-site, then rerun the script.';
+  }
+  if (pageErrorMessages.includes('Invalid or unexpected token')) {
+    return 'The page JavaScript failed to parse. Check the dev server output and generated chunks before judging sync status.';
+  }
+  if (report.runtimeErrors?.length > 0 || report.pageErrors?.length > 0) {
+    return 'The page produced runtime errors. Inspect runtimeErrors and pageErrors in the JSON report.';
+  }
+  if (report.statusMissing) {
+    return 'No sync status text was sampled. Check the screenshot to confirm whether the page is still loading or the status text changed.';
+  }
+  if (report.summary?.flapDetected) {
+    return 'The page flapped between connecting and offline. Inspect summary.transitions in the JSON report.';
+  }
+  return null;
+}
+
 fs.mkdirSync(reportDir, { recursive: true });
 
 const consoleEvents = [];
@@ -378,7 +585,29 @@ try {
 
   const samples = [];
   const startedAt = Date.now();
-  while (Date.now() - startedAt <= durationMs) {
+  if (!cliOptions.flushOnly) {
+    while (Date.now() - startedAt <= durationMs) {
+      try {
+        const candidate = await readVisibleSyncStatus(page);
+        const text = candidate?.matched ?? candidate?.text ?? '';
+        samples.push({
+          atMs: Date.now() - startedAt,
+          status: text ? normalizeStatus(text) : 'missing',
+          text,
+          candidate,
+        });
+      } catch (error) {
+        samples.push({
+          atMs: Date.now() - startedAt,
+          status: 'evaluate-error',
+          text: '',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      await sleep(sampleMs);
+    }
+
+    await sleep(sampleMs);
     try {
       const candidate = await readVisibleSyncStatus(page);
       const text = candidate?.matched ?? candidate?.text ?? '';
@@ -396,11 +625,10 @@ try {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-    await sleep(sampleMs);
   }
 
   const summary = summarizeSamples(samples);
-  const flushErrorVisible = (summary.statusCounts['flush-error'] ?? 0) > 0;
+  const flushErrorVisible = !cliOptions.flushOnly && (summary.statusCounts['flush-error'] ?? 0) > 0;
   const runtimeErrors = consoleEvents.filter((event) => {
     const text = event.text.toLowerCase();
     return (
@@ -409,7 +637,7 @@ try {
       text.includes('the above error occurred')
     );
   });
-  const statusMissing = summary.foundStatusCount === 0;
+  const statusMissing = !cliOptions.flushOnly && summary.foundStatusCount === 0;
   const hasPageErrors = pageErrors.length > 0;
   await page.screenshot({ path: screenshotPath, fullPage: false }).catch(() => {});
 
@@ -417,11 +645,13 @@ try {
     ok:
       flushProbe.ok &&
       !flushErrorVisible &&
-      !summary.flapDetected &&
+      (cliOptions.flushOnly || !summary.flapDetected) &&
       !statusMissing &&
-      runtimeErrors.length === 0 &&
-      !hasPageErrors,
+      (cliOptions.flushOnly || runtimeErrors.length === 0) &&
+      (cliOptions.flushOnly || !hasPageErrors),
     targetUrl,
+    selectedProject,
+    mode: cliOptions.flushOnly ? 'flush-only' : 'status-sampling',
     generatedAt: new Date().toISOString(),
     sampleMs,
     durationMs,
@@ -444,6 +674,8 @@ try {
   report = {
     ok: false,
     targetUrl,
+    selectedProject,
+    mode: cliOptions.flushOnly ? 'flush-only' : 'status-sampling',
     generatedAt: new Date().toISOString(),
     sampleMs,
     durationMs,
@@ -468,6 +700,10 @@ if (report.error) {
 
 const summary = report.summary;
 console.log(`Target: ${targetUrl}`);
+if (selectedProject) {
+  console.log(`Project: ${selectedProject.id} ${selectedProject.name}`);
+}
+console.log(`Mode: ${report.mode}`);
 console.log(`Duration: ${durationMs}ms, sample interval: ${sampleMs}ms`);
 console.log(`Status counts: ${JSON.stringify(summary.statusCounts)}`);
 if (report.flushProbe) {
@@ -481,14 +717,20 @@ if (report.flushProbe) {
   }
 }
 if (report.flushProbe && !report.flushProbe.ok) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log('FAIL workspace flush probe failed.');
   process.exit(1);
 }
 if (report.flushErrorVisible) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log('FAIL visible sync status shows 同步失败.');
   process.exit(1);
 }
 if (report.statusMissing) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log('FAIL sync status text was not found in the rendered page.');
   if (report.runtimeErrors.length > 0) {
     console.log(`Runtime error: ${report.runtimeErrors[0].text.split('\n')[0]}`);
@@ -498,11 +740,19 @@ if (report.statusMissing) {
   }
   process.exit(1);
 }
+if (report.mode === 'flush-only') {
+  console.log('PASS workspace flush probe passed.');
+  process.exit(0);
+}
 if (report.runtimeErrors.length > 0) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log(`FAIL page has runtime errors: ${report.runtimeErrors[0].text.split('\n')[0]}`);
   process.exit(1);
 }
 if (report.pageErrors.length > 0) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log(`FAIL page has uncaught errors: ${report.pageErrors[0].message}`);
   process.exit(1);
 }
@@ -514,6 +764,8 @@ for (const transition of summary.connectingOfflineTransitions.slice(0, 12)) {
 }
 
 if (summary.flapDetected) {
+  const hint = getFailureHint(report);
+  if (hint) console.log(`Hint: ${hint}`);
   console.log('FAIL detected sync status flapping between connecting and offline.');
   process.exit(1);
 }

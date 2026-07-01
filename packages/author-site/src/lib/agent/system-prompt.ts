@@ -1,3 +1,5 @@
+import { generatePreviewAuthoringRules } from '@opencode-workbench/preview-contract/rules';
+
 import SYSTEM_PROMPT from './prompts/system-prompt.md';
 import { WORKSPACE_STATUS_TEMPLATE } from '../agent-prompts/workspace-status.template';
 
@@ -129,13 +131,14 @@ arrangeCanvasPages({
  * 删除页面规则会根据 agent-service 实际可用工具分支生成，避免 prompt 要求调用不存在的工具。
  */
 export function buildStaticSystemPrompt(capabilities?: ToolCapabilitiesForPrompt): string {
-  return SYSTEM_PROMPT.replace(
+  const promptWithDynamicRules = SYSTEM_PROMPT.replace(
     /### 删除页面[\s\S]*?(?=\n## 画布管理|\n## 项目级配置管理)/,
     buildDeletePageRules(capabilities?.toolNames),
   ).replace(
     /## 画布管理[\s\S]*?(?=\n## 项目级配置管理)/,
     buildCanvasLayoutRules(capabilities?.toolNames),
   );
+  return `${promptWithDynamicRules}\n\n${generatePreviewAuthoringRules()}`;
 }
 
 /**

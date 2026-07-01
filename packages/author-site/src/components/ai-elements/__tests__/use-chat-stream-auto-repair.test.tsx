@@ -126,4 +126,88 @@ describe("useChatStream 自动修复发送", () => {
     expect(updateSessionTitle).not.toHaveBeenCalled();
     expect(persistMessages).toHaveBeenCalledWith("session-1", messages);
   });
+
+  it("AI 回复期间提交的用户消息会排队并在上一轮结束后自动发送", async () => {
+    jest.useFakeTimers();
+
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages =
+        typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("第一条");
+      result.current.handleSend("第二条");
+    });
+
+    expect(
+      messages.some(
+        (message) =>
+          message.role === "user" &&
+          message.content === "第二条" &&
+          message.queueStatus === "queued",
+      ),
+    ).toBe(true);
+
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "第一条",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "第二条",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+
+    expect(messages.map((message) => message.content)).toEqual([
+      "第一条",
+      "已处理: 第一条",
+      "第二条",
+      "已处理: 第二条",
+    ]);
+    expect(messages.some((message) => message.queueStatus)).toBe(false);
+
+    jest.useRealTimers();
+  });
 });

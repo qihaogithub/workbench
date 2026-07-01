@@ -13,6 +13,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { cleanupAllExpiredSessions } = await import('@/lib/session-manager');
     const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
+    const { scheduleStartupBackendProvidersSync } = await import('@/lib/backend-providers-sync');
 
     // 启动时立即执行一次清理
     try {
@@ -27,6 +28,8 @@ export async function register() {
     } catch (error) {
       console.error('[Cleanup] Initial cleanup failed:', error);
     }
+
+    scheduleStartupBackendProvidersSync();
 
     // 每 30 分钟执行一次全局清理
     cleanupInterval = setInterval(() => {

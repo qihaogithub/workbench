@@ -35,6 +35,22 @@ export interface PreviewSize {
   scale?: number;
 }
 
+export interface PreviewDiagnostic {
+  source: "post_generation_validation" | "preview_runtime";
+  stage?: string;
+  code?: string;
+  pageId?: string;
+  file?: string;
+  message: string;
+  instruction?: string;
+  moduleName?: string;
+  importName?: string;
+}
+
+export type PreviewDiagnosticError = Error & {
+  previewDiagnostic?: PreviewDiagnostic;
+};
+
 export interface PositionableConfig {
   items: string[];
   defaults?: Record<string, PositionItem>;
@@ -73,7 +89,7 @@ export interface PreviewPanelProps {
   appState?: Record<string, unknown>;
   routeParams?: Record<string, unknown>;
   sdkFiles?: Record<string, string>;
-  onError?: (error: Error) => void;
+  onError?: (error: PreviewDiagnosticError) => void;
   previewSize?: PreviewSize;
   placeholderScreenshotUrl?: string;
   cdnBaseUrl?: string;
@@ -194,6 +210,8 @@ export interface CanvasDocumentNode extends CanvasFreeNodeBase {
   kind: "document";
   markdown?: string;
   knowledgeDocument?: CanvasKnowledgeDocument;
+  documents?: CanvasDocumentEntry[];
+  activeDocumentId?: string;
   collapsed?: boolean;
   expandedHeight?: number;
 }
@@ -234,6 +252,12 @@ export interface CanvasKnowledgeDocument {
   title: string;
   fileName: string;
   description?: string;
+}
+
+export interface CanvasDocumentEntry {
+  id: string;
+  title: string;
+  knowledgeDocument: CanvasKnowledgeDocument;
 }
 
 export interface CanvasTextNodeSummary {

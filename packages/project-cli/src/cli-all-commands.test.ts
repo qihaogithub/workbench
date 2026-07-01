@@ -117,6 +117,7 @@ try {
   const pageId = dataOf<{ meta: { id: string } }>(page).meta.id;
   await runCommand("page list", ["page", "list", editId]);
   await runCommand("page get", ["page", "get", editId, pageId]);
+  await runCommand("page validate-runtime", ["page", "validate-runtime", editId, pageId]);
 
   const duplicatedPage = await runCommand("page duplicate", ["page", "duplicate", editId, pageId, "首页副本"]);
   const duplicatedPageId = dataOf<{ meta: { id: string } }>(duplicatedPage).meta.id;
@@ -222,6 +223,7 @@ try {
   const pageVersionId = dataOf<{ versionId: string }>(createdPageVersion).versionId;
   await runCommand("page version-list", ["page", "version-list", projectId, pageId]);
   await runCommand("page version-get", ["page", "version-get", projectId, pageId, pageVersionId]);
+  await runCommand("project validate-runtime", ["project", "validate-runtime", projectId]);
 
   const discardEdit = await runCommand("edit begin", ["edit", "begin", projectId]);
   await runCommand("edit discard", ["edit", "discard", dataOf<{ editId: string }>(discardEdit).editId]);

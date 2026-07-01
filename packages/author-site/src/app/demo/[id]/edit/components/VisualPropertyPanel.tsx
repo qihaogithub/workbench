@@ -59,15 +59,22 @@ import type {
   VisualPropertyChange,
   VisualPropertyChangeKind,
 } from "@opencode-workbench/demo-ui";
-import type { VisualConfigMark } from "../hooks/useVisualEditState";
+import type {
+  VisualConfigMark,
+  VisualPropertySubmission,
+} from "../hooks/useVisualEditState";
 
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
   sessionId?: string;
   nodeStack: VisualNodeInfo[];
   propertyChanges: VisualPropertyChange[];
+  pendingPropertyChanges: VisualPropertyChange[];
   configMarks: VisualConfigMark[];
+  pendingConfigMarks: VisualConfigMark[];
   aiInstruction: string;
+  hasPendingAiInstruction: boolean;
+  submission: VisualPropertySubmission;
   sending: boolean;
   usedConfigKeys: string[];
   onPropertyChange: (
@@ -563,8 +570,12 @@ export function VisualPropertyPanel({
   sessionId,
   nodeStack,
   propertyChanges,
+  pendingPropertyChanges,
   configMarks,
+  pendingConfigMarks,
   aiInstruction,
+  hasPendingAiInstruction,
+  submission,
   sending,
   usedConfigKeys,
   onPropertyChange,
@@ -594,18 +605,69 @@ export function VisualPropertyPanel({
   const configKeyConflicts = configMarks.filter((mark) =>
     usedConfigKeys.includes(mark.fieldKey.trim()),
   );
+  const pendingConfigKeyConflicts = pendingConfigMarks.filter((mark) =>
+    usedConfigKeys.includes(mark.fieldKey.trim()),
+  );
+  const hasPendingDraft =
+    pendingPropertyChanges.length > 0 ||
+    pendingConfigMarks.length > 0 ||
+    hasPendingAiInstruction;
+  const canRetrySubmission =
+    submission.status === "failed" &&
+    !!submission.prompt;
+  const exportPropertyChanges = hasPendingDraft
+    ? pendingPropertyChanges
+    : submission.status !== "idle"
+      ? submission.changes
+      : propertyChanges;
+  const exportConfigMarks = hasPendingDraft
+    ? pendingConfigMarks
+    : submission.status !== "idle"
+      ? submission.configMarks
+      : configMarks;
+  const exportInstruction = hasPendingDraft
+    ? aiInstruction
+    : submission.status !== "idle"
+      ? submission.instruction
+      : aiInstruction;
   const sendDisabled =
     sending ||
-    (!selectedNode && !aiInstruction.trim()) ||
-    (propertyChanges.length === 0 && configMarks.length === 0 && !aiInstruction.trim()) ||
-    configKeyConflicts.length > 0;
+    (!selectedNode && !hasPendingAiInstruction && !canRetrySubmission) ||
+    (!hasPendingDraft && !canRetrySubmission) ||
+    pendingConfigKeyConflicts.length > 0;
+  const sendButtonLabel = hasPendingDraft
+    ? "发送给 AI"
+    : submission.status === "sending"
+      ? "AI 处理中"
+      : submission.status === "failed"
+        ? "重新发送"
+        : submission.status === "queued" || submission.status === "sent"
+          ? "已发送给 AI"
+          : "发送给 AI";
+  const submissionNotice =
+    hasPendingDraft && submission.status === "sending"
+      ? "AI 正在处理上一批修改，新修改可继续发送。"
+      : submission.status === "sending"
+        ? "AI 正在处理已发送的属性修改。"
+        : submission.status === "failed"
+          ? submission.error || "发送失败，可重新发送。"
+          : !hasPendingDraft && submission.status === "sent"
+            ? "本次属性修改已发送给 AI。"
+            : !hasPendingDraft && submission.status === "queued"
+              ? "本次属性修改已提交，等待 AI 接收。"
+              : "";
+  const isSubmittedChangeLocked = (changeId: string) =>
+    submission.status !== "idle" &&
+    submission.status !== "failed" &&
+    submission.changes.some((change) => change.id === changeId) &&
+    !pendingPropertyChanges.some((change) => change.id === changeId);
   const exportText = selectedNode
     ? buildExportText({
         selectedNode,
         nodeStack,
-        propertyChanges,
-        configMarks,
-        aiInstruction,
+        propertyChanges: exportPropertyChanges,
+        configMarks: exportConfigMarks,
+        aiInstruction: exportInstruction,
       })
     : "";
 
@@ -1224,7 +1286,10 @@ export function VisualPropertyPanel({
                       <Copy className="mr-2 h-3.5 w-3.5" />
                       复制当前值
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSendToAI(sendChange)}>
+                    <DropdownMenuItem
+                      disabled={isSubmittedChangeLocked(changeId)}
+                      onClick={() => onSendToAI(sendChange)}
+                    >
                       <Send className="mr-2 h-3.5 w-3.5" />
                       发送该属性给 AI 调整
                     </DropdownMenuItem>
@@ -1346,7 +1411,10 @@ export function VisualPropertyPanel({
                           <Copy className="mr-2 h-3.5 w-3.5" />
                           复制当前值
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onSendToAI(sendChange)}>
+                        <DropdownMenuItem
+                          disabled={isSubmittedChangeLocked(changeId)}
+                          onClick={() => onSendToAI(sendChange)}
+                        >
                           <Send className="mr-2 h-3.5 w-3.5" />
                           发送该属性给 AI 调整
                         </DropdownMenuItem>
@@ -1659,7 +1727,10 @@ export function VisualPropertyPanel({
                                 <Copy className="mr-2 h-3.5 w-3.5" />
                                 复制当前值
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onSendToAI(sendChange)}>
+                              <DropdownMenuItem
+                                disabled={isSubmittedChangeLocked(changeId)}
+                                onClick={() => onSendToAI(sendChange)}
+                              >
                                 <Send className="mr-2 h-3.5 w-3.5" />
                                 发送该属性给 AI 调整
                               </DropdownMenuItem>
@@ -1770,10 +1841,29 @@ export function VisualPropertyPanel({
 
       <div className="border-t bg-card p-3">
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{propertyChanges.length} 项修改</Badge>
-          <Badge variant="outline">{configMarks.length} 个配置项</Badge>
+          <Badge variant={hasPendingDraft ? "secondary" : "outline"}>
+            {pendingPropertyChanges.length} 项修改
+          </Badge>
+          <Badge variant="outline">{pendingConfigMarks.length} 个配置项</Badge>
+          {!hasPendingDraft && submission.status !== "idle" && (
+            <Badge variant="outline">
+              已提交 {submission.changes.length} 项
+            </Badge>
+          )}
           {copyNotice && <span>{copyNotice}</span>}
         </div>
+        {submissionNotice && (
+          <p
+            className={cn(
+              "mb-2 text-xs",
+              submission.status === "failed"
+                ? "text-destructive"
+                : "text-muted-foreground",
+            )}
+          >
+            {submissionNotice}
+          </p>
+        )}
         <div className="flex gap-2">
           <Button
             type="button"
@@ -1791,7 +1881,7 @@ export function VisualPropertyPanel({
             variant="outline"
             size="sm"
             className="h-8 flex-1"
-            disabled={propertyChanges.length === 0 && configMarks.length === 0 && !aiInstruction.trim()}
+            disabled={!hasPendingDraft}
             onClick={onClearChanges}
           >
             清空
@@ -1804,7 +1894,7 @@ export function VisualPropertyPanel({
             onClick={() => onSendToAI()}
           >
             <Send className="h-3.5 w-3.5" />
-            发送给 AI
+            {sendButtonLabel}
           </Button>
         </div>
       </div>

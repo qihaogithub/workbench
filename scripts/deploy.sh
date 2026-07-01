@@ -191,6 +191,9 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
 
     # 复制部署环境文件
     cp -f .deploy.env .env.docker
+    APP_DATA_DIR=\$(awk -F= '\$1 == \"APP_DATA_DIR\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
+    APP_DATA_DIR=\${APP_DATA_DIR:-/opt/opencode-workbench/data}
+    mkdir -p \"\${APP_DATA_DIR}\"
 
     export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
     DEPLOY_SERVICES='${DEPLOY_SERVICES}'

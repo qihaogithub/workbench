@@ -124,6 +124,14 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段');
   });
 
+  it('包含共享 preview contract 生成的页面运行规则', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('创作端页面运行契约');
+    expect(prompt).toContain('当前契约版本：');
+    expect(prompt).toContain('react/jsx-runtime');
+    expect(prompt).toContain('@preview/sdk');
+  });
+
   it('知识库查阅规则要求按索引自主选择并按需读取', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('上下文中只会提供知识库索引，不会提供正文');

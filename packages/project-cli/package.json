@@ -3,25 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.mjs",
   "types": "./src/index.ts",
   "bin": {
-    "ow": "./src/index.ts",
-    "opencode-project-admin": "./src/index.ts"
+    "ow": "./bin/ow.mjs",
+    "opencode-project-admin": "./bin/ow.mjs"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "start": "tsx src/index.ts",
+    "build": "node scripts/build.mjs",
+    "start": "node bin/ow.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx src/cli.test.ts && node --import tsx src/cli-all-commands.test.ts"
+    "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {
+    "esbuild": "^0.20.2",
+    "@opencode-workbench/preview-contract": "workspace:*",
     "@opencode-workbench/project-core": "workspace:*",
-    "@opencode-workbench/project-scaffold": "workspace:*"
+    "@opencode-workbench/project-scaffold": "workspace:*",
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",
-    "tsx": "^4.21.0",
-    "typescript": "^5.3.3"
+    "tsx": "^4.21.0"
   }
 }

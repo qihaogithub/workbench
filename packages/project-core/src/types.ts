@@ -31,12 +31,46 @@ export interface ValidationIssue {
   code: string;
   message: string;
   resourceId?: string;
+  pageId?: string;
+  stage?:
+    | "source_contract"
+    | "dependency_import"
+    | "component_export"
+    | "render_contract"
+    | "schema_contract"
+    | "compile_transform"
+    | "module_parse";
+  instruction?: string;
   severity: "blocking" | "warning";
 }
 
 export interface ValidationResult {
   ok: boolean;
   issues: ValidationIssue[];
+}
+
+export interface RuntimeValidationIssue {
+  pageId: string;
+  severity: "error" | "warning";
+  stage:
+    | "source_contract"
+    | "dependency_import"
+    | "component_export"
+    | "render_contract"
+    | "schema_contract"
+    | "compile_transform"
+    | "module_parse";
+  code: string;
+  message: string;
+  instruction: string;
+  moduleName?: string;
+  importName?: string;
+}
+
+export interface RuntimeValidationResult {
+  ok: boolean;
+  issues: RuntimeValidationIssue[];
+  pageIds: string[];
 }
 
 export interface DiffSummary {
@@ -54,6 +88,7 @@ export interface ProjectAdminResult<T> {
   warnings?: string[];
   diffSummary?: DiffSummary;
   validation?: ValidationResult;
+  runtimeValidation?: RuntimeValidationResult;
   nextActions?: string[];
   auditId?: string;
 }

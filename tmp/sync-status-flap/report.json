@@ -1,596 +1,154 @@
 {
-  "ok": false,
-  "targetUrl": "http://localhost:3200/demo/proj_1782286923644/edit",
-  "generatedAt": "2026-06-30T14:36:39.122Z",
+  "ok": true,
+  "targetUrl": "http://localhost:3200/demo/proj_1779608460375/edit",
+  "selectedProject": {
+    "id": "proj_1779608460375",
+    "name": "我的页面",
+    "updatedAt": 1782835679807,
+    "demoCount": 2
+  },
+  "mode": "flush-only",
+  "generatedAt": "2026-06-30T17:14:12.093Z",
   "sampleMs": 500,
   "durationMs": 20000,
   "screenshotPath": "tmp/sync-status-flap/last-page.png",
   "summary": {
-    "statusCounts": {
-      "missing": 10,
-      "offline": 30
-    },
-    "foundStatusCount": 30,
-    "transitions": [
-      {
-        "atMs": 5058,
-        "from": "missing",
-        "to": "offline"
-      }
-    ],
+    "statusCounts": {},
+    "foundStatusCount": 0,
+    "transitions": [],
     "connectingOfflineTransitions": [],
     "flapDetected": false
   },
   "flushProbe": {
-    "ok": false,
-    "error": "apiRequestContext.get: read ECONNRESET\nCall log:\n\u001b[2m  - → GET http://localhost:3200/api/sessions/project/proj_1782286923644\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/147.0.7727.15 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: auth_token=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJhNTg2MjYxNS0yNmJiLTQ2ODgtOTI0ZC03ZmQ2OGMxMzJlMjEiLCJ1c2VybmFtZSI6InFpaGFvIiwiaWF0IjoxNzgyODMwMTcyLCJleHAiOjE3ODM0MzQ5NzJ9.y4KKJTHtySvxuaexlJKKBXdE_z2GIHCCO_g0sWzG4a8\u001b[22m\n\n    at getSessionFromProjectList (/Users/qh2/Documents/PGM/1·Work/opencode-workbench/scripts/development/detect-sync-status-flap.mjs:74:39)\n    at runWorkspaceFlushProbe (/Users/qh2/Documents/PGM/1·Work/opencode-workbench/scripts/development/detect-sync-status-flap.mjs:126:33)\n    at /Users/qh2/Documents/PGM/1·Work/opencode-workbench/scripts/development/detect-sync-status-flap.mjs:368:28"
+    "ok": true,
+    "projectId": "proj_1779608460375",
+    "sessionSource": "project-session-list",
+    "session": {
+      "sessionId": "session-1782838743539-0cdzp5c71",
+      "workspaceId": "ws-1782838743534-lxg7mwcwp"
+    },
+    "projectSessions": {
+      "status": 200,
+      "ok": true,
+      "sessionCount": 5,
+      "body": {
+        "success": true,
+        "data": [
+          {
+            "sessionId": "session-1782838743539-0cdzp5c71",
+            "demoId": "proj_1779608460375",
+            "workspaceId": "ws-1782838743534-lxg7mwcwp",
+            "title": null,
+            "createdAt": 1782838743540,
+            "expiresAt": 1782845943540,
+            "isExpired": false,
+            "messageCount": 0,
+            "lastMessageAt": 1782838743540,
+            "hasUnsavedChanges": true
+          },
+          {
+            "sessionId": "session-1782835700092-e85pd6lgv",
+            "demoId": "proj_1779608460375",
+            "workspaceId": "ws-1782835700086-675h3nytk",
+            "title": null,
+            "createdAt": 1782835700092,
+            "expiresAt": 1782842900092,
+            "isExpired": false,
+            "messageCount": 0,
+            "lastMessageAt": 1782835700092,
+            "hasUnsavedChanges": false
+          },
+          {
+            "sessionId": "session-1782829180381-nqc9eqnts",
+            "demoId": "proj_1779608460375",
+            "workspaceId": "ws-1782829180374-kjyxnfhde",
+            "title": "请根据右侧属性面板中的结构化变更修改当前页面。\n\n页面文件：demos/demo_177993567...",
+            "createdAt": 1782829180382,
+            "expiresAt": 1782842932297,
+            "isExpired": false,
+            "messageCount": 8,
+            "lastMessageAt": 1782835788651,
+            "hasUnsavedChanges": false
+          },
+          {
+            "sessionId": "session-1782814145889-7qg8b8501",
+            "demoId": "proj_1779608460375",
+            "workspaceId": "ws-1782814145881-xbtr9m9xb",
+            "title": null,
+            "createdAt": 1782814145889,
+            "expiresAt": 1782821345889,
+            "isExpired": true,
+            "messageCount": 0,
+            "lastMessageAt": 1782814145889,
+            "hasUnsavedChanges": false
+          },
+          {
+            "sessionId": "session-1782795820605-xdiod6ye3",
+            "demoId": "proj_1779608460375",
+            "workspaceId": "ws-1782795820585-lipxgmarw",
+            "title": null,
+            "createdAt": 1782795820605,
+            "expiresAt": 1782803020605,
+            "isExpired": true,
+            "messageCount": 6,
+            "lastMessageAt": 1782796095937,
+            "hasUnsavedChanges": false
+          }
+        ]
+      }
+    },
+    "sessionCreate": null,
+    "flush": {
+      "status": 200,
+      "ok": true,
+      "body": {
+        "success": true,
+        "data": {
+          "status": "flushed",
+          "flushedRooms": 5
+        }
+      }
+    }
   },
   "flushErrorVisible": false,
   "statusMissing": false,
   "runtimeErrors": [],
   "pageErrors": [],
-  "samples": [
-    {
-      "atMs": 13,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 516,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 1019,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 1524,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 2027,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 2530,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 3036,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 3539,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 4045,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 4548,
-      "status": "missing",
-      "text": "",
-      "candidate": null
-    },
-    {
-      "atMs": 5058,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 5563,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 6069,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 6572,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 7078,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 7584,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 8091,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 8597,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 9104,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 9609,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 10116,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 10620,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 11126,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 11631,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 12136,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 12642,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 13147,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 13653,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 14158,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 14665,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 15169,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 15675,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 16180,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 16686,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 17192,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 17697,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 18203,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 18708,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 19211,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    },
-    {
-      "atMs": 19717,
-      "status": "offline",
-      "text": "离线待同步",
-      "candidate": {
-        "text": "离线待同步",
-        "matched": "离线待同步",
-        "tag": "span",
-        "className": "",
-        "top": 28,
-        "left": 1249,
-        "width": 60,
-        "height": 16
-      }
-    }
-  ],
-  "consoleEvents": [
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-    },
-    {
-      "type": "warning",
-      "text": "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing."
-    },
-    {
-      "type": "warning",
-      "text": "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation"
-    }
-  ],
+  "samples": [],
+  "consoleEvents": [],
   "failedRequests": [
     {
-      "url": "http://localhost:3200/api/screenshots/health",
+      "url": "http://localhost:3200/_next/static/chunks/main-app.js?v=1782839643940",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
     {
       "url": "http://localhost:3200/api/auth/me",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/screenshots/health",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/projects/proj_1779608460375/publish-status",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3201/api/projects/proj_1779608460375/versions",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/demos",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3201/api/projects/proj_1779608460375/versions",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
@@ -610,17 +168,7 @@
       "failure": "net::ERR_ABORTED"
     },
     {
-      "url": "http://localhost:3200/api/projects/proj_1782286923644/publish-status",
-      "method": "GET",
-      "failure": "net::ERR_ABORTED"
-    },
-    {
-      "url": "http://localhost:3200/api/demos",
-      "method": "GET",
-      "failure": "net::ERR_ABORTED"
-    },
-    {
-      "url": "http://localhost:3200/api/projects/proj_1782286923644/publish-status",
+      "url": "http://localhost:3200/api/projects/proj_1779608460375/publish-status",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     }
@@ -629,12 +177,12 @@
   "trackedResponses": [
     {
       "url": "http://localhost:3200/api/sessions",
-      "status": 404,
+      "status": 200,
       "requestMethod": "POST"
     },
     {
       "url": "http://localhost:3200/api/sessions",
-      "status": 404,
+      "status": 200,
       "requestMethod": "POST"
     }
   ]

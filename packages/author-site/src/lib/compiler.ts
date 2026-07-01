@@ -1,5 +1,10 @@
-import { transform } from 'sucrase';
 import { createHash } from 'crypto';
+import { compilePreviewPageSource } from '@opencode-workbench/preview-contract/compiler';
+import {
+  extractImports as extractPreviewImports,
+  isNpmPackage,
+  rewriteImportsWithResolver,
+} from '@opencode-workbench/preview-contract/runtime';
 import {
   readProjectMeta,
   getSessionMeta,
@@ -8,9 +13,7 @@ import {
 import {
   PREVIEW_DEPENDENCY_POLICY,
   PREVIEW_DEPENDENCY_POLICY_VERSION,
-  assertPreviewRuntimeContract,
   getPreviewDependencyUrl,
-  isNpmPackage,
 } from './preview-dependency-policy';
 import type { PreviewRuntimeResolveOptions } from './preview-runtime-manifest';
 
@@ -47,23 +50,7 @@ function removeComments(code: string): string {
  * 返回所有 import 的源模块，包括 npm 包和相对路径
  */
 export function extractImports(code: string): string[] {
-  const cleanCode = removeComments(code);
-  const imports: string[] = [];
-  const seen = new Set<string>();
-
-  // 匹配: import ... from 'module' 或 import 'module'
-  const regex = /import\s+(?:(?:[^'"]*\s+from\s+)?['"]([^'"]+)['"]|['"]([^'"]+)['"])/g;
-  let match;
-
-  while ((match = regex.exec(cleanCode)) !== null) {
-    const moduleName = match[1] || match[2];
-    if (moduleName && !seen.has(moduleName)) {
-      seen.add(moduleName);
-      imports.push(moduleName);
-    }
-  }
-
-  return imports;
+  return extractPreviewImports(removeComments(code));
 }
 
 /**
@@ -85,17 +72,6 @@ function toRuntimeUrl(
 }
 
 /**
- * 转义正则表达式特殊字符
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function toImportSpecifier(moduleName: string): string {
-  return JSON.stringify(moduleName);
-}
-
-/**
  * 将编译后代码中的 npm 包 import 路径替换为 CDN URL
  * 保留相对路径和 CSS 导入不变（由调用方单独处理）
  */
@@ -105,53 +81,7 @@ export function rewriteImportsToCdn(
   _lockedDependencies?: Record<string, string>,
   runtimeOptions?: PreviewRuntimeResolveOptions,
 ): string {
-  let result = compiledCode;
-
-  for (const dep of dependencies) {
-    if (!isNpmPackage(dep) || isCssImport(dep)) continue;
-
-    const cdnUrl = toRuntimeUrl(dep, runtimeOptions);
-    
-    // 替换 from 'package' 和 from "package"
-    const fromPattern = new RegExp(
-      `from\\s+(['"])${escapeRegex(dep)}\\1`,
-      'g'
-    );
-    result = result.replace(fromPattern, `from ${toImportSpecifier(cdnUrl)}`);
-
-    // 替换 import 'package' 和 import "package"（副作用导入）
-    const importPattern = new RegExp(
-      `import\\s+(['"])${escapeRegex(dep)}\\1`,
-      'g'
-    );
-    result = result.replace(importPattern, `import ${toImportSpecifier(cdnUrl)}`);
-  }
-
-  return result;
-}
-
-/**
- * Figma 导入的代码是裸 JSX（无 export default），iframe 无法渲染。
- * 此函数检测并自动包装：裸 JSX → export default function() { return (...) }
- * 有组件变量但无 export default → 追加 export default Xxx
- */
-function autoWrapIfNoDefaultExport(code: string): string {
-  if (/\bexport\s+default\b/.test(removeComments(code))) {
-    return code;
-  }
-
-  const trimmed = code.trim();
-
-  if (trimmed.startsWith('<')) {
-    return `export default function __AutoComponent__() {\n  return (\n${code}\n  );\n}`;
-  }
-
-  const componentMatch = code.match(/(?:const|let|var|function)\s+([A-Z]\w*)\s*[=({]/);
-  if (componentMatch) {
-    return `${code}\nexport default ${componentMatch[1]};\n`;
-  }
-
-  return code;
+  return rewriteImportsWithResolver(compiledCode, dependencies, (dep) => toRuntimeUrl(dep, runtimeOptions));
 }
 
 /**
@@ -163,11 +93,8 @@ export function compileCode(
   lockedDependencies?: Record<string, string>,
   runtimeOptions?: PreviewRuntimeResolveOptions,
 ): CompileResult {
-  const wrappedCode = autoWrapIfNoDefaultExport(code);
-  assertPreviewRuntimeContract(wrappedCode);
-
   const cacheKey = getCodeHash(
-    wrappedCode +
+    code +
       PREVIEW_DEPENDENCY_POLICY_VERSION +
       JSON.stringify(lockedDependencies || {}) +
       JSON.stringify(runtimeOptions || {}),
@@ -177,34 +104,9 @@ export function compileCode(
     return cached;
   }
 
-  // 1. 使用 sucrase 编译：只转换 TypeScript 和 JSX，保留 ESM import/export
-  const result = transform(wrappedCode, {
-    transforms: ['typescript', 'jsx'],
-    jsxRuntime: 'automatic',
-    production: true,
+  const compileResult = compilePreviewPageSource(code, {
+    resolveDependencyUrl: (specifier) => toRuntimeUrl(specifier, runtimeOptions),
   });
-
-  // 2. 从编译后的代码中提取依赖（包括自动添加的 react/jsx-runtime）
-  const dependencies = extractImports(result.code);
-
-  // 3. 分类处理
-  const cssImports = dependencies.filter(isCssImport);
-
-  // 4. 将 npm 包 import 路径替换为 CDN URL
-  const compiledCode = rewriteImportsToCdn(
-    result.code,
-    dependencies,
-    lockedDependencies,
-    runtimeOptions,
-  );
-  const moduleHash = createHash('sha256').update(compiledCode).digest('hex');
-
-  const compileResult: CompileResult = {
-    compiledCode,
-    dependencies,
-    cssImports,
-    moduleHash,
-  };
 
   // 5. 写入缓存
   if (compileCache.size >= MAX_CACHE_SIZE) {

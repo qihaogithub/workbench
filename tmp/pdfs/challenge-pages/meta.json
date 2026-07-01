@@ -1,0 +1,434 @@
+[
+  {
+    "index": 1,
+    "sourceBox18": [
+      3181,
+      164,
+      3274,
+      367
+    ],
+    "crop72": {
+      "x": 12692,
+      "y": 624,
+      "width": 440,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-01.png"
+  },
+  {
+    "index": 2,
+    "sourceBox18": [
+      3794,
+      164,
+      3888,
+      368
+    ],
+    "crop72": {
+      "x": 15144,
+      "y": 624,
+      "width": 444,
+      "height": 884
+    },
+    "file": "tmp/pdfs/challenge-pages/page-02.png"
+  },
+  {
+    "index": 3,
+    "sourceBox18": [
+      3483,
+      165,
+      3577,
+      367
+    ],
+    "crop72": {
+      "x": 13900,
+      "y": 628,
+      "width": 444,
+      "height": 876
+    },
+    "file": "tmp/pdfs/challenge-pages/page-03.png"
+  },
+  {
+    "index": 4,
+    "sourceBox18": [
+      4281,
+      504,
+      4375,
+      707
+    ],
+    "crop72": {
+      "x": 17092,
+      "y": 1984,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-04.png"
+  },
+  {
+    "index": 5,
+    "sourceBox18": [
+      2895,
+      505,
+      2990,
+      708
+    ],
+    "crop72": {
+      "x": 11548,
+      "y": 1988,
+      "width": 448,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-05.png"
+  },
+  {
+    "index": 6,
+    "sourceBox18": [
+      3156,
+      505,
+      3250,
+      708
+    ],
+    "crop72": {
+      "x": 12592,
+      "y": 1988,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-06.png"
+  },
+  {
+    "index": 7,
+    "sourceBox18": [
+      4063,
+      506,
+      4207,
+      709
+    ],
+    "crop72": {
+      "x": 16220,
+      "y": 1992,
+      "width": 644,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-07.png"
+  },
+  {
+    "index": 8,
+    "sourceBox18": [
+      3588,
+      731,
+      3725,
+      949
+    ],
+    "crop72": {
+      "x": 14320,
+      "y": 2892,
+      "width": 616,
+      "height": 940
+    },
+    "file": "tmp/pdfs/challenge-pages/page-08.png"
+  },
+  {
+    "index": 9,
+    "sourceBox18": [
+      3743,
+      733,
+      3837,
+      937
+    ],
+    "crop72": {
+      "x": 14940,
+      "y": 2900,
+      "width": 444,
+      "height": 884
+    },
+    "file": "tmp/pdfs/challenge-pages/page-09.png"
+  },
+  {
+    "index": 10,
+    "sourceBox18": [
+      3927,
+      1865,
+      4021,
+      2400
+    ],
+    "crop72": {
+      "x": 15676,
+      "y": 7428,
+      "width": 444,
+      "height": 2208
+    },
+    "file": "tmp/pdfs/challenge-pages/page-10.png"
+  },
+  {
+    "index": 11,
+    "sourceBox18": [
+      3231,
+      1871,
+      3324,
+      2074
+    ],
+    "crop72": {
+      "x": 12892,
+      "y": 7452,
+      "width": 440,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-11.png"
+  },
+  {
+    "index": 12,
+    "sourceBox18": [
+      4227,
+      1890,
+      4393,
+      2424
+    ],
+    "crop72": {
+      "x": 16876,
+      "y": 7528,
+      "width": 732,
+      "height": 2204
+    },
+    "file": "tmp/pdfs/challenge-pages/page-12.png"
+  },
+  {
+    "index": 13,
+    "sourceBox18": [
+      4506,
+      1914,
+      4651,
+      2118
+    ],
+    "crop72": {
+      "x": 17992,
+      "y": 7624,
+      "width": 648,
+      "height": 884
+    },
+    "file": "tmp/pdfs/challenge-pages/page-13.png"
+  },
+  {
+    "index": 14,
+    "sourceBox18": [
+      5081,
+      1919,
+      5175,
+      2122
+    ],
+    "crop72": {
+      "x": 20292,
+      "y": 7644,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-14.png"
+  },
+  {
+    "index": 15,
+    "sourceBox18": [
+      4118,
+      2529,
+      4212,
+      2718
+    ],
+    "crop72": {
+      "x": 16440,
+      "y": 10084,
+      "width": 444,
+      "height": 824
+    },
+    "file": "tmp/pdfs/challenge-pages/page-15.png"
+  },
+  {
+    "index": 16,
+    "sourceBox18": [
+      3742,
+      2530,
+      3836,
+      2718
+    ],
+    "crop72": {
+      "x": 14936,
+      "y": 10088,
+      "width": 444,
+      "height": 820
+    },
+    "file": "tmp/pdfs/challenge-pages/page-16.png"
+  },
+  {
+    "index": 17,
+    "sourceBox18": [
+      3862,
+      2530,
+      3956,
+      2719
+    ],
+    "crop72": {
+      "x": 15416,
+      "y": 10088,
+      "width": 444,
+      "height": 824
+    },
+    "file": "tmp/pdfs/challenge-pages/page-17.png"
+  },
+  {
+    "index": 18,
+    "sourceBox18": [
+      3529,
+      2764,
+      3623,
+      2952
+    ],
+    "crop72": {
+      "x": 14084,
+      "y": 11024,
+      "width": 444,
+      "height": 820
+    },
+    "file": "tmp/pdfs/challenge-pages/page-18.png"
+  },
+  {
+    "index": 19,
+    "sourceBox18": [
+      3883,
+      3012,
+      3977,
+      3201
+    ],
+    "crop72": {
+      "x": 15500,
+      "y": 12016,
+      "width": 444,
+      "height": 824
+    },
+    "file": "tmp/pdfs/challenge-pages/page-19.png"
+  },
+  {
+    "index": 20,
+    "sourceBox18": [
+      4132,
+      3013,
+      4226,
+      3201
+    ],
+    "crop72": {
+      "x": 16496,
+      "y": 12020,
+      "width": 444,
+      "height": 820
+    },
+    "file": "tmp/pdfs/challenge-pages/page-20.png"
+  },
+  {
+    "index": 21,
+    "sourceBox18": [
+      3756,
+      3014,
+      3850,
+      3202
+    ],
+    "crop72": {
+      "x": 14992,
+      "y": 12024,
+      "width": 444,
+      "height": 820
+    },
+    "file": "tmp/pdfs/challenge-pages/page-21.png"
+  },
+  {
+    "index": 22,
+    "sourceBox18": [
+      4000,
+      3014,
+      4094,
+      3201
+    ],
+    "crop72": {
+      "x": 15968,
+      "y": 12024,
+      "width": 444,
+      "height": 816
+    },
+    "file": "tmp/pdfs/challenge-pages/page-22.png"
+  },
+  {
+    "index": 23,
+    "sourceBox18": [
+      3661,
+      3325,
+      3755,
+      3528
+    ],
+    "crop72": {
+      "x": 14612,
+      "y": 13268,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-23.png"
+  },
+  {
+    "index": 24,
+    "sourceBox18": [
+      3404,
+      3326,
+      3498,
+      3856
+    ],
+    "crop72": {
+      "x": 13584,
+      "y": 13272,
+      "width": 444,
+      "height": 2188
+    },
+    "file": "tmp/pdfs/challenge-pages/page-24.png"
+  },
+  {
+    "index": 25,
+    "sourceBox18": [
+      3058,
+      4131,
+      3152,
+      4334
+    ],
+    "crop72": {
+      "x": 12200,
+      "y": 16492,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-25.png"
+  },
+  {
+    "index": 26,
+    "sourceBox18": [
+      3186,
+      4131,
+      3280,
+      4334
+    ],
+    "crop72": {
+      "x": 12712,
+      "y": 16492,
+      "width": 444,
+      "height": 880
+    },
+    "file": "tmp/pdfs/challenge-pages/page-26.png"
+  },
+  {
+    "index": 27,
+    "sourceBox18": [
+      3058,
+      4382,
+      3152,
+      4569
+    ],
+    "crop72": {
+      "x": 12200,
+      "y": 17496,
+      "width": 444,
+      "height": 816
+    },
+    "file": "tmp/pdfs/challenge-pages/page-27.png"
+  }
+]

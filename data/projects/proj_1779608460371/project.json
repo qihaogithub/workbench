@@ -6,24 +6,35 @@
   "demoPages": [
     {
       "id": "demo_1779608460372_f5g6h7",
-      "name": "伴读广告-手机",
-      "order": 1,
-      "parentId": null,
-      "createdAt": 1779608460372,
-      "updatedAt": 1779608460372
+      "name": "手机",
+      "routeKey": "demo",
+      "order": 0,
+      "parentId": null
     },
     {
       "id": "demo_1779608460373_h7i8j9",
-      "name": "伴读广告-平板",
-      "order": 2,
-      "parentId": null,
-      "createdAt": 1779608460373,
-      "updatedAt": 1779608460373
+      "name": "平板",
+      "routeKey": "demo-2",
+      "order": 1,
+      "parentId": null
     }
   ],
   "demoFolders": [],
-  "versions": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "publish_snapshot",
+      "savedAt": 1782838591292,
+      "savedBy": "system",
+      "sessionId": "publish-1782838591290",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v1",
+      "fileCount": 9,
+      "note": "发布快照"
+    }
+  ],
   "pageVersions": {},
   "createdAt": 1779608460371,
-  "updatedAt": 1782723628152
+  "updatedAt": 1782887159783,
+  "publishedVersion": "v1",
+  "publishedAt": 1782838591293
 }

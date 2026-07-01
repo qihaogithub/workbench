@@ -10,7 +10,10 @@
 
 | 路径 | 说明 |
 | --- | --- |
+| `bin/ow.mjs` | 面向用户和代理的稳定 Node.js CLI 入口 |
 | `src/index.ts` | CLI 入口、参数解析和命令注册 |
+| `scripts/build.mjs` | 将 TypeScript CLI 源码打包为 `dist/index.mjs` |
+| `scripts/run-tests.mjs` | 不依赖 `tsx` 的 CLI 测试运行器 |
 | `src/cli.test.ts` | CLI JSON 契约与核心流程测试 |
 
 ## 改动边界

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { PreviewCanvas, type CanvasState } from "@opencode-workbench/demo-ui";
+import {
+  PreviewCanvas,
+  type CanvasKnowledgeDocument,
+  type CanvasState,
+} from "@opencode-workbench/demo-ui";
 
 const initialState: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -72,6 +76,83 @@ function TestEditorCanvas() {
         ]}
         canvasState={state}
         onCanvasStateChange={setState}
+      />
+      <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
+const documentA: CanvasKnowledgeDocument = {
+  id: "knowledge_a",
+  title: "文档 A",
+  fileName: "a.md",
+};
+
+const documentB: CanvasKnowledgeDocument = {
+  id: "knowledge_b",
+  title: "文档 B",
+  fileName: "b.md",
+};
+
+function TestEditorCanvasWithKnowledgeDocuments({
+  aggregate = false,
+}: {
+  aggregate?: boolean;
+}) {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 1 },
+    pages: {},
+    nodes: aggregate
+      ? {
+          doc_group: {
+            id: "doc_group",
+            kind: "document",
+            title: "文档 A 等 2 个文档",
+            documents: [
+              { id: documentA.id, title: documentA.title, knowledgeDocument: documentA },
+              { id: documentB.id, title: documentB.title, knowledgeDocument: documentB },
+            ],
+            activeDocumentId: documentA.id,
+            layout: { x: 100, y: 100, width: 620, height: 420 },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        }
+      : {
+          doc_a: {
+            id: "doc_a",
+            kind: "document",
+            title: documentA.title,
+            knowledgeDocument: documentA,
+            layout: { x: 100, y: 100, width: 420, height: 360 },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          doc_b: {
+            id: "doc_b",
+            kind: "document",
+            title: documentB.title,
+            knowledgeDocument: documentB,
+            layout: { x: 560, y: 120, width: 420, height: 360 },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+  });
+
+  return (
+    <>
+      <PreviewCanvas
+        interactionMode="editor"
+        pages={[]}
+        canvasState={state}
+        onCanvasStateChange={setState}
+        knowledgeDocuments={[documentA, documentB]}
+        onReadKnowledgeDocument={async (document) =>
+          document.id === documentA.id
+            ? "# 文档 A\n\nAlpha content"
+            : "# 文档 B\n\nBeta content"
+        }
       />
       <output data-testid="canvas-state">{JSON.stringify(state)}</output>
     </>
@@ -1341,6 +1422,88 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
           height: 360,
         },
       });
+    });
+  });
+
+  it("支持 Shift 多选文档节点并合并为聚合文档节点", async () => {
+    const { container } = render(<TestEditorCanvasWithKnowledgeDocuments />);
+    const docA = container.querySelector(
+      "[data-canvas-node-id='doc_a']",
+    ) as HTMLElement;
+    const docB = container.querySelector(
+      "[data-canvas-node-id='doc_b']",
+    ) as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    fireEvent.pointerDown(docA, {
+      button: 0,
+      clientX: 120,
+      clientY: 120,
+      pointerId: 31,
+    });
+    fireEvent.pointerUp(docA, {
+      clientX: 120,
+      clientY: 120,
+      pointerId: 31,
+    });
+    fireEvent.pointerDown(docB, {
+      button: 0,
+      clientX: 580,
+      clientY: 140,
+      pointerId: 32,
+      shiftKey: true,
+    });
+    fireEvent.pointerUp(docB, {
+      clientX: 580,
+      clientY: 140,
+      pointerId: 32,
+      shiftKey: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "合并文档" }));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const nodes = Object.values(state.nodes ?? {});
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        kind: "document",
+        title: "文档 A 等 2 个文档",
+        activeDocumentId: documentA.id,
+        layout: {
+          x: 100,
+          y: 100,
+          width: 880,
+          height: 420,
+        },
+      });
+      expect(nodes[0].kind === "document" ? nodes[0].documents : []).toEqual([
+        { id: documentA.id, title: documentA.title, knowledgeDocument: documentA },
+        { id: documentB.id, title: documentB.title, knowledgeDocument: documentB },
+      ]);
+      expect(state.hiddenKnowledgeDocumentIds).toEqual([
+        documentA.id,
+        documentB.id,
+      ]);
+    });
+  });
+
+  it("聚合文档节点支持通过左侧目录切换当前文档", async () => {
+    render(<TestEditorCanvasWithKnowledgeDocuments aggregate />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alpha content")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: documentB.title }));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const node = state.nodes?.doc_group;
+      expect(node?.kind === "document" ? node.activeDocumentId : "").toBe(
+        documentB.id,
+      );
+      expect(screen.getByText("Beta content")).toBeInTheDocument();
     });
   });
 

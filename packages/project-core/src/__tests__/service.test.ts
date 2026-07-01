@@ -71,6 +71,107 @@ describe("ProjectAdminService", () => {
     expect(detail.data?.versions).toHaveLength(1);
   });
 
+  it("阻止本事务新增或修改的不合规运行时页面", () => {
+    const created = service.createProject({ name: "运行时契约项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const page = service.createPage({
+      editId,
+      name: "首页",
+      code: "import { jsx } from 'react/jsx-runtime';\nexport default function Demo(){ return jsx('div', {}); }",
+    });
+    expect(page.ok).toBe(true);
+    expect(page.runtimeValidation?.ok).toBe(false);
+    const pageId = (page.data as PageDetail).meta.id;
+
+    const pageValidation = service.validatePageRuntime(editId, pageId);
+    expect(pageValidation.data?.ok).toBe(false);
+    expect(pageValidation.data?.issues[0]).toMatchObject({
+      pageId,
+      severity: "error",
+      stage: "source_contract",
+      code: "AUTHORING_RUNTIME_IMPORT_UNSUPPORTED",
+    });
+
+    const validation = service.editValidate(editId);
+    expect(validation.data?.ok).toBe(false);
+    expect(validation.data?.issues).toContainEqual(expect.objectContaining({
+      pageId,
+      severity: "blocking",
+      code: "AUTHORING_RUNTIME_IMPORT_UNSUPPORTED",
+    }));
+    expect(service.commitEdit(editId, "不合规页面").ok).toBe(false);
+  });
+
+  it("识别重复拼接导致的模块解析失败并保留落盘内容", () => {
+    const created = service.createProject({ name: "模块预检项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+    const duplicatedCode = [
+      "const accentMap = { primary: 'red' };",
+      "export default function Demo(){ return <div />; }",
+      "const accentMap = { primary: 'blue' };",
+    ].join("\n");
+
+    const page = service.createPage({
+      editId,
+      name: "重复页",
+      code: duplicatedCode,
+    });
+    expect(page.ok).toBe(true);
+    expect(page.runtimeValidation).toMatchObject({
+      ok: false,
+      issues: [
+        expect.objectContaining({
+          stage: "module_parse",
+          code: "DUPLICATE_TOP_LEVEL_DECLARATION",
+        }),
+      ],
+    });
+
+    const pageId = (page.data as PageDetail).meta.id;
+    const saved = service.getPage(editId, pageId);
+    expect(saved.data?.files.code).toBe(duplicatedCode);
+    expect(service.commitEdit(editId, "重复拼接页").ok).toBe(false);
+  });
+
+  it("旧项目未改页面的运行时契约问题只作为 warning", () => {
+    const created = service.createProject({ name: "旧页面兼容项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "首页",
+      code: "export default function Demo(){ return <div>ok</div>; }",
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+    expect(service.commitEdit(editId, "初始页面").ok).toBe(true);
+
+    fs.writeFileSync(
+      path.join(tempDir, "projects", projectId, "workspace", "demos", pageId, "index.tsx"),
+      "export default function Demo(){ return null; }\n",
+      "utf-8",
+    );
+    const followupEdit = service.beginEdit(projectId);
+    const followupEditId = (followupEdit.data as EditTransaction).editId;
+    const configUpdate = service.setProjectConfig({
+      editId: followupEditId,
+      schema: JSON.stringify({ type: "object", properties: {}, required: [] }),
+    });
+    expect(configUpdate.ok).toBe(true);
+
+    const validation = service.editValidate(followupEditId);
+    expect(validation.data?.ok).toBe(true);
+    expect(validation.data?.issues).toContainEqual(expect.objectContaining({
+      pageId,
+      severity: "warning",
+      code: "EMPTY_RENDER_RISK",
+    }));
+    expect(service.commitEdit(followupEditId, "无关配置改动").ok).toBe(true);
+  });
+
   it("恢复页面历史版本并生成新的项目版本", () => {
     const created = service.createProject({ name: "页面恢复项目" });
     const projectId = created.data?.id ?? "";
@@ -520,6 +621,18 @@ describe("ProjectAdminService", () => {
         null,
         2,
       ),
+      "utf-8",
+    );
+    const pageDir = path.join(projectWorkspacePath, "demos", "page-home");
+    fs.mkdirSync(pageDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pageDir, "index.tsx"),
+      "export default function Demo(){ return <div>home</div>; }",
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(pageDir, "config.schema.json"),
+      JSON.stringify({ type: "object", properties: {} }, null, 2),
       "utf-8",
     );
 

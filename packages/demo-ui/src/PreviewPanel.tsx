@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import type { PreviewPanelProps, PreviewSize, PositionableSizeItem } from "./types";
+import type {
+  PreviewDiagnostic,
+  PreviewDiagnosticError,
+  PreviewPanelProps,
+  PreviewSize,
+  PositionableSizeItem,
+} from "./types";
 import type { AppActionPayload, ConsoleLogPayload, VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
 import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
@@ -298,7 +304,26 @@ interface CompileApiResponse {
   data?: CompileResult;
   error?: {
     message?: string;
+    details?: {
+      issues?: Array<{
+        stage?: string;
+        code?: string;
+        moduleName?: string;
+        importName?: string;
+        message?: string;
+        instruction?: string;
+      }>;
+    };
   };
+}
+
+function createPreviewDiagnosticError(
+  message: string,
+  diagnostic: PreviewDiagnostic,
+): PreviewDiagnosticError {
+  const error = new Error(message) as PreviewDiagnosticError;
+  error.previewDiagnostic = diagnostic;
+  return error;
 }
 
 async function readCompileResponse(response: Response): Promise<CompileApiResponse> {
@@ -756,7 +781,6 @@ export function PreviewPanel({
     setIsCompiling(true);
     setCompileError(null);
     setRuntimeError(null);
-    setLastSuccessfulResult(null);
 
     const compile = async () => {
       try {
@@ -801,10 +825,21 @@ export function PreviewPanel({
 
         if (!response.ok || !result.success || !result.data) {
           const message = result.error?.message || "编译失败";
+          const issue = result.error?.details?.issues?.[0];
+          const diagnostic: PreviewDiagnostic = {
+            source: "post_generation_validation",
+            stage: issue?.stage ?? "compile_transform",
+            code: issue?.code,
+            pageId: demoId,
+            file: demoId ? `demos/${demoId}/index.tsx` : undefined,
+            message: issue?.message ?? message,
+            instruction: issue?.instruction,
+            moduleName: issue?.moduleName,
+            importName: issue?.importName,
+          };
           setCompileError(message);
-          onErrorRef.current?.(new Error(message));
+          onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
           setPendingCompileResult(null);
-          setLastSuccessfulResult(null);
           setIsCompiling(false);
           const compileMs =
             compileStartRef.current != null && typeof performance !== "undefined"
@@ -838,10 +873,17 @@ export function PreviewPanel({
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "编译失败";
+        const diagnostic: PreviewDiagnostic = {
+          source: "post_generation_validation",
+          stage: "compile_transform",
+          pageId: demoId,
+          file: demoId ? `demos/${demoId}/index.tsx` : undefined,
+          message,
+          instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
+        };
         setCompileError(message);
-        onErrorRef.current?.(new Error(message));
+        onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
         setPendingCompileResult(null);
-        setLastSuccessfulResult(null);
         setIsCompiling(false);
         const compileMs =
           compileStartRef.current != null && typeof performance !== "undefined"
@@ -1002,8 +1044,21 @@ export function PreviewPanel({
 
         case "RUNTIME_ERROR":
           if (!isCurrentPreviewRequest) return;
-          setRuntimeError(error || "组件运行时发生错误");
-          onErrorRef.current?.(new Error(error || "组件运行时发生错误"));
+          {
+            const message = error || "组件运行时发生错误";
+            setRuntimeError(message);
+            onErrorRef.current?.(
+              createPreviewDiagnosticError(message, {
+                source: "preview_runtime",
+                stage: "runtime",
+                pageId: demoId,
+                file: demoId ? `demos/${demoId}/index.tsx` : undefined,
+                message,
+                instruction:
+                  "请优先检查当前页面的 import、默认导出和渲染逻辑；图标和基础能力优先使用 @preview/sdk。",
+              }),
+            );
+          }
           break;
 
         case "RESIZE":
@@ -1286,10 +1341,9 @@ export function PreviewPanel({
 
       {compileError && !isCompiling && (
         <div
-          className="absolute inset-0 z-30 m-2 flex flex-col items-center justify-center rounded-lg border border-destructive/40 bg-background/95 p-4 text-center"
+          className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
         >
-          <p className="text-sm font-medium text-destructive">编译错误</p>
-          <p className="mt-1 text-xs text-muted-foreground">{compileError}</p>
+          <p className="text-sm font-medium text-muted-foreground">正在修复预览</p>
         </div>
       )}
 

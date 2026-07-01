@@ -45,17 +45,59 @@
 pnpm test:sync-status-flap
 ```
 
+列出当前 `data/projects` 中可检测的项目：
+
+```bash
+pnpm test:sync-status-flap:list
+```
+
+用可视浏览器窗口复现：
+
+```bash
+pnpm test:sync-status-flap:headed
+```
+
+只快速验证 Session 与 Workspace flush 链路：
+
+```bash
+pnpm test:sync-status-flap:flush
+```
+
 也可以直接运行：
 
 ```bash
 node scripts/development/detect-sync-status-flap.mjs
 ```
 
+### 常用参数
+
+| 参数 | 说明 |
+|---|---|
+| `--list-projects` | 列出本地项目候选并退出。 |
+| `--project-id <id>` | 指定项目 ID，脚本会拼成 `<base-url>/demo/<id>/edit`。 |
+| `--url <url>` | 直接指定编辑页 URL，优先级高于 `--project-id`。 |
+| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:3200`。 |
+| `--duration <ms>` | 指定采样总时长。 |
+| `--sample-ms <ms>` | 指定采样间隔。 |
+| `--headed` / `--headless` | 切换可视/无头浏览器。 |
+| `--user <username>` / `--password <password>` | 覆盖自动登录账号。 |
+| `--report-dir <path>` | 指定报告输出目录。 |
+| `--flush-only` | 只运行 Workspace flush 探针，不要求页面可见同步状态采样；页面运行时错误仍写入报告，但不影响退出码。 |
+
+示例：
+
+```bash
+pnpm test:sync-status-flap -- --project-id proj_1779608460375 --duration 30000
+pnpm test:sync-status-flap -- --url http://localhost:3200/demo/proj_1779608460375/edit --headed
+pnpm test:sync-status-flap -- --project-id proj_1779608460375 --flush-only
+```
+
 ### 常用环境变量
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `SYNC_STATUS_URL` | `http://localhost:3200/demo/proj_1782286923644/edit` | 要检测的编辑页地址。 |
+| `SYNC_STATUS_URL` | 自动选择 `data/projects` 中最近更新的项目 | 要检测的编辑页地址。 |
+| `SYNC_STATUS_BASE_URL` | `http://localhost:3200` | 未指定 URL 时使用的 author-site 地址。 |
 | `SYNC_STATUS_SAMPLE_MS` | `500` | 采样间隔，单位毫秒。 |
 | `SYNC_STATUS_DURATION_MS` | `20000` | 总采样时长，单位毫秒。 |
 | `HEADLESS` | 非 `0` 时无头运行 | 设置为 `0` 可打开可视浏览器窗口。 |

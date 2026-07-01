@@ -51,6 +51,34 @@ function writeSession(
   );
 }
 
+function writeActiveSession(
+  dataDir: string,
+  userId: string,
+  projectId: string,
+  sessionId: string,
+  workspaceId: string,
+): void {
+  const sessionDir = path.join(dataDir, "sessions", userId, projectId, sessionId);
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(sessionDir, ".session.json"),
+    JSON.stringify(
+      {
+        sessionId,
+        userId,
+        demoId: projectId,
+        workspaceId,
+        status: "editing",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+}
+
 describe("对话历史 Session 数量限制", () => {
   const originalEnv = { ...process.env };
   let dataDir: string;
@@ -135,5 +163,48 @@ describe("对话历史 Session 数量限制", () => {
       ),
     ).toBe(true);
     expect(fs.existsSync(brokenDir)).toBe(true);
+  });
+});
+
+describe("活跃 Session 复用", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("跳过 workspace 已缺失的活跃 Session", async () => {
+    const { findActiveSession } = await importSessionManager(dataDir);
+    writeActiveSession(
+      dataDir,
+      "user-1",
+      "project-1",
+      "session-orphan",
+      "workspace-missing",
+    );
+
+    expect(findActiveSession("user-1", "project-1")).toBeNull();
+
+    const meta = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          dataDir,
+          "sessions",
+          "user-1",
+          "project-1",
+          "session-orphan",
+          ".session.json",
+        ),
+        "utf-8",
+      ),
+    );
+    expect(meta.status).toBe("orphaned");
   });
 });

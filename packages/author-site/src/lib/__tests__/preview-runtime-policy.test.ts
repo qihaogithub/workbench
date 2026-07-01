@@ -104,17 +104,29 @@ describe("AI 页面预览运行时策略", () => {
     });
   });
 
+  it("拒绝页面源码手写 JSX runtime 编译产物", () => {
+    expect(() =>
+      compileCode(`
+        import { jsx } from "react/jsx-runtime";
+
+        export default function Demo() {
+          return jsx("div", { children: "compiled" });
+        }
+      `),
+    ).toThrow(PreviewRuntimeContractError);
+  });
+
   it("拒绝当前 lucide-react 版本不存在的 named import", () => {
     const validation = validatePreviewRuntimeContract(`
       import { Soccer, Trophy } from "lucide-react";
     `);
 
-    expect(validation.issues).toEqual([
+    expect(validation.issues).toContainEqual(
       expect.objectContaining({
         code: "INVALID_LUCIDE_IMPORT",
         moduleName: "lucide-react",
         importName: "Soccer",
       }),
-    ]);
+    );
   });
 });

@@ -1,8 +1,11 @@
+import path from "node:path";
+
 import { NextRequest, NextResponse } from "next/server";
 import {
   createApiError,
   createApiSuccess,
   createPageVersionSnapshot,
+  getProjectPath,
   findWorkspacePath,
   getPageVersionHistory,
   getSessionMeta,
@@ -15,6 +18,7 @@ import {
   flushWorkspaceBeforeCriticalAction,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
+import { validateWorkspacePreviewRuntime } from "@/lib/preview-validation";
 
 async function getAuthenticatedUser() {
   const token = getAuthCookie();
@@ -122,6 +126,21 @@ export async function POST(
       sourceWorkspacePath = meta.workspaceId
         ? findWorkspacePath(meta.workspaceId) ?? undefined
         : undefined;
+    }
+
+    const workspaceToValidate = sourceWorkspacePath ?? path.join(getProjectPath(projectId), "workspace");
+    if (workspaceToValidate) {
+      const runtimeValidation = validateWorkspacePreviewRuntime(workspaceToValidate, demoId);
+      if (!runtimeValidation.ok) {
+        return NextResponse.json(
+          createApiError(
+            "VALIDATION_ERROR",
+            "预览校验未通过，暂不创建页面版本",
+            { runtimeValidation },
+          ),
+          { status: 422 },
+        );
+      }
     }
 
     const result = createPageVersionSnapshot(

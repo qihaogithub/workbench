@@ -9,6 +9,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@opencode-workbench/preview-contract": ["../preview-contract/src"],
+      "@opencode-workbench/preview-contract/*": ["../preview-contract/src/*"]
+    },
     "noEmit": true
   },
   "include": ["src/**/*"],

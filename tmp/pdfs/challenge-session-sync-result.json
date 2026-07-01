@@ -1,0 +1,124 @@
+{
+  "projectId": "proj_1782839405716_tqjl1f",
+  "sessionWorkspace": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0",
+  "projectWorkspace": "data/projects/proj_1782839405716_tqjl1f/workspace",
+  "copiedCount": 0,
+  "skippedCount": 27,
+  "copied": [],
+  "skipped": [
+    {
+      "pageId": "prototype-01",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-02",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-03",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-04",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-05",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-06",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-07",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-08",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-09",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-10",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-11",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-12",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-13",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-14",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-15",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-16",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-17",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-18",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-19",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-20",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-21",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-22",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-23",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-24",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-25",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-26",
+      "reason": "already-inline"
+    },
+    {
+      "pageId": "prototype-27",
+      "reason": "already-inline"
+    }
+  ],
+  "syncedFiles": [
+    "workspace-tree.json",
+    ".canvas-layout.json",
+    "app.graph.json",
+    "memory.md"
+  ]
+}

@@ -14,6 +14,7 @@ import {
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
 import type {
+  CanvasDocumentEntry,
   CanvasFreeNode,
   CanvasLayersState,
   CanvasPageLayout,
@@ -100,14 +101,20 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   if (kind === "document") {
     const markdown = readString(value, "markdown");
     const knowledgeDocument = parseKnowledgeDocument(value.knowledgeDocument);
+    const documents = parseCanvasDocumentEntries(value.documents);
+    const activeDocumentId = readString(value, "activeDocumentId");
     const collapsed = readBoolean(value, "collapsed");
     const expandedHeight = readNumber(value, "expandedHeight");
-    if (markdown === null && !knowledgeDocument) return null;
+    if (markdown === null && !knowledgeDocument && documents.length === 0) {
+      return null;
+    }
     return {
       ...base,
       kind,
       ...(markdown === null ? {} : { markdown }),
       ...(knowledgeDocument ? { knowledgeDocument } : {}),
+      ...(documents.length > 0 ? { documents } : {}),
+      ...(activeDocumentId ? { activeDocumentId } : {}),
       ...(collapsed === null ? {} : { collapsed }),
       ...(expandedHeight === null ? {} : { expandedHeight }),
     };
@@ -147,6 +154,20 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   }
 
   return null;
+}
+
+function parseCanvasDocumentEntries(value: unknown): CanvasDocumentEntry[] {
+  if (!Array.isArray(value)) return [];
+  const entries: CanvasDocumentEntry[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return [];
+    const id = readString(item, "id");
+    const title = readString(item, "title");
+    const knowledgeDocument = parseKnowledgeDocument(item.knowledgeDocument);
+    if (!id || !title || !knowledgeDocument) return [];
+    entries.push({ id, title, knowledgeDocument });
+  }
+  return entries;
 }
 
 function parseCanvasLayers(value: unknown): CanvasLayersState | undefined | null {
@@ -324,21 +345,94 @@ function getCanvasLayoutPaths(access: {
   return Array.from(new Set(paths));
 }
 
+function parseJsonDocuments(content: string): unknown[] {
+  const documents: unknown[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < content.length; i += 1) {
+    const char = content[i];
+
+    if (start === -1) {
+      if (/\s/.test(char)) continue;
+      if (char !== "{" && char !== "[") return [];
+      start = i;
+      depth = 1;
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{" || char === "[") {
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        const segment = content.slice(start, i + 1);
+        try {
+          documents.push(JSON.parse(segment));
+        } catch {
+          // Ignore invalid recovered segments and keep scanning.
+        }
+        start = -1;
+      }
+    }
+  }
+
+  return documents;
+}
+
+function parseStoredCanvasLayoutContent(content: string): unknown[] {
+  try {
+    return [JSON.parse(content)];
+  } catch {
+    return parseJsonDocuments(content);
+  }
+}
+
 function readStoredCanvasLayout(layoutPath: string): {
   state: CanvasState;
   updatedAt?: number;
 } | null {
-  const parsed = JSON.parse(fs.readFileSync(layoutPath, "utf-8")) as unknown;
-  if (!isRecord(parsed)) return null;
+  const candidates = parseStoredCanvasLayoutContent(
+    fs.readFileSync(layoutPath, "utf-8"),
+  );
+  let recovered: { state: CanvasState; updatedAt?: number } | null = null;
 
-  const state = parseCanvasState(parsed.state);
-  if (!state) return null;
+  for (const parsed of candidates) {
+    if (!isRecord(parsed)) continue;
+    const state = parseCanvasState(parsed.state);
+    if (!state) continue;
+    const candidate = {
+      state,
+      updatedAt:
+        typeof parsed.updatedAt === "number" ? parsed.updatedAt : undefined,
+    };
+    if (!recovered || (candidate.updatedAt ?? 0) > (recovered.updatedAt ?? 0)) {
+      recovered = candidate;
+    }
+  }
 
-  return {
-    state,
-    updatedAt:
-      typeof parsed.updatedAt === "number" ? parsed.updatedAt : undefined,
-  };
+  return recovered;
+}
+
+function writeJsonFileAtomic(filePath: string, value: unknown): void {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2), "utf-8");
+  fs.renameSync(tmpPath, filePath);
 }
 
 export async function GET(
@@ -414,7 +508,7 @@ export async function POST(
 
     for (const layoutPath of getCanvasLayoutPaths(access)) {
       fs.mkdirSync(path.dirname(layoutPath), { recursive: true });
-      fs.writeFileSync(layoutPath, JSON.stringify(stored, null, 2), "utf-8");
+      writeJsonFileAtomic(layoutPath, stored);
     }
 
     return NextResponse.json(

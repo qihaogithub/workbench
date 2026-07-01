@@ -15,9 +15,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
+import { syncBackendProvidersConfigToAgent } from "@/lib/backend-providers-sync";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
-import { pushBackendProvidersToAgent } from "@/lib/agent-providers";
 import { getModelEnvConfig } from "@/lib/runtime-config";
 
 const CONFIG_ID = "model_config";
@@ -303,8 +303,10 @@ export async function PUT(request: NextRequest) {
     // 如果包含 backendProviders 字段,推送到 agent-service
     let pushResult: { ok: boolean; message: string } | null = null;
     if (updatedConfig.backendProviders !== undefined) {
-      pushResult = await pushBackendProvidersToAgent(
+      pushResult = await syncBackendProvidersConfigToAgent(
         updatedConfig.backendProviders,
+        "save",
+        { scheduleRetryOnFailure: true },
       );
     }
 

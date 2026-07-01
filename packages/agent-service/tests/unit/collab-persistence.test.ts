@@ -130,6 +130,23 @@ describe("WorkspaceFilePersistence", () => {
     expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
   });
 
+  it("workspace 元数据缺失时仍可按嵌套目录名定位 workspace", () => {
+    fs.rmSync(
+      path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1", ".workspace.json"),
+      { force: true },
+    );
+    const persistence = new WorkspaceFilePersistence(tempDir);
+
+    const result = persistence.validateWorkspaceSession({
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-1",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
+  });
+
   it("拒绝跨 workspace 或越权资源路径", () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
 

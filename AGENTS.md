@@ -43,12 +43,13 @@
 - 共享包：`@opencode-workbench/shared`
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
 - 环境变量文件：`.env` 被 git 忽略，`.env.docker` 用于 Docker 部署覆盖
+- OPS 工程上下文入口：`OPS/AGENTS.md`
 - Codex 定时任务上下文：`OPS/automations/`
 - `CLAUDE.md` 仅包含 `@AGENTS.md` 转引，根目录 `AGENTS.md` 是主要工作指南。
 
 ## 工作流程
 
-1. 先确认改动范围。涉及 `packages/agent-service/` 时，必须先阅读 `packages/agent-service/AGENTS.md`。
+1. 先确认改动范围。涉及 `packages/agent-service/` 时，必须先阅读 `packages/agent-service/AGENTS.md`；涉及 `OPS/` 时，必须先阅读 `OPS/AGENTS.md`，再按子目录规则继续。
 2. 若任务较复杂，先在 `docs/plans/进行中/` 创建任务文档，再开始实施，具体要求见“复杂任务计划文档”。
 3. 用 CodeGraph 获取结构上下文；只有在查找字面文本时用 `rg`。
 4. 涉及功能新增、功能调整、产品行为、业务流程、架构边界或接口契约时，优先读取 `docs/项目文档/` 中的相关模块文档，先确认既有语义和约束。
@@ -112,12 +113,15 @@
 - 当前项目文档入口是 `docs/项目文档/INDEX.md`；`doc-maintainer` 技能里提到的 `docs/INDEX.md` 在本项目中映射为 `docs/项目文档/INDEX.md`，除非后续专门建立全局 `docs/INDEX.md`。
 - `docs/plans/进行中/` 是任务追踪区，新增或更新计划文档不需要同步 `docs/项目文档/INDEX.md`；任务完成后按 `docs/plans/已完成/AGENTS.md` 的归档规则移动。
 
-## OPS 自动任务上下文
+## OPS 工程与自动任务上下文
+
+`OPS/` 用于维护项目内工程诊断工具、Codex 定时任务和维护型自动任务上下文。进入 `OPS/` 前先读 `OPS/AGENTS.md`，再根据实际子目录读取 `OPS/CLI/AGENTS.md` 或 `OPS/automations/AGENTS.md`。
 
 `OPS/automations/` 用于维护 Codex 定时任务和维护型自动任务的运行上下文，包括 context、runbook 和当前状态账本。它的目标读者是自动任务中的 AI，优先保证可执行、可复查和低噪声更新。
 
 维护规则：
 
+- `OPS/CLI/` 是长期工程诊断 CLI 和 Agent Service 测试工具，修改前读取 `OPS/CLI/AGENTS.md`、`OPS/CLI/README.md` 和 `OPS/CLI/package.json`。
 - `OPS/automations/` 不属于 `docs/项目文档/` 知识库，不套用需求文档/技术文档拆分规范。
 - 修改 `OPS/automations/` 时优先读取 `OPS/automations/AGENTS.md` 和 `OPS/automations/README.md`。
 - `contexts/` 放长期任务上下文，`runbooks/` 放按触发频率组织的执行手册，`state/` 放覆盖式当前状态。
@@ -153,6 +157,8 @@
 `packages/shared/src/index.ts` 是共享类型入口。`@opencode-workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
 
 ## 常用命令
+
+人工开发命令示例使用 `pnpm ...`；Codex 定时任务和 `OPS/automations/` runbook 优先使用 `corepack pnpm ...`，确保包管理器版本一致。
 
 根目录命令：
 

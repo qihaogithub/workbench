@@ -8,6 +8,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@opencode-workbench/preview-contract": ["../preview-contract/src/index.ts"],
+      "@opencode-workbench/preview-contract/*": ["../preview-contract/src/*"],
+      "@opencode-workbench/project-core": ["../project-core/src/index.ts"],
+      "@opencode-workbench/project-scaffold": ["../project-scaffold/src/index.ts"]
+    },
     "noEmit": true
   },
   "include": ["src/**/*.ts"]

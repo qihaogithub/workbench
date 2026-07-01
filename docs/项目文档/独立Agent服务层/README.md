@@ -1,8 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.9
+> 版本：v2.10
 > 创建日期：2026-04-05
-> 更新日期：2026-06-30
+> 更新日期：2026-07-01
 
 ---
 
@@ -95,7 +95,7 @@
 | 后端形态 | 只支持 Pi Agent 单后端，`AgentType` 固定为 `pi-agent` |
 | Agent 运行方式 | 进程内动态导入 `@earendil-works/pi-agent-core` 和 node 子入口 |
 | 工具权限 | 由 Pi Tools 权限白名单、路径校验、用户确认和后端快照共同约束 |
-| 模型配置 | 通过全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效 |
+| 模型配置 | 通过 author-site 恢复的全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效 |
 | 网页读取 | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容 |
 | 联网搜索 | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用 |
 | 外部授权 | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号 |
@@ -122,3 +122,4 @@
 | 2026-06-27 | v2.7 | 新增创作端 Agent 预装 `design-taste-frontend` Skill 与按需读取工具说明 |
 | 2026-06-28 | v2.8 | 补充模型列表 route/service 分层和 shared/demo-ui 包边界 |
 | 2026-06-30 | v2.9 | 新增 `requestUserChoice` 需求确认卡片工具和 `user_choice_request` 事件说明 |
+| 2026-07-01 | v2.10 | 补充全局 backend providers 的运行时副本定位和 author-site 启动恢复机制 |
