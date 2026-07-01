@@ -45,6 +45,8 @@ export interface PreviewDiagnostic {
   instruction?: string;
   moduleName?: string;
   importName?: string;
+  codeHash?: string;
+  moduleHash?: string;
 }
 
 export type PreviewDiagnosticError = Error & {

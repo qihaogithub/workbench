@@ -50,7 +50,7 @@ export function compilePreviewPageSource(
     dependencies,
     options.resolveDependencyUrl,
   );
-  assertCompiledPreviewModule(compiledCode);
+  assertCompiledPreviewModule(compiledCode, { generated: true });
 
   return {
     compiledCode,

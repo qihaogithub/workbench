@@ -305,6 +305,10 @@ interface CompileApiResponse {
   error?: {
     message?: string;
     details?: {
+      demoId?: string;
+      pageId?: string;
+      codeHash?: string;
+      moduleHash?: string;
       issues?: Array<{
         stage?: string;
         code?: string;
@@ -488,6 +492,19 @@ export function PreviewPanel({
     },
     [],
   );
+
+  const updateContainerSize = useCallback((width: number, height: number) => {
+    if (width <= 0 || height <= 0) return;
+    setContainerWidth((current) => (current === width ? current : width));
+    setContainerHeight((current) => (current === height ? current : height));
+  }, []);
+
+  const measureContainer = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    updateContainerSize(rect.width, rect.height);
+  }, [updateContainerSize]);
 
   const sendLifecycleMessage = useCallback((type: "SLEEP" | "WAKE") => {
     const iframe = iframeRef.current;
@@ -826,16 +843,20 @@ export function PreviewPanel({
         if (!response.ok || !result.success || !result.data) {
           const message = result.error?.message || "编译失败";
           const issue = result.error?.details?.issues?.[0];
+          const diagnosticPageId =
+            result.error?.details?.pageId || result.error?.details?.demoId || demoId;
           const diagnostic: PreviewDiagnostic = {
             source: "post_generation_validation",
             stage: issue?.stage ?? "compile_transform",
             code: issue?.code,
-            pageId: demoId,
-            file: demoId ? `demos/${demoId}/index.tsx` : undefined,
+            pageId: diagnosticPageId,
+            file: diagnosticPageId ? `demos/${diagnosticPageId}/index.tsx` : undefined,
             message: issue?.message ?? message,
             instruction: issue?.instruction,
             moduleName: issue?.moduleName,
             importName: issue?.importName,
+            codeHash: result.error?.details?.codeHash,
+            moduleHash: result.error?.details?.moduleHash,
           };
           setCompileError(message);
           onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
@@ -1211,15 +1232,7 @@ export function PreviewPanel({
     sendCollectVisualNodeTree();
   }, [sendCollectVisualNodeTree, visualNodeTreeRequestKey]);
 
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      setContainerWidth(rect.width);
-      setContainerHeight(rect.height);
-    }
-  }, [previewSize]);
+  useLayoutEffect(measureContainer);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1227,13 +1240,12 @@ export function PreviewPanel({
 
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-        setContainerHeight(entry.contentRect.height);
+        updateContainerSize(entry.contentRect.width, entry.contentRect.height);
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [updateContainerSize]);
 
   // 页面切换时重置外层滚动容器的 scrollTop，避免 iframe 偏移到底部
   useEffect(() => {

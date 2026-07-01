@@ -54,3 +54,843 @@
     }
   }
 }
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "伴读广告页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "phoneSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "手机广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage1，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
+    },
+    "padSingleAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "平板广告图：1行1个",
+      "description": "对应 uiweb-vue 的 updateImage2，建议宽度 2832。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    },
+    "carouselAdImage": {
+      "type": "string",
+      "format": "image",
+      "title": "广告图：轮播",
+      "description": "对应 uiweb-vue 的 updateImage3，建议尺寸 1029x540。",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png"
+    }
+  }
+}

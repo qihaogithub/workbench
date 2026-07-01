@@ -19,9 +19,15 @@ describe("PreviewPanel", () => {
   const mockCode = `export default function Demo({ title }: { title: string }) {
     return <h1>{title}</h1>;
   }`;
+  let getBoundingClientRectSpy: jest.SpyInstance<DOMRect, []> | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    getBoundingClientRectSpy?.mockRestore();
+    getBoundingClientRectSpy = undefined;
   });
 
   it("应渲染 iframe", () => {
@@ -58,6 +64,53 @@ describe("PreviewPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("正在修复预览")).toBeInTheDocument();
       expect(screen.queryByText("语法错误: 第3行")).not.toBeInTheDocument();
+    });
+  });
+
+  it("编译错误诊断应保留页面和源码定位信息", async () => {
+    const onError = jest.fn();
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: false,
+        error: {
+          message: "页面运行时契约校验失败",
+          details: {
+            pageId: "page_1",
+            codeHash: "abc123",
+            issues: [
+              {
+                stage: "module_parse",
+                code: "GENERATED_MODULE_BINDING_CONFLICT",
+                message: "预览编译生成模块的顶层绑定 jsx 发生冲突",
+                instruction: "请由系统侧调整编译隔离或生成绑定命名。",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    render(
+      <PreviewPanel
+        code={mockCode}
+        demoId="page_1"
+        configData={{ title: "Test" }}
+        onError={onError}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previewDiagnostic: expect.objectContaining({
+            pageId: "page_1",
+            file: "demos/page_1/index.tsx",
+            stage: "module_parse",
+            code: "GENERATED_MODULE_BINDING_CONFLICT",
+            codeHash: "abc123",
+          }),
+        }),
+      );
     });
   });
 
@@ -109,6 +162,55 @@ describe("PreviewPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByTitle("预览")).toBeInTheDocument();
+    });
+  });
+
+  it("fillContainer 应在父级尺寸变化但 ResizeObserver 未回调时重新计算 iframe 缩放", async () => {
+    let measuredRect = { width: 1242, height: 821 };
+    getBoundingClientRectSpy = jest
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(
+        () =>
+          ({
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: measuredRect.width,
+            bottom: measuredRect.height,
+            width: measuredRect.width,
+            height: measuredRect.height,
+            toJSON: () => ({}),
+          }) as DOMRect,
+      );
+
+    const previewSize = { width: 1133, height: 749 };
+    const { rerender } = render(
+      <PreviewPanel
+        compiledJsUrl="/preview/page.js"
+        fillContainer
+        previewSize={previewSize}
+      />,
+    );
+
+    const iframe = (await screen.findByTitle("预览")) as HTMLIFrameElement;
+    await waitFor(() => {
+      expect(iframe.style.transform).toBe(
+        `scale(${Math.min(1242 / 1133, 821 / 749)})`,
+      );
+    });
+
+    measuredRect = { width: 1133, height: 749 };
+    rerender(
+      <PreviewPanel
+        compiledJsUrl="/preview/page.js"
+        fillContainer
+        previewSize={previewSize}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(iframe.style.transform).toBe("scale(1)");
     });
   });
 

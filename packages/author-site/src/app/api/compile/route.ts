@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
 import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
 import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
@@ -9,9 +10,15 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   let requestKind = 'unknown';
   let codeLength = 0;
+  let codeHash: string | undefined;
+  let requestDemoId: string | undefined;
   try {
     const body = await request.json();
     const { code, sessionId, demoId } = body;
+    requestDemoId = typeof demoId === 'string' ? demoId : undefined;
+    codeHash = typeof code === 'string'
+      ? createHash('sha256').update(code).digest('hex')
+      : undefined;
     const runtimeBaseUrl = request.headers.get('origin') || request.nextUrl.origin;
     const runtimeOptions = {
       baseUrl: runtimeBaseUrl,
@@ -110,7 +117,9 @@ export async function POST(request: NextRequest) {
     console.info('[PreviewRuntime][compile-api]', {
       requestKind,
       sessionId: typeof sessionId === 'string' ? sessionId : undefined,
-      demoId: typeof demoId === 'string' ? demoId : undefined,
+      demoId: requestDemoId,
+      pageId: requestDemoId,
+      codeHash,
       codeLength,
       dependencies: resultWithModuleUrl.dependencies.length,
       cssImports: resultWithModuleUrl.cssImports.length,
@@ -131,6 +140,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         createApiError('VALIDATION_ERROR', error.message, {
           issues: error.issues,
+          demoId: requestDemoId,
+          pageId: requestDemoId,
+          codeHash,
+          requestKind,
         }),
         { status: 422 },
       );
