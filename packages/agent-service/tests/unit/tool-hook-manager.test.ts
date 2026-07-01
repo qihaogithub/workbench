@@ -1,10 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { collabRoomManager } from '../../src/collab/collab-room-manager';
 import { ToolHookManager } from '../../src/backends/managers/tool-hook-manager';
 import type { AgentConfig, AgentEvent, FileChange } from '../../src/core/types';
 
 vi.mock('fs', () => ({
   existsSync: vi.fn(() => true),
   readFileSync: vi.fn(() => 'file content'),
+}));
+
+vi.mock('../../src/collab/collab-room-manager', () => ({
+  collabRoomManager: {
+    applyExternalFileChanges: vi.fn(() => ({ reloadedRooms: 0 })),
+  },
 }));
 
 describe('ToolHookManager', () => {
@@ -18,6 +25,7 @@ describe('ToolHookManager', () => {
 
   beforeEach(() => {
     events = [];
+    vi.mocked(collabRoomManager.applyExternalFileChanges).mockClear();
     manager = new ToolHookManager(config, (event) => events.push(event));
   });
 
@@ -99,6 +107,21 @@ describe('ToolHookManager', () => {
       );
       expect(collected).toHaveLength(1);
       expect(manager.getFiles()).toHaveLength(1);
+    });
+
+    it('文件写入成功后应通知协同房间重载外部变更', () => {
+      manager.handleToolResult(
+        'writeFile',
+        { path: 'demos/page-1/index.tsx', content: 'fixed' },
+        false,
+        {},
+        'session-1',
+      );
+
+      expect(collabRoomManager.applyExternalFileChanges).toHaveBeenCalledWith(
+        '/tmp/workspace',
+        [{ path: 'demos/page-1/index.tsx', action: 'modified', content: 'fixed' }],
+      );
     });
 
     it('readFile 知识库路径时应记录到 readKnowledgeFiles', () => {

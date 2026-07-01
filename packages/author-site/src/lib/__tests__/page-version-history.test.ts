@@ -186,6 +186,98 @@ describe("页面级版本历史", () => {
     expect(getPageVersionHistory("proj_page_versions", "home")).toHaveLength(2);
   });
 
+  it("恢复页面版本后可更新 live workspace 基线并同步项目工作区", async () => {
+    const workspacePath = writeProject(dataDir);
+    const {
+      createPageVersionSnapshot,
+      markWorkspaceBasedOnVersion,
+      readProjectMeta,
+      restorePageVersion,
+      updateWorkspaceDemoFiles,
+      writeProjectMeta,
+    } = await importFsUtils(dataDir);
+    const workspaceManager = await import("../workspace-manager");
+
+    createPageVersionSnapshot("proj_page_versions", "home", "alice", "v1");
+    writeDemoPage(workspacePath, "home", "// home v2", '{"title":"v2"}');
+    createPageVersionSnapshot("proj_page_versions", "home", "alice", "v2");
+
+    const liveWorkspaceId = "live-page-restore";
+    const liveWorkspacePath = path.join(
+      dataDir,
+      "workspaces",
+      "projects",
+      "proj_page_versions",
+      liveWorkspaceId,
+    );
+    fs.mkdirSync(path.dirname(liveWorkspacePath), { recursive: true });
+    fs.cpSync(workspacePath, liveWorkspacePath, { recursive: true });
+    fs.writeFileSync(
+      path.join(liveWorkspacePath, ".workspace.json"),
+      JSON.stringify(
+        {
+          workspaceId: liveWorkspaceId,
+          demoId: "proj_page_versions",
+          projectId: "proj_page_versions",
+          scope: "live",
+          status: "active",
+          baseVersion: "v0",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    const project = readProjectMeta("proj_page_versions");
+    if (!project) throw new Error("project missing");
+    writeProjectMeta("proj_page_versions", {
+      ...project,
+      activeWorkspaceId: liveWorkspaceId,
+    });
+
+    const restored = restorePageVersion(
+      "proj_page_versions",
+      "home",
+      "v1",
+      "bob",
+    );
+    expect(restored.success).toBe(true);
+    if (!restored.files || !restored.newVersionId) {
+      throw new Error("restore result missing files or version");
+    }
+
+    expect(
+      updateWorkspaceDemoFiles(liveWorkspaceId, "home", restored.files),
+    ).toBe(true);
+    expect(
+      workspaceManager.syncActiveWorkspaceToCanonical(
+        "proj_page_versions",
+        liveWorkspaceId,
+      ),
+    ).toMatchObject({
+      success: false,
+      code: "WORKSPACE_STALE",
+    });
+
+    expect(
+      markWorkspaceBasedOnVersion(liveWorkspaceId, restored.newVersionId),
+    ).toBe(true);
+    expect(
+      workspaceManager.syncActiveWorkspaceToCanonical(
+        "proj_page_versions",
+        liveWorkspaceId,
+      ),
+    ).toMatchObject({ success: true });
+    expect(
+      fs.readFileSync(
+        path.join(workspacePath, "demos", "home", "index.tsx"),
+        "utf-8",
+      ),
+    ).toBe("// home v1");
+  });
+
   it("创建页面快照时优先使用传入的临时 workspace 内容", async () => {
     const officialWorkspace = writeProject(dataDir);
     const sessionWorkspace = path.join(dataDir, "workspaces", "ws-current");

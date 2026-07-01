@@ -1,14 +1,14 @@
 {
   "ok": true,
-  "targetUrl": "http://localhost:3200/demo/proj_1779608460375/edit",
+  "targetUrl": "http://localhost:3200/demo/proj_1779608460371/edit",
   "selectedProject": {
-    "id": "proj_1779608460375",
-    "name": "我的页面",
-    "updatedAt": 1782835679807,
+    "id": "proj_1779608460371",
+    "name": "伴读广告页面",
+    "updatedAt": 1782916251215,
     "demoCount": 2
   },
   "mode": "flush-only",
-  "generatedAt": "2026-06-30T17:14:12.093Z",
+  "generatedAt": "2026-07-01T14:34:47.017Z",
   "sampleMs": 500,
   "durationMs": 20000,
   "screenshotPath": "tmp/sync-status-flap/last-page.png",
@@ -21,11 +21,11 @@
   },
   "flushProbe": {
     "ok": true,
-    "projectId": "proj_1779608460375",
+    "projectId": "proj_1779608460371",
     "sessionSource": "project-session-list",
     "session": {
-      "sessionId": "session-1782838743539-0cdzp5c71",
-      "workspaceId": "ws-1782838743534-lxg7mwcwp"
+      "sessionId": "session-1782913248714-lgecck15p",
+      "workspaceId": "live-1782916125369-nz4tnguq6"
     },
     "projectSessions": {
       "status": 200,
@@ -35,63 +35,63 @@
         "success": true,
         "data": [
           {
-            "sessionId": "session-1782838743539-0cdzp5c71",
-            "demoId": "proj_1779608460375",
-            "workspaceId": "ws-1782838743534-lxg7mwcwp",
-            "title": null,
-            "createdAt": 1782838743540,
-            "expiresAt": 1782845943540,
+            "sessionId": "session-1782913248714-lgecck15p",
+            "demoId": "proj_1779608460371",
+            "workspaceId": "live-1782916125369-nz4tnguq6",
+            "title": "你把手机页面尺寸改了吗，现在手机也和pad一个尺寸",
+            "createdAt": 1782913248715,
+            "expiresAt": 1782920448715,
             "isExpired": false,
-            "messageCount": 0,
-            "lastMessageAt": 1782838743540,
+            "messageCount": 2,
+            "lastMessageAt": 1782916175173,
             "hasUnsavedChanges": true
           },
           {
-            "sessionId": "session-1782835700092-e85pd6lgv",
-            "demoId": "proj_1779608460375",
-            "workspaceId": "ws-1782835700086-675h3nytk",
-            "title": null,
-            "createdAt": 1782835700092,
-            "expiresAt": 1782842900092,
-            "isExpired": false,
-            "messageCount": 0,
-            "lastMessageAt": 1782835700092,
-            "hasUnsavedChanges": false
-          },
-          {
-            "sessionId": "session-1782829180381-nqc9eqnts",
-            "demoId": "proj_1779608460375",
-            "workspaceId": "ws-1782829180374-kjyxnfhde",
-            "title": "请根据右侧属性面板中的结构化变更修改当前页面。\n\n页面文件：demos/demo_177993567...",
-            "createdAt": 1782829180382,
-            "expiresAt": 1782842932297,
-            "isExpired": false,
-            "messageCount": 8,
-            "lastMessageAt": 1782835788651,
-            "hasUnsavedChanges": false
-          },
-          {
-            "sessionId": "session-1782814145889-7qg8b8501",
-            "demoId": "proj_1779608460375",
-            "workspaceId": "ws-1782814145881-xbtr9m9xb",
-            "title": null,
-            "createdAt": 1782814145889,
-            "expiresAt": 1782821345889,
+            "sessionId": "session-1782900379861-stbp31s7q",
+            "demoId": "proj_1779608460371",
+            "workspaceId": "live-1782900854472-ett8bhihh",
+            "title": "手机页面的预览尺寸不对",
+            "createdAt": 1782900379862,
+            "expiresAt": 1782907579862,
             "isExpired": true,
-            "messageCount": 0,
-            "lastMessageAt": 1782814145889,
+            "messageCount": 2,
+            "lastMessageAt": 1782900909234,
             "hasUnsavedChanges": false
           },
           {
-            "sessionId": "session-1782795820605-xdiod6ye3",
-            "demoId": "proj_1779608460375",
-            "workspaceId": "ws-1782795820585-lipxgmarw",
+            "sessionId": "session-1782897859458-lfwzpmwxq",
+            "demoId": "proj_1779608460371",
+            "workspaceId": "live-1782900154759-2idlzyb9g",
             "title": null,
-            "createdAt": 1782795820605,
-            "expiresAt": 1782803020605,
+            "createdAt": 1782897859458,
+            "expiresAt": 1782905059458,
             "isExpired": true,
-            "messageCount": 6,
-            "lastMessageAt": 1782796095937,
+            "messageCount": 2,
+            "lastMessageAt": 1782900208588,
+            "hasUnsavedChanges": false
+          },
+          {
+            "sessionId": "session-1782890129395-yyu9pmwb0",
+            "demoId": "proj_1779608460371",
+            "workspaceId": "live-1782891781169-e508q0ni4",
+            "title": null,
+            "createdAt": 1782890129395,
+            "expiresAt": 1782897329395,
+            "isExpired": true,
+            "messageCount": 2,
+            "lastMessageAt": 1782894557744,
+            "hasUnsavedChanges": false
+          },
+          {
+            "sessionId": "session-1782888281733-ykxxzztwk",
+            "demoId": "proj_1779608460371",
+            "workspaceId": "ws-1782888281729-obmpfyiny",
+            "title": null,
+            "createdAt": 1782888281733,
+            "expiresAt": 1782895481733,
+            "isExpired": true,
+            "messageCount": 15,
+            "lastMessageAt": 1782889440856,
             "hasUnsavedChanges": false
           }
         ]
@@ -105,7 +105,7 @@
         "success": true,
         "data": {
           "status": "flushed",
-          "flushedRooms": 5
+          "flushedRooms": 7
         }
       }
     }
@@ -118,11 +118,6 @@
   "consoleEvents": [],
   "failedRequests": [
     {
-      "url": "http://localhost:3200/_next/static/chunks/main-app.js?v=1782839643940",
-      "method": "GET",
-      "failure": "net::ERR_ABORTED"
-    },
-    {
       "url": "http://localhost:3200/api/auth/me",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
@@ -133,12 +128,12 @@
       "failure": "net::ERR_ABORTED"
     },
     {
-      "url": "http://localhost:3200/api/projects/proj_1779608460375/publish-status",
-      "method": "GET",
+      "url": "http://localhost:3200/api/editor-diagnostics/events",
+      "method": "POST",
       "failure": "net::ERR_ABORTED"
     },
     {
-      "url": "http://localhost:3201/api/projects/proj_1779608460375/versions",
+      "url": "http://localhost:3200/api/projects/proj_1779608460371/publish-status",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
@@ -148,7 +143,12 @@
       "failure": "net::ERR_ABORTED"
     },
     {
-      "url": "http://localhost:3201/api/projects/proj_1779608460375/versions",
+      "url": "http://localhost:3200/api/projects/proj_1779608460371/publish-status",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3200/api/demos",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
@@ -158,32 +158,11 @@
       "failure": "net::ERR_ABORTED"
     },
     {
-      "url": "http://localhost:3200/api/demos",
-      "method": "GET",
-      "failure": "net::ERR_ABORTED"
-    },
-    {
       "url": "http://localhost:3200/api/screenshots/health",
-      "method": "GET",
-      "failure": "net::ERR_ABORTED"
-    },
-    {
-      "url": "http://localhost:3200/api/projects/proj_1779608460375/publish-status",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     }
   ],
   "websocketResponses": [],
-  "trackedResponses": [
-    {
-      "url": "http://localhost:3200/api/sessions",
-      "status": 200,
-      "requestMethod": "POST"
-    },
-    {
-      "url": "http://localhost:3200/api/sessions",
-      "status": 200,
-      "requestMethod": "POST"
-    }
-  ]
+  "trackedResponses": []
 }

@@ -96,6 +96,56 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v10",
       "fileCount": 10,
       "note": "从 v1 恢复"
+    },
+    {
+      "versionId": "v12",
+      "type": "auto_checkpoint",
+      "savedAt": 1782913720239,
+      "savedBy": "qihao",
+      "sessionId": "session-1782913248714-lgecck15p",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v12",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v13",
+      "type": "restore_snapshot",
+      "savedAt": 1782915674546,
+      "savedBy": "qihao",
+      "sessionId": "restore-page-demo_1779608460372_f5g6h7-v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v13",
+      "fileCount": 9,
+      "note": "从页面 手机 的历史版本 v11 恢复"
+    },
+    {
+      "versionId": "v14",
+      "type": "restore_snapshot",
+      "savedAt": 1782915785829,
+      "savedBy": "qihao",
+      "sessionId": "restore-page-demo_1779608460372_f5g6h7-v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v14",
+      "fileCount": 9,
+      "note": "从页面 手机 的历史版本 v11 恢复"
+    },
+    {
+      "versionId": "v15",
+      "type": "restore_snapshot",
+      "savedAt": 1782916251215,
+      "savedBy": "qihao",
+      "sessionId": "restore-page-demo_1779608460372_f5g6h7-v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v15",
+      "fileCount": 9,
+      "note": "从页面 手机 的历史版本 v11 恢复"
+    },
+    {
+      "versionId": "v16",
+      "type": "restore_snapshot",
+      "savedAt": 1782917212049,
+      "savedBy": "qihao",
+      "sessionId": "restore-page-demo_1779608460372_f5g6h7-v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608460371/v16",
+      "fileCount": 9,
+      "note": "从页面 手机 的历史版本 v11 恢复"
     }
   ],
   "pageVersions": {
@@ -141,11 +191,11 @@
     ]
   },
   "createdAt": 1779608460371,
-  "updatedAt": 1782900958821,
+  "updatedAt": 1782917379113,
   "publishedVersion": "v1",
   "publishedAt": 1782838591293,
-  "activeWorkspaceId": "live-1782900854472-ett8bhihh",
-  "activeWorkspaceUpdatedAt": 1782900916758,
-  "canonicalSyncedWorkspaceId": "live-1782900854472-ett8bhihh",
-  "canonicalSyncedAt": 1782900958821
+  "activeWorkspaceId": "live-1782917116177-e2okz40rv",
+  "activeWorkspaceUpdatedAt": 1782917329993,
+  "canonicalSyncedWorkspaceId": "live-1782917116177-e2okz40rv",
+  "canonicalSyncedAt": 1782917379113
 }

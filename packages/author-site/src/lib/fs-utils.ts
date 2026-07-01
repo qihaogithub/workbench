@@ -1771,6 +1771,9 @@ export function restoreVersion(
   };
   project.versions.push(restoreVersionInfo);
   project.updatedAt = Date.now();
+  if (project.activeWorkspaceId) {
+    markWorkspaceBasedOnVersion(project.activeWorkspaceId, restoreVersionId);
+  }
 
   // 4. 清理旧版本
   cleanupOldVersions(project);
@@ -1956,6 +1959,21 @@ export function writeWorkspaceMeta(
     JSON.stringify(meta, null, 2),
     "utf-8",
   );
+}
+
+export function markWorkspaceBasedOnVersion(
+  workspaceId: string,
+  baseVersion: string,
+): boolean {
+  const meta = getWorkspaceMeta(workspaceId);
+  if (!meta) return false;
+
+  writeWorkspaceMeta(workspaceId, {
+    ...meta,
+    baseVersion,
+    updatedAt: Date.now(),
+  });
+  return true;
 }
 
 export function getWorkspaceFiles(workspaceId: string): DemoFiles | null {
