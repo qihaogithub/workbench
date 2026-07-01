@@ -130,6 +130,39 @@ describe("WorkspaceFilePersistence", () => {
     expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
   });
 
+  it("允许项目级 live workspace 作为共享协作边界", () => {
+    const liveWorkspacePath = path.join(tempDir, "workspaces", "projects", "proj-1", "live-1");
+    fs.mkdirSync(path.join(liveWorkspacePath, "demos", "page-1"), { recursive: true });
+    fs.writeFileSync(path.join(liveWorkspacePath, "demos", "page-1", "index.tsx"), "live", "utf-8");
+    writeJson(path.join(liveWorkspacePath, ".workspace.json"), {
+      workspaceId: "live-1",
+      demoId: "proj-1",
+      projectId: "proj-1",
+      scope: "live",
+      status: "active",
+      updatedAt: 1,
+    });
+    writeJson(path.join(tempDir, "sessions", "user-3", "proj-1", "session-3", ".session.json"), {
+      sessionId: "session-3",
+      demoId: "proj-1",
+      userId: "user-3",
+      workspaceId: "live-1",
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const persistence = new WorkspaceFilePersistence(tempDir);
+    const result = persistence.validateSession({
+      projectId: "proj-1",
+      workspaceId: "live-1",
+      sessionId: "session-3",
+      resourcePath: "demos/page-1/index.tsx",
+      kind: "page-code",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.workspacePath).toContain(path.join("workspaces", "projects", "proj-1", "live-1"));
+  });
+
   it("workspace 元数据缺失时仍可按嵌套目录名定位 workspace", () => {
     fs.rmSync(
       path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1", ".workspace.json"),

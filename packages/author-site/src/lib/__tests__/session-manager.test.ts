@@ -23,6 +23,19 @@ async function importSessionManager(dataDir: string) {
   return import("../session-manager");
 }
 
+async function importProjectModules(dataDir: string) {
+  jest.resetModules();
+  process.env.DATA_DIR = dataDir;
+  process.env.PROJECTS_DIR = path.join(dataDir, "projects");
+  process.env.SESSIONS_DIR = path.join(dataDir, "sessions");
+  process.env.WORKSPACES_DIR = path.join(dataDir, "workspaces");
+  process.env.SNAPSHOTS_DIR = path.join(dataDir, "snapshots");
+
+  const fsUtils = await import("../fs-utils");
+  const sessionManager = await import("../session-manager");
+  return { fsUtils, sessionManager };
+}
+
 function writeSession(
   dataDir: string,
   userId: string,
@@ -206,5 +219,48 @@ describe("活跃 Session 复用", () => {
       ),
     );
     expect(meta.status).toBe("orphaned");
+  });
+});
+
+describe("项目级共享 Workspace", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("不同用户打开同一项目时绑定同一个 live workspace", async () => {
+    const { fsUtils, sessionManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("共享工作区项目");
+
+    const userA = await sessionManager.createEditSession("user-a", project.id);
+    const userB = await sessionManager.createEditSession("user-b", project.id);
+
+    expect(userA.workspaceId).toBe(userB.workspaceId);
+    expect(userA.workspaceScope).toBe("live");
+    expect(userA.isSharedWorkspace).toBe(true);
+    expect(userB.workspaceScope).toBe("live");
+
+    const meta = fsUtils.getWorkspaceMeta(userA.workspaceId);
+    expect(meta?.scope).toBe("live");
+    expect(meta?.projectId).toBe(project.id);
+  });
+
+  it("归档 Session 不删除项目级 live workspace", async () => {
+    const { fsUtils, sessionManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("归档保留共享工作区项目");
+    const session = await sessionManager.createEditSession("user-a", project.id);
+    const workspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+
+    expect(workspacePath).toBeTruthy();
+    expect(sessionManager.archiveSession(session.sessionId, "archived")).toBe(true);
+    expect(fs.existsSync(workspacePath!)).toBe(true);
   });
 });

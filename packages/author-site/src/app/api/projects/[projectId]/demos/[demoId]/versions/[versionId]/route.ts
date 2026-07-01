@@ -12,9 +12,10 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
-  flushWorkspaceBeforeCriticalAction,
+  flushAndSyncProjectWorkspace,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
+import { syncActiveWorkspaceToCanonical } from "@/lib/workspace-manager";
 
 async function getAuthenticatedUser() {
   const token = getAuthCookie();
@@ -103,7 +104,7 @@ export async function POST(
         });
       }
       try {
-        await flushWorkspaceBeforeCriticalAction({
+        await flushAndSyncProjectWorkspace({
           projectId,
           workspaceId: meta.workspaceId,
           sessionId,
@@ -133,6 +134,13 @@ export async function POST(
 
     if (meta?.workspaceId) {
       updateWorkspaceDemoFiles(meta.workspaceId, demoId, result.files);
+      const synced = syncActiveWorkspaceToCanonical(projectId, meta.workspaceId);
+      if (!synced.success) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", synced.error || "同步项目当前工作区失败"),
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json(

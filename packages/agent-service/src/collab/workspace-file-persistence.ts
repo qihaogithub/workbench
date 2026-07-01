@@ -23,7 +23,11 @@ interface SessionMetaFile {
 interface WorkspaceMetaFile {
   workspaceId?: string;
   demoId?: string;
+  projectId?: string;
   userId?: string;
+  ownerUserId?: string;
+  scope?: "live" | "branch" | "snapshot-source" | "legacy";
+  status?: "active" | "archived" | "committed" | "expired";
 }
 
 function findProjectRoot(cwd: string): string {
@@ -85,10 +89,11 @@ export class WorkspaceFilePersistence {
     if (!workspacePath) return { ok: false, reason: "WORKSPACE_NOT_FOUND" };
 
     const workspaceMeta = this.readWorkspaceMeta(workspacePath);
-    if (workspaceMeta?.demoId && workspaceMeta.demoId !== input.projectId) {
+    const workspaceProjectId = workspaceMeta?.projectId ?? workspaceMeta?.demoId;
+    if (workspaceProjectId && workspaceProjectId !== input.projectId) {
       return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };
     }
-    if (!workspaceMeta?.demoId) {
+    if (!workspaceProjectId) {
       const inferredProjectId = this.inferProjectIdFromWorkspacePath(workspacePath);
       if (inferredProjectId && inferredProjectId !== input.projectId) {
         return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };

@@ -6,12 +6,9 @@ import {
   createApiSuccess,
   createProjectVersionSnapshot,
 } from "@/lib/fs-utils";
+import { getEditSession } from "@/lib/session-manager";
 import {
-  getEditSession,
-  syncEditSessionToProjectWorkspace,
-} from "@/lib/session-manager";
-import {
-  flushWorkspaceBeforeCriticalAction,
+  flushAndSyncProjectWorkspace,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
 import { validateWorkspacePreviewRuntime } from "@/lib/preview-validation";
@@ -61,7 +58,7 @@ export async function POST(
     }
 
     try {
-      await flushWorkspaceBeforeCriticalAction({
+      await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
         sessionId: params.sessionId,
@@ -83,14 +80,6 @@ export async function POST(
           { runtimeValidation },
         ),
         { status: 422 },
-      );
-    }
-
-    const synced = syncEditSessionToProjectWorkspace(params.sessionId);
-    if (!synced.success) {
-      return NextResponse.json(
-        createApiError("FILE_WRITE_ERROR", synced.error || "同步项目当前工作区失败"),
-        { status: 500 },
       );
     }
 

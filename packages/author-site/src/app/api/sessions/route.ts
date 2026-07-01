@@ -8,6 +8,7 @@ import {
   getSessionPath,
   getSessionMeta,
   findWorkspacePath,
+  getWorkspaceMeta,
   getWorkspaceMultiDemoFiles,
   getWorkspaceFiles,
 } from "@/lib/fs-utils";
@@ -15,9 +16,9 @@ import {
   archiveActiveSession,
   createEditSession,
   enforceSessionLimit,
+  ensureSessionUsesProjectActiveWorkspace,
   findActiveSession,
 } from "@/lib/session-manager";
-import { findActiveWorkspace } from "@/lib/workspace-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
   pushSessionExternalAuthToAgent,
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
 
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
+      ensureSessionUsesProjectActiveWorkspace(userId, projectId, activeSessionId);
       await pushUserModelConfig(userId, activeSessionId);
       await pushUserExternalAuth(userId, activeSessionId);
 
@@ -134,6 +136,12 @@ export async function POST(request: NextRequest) {
         createApiSuccess({
           sessionId: activeSessionId,
           workspaceId: meta?.workspaceId || null,
+          workspaceScope: meta?.workspaceId
+            ? getWorkspaceMeta(meta.workspaceId)?.scope || "legacy"
+            : "legacy",
+          isSharedWorkspace: meta?.workspaceId
+            ? getWorkspaceMeta(meta.workspaceId)?.scope === "live"
+            : false,
           code,
           schema,
           tempWorkspace,
@@ -144,9 +152,7 @@ export async function POST(request: NextRequest) {
     const resumeWorkspaceId =
       typeof workspaceId === "string"
         ? workspaceId
-        : forceNew
-          ? undefined
-          : findActiveWorkspace(userId, projectId) ?? undefined;
+        : undefined;
     const result = await createEditSession(userId, projectId, resumeWorkspaceId);
     await pushUserModelConfig(userId, result.sessionId);
     await pushUserExternalAuth(userId, result.sessionId);

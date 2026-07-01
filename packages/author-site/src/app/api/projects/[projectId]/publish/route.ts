@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { publishProject } from '@/lib/publish-manager';
-import { createApiSuccess, createApiError, getWorkspaceMeta } from '@/lib/fs-utils';
+import {
+  createApiSuccess,
+  createApiError,
+  getWorkspaceMeta,
+  readProjectMeta,
+} from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import {
   createEditSession,
   getEditSession,
-  syncEditSessionToProjectWorkspace,
 } from '@/lib/session-manager';
 import {
-  flushWorkspaceBeforeCriticalAction,
+  flushAndSyncProjectWorkspace,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
 
@@ -61,7 +65,7 @@ export async function POST(
         return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Session'), { status: 403 });
       }
       try {
-        await flushWorkspaceBeforeCriticalAction({
+        await flushAndSyncProjectWorkspace({
           projectId: params.projectId,
           workspaceId: session.workspaceId,
           sessionId,
@@ -73,14 +77,23 @@ export async function POST(
           { status: flushError.status },
         );
       }
-      const synced = syncEditSessionToProjectWorkspace(sessionId);
-      if (!synced.success) {
+    } else {
+      const project = readProjectMeta(params.projectId);
+      const activeUpdatedAt = project?.activeWorkspaceId
+        ? getWorkspaceMeta(project.activeWorkspaceId)?.updatedAt ??
+          project.activeWorkspaceUpdatedAt ??
+          0
+        : 0;
+      if (
+        project?.activeWorkspaceId &&
+        (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId ||
+          activeUpdatedAt > (project.canonicalSyncedAt ?? 0))
+      ) {
         return NextResponse.json(
-          createApiError('FILE_WRITE_ERROR', synced.error || '发布前同步失败'),
-          { status: 500 },
+          createApiError('INVALID_REQUEST', '发布前需要同步当前共享工作区'),
+          { status: 400 },
         );
       }
-    } else {
       sessionId = undefined;
     }
 

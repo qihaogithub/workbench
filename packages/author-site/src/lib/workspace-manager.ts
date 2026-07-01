@@ -11,6 +11,10 @@ import {
   getWorkspaceMeta as getWorkspaceMetaFromFs,
   writeWorkspaceMeta,
   getWorkspaceMultiDemoFiles,
+  readProjectMeta,
+  writeProjectMeta,
+  getLatestVersion,
+  syncProjectDemoPagesFromWorkspace,
   type WorkspaceMeta,
 } from "./fs-utils";
 import type { MultiDemoFiles } from "@opencode-workbench/shared";
@@ -20,8 +24,64 @@ export interface CreateWorkspaceResult {
   workspacePath: string;
   /** 多页面文件集合（取代旧 code/schema 单文件返回） */
   demos: MultiDemoFiles;
+  workspaceScope?: WorkspaceMeta["scope"];
 }
 
+function getProjectLiveWorkspaceDir(projectId: string): string {
+  return path.join(getWorkspacesDir(), "projects", projectId);
+}
+
+function copyWorkspaceClean(source: string, target: string): void {
+  fs.cpSync(source, target, {
+    recursive: true,
+    filter: (src: string) => !src.includes("node_modules"),
+  });
+}
+
+function writeLiveWorkspaceMeta(
+  workspacePath: string,
+  workspaceId: string,
+  projectId: string,
+): void {
+  const now = Date.now();
+  const latestVersion = getLatestVersion(projectId);
+  const meta: WorkspaceMeta = {
+    workspaceId,
+    demoId: projectId,
+    projectId,
+    scope: "live",
+    status: "active",
+    baseVersion: latestVersion?.versionId || "v0",
+    createdAt: now,
+    updatedAt: now,
+  };
+  fs.writeFileSync(
+    path.join(workspacePath, ".workspace.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
+}
+
+function readWorkspaceUpdatedAt(workspaceId: string): number {
+  const meta = getWorkspaceMetaFromFs(workspaceId);
+  if (meta?.updatedAt) return meta.updatedAt;
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath || !fs.existsSync(wsPath)) return 0;
+  return fs.statSync(wsPath).mtimeMs;
+}
+
+export function isLiveWorkspace(workspaceId: string | null | undefined): boolean {
+  if (!workspaceId) return false;
+  const meta = getWorkspaceMetaFromFs(workspaceId);
+  return meta?.scope === "live" && meta.status !== "archived";
+}
+
+export function getProjectActiveWorkspacePath(projectId: string): string | null {
+  const project = readProjectMeta(projectId);
+  if (!project?.activeWorkspaceId) return null;
+  const wsPath = findWorkspacePath(project.activeWorkspaceId);
+  return wsPath && fs.existsSync(wsPath) ? wsPath : null;
+}
 
 export function createWorkspace(
   userId: string,
@@ -45,7 +105,12 @@ export function createWorkspace(
   const meta: WorkspaceMeta = {
     workspaceId,
     demoId: projectId,
+    projectId,
     userId,
+    ownerUserId: userId,
+    scope: "branch",
+    status: "active",
+    baseVersion: getLatestVersion(projectId)?.versionId || "v0",
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -64,7 +129,147 @@ export function createWorkspace(
     workspaceId,
     workspacePath,
     demos,
+    workspaceScope: "branch",
   };
+}
+
+export function getOrCreateProjectActiveWorkspace(
+  projectId: string,
+  options: { migrationWorkspaceId?: string | null } = {},
+): CreateWorkspaceResult {
+  if (!projectExists(projectId)) {
+    throw new Error(`Project "${projectId}" 不存在`);
+  }
+
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    throw new Error(`Project "${projectId}" 不存在`);
+  }
+
+  if (project.activeWorkspaceId) {
+    const activePath = findWorkspacePath(project.activeWorkspaceId);
+    if (activePath && fs.existsSync(activePath)) {
+      const meta = getWorkspaceMetaFromFs(project.activeWorkspaceId);
+      if (!meta) {
+        writeLiveWorkspaceMeta(activePath, project.activeWorkspaceId, projectId);
+      } else if (meta.scope !== "live") {
+        writeWorkspaceMeta(project.activeWorkspaceId, {
+          ...meta,
+          scope: "live",
+          status: "active",
+          projectId,
+          demoId: projectId,
+          updatedAt: meta.updatedAt ?? Date.now(),
+        });
+      }
+      const demos = getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {
+        demos: {},
+        projectConfigSchema: undefined,
+      };
+      return {
+        workspaceId: project.activeWorkspaceId,
+        workspacePath: activePath,
+        demos,
+        workspaceScope: "live",
+      };
+    }
+  }
+
+  const workspaceId = `live-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  const liveDir = getProjectLiveWorkspaceDir(projectId);
+  const workspacePath = path.join(liveDir, workspaceId);
+  const migrationPath = options.migrationWorkspaceId
+    ? findWorkspacePath(options.migrationWorkspaceId)
+    : null;
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  const sourcePath =
+    migrationPath && fs.existsSync(migrationPath)
+      ? migrationPath
+      : projectWorkspacePath;
+
+  ensureWorkspaceFiles(projectWorkspacePath);
+  fs.mkdirSync(liveDir, { recursive: true });
+  copyWorkspaceClean(sourcePath, workspacePath);
+  writeLiveWorkspaceMeta(workspacePath, workspaceId, projectId);
+
+  const now = Date.now();
+  writeProjectMeta(projectId, {
+    ...project,
+    activeWorkspaceId: workspaceId,
+    activeWorkspaceUpdatedAt: now,
+    updatedAt: now,
+  });
+
+  const demos = getWorkspaceMultiDemoFiles(workspaceId) ?? {
+    demos: {},
+    projectConfigSchema: undefined,
+  };
+  return {
+    workspaceId,
+    workspacePath,
+    demos,
+    workspaceScope: "live",
+  };
+}
+
+export function syncActiveWorkspaceToCanonical(
+  projectId: string,
+  workspaceId?: string | null,
+): { success: boolean; workspacePath?: string; error?: string } {
+  const project = readProjectMeta(projectId);
+  if (!project) return { success: false, error: "Project not found" };
+
+  const effectiveWorkspaceId = workspaceId || project.activeWorkspaceId;
+  if (!effectiveWorkspaceId) {
+    return { success: false, error: "Project active workspace not found" };
+  }
+
+  const sourcePath = findWorkspacePath(effectiveWorkspaceId);
+  if (!sourcePath || !fs.existsSync(sourcePath)) {
+    return {
+      success: false,
+      error: `Workspace source not found: ${effectiveWorkspaceId}`,
+    };
+  }
+
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  const tempPath = `${projectWorkspacePath}.tmp`;
+  if (fs.existsSync(tempPath)) {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+  }
+
+  try {
+    copyWorkspaceClean(sourcePath, tempPath);
+    for (const filename of [".session.json", ".workspace.json"]) {
+      const filePath = path.join(tempPath, filename);
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+      }
+    }
+    if (fs.existsSync(projectWorkspacePath)) {
+      fs.rmSync(projectWorkspacePath, { recursive: true, force: true });
+    }
+    fs.renameSync(tempPath, projectWorkspacePath);
+    syncProjectDemoPagesFromWorkspace(projectId, projectWorkspacePath);
+
+    const latestProject = readProjectMeta(projectId) ?? project;
+    const now = Date.now();
+    writeProjectMeta(projectId, {
+      ...latestProject,
+      activeWorkspaceId: effectiveWorkspaceId,
+      activeWorkspaceUpdatedAt: readWorkspaceUpdatedAt(effectiveWorkspaceId) || now,
+      canonicalSyncedWorkspaceId: effectiveWorkspaceId,
+      canonicalSyncedAt: now,
+      updatedAt: now,
+    });
+    return { success: true, workspacePath: projectWorkspacePath };
+  } catch (error) {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sync failed",
+    };
+  }
 }
 
 export function getWorkspace(workspaceId: string) {
@@ -235,7 +440,9 @@ export function cleanupOrphanWorkspaces(
         if (fs.existsSync(metaPath)) {
           try {
             const wsMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-            shouldDelete = Date.now() - wsMeta.updatedAt > ttlMs;
+            shouldDelete =
+              wsMeta.scope !== "live" &&
+              Date.now() - wsMeta.updatedAt > ttlMs;
           } catch {
             const stat = fs.statSync(wsPath);
             shouldDelete = Date.now() - stat.mtimeMs > ttlMs;
@@ -272,14 +479,27 @@ export function syncSessionFromProject(
   const projectWorkspacePath = path.join(projectPath, "workspace");
   if (!fs.existsSync(projectWorkspacePath)) return null;
 
+  const existingMeta = getWorkspaceMetaFromFs(workspaceId);
   fs.rmSync(wsPath, { recursive: true, force: true });
   fs.cpSync(projectWorkspacePath, wsPath, { recursive: true });
 
-  const meta = getWorkspaceMetaFromFs(workspaceId);
-  if (meta) {
-    meta.updatedAt = Date.now();
-    writeWorkspaceMeta(workspaceId, meta);
-  }
+  const meta: WorkspaceMeta = {
+    ...(existingMeta ?? {
+      workspaceId,
+      demoId: projectId,
+      projectId,
+      userId,
+      createdAt: Date.now(),
+    }),
+    demoId: projectId,
+    projectId,
+    updatedAt: Date.now(),
+  };
+  fs.writeFileSync(
+    path.join(wsPath, ".workspace.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
 
   return wsPath;
 }

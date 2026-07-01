@@ -1,6 +1,7 @@
 import type { ErrorCodeType } from "@opencode-workbench/shared";
 
 import { getServerAgentServiceUrl } from "./runtime-config";
+import { syncActiveWorkspaceToCanonical } from "./workspace-manager";
 
 export type WorkspaceFlushStatus = "skipped" | "flushed" | "no_active_room";
 
@@ -64,6 +65,7 @@ function toApiErrorCode(code: string): ErrorCodeType {
   if (code === "SESSION_EXPIRED") return "SESSION_EXPIRED";
   if (code === "INVALID_REQUEST") return "INVALID_REQUEST";
   if (code === "FORBIDDEN") return "FORBIDDEN";
+  if (code === "FILE_WRITE_ERROR") return "FILE_WRITE_ERROR";
   return "AGENT_SERVICE_ERROR";
 }
 
@@ -103,5 +105,25 @@ export async function flushWorkspaceBeforeCriticalAction(
   return {
     status: isFlushStatus(data?.status) ? data.status : "flushed",
     flushedRooms: typeof data?.flushedRooms === "number" ? data.flushedRooms : 0,
+  };
+}
+
+export async function flushAndSyncProjectWorkspace(
+  options: WorkspaceFlushOptions,
+): Promise<WorkspaceFlushResult & { workspacePath?: string }> {
+  const flushResult = await flushWorkspaceBeforeCriticalAction(options);
+  const synced = syncActiveWorkspaceToCanonical(
+    options.projectId,
+    options.workspaceId,
+  );
+  if (!synced.success) {
+    throw new WorkspaceFlushError(
+      synced.error || "同步项目当前工作区失败",
+      { code: "FILE_WRITE_ERROR", status: 500 },
+    );
+  }
+  return {
+    ...flushResult,
+    workspacePath: synced.workspacePath,
   };
 }

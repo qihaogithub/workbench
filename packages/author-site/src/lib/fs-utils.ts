@@ -1247,16 +1247,22 @@ export function deleteSession(sessionId: string): boolean {
   const sessionPath = getSessionPath(sessionId);
 
   try {
-    const metaPath = path.join(sessionPath, ".session.json");
-    if (fs.existsSync(metaPath)) {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      if (meta.workspaceId) {
-        const wsPath = findWorkspacePath(meta.workspaceId);
-        if (wsPath && fs.existsSync(wsPath)) {
-          fs.rmSync(wsPath, { recursive: true, force: true });
+      const metaPath = path.join(sessionPath, ".session.json");
+      if (fs.existsSync(metaPath)) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        if (meta.workspaceId) {
+          const wsPath = findWorkspacePath(meta.workspaceId);
+          if (wsPath && fs.existsSync(wsPath)) {
+            const wsMetaPath = path.join(wsPath, ".workspace.json");
+            const wsMeta = fs.existsSync(wsMetaPath)
+              ? JSON.parse(fs.readFileSync(wsMetaPath, "utf-8"))
+              : null;
+            if (wsMeta?.scope !== "live") {
+              fs.rmSync(wsPath, { recursive: true, force: true });
+            }
+          }
         }
       }
-    }
   } catch {
     // 元数据读取失败不影响 session 删除
   }
@@ -1328,6 +1334,22 @@ export function readProjectMeta(projectId: string): Project | null {
           : {},
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
+      activeWorkspaceId:
+        typeof parsed.activeWorkspaceId === "string"
+          ? parsed.activeWorkspaceId
+          : undefined,
+      activeWorkspaceUpdatedAt:
+        typeof parsed.activeWorkspaceUpdatedAt === "number"
+          ? parsed.activeWorkspaceUpdatedAt
+          : undefined,
+      canonicalSyncedWorkspaceId:
+        typeof parsed.canonicalSyncedWorkspaceId === "string"
+          ? parsed.canonicalSyncedWorkspaceId
+          : undefined,
+      canonicalSyncedAt:
+        typeof parsed.canonicalSyncedAt === "number"
+          ? parsed.canonicalSyncedAt
+          : undefined,
     } as Project;
   } catch {
     return null;
@@ -1694,6 +1716,43 @@ export function restoreVersion(
   // 2. 用目标版本快照覆盖 workspace
   fs.rmSync(workspacePath, { recursive: true, force: true });
   fs.cpSync(targetVersion.snapshotPath, workspacePath, { recursive: true });
+  if (project.activeWorkspaceId) {
+    const activeWorkspacePath = findWorkspacePath(project.activeWorkspaceId);
+    if (activeWorkspacePath) {
+      const activeMetaPath = path.join(activeWorkspacePath, ".workspace.json");
+      const activeMeta = fs.existsSync(activeMetaPath)
+        ? JSON.parse(fs.readFileSync(activeMetaPath, "utf-8"))
+        : {
+            workspaceId: project.activeWorkspaceId,
+            demoId: projectId,
+            projectId,
+            scope: "live",
+            status: "active",
+            createdAt: Date.now(),
+          };
+      fs.rmSync(activeWorkspacePath, { recursive: true, force: true });
+      fs.cpSync(targetVersion.snapshotPath, activeWorkspacePath, { recursive: true });
+      fs.writeFileSync(
+        path.join(activeWorkspacePath, ".workspace.json"),
+        JSON.stringify(
+          {
+            ...activeMeta,
+            demoId: projectId,
+            projectId,
+            scope: activeMeta.scope ?? "live",
+            status: activeMeta.status ?? "active",
+            updatedAt: Date.now(),
+          },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+      project.activeWorkspaceUpdatedAt = Date.now();
+      project.canonicalSyncedWorkspaceId = project.activeWorkspaceId;
+      project.canonicalSyncedAt = Date.now();
+    }
+  }
 
   // 3. 记录恢复操作作为新版本
   const restoreVersionId = generateVersionId(project);
@@ -1861,7 +1920,12 @@ export function workspaceExists(workspaceId: string): boolean {
 export interface WorkspaceMeta {
   workspaceId: string;
   demoId: string;
+  projectId?: string;
   userId?: string;
+  ownerUserId?: string;
+  scope?: "live" | "branch" | "snapshot-source" | "legacy";
+  baseVersion?: string;
+  status?: "active" | "archived" | "committed" | "expired";
   createdAt: number;
   updatedAt: number;
 }
@@ -2045,6 +2109,20 @@ export function updateWorkspaceDemoFiles(
   }
   if (meta) {
     writeDemoPageMeta(wsPath, demoId, meta);
+  }
+  const workspaceMetaPath = path.join(wsPath, ".workspace.json");
+  if (fs.existsSync(workspaceMetaPath)) {
+    try {
+      const workspaceMeta = JSON.parse(fs.readFileSync(workspaceMetaPath, "utf-8"));
+      workspaceMeta.updatedAt = Date.now();
+      fs.writeFileSync(
+        workspaceMetaPath,
+        JSON.stringify(workspaceMeta, null, 2),
+        "utf-8",
+      );
+    } catch {
+      // 文件内容已写入，损坏的 workspace 元数据不阻断页面恢复。
+    }
   }
 
   return true;

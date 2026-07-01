@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
+import { getEditSession } from "@/lib/session-manager";
 import {
-  getEditSession,
-  syncEditSessionToProjectWorkspace,
-} from "@/lib/session-manager";
-import {
-  flushWorkspaceBeforeCriticalAction,
+  flushAndSyncProjectWorkspace,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
 
@@ -50,11 +47,19 @@ export async function POST(
     }
 
     try {
-      await flushWorkspaceBeforeCriticalAction({
+      const synced = await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
         sessionId: params.sessionId,
       });
+      return NextResponse.json(
+        createApiSuccess({
+          sessionId: params.sessionId,
+          projectId: session.demoId,
+          workspacePath: synced.workspacePath,
+          persistedAt: Date.now(),
+        }),
+      );
     } catch (error) {
       const flushError = getWorkspaceFlushErrorResponse(error);
       return NextResponse.json(
@@ -62,23 +67,6 @@ export async function POST(
         { status: flushError.status },
       );
     }
-
-    const synced = syncEditSessionToProjectWorkspace(params.sessionId);
-    if (!synced.success) {
-      return NextResponse.json(
-        createApiError("FILE_WRITE_ERROR", synced.error || "同步项目当前工作区失败"),
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json(
-      createApiSuccess({
-        sessionId: params.sessionId,
-        projectId: synced.projectId,
-        workspacePath: synced.workspacePath,
-        persistedAt: Date.now(),
-      }),
-    );
   } catch (error) {
     console.error("Error persisting session workspace:", error);
     return NextResponse.json(

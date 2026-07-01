@@ -935,11 +935,23 @@ export class ProjectAdminService {
     const workspacePath = path.join(this.workspacesDir, actor.id, projectId, workspaceId);
     ensureDir(path.dirname(workspacePath));
     copyWorkspace(source, workspacePath);
+    writeJsonFile(path.join(workspacePath, ".workspace.json"), {
+      workspaceId,
+      demoId: projectId,
+      projectId,
+      ownerUserId: actor.id,
+      scope: "branch",
+      status: "active",
+      baseVersion: project.versions.at(-1)?.versionId ?? "v0",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
     const transaction: EditTransaction = {
       editId,
       projectId,
       workspaceId,
       workspacePath,
+      workspaceScope: "branch",
       baseVersion: project.versions.at(-1)?.versionId ?? "v0",
       actor,
       createdAt: Date.now(),
