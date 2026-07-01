@@ -69,6 +69,48 @@ describe("preview contract", () => {
     expect(compiled.compiledCode).toContain("function __AutoComponent__");
   });
 
+  it("允许页面模块使用 page 作为普通顶层变量", () => {
+    const compiled = compilePreviewPageSource(
+      [
+        "const page = { title: '首页' };",
+        "export default function Demo(){ return <div>{page.title}</div>; }",
+      ].join("\n"),
+      { resolveDependencyUrl },
+    );
+
+    expect(compiled.compiledCode).toContain("const page");
+    expect(compiled.moduleHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("源码契约识别同一页面模块内重复的 page 顶层声明", () => {
+    const validation = validatePreviewPageSource(
+      [
+        "const page = { title: '首页' };",
+        "export default function Demo(){ return <div>{page.title}</div>; }",
+        "const page = { title: '重复' };",
+      ].join("\n"),
+    );
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues[0]?.stage).toBe("module_parse");
+    expect(validation.issues[0]?.code).toBe("DUPLICATE_TOP_LEVEL_DECLARATION");
+    expect(validation.issues[0]?.message).toContain("page");
+  });
+
+  it("编译生成绑定冲突不伪装成页面重复拼接", () => {
+    const validation = validateCompiledPreviewModule(
+      "import { jsx } from '/runtime/react/jsx-runtime.js';\nconst jsx = 'user';\nexport default function Demo(){ return jsx('div', {}); }",
+      { generated: true },
+    );
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toContainEqual(expect.objectContaining({
+      stage: "module_parse",
+      code: "GENERATED_MODULE_BINDING_CONFLICT",
+      message: expect.stringContaining("jsx"),
+    }));
+  });
+
   it("module preflight 识别重复顶层声明", () => {
     const validation = validateCompiledPreviewModule(
       "const accentMap = {};\nconst accentMap = {};\nexport default function Demo(){ return null; }",

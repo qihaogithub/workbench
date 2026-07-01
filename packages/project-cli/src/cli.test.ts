@@ -269,6 +269,35 @@ try {
   assert.equal(duplicateCommit.result.status, 1);
   assert.equal(duplicateCommit.payload.ok, false);
 
+  const multiPageEdit = runCli(["edit", "begin", createdData.id], tempDir);
+  assert.equal(multiPageEdit.result.status, 0);
+  const multiPageEditData = multiPageEdit.payload.data as { editId: string };
+  const pageVariableCode = "const page = { title: '首页' };\nexport default function Demo(){ return <div>{page.title}</div>; }";
+  const secondPageVariableCode = "const page = { title: '详情' };\nexport default function Demo(){ return <section>{page.title}</section>; }";
+  const firstPageUpdate = runCli(
+    ["page", "update-code", multiPageEditData.editId, pageData.meta.id, pageVariableCode],
+    tempDir,
+  );
+  assert.equal(firstPageUpdate.result.status, 0);
+  assert.equal(firstPageUpdate.payload.ok, true);
+  const secondPage = runCli(
+    ["page", "create", "--edit-id", multiPageEditData.editId, "--name", "详情", "--code", secondPageVariableCode],
+    tempDir,
+  );
+  assert.equal(secondPage.result.status, 0);
+  assert.equal(secondPage.payload.ok, true);
+  const multiPageValidation = runCli(["edit_validate", multiPageEditData.editId], tempDir);
+  assert.equal(multiPageValidation.result.status, 0);
+  const multiPageValidationData = multiPageValidation.payload.data as {
+    ok: boolean;
+    issues: Array<{ code: string }>;
+  };
+  assert.equal(multiPageValidationData.ok, true);
+  assert.equal(
+    multiPageValidationData.issues.some((issue) => issue.code === "DUPLICATE_TOP_LEVEL_DECLARATION"),
+    false,
+  );
+
   const missingProject = runCli(["project", "get", "proj_missing"], tempDir);
   assert.equal(missingProject.result.status, 1);
   assert.equal(missingProject.payload.ok, false);

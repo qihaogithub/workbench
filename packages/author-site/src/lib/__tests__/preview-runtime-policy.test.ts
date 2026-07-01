@@ -116,6 +116,19 @@ describe("AI 页面预览运行时策略", () => {
     ).toThrow(PreviewRuntimeContractError);
   });
 
+  it("允许页面使用 JSX runtime 常见生成名作为普通变量", () => {
+    const result = compileCode(`
+      const jsx = "user binding";
+
+      export default function Demo() {
+        return <div>{jsx}</div>;
+      }
+    `);
+
+    expect(result.moduleHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.compiledCode).toContain("user binding");
+  });
+
   it("拒绝当前 lucide-react 版本不存在的 named import", () => {
     const validation = validatePreviewRuntimeContract(`
       import { Soccer, Trophy } from "lucide-react";

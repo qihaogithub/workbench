@@ -37,6 +37,7 @@ export interface RuntimeContractIssue {
     | "COMPILE_TRANSFORM_FAILED"
     | "MODULE_PARSE_FAILED"
     | "DUPLICATE_TOP_LEVEL_DECLARATION"
+    | "GENERATED_MODULE_BINDING_CONFLICT"
     | "MULTIPLE_DEFAULT_EXPORTS"
     | "FILE_READ_ERROR"
     | "INVALID_JSON";
@@ -56,6 +57,10 @@ export type PreviewGenerationDiagnostic = RuntimeContractIssue;
 
 export interface ValidatePreviewPageSourceOptions {
   mode?: PreviewSourceMode;
+}
+
+export interface ValidateCompiledPreviewModuleOptions {
+  generated?: boolean;
 }
 
 export class PreviewRuntimeContractError extends Error {
@@ -219,6 +224,8 @@ export function validatePreviewPageSource(
     }
   }
 
+  issues.push(...collectTopLevelModuleIssues(wrappedSource, ts.ScriptKind.TSX));
+
   if (!/\bexport\s+default\b/.test(removeComments(wrappedSource))) {
     issues.push({
       stage: "component_export",
@@ -288,6 +295,16 @@ function createDuplicateTopLevelDeclarationIssue(name: string): RuntimeContractI
   };
 }
 
+function createGeneratedModuleBindingConflictIssue(name: string): RuntimeContractIssue {
+  return {
+    stage: "module_parse",
+    code: "GENERATED_MODULE_BINDING_CONFLICT",
+    severity: "error",
+    message: `预览编译生成模块的顶层绑定 ${name} 发生冲突，浏览器会拒绝导入该模块`,
+    instruction: "这是预览编译生成产物与页面源码绑定名的冲突，请由系统侧调整编译隔离或生成绑定命名；不要把不同页面的同名普通变量当作重复拼接处理。",
+  };
+}
+
 function createMultipleDefaultExportsIssue(): RuntimeContractIssue {
   return {
     stage: "module_parse",
@@ -314,11 +331,16 @@ function addBindingName(
   names: Map<string, number>,
   issues: RuntimeContractIssue[],
   name: string | undefined,
+  options: { generated?: boolean } = {},
 ): void {
   if (!name) return;
   const count = names.get(name) ?? 0;
   if (count === 1) {
-    issues.push(createDuplicateTopLevelDeclarationIssue(name));
+    issues.push(
+      options.generated
+        ? createGeneratedModuleBindingConflictIssue(name)
+        : createDuplicateTopLevelDeclarationIssue(name),
+    );
   }
   names.set(name, count + 1);
 }
@@ -328,7 +350,75 @@ function hasDefaultModifier(node: ts.Node): boolean {
     (ts.getModifiers(node) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword);
 }
 
-export function validateCompiledPreviewModule(compiledCode: string): RuntimeContractValidation {
+function collectTopLevelModuleIssues(
+  source: string,
+  scriptKind: ts.ScriptKind,
+  options: ValidateCompiledPreviewModuleOptions = {},
+): RuntimeContractIssue[] {
+  const sourceFile = ts.createSourceFile(
+    "preview-module.mjs",
+    source,
+    MODULE_PARSE_TARGET,
+    true,
+    scriptKind,
+  );
+  const issues: RuntimeContractIssue[] = [];
+  const topLevelNames = new Map<string, number>();
+  let defaultExportCount = 0;
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const importClause = statement.importClause;
+      if (!importClause || importClause.isTypeOnly) continue;
+      addBindingName(topLevelNames, issues, importClause.name?.text, options);
+      const namedBindings = importClause.namedBindings;
+      if (namedBindings && ts.isNamedImports(namedBindings)) {
+        for (const element of namedBindings.elements) {
+          if (!element.isTypeOnly) {
+            addBindingName(topLevelNames, issues, element.name.text, options);
+          }
+        }
+      } else if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+        addBindingName(topLevelNames, issues, namedBindings.name.text, options);
+      }
+      continue;
+    }
+
+    if (ts.isExportAssignment(statement)) {
+      defaultExportCount += 1;
+      continue;
+    }
+
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        const names: string[] = [];
+        collectBindingNames(declaration.name, names);
+        for (const name of names) {
+          addBindingName(topLevelNames, issues, name, options);
+        }
+      }
+      continue;
+    }
+
+    if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
+      if (hasDefaultModifier(statement)) {
+        defaultExportCount += 1;
+      }
+      addBindingName(topLevelNames, issues, statement.name?.text, options);
+    }
+  }
+
+  if (defaultExportCount > 1) {
+    issues.push(createMultipleDefaultExportsIssue());
+  }
+
+  return issues;
+}
+
+export function validateCompiledPreviewModule(
+  compiledCode: string,
+  options: ValidateCompiledPreviewModuleOptions = {},
+): RuntimeContractValidation {
   const transpiled = ts.transpileModule(compiledCode, {
     compilerOptions: {
       allowJs: true,
@@ -345,56 +435,7 @@ export function validateCompiledPreviewModule(compiledCode: string): RuntimeCont
     }
   }
 
-  const sourceFile = ts.createSourceFile(
-    "preview-module.mjs",
-    compiledCode,
-    MODULE_PARSE_TARGET,
-    true,
-    ts.ScriptKind.JS,
-  );
-  const topLevelNames = new Map<string, number>();
-  let defaultExportCount = 0;
-
-  for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement)) {
-      const importClause = statement.importClause;
-      addBindingName(topLevelNames, issues, importClause?.name?.text);
-      const namedBindings = importClause?.namedBindings;
-      if (namedBindings && ts.isNamedImports(namedBindings)) {
-        for (const element of namedBindings.elements) {
-          addBindingName(topLevelNames, issues, element.name.text);
-        }
-      }
-      continue;
-    }
-
-    if (ts.isExportAssignment(statement)) {
-      defaultExportCount += 1;
-      continue;
-    }
-
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        const names: string[] = [];
-        collectBindingNames(declaration.name, names);
-        for (const name of names) {
-          addBindingName(topLevelNames, issues, name);
-        }
-      }
-      continue;
-    }
-
-    if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
-      if (hasDefaultModifier(statement)) {
-        defaultExportCount += 1;
-      }
-      addBindingName(topLevelNames, issues, statement.name?.text);
-    }
-  }
-
-  if (defaultExportCount > 1) {
-    issues.push(createMultipleDefaultExportsIssue());
-  }
+  issues.push(...collectTopLevelModuleIssues(compiledCode, ts.ScriptKind.JS, options));
 
   return {
     ok: issues.length === 0,
@@ -412,8 +453,11 @@ export function assertPreviewRuntimeContract(
   }
 }
 
-export function assertCompiledPreviewModule(compiledCode: string): void {
-  const validation = validateCompiledPreviewModule(compiledCode);
+export function assertCompiledPreviewModule(
+  compiledCode: string,
+  options: ValidateCompiledPreviewModuleOptions = {},
+): void {
+  const validation = validateCompiledPreviewModule(compiledCode, options);
   if (!validation.ok) {
     throw new PreviewRuntimeContractError(validation.issues);
   }
