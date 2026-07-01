@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1782839405721_zb8k0w",
+  "at": 1782839405721,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-import-script"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "resourceId": "assets/images/challenge-prototype/page-01.png",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/images/challenge-prototype/page-01.png"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

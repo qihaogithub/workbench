@@ -121,6 +121,36 @@ describe("canvas layout route", () => {
           createdAt: 1,
           updatedAt: 1,
         },
+        "doc-group": {
+          id: "doc-group",
+          kind: "document",
+          title: "活动规则 等 2 个文档",
+          documents: [
+            {
+              id: "kb_1",
+              title: "活动规则",
+              knowledgeDocument: {
+                id: "kb_1",
+                title: "活动规则",
+                fileName: "活动规则.md",
+                description: "活动规则",
+              },
+            },
+            {
+              id: "kb_2",
+              title: "执行手册",
+              knowledgeDocument: {
+                id: "kb_2",
+                title: "执行手册",
+                fileName: "执行手册.md",
+              },
+            },
+          ],
+          activeDocumentId: "kb_2",
+          layout: { x: 40, y: 420, width: 620, height: 420 },
+          createdAt: 4,
+          updatedAt: 4,
+        },
         "img-1": {
           id: "img-1",
           kind: "image",
@@ -192,6 +222,71 @@ describe("canvas layout route", () => {
     expect(body.data.state).toEqual(expectedState);
     expect(body.data.state?.nodes).toEqual(state.nodes);
     expect(body.data.state?.layers?.annotations?.nodes).toEqual(state.nodes);
+  });
+
+  it("读取拼接损坏的画布布局时恢复最新有效布局", async () => {
+    const fsUtils = await import("@/lib/fs-utils");
+    const sessionManager = await import("@/lib/session-manager");
+    const { GET } = await import("./route");
+
+    const project = fsUtils.createProject("损坏画布布局项目");
+    const session = await sessionManager.createEditSession(
+      "user-1",
+      project.id,
+    );
+    const oldState: CanvasState = {
+      viewport: { x: 1, y: 2, zoom: 0.5 },
+      pages: {
+        page_old: { x: 10, y: 20, width: 375, height: 812 },
+      },
+      nodes: {},
+      hiddenKnowledgeDocumentIds: [],
+    };
+    const latestState: CanvasState = {
+      viewport: { x: 30, y: 40, zoom: 0.75 },
+      pages: {
+        page_latest: { x: 50, y: 60, width: 390, height: 844 },
+      },
+      nodes: {},
+      hiddenKnowledgeDocumentIds: [],
+    };
+
+    const sessionPath = fsUtils.getSessionPath(session.sessionId);
+    const workspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+    expect(sessionPath).toBeTruthy();
+    expect(workspacePath).toBeTruthy();
+
+    fs.writeFileSync(
+      path.join(fsUtils.getProjectPath(project.id), "workspace", ".canvas-layout.json"),
+      `${JSON.stringify({
+        version: 1,
+        projectId: project.id,
+        updatedAt: 1,
+        state: oldState,
+      }, null, 2)}${JSON.stringify({
+        version: 1,
+        projectId: project.id,
+        updatedAt: 2,
+        state: latestState,
+      }, null, 2)}`,
+      "utf-8",
+    );
+    fs.rmSync(path.join(sessionPath!, ".canvas-layout.json"), { force: true });
+    fs.rmSync(path.join(workspacePath!, ".canvas-layout.json"), { force: true });
+
+    const response = await GET(
+      createRequest(),
+      { params: { sessionId: session.sessionId } },
+    );
+    const body = (await response.json()) as {
+      success: boolean;
+      data: { state: CanvasState | null; updatedAt?: number };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.updatedAt).toBe(2);
+    expect(body.data.state).toEqual(normalizeCanvasStateLayers(latestState));
   });
 
   it("保存非法自由节点时返回无效请求", async () => {

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782839405717_0ttfyf",
+  "at": 1782839405717,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-import-script"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "inputSummary": {
+    "name": "闯关活动",
+    "category": "营销活动"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782839405716_tqjl1f"
+    ]
+  }
+}

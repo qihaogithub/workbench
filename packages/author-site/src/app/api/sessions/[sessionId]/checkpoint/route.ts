@@ -6,11 +6,15 @@ import {
   createApiSuccess,
   createProjectVersionSnapshot,
 } from "@/lib/fs-utils";
-import { getEditSession } from "@/lib/session-manager";
+import {
+  getEditSession,
+  syncEditSessionToProjectWorkspace,
+} from "@/lib/session-manager";
 import {
   flushWorkspaceBeforeCriticalAction,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
+import { validateWorkspacePreviewRuntime } from "@/lib/preview-validation";
 
 export async function POST(
   request: Request,
@@ -70,11 +74,30 @@ export async function POST(
       );
     }
 
+    const runtimeValidation = validateWorkspacePreviewRuntime(session.workspacePath);
+    if (!runtimeValidation.ok) {
+      return NextResponse.json(
+        createApiError(
+          "VALIDATION_ERROR",
+          "预览校验未通过，暂不创建自动保存记录",
+          { runtimeValidation },
+        ),
+        { status: 422 },
+      );
+    }
+
+    const synced = syncEditSessionToProjectWorkspace(params.sessionId);
+    if (!synced.success) {
+      return NextResponse.json(
+        createApiError("FILE_WRITE_ERROR", synced.error || "同步项目当前工作区失败"),
+        { status: 500 },
+      );
+    }
+
     const result = createProjectVersionSnapshot(session.demoId, payload.username, {
       sessionId: params.sessionId,
       note,
       type: "auto_checkpoint",
-      sourceWorkspacePath: session.workspacePath,
     });
 
     if (!result.success || !result.version) {

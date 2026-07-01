@@ -305,9 +305,10 @@ export function PromptInputTextarea({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && context.status === 'idle') {
+      if (value.trim() && context.status !== 'loading') {
         context.onSubmit?.({ text: value.trim(), files: context.files })
         context.setText('')
+        context.clearFiles()
       }
     }
   }
@@ -353,7 +354,7 @@ export function PromptInputTextarea({
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
-      disabled={context.status !== 'idle'}
+      disabled={context.status === 'loading'}
       className={cn(
         'resize-none overflow-hidden rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50',
         className,
@@ -458,13 +459,14 @@ export function PromptInputSubmit({
 }: PromptInputSubmitProps) {
   const context = usePromptInput()
   const status = propStatus || context.status
+  const hasContent = Boolean(context.text.trim() || context.files.length > 0)
 
   const handleClick = () => {
-    if (status === 'streaming') {
+    if (status === 'streaming' && !hasContent) {
       context.onCancel?.()
       return
     }
-    if (status === 'idle' && (context.text.trim() || context.files.length > 0)) {
+    if (status !== 'loading' && hasContent) {
       context.onSubmit?.({ text: context.text.trim(), files: context.files })
       context.setText('')
       context.clearFiles()
@@ -476,13 +478,13 @@ export function PromptInputSubmit({
       type="button"
       size="icon"
       className={cn('h-8 w-8 rounded-lg', className)}
-      disabled={status === 'idle' && !context.text.trim() && context.files.length === 0}
+      disabled={status === 'loading' || (status === 'idle' && !hasContent)}
       onClick={handleClick}
       {...props}
     >
       {status === 'loading' ? (
         <Loader2 className="h-4 w-4 animate-spin" />
-      ) : status === 'streaming' ? (
+      ) : status === 'streaming' && !hasContent ? (
         <Square className="h-3 w-3 fill-current" />
       ) : (
         <Send className="h-4 w-4" />

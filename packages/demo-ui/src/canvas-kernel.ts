@@ -1,4 +1,6 @@
 import type {
+  CanvasDocumentEntry,
+  CanvasDocumentNode,
   CanvasFreeNode,
   CanvasLayersState,
   CanvasPageLayout,
@@ -82,6 +84,31 @@ export function getAnnotationsFromCanvasState(
   state: CanvasState,
 ): Record<string, CanvasFreeNode> {
   return state.layers?.annotations?.nodes ?? state.nodes ?? {};
+}
+
+export function getCanvasDocumentEntries(
+  node: CanvasDocumentNode,
+): CanvasDocumentEntry[] {
+  if (node.documents && node.documents.length > 0) {
+    return node.documents;
+  }
+  if (!node.knowledgeDocument) return [];
+  return [
+    {
+      id: node.knowledgeDocument.id,
+      title: node.title || node.knowledgeDocument.title,
+      knowledgeDocument: node.knowledgeDocument,
+    },
+  ];
+}
+
+export function getActiveCanvasDocumentEntry(
+  node: CanvasDocumentNode,
+): CanvasDocumentEntry | undefined {
+  const entries = getCanvasDocumentEntries(node);
+  return (
+    entries.find((entry) => entry.id === node.activeDocumentId) ?? entries[0]
+  );
 }
 
 export function withCanvasAnnotationNodes(

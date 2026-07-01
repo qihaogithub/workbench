@@ -23,6 +23,7 @@
     "@fastify/websocket": "^10.0.0",
     "@opencode-workbench/knowledge-core": "workspace:*",
     "@opencode-workbench/knowledge-service": "workspace:*",
+    "@opencode-workbench/preview-contract": "workspace:*",
     "@opencode-workbench/shared": "workspace:*",
     "dotenv": "^17.4.2",
     "fastify": "^4.26.0",

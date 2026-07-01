@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Shield, AlertTriangle, FileText, X } from 'lucide-react'
+import { Shield, AlertTriangle, FileText, Check, X } from 'lucide-react'
 import { DocumentEditor } from '@opencode-workbench/demo-ui'
 
 interface PermissionRequestData {
@@ -61,7 +61,7 @@ export function PermissionDialog({
       <>
         <div className={cn(isInline ? 'px-4 py-2' : '', className)}>
           <div className="w-full rounded-lg border bg-background shadow-sm">
-            <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="p-2 rounded-full bg-blue-500/10">
                 <FileText className="h-5 w-5 text-blue-600" />
               </div>
@@ -71,9 +71,15 @@ export function PermissionDialog({
                   Agent 已制定计划，批准后才会继续执行
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setIsPlanOpen(true)}>
-                查看计划
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setIsPlanOpen(true)}>
+                  查看计划
+                </Button>
+                <Button size="sm" onClick={() => onRespond('allow_once', editablePlan)}>
+                  <Check className="mr-1.5 h-4 w-4" />
+                  批准
+                </Button>
+              </div>
             </div>
           </div>
         </div>

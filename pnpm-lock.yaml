@@ -17,6 +17,21 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
+      esbuild:
+        specifier: ^0.20.2
+        version: 0.20.2
+      framer-motion:
+        specifier: ^12.38.0
+        version: 12.38.0(react-dom@18.3.1)(react@18.3.1)
+      lucide-react:
+        specifier: ^0.323.0
+        version: 0.323.0(react@18.3.1)
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -84,6 +99,9 @@ importers:
       '@opencode-workbench/knowledge-service':
         specifier: workspace:*
         version: link:../knowledge-service
+      '@opencode-workbench/preview-contract':
+        specifier: workspace:*
+        version: link:../preview-contract
       '@opencode-workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -184,6 +202,9 @@ importers:
       '@opencode-workbench/knowledge-service':
         specifier: workspace:*
         version: link:../knowledge-service
+      '@opencode-workbench/preview-contract':
+        specifier: workspace:*
+        version: link:../preview-contract
       '@opencode-workbench/project-core':
         specifier: workspace:*
         version: link:../project-core
@@ -353,10 +374,10 @@ importers:
         specifier: ^1.13.4
         version: 1.13.4
       react:
-        specifier: ^18.2.0
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.2.0
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       react-simple-code-editor:
         specifier: ^0.14.1
@@ -448,7 +469,7 @@ importers:
         version: 1.0.7(tailwindcss@3.4.19)
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(jest@30.3.0)(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(esbuild@0.20.2)(jest@30.3.0)(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.37)(typescript@5.9.3)
@@ -534,6 +555,9 @@ importers:
         specifier: ^2.2.0
         version: 2.6.1
     devDependencies:
+      '@types/markdown-it':
+        specifier: ^14.1.2
+        version: 14.1.2
       '@types/react':
         specifier: ^18.2.52
         version: 18.3.28
@@ -569,14 +593,42 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@20.19.37)
 
+  packages/preview-contract:
+    dependencies:
+      lucide-react:
+        specifier: ^0.323.0
+        version: 0.323.0(react@18.3.1)
+      sucrase:
+        specifier: ^3.35.1
+        version: 3.35.1
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.16
+        version: 20.19.37
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.37)
+
   packages/project-cli:
     dependencies:
+      '@opencode-workbench/preview-contract':
+        specifier: workspace:*
+        version: link:../preview-contract
       '@opencode-workbench/project-core':
         specifier: workspace:*
         version: link:../project-core
       '@opencode-workbench/project-scaffold':
         specifier: workspace:*
         version: link:../project-scaffold
+      esbuild:
+        specifier: ^0.20.2
+        version: 0.20.2
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: ^20.11.16
@@ -584,15 +636,15 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
 
   packages/project-core:
     dependencies:
       '@opencode-workbench/knowledge-service':
         specifier: workspace:*
         version: link:../knowledge-service
+      '@opencode-workbench/preview-contract':
+        specifier: workspace:*
+        version: link:../preview-contract
       '@opencode-workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -764,10 +816,10 @@ importers:
         specifier: 14.1.0
         version: 14.1.0(@babel/core@7.29.0)(react-dom@18.3.1)(react@18.3.1)
       react:
-        specifier: ^18.2.0
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.2.0
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       tailwind-merge:
         specifier: ^2.2.1
@@ -1803,7 +1855,6 @@ packages:
     cpu: [ppc64]
     os: [aix]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/aix-ppc64@0.21.5:
@@ -1830,7 +1881,6 @@ packages:
     cpu: [arm64]
     os: [android]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/android-arm64@0.21.5:
@@ -1857,7 +1907,6 @@ packages:
     cpu: [arm]
     os: [android]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/android-arm@0.21.5:
@@ -1884,7 +1933,6 @@ packages:
     cpu: [x64]
     os: [android]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/android-x64@0.21.5:
@@ -1911,7 +1959,6 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/darwin-arm64@0.21.5:
@@ -1938,7 +1985,6 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/darwin-x64@0.21.5:
@@ -1965,7 +2011,6 @@ packages:
     cpu: [arm64]
     os: [freebsd]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/freebsd-arm64@0.21.5:
@@ -1992,7 +2037,6 @@ packages:
     cpu: [x64]
     os: [freebsd]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/freebsd-x64@0.21.5:
@@ -2019,7 +2063,6 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-arm64@0.21.5:
@@ -2046,7 +2089,6 @@ packages:
     cpu: [arm]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-arm@0.21.5:
@@ -2073,7 +2115,6 @@ packages:
     cpu: [ia32]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-ia32@0.21.5:
@@ -2100,7 +2141,6 @@ packages:
     cpu: [loong64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-loong64@0.21.5:
@@ -2127,7 +2167,6 @@ packages:
     cpu: [mips64el]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-mips64el@0.21.5:
@@ -2154,7 +2193,6 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-ppc64@0.21.5:
@@ -2181,7 +2219,6 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-riscv64@0.21.5:
@@ -2208,7 +2245,6 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-s390x@0.21.5:
@@ -2235,7 +2271,6 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/linux-x64@0.21.5:
@@ -2271,7 +2306,6 @@ packages:
     cpu: [x64]
     os: [netbsd]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/netbsd-x64@0.21.5:
@@ -2307,7 +2341,6 @@ packages:
     cpu: [x64]
     os: [openbsd]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/openbsd-x64@0.21.5:
@@ -2343,7 +2376,6 @@ packages:
     cpu: [x64]
     os: [sunos]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/sunos-x64@0.21.5:
@@ -2370,7 +2402,6 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/win32-arm64@0.21.5:
@@ -2397,7 +2428,6 @@ packages:
     cpu: [ia32]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/win32-ia32@0.21.5:
@@ -2424,7 +2454,6 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@esbuild/win32-x64@0.21.5:
@@ -7894,7 +7923,6 @@ packages:
       '@esbuild/win32-arm64': 0.20.2
       '@esbuild/win32-ia32': 0.20.2
       '@esbuild/win32-x64': 0.20.2
-    dev: true
 
   /esbuild@0.21.5:
     resolution: {integrity: sha512-mg3OPMV4hXywwpoDxu3Qda5xCKQi+vCTZq8S9J/EpkhB2HzKXq4SNFZE3+NK93JYxc8VMSep+lOUSC/RVKaBqw==}
@@ -8675,7 +8703,6 @@ packages:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       tslib: 2.8.1
-    dev: false
 
   /fs-constants@1.0.0:
     resolution: {integrity: sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==}
@@ -10502,7 +10529,6 @@ packages:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0
     dependencies:
       react: 18.3.1
-    dev: false
 
   /lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -11242,11 +11268,9 @@ packages:
     resolution: {integrity: sha512-pdkHLD8QYRp8VfiNLb8xIBJis1byQ9gPT3Jnh2jqfFtAsWUA3dEepDlsWe/xMpO8McV+VdpKVcp+E+TGJEtOoA==}
     dependencies:
       motion-utils: 12.36.0
-    dev: false
 
   /motion-utils@12.36.0:
     resolution: {integrity: sha512-eHWisygbiwVvf6PZ1vhaHCLamvkSbPIeAYxWUuL3a2PD/TROgE7FvfHWTIH4vMl798QLfMw15nRqIaRDXTlYRg==}
-    dev: false
 
   /ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -13730,7 +13754,7 @@ packages:
   /ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
 
-  /ts-jest@29.4.6(@babel/core@7.29.0)(jest@30.3.0)(typescript@5.9.3):
+  /ts-jest@29.4.6(@babel/core@7.29.0)(esbuild@0.20.2)(jest@30.3.0)(typescript@5.9.3):
     resolution: {integrity: sha512-fSpWtOO/1AjSNQguk43hb/JCo16oJDnMJf3CdEGNkqsEX3t0KX96xvyX1D7PfLCpVoKu4MfVrqUkFyblYoY4lA==}
     engines: {node: ^14.15.0 || ^16.10.0 || ^18.0.0 || >=20.0.0}
     hasBin: true
@@ -13759,6 +13783,7 @@ packages:
     dependencies:
       '@babel/core': 7.29.0
       bs-logger: 0.2.6
+      esbuild: 0.20.2
       fast-json-stable-stringify: 2.1.0
       handlebars: 4.7.9
       jest: 30.3.0(@types/node@20.19.37)(ts-node@10.9.2)
@@ -13920,7 +13945,6 @@ packages:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
-    dev: true
 
   /uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}

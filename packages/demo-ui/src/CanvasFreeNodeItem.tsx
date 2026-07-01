@@ -9,6 +9,10 @@ import {
   Minimize2,
 } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
+import {
+  getActiveCanvasDocumentEntry,
+  getCanvasDocumentEntries,
+} from "./canvas-kernel";
 import { cn } from "./utils";
 import type {
   CanvasFreeNode,
@@ -32,7 +36,11 @@ interface CanvasFreeNodeItemProps {
   onNodeStyleChange?: (node: CanvasFreeNode) => void;
   onTextEditStart?: (nodeId: string) => void;
   onToggleCollapse?: (nodeId: string) => void;
-  onSelect?: (nodeId: string) => void;
+  onActiveDocumentChange?: (nodeId: string, documentId: string) => void;
+  onSelect?: (
+    nodeId: string,
+    event?: React.PointerEvent | React.MouseEvent,
+  ) => void;
   onDragStart?: (nodeId: string) => void;
   onDragMove?: (nodeId: string, layout: CanvasPageLayout, edge?: string) => void;
   onDragEnd?: () => void;
@@ -384,6 +392,7 @@ export function CanvasFreeNodeItem({
   onNodeStyleChange,
   onTextEditStart,
   onToggleCollapse,
+  onActiveDocumentChange,
   onSelect,
   onDragStart,
   onDragMove,
@@ -413,6 +422,10 @@ export function CanvasFreeNodeItem({
     !isResizing &&
     node.kind === "text";
 
+  const documentEntries =
+    node.kind === "document" ? getCanvasDocumentEntries(node) : [];
+  const activeDocumentEntry =
+    node.kind === "document" ? getActiveCanvasDocumentEntry(node) : undefined;
   const renderedMarkdown =
     node.kind === "document"
       ? markdownRenderer.render(node.markdown || "文档内容加载中...")
@@ -455,7 +468,7 @@ export function CanvasFreeNodeItem({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       startPosRef.current = { x: e.clientX, y: e.clientY };
-      onSelect?.(node.id);
+      onSelect?.(node.id, e);
       if (!canInteract || e.button !== 0) return;
 
       const target = e.target as HTMLElement;
@@ -749,7 +762,40 @@ export function CanvasFreeNodeItem({
           </div>
         )}
 
-        {node.kind === "document" && !node.collapsed && (
+        {node.kind === "document" && !node.collapsed && documentEntries.length > 1 && (
+          <div className="flex h-full min-h-0">
+            <div className="scrollbar-thin w-40 shrink-0 overflow-auto border-r bg-muted/30 py-2">
+              {documentEntries.map((entry) => {
+                const active = entry.id === activeDocumentEntry?.id;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={cn(
+                      "block w-full truncate px-3 py-2 text-left text-xs transition-colors hover:bg-background/80",
+                      active
+                        ? "bg-background font-medium text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                    title={entry.title}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onActiveDocumentChange?.(node.id, entry.id);
+                    }}
+                  >
+                    {entry.title}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              className="markdown-editor-content scrollbar-thin h-full min-w-0 flex-1 overflow-auto px-4 py-3 text-sm"
+              dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+            />
+          </div>
+        )}
+
+        {node.kind === "document" && !node.collapsed && documentEntries.length <= 1 && (
           <div
             className="markdown-editor-content scrollbar-thin h-full overflow-auto px-4 py-3 text-sm"
             dangerouslySetInnerHTML={{ __html: renderedMarkdown }}

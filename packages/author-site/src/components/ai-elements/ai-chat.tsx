@@ -138,6 +138,7 @@ export function AIChat({
     handleRegenerate,
     handleRollback,
     handleEditResend,
+    handleCancelQueuedMessage,
     handlePermissionResponse,
     handlePermissionCancel,
     handleUserChoiceResponse,
@@ -295,6 +296,7 @@ export function AIChat({
             messagesRef={messagesRef}
             setMessages={setMessages}
             handleSend={handleSend}
+            onCancelQueuedMessage={handleCancelQueuedMessage}
             onUserChoiceResponse={handleUserChoiceResponse}
           />
         </ConversationContent>

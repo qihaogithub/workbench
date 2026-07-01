@@ -47,6 +47,7 @@ interface ChatMessagesProps {
       displayMessage: NonNullable<ChatMessage["autoRepair"]>;
     },
   ) => void;
+  onCancelQueuedMessage: (queueId: string) => void;
   onUserChoiceResponse: (requestId: string, choice: UserChoiceResponse) => void;
 }
 
@@ -64,9 +65,46 @@ export function ChatMessages({
   messagesRef,
   setMessages,
   handleSend,
+  onCancelQueuedMessage,
   onUserChoiceResponse,
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeMessages = messages.filter((message) => !message.queueStatus);
+  const queuedMessages = messages.filter((message) => message.queueStatus);
+
+  const renderMessage = (msg: ChatMessage) => {
+    if (msg.role === "user" || msg.kind === "auto_repair") {
+      return (
+        <Message
+          key={msg.id}
+          message={msg}
+          isStreaming={isStreaming}
+          onEditResend={onEditResend}
+          allMessages={messages}
+          setMessages={setMessages}
+          handleSend={handleSend}
+          onCancelQueuedMessage={onCancelQueuedMessage}
+        />
+      );
+    }
+    return (
+      <AssistantMessage
+        key={msg.id}
+        content={msg.content}
+        reasonings={msg.reasonings}
+        tools={msg.tools}
+        parts={msg.parts}
+        messageId={msg.id}
+        hasFileChanges={hasFileChanges(msg)}
+        isStreaming={false}
+        onRegenerate={onRegenerate}
+        onExternalAuthConnected={onExternalAuthConnected}
+        onRollback={onRollback}
+        externalAuthSessionId={externalAuthSessionId}
+        onUserChoiceResponse={onUserChoiceResponse}
+      />
+    );
+  };
 
   if (messages.length === 0 && !isStreaming) {
     return (
@@ -100,38 +138,7 @@ export function ChatMessages({
 
   return (
     <>
-      {messages.map((msg) => {
-        if (msg.role === "user" || msg.kind === "auto_repair") {
-          return (
-            <Message
-              key={msg.id}
-              message={msg}
-              isStreaming={isStreaming}
-              onEditResend={onEditResend}
-              allMessages={messages}
-              setMessages={setMessages}
-              handleSend={handleSend}
-            />
-          );
-        }
-        return (
-          <AssistantMessage
-            key={msg.id}
-            content={msg.content}
-            reasonings={msg.reasonings}
-            tools={msg.tools}
-            parts={msg.parts}
-            messageId={msg.id}
-            hasFileChanges={hasFileChanges(msg)}
-            isStreaming={false}
-            onRegenerate={onRegenerate}
-            onExternalAuthConnected={onExternalAuthConnected}
-            onRollback={onRollback}
-            externalAuthSessionId={externalAuthSessionId}
-            onUserChoiceResponse={onUserChoiceResponse}
-          />
-        );
-      })}
+      {activeMessages.map(renderMessage)}
 
       {isStreaming && (
         <AssistantMessage
@@ -146,6 +153,8 @@ export function ChatMessages({
           onUserChoiceResponse={onUserChoiceResponse}
         />
       )}
+
+      {queuedMessages.map(renderMessage)}
 
       {isUserScrolling && isStreaming && (
         <div className="sticky bottom-0 flex justify-center pb-2">

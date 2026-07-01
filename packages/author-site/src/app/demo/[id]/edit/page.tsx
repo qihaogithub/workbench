@@ -130,6 +130,7 @@ import type {
   CanvasKnowledgeDocument,
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
+  PreviewDiagnosticError,
 } from "@opencode-workbench/demo-ui";
 import type {
   DemoFiles,
@@ -159,7 +160,7 @@ type AiFileChange = {
 };
 
 type PreviewRuntimeErrorContext = NonNullable<
-  ActiveViewContext["previewRuntimeError"]
+  ActiveViewContext["previewDiagnostic"]
 >;
 
 function parsePreviewDimension(value: string | number | undefined): number | undefined {
@@ -867,7 +868,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
-  const autoPreviewRepairPageIdsRef = useRef<Set<string>>(new Set());
+  const autoPreviewRepairCountsRef = useRef<Map<string, number>>(new globalThis.Map());
   const { handleConsoleEntry } = useConsoleBuffer(streamServiceRef);
 
   // publishStatus, versionHistory, and related state moved to useVersionControl hook
@@ -969,6 +970,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             schema: `demos/${focusedPageId}/config.schema.json`,
           }
         : undefined,
+      previewDiagnostic:
+        previewRuntimeError &&
+        (!previewRuntimeError.pageId ||
+          previewRuntimeError.pageId === focusedPageId)
+          ? previewRuntimeError
+          : undefined,
       previewRuntimeError:
         previewRuntimeError &&
         (!previewRuntimeError.pageId ||
@@ -979,32 +986,47 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [activeDemoId, canvasEditingPageId, demoPages, previewMode, previewRuntimeError]);
 
   const handlePreviewError = useCallback(
-    (error: Error) => {
+    (error: PreviewDiagnosticError) => {
       const pageId =
         previewMode === "canvas"
           ? (canvasEditingPageId ?? activeDemoId)
           : activeDemoId;
-      setPreviewRuntimeError({
+      const diagnostic = error.previewDiagnostic ?? {
+        source: "preview_runtime" as const,
         stage: "runtime",
         pageId: pageId || undefined,
         file: pageId ? `demos/${pageId}/index.tsx` : undefined,
         message: error.message || "组件运行时发生错误",
         instruction:
           "请优先检查当前页面的 import、默认导出和渲染逻辑；图标和基础能力优先使用 @preview/sdk。",
-      });
+      };
+      const normalizedDiagnostic = {
+        ...diagnostic,
+        pageId: diagnostic.pageId || pageId || undefined,
+        file: diagnostic.file || (pageId ? `demos/${pageId}/index.tsx` : undefined),
+      };
+      setPreviewRuntimeError(normalizedDiagnostic);
 
-      if (pageId && !autoPreviewRepairPageIdsRef.current.has(pageId)) {
-        autoPreviewRepairPageIdsRef.current.add(pageId);
+      const repairCount = pageId
+        ? autoPreviewRepairCountsRef.current.get(pageId) ?? 0
+        : 0;
+      if (pageId && repairCount < 2) {
+        autoPreviewRepairCountsRef.current.set(pageId, repairCount + 1);
         setTabValue("ai");
-        const hiddenPrompt = `当前页面预览运行失败，请自动修复一次。
+        const hiddenPrompt = `当前页面预览诊断失败，请自动修复一次。
 
 页面: ${pageId}
 文件: demos/${pageId}/index.tsx
-错误: ${error.message || "组件运行时发生错误"}
+触发来源: ${normalizedDiagnostic.source ?? "preview_runtime"}
+阶段: ${normalizedDiagnostic.stage ?? "runtime"}
+错误代码: ${normalizedDiagnostic.code ?? "unknown"}
+错误: ${normalizedDiagnostic.message || "组件运行时发生错误"}
+修复指引: ${normalizedDiagnostic.instruction ?? "请修复当前页面代码后确保预览可以重新编译和导入。"}
 
 要求:
 - 保持页面原有产品意图、视觉结构和配置字段不变。
 - 优先使用 @preview/sdk 的受控能力，避免未登记依赖和不存在的 named import。
+- 如果错误指向重复顶层声明或多个 default export，请删除重复拼接块，只保留一个完整 React 组件模块。
 - 修复后不要新增无关文件。`;
         setTriggerAutoSend({
           kind: "auto_repair",
@@ -1014,7 +1036,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           debugDetail: [
             `页面: ${pageId}`,
             `文件: demos/${pageId}/index.tsx`,
-            `错误: ${error.message || "组件运行时发生错误"}`,
+            `来源: ${normalizedDiagnostic.source ?? "preview_runtime"}`,
+            `阶段: ${normalizedDiagnostic.stage ?? "runtime"}`,
+            `代码: ${normalizedDiagnostic.code ?? "unknown"}`,
+            `错误: ${normalizedDiagnostic.message || "组件运行时发生错误"}`,
           ].join("\n"),
         });
       }
@@ -1152,6 +1177,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigMarks,
     visualAiInstruction,
     setVisualAiInstruction,
+    visualPropertySubmission,
+    visualPendingPropertyChanges,
+    visualPendingConfigMarks,
+    hasPendingVisualAiInstruction,
     visualPropertySending,
     visualAnnotations,
     setVisualAnnotations,
@@ -1186,6 +1215,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleRemoveVisualConfigMark,
     handleSendVisualPropertiesToAI,
     confirmDiscardVisualPropertyWork,
+    handleVisualPropertyAutoSendHandled,
+    handleVisualPropertySubmissionStreamingChange,
     handleStartVisualConfig,
     handleApplyVisualConfig,
     handleCloseVisualConfigDialog,
@@ -1215,9 +1246,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   useEffect(() => {
     const hasPendingVisualWork =
-      visualPropertyChanges.length > 0 ||
-      visualConfigMarks.length > 0 ||
-      visualAiInstruction.trim().length > 0;
+      visualPendingPropertyChanges.length > 0 ||
+      visualPendingConfigMarks.length > 0 ||
+      hasPendingVisualAiInstruction;
     if (!hasPendingVisualWork) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1227,7 +1258,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [visualAiInstruction, visualConfigMarks.length, visualPropertyChanges.length]);
+  }, [
+    hasPendingVisualAiInstruction,
+    visualPendingConfigMarks.length,
+    visualPendingPropertyChanges.length,
+  ]);
+
+  const handleAiStreamingChange = useCallback(
+    (isStreaming: boolean) => {
+      setAiIsStreaming(isStreaming);
+      handleVisualPropertySubmissionStreamingChange(isStreaming);
+    },
+    [handleVisualPropertySubmissionStreamingChange],
+  );
 
   // Version control hook
   const versionControl = useVersionControl({
@@ -2225,12 +2268,26 @@ ${context.details}
     }
   }, [sessionId, workspaceId]);
 
+  const persistWorkspaceToProject = useCallback(async () => {
+    if (!sessionId) return;
+    const response = await fetch(`/api/sessions/${sessionId}/persist-workspace`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      throw new Error(
+        result?.error?.message || "同步项目当前工作区失败",
+      );
+    }
+  }, [sessionId]);
+
   useEffect(() => {
     if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
 
     const revisionAtStart = workspaceFlushRevision;
     const timer = window.setTimeout(() => {
       flushWorkspaceCollab(demoId, workspaceId, sessionId)
+        .then(() => persistWorkspaceToProject())
         .then(() => {
           if (workspaceFlushRevisionRef.current !== revisionAtStart) return;
           setHasPendingWorkspaceFlush(false);
@@ -2248,6 +2305,7 @@ ${context.details}
   }, [
     demoId,
     hasPendingWorkspaceFlush,
+    persistWorkspaceToProject,
     sessionId,
     workspaceFlushRevision,
     workspaceId,
@@ -2272,26 +2330,33 @@ ${context.details}
       ));
 
   const flushBeforeExit = useCallback(async () => {
+    const shouldPersistWorkspace =
+      hasPendingWorkspaceFlush || hasUnsavedChanges;
     if (hasUnsavedCanvasChanges) {
       await flushCanvasState();
     }
-    if (hasPendingWorkspaceFlush) {
-      try {
+    try {
+      if (hasPendingWorkspaceFlush) {
         await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-        setHasPendingWorkspaceFlush(false);
-        setWorkspaceFlushError(null);
-      } catch (error) {
-        setWorkspaceFlushError(
-          error instanceof Error ? error.message : "协同草稿同步失败",
-        );
-        throw error;
       }
+      if (shouldPersistWorkspace) {
+        await persistWorkspaceToProject();
+      }
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+    } catch (error) {
+      setWorkspaceFlushError(
+        error instanceof Error ? error.message : "协同草稿同步失败",
+      );
+      throw error;
     }
   }, [
     demoId,
     flushCanvasState,
+    hasUnsavedChanges,
     hasPendingWorkspaceFlush,
     hasUnsavedCanvasChanges,
+    persistWorkspaceToProject,
     sessionId,
     workspaceId,
   ]);
@@ -2679,7 +2744,7 @@ ${context.details}
                   externalStreamContent={aiStreamContent}
                   externalCurrentMessage={aiCurrentMessage}
                   onMessagesChange={setAiMessages}
-                  onIsStreamingChange={setAiIsStreaming}
+                  onIsStreamingChange={handleAiStreamingChange}
                   onStreamContentChange={setAiStreamContent}
                   onCurrentMessageChange={setAiCurrentMessage}
                   currentSessionId={sessionId}
@@ -2808,7 +2873,10 @@ ${context.details}
                     }
                   }}
                   triggerAutoSend={triggerAutoSend}
-                  onTriggerAutoSendHandled={() => setTriggerAutoSend(null)}
+                  onTriggerAutoSendHandled={() => {
+                    setTriggerAutoSend(null);
+                    handleVisualPropertyAutoSendHandled();
+                  }}
                   externalStreamServiceRef={streamServiceRef}
                   errorBanner={
                     errorBannerVisible && validationResult.errors.length > 0 ? (
@@ -3599,7 +3667,12 @@ ${context.details}
                         pageScreenshots[activeDemoId]?.screenshotUrl
                       }
                       onConsoleEntry={handleConsoleEntry}
-                      onContentLoaded={() => setSinglePreviewLoaded(true)}
+                      onContentLoaded={() => {
+                        setSinglePreviewLoaded(true);
+                        if (activeDemoId) {
+                          autoPreviewRepairCountsRef.current.delete(activeDemoId);
+                        }
+                      }}
                       onPositionableSizes={handlePositionableSizes}
                       visualEditMode={propertyPanelActive}
                       visualHoverNodeId={
@@ -3717,8 +3790,12 @@ ${context.details}
                       sessionId={sessionId}
                       nodeStack={visualNodeStack}
                       propertyChanges={visualPropertyChanges}
+                      pendingPropertyChanges={visualPendingPropertyChanges}
                       configMarks={visualConfigMarks}
+                      pendingConfigMarks={visualPendingConfigMarks}
                       aiInstruction={visualAiInstruction}
+                      hasPendingAiInstruction={hasPendingVisualAiInstruction}
+                      submission={visualPropertySubmission}
                       sending={visualPropertySending}
                       usedConfigKeys={visualConfigUsedKeys}
                       onPropertyChange={handleVisualPropertyChange}

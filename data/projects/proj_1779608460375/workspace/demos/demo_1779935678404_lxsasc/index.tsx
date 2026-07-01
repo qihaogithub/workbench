@@ -1,17 +1,23 @@
-interface Props {}
+interface DemoProps {
+  inviteCard1Color?: string;
+  inviteCard1Image?: string;
+  inviteCard2Color?: string;
+  inviteCard2Image?: string;
+}
 
-export default function FigmaComponent(props: Props) {
+export default function Demo({
+  inviteCard1Color = '#FF6B35',
+  inviteCard1Image = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A801.png',
+  inviteCard2Color = '#F7C59F',
+  inviteCard2Image = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A802.png',
+}: DemoProps) {
   // 项目级共享配置（由 PreviewPanel 运行时注入）
   const {
-    inviteColor1 = '#FF6B35',
-    inviteColor2 = '#F7C59F',
     mallColor1 = '#FEF7E5',
     mallColor2 = '#FEF7E5',
-    inviteImage1URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A801.png',
-    inviteImage2URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A802.png',
     mallImage1URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA1.png',
     mallImage2URL = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA2.png',
-  } = props as Record<string, unknown>;
+  } = {} as Record<string, unknown>;
   return (
     <div className="w-full h-screen overflow-hidden relative bg-[#ffffff]">
     <style>{`
@@ -40,11 +46,11 @@ export default function FigmaComponent(props: Props) {
             </div>
           </div>
           <div className="self-stretch shrink-0 inline-flex justify-start items-center gap-2.5" data-figma-id="153:164868">
-            <div className="flex items-center justify-center overflow-hidden rounded-md" style={{ width: 385, height: 80, backgroundColor: inviteColor1, borderRadius: 20 }}>
-              <img src={inviteImage1URL} alt="邀请活动图片1" className="h-full w-auto" />
+            <div className="flex items-center justify-center overflow-hidden rounded-md" style={{ width: 385, height: 80, backgroundColor: inviteCard1Color, borderRadius: 20 }}>
+              <img src={inviteCard1Image} alt="邀请活动图片1" className="h-full w-auto" />
             </div>
-            <div className="flex items-center justify-center overflow-hidden rounded-md" style={{ width: 385, height: 77.5, backgroundColor: inviteColor2, borderRadius: 20 }}>
-              <img src={inviteImage2URL} alt="邀请活动图片2" className="h-full w-auto" />
+            <div className="flex items-center justify-center overflow-hidden rounded-md" style={{ width: 385, height: 77.5, backgroundColor: inviteCard2Color, borderRadius: 20 }}>
+              <img src={inviteCard2Image} alt="邀请活动图片2" className="h-full w-auto" />
             </div>
           </div>
         </div>

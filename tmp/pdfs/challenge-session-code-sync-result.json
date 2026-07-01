@@ -1,0 +1,151 @@
+{
+  "projectId": "proj_1782839405716_tqjl1f",
+  "sessionWorkspace": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0",
+  "projectWorkspace": "data/projects/proj_1782839405716_tqjl1f/workspace",
+  "copiedCount": 27,
+  "skippedCount": 0,
+  "copied": [
+    {
+      "pageId": "prototype-01",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-01/index.tsx",
+      "reason": "replace-screenshot"
+    },
+    {
+      "pageId": "prototype-02",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-02/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-03",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-03/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-04",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-04/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-05",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-05/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-06",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-06/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-07",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-07/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-08",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-08/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-09",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-09/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-10",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-10/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-11",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-11/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-12",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-12/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-13",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-13/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-14",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-14/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-15",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-15/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-16",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-16/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-17",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-17/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-18",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-18/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-19",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-19/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-20",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-20/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-21",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-21/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-22",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-22/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-23",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-23/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-24",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-24/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-25",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-25/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-26",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-26/index.tsx",
+      "reason": "sync-newer-code"
+    },
+    {
+      "pageId": "prototype-27",
+      "file": "data/workspaces/a5862615-26bb-4688-924d-7fd68c132e21/proj_1782839405716_tqjl1f/ws-1782863019233-xvvc4hen0/demos/prototype-27/index.tsx",
+      "reason": "sync-newer-code"
+    }
+  ],
+  "skipped": [],
+  "syncedFiles": [
+    "workspace-tree.json",
+    ".canvas-layout.json",
+    "app.graph.json",
+    "memory.md"
+  ]
+}

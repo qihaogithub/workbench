@@ -88,6 +88,12 @@ export class WorkspaceFilePersistence {
     if (workspaceMeta?.demoId && workspaceMeta.demoId !== input.projectId) {
       return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };
     }
+    if (!workspaceMeta?.demoId) {
+      const inferredProjectId = this.inferProjectIdFromWorkspacePath(workspacePath);
+      if (inferredProjectId && inferredProjectId !== input.projectId) {
+        return { ok: false, reason: "WORKSPACE_PROJECT_MISMATCH" };
+      }
+    }
 
     return {
       ok: true,
@@ -154,10 +160,31 @@ export class WorkspaceFilePersistence {
   private findWorkspacePath(workspaceId: string): string | null {
     const workspacesDir = path.join(this.dataDir, "workspaces");
     if (!fs.existsSync(workspacesDir)) return null;
+
+    const directPath = path.join(workspacesDir, workspaceId);
+    if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
+      return directPath;
+    }
+
+    const pathByDirectoryName = this.findDirectoryByName(workspacesDir, workspaceId);
+    if (pathByDirectoryName) return pathByDirectoryName;
+
     const found = this.findJsonPath(workspacesDir, ".workspace.json", (meta: WorkspaceMetaFile) => {
       return meta.workspaceId === workspaceId;
     });
     return found ? path.dirname(found) : null;
+  }
+
+  private inferProjectIdFromWorkspacePath(workspacePath: string): string | null {
+    const workspacesDir = path.resolve(this.dataDir, "workspaces");
+    const resolvedWorkspacePath = path.resolve(workspacePath);
+    const relative = path.relative(workspacesDir, resolvedWorkspacePath);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      return null;
+    }
+
+    const segments = relative.split(path.sep).filter(Boolean);
+    return segments.length >= 3 ? segments[1] : null;
   }
 
   private readWorkspaceMeta(workspacePath: string): WorkspaceMetaFile | null {
@@ -215,6 +242,20 @@ export class WorkspaceFilePersistence {
           continue;
         }
       }
+    }
+    return null;
+  }
+
+  private findDirectoryByName(root: string, dirname: string): string | null {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const entryPath = path.join(root, entry.name);
+      if (entry.name === dirname) return entryPath;
+
+      const nested = this.findDirectoryByName(entryPath, dirname);
+      if (nested) return nested;
     }
     return null;
   }

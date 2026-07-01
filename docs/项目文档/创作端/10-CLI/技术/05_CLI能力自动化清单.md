@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-06-30
+> 更新日期：2026-07-01
 
 ## 用途
 
@@ -46,6 +46,7 @@ covers:
 | project.list | 项目 | `project list` | 低 | L3 | 已覆盖 | 查询项目列表 |
 | project.get | 项目 | `project get` | 低 | L3 | 已覆盖 | 查询项目详情 |
 | project.pull | 项目 | `project pull` | 低 | L3 | 已覆盖 | 拉取项目为本地项目包 |
+| project.runtime.validate | 项目 | `project validate-runtime` | 低 | L3 | 已覆盖 | 校验项目当前版本页面是否符合创作端预览运行契约 |
 | project.create | 项目 | `project create` | 中 | L4 | 已覆盖 | 创建项目 |
 | project.update | 项目 | `project update` | 中 | L4 | 已覆盖 | 修改项目基础信息 |
 | project.duplicate | 项目 | `project duplicate` | 中 | L4 | 已覆盖 | 复制项目 |
@@ -71,6 +72,7 @@ covers:
 | edit.extend | 编辑事务 | `edit extend` | 低 | L3 | 已覆盖 | 延长事务有效期 |
 | page.list | 页面 | `page list` | 低 | L3 | 已覆盖 | 查询页面树 |
 | page.get | 页面 | `page get` | 低 | L3 | 已覆盖 | 查询页面代码和配置 |
+| page.runtime.validate | 页面 | `page validate-runtime` | 低 | L3 | 已覆盖 | 校验编辑事务中的单页是否符合创作端预览运行契约 |
 | page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建页面 |
 | page.duplicate | 页面 | `page duplicate` | 中 | L4 | 已覆盖 | 复制页面 |
 | page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新页面代码 |
@@ -96,7 +98,7 @@ covers:
 | asset.upload | 资产 | `asset upload` | 中 | L4 | 已覆盖 | 上传资产 |
 | asset.replace | 资产 | `asset replace` | 中 | L4 | 已覆盖 | 替换资产并改引用 |
 | asset.delete | 资产 | `asset delete-preview`、`asset delete-execute` | 高 | L5 | 已覆盖 | 删除资产必须保留预览和确认 |
-| preview.compile | 预览 | `preview compile` | 低 | L3 | 已覆盖 | 编译预检 |
+| preview.compile | 预览 | `preview compile` | 低 | L3 | 已覆盖 | 源码运行契约校验与编译预检 |
 | preview.render | 预览 | `preview render` | 低 | L3 | 已覆盖 | 获取预览入口 |
 | preview.screenshot | 预览 | `preview screenshot` | 低 | L3 | 已覆盖 | 截图服务状态 |
 | preview.logs | 预览 | `preview console-logs` | 低 | L3 | 已覆盖 | 控制台日志 |

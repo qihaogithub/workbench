@@ -1,193 +1,43 @@
-import * as LucideIcons from "lucide-react";
-
 import { getCdnBaseUrl } from "./cdn-config";
 import {
-  PREVIEW_RUNTIME_MANIFEST_VERSION,
   type PreviewRuntimeResolveOptions,
   getPreviewRuntimeUrl,
 } from "./preview-runtime-manifest";
+import {
+  PREVIEW_CONTRACT_VERSION,
+  PREVIEW_DEPENDENCY_POLICY,
+  PreviewRuntimeContractError,
+  assertPreviewRuntimeContract,
+  isNpmPackage,
+  validatePreviewPageSource,
+  type ImportDeclaration,
+  type PreviewDependencyDefinition,
+  type PreviewDependencyKind,
+  type RuntimeContractIssue,
+  type RuntimeContractValidation,
+} from "@opencode-workbench/preview-contract/runtime";
 
-export type PreviewDependencyKind = "core" | "internal" | "sdk";
-
-export interface PreviewDependencyDefinition {
-  version: string;
-  kind: PreviewDependencyKind;
-}
-
-export interface ImportDeclaration {
-  moduleName: string;
-  namedImports: string[];
-}
-
-export interface RuntimeContractIssue {
-  stage: "dependency_import" | "component_export" | "render_contract";
-  code:
-    | "UNKNOWN_NPM_IMPORT"
-    | "RELATIVE_IMPORT_UNSUPPORTED"
-    | "INVALID_LUCIDE_IMPORT"
-    | "EMPTY_RENDER_RISK";
-  moduleName?: string;
-  importName?: string;
-  message: string;
-  instruction: string;
-}
-
-export interface RuntimeContractValidation {
-  ok: boolean;
-  issues: RuntimeContractIssue[];
-}
-
-export class PreviewRuntimeContractError extends Error {
-  readonly issues: RuntimeContractIssue[];
-
-  constructor(issues: RuntimeContractIssue[]) {
-    super("页面运行时契约校验失败");
-    this.name = "PreviewRuntimeContractError";
-    this.issues = issues;
-  }
-}
-
-export const PREVIEW_DEPENDENCY_POLICY_VERSION = PREVIEW_RUNTIME_MANIFEST_VERSION;
-
-export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefinition> = {
-  react: { version: "18.3.1", kind: "core" },
-  "react-dom": { version: "18.3.1", kind: "core" },
-  "lucide-react": { version: "0.323.0", kind: "internal" },
-  "framer-motion": { version: "12.38.0", kind: "internal" },
-  "@preview/sdk": { version: PREVIEW_DEPENDENCY_POLICY_VERSION, kind: "sdk" },
+export {
+  PREVIEW_DEPENDENCY_POLICY,
+  PreviewRuntimeContractError,
+  assertPreviewRuntimeContract,
+  isNpmPackage,
+  type ImportDeclaration,
+  type PreviewDependencyDefinition,
+  type PreviewDependencyKind,
+  type RuntimeContractIssue,
+  type RuntimeContractValidation,
 };
 
-const LUCIDE_EXPORTS = new Set(Object.keys(LucideIcons));
+export const PREVIEW_DEPENDENCY_POLICY_VERSION = PREVIEW_CONTRACT_VERSION;
+export const validatePreviewRuntimeContract = validatePreviewPageSource;
+
 const ESM_SH_BASE = getCdnBaseUrl();
-
-function removeComments(code: string): string {
-  return code
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
-function isCssImport(moduleName: string): boolean {
-  return moduleName.endsWith(".css") || moduleName.endsWith(".scss") || moduleName.endsWith(".less");
-}
-
-export function isNpmPackage(moduleName: string): boolean {
-  return !moduleName.startsWith(".") && !moduleName.startsWith("/");
-}
 
 function getPolicyPackageName(moduleName: string): string {
   if (moduleName === "react" || moduleName.startsWith("react/")) return "react";
   if (moduleName === "react-dom" || moduleName.startsWith("react-dom/")) return "react-dom";
   return moduleName;
-}
-
-export function isPreviewDependencyAllowed(moduleName: string): boolean {
-  if (isCssImport(moduleName)) return true;
-  return PREVIEW_DEPENDENCY_POLICY[getPolicyPackageName(moduleName)] !== undefined;
-}
-
-function splitNamedImports(namedBlock: string): string[] {
-  return namedBlock
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => part.replace(/\s+as\s+\w+$/u, "").trim())
-    .filter(Boolean);
-}
-
-export function extractImportDeclarations(code: string): ImportDeclaration[] {
-  const cleanCode = removeComments(code);
-  const declarations: ImportDeclaration[] = [];
-
-  const fromImportRegex = /import\s+(?:type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
-  let fromMatch: RegExpExecArray | null;
-  while ((fromMatch = fromImportRegex.exec(cleanCode)) !== null) {
-    const clause = fromMatch[1] || "";
-    const moduleName = fromMatch[2];
-    const namedBlockMatch = clause.match(/\{([\s\S]*?)\}/);
-    declarations.push({
-      moduleName,
-      namedImports: namedBlockMatch ? splitNamedImports(namedBlockMatch[1]) : [],
-    });
-  }
-
-  const sideEffectImportRegex = /import\s+['"]([^'"]+)['"]/g;
-  let sideEffectMatch: RegExpExecArray | null;
-  while ((sideEffectMatch = sideEffectImportRegex.exec(cleanCode)) !== null) {
-    declarations.push({
-      moduleName: sideEffectMatch[1],
-      namedImports: [],
-    });
-  }
-
-  return declarations;
-}
-
-export function validatePreviewRuntimeContract(code: string): RuntimeContractValidation {
-  const issues: RuntimeContractIssue[] = [];
-  const declarations = extractImportDeclarations(code);
-
-  for (const declaration of declarations) {
-    const { moduleName } = declaration;
-    if (isCssImport(moduleName)) continue;
-
-    if (!isNpmPackage(moduleName)) {
-      issues.push({
-        stage: "dependency_import",
-        code: "RELATIVE_IMPORT_UNSUPPORTED",
-        moduleName,
-        message: `预览运行时不支持相对源码导入 ${moduleName}`,
-        instruction: "页面代码必须保持单文件；图片请使用配置数据或 ImageAsset，通用能力请使用 @preview/sdk。",
-      });
-      continue;
-    }
-
-    if (!isPreviewDependencyAllowed(moduleName)) {
-      issues.push({
-        stage: "dependency_import",
-        code: "UNKNOWN_NPM_IMPORT",
-        moduleName,
-        message: `预览运行时未登记依赖 ${moduleName}`,
-        instruction: "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",
-      });
-      continue;
-    }
-
-    if (moduleName === "lucide-react") {
-      for (const importName of declaration.namedImports) {
-        if (!LUCIDE_EXPORTS.has(importName)) {
-          issues.push({
-            stage: "dependency_import",
-            code: "INVALID_LUCIDE_IMPORT",
-            moduleName,
-            importName,
-            message: `lucide-react@${PREVIEW_DEPENDENCY_POLICY["lucide-react"].version} 不提供 ${importName} 导出`,
-            instruction: "请改用 @preview/sdk 的 Icon 语义名称，例如 browser、football、trophy，或替换为 lucide-react 中存在的图标。",
-          });
-        }
-      }
-    }
-  }
-
-  if (/\breturn\s+null\s*;?/.test(removeComments(code))) {
-    issues.push({
-      stage: "render_contract",
-      code: "EMPTY_RENDER_RISK",
-      message: "组件存在 return null，可能导致预览空白",
-      instruction: "请返回可见 DOM；需要等待状态时使用加载占位，而不是返回 null。",
-    });
-  }
-
-  return {
-    ok: issues.length === 0,
-    issues,
-  };
-}
-
-export function assertPreviewRuntimeContract(code: string): void {
-  const validation = validatePreviewRuntimeContract(code);
-  if (!validation.ok) {
-    throw new PreviewRuntimeContractError(validation.issues);
-  }
 }
 
 function buildCdnPackageUrl(packageName: string): string {
@@ -198,6 +48,7 @@ function buildCdnPackageUrl(packageName: string): string {
       {
         stage: "dependency_import",
         code: "UNKNOWN_NPM_IMPORT",
+        severity: "error",
         moduleName: packageName,
         message: `预览运行时未登记依赖 ${packageName}`,
         instruction: "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 616,
+      "height": 940
+    }
+  },
+  "title": "关卡任务列表组件页配置",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "页面标题",
+      "default": "关卡任务列表组件页"
+    }
+  }
+}

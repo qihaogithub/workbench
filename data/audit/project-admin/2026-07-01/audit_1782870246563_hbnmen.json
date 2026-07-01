@@ -1,0 +1,54 @@
+{
+  "auditId": "audit_1782870246563_hbnmen",
+  "at": 1782870246563,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "resourceId": "edit_1782870041629_uylfvz",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      ".canvas-layout.json",
+      "demos/prototype-01/index.tsx",
+      "demos/prototype-02/index.tsx",
+      "demos/prototype-03/index.tsx",
+      "demos/prototype-04/index.tsx",
+      "demos/prototype-05/index.tsx",
+      "demos/prototype-06/index.tsx",
+      "demos/prototype-07/index.tsx",
+      "demos/prototype-08/index.tsx",
+      "demos/prototype-09/index.tsx",
+      "demos/prototype-10/index.tsx",
+      "demos/prototype-11/index.tsx",
+      "demos/prototype-12/index.tsx",
+      "demos/prototype-13/index.tsx",
+      "demos/prototype-14/index.tsx",
+      "demos/prototype-15/index.tsx",
+      "demos/prototype-16/index.tsx",
+      "demos/prototype-17/index.tsx",
+      "demos/prototype-18/index.tsx",
+      "demos/prototype-19/index.tsx",
+      "demos/prototype-20/index.tsx",
+      "demos/prototype-21/index.tsx",
+      "demos/prototype-22/index.tsx",
+      "demos/prototype-23/index.tsx",
+      "demos/prototype-24/index.tsx",
+      "demos/prototype-25/index.tsx",
+      "demos/prototype-26/index.tsx",
+      "demos/prototype-27/index.tsx"
+    ],
+    "notes": [
+      "生成版本 v8"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

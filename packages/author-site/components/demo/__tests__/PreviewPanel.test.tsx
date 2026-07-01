@@ -56,8 +56,8 @@ describe("PreviewPanel", () => {
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
     await waitFor(() => {
-      expect(screen.getByText("编译错误")).toBeInTheDocument();
-      expect(screen.getByText("语法错误: 第3行")).toBeInTheDocument();
+      expect(screen.getByText("正在修复预览")).toBeInTheDocument();
+      expect(screen.queryByText("语法错误: 第3行")).not.toBeInTheDocument();
     });
   });
 

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import { getDataDir } from '@/lib/fs-utils';
 import { initializeDatabase } from './schema';
@@ -8,7 +9,9 @@ let initialized = false;
 
 export function getDb(): Database.Database {
   if (!db) {
-    db = new Database(path.join(getDataDir(), 'users.db'));
+    const dataDir = getDataDir();
+    fs.mkdirSync(dataDir, { recursive: true });
+    db = new Database(path.join(dataDir, 'users.db'));
     db.pragma('journal_mode = WAL');  // 提升并发性能
     db.pragma('foreign_keys = ON');
 

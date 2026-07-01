@@ -22,6 +22,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@opencode-workbench/project-core": ["../project-core/src"],
+      "@opencode-workbench/preview-contract": ["../preview-contract/src"],
+      "@opencode-workbench/preview-contract/*": ["../preview-contract/src/*"],
       "@opencode-workbench/shared": ["../shared/src"],
       "@opencode-workbench/demo-ui": ["../demo-ui/src/index.ts"],
       "@opencode-workbench/demo-ui/*": ["../demo-ui/src/*"],

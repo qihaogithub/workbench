@@ -98,6 +98,8 @@ export interface ChatMessage {
   id?: string;
   role: "user" | "assistant" | "system";
   kind?: "auto_repair";
+  queueId?: string;
+  queueStatus?: "queued" | "sending";
   /** @deprecated 使用 parts 数组替代 */
   content: string;
   autoRepair?: {
@@ -159,6 +161,7 @@ interface MessageProps {
       displayMessage: NonNullable<ChatMessage["autoRepair"]>;
     },
   ) => void;
+  onCancelQueuedMessage?: (queueId: string) => void;
 }
 
 export function Message({
@@ -169,6 +172,7 @@ export function Message({
   allMessages,
   setMessages,
   handleSend,
+  onCancelQueuedMessage,
 }: MessageProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -334,7 +338,22 @@ export function Message({
                 {message.content}
               </Streamdown>
             </div>
-            {!isStreaming && onEditResend && message.id && (
+            {message.queueStatus && (
+              <div className="mt-2 flex items-center justify-end gap-2 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                <span>{message.queueStatus === "queued" ? "等待发送" : "正在发送"}</span>
+                {message.queueStatus === "queued" && message.queueId && onCancelQueuedMessage && (
+                  <button
+                    type="button"
+                    onClick={() => onCancelQueuedMessage(message.queueId!)}
+                    className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    取消
+                  </button>
+                )}
+              </div>
+            )}
+            {!message.queueStatus && !isStreaming && onEditResend && message.id && (
               <button
                 onClick={() => {
                   setEditContent(message.content);
@@ -400,13 +419,13 @@ function AutoRepairMessage({
   return (
     <div className={cn("flex justify-center px-3 py-2", className)}>
       <div className="w-full max-w-[540px] rounded-lg border border-border/70 bg-card/80 px-3.5 py-3 text-sm text-foreground shadow-sm">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground">
-            <Wrench className="h-4 w-4" />
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+            <Wrench className="h-3.5 w-3.5" />
           </div>
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
-              <p className="min-w-0 text-sm font-semibold leading-5">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-6">
                 {autoRepair.title}
               </p>
               <span
@@ -419,67 +438,69 @@ function AutoRepairMessage({
                 {statusConfig.label}
               </span>
             </div>
-            <p className="text-sm leading-5 text-muted-foreground">
-              {autoRepair.summary}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {autoRepair.debugDetail && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                      查看详情
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="flex max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
-                    <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
-                      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <DialogTitle className="text-base leading-6">
-                          自动修复详情
-                        </DialogTitle>
-                        <span
-                          className={cn(
-                            "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-medium",
-                            statusConfig.className,
-                          )}
-                        >
-                          <StatusIcon className="h-3 w-3" />
-                          {statusConfig.label}
-                        </span>
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm leading-5 text-muted-foreground">
+                {autoRepair.summary}
+              </p>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {autoRepair.debugDetail && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        查看详情
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="flex max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
+                      <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <DialogTitle className="text-base leading-6">
+                            自动修复详情
+                          </DialogTitle>
+                          <span
+                            className={cn(
+                              "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-medium",
+                              statusConfig.className,
+                            )}
+                          >
+                            <StatusIcon className="h-3 w-3" />
+                            {statusConfig.label}
+                          </span>
+                        </div>
+                        <DialogDescription className="text-sm leading-5">
+                          {autoRepair.summary}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="min-h-0 flex-1 overflow-auto bg-muted/30 p-4">
+                        <pre className="whitespace-pre-wrap break-words rounded-md border border-border/70 bg-background p-3 text-xs leading-relaxed text-muted-foreground">
+                          {autoRepair.debugDetail}
+                        </pre>
                       </div>
-                      <DialogDescription className="text-sm leading-5">
-                        {autoRepair.summary}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="min-h-0 flex-1 overflow-auto bg-muted/30 p-4">
-                      <pre className="whitespace-pre-wrap break-words rounded-md border border-border/70 bg-background p-3 text-xs leading-relaxed text-muted-foreground">
-                        {autoRepair.debugDetail}
-                      </pre>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-              {canRetry && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onRetry(autoRepair.hiddenPrompt!, undefined, {
-                      source: "system_auto_repair",
-                      displayMessage: {
-                        ...autoRepair,
-                        status: "running",
-                      },
-                    })
-                  }
-                  className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  重新修复
-                </button>
-              )}
+                    </DialogContent>
+                  </Dialog>
+                )}
+                {canRetry && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRetry(autoRepair.hiddenPrompt!, undefined, {
+                        source: "system_auto_repair",
+                        displayMessage: {
+                          ...autoRepair,
+                          status: "running",
+                        },
+                      })
+                    }
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    重新修复
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

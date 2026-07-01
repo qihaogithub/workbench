@@ -8,13 +8,22 @@ export interface ActiveViewContext {
     index?: string;
     schema?: string;
   };
-  previewRuntimeError?: {
+  previewDiagnostic?: {
+    source?:
+      | "post_generation_validation"
+      | "cli_runtime_validation"
+      | "preview_runtime"
+      | "checkpoint_guard";
     stage?: string;
+    code?: string;
     pageId?: string;
     file?: string;
     message: string;
     instruction?: string;
+    moduleName?: string;
+    importName?: string;
   };
+  previewRuntimeError?: ActiveViewContext["previewDiagnostic"];
 }
 
 export function buildActiveViewContextPrefix(
@@ -50,19 +59,28 @@ export function buildActiveViewContextPrefix(
     lines.push(`- 当前焦点页面配置路径: ${context.focusedPagePaths.schema}`);
   }
 
-  if (context.previewRuntimeError) {
+  const previewDiagnostic = context.previewDiagnostic ?? context.previewRuntimeError;
+  if (previewDiagnostic) {
     lines.push(
       "",
-      "## 最近一次预览运行错误（系统内部回流给 AI）",
+      "## 最近一次预览诊断（系统内部回流给 AI）",
       "",
-      "用户侧不会展示技术错误；以下信息用于你自动修复当前页面。优先修改对应页面代码，并避免再次使用未登记依赖或不存在的导出。",
-      `- 错误阶段: ${context.previewRuntimeError.stage ?? "runtime"}`,
-      `- 页面: ${context.previewRuntimeError.pageId ?? context.focusedPageId ?? "unknown"}`,
-      `- 文件: ${context.previewRuntimeError.file ?? context.focusedPagePaths?.index ?? "unknown"}`,
-      `- 错误信息: ${context.previewRuntimeError.message}`,
+      "用户侧不会展示技术错误；以下信息用于你自动修复当前页面。优先修改对应页面代码，并避免再次使用未登记依赖、不存在的导出或重复拼接模块。",
+      `- 触发来源: ${previewDiagnostic.source ?? "preview_runtime"}`,
+      `- 错误阶段: ${previewDiagnostic.stage ?? "runtime"}`,
+      `- 错误代码: ${previewDiagnostic.code ?? "unknown"}`,
+      `- 页面: ${previewDiagnostic.pageId ?? context.focusedPageId ?? "unknown"}`,
+      `- 文件: ${previewDiagnostic.file ?? context.focusedPagePaths?.index ?? "unknown"}`,
+      `- 错误信息: ${previewDiagnostic.message}`,
     );
-    if (context.previewRuntimeError.instruction) {
-      lines.push(`- 修复指引: ${context.previewRuntimeError.instruction}`);
+    if (previewDiagnostic.moduleName) {
+      lines.push(`- 相关模块: ${previewDiagnostic.moduleName}`);
+    }
+    if (previewDiagnostic.importName) {
+      lines.push(`- 相关导入: ${previewDiagnostic.importName}`);
+    }
+    if (previewDiagnostic.instruction) {
+      lines.push(`- 修复指引: ${previewDiagnostic.instruction}`);
     }
   }
 

@@ -595,6 +595,11 @@ register("project update", "修改项目名称或描述", (args, pos, { service,
   ["project_rename"],
 );
 
+register("project validate-runtime", "校验项目当前版本页面是否符合创作端预览运行契约", (args, pos, { service, actor }) =>
+  service.validateProjectRuntime(stringArg(args, "projectId", pos[0]), actor),
+  ["project_validate_runtime"],
+);
+
 register("project duplicate", "复制项目为独立项目", (args, pos, { service, actor }) =>
   service.duplicateProject(stringArg(args, "projectId", pos[0]), optionalStringArg(args, "name", pos[1]), undefined, actor),
   ["project_duplicate"],
@@ -825,6 +830,11 @@ register("page update-code", "更新页面代码", (args, pos, { service, actor 
     actor,
   ),
   ["page_update_code"],
+);
+
+register("page validate-runtime", "校验页面是否符合创作端预览运行契约", (args, pos, { service }) =>
+  service.validatePageRuntime(stringArg(args, "editId", pos[0]), stringArg(args, "pageId", pos[1])),
+  ["page_validate_runtime"],
 );
 
 register("page update-schema", "更新页面 Schema", (args, pos, { service, actor }) =>
@@ -1183,7 +1193,10 @@ export async function runCli(argv: string[]): Promise<number> {
   return isFailedResult(normalizeResult(result)) ? 1 : 0;
 }
 
-const isCliEntrypoint = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isCliEntrypoint =
+  process.env.PROJECT_CLI_DISABLE_AUTO_RUN !== "1" &&
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCliEntrypoint) {
   runCli(process.argv.slice(2)).then((code) => {

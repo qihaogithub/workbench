@@ -19,6 +19,12 @@ export interface SystemConfig {
   updated_by?: string;
 }
 
+export interface DbConfigWithMeta {
+  config: Record<string, unknown>;
+  updatedAt: number;
+  updatedBy?: string;
+}
+
 /**
  * 读取配置
  * @param id 配置项唯一标识 (如 "model_config")
@@ -31,6 +37,28 @@ export function readDbConfig(id: string): Record<string, any> | null {
     .get(id) as SystemConfig | undefined;
 
   return row ? JSON.parse(row.config_json) : null;
+}
+
+/**
+ * 读取配置及元信息
+ * @param id 配置项唯一标识
+ * @returns 配置对象和更新时间，不存在时返回 null
+ */
+export function readDbConfigWithMeta(id: string): DbConfigWithMeta | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      "SELECT config_json, updated_at, updated_by FROM system_configs WHERE id = ?",
+    )
+    .get(id) as SystemConfig | undefined;
+
+  if (!row) return null;
+
+  return {
+    config: JSON.parse(row.config_json) as Record<string, unknown>,
+    updatedAt: row.updated_at,
+    updatedBy: row.updated_by,
+  };
 }
 
 /**

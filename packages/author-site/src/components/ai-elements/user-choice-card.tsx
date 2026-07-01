@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, HelpCircle, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,11 +64,7 @@ export function UserChoiceCard({
         compact ? "p-3" : "p-4",
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-full bg-blue-500/10 p-2">
-          <HelpCircle className="h-4 w-4 text-blue-600" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-3">
+      <div className="space-y-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-medium leading-5 text-foreground">
@@ -203,7 +199,6 @@ export function UserChoiceCard({
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

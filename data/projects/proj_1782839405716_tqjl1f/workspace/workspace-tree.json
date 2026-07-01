@@ -1,0 +1,194 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "prototype-01",
+      "name": "01 首页弹窗-体验包领取",
+      "routeKey": "prototype-01",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "prototype-02",
+      "name": "02 详情页-活动入口",
+      "routeKey": "prototype-02",
+      "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "prototype-03",
+      "name": "03 任务中心-活动入口",
+      "routeKey": "prototype-03",
+      "order": 3,
+      "parentId": null
+    },
+    {
+      "id": "prototype-04",
+      "name": "04 成了诗仙李白-首页",
+      "routeKey": "prototype-04",
+      "order": 4,
+      "parentId": null
+    },
+    {
+      "id": "prototype-05",
+      "name": "05 视频竖版占位页",
+      "routeKey": "prototype-05",
+      "order": 5,
+      "parentId": null
+    },
+    {
+      "id": "prototype-06",
+      "name": "06 端午大作战-启动页",
+      "routeKey": "prototype-06",
+      "order": 6,
+      "parentId": null
+    },
+    {
+      "id": "prototype-07",
+      "name": "07 活动规则说明页",
+      "routeKey": "prototype-07",
+      "order": 7,
+      "parentId": null
+    },
+    {
+      "id": "prototype-08",
+      "name": "08 关卡任务列表组件页",
+      "routeKey": "prototype-08",
+      "order": 8,
+      "parentId": null
+    },
+    {
+      "id": "prototype-09",
+      "name": "09 动物园奇遇记-首页弹窗",
+      "routeKey": "prototype-09",
+      "order": 9,
+      "parentId": null
+    },
+    {
+      "id": "prototype-10",
+      "name": "10 任务流程长页A",
+      "routeKey": "prototype-10",
+      "order": 10,
+      "parentId": null
+    },
+    {
+      "id": "prototype-11",
+      "name": "11 视频横版占位页",
+      "routeKey": "prototype-11",
+      "order": 11,
+      "parentId": null
+    },
+    {
+      "id": "prototype-12",
+      "name": "12 任务流程长页B",
+      "routeKey": "prototype-12",
+      "order": 12,
+      "parentId": null
+    },
+    {
+      "id": "prototype-13",
+      "name": "13 任务详情弹窗页",
+      "routeKey": "prototype-13",
+      "order": 13,
+      "parentId": null
+    },
+    {
+      "id": "prototype-14",
+      "name": "14 视频播放页",
+      "routeKey": "prototype-14",
+      "order": 14,
+      "parentId": null
+    },
+    {
+      "id": "prototype-15",
+      "name": "15 生成作品-拍摄入口",
+      "routeKey": "prototype-15",
+      "order": 15,
+      "parentId": null
+    },
+    {
+      "id": "prototype-16",
+      "name": "16 拍摄页-实时预览",
+      "routeKey": "prototype-16",
+      "order": 16,
+      "parentId": null
+    },
+    {
+      "id": "prototype-17",
+      "name": "17 作品生成页-进度",
+      "routeKey": "prototype-17",
+      "order": 17,
+      "parentId": null
+    },
+    {
+      "id": "prototype-18",
+      "name": "18 拍摄页-确认动作",
+      "routeKey": "prototype-18",
+      "order": 18,
+      "parentId": null
+    },
+    {
+      "id": "prototype-19",
+      "name": "19 作品生成页-素材预览",
+      "routeKey": "prototype-19",
+      "order": 19,
+      "parentId": null
+    },
+    {
+      "id": "prototype-20",
+      "name": "20 分享视频作品页",
+      "routeKey": "prototype-20",
+      "order": 20,
+      "parentId": null
+    },
+    {
+      "id": "prototype-21",
+      "name": "21 作品生成页-键盘态",
+      "routeKey": "prototype-21",
+      "order": 21,
+      "parentId": null
+    },
+    {
+      "id": "prototype-22",
+      "name": "22 作品生成页-底部操作",
+      "routeKey": "prototype-22",
+      "order": 22,
+      "parentId": null
+    },
+    {
+      "id": "prototype-23",
+      "name": "23 交互弹窗-完成提示",
+      "routeKey": "prototype-23",
+      "order": 23,
+      "parentId": null
+    },
+    {
+      "id": "prototype-24",
+      "name": "24 素材选择长页",
+      "routeKey": "prototype-24",
+      "order": 24,
+      "parentId": null
+    },
+    {
+      "id": "prototype-25",
+      "name": "25 竞速任务-可参与",
+      "routeKey": "prototype-25",
+      "order": 25,
+      "parentId": null
+    },
+    {
+      "id": "prototype-26",
+      "name": "26 竞速任务-已完成",
+      "routeKey": "prototype-26",
+      "order": 26,
+      "parentId": null
+    },
+    {
+      "id": "prototype-27",
+      "name": "27 送祝福抽好礼-首页",
+      "routeKey": "prototype-27",
+      "order": 27,
+      "parentId": null
+    }
+  ]
+}

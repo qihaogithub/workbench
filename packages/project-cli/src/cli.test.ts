@@ -6,14 +6,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cliPath = path.join(packageRoot, "src", "index.ts");
+const effectivePackageRoot = process.env.PROJECT_CLI_PACKAGE_ROOT
+  ? path.resolve(process.env.PROJECT_CLI_PACKAGE_ROOT)
+  : packageRoot;
+const cliPath = path.join(effectivePackageRoot, "bin", "ow.mjs");
 
 function runCli(args: string[], dataDir: string) {
   const result = spawnSync(
     process.execPath,
-    ["--import", "tsx", cliPath, ...args, "--json", "--data-dir", dataDir],
+    [cliPath, ...args, "--json", "--data-dir", dataDir],
     {
-      cwd: packageRoot,
+      cwd: effectivePackageRoot,
       encoding: "utf-8",
       env: {
         ...process.env,
@@ -47,6 +50,17 @@ try {
   const page = runCli(["page", "create", "--edit-id", editData.editId, "--name", "首页"], tempDir);
   assert.equal(page.result.status, 0);
   assert.equal(page.payload.ok, true);
+  const pageData = page.payload.data as { meta: { id: string } };
+
+  const pageRuntimeValidation = runCli(
+    ["page", "validate-runtime", editData.editId, pageData.meta.id],
+    tempDir,
+  );
+  assert.equal(pageRuntimeValidation.result.status, 0);
+  assert.equal(pageRuntimeValidation.payload.ok, true);
+  const pageRuntimeValidationData = pageRuntimeValidation.payload.data as { ok: boolean; issues: unknown[] };
+  assert.equal(pageRuntimeValidationData.ok, true);
+  assert.deepEqual(pageRuntimeValidationData.issues, []);
 
   const validation = runCli(["edit_validate", editData.editId], tempDir);
   assert.equal(validation.result.status, 0);
@@ -177,6 +191,83 @@ try {
   assert.equal(cloudPublishData.artifactSummary?.projectJsonPath, "project.json");
   assert.equal(cloudPublishData.accessUrls?.viewerUrl, `/projects/${createdData.id}`);
   assert.equal(cloudPublishData.accessUrls?.dataUrl, `/data/${createdData.id}/project.json`);
+
+  const invalidEdit = runCli(["edit", "begin", createdData.id], tempDir);
+  assert.equal(invalidEdit.result.status, 0);
+  const invalidEditData = invalidEdit.payload.data as { editId: string };
+  const invalidCode = "import { jsx } from 'react/jsx-runtime';\nexport default function Demo(){ return jsx('div', {}); }";
+  const invalidUpdate = runCli(
+    ["page", "update-code", invalidEditData.editId, pageData.meta.id, invalidCode],
+    tempDir,
+  );
+  assert.equal(invalidUpdate.result.status, 0);
+  assert.equal(invalidUpdate.payload.ok, true);
+  const invalidUpdateRuntime = invalidUpdate.payload.runtimeValidation as {
+    ok: boolean;
+    issues: Array<{ code: string }>;
+  };
+  assert.equal(invalidUpdateRuntime.ok, false);
+  assert.equal(invalidUpdateRuntime.issues[0]?.code, "AUTHORING_RUNTIME_IMPORT_UNSUPPORTED");
+  const invalidPageRuntimeValidation = runCli(
+    ["page", "validate-runtime", invalidEditData.editId, pageData.meta.id],
+    tempDir,
+  );
+  assert.equal(invalidPageRuntimeValidation.result.status, 0);
+  const invalidPageRuntimeData = invalidPageRuntimeValidation.payload.data as {
+    ok: boolean;
+    issues: Array<{ pageId: string; severity: string; code: string }>;
+  };
+  assert.equal(invalidPageRuntimeData.ok, false);
+  assert.deepEqual(invalidPageRuntimeData.issues[0], {
+    pageId: pageData.meta.id,
+    severity: "error",
+    stage: "source_contract",
+    code: "AUTHORING_RUNTIME_IMPORT_UNSUPPORTED",
+    message: "页面源码不应直接导入 react/jsx-runtime",
+    instruction: "请保留原始 JSX 交给创作端预览编译器转换，不要提交已经预编译的 JSX runtime 代码。",
+    moduleName: "react/jsx-runtime",
+  });
+  const invalidEditValidation = runCli(["edit_validate", invalidEditData.editId], tempDir);
+  assert.equal(invalidEditValidation.result.status, 0);
+  const invalidEditValidationData = invalidEditValidation.payload.data as {
+    ok: boolean;
+    issues: Array<{ pageId?: string; severity: string; code: string }>;
+  };
+  assert.equal(invalidEditValidationData.ok, false);
+  assert.equal(
+    invalidEditValidationData.issues.some((issue) =>
+      issue.pageId === pageData.meta.id &&
+      issue.severity === "blocking" &&
+      issue.code === "AUTHORING_RUNTIME_IMPORT_UNSUPPORTED"
+    ),
+    true,
+  );
+
+  const duplicateEdit = runCli(["edit", "begin", createdData.id], tempDir);
+  assert.equal(duplicateEdit.result.status, 0);
+  const duplicateEditData = duplicateEdit.payload.data as { editId: string };
+  const duplicateCode = [
+    "const accentMap = { primary: 'red' };",
+    "export default function Demo(){ return <div />; }",
+    "const accentMap = { primary: 'blue' };",
+  ].join("\n");
+  const duplicateUpdate = runCli(
+    ["page", "update-code", duplicateEditData.editId, pageData.meta.id, duplicateCode],
+    tempDir,
+  );
+  assert.equal(duplicateUpdate.result.status, 0);
+  assert.equal(duplicateUpdate.payload.ok, true);
+  const duplicateRuntime = duplicateUpdate.payload.runtimeValidation as {
+    ok: boolean;
+    issues: Array<{ stage: string; code: string; message: string }>;
+  };
+  assert.equal(duplicateRuntime.ok, false);
+  assert.equal(duplicateRuntime.issues[0]?.stage, "module_parse");
+  assert.equal(duplicateRuntime.issues[0]?.code, "DUPLICATE_TOP_LEVEL_DECLARATION");
+  assert.equal(duplicateRuntime.issues[0]?.message.includes("accentMap"), true);
+  const duplicateCommit = runCli(["edit", "commit", duplicateEditData.editId, "--note", "重复拼接"], tempDir);
+  assert.equal(duplicateCommit.result.status, 1);
+  assert.equal(duplicateCommit.payload.ok, false);
 
   const missingProject = runCli(["project", "get", "proj_missing"], tempDir);
   assert.equal(missingProject.result.status, 1);

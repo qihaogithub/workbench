@@ -45,6 +45,31 @@ describe("Message 用户消息展示", () => {
       "站外引导页",
     );
   });
+
+  it("排队用户消息展示等待状态并支持取消", async () => {
+    const user = userEvent.setup();
+    const onCancelQueuedMessage = jest.fn();
+
+    render(
+      <Message
+        message={{
+          id: "user-queued",
+          role: "user",
+          content: "下一条需求",
+          queueId: "queued-1",
+          queueStatus: "queued",
+        }}
+        isStreaming
+        onCancelQueuedMessage={onCancelQueuedMessage}
+      />,
+    );
+
+    expect(screen.getByText("等待发送")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(onCancelQueuedMessage).toHaveBeenCalledWith("queued-1");
+  });
 });
 
 describe("Message 自动修复系统任务", () => {

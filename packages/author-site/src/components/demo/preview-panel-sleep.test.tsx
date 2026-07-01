@@ -86,7 +86,7 @@ describe("PreviewPanel iframe sleep", () => {
     });
   });
 
-  it("编译接口返回 HTML 时展示明确的非 JSON 错误", async () => {
+  it("编译接口返回 HTML 时回传明确的非 JSON 错误", async () => {
     const onError = jest.fn();
     global.fetch = jest.fn().mockResolvedValue(
       {
@@ -113,8 +113,7 @@ describe("PreviewPanel iframe sleep", () => {
       />,
     );
 
-    await findByText("编译错误");
-    await findByText(/编译服务返回非 JSON 响应（404 Not Found）/);
+    await findByText("正在修复预览");
 
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({

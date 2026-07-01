@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createReadFileTool, createWriteFileTool, createListFilesTool } from '../../src/backends/pi-tools/file-tools';
+import { createEditFileTool } from '../../src/backends/pi-tools/edit-file-tool';
 import { createReadFileLinesTool } from '../../src/backends/pi-tools/read-file-lines-tool';
 import { createBashTool } from '../../src/backends/pi-tools/bash-tool';
 import { setSystemKnowledgeSnapshot } from '../../src/config/system-knowledge';
@@ -133,6 +134,55 @@ describe('createWriteFileTool - 权限感知', () => {
     // ** 允许工作空间内任意路径，敏感路径由 deny 拦截
     const result = await tool.execute('id', { path: 'demos/notes.txt', content: 'x' } as any);
     expect(result.isError).toBeFalsy();
+  });
+
+  it('写入坏页面代码后应返回非阻塞预览诊断', async () => {
+    (fs.promises.mkdir as any).mockResolvedValue(undefined);
+    (fs.promises.writeFile as any).mockResolvedValue(undefined);
+    const tool = createWriteFileTool(mockConfig);
+    const result = await tool.execute('id', {
+      path: 'demos/home/index.tsx',
+      content: [
+        "const accentMap = { primary: 'red' };",
+        "export default function Demo(){ return <div />; }",
+        "const accentMap = { primary: 'blue' };",
+      ].join('\n'),
+    } as any);
+
+    expect(result.isError).toBeFalsy();
+    expect(fs.promises.writeFile).toHaveBeenCalled();
+    expect(result.content[0].text).toContain('Preview validation failed');
+    expect(result.details?.runtimeValidation).toMatchObject({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'DUPLICATE_TOP_LEVEL_DECLARATION' })],
+    });
+  });
+});
+
+describe('createEditFileTool - 预览校验反馈', () => {
+  it('编辑坏页面代码后应返回非阻塞预览诊断', async () => {
+    (fs.promises.readFile as any).mockResolvedValue(
+      "export default function Demo(){ return <div />; }\n",
+    );
+    (fs.promises.writeFile as any).mockResolvedValue(undefined);
+    const tool = createEditFileTool(mockConfig);
+    const result = await tool.execute('id', {
+      path: 'demos/home/index.tsx',
+      old_string: "export default function Demo(){ return <div />; }\n",
+      new_string: [
+        "const accentMap = { primary: 'red' };",
+        "export default function Demo(){ return <div />; }",
+        "const accentMap = { primary: 'blue' };",
+      ].join('\n'),
+    } as any);
+
+    expect(result.isError).toBeFalsy();
+    expect(fs.promises.writeFile).toHaveBeenCalled();
+    expect(result.content[0].text).toContain('Preview validation failed');
+    expect(result.details?.runtimeValidation).toMatchObject({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'DUPLICATE_TOP_LEVEL_DECLARATION' })],
+    });
   });
 });
 

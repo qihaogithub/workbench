@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type {
+  CanvasDocumentEntry,
   CanvasFreeNode,
   CanvasLayersState,
   CanvasPageLayout,
@@ -81,14 +82,20 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   if (kind === "document") {
     const markdown = readString(value, "markdown");
     const knowledgeDocument = parseKnowledgeDocument(value.knowledgeDocument);
+    const documents = parseCanvasDocumentEntries(value.documents);
+    const activeDocumentId = readString(value, "activeDocumentId");
     const collapsed = readBoolean(value, "collapsed");
     const expandedHeight = readNumber(value, "expandedHeight");
-    if (markdown === null && !knowledgeDocument) return null;
+    if (markdown === null && !knowledgeDocument && documents.length === 0) {
+      return null;
+    }
     return {
       ...base,
       kind,
       ...(markdown === null ? {} : { markdown }),
       ...(knowledgeDocument ? { knowledgeDocument } : {}),
+      ...(documents.length > 0 ? { documents } : {}),
+      ...(activeDocumentId ? { activeDocumentId } : {}),
       ...(collapsed === null ? {} : { collapsed }),
       ...(expandedHeight === null ? {} : { expandedHeight }),
     };
@@ -128,6 +135,20 @@ function parseCanvasNode(value: unknown): CanvasFreeNode | null {
   }
 
   return null;
+}
+
+function parseCanvasDocumentEntries(value: unknown): CanvasDocumentEntry[] {
+  if (!Array.isArray(value)) return [];
+  const entries: CanvasDocumentEntry[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return [];
+    const id = readString(item, "id");
+    const title = readString(item, "title");
+    const knowledgeDocument = parseKnowledgeDocument(item.knowledgeDocument);
+    if (!id || !title || !knowledgeDocument) return [];
+    entries.push({ id, title, knowledgeDocument });
+  }
+  return entries;
 }
 
 function parseKnowledgeDocument(value: unknown):

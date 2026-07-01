@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 444,
+      "height": 1200
+    }
+  },
+  "title": "素材选择长页配置",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "页面标题",
+      "default": "素材选择长页"
+    }
+  }
+}
