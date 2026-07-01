@@ -2523,6 +2523,20 @@ ${context.details}
   const handleAiFilesChange = useCallback(
     async (files: AiFileChange[]) => {
       const traceId = createDiagnosticTraceId("ai-files");
+      const activePageId = activeDemoIdRef.current;
+      const normalizeAiFilePath = (filePath: string) => {
+        const normalizedPath = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+        if (normalizedPath.startsWith("demos/") || normalizedPath === "workspace-tree.json") {
+          return normalizedPath;
+        }
+        if (
+          activePageId &&
+          (normalizedPath === "index.tsx" || normalizedPath === "config.schema.json")
+        ) {
+          return `demos/${activePageId}/${normalizedPath}`;
+        }
+        return normalizedPath;
+      };
       recordDiagnosticEvent({
         category: "ai",
         name: "ai.files_change_received",
@@ -2531,12 +2545,13 @@ ${context.details}
           fileCount: files.length,
           files: files.map((file) => ({
             path: file.path,
+            normalizedPath: normalizeAiFilePath(file.path),
             action: file.action,
           })),
         },
       });
       const hasWorkspaceStructureChange = files.some((file) => {
-        const normalizedPath = file.path.replace(/\\/g, "/");
+        const normalizedPath = normalizeAiFilePath(file.path);
         return (
           normalizedPath === "workspace-tree.json" ||
           normalizedPath.startsWith("demos/")
@@ -2545,6 +2560,15 @@ ${context.details}
       if (!hasWorkspaceStructureChange || !sessionId) return;
 
       handleWorkspaceTreeChanged();
+      markWorkspaceChanged();
+      recordDiagnosticEvent({
+        category: "ai",
+        name: "ai.files_change_marked_workspace_dirty",
+        traceId,
+        details: {
+          reason: "agent_file_change",
+        },
+      });
 
       const previousPageIds = new Set(demoPages.map((page) => page.id));
       const previousActiveId = activeDemoIdRef.current;
@@ -2683,6 +2707,7 @@ ${context.details}
       createDiagnosticTraceId,
       getSafeMergedDefaults,
       handleWorkspaceTreeChanged,
+      markWorkspaceChanged,
       previewMode,
       recordDiagnosticEvent,
       sessionId,
