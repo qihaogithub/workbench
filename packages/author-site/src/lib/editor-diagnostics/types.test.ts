@@ -84,4 +84,32 @@ describe("editor diagnostic sanitizers", () => {
       prompt: { length: 13, redacted: true },
     });
   });
+
+  it("保留预览运行时事件的关键排查字段", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-preview-runtime",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "preview",
+      name: "preview.runtime_event",
+      details: {
+        level: "info",
+        stage: "module_loaded",
+        sinceStart: 123,
+        requestId: "request-1",
+        pageId: "page-1",
+        ignored: "not allowed",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      level: "info",
+      stage: "module_loaded",
+      sinceStart: 123,
+      requestId: "request-1",
+      pageId: "page-1",
+    });
+  });
 });

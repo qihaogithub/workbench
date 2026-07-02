@@ -233,22 +233,22 @@ pnpm dev diagnose "session-1" -m "你好"
 
 ```bash
 # 最近 24 小时项目诊断时间线
-pnpm dev diagnostics recent --project "project-1"
+corepack pnpm diagnostics:recent -- --project "project-1"
 
 # 单个编辑页会话
-pnpm dev diagnostics session --editor-session "editor-session-1"
+corepack pnpm diagnostics:session -- --editor-session "editor-session-1"
 
 # 单次 trace / operation
-pnpm dev diagnostics trace --trace "trace-1"
-pnpm dev diagnostics operation --operation "message-1"
+corepack pnpm diagnostics:trace -- --trace "trace-1"
+corepack pnpm diagnostics:operation -- --operation "message-1"
 
 # 专项排查
-pnpm dev diagnostics autosave --project "project-1" --since 24h
-pnpm dev diagnostics collab --workspace "workspace-1"
-pnpm dev diagnostics preview --project "project-1"
+corepack pnpm diagnostics:autosave -- --project "project-1" --since 24h
+corepack pnpm diagnostics:collab -- --workspace "workspace-1"
+corepack pnpm diagnostics:preview -- --project "project-1"
 
 # 导出 JSON 复现包
-pnpm dev diagnostics export --project "project-1" --since 24h --output diagnostics-export.json
+corepack pnpm diagnostics:export -- --project "project-1" --since 24h --output diagnostics-export.json
 ```
 
 根目录提供稳定别名：
@@ -260,6 +260,8 @@ corepack pnpm diagnostics:export -- --project "project-1" --since 24h
 ```
 
 默认输出 JSON；人工查看可加 `--format text` 输出简短时间线。
+
+SQLite 是诊断主账本。JSONL 只在 SQLite 不可用、无匹配主事件或导出 fallback/spool 片段时读取；输出中的 `jsonlFallbackUsed` 会明确标记该情况。
 
 **输出示例:**
 ```

@@ -2512,6 +2512,13 @@ ${context.details}
     ],
   );
 
+  useEffect(() => {
+    if (isLoading || activeDemoId || demoPages.length === 0) return;
+    const fallbackPage = [...demoPages].sort((a, b) => a.order - b.order)[0];
+    if (!fallbackPage) return;
+    void handleConfigPanelPageSelect(fallbackPage.id);
+  }, [activeDemoId, demoPages, handleConfigPanelPageSelect, isLoading]);
+
   const handleSinglePreviewDocumentSelect = useCallback(
     (documentNodeId: string) => {
       if (!confirmDiscardVisualPropertyWork()) return;

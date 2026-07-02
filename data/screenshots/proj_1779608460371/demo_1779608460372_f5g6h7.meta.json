@@ -67,6 +67,22 @@
     }
   },
   "variants": {
+    "200eae33d97d3ed9:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-02T06:37:46.454Z",
+      "elapsed": 16311,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    },
     "4ca93d7525a9f8ba:fast": {
       "variant": "fast",
       "generatedAt": "2026-07-02T05:37:24.053Z",

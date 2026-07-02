@@ -174,6 +174,22 @@ const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
   "preview.compile_started": ["compileHash", "pageId", "resourcePath"],
   "preview.compile_succeeded": ["compileHash", "durationMs", "runtimeValidationOk"],
   "preview.compile_failed": ["compileHash", "errorName", "errorMessage", "line", "column"],
+  "preview.runtime_event": ["level", "stage", "sinceStart", "requestId", "pageId"],
+  "preview.error": [
+    "source",
+    "stage",
+    "errorCode",
+    "errorName",
+    "errorMessage",
+    "file",
+    "message",
+    "instruction",
+    "pageId",
+    "moduleName",
+    "importName",
+    "moduleHash",
+    "codeHash",
+  ],
   "preview.runtime_error": ["errorName", "errorMessage", "line", "column", "stackHash"],
 };
 

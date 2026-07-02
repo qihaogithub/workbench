@@ -318,16 +318,27 @@ function buildResult(kind: string, options: DiagnosticsOptions, filters: Record<
   if (sqlite.warning) warnings.push(`SQLite 事件库不可用: ${sqlite.warning}`);
   if (sqlite.dbMissing) warnings.push("SQLite 事件库不存在，已尝试 JSONL 兜底");
 
-  const jsonlEvents = sqlite.events.length > 0 && !sqlite.warning && !sqlite.dbMissing
-    ? []
-    : applyFilters(readJsonlEvents(dataDir), filters, limit);
+  const shouldReadFallback =
+    kind === "export" || sqlite.events.length === 0 || Boolean(sqlite.warning) || sqlite.dbMissing;
+  const rawJsonlEvents = shouldReadFallback
+    ? applyFilters(readJsonlEvents(dataDir), filters, limit)
+    : [];
+  const sqliteEventIds = new Set(sqlite.events.map((event) => event.id));
+  const jsonlEvents = sqliteEventIds.size > 0
+    ? rawJsonlEvents.filter((event) => !sqliteEventIds.has(event.id))
+    : rawJsonlEvents;
+  if (jsonlEvents.length > 0) {
+    warnings.push("已读取 JSONL fallback/spool 事件，SQLite 仍是诊断主账本");
+  }
   const events = sqlite.events.length > 0 ? sqlite.events : jsonlEvents;
+  const eventsForRunLogs =
+    sqlite.events.length > 0 ? [...sqlite.events, ...jsonlEvents] : events;
 
   const diagnostics: EditorDiagnosticQueryDiagnostics = {
     sqliteUsed: sqlite.events.length > 0,
     jsonlFallbackUsed: jsonlEvents.length > 0 || sqlite.dbMissing || Boolean(sqlite.warning),
     dbUnavailable: sqlite.dbMissing || Boolean(sqlite.warning),
-    eventGapDetected: sqlite.dbMissing || Boolean(sqlite.warning),
+    eventGapDetected: jsonlEvents.length > 0 || sqlite.dbMissing || Boolean(sqlite.warning),
     warnings,
   };
 
@@ -341,7 +352,8 @@ function buildResult(kind: string, options: DiagnosticsOptions, filters: Record<
     },
     diagnostics,
     events,
-    agentRunLogs: listAgentRunLogs(dataDir, events),
+    fallbackEvents: jsonlEvents.length > 0 ? jsonlEvents : undefined,
+    agentRunLogs: listAgentRunLogs(dataDir, eventsForRunLogs),
   };
 }
 

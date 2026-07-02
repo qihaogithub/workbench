@@ -239,23 +239,23 @@ export async function appendEditorDiagnosticEvents(
   }
 
   const sanitized = events.map(sanitizeDiagnosticEvent);
-  const payload = sanitized.map((event) => JSON.stringify(event)).join("\n") + "\n";
-  const filePath = getDiagnosticsPath(editorSessionId);
-
-  await ensureDiagnosticsDir();
-  await trimIfNeeded(filePath, Buffer.byteLength(payload));
-  await fs.promises.appendFile(filePath, payload, "utf8");
-
   const normalized = sanitized.map((event) =>
     normalizeEditorDiagnosticEvent(event, "frontend"),
   );
   const warnings: string[] = [];
   let sqliteWritten = 0;
   let dbUnavailable = false;
+  let jsonlFallbackUsed = false;
   try {
     sqliteWritten = insertSqliteEvents(normalized);
   } catch (error) {
     dbUnavailable = true;
+    jsonlFallbackUsed = true;
+    const payload = sanitized.map((event) => JSON.stringify(event)).join("\n") + "\n";
+    const filePath = getDiagnosticsPath(editorSessionId);
+    await ensureDiagnosticsDir();
+    await trimIfNeeded(filePath, Buffer.byteLength(payload));
+    await fs.promises.appendFile(filePath, payload, "utf8");
     warnings.push(
       `SQLite 事件库写入失败，已保留 JSONL 兜底: ${
         error instanceof Error ? error.message : String(error)
@@ -269,7 +269,7 @@ export async function appendEditorDiagnosticEvents(
     editorSessionId,
     diagnostics: {
       sqliteUsed: !dbUnavailable,
-      jsonlFallbackUsed: true,
+      jsonlFallbackUsed,
       dbUnavailable,
       eventGapDetected: dbUnavailable,
       warnings,
@@ -426,14 +426,17 @@ export async function queryEditorDiagnosticEvents(options: {
     .filter((event) => !options.since || event.ts >= options.since)
     .sort((a, b) => a.ts.localeCompare(b.ts))
     .slice(-(options.limit ?? 200));
+  if (filtered.length > 0) {
+    warnings.push("SQLite 主库无匹配事件，已读取 JSONL fallback/spool");
+  }
 
   return {
     events: filtered,
     diagnostics: {
       sqliteUsed,
-      jsonlFallbackUsed: true,
+      jsonlFallbackUsed: filtered.length > 0,
       dbUnavailable,
-      eventGapDetected: !sqliteUsed || dbUnavailable,
+      eventGapDetected: filtered.length > 0 || !sqliteUsed || dbUnavailable,
       warnings,
     },
   };
@@ -465,24 +468,35 @@ export async function buildEditorDiagnosticExport(
   if (!isValidEditorSessionId(editorSessionId)) {
     throw new Error("INVALID_EDITOR_SESSION_ID");
   }
-  const events = await readEditorDiagnosticEvents(editorSessionId);
-  const normalizedEvents = events.map((event) =>
+  const rawFallbackEvents = await readEditorDiagnosticEvents(editorSessionId);
+  const queried = await queryEditorDiagnosticEvents({ editorSessionId });
+  const queriedEventIds = new Set(queried.events.map((event) => event.id));
+  const fallbackEvents = queried.diagnostics.sqliteUsed
+    ? rawFallbackEvents.filter((event) => !queriedEventIds.has(event.id))
+    : rawFallbackEvents;
+  const normalizedFallbackEvents = fallbackEvents.map((event) =>
     normalizeEditorDiagnosticEvent(event, "frontend"),
   );
-  const queried = await queryEditorDiagnosticEvents({ editorSessionId });
   const sessionIds = Array.from(
-    new Set(events.map((event) => event.sessionId).filter(Boolean) as string[]),
+    new Set(
+      [...queried.events, ...fallbackEvents]
+        .map((event) => event.sessionId)
+        .filter(Boolean) as string[],
+    ),
   );
+  const events = queried.events.length > 0 ? queried.events : fallbackEvents;
 
   return {
     editorSessionId,
     exportedAt: Date.now(),
     events,
-    normalizedEvents: queried.events.length > 0 ? queried.events : normalizedEvents,
+    normalizedEvents: queried.events.length > 0 ? queried.events : normalizedFallbackEvents,
+    fallbackEvents: fallbackEvents.length > 0 ? fallbackEvents : undefined,
     agentRunLogs: await listAgentRunLogs(sessionIds),
     diagnostics: queried.diagnostics,
     warnings: [
       ...(events.length === 0 ? ["未找到后端诊断事件"] : []),
+      ...(fallbackEvents.length > 0 ? ["导出包包含 JSONL fallback/spool 事件"] : []),
       ...queried.diagnostics.warnings,
     ],
   };
