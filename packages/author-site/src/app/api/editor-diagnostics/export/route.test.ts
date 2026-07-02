@@ -22,7 +22,15 @@ jest.mock("@/lib/editor-diagnostics/store", () => ({
     editorSessionId,
     exportedAt: 1,
     events: [],
+    normalizedEvents: [],
     agentRunLogs: [],
+    diagnostics: {
+      sqliteUsed: true,
+      jsonlFallbackUsed: false,
+      dbUnavailable: false,
+      eventGapDetected: false,
+      warnings: [],
+    },
     warnings: ["未找到后端诊断事件"],
   })),
 }));
@@ -79,7 +87,15 @@ describe("editor diagnostics export route", () => {
         editorSessionId: "editor-session-1",
         exportedAt: 1,
         events: [],
+        normalizedEvents: [],
         agentRunLogs: [],
+        diagnostics: {
+          sqliteUsed: true,
+          jsonlFallbackUsed: false,
+          dbUnavailable: false,
+          eventGapDetected: false,
+          warnings: [],
+        },
         warnings: ["未找到后端诊断事件"],
       },
     });

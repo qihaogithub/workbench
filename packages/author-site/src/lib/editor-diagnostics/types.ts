@@ -24,8 +24,12 @@ export interface EditorDiagnosticAgentRunLogIndex {
 export interface EditorDiagnosticExport {
   editorSessionId: string;
   exportedAt: number;
-  events: import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent[];
+  events: Array<
+    | import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent
+    | import("@opencode-workbench/shared").EditorDiagnosticEvent
+  >;
   normalizedEvents: import("@opencode-workbench/shared").EditorDiagnosticEvent[];
+  fallbackEvents?: import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent[];
   localEvents?: import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent[];
   snapshot?: Record<string, unknown>;
   agentRunLogs: EditorDiagnosticAgentRunLogIndex[];
