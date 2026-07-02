@@ -187,6 +187,7 @@ export * from "./validator";
 export * from "./agent-config";
 export * from "./knowledge";
 export * from "./external-auth";
+export * from "./diagnostics";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

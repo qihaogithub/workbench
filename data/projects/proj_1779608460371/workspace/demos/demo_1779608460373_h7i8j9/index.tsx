@@ -1,21 +1,19 @@
 interface DemoProps {
-  /** 对应 uiweb-vue updateImage2：平板广告图，1行1个 */
-  padSingleAdImage?: string;
+  /** 替换图片 - 平板广告图，1行1个 */
+  field?: string;
   /** 对应 uiweb-vue updateImage3：轮播广告图 */
   carouselAdImage?: string;
 }
 
 export default function PadBanduAd({
-  padSingleAdImage,
+  field = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png',
   carouselAdImage,
 }: DemoProps) {
   const padAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad';
   const sharedPhoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
 
-  const defaultPadAd = `${padAssetBase}/一行1个.png`;
   const defaultCarouselAd = `${sharedPhoneAssetBase}/广告图.png`;
 
-  const imgPadSingle = padSingleAdImage || defaultPadAd;
   const imgCarousel = carouselAdImage || defaultCarouselAd;
 
   const sideImages = ['配图-3.png', '配图-4.png', '配图-5.png', '配图-6.png'];
@@ -35,7 +33,7 @@ export default function PadBanduAd({
         <img src={`${padAssetBase}/1.png`} alt="顶部区域" className="h-[188px] w-[1133px] shrink-0 object-cover" />
 
         <div className="shrink-0 overflow-hidden rounded-[12px] bg-white">
-          <img src={imgPadSingle} alt="平板广告图" className="h-[180px] w-[1005px] object-cover" />
+          <img src={field} alt="平板广告图" className="h-[180px] w-[1005px] object-cover" />
         </div>
 
         <div className="flex w-[1133px] shrink-0 flex-col items-start">

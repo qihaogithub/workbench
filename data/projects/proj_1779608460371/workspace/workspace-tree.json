@@ -10,10 +10,10 @@
     },
     {
       "id": "demo_1779608460373_h7i8j9",
-      "name": "平板",
-      "routeKey": "demo-2",
+      "name": "demo",
       "order": 1,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "demo-2"
     }
   ]
 }

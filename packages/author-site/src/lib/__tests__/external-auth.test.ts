@@ -152,7 +152,7 @@ describe("external auth config", () => {
         refresh_token: "new-refresh-token",
         expires_in: 3600,
         token_type: "bearer",
-        scope: "files:read",
+        scope: "file_content:read",
       }),
     } as Response);
     (global as typeof globalThis & { fetch: typeof fetchMock }).fetch = fetchMock;
@@ -161,9 +161,12 @@ describe("external auth config", () => {
 
     expect(sessionConfig.figma?.accessToken).toBe("new-token");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.figma.com/v1/oauth/token",
+      "https://api.figma.com/v1/oauth/refresh",
       expect.objectContaining({
         method: "POST",
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Basic /),
+        }),
       }),
     );
     const raw = getDb()

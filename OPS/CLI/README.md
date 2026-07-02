@@ -225,6 +225,42 @@ pnpm dev diagnose "session-1" -m "你好"
 - `sessionId` - 会话 ID(可选)
 - `-m, --message <message>` - 发送测试消息进行诊断
 
+---
+
+### `diagnostics <kind>` - 创作端诊断事件查询
+
+查询 `data/diagnostics/editor-events.db` 中的结构化创作端事件；当 SQLite 缺失、锁定或不可读时，会扫描 `data/editor-diagnostics/*.jsonl` 作为兜底，并在 JSON 输出的 `diagnostics` 字段标记数据来源和缺口。
+
+```bash
+# 最近 24 小时项目诊断时间线
+pnpm dev diagnostics recent --project "project-1"
+
+# 单个编辑页会话
+pnpm dev diagnostics session --editor-session "editor-session-1"
+
+# 单次 trace / operation
+pnpm dev diagnostics trace --trace "trace-1"
+pnpm dev diagnostics operation --operation "message-1"
+
+# 专项排查
+pnpm dev diagnostics autosave --project "project-1" --since 24h
+pnpm dev diagnostics collab --workspace "workspace-1"
+pnpm dev diagnostics preview --project "project-1"
+
+# 导出 JSON 复现包
+pnpm dev diagnostics export --project "project-1" --since 24h --output diagnostics-export.json
+```
+
+根目录提供稳定别名：
+
+```bash
+corepack pnpm diagnostics:recent -- --project "project-1"
+corepack pnpm diagnostics:trace -- --trace "trace-1"
+corepack pnpm diagnostics:export -- --project "project-1" --since 24h
+```
+
+默认输出 JSON；人工查看可加 `--format text` 输出简短时间线。
+
 **输出示例:**
 ```
 === 错误诊断 ===
@@ -456,6 +492,7 @@ OPS/CLI/
 │       ├── list-sessions.ts  # 会话列表
 │       ├── destroy-session.ts # 销毁会话
 │       ├── diagnose.ts       # 错误诊断
+│       ├── diagnostics.ts    # 创作端诊断事件查询
 │       └── interactive.ts    # 交互式测试模式
 ├── package.json
 └── tsconfig.json
@@ -467,6 +504,7 @@ OPS/CLI/
 - `ws` - WebSocket 客户端
 - `ora` - 加载动画
 - `tsx` - TypeScript 执行器
+- `better-sqlite3` - 只读查询本地诊断事件库
 
 ---
 

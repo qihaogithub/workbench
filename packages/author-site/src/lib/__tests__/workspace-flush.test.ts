@@ -7,6 +7,7 @@ import {
   advanceWorkspaceBaseIfLatestSessionVersion,
   syncActiveWorkspaceToCanonical,
 } from "../workspace-manager";
+import { renewEditSession } from "../session-manager";
 
 jest.mock("../workspace-manager", () => ({
   syncActiveWorkspaceToCanonical: jest.fn(() => ({
@@ -14,6 +15,10 @@ jest.mock("../workspace-manager", () => ({
     workspacePath: "/tmp/project/workspace",
   })),
   advanceWorkspaceBaseIfLatestSessionVersion: jest.fn(() => false),
+}));
+
+jest.mock("../session-manager", () => ({
+  renewEditSession: jest.fn(() => true),
 }));
 
 function mockJsonResponse(value: unknown, init: { status: number; ok: boolean }) {
@@ -49,6 +54,7 @@ describe("workspace-flush", () => {
 
     expect(result).toEqual({ status: "skipped", flushedRooms: 0 });
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(renewEditSession).not.toHaveBeenCalled();
   });
 
   it("flushes workspace through agent-service", async () => {
@@ -69,6 +75,7 @@ describe("workspace-flush", () => {
     });
 
     expect(result).toEqual({ status: "flushed", flushedRooms: 2 });
+    expect(renewEditSession).toHaveBeenCalledWith("session 1");
     expect(global.fetch).toHaveBeenCalledWith(
       "http://agent.test/api/collab/projects/proj%201/workspaces/workspace%2F1/flush-all?sessionId=session+1",
       { method: "POST" },

@@ -3,17 +3,17 @@
   "pages": [
     {
       "id": "demo_1779934698596_dvvk55",
-      "name": "demo",
+      "name": "手机",
+      "routeKey": "demo",
       "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
+      "parentId": null
     },
     {
       "id": "demo_1779935678404_lxsasc",
-      "name": "demo",
+      "name": "平板",
+      "routeKey": "demo-2",
       "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
+      "parentId": null
     }
   ]
 }

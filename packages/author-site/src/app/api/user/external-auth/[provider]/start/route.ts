@@ -17,6 +17,7 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import { listActiveSessionsForUser } from "@/lib/session-manager";
 
 const FIGMA_AUTH_URL = "https://www.figma.com/oauth";
+const DEFAULT_FIGMA_OAUTH_SCOPES = "file_content:read";
 
 function getSigningSecret(): string {
   return process.env.JWT_SECRET || "change-me-in-production";
@@ -52,6 +53,13 @@ function buildFigmaRedirectUri(request: NextRequest): string {
 function getRequestedAgentSessionId(request: NextRequest): string | undefined {
   const value = request.nextUrl.searchParams.get("sessionId");
   return value && value.trim() ? value.trim() : undefined;
+}
+
+function getMissingFigmaOAuthMessage(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "Figma OAuth 客户端未配置。开发环境请在 packages/author-site/.env.local 设置 FIGMA_OAUTH_CLIENT_ID 和 FIGMA_OAUTH_CLIENT_SECRET，重启 pnpm dev 后重试。";
+  }
+  return "Figma OAuth 客户端未配置，无法启用 Figma MCP 授权";
 }
 
 async function syncExternalAuthToActiveSessions(
@@ -143,7 +151,7 @@ export async function GET(
       const status = upsertExternalAuthConfig(userId, {
         provider,
         status: "unsupported",
-        message: "Figma OAuth 客户端未配置，无法启用 Figma MCP 授权",
+        message: getMissingFigmaOAuthMessage(),
       });
       await syncExternalAuthToActiveSessions(userId, requestedSessionId);
       return NextResponse.json(createApiSuccess(status));
@@ -164,7 +172,7 @@ export async function GET(
     url.searchParams.set("state", state);
     url.searchParams.set(
       "scope",
-      process.env.FIGMA_OAUTH_SCOPES || "files:read,file_variables:read",
+      process.env.FIGMA_OAUTH_SCOPES || DEFAULT_FIGMA_OAUTH_SCOPES,
     );
 
     upsertExternalAuthConfig(userId, {

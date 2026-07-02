@@ -172,10 +172,21 @@ export class CollabRoomManager {
     for (const change of changes) {
       const resourcePath = this.normalizeResourcePath(change.path);
       if (!resourcePath) continue;
+      let matchedRooms = 0;
+      const workspaceRooms = Array.from(this.rooms.values()).filter((room) => {
+        return this.normalizeWorkspacePath(room.workspacePath) === normalizedWorkspacePath;
+      });
+      const candidateResourcePaths = this.resolveExternalChangeResourcePaths(
+        normalizedWorkspacePath,
+        resourcePath,
+        change.action,
+        workspaceRooms,
+      );
+      const candidateResourcePathSet = new Set(candidateResourcePaths);
 
-      for (const room of this.rooms.values()) {
-        if (this.normalizeWorkspacePath(room.workspacePath) !== normalizedWorkspacePath) continue;
-        if (this.normalizeResourcePath(room.descriptor.resourcePath) !== resourcePath) continue;
+      for (const room of workspaceRooms) {
+        if (!candidateResourcePathSet.has(this.normalizeResourcePath(room.descriptor.resourcePath))) continue;
+        matchedRooms += 1;
         const state = this.persistence.readResourceState(
           room.workspacePath,
           room.descriptor.resourcePath,
@@ -184,9 +195,68 @@ export class CollabRoomManager {
         this.reloadRoomFromFileState(room, state);
         reloadedRooms += 1;
       }
+
+      if (matchedRooms === 0 && workspaceRooms.length > 0) {
+        logger.info(
+          {
+            event: "collab.external_file_change_missed",
+            workspacePath: normalizedWorkspacePath,
+            changePath: change.path,
+            normalizedChangePath: resourcePath,
+            candidateResourcePaths,
+            action: change.action,
+            activeRoomCount: workspaceRooms.length,
+            activeRoomResources: workspaceRooms.map((room) => room.descriptor.resourcePath),
+          },
+          "External file change did not match any active collab room",
+        );
+      } else if (matchedRooms > 0) {
+        logger.info(
+          {
+            event: "collab.external_file_change_reloaded",
+            workspacePath: normalizedWorkspacePath,
+            changePath: change.path,
+            normalizedChangePath: resourcePath,
+            candidateResourcePaths,
+            action: change.action,
+            matchedRooms,
+          },
+          "Reloaded collab rooms after external file change",
+        );
+      }
     }
 
     return { reloadedRooms };
+  }
+
+  private resolveExternalChangeResourcePaths(
+    workspacePath: string,
+    resourcePath: string,
+    action: Pick<FileChange, "action">["action"],
+    workspaceRooms: CollabRoom[],
+  ): string[] {
+    const candidates = new Set([resourcePath]);
+    if (!this.isCurrentPageRelativeResourcePath(resourcePath) || action === "deleted") {
+      return Array.from(candidates);
+    }
+
+    const exactWorkspaceFilePath = path.resolve(workspacePath, resourcePath);
+    if (fs.existsSync(exactWorkspaceFilePath)) {
+      return Array.from(candidates);
+    }
+
+    for (const room of workspaceRooms) {
+      const roomResourcePath = this.normalizeResourcePath(room.descriptor.resourcePath);
+      if (path.posix.basename(roomResourcePath) === resourcePath) {
+        candidates.add(roomResourcePath);
+      }
+    }
+
+    return Array.from(candidates);
+  }
+
+  private isCurrentPageRelativeResourcePath(resourcePath: string): boolean {
+    return resourcePath === "index.tsx" || resourcePath === "config.schema.json";
   }
 
   private getOrCreateRoom(descriptor: RoomDescriptor, workspacePath: string): CollabRoom {
@@ -232,6 +302,7 @@ export class CollabRoomManager {
     doc.on("update", (update: Uint8Array, origin: unknown) => {
       room.lastActiveAt = Date.now();
       if (origin !== SERVER_RELOAD_ORIGIN) {
+        if (this.resetRepeatedFileContent(room)) return;
         room.dirty = true;
         this.scheduleSave(room);
       }
@@ -326,7 +397,21 @@ export class CollabRoomManager {
         room.descriptor.resourcePath,
         room.descriptor.kind,
       );
-      const roomContent = room.text.toString();
+      let roomContent = room.text.toString();
+      const normalizedRoomContent = this.normalizeRepeatedJsonObjects(roomContent);
+      if (normalizedRoomContent) {
+        logger.warn(
+          {
+            roomKey: room.key,
+            resourcePath: room.descriptor.resourcePath,
+            roomLength: roomContent.length,
+            normalizedLength: normalizedRoomContent.length,
+          },
+          "Normalized repeated JSON content before collab flush",
+        );
+        this.replaceRoomText(room, normalizedRoomContent);
+        roomContent = normalizedRoomContent;
+      }
 
       if (currentState.content === roomContent) {
         room.baselineHash = currentState.hash;
@@ -365,21 +450,146 @@ export class CollabRoomManager {
       room.saveTimer = null;
     }
 
-    const current = room.text.toString();
-    if (current !== state.content) {
-      room.doc.transact(() => {
-        if (room.text.length > 0) {
-          room.text.delete(0, room.text.length);
-        }
-        if (state.content) {
-          room.text.insert(0, state.content);
-        }
-      }, SERVER_RELOAD_ORIGIN);
-    }
+    this.replaceRoomText(room, state.content);
 
     room.baselineHash = state.hash;
     room.dirty = false;
     room.lastActiveAt = Date.now();
+  }
+
+  private replaceRoomText(room: CollabRoom, content: string): void {
+    const current = room.text.toString();
+    if (current === content) return;
+
+    room.doc.transact(() => {
+      if (room.text.length > 0) {
+        room.text.delete(0, room.text.length);
+      }
+      if (content) {
+        room.text.insert(0, content);
+      }
+    }, SERVER_RELOAD_ORIGIN);
+  }
+
+  private resetRepeatedFileContent(room: CollabRoom): boolean {
+    const roomContent = room.text.toString();
+    const normalizedRoomContent = this.normalizeRepeatedJsonObjects(roomContent);
+    if (normalizedRoomContent) {
+      logger.warn(
+        {
+          roomKey: room.key,
+          resourcePath: room.descriptor.resourcePath,
+          roomLength: roomContent.length,
+          normalizedLength: normalizedRoomContent.length,
+        },
+        "Normalized collab room after repeated JSON content was merged",
+      );
+      this.replaceRoomText(room, normalizedRoomContent);
+      room.dirty = true;
+      this.scheduleSave(room);
+      return true;
+    }
+
+    const currentState = this.persistence.readResourceState(
+      room.workspacePath,
+      room.descriptor.resourcePath,
+      room.descriptor.kind,
+    );
+    if (!currentState.content) return false;
+
+    if (!this.isRepeatedContent(roomContent, currentState.content)) return false;
+
+    logger.warn(
+      {
+        roomKey: room.key,
+        resourcePath: room.descriptor.resourcePath,
+        fileSize: currentState.size,
+        roomLength: roomContent.length,
+      },
+      "Reset collab room after repeated file content was merged",
+    );
+    this.reloadRoomFromFileState(room, currentState);
+    return true;
+  }
+
+  private normalizeRepeatedJsonObjects(content: string): string | null {
+    const unit = this.readFirstJsonObjectText(content);
+    if (!unit || unit.length === content.length) return null;
+
+    try {
+      JSON.parse(unit);
+    } catch {
+      return null;
+    }
+
+    let offset = unit.length;
+    let repeats = 1;
+    while (offset < content.length) {
+      while (offset < content.length && /\s/.test(content[offset])) {
+        offset += 1;
+      }
+      if (offset === content.length) break;
+      if (!content.startsWith(unit, offset)) return null;
+      offset += unit.length;
+      repeats += 1;
+    }
+
+    return repeats > 1 ? unit : null;
+  }
+
+  private readFirstJsonObjectText(content: string): string | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let started = false;
+
+    for (let index = 0; index < content.length; index += 1) {
+      const char = content[index];
+
+      if (!started) {
+        if (/\s/.test(char)) continue;
+        if (char !== "{") return null;
+        started = true;
+        depth = 1;
+        continue;
+      }
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === "\"") {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === "\"") {
+        inString = true;
+      } else if (char === "{") {
+        depth += 1;
+      } else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return content.slice(0, index + 1);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private isRepeatedContent(content: string, unit: string): boolean {
+    if (!unit || content.length <= unit.length) return false;
+    if (content.length % unit.length !== 0) return false;
+
+    for (let offset = 0; offset < content.length; offset += unit.length) {
+      if (content.slice(offset, offset + unit.length) !== unit) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async cleanupIdleRooms(): Promise<void> {

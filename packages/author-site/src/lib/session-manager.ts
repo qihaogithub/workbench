@@ -538,6 +538,25 @@ export function getEditSession(sessionId: string) {
   };
 }
 
+export function renewEditSession(sessionId: string): boolean {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath || !fs.existsSync(sessionPath)) return false;
+
+  const metaPath = path.join(sessionPath, ".session.json");
+  if (!fs.existsSync(metaPath)) return false;
+
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    if ((meta.status || "editing") !== "editing") return false;
+
+    meta.expiresAt = Date.now() + SESSION_EXPIRY_MS;
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface SaveEditSessionResult {
   success: boolean;
   version?: string;

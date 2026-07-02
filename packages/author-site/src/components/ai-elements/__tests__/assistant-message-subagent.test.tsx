@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { AssistantMessage } from "../assistant-message";
 import { Tool } from "../tool";
@@ -314,6 +314,50 @@ describe("AssistantMessage 子 Agent 展示", () => {
     });
   });
 
+  it("Figma OAuth 未配置时授权卡片显示不可用状态", async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          provider: "figma",
+          status: "unsupported",
+          message: "Figma OAuth 客户端未配置，无法启用 Figma MCP 授权",
+        },
+      }),
+    });
+    (global as typeof globalThis & { fetch: typeof fetchMock }).fetch = fetchMock;
+
+    render(
+      <AssistantMessage
+        parts={[
+          {
+            type: "tool",
+            toolCallId: "figma-1",
+            toolName: "figmaMcp",
+            status: "error",
+            details: {
+              kind: "external_auth_required",
+              provider: "figma",
+              reason: "not_connected",
+              title: "连接 Figma 后继续",
+              message: "需要使用你的 Figma 权限授权。",
+            },
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /连接 Figma/ }));
+
+    expect(
+      await screen.findByText("Figma OAuth 客户端未配置，无法启用 Figma MCP 授权"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /当前不可用/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /重新检查配置/ })).toBeInTheDocument();
+    expect(screen.queryByText("打开授权页")).not.toBeInTheDocument();
+  });
+
   it("授权卡片不折叠进执行过程", () => {
     render(
       <AssistantMessage
@@ -360,7 +404,7 @@ describe("AssistantMessage 子 Agent 展示", () => {
     expect(screen.queryByText("日志")).not.toBeInTheDocument();
   });
 
-  it("已有可见处理过程时隐藏点阵处理中动效", () => {
+  it("已有可见处理过程时将点阵处理中动效放入操作栏", () => {
     render(
       <AssistantMessage
         isStreaming
@@ -377,7 +421,12 @@ describe("AssistantMessage 子 Agent 展示", () => {
       />,
     );
 
-    expect(screen.queryByTestId("ai-working-indicator")).not.toBeInTheDocument();
+    const actionBar = screen.getByTestId("assistant-message-actions");
+    const copyButton = within(actionBar).getByRole("button", { name: "复制" });
+    expect(actionBar).toHaveClass("opacity-100");
+    expect(within(actionBar).getByTestId("ai-working-indicator")).toBeInTheDocument();
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveClass("opacity-70");
     expect(document.body).toHaveTextContent("检查页面问题");
     expect(screen.queryByText("模型响应")).not.toBeInTheDocument();
     expect(screen.queryByText("日志")).not.toBeInTheDocument();

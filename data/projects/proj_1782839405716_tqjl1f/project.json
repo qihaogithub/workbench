@@ -365,6 +365,16 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/v19",
       "fileCount": 85,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v20",
+      "type": "auto_checkpoint",
+      "savedAt": 1782956990933,
+      "savedBy": "qihao",
+      "sessionId": "session-1782955805488-kl5yvtoy4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782839405716_tqjl1f/v20",
+      "fileCount": 85,
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "pageVersions": {
@@ -398,9 +408,9 @@
     ]
   },
   "createdAt": 1782839405717,
-  "updatedAt": 1782924909591,
+  "updatedAt": 1782956990933,
   "activeWorkspaceId": "live-1782918232468-1hrvwux69",
-  "activeWorkspaceUpdatedAt": 1782924907133,
+  "activeWorkspaceUpdatedAt": 1782956988522,
   "canonicalSyncedWorkspaceId": "live-1782918232468-1hrvwux69",
-  "canonicalSyncedAt": 1782924908676
+  "canonicalSyncedAt": 1782956990093
 }

@@ -34,6 +34,7 @@
 日常开发遇到具体问题时，先查 [诊断包索引](./diagnostics/README.md)，再按对应路径排查。当前覆盖：
 
 - [E2E 失败](./diagnostics/e2e-failed.md)
+- [创作端编辑诊断事件](./diagnostics/editor-diagnostics.md)
 - [预览不更新](./diagnostics/preview-not-updating.md)
 - [AI 会话失败](./diagnostics/ai-session-failed.md)
 - [发布 SESSION_NOT_FOUND](./diagnostics/publish-session-not-found.md)

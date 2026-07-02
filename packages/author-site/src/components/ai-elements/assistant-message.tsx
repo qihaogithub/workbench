@@ -518,12 +518,12 @@ export function AssistantMessage({
     return null;
   }
 
-  const showRunProgressPanel = isStreaming && renderBlocks.length === 0;
-
   const allTextContent = renderBlocks
     .filter((b) => b.type === "text")
     .map((b) => b.content)
     .join("\n\n");
+  const showRunProgressPanel = isStreaming && renderBlocks.length === 0;
+  const showActionBar = Boolean(allTextContent) || (isStreaming && !showRunProgressPanel);
 
   const handleCopy = async () => {
     if (allTextContent) {
@@ -721,39 +721,90 @@ export function AssistantMessage({
 
       {showRunProgressPanel && <RunProgressPanel />}
 
+      {showActionBar && (
+        <MessageActionBar
+          allTextContent={allTextContent}
+          copied={copied}
+          isStreaming={isStreaming}
+          hasFileChanges={hasFileChanges}
+          messageId={messageId}
+          onCopy={handleCopy}
+          onRegenerate={onRegenerate}
+          onRollback={onRollback}
+        />
+      )}
+    </div>
+  );
+}
+
+function MessageActionBar({
+  allTextContent,
+  copied,
+  isStreaming,
+  hasFileChanges,
+  messageId,
+  onCopy,
+  onRegenerate,
+  onRollback,
+}: {
+  allTextContent: string;
+  copied: boolean;
+  isStreaming: boolean;
+  hasFileChanges: boolean;
+  messageId?: string;
+  onCopy: () => void;
+  onRegenerate?: (targetAssistantId: string) => void;
+  onRollback?: (targetAssistantId: string) => void;
+}) {
+  return (
+    <div
+      data-testid="assistant-message-actions"
+      className={cn(
+        "mt-1 flex min-h-7 items-center gap-1 transition-opacity",
+        isStreaming ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+      )}
+    >
+      {isStreaming && <RunProgressPanel inline />}
       {allTextContent && (
-        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleCopy}
-            disabled={isStreaming}
-            className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
-            title="复制"
-          >
-            {copied ? (
-              <Check className="h-3.5 w-3.5 text-green-500" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-          </button>
-          {!isStreaming && onRegenerate && messageId && (
-            <button
-              onClick={() => onRegenerate(messageId)}
-              className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
-              title="重新生成"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
+        <button
+          type="button"
+          onClick={onCopy}
+          disabled={isStreaming}
+          className={cn(
+            "cursor-pointer rounded p-1.5 transition-all hover:bg-muted/50 hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+            isStreaming ? "opacity-70" : "opacity-40",
           )}
-          {!isStreaming && hasFileChanges && onRollback && messageId && (
-            <button
-              onClick={() => onRollback(messageId)}
-              className="p-1.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/50 transition-all"
-              title="回撤"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </button>
+          title="复制"
+          aria-label="复制"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-green-500" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
           )}
-        </div>
+        </button>
+      )}
+      {!isStreaming && onRegenerate && messageId && (
+        <button
+          type="button"
+          onClick={() => onRegenerate(messageId)}
+          className="cursor-pointer rounded p-1.5 opacity-40 transition-all hover:bg-muted/50 hover:opacity-100"
+          title="重新生成"
+          aria-label="重新生成"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {!isStreaming && hasFileChanges && onRollback && messageId && (
+        <button
+          type="button"
+          onClick={() => onRollback(messageId)}
+          className="cursor-pointer rounded p-1.5 opacity-40 transition-all hover:bg-muted/50 hover:opacity-100"
+          title="回撤"
+          aria-label="回撤"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+        </button>
       )}
     </div>
   );
@@ -1069,13 +1120,18 @@ function DotMatrixWorkingIndicator() {
   );
 }
 
-function RunProgressPanel() {
+function RunProgressPanel({ inline = false }: { inline?: boolean }) {
   return (
     <div
       role="status"
       aria-label="AI 正在处理"
       data-testid="ai-working-indicator"
-      className="flex justify-start px-1 py-0.5"
+      className={cn(
+        "flex justify-start",
+        inline
+          ? "h-7 w-7 items-center justify-center rounded text-muted-foreground"
+          : "px-1 py-0.5",
+      )}
     >
       <DotMatrixWorkingIndicator />
     </div>
@@ -1109,11 +1165,13 @@ function ExternalAuthCard({
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [userCode, setUserCode] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [unsupported, setUnsupported] = useState(details.reason === "unsupported");
   const autoContinueTriggeredRef = useRef(false);
   const providerLabel = getProviderLabel(details.provider);
 
   const markConnected = (message: string) => {
     setConnected(true);
+    setUnsupported(false);
     setStatusText(message);
     setAuthUrl(null);
     setUserCode(null);
@@ -1127,6 +1185,7 @@ function ExternalAuthCard({
     setLoading(true);
     setStatusText(null);
     try {
+      setUnsupported(false);
       const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
       const response = await fetch(
         `/api/user/external-auth/${details.provider}/start${query}`,
@@ -1142,10 +1201,15 @@ function ExternalAuthCard({
         return;
       }
       if (data.status === "unsupported") {
+        setUnsupported(true);
+        setConnected(false);
+        setAuthUrl(null);
+        setUserCode(null);
         setStatusText(data.message || `${providerLabel} 当前部署未启用。`);
         return;
       }
 
+      setUnsupported(false);
       const nextUrl = data.authUrl || data.verificationUrl || null;
       setAuthUrl(nextUrl);
       setUserCode(data.userCode || null);
@@ -1187,9 +1251,13 @@ function ExternalAuthCard({
         );
       } else if (provider?.status === "unsupported") {
         setConnected(false);
+        setUnsupported(true);
+        setAuthUrl(null);
+        setUserCode(null);
         setStatusText(provider.message || `${providerLabel} 当前部署未启用。`);
       } else {
         setConnected(false);
+        setUnsupported(false);
         setStatusText(provider?.message || `${providerLabel} 还未完成授权。`);
       }
     } catch (error) {
@@ -1247,10 +1315,10 @@ function ExternalAuthCard({
             <button
               type="button"
               onClick={startAuth}
-              disabled={loading || connected}
+              disabled={loading || connected || unsupported}
               className={cn(
                 "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors disabled:opacity-70",
-                connected
+                connected || unsupported
                   ? "border border-border/50 bg-background/50 text-muted-foreground"
                   : "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
@@ -1264,7 +1332,9 @@ function ExternalAuthCard({
               )}
               {connected
                 ? "已连接"
-                : details.reason === "expired"
+                : unsupported
+                  ? "当前不可用"
+                  : details.reason === "expired"
                   ? "重新授权"
                   : `连接 ${providerLabel}`}
             </button>
@@ -1279,7 +1349,11 @@ function ExternalAuthCard({
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
-              {connected ? "重新检查授权" : "我已完成授权"}
+              {unsupported
+                ? "重新检查配置"
+                : connected
+                  ? "重新检查授权"
+                  : "我已完成授权"}
             </button>
             {authUrl && (
               <a
