@@ -8,5 +8,12 @@
   },
   "title": "伴读广告 - 平板版配置",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "field": {
+      "title": "替换图片",
+      "type": "string",
+      "format": "image",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    }
+  }
 }

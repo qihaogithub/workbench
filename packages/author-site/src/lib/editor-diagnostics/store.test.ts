@@ -11,6 +11,7 @@ jest.mock("@/lib/fs-utils", () => ({
 import {
   appendEditorDiagnosticEvents,
   buildEditorDiagnosticExport,
+  queryEditorDiagnosticEvents,
   readEditorDiagnosticEvents,
 } from "./store";
 
@@ -43,6 +44,23 @@ describe("editor diagnostics store", () => {
       revision: 1,
     });
 
+    const queried = await queryEditorDiagnosticEvents({
+      editorSessionId: "editor-session-1",
+    });
+    expect(queried.diagnostics.sqliteUsed).toBe(true);
+    expect(queried.events).toEqual([
+      expect.objectContaining({
+        schemaVersion: 1,
+        eventGroup: "autosave",
+        eventType: "autosave.flush_started",
+        editorSessionId: "editor-session-1",
+        payload: {
+          token: "[redacted]",
+          revision: 1,
+        },
+      }),
+    ]);
+
     fs.mkdirSync(path.join(mockDataDir, "agent-run-logs", "session-1"), {
       recursive: true,
     });
@@ -53,6 +71,8 @@ describe("editor diagnostics store", () => {
 
     const exported = await buildEditorDiagnosticExport("editor-session-1");
     expect(exported.events).toHaveLength(1);
+    expect(exported.normalizedEvents).toHaveLength(1);
+    expect(exported.diagnostics.sqliteUsed).toBe(true);
     expect(exported.agentRunLogs).toEqual([
       {
         sessionId: "session-1",

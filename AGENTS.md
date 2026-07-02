@@ -59,6 +59,28 @@
 8. 修改后运行与改动范围匹配的验证命令。优先使用根目录 `check:*` 脚本，无法覆盖时再使用包级命令。
 9. 不要回滚或整理与当前任务无关的用户改动。
 
+## 创作端问题诊断优先入口
+
+遇到创作端编辑页、协同、自动保存、AI 对话、预览、发布或重新打开复原类问题时，先使用结构化诊断入口建立时间线，再读源码或手工 `rg data/editor-diagnostics`：
+
+```bash
+corepack pnpm diagnostics:recent -- --project <projectId>
+corepack pnpm diagnostics:project -- --project <projectId> --since 24h
+corepack pnpm diagnostics:preview -- --project <projectId> --since 24h
+corepack pnpm diagnostics:autosave -- --project <projectId> --since 24h
+corepack pnpm diagnostics:collab -- --workspace <workspaceId> --since 24h
+corepack pnpm diagnostics:session -- --editor-session <editorSessionId>
+corepack pnpm diagnostics:trace -- --trace <traceId>
+corepack pnpm diagnostics:export -- --project <projectId> --since 24h
+```
+
+使用规则：
+
+- 先看输出中的 `diagnostics` 完整性字段，确认 SQLite、JSONL fallback、event gap 和 warning，再下结论。
+- 若 CLI 返回缺失、不可用或事件缺口，再降级读取 `data/editor-diagnostics/*.jsonl`，并在结论中说明使用了兜底数据。
+- 预览错误优先按 `preview` 分组判断失败来自编译、iframe 加载、运行时错误还是自动修复；自动保存/复原问题优先同时看 `collab`、`autosave` 和 `ai` 分组。
+- 如果排查中发现诊断事件缺字段、命令不可用、fallback 误判或导出包缺口，应同步维护 `OPS/CLI`、`OPS/automations/diagnostics/` 和 `docs/项目文档/创作端/11-诊断与日志/`，不要只在当前 bug 文档里记录。
+
 ## 计划与问题沉淀文档
 
 `docs/plans/进行中/` 用于记录排查过程、问题根因、修复经验、测试缺口和后续事项。默认不要因为每次修复问题就新建文档；优先按功能模块维护少量固定文档，让同类问题持续沉淀在同一个位置。

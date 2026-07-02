@@ -11,6 +11,10 @@ import { listActiveSessionsForUser } from "@/lib/session-manager";
 const FIGMA_TOKEN_URL = "https://api.figma.com/v1/oauth/token";
 const FIGMA_ME_URL = "https://api.figma.com/v1/me";
 
+function createBasicAuthHeader(clientId: string, clientSecret: string): string {
+  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+}
+
 function getSigningSecret(): string {
   return process.env.JWT_SECRET || "change-me-in-production";
 }
@@ -49,9 +53,30 @@ function verifyState(
 }
 
 function buildRedirect(request: NextRequest, status: string): NextResponse {
-  const url = new URL("/", request.url);
+  const url = buildPostAuthRedirectUrl(request);
   url.searchParams.set("externalAuth", status);
   return NextResponse.redirect(url);
+}
+
+function buildPostAuthRedirectUrl(request: NextRequest): URL {
+  const configuredTarget =
+    process.env.FIGMA_OAUTH_POST_AUTH_ORIGIN ||
+    process.env.FIGMA_OAUTH_REDIRECT_URI;
+  if (configuredTarget) {
+    try {
+      return new URL("/", configuredTarget);
+    } catch {
+      // Fall back to the request URL below if local configuration is malformed.
+    }
+  }
+  return new URL("/", request.url);
+}
+
+function getMissingFigmaOAuthMessage(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "Figma OAuth 客户端未完整配置。开发环境请在 packages/author-site/.env.local 设置 FIGMA_OAUTH_CLIENT_ID 和 FIGMA_OAUTH_CLIENT_SECRET，重启 pnpm dev 后重试。";
+  }
+  return "Figma OAuth 客户端未完整配置";
 }
 
 async function fetchFigmaAccountLabel(accessToken: string): Promise<string | undefined> {
@@ -107,7 +132,7 @@ export async function GET(
     upsertExternalAuthConfig(payload.userId, {
       provider: "figma",
       status: "unsupported",
-      message: "Figma OAuth 客户端未完整配置",
+      message: getMissingFigmaOAuthMessage(),
     });
     return buildRedirect(request, "unsupported");
   }
@@ -115,10 +140,11 @@ export async function GET(
   try {
     const res = await fetch(FIGMA_TOKEN_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: createBasicAuthHeader(clientId, clientSecret),
+      },
       body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
         redirect_uri: redirectUri,
         code,
         grant_type: "authorization_code",

@@ -40,12 +40,17 @@ class TestAgent extends BaseAgent {
 
 describe('WebSocketEventRouter', () => {
   let tempLogDir: string;
+  let tempDataDir: string;
   let originalRunLogDir: string | undefined;
+  let originalDataDir: string | undefined;
 
   beforeEach(() => {
     originalRunLogDir = process.env.AGENT_RUN_LOG_DIR;
+    originalDataDir = process.env.DATA_DIR;
     tempLogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-run-logs-'));
+    tempDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-diagnostics-data-'));
     process.env.AGENT_RUN_LOG_DIR = tempLogDir;
+    process.env.DATA_DIR = tempDataDir;
   });
 
   afterEach(() => {
@@ -54,7 +59,13 @@ describe('WebSocketEventRouter', () => {
     } else {
       process.env.AGENT_RUN_LOG_DIR = originalRunLogDir;
     }
+    if (originalDataDir === undefined) {
+      delete process.env.DATA_DIR;
+    } else {
+      process.env.DATA_DIR = originalDataDir;
+    }
     fs.rmSync(tempLogDir, { recursive: true, force: true });
+    fs.rmSync(tempDataDir, { recursive: true, force: true });
   });
 
   it('应完整转发工具调用入参、结果详情、耗时和错误信息', () => {
@@ -267,5 +278,29 @@ describe('WebSocketEventRouter', () => {
         fileCount: 1,
       }),
     );
+
+    const diagnosticPath = path.join(tempDataDir, 'editor-diagnostics', 'agent-service.jsonl');
+    const diagnostics = fs
+      .readFileSync(diagnosticPath, 'utf-8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+
+    expect(diagnostics.map((entry) => entry.eventType)).toEqual([
+      'ai.run_started',
+      'ai.tool_call_started',
+      'ai.tool_call_finished',
+      'ai.run_finished',
+    ]);
+    expect(diagnostics[1].payload).toEqual(
+      expect.objectContaining({
+        messageId: 'message-1',
+        runId: 'message-1',
+        toolCallId: 'delegate-1',
+        toolName: 'delegateTask',
+        status: 'in_progress',
+      }),
+    );
+    expect(diagnostics[1].payload.parameters).toBeUndefined();
   });
 });

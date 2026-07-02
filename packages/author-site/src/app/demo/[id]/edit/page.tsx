@@ -52,6 +52,11 @@ import {
   hasPreviewPageCode,
   resolvePreviewPageCode,
 } from "@/lib/preview-page-code";
+import {
+  buildAutoPreviewRepairFingerprint,
+  getAutoPreviewRepairAttemptCount,
+  recordAutoPreviewRepairAttempt,
+} from "@/lib/auto-preview-repair-guard";
 import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
@@ -1322,18 +1327,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       });
       setPreviewRuntimeError(normalizedDiagnostic);
 
-      const repairCount = pageId
-        ? autoPreviewRepairCountsRef.current.get(pageId) ?? 0
+      const repairFingerprint = pageId
+        ? buildAutoPreviewRepairFingerprint({
+            projectId: demoId,
+            pageId,
+            diagnostic: normalizedDiagnostic,
+          })
+        : null;
+      const repairCount = repairFingerprint
+        ? getAutoPreviewRepairAttemptCount(
+            repairFingerprint,
+            autoPreviewRepairCountsRef.current,
+          )
         : 0;
       if (pageId && repairCount < 2) {
-        autoPreviewRepairCountsRef.current.set(pageId, repairCount + 1);
+        const nextRepairCount = repairFingerprint
+          ? recordAutoPreviewRepairAttempt(
+              repairFingerprint,
+              autoPreviewRepairCountsRef.current,
+            )
+          : repairCount + 1;
         recordDiagnosticEvent({
           category: "ai",
           name: "ai.auto_repair_triggered",
           level: "warn",
           details: {
             pageId,
-            repairCount: repairCount + 1,
+            repairCount: nextRepairCount,
+            repairFingerprint,
             diagnostic: normalizedDiagnostic,
           },
         });
@@ -1367,12 +1388,26 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             `错误: ${normalizedDiagnostic.message || "组件运行时发生错误"}`,
           ].join("\n"),
         });
+      } else if (pageId) {
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.auto_repair_skipped",
+          level: "warn",
+          details: {
+            pageId,
+            repairCount,
+            repairFingerprint,
+            diagnostic: normalizedDiagnostic,
+            reason: "repeated_diagnostic_fingerprint",
+          },
+        });
       }
     },
     [
       activeDemoId,
       canvasEditingPageId,
       createDiagnosticTraceId,
+      demoId,
       previewMode,
       recordDiagnosticEvent,
     ],
@@ -1391,8 +1426,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       code?: string;
       schema?: string;
       source: "ai-realtime" | "ai-finish" | "manual-load" | "page-switch" | "collab";
+      syncCollab?: boolean;
     }) => {
-      const { code: newCode, schema: newSchema, source } = params;
+      const { code: newCode, schema: newSchema, source, syncCollab = true } = params;
       const targetPageId = activeDemoIdRef.current;
       recordDiagnosticEvent({
         category: source === "collab" ? "collab" : "ai",
@@ -1411,7 +1447,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       });
 
       if (newCode !== undefined) {
-        if (source !== "collab") {
+        if (source !== "collab" && syncCollab) {
           replaceCollabText(activeCodeCollab.ytext, newCode);
         }
         setCode((prev) => (prev === newCode ? prev : newCode));
@@ -1429,7 +1465,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       if (newSchema !== undefined) {
-        if (source !== "collab") {
+        if (source !== "collab" && syncCollab) {
           replaceCollabText(activeSchemaCollab.ytext, newSchema);
         }
         const oldSchema = schemaRef.current;
@@ -2023,9 +2059,6 @@ ${context.details}
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
         projectConfigSchemaRef.current = multi.projectConfigSchema;
-        if (multi.projectConfigSchema) {
-          replaceCollabText(projectSchemaCollab.ytext, multi.projectConfigSchema);
-        }
 
         // 记录每个页面的 previewSize
         const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
@@ -2597,9 +2630,6 @@ ${context.details}
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
         projectConfigSchemaRef.current = multi.projectConfigSchema;
-        if (multi.projectConfigSchema) {
-          replaceCollabText(projectSchemaCollab.ytext, multi.projectConfigSchema);
-        }
 
         const pageIds = rawPages.map((page: DemoPageMeta) => page.id);
         const newPageIds = pageIds.filter((pageId: string) => !previousPageIds.has(pageId));
@@ -2640,6 +2670,7 @@ ${context.details}
               code: target.code || "",
               schema: target.schema || "",
               source: "ai-finish",
+              syncCollab: false,
             });
           } else {
             const targetCode = target.code || "";
@@ -4402,9 +4433,6 @@ ${context.details}
                               },
                             });
                             setSinglePreviewLoaded(true);
-                            if (activeDemoId) {
-                              autoPreviewRepairCountsRef.current.delete(activeDemoId);
-                            }
                           }}
                           onPositionableSizes={handlePositionableSizes}
                           visualEditMode={propertyPanelActive}

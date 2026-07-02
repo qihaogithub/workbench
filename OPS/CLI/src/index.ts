@@ -14,6 +14,7 @@ import { collectLogs } from "./commands/logs.js";
 import { listModels } from "./commands/models.js";
 import { getWorkspace, updateWorkspace } from "./commands/workspace.js";
 import { listFiles } from "./commands/files.js";
+import { queryDiagnostics } from "./commands/diagnostics.js";
 
 const program = new Command();
 
@@ -220,6 +221,27 @@ program
   });
 
 // ============================================================
+// 创作端诊断事件查询
+// ============================================================
+program
+  .command("diagnostics <kind>")
+  .description("查询创作端结构化诊断事件: recent/project/session/trace/operation/autosave/collab/preview/export")
+  .option("--project <projectId>", "项目 ID")
+  .option("--session <sessionId>", "编辑 Session ID")
+  .option("--workspace <workspaceId>", "Workspace ID")
+  .option("--editor-session <editorSessionId>", "编辑页浏览器会话 ID")
+  .option("--trace <traceId>", "Trace ID")
+  .option("--operation <operationId>", "Operation ID")
+  .option("--since <durationOrIso>", "起始时间, 支持 24h/7d/ISO")
+  .option("--limit <n>", "事件数量上限", "200")
+  .option("--format <format>", "输出格式: json/text", "json")
+  .option("--data-dir <dir>", "覆盖 data 目录")
+  .option("--output <file>", "export 查询写入文件")
+  .action(async (kind, options) => {
+    await queryDiagnostics(kind, options);
+  });
+
+// ============================================================
 // 交互式测试模式
 // ============================================================
 program
@@ -239,7 +261,7 @@ program
 // ============================================================
 // 解析命令行参数
 // ============================================================
-program.parse(process.argv);
+program.parse(process.argv.filter((arg, index) => index < 2 || arg !== "--"));
 
 if (!process.argv.slice(2).length) {
   program.outputHelp();

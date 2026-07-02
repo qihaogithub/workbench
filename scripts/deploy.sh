@@ -63,6 +63,12 @@ for key, value in defaults.items():
         order.append(key)
         values[key] = value
 
+internal_api_token = values.get("INTERNAL_API_TOKEN", "").strip()
+if not internal_api_token:
+    print("❌ .env.docker 缺少 INTERNAL_API_TOKEN，生产环境无法同步管理后台模型配置到 agent-service", file=sys.stderr)
+    print("   请在 .env.docker 中设置 author-site 与 agent-service 共享的随机密钥后重试", file=sys.stderr)
+    sys.exit(1)
+
 with open(out_path, "w", encoding="utf-8") as f:
     for key in order:
         f.write(f"{key}={values[key]}\n")
@@ -357,6 +363,27 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
+                docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
+                exit 1
+            fi
+            sleep 1
+        done
+    fi
+
+    if service_in_deploy author-site || service_in_deploy agent-service; then
+        internal_api_token=\$(awk -F= '\$1 == \"INTERNAL_API_TOKEN\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
+        if [ -z \"\$internal_api_token\" ]; then
+            echo '❌ .env.docker 缺少 INTERNAL_API_TOKEN，管理后台模型配置无法同步到 agent-service'
+            exit 1
+        fi
+
+        for i in \$(seq 1 30); do
+            if curl -fsS -H \"x-internal-token: \${internal_api_token}\" http://127.0.0.1:3201/internal/backend-providers >/dev/null 2>&1; then
+                echo '✅ agent-service 内部模型配置接口鉴权通过'
+                break
+            fi
+            if [ \"\$i\" -eq 30 ]; then
+                echo '❌ agent-service 内部模型配置接口鉴权失败，请确认 author-site 与 agent-service 使用同一个 INTERNAL_API_TOKEN'
                 docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
                 exit 1
             fi

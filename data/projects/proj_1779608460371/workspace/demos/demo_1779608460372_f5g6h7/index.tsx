@@ -1,15 +1,15 @@
 interface DemoProps {
-  /** 对应 uiweb-vue updateImage1：手机广告图，1行1个 */
-  phoneSingleAdImage?: string;
   /** 对应 uiweb-vue updateImage3：轮播广告图 */
   carouselAdImage?: string;
+  /** 替换图片 - 手机广告图，1行1个 */
+  field?: string;
 }
 
 const phoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
 
-export default function PhoneBanduAd({
-  phoneSingleAdImage = `${phoneAssetBase}/一行一个广告图.png`,
+export default function Demo({
   carouselAdImage = `${phoneAssetBase}/广告图.png`,
+  field = `${phoneAssetBase}/一行一个广告图.png`,
 }: DemoProps) {
   return (
     <div
@@ -22,10 +22,10 @@ export default function PhoneBanduAd({
         className="absolute left-0 top-0 z-20 w-[375px]"
       />
 
-      <div className="absolute left-0 top-[141px] flex h-[585px] w-[375px] flex-col items-center overflow-x-hidden overflow-y-auto bg-white">
+      <div className="absolute left-0 top-[141px] flex h-[585px] w-[375px] flex-col items-center overflow-x-hidden overflow-y-auto bg-white [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="flex flex-col items-center">
           <img src={`${phoneAssetBase}/重磅更新标题.png`} alt="重磅更新" className="w-[344px]" />
-          <img src={phoneSingleAdImage} alt="手机广告图" className="h-[180px] w-[344px] object-cover" />
+          <img src={field} alt="手机广告图" className="h-[180px] w-[344px] object-cover" />
           <img src={`${phoneAssetBase}/叫叫活动标题.png`} alt="叫叫活动" className="w-[344px]" />
         </div>
 

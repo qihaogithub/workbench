@@ -13,12 +13,23 @@ import { getDb } from "@/lib/db";
 
 const ENCRYPTION_VERSION = "v1";
 const PROVIDERS: ExternalAuthProvider[] = ["figma", "dingtalk"];
-const FIGMA_TOKEN_URL = "https://api.figma.com/v1/oauth/token";
+const FIGMA_REFRESH_URL = "https://api.figma.com/v1/oauth/refresh";
 const FIGMA_REFRESH_WINDOW_MS = 5 * 60 * 1000;
 
 type ExternalAuthCredential =
   | FigmaExternalAuthCredential
   | DingtalkExternalAuthCredential;
+
+function getMissingFigmaOAuthRefreshMessage(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "Figma OAuth 客户端未配置，无法刷新授权。开发环境请在 packages/author-site/.env.local 设置 FIGMA_OAUTH_CLIENT_ID 和 FIGMA_OAUTH_CLIENT_SECRET，重启 pnpm dev 后重试。";
+  }
+  return "Figma OAuth 客户端未配置，无法刷新授权";
+}
+
+function createBasicAuthHeader(clientId: string, clientSecret: string): string {
+  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+}
 
 interface StoredExternalAuthConfig {
   provider: ExternalAuthProvider;
@@ -248,19 +259,19 @@ async function refreshFigmaCredential(
       status: "needs_reauth",
       accountLabel: stored.accountLabel,
       expiresAt: stored.expiresAt,
-      message: "Figma OAuth 客户端未配置，无法刷新授权",
+      message: getMissingFigmaOAuthRefreshMessage(),
     });
     return null;
   }
 
   try {
-    const res = await fetch(FIGMA_TOKEN_URL, {
+    const res = await fetch(FIGMA_REFRESH_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: createBasicAuthHeader(clientId, clientSecret),
+      },
       body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: "refresh_token",
         refresh_token: credential.refreshToken,
       }),
     });

@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@opencode-workbench/shared';
+
 import { AgentError, AgentEvent, AgentResult } from '../core/types';
 import { logger } from '../utils/logger';
 
@@ -48,6 +50,11 @@ function getRunLogRoot(): string {
       'agent-run-logs',
     )
   );
+}
+
+function getDiagnosticsJsonlPath(): string {
+  const root = process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data');
+  return path.join(root, 'editor-diagnostics', 'agent-service.jsonl');
 }
 
 function safePathPart(value: string): string {
@@ -110,10 +117,17 @@ export class AgentRunLog {
   private fileOperationCount = 0;
   private hasModelOutput = false;
   private toolNames = new Map<string, string>();
+  private diagnosticSequence = 0;
+  private readonly demoId?: string;
+  private readonly workingDir?: string;
+  private readonly model?: string;
 
   constructor(options: AgentRunLogStartOptions) {
     this.sessionId = options.sessionId;
     this.messageId = options.messageId;
+    this.demoId = options.demoId;
+    this.workingDir = options.workingDir;
+    this.model = options.model;
 
     const dir = path.join(getRunLogRoot(), safePathPart(options.sessionId));
     fs.mkdirSync(dir, { recursive: true });
@@ -319,6 +333,55 @@ export class AgentRunLog {
     });
   }
 
+  private appendDiagnosticEvent(line: RunLogEntry): void {
+    const eventTypeByRunLog: Record<string, string> = {
+      run_start: 'ai.run_started',
+      tool_call: 'ai.tool_call_started',
+      tool_call_update: 'ai.tool_call_finished',
+      file_operation: 'ai.file_change_detected',
+      finish: 'ai.run_finished',
+      error: 'ai.run_failed',
+      agent_error: 'ai.run_failed',
+      cancel: 'ai.run_failed',
+    };
+    const eventType = eventTypeByRunLog[line.eventType];
+    if (!eventType) return;
+
+    const diagnostic: EditorDiagnosticEvent = createEditorDiagnosticEvent({
+      id: `ai-${this.sessionId}-${this.messageId}-${this.diagnosticSequence}`,
+      ts: line.timestamp,
+      source: 'ai-run',
+      level: line.level,
+      eventGroup: 'ai',
+      eventType,
+      sessionId: this.sessionId,
+      operationId: this.messageId,
+      traceId: this.messageId,
+      message: line.title,
+      payload: {
+        ...(line.payload && typeof line.payload === 'object'
+          ? line.payload as Record<string, unknown>
+          : {}),
+        messageId: this.messageId,
+        runId: this.messageId,
+        toolCallId: line.toolCallId,
+        demoId: this.demoId,
+        workingDir: this.workingDir,
+        model: this.model,
+        errorMessage: line.level === 'error' ? line.summary || line.title : undefined,
+      },
+    });
+    this.diagnosticSequence += 1;
+
+    const filePath = getDiagnosticsJsonlPath();
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.appendFileSync(filePath, `${JSON.stringify(diagnostic)}\n`, 'utf-8');
+    } catch (error) {
+      logger.warn({ error, filePath }, 'Failed to append agent diagnostic event');
+    }
+  }
+
   private append(entry: Omit<RunLogEntry, 'timestamp' | 'sessionId' | 'messageId'>): void {
     const line: RunLogEntry = {
       timestamp: new Date().toISOString(),
@@ -333,6 +396,7 @@ export class AgentRunLog {
     } catch (error) {
       logger.warn({ error, logPath: this.filePath }, 'Failed to append agent run log');
     }
+    this.appendDiagnosticEvent(line);
   }
 }
 

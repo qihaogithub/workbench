@@ -1,4 +1,5 @@
 import {
+  normalizeEditorDiagnosticEvent,
   sanitizeDiagnosticDetails,
   sanitizeDiagnosticEvent,
 } from "./types";
@@ -43,6 +44,44 @@ describe("editor diagnostic sanitizers", () => {
     expect(event.details).toEqual({
       code: { length: 49, redacted: true },
       schema: { length: 17, redacted: true },
+    });
+  });
+
+  it("把旧 JSONL 事件映射为统一事件模型并对白名单 payload 治理", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-1",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      sessionId: "session-1",
+      workspaceId: "workspace-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "preview",
+      name: "preview.compile_failed",
+      traceId: "trace-1",
+      level: "error",
+      details: {
+        compileHash: "hash-1",
+        code: "x".repeat(20),
+        prompt: "secret prompt",
+        ignored: "not allowed",
+      },
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        schemaVersion: 1,
+        ts: "1970-01-01T00:00:00.001Z",
+        source: "frontend",
+        eventGroup: "preview",
+        eventType: "preview.compile_failed",
+        pageId: "page-1",
+      }),
+    );
+    expect(event.payload).toEqual({
+      compileHash: "hash-1",
+      code: { length: 20, redacted: true },
+      prompt: { length: 13, redacted: true },
     });
   });
 });

@@ -27,6 +27,8 @@ services:
       - DATA_DIR=/app/data
       - SCREENSHOT_SERVICE_URL=http://screenshot-service:3202
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
+      - FIGMA_MCP_URL=${FIGMA_MCP_URL:-}
+      - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
     volumes:
       - ${APP_DATA_DIR:-/opt/opencode-workbench/data}:/app/data
@@ -63,6 +65,11 @@ services:
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data
+      - FIGMA_OAUTH_CLIENT_ID=${FIGMA_OAUTH_CLIENT_ID:-}
+      - FIGMA_OAUTH_CLIENT_SECRET=${FIGMA_OAUTH_CLIENT_SECRET:-}
+      - FIGMA_OAUTH_REDIRECT_URI=${FIGMA_OAUTH_REDIRECT_URI:-}
+      - FIGMA_OAUTH_POST_AUTH_ORIGIN=${FIGMA_OAUTH_POST_AUTH_ORIGIN:-}
+      - FIGMA_OAUTH_SCOPES=${FIGMA_OAUTH_SCOPES:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - ADMIN_SECRET=${ADMIN_SECRET:-}
     volumes:

@@ -1,6 +1,7 @@
 import type { ErrorCodeType } from "@opencode-workbench/shared";
 
 import { getServerAgentServiceUrl } from "./runtime-config";
+import { renewEditSession } from "./session-manager";
 import {
   advanceWorkspaceBaseIfLatestSessionVersion,
   syncActiveWorkspaceToCanonical,
@@ -84,6 +85,8 @@ export async function flushWorkspaceBeforeCriticalAction(
   if (!options.workspaceId) {
     return { status: "skipped", flushedRooms: 0 };
   }
+
+  renewEditSession(options.sessionId);
 
   const params = new URLSearchParams({ sessionId: options.sessionId });
   const response = await fetch(

@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-01。
+CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-02。
 
-主线结论：CLI 对账未发现新的注册命令漏登记问题，也未发现全命令测试漏覆盖问题。runtime contract 校验能力已补齐；剩余 4 个结构性缺口继续维持只报告策略。
+主线结论：CLI 对账未发现新的注册命令漏登记问题，也未发现全命令测试漏覆盖问题。`commands --json` 与 `register(...)` 列表保持一致，`cli-all-commands` 末尾仍用反查守卫覆盖所有已注册命令。runtime contract 校验能力已补齐；剩余 4 个结构性缺口继续维持只报告策略。
 
 ## 当前缺口
 
@@ -26,10 +26,18 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-01。
 
 - `corepack pnpm check:automation`：通过。
 - `corepack pnpm ops:automation report --json`：通过，当前仍为 13 个 active 入口（`tools.json` 3 / `tests.json` 6 / `scripts.json` 4）。
-- `corepack pnpm check:project-core`：通过。
-- `corepack pnpm check:project-cli`：通过。
+- `corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json`：通过；返回的命令清单与 `packages/project-cli/src/index.ts` 注册项一致。
+- `packages/project-cli/src/cli-all-commands.test.ts`：仍以 `registeredCommands.filter((command) => !executed.has(command))` 断言没有未覆盖命令。
+- `corepack pnpm check:project-core`：最近一次通过；本轮未改动 `project-core`，未重复运行。
+- `corepack pnpm check:project-cli`：最近一次通过；本轮未改动 `project-cli`，未重复运行。
 - 未运行 `corepack pnpm check:author`：最近一轮未修改 author-site API 或 shared 契约。
 - 未运行 `corepack pnpm check:project-scaffold`：最近一轮未修改 project-scaffold。
+
+## 当前结论
+
+- `project-core` 仍未提供通用 `session *`、`workspace *`、`knowledge *` 或截图任务级共享服务；当前相关能力仍主要停留在 author-site 路由与本地 manager 层。
+- `packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`screenshots/generate-batch/route.ts` 继续证明上述 4 个缺口属于共享层缺口，不适合在 CLI 侧直接复制 Web 逻辑。
+- 外部自动化提示词仍使用历史文件名 `CLI与创作端能力对齐长期跟踪.md`；本轮已补回兼容入口，正文继续只在本文件维护。
 
 ## 下次检查重点
 

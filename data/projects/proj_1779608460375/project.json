@@ -6,17 +6,17 @@
   "demoPages": [
     {
       "id": "demo_1779934698596_dvvk55",
-      "name": "demo",
+      "name": "手机",
+      "routeKey": "demo",
       "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
+      "parentId": null
     },
     {
       "id": "demo_1779935678404_lxsasc",
-      "name": "demo",
+      "name": "平板",
+      "routeKey": "demo-2",
       "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
+      "parentId": null
     }
   ],
   "demoFolders": [],
@@ -224,8 +224,12 @@
     ]
   },
   "createdAt": 1779608460375,
-  "updatedAt": 1782898322268,
+  "updatedAt": 1782973485583,
   "thumbnail": "/thumbnails/proj_1779608460375_cover.png",
   "publishedVersion": "v14",
-  "publishedAt": 1782830809395
+  "publishedAt": 1782830809395,
+  "activeWorkspaceId": "live-1782973349912-ag4qbomsx",
+  "activeWorkspaceUpdatedAt": 1782973353379,
+  "canonicalSyncedWorkspaceId": "live-1782973349912-ag4qbomsx",
+  "canonicalSyncedAt": 1782973485583
 }
