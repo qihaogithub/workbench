@@ -68,6 +68,28 @@ function readPresence(provider: WebsocketProvider | null): CollabPresence[] {
     });
 }
 
+function getPresenceSignature(presence: CollabPresence): string {
+  return JSON.stringify({
+    userId: presence.userId,
+    username: presence.username,
+    color: presence.color,
+    activePageId: presence.activePageId,
+    resourcePath: presence.resourcePath,
+  });
+}
+
+function arePresenceListsEqual(
+  current: CollabPresence[],
+  next: CollabPresence[],
+): boolean {
+  if (current.length !== next.length) return false;
+  const currentSignatures = current.map(getPresenceSignature).sort();
+  const nextSignatures = next.map(getPresenceSignature).sort();
+  return currentSignatures.every(
+    (signature, index) => signature === nextSignatures[index],
+  );
+}
+
 export function useCollabDocument(
   descriptor: CollabRoomDescriptor | null,
   user?: Partial<CollabUser>,
@@ -133,18 +155,20 @@ export function useCollabDocument(
 
     if (!stableDescriptor) {
       clearOfflineStatusTimer();
-      setStatus("offline");
-      setValue("");
-      setAwareness([]);
-      setProvider(null);
-      setYdoc(null);
-      setYtext(null);
+      setStatus((current) => (current === "offline" ? current : "offline"));
+      setValue((current) => (current === "" ? current : ""));
+      setAwareness((current) => (current.length === 0 ? current : []));
+      setProvider((current) => (current === null ? current : null));
+      setYdoc((current) => (current === null ? current : null));
+      setYtext((current) => (current === null ? current : null));
       return;
     }
 
     clearOfflineStatusTimer();
-    setStatus("connecting");
-    setError(null);
+    setStatus((current) =>
+      current === "connecting" ? current : "connecting",
+    );
+    setError((current) => (current === null ? current : null));
 
     const doc = new Y.Doc();
     const text = doc.getText("content");
@@ -165,7 +189,12 @@ export function useCollabDocument(
     setYdoc(doc);
     setYtext(text);
 
-    const updatePresence = () => setAwareness(readPresence(nextProvider));
+    const updatePresence = () => {
+      const nextPresence = readPresence(nextProvider);
+      setAwareness((current) =>
+        arePresenceListsEqual(current, nextPresence) ? current : nextPresence,
+      );
+    };
     nextProvider.awareness.setLocalStateField("user", {
       name: collabUser.username,
       color: collabUser.color,
@@ -183,7 +212,7 @@ export function useCollabDocument(
 
     const handleTextChange = () => {
       const nextValue = text.toString();
-      setValue(nextValue);
+      setValue((current) => (current === nextValue ? current : nextValue));
       nextProvider.awareness.setLocalStateField("presence", {
         userId: collabUser.userId,
         username: collabUser.username,
@@ -199,7 +228,7 @@ export function useCollabDocument(
     nextProvider.on("status", ({ status: wsStatus }: { status: "connecting" | "connected" | "disconnected" }) => {
       if (wsStatus === "connected") {
         clearOfflineStatusTimer();
-        setStatus("synced");
+        setStatus((current) => (current === "synced" ? current : "synced"));
         return;
       }
 
@@ -216,7 +245,7 @@ export function useCollabDocument(
       clearOfflineStatusTimer();
       offlineStatusTimerRef.current = setTimeout(() => {
         if (providerRef.current === nextProvider) {
-          setStatus("offline");
+          setStatus((current) => (current === "offline" ? current : "offline"));
         }
         offlineStatusTimerRef.current = null;
       }, OFFLINE_STATUS_DELAY_MS);
@@ -227,14 +256,17 @@ export function useCollabDocument(
     nextProvider.on("sync", (isSynced: boolean) => {
       if (isSynced) {
         clearOfflineStatusTimer();
-        setValue(text.toString());
-        setStatus("synced");
+        const nextValue = text.toString();
+        setValue((current) => (current === nextValue ? current : nextValue));
+        setStatus((current) => (current === "synced" ? current : "synced"));
       }
     });
     nextProvider.on("connection-error", () => {
       clearOfflineStatusTimer();
-      setError("协同连接失败");
-      setStatus("error");
+      setError((current) =>
+        current === "协同连接失败" ? current : "协同连接失败",
+      );
+      setStatus((current) => (current === "error" ? current : "error"));
     });
 
     return () => {
@@ -264,10 +296,10 @@ export function useCollabDocument(
       { method: "POST" },
     );
     if (!response.ok) {
-      setStatus("error");
+      setStatus((current) => (current === "error" ? current : "error"));
       throw new Error("协同草稿落盘失败");
     }
-    setStatus("synced");
+    setStatus((current) => (current === "synced" ? current : "synced"));
   }, []);
 
   return {

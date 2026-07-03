@@ -12,6 +12,7 @@ export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefiniti
   "react-dom": { version: "18.3.1", kind: "core" },
   "lucide-react": { version: "0.323.0", kind: "internal" },
   "framer-motion": { version: "12.38.0", kind: "internal" },
+  "svgaplayerweb": { version: "2.3.1", kind: "internal" },
   "@preview/sdk": { version: PREVIEW_CONTRACT_VERSION, kind: "sdk" },
 };
 
@@ -25,7 +26,7 @@ export function generatePreviewAuthoringRules(): string {
     "- 页面源码必须是单文件 React 组件，提交源码时保留原始 JSX。",
     "- 页面源码必须提供 export default 组件；裸 JSX 或首字母大写组件可由编译器自动包装。",
     "- 页面源码禁止直接导入 react/jsx-runtime；该导入只允许出现在编译产物中。",
-    "- 页面源码禁止相对源码 import；共享能力使用 @preview/sdk，图片使用配置数据或 ImageAsset。",
+    "- 页面源码禁止相对源码 import；共享能力使用 @preview/sdk，图片使用配置数据或 ImageAsset，SVGA 使用 SvgaPlayer。",
     `- 页面源码只能导入已登记依赖：${allowedPackages}。`,
     "- lucide-react 只能导入当前版本实际存在的图标。",
     "- 组件不得 return null；等待、空状态或异常状态必须返回可见 DOM。",

@@ -288,7 +288,7 @@ export function CanvasPageItem({
 
   React.useEffect(() => {
     setIframeContentLoaded(false);
-  }, [renderMode, page.code, page.compiledJsUrl, page.configData]);
+  }, [renderMode, page.code, page.compiledJsUrl, page.iframeUrl, page.configData]);
 
   React.useEffect(() => {
     if (!screenshotRenderBox) return;
@@ -530,11 +530,28 @@ export function CanvasPageItem({
             html={page.prototypeHtml}
             css={page.prototypeCss}
             configData={page.configData}
+            previewSize={page.previewSize}
+            fillContainer
+            effectiveHeight={iframeEffectiveHeight}
           />
         </div>
       )}
 
-      {shouldRenderIframe && (
+      {shouldRenderIframe && page.iframeUrl && (
+        <iframe
+          title={page.name}
+          src={page.iframeUrl}
+          className="absolute inset-0 h-full w-full border-0 bg-white shadow-md transition-opacity duration-200 ease-out"
+          style={{
+            opacity: showIframeContent ? 1 : 0,
+            pointerEvents: "none",
+          }}
+          sandbox="allow-scripts"
+          onLoad={handleIframeContentLoaded}
+        />
+      )}
+
+      {shouldRenderIframe && !page.iframeUrl && (
         <div
           className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
           style={{

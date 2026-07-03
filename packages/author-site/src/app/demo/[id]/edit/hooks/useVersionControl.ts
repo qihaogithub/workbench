@@ -114,6 +114,14 @@ export function useVersionControl(params: UseVersionControlParams) {
     hasUnsavedChanges,
     hasUnsavedCanvasChanges,
   });
+  const pageVersionHistoryPageIds = useMemo(
+    () => demoPages.map((page) => page.id),
+    [demoPages],
+  );
+  const pageVersionHistoryPageKey = useMemo(
+    () => pageVersionHistoryPageIds.join("\0"),
+    [pageVersionHistoryPageIds],
+  );
 
   const autoCheckpointSignature = useMemo(() => {
     return JSON.stringify({
@@ -151,19 +159,22 @@ export function useVersionControl(params: UseVersionControlParams) {
   }, [demoId]);
 
   const loadPageVersionHistories = useCallback(async () => {
-    if (demoPages.length === 0) {
+    const pageIds = pageVersionHistoryPageKey
+      ? pageVersionHistoryPageKey.split("\0")
+      : [];
+    if (pageIds.length === 0) {
       setPageVersionHistories({});
       return;
     }
 
     const entries = await Promise.all(
-      demoPages.map(async (page) => {
+      pageIds.map(async (pageId) => {
         try {
           const history = await projectApiClient.getPageVersionHistory(
             demoId,
-            page.id,
+            pageId,
           );
-          return [page.id, history] as const;
+          return [pageId, history] as const;
         } catch {
           return null;
         }
@@ -177,7 +188,7 @@ export function useVersionControl(params: UseVersionControlParams) {
         ),
       ),
     );
-  }, [demoId, demoPages]);
+  }, [demoId, pageVersionHistoryPageKey]);
 
   useEffect(() => {
     loadVersionHistory();

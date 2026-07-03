@@ -96,10 +96,12 @@ function buildLocalPackageUrl(
 function createPreviewSdkSource(options: PreviewRuntimeResolveOptions = {}): string {
   const reactUrl = getPreviewDependencyUrl("react", options);
   const lucideUrl = getPreviewDependencyUrl("lucide-react", options);
+  const svgaUrl = getPreviewDependencyUrl("svgaplayerweb", options);
 
   return `
 import React from '${reactUrl}';
 import * as Lucide from '${lucideUrl}';
+import SVGA from '${svgaUrl}';
 
 const semanticIcons = {
   browser: 'Globe2',
@@ -249,6 +251,78 @@ export function ImageAsset(props) {
     className,
     loading: 'lazy',
     onError: () => setFailed(true),
+    ...rest
+  });
+}
+
+export function SvgaPlayer(props) {
+  const {
+    src,
+    className,
+    style,
+    loops = 0,
+    contentMode = 'AspectFit',
+    fallback = null,
+    onError,
+    ...rest
+  } = props || {};
+  const containerRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !src) return undefined;
+
+    let disposed = false;
+    let player = null;
+    container.innerHTML = '';
+    setFailed(false);
+
+    try {
+      player = new SVGA.Player(container);
+      player.loops = loops;
+      if (typeof player.setContentMode === 'function') {
+        player.setContentMode(contentMode);
+      }
+      const parser = new SVGA.Parser();
+      parser.load(
+        src,
+        (videoItem) => {
+          if (disposed || !player) return;
+          player.setVideoItem(videoItem);
+          player.startAnimation();
+        },
+        (error) => {
+          if (disposed) return;
+          setFailed(true);
+          if (typeof onError === 'function') onError(error);
+        },
+      );
+    } catch (error) {
+      setFailed(true);
+      if (typeof onError === 'function') onError(error);
+    }
+
+    return () => {
+      disposed = true;
+      if (player) {
+        try {
+          player.stopAnimation();
+          if (typeof player.clear === 'function') player.clear();
+        } catch {}
+      }
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [src, loops, contentMode, onError]);
+
+  if (!src || failed) {
+    return fallback ? React.createElement('div', { className, style, ...rest }, fallback) : null;
+  }
+
+  return React.createElement('div', {
+    ref: containerRef,
+    className: cx('overflow-hidden', className),
+    style,
     ...rest
   });
 }

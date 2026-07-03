@@ -765,7 +765,7 @@ function MessageActionBar({
       )}
     >
       {isStreaming && <RunProgressPanel inline />}
-      {allTextContent && (
+      {!isStreaming && allTextContent && (
         <button
           type="button"
           onClick={onCopy}

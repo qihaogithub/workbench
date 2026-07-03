@@ -15,5 +15,6 @@
       "format": "image",
       "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png"
     }
-  }
+  },
+  "required": []
 }

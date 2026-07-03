@@ -22,7 +22,6 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -481,7 +480,7 @@ export function DemoPageTree({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="px-4 pb-4">
           {flatItems.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
@@ -547,7 +546,7 @@ export function DemoPageTree({
             💡 拖拽可排序或移入文件夹，右键菜单可移动到文件夹
           </p>
         </div>
-      </ScrollArea>
+      </div>
 
       <NewFolderDialog
         open={newFolderDialogOpen}

@@ -18,6 +18,7 @@ export interface PublishedDemoPage {
   parentId: string | null;
   runtimeType?: PublishedPageRuntimeType;
   compiledJsPath?: string;
+  iframeHtmlPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
   prototypeHtml?: string;
@@ -104,8 +105,11 @@ export function getCompiledJsUrl(
   return `${DATA_BASE}/data/${projectId}/${compiledJsPath}`;
 }
 
-export function getProjectScaffoldUrl(projectId: string): string {
-  return `${DATA_BASE}/api/viewer/${encodeURIComponent(projectId)}/scaffold`;
+export function getPublishedFileUrl(
+  projectId: string,
+  filePath: string,
+): string {
+  return `${DATA_BASE}/data/${projectId}/${filePath}`;
 }
 
 export interface ViewerAiHistoryMessage {

@@ -14,7 +14,6 @@ import {
   FileText,
   Map as MapIcon,
   MessageCircle,
-  Download,
 } from "lucide-react";
 import {
   getProjects,
@@ -22,7 +21,7 @@ import {
   getDemoSchema,
   getThumbnailUrl,
   getCompiledJsUrl,
-  getProjectScaffoldUrl,
+  getPublishedFileUrl,
 } from "@/lib/api";
 import type {
   ProjectsIndex,
@@ -65,6 +64,41 @@ function mergeConfigDefaults(
   const projectDefaults = projectSchema ? getDefaultValues(projectSchema) : {};
   const pageDefaults = pageSchema ? getDefaultValues(pageSchema) : {};
   return { ...projectDefaults, ...pageDefaults };
+}
+
+function PublishedIframePreview({
+  src,
+  title,
+  previewSize,
+}: {
+  src: string;
+  title: string;
+  previewSize?: PreviewSize;
+}) {
+  const width =
+    typeof previewSize?.width === "number" && Number.isFinite(previewSize.width)
+      ? previewSize.width
+      : 375;
+  const height =
+    typeof previewSize?.height === "number" && Number.isFinite(previewSize.height)
+      ? previewSize.height
+      : 812;
+
+  return (
+    <div className="flex min-h-full items-start justify-center bg-muted/20 p-6">
+      <div
+        className="overflow-hidden bg-white shadow-sm"
+        style={{ width, maxWidth: "100%", aspectRatio: `${width} / ${height}` }}
+      >
+        <iframe
+          title={title}
+          src={src}
+          className="h-full w-full border-0"
+          sandbox="allow-scripts"
+        />
+      </div>
+    </div>
+  );
 }
 
 function ProjectListPage() {
@@ -134,7 +168,12 @@ function ProjectListPage() {
     <div className="min-h-screen">
       <header className="border-b border-border">
         <div className="container flex h-14 items-center gap-4 px-6">
-          <h1 className="text-lg font-semibold shrink-0">资源效果预览</h1>
+          <div className="flex shrink-0 items-baseline gap-3">
+            <h1 className="text-lg font-semibold leading-none">FlowSite</h1>
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+              来自 OneFlow 的项目站点
+            </p>
+          </div>
 
           <div className="flex-1 flex items-center justify-end gap-2">
             <div className="relative flex items-center">
@@ -557,13 +596,15 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const compiledUrl = activePage?.compiledJsPath
     ? getCompiledJsUrl(projectId, activePage.compiledJsPath)
     : "";
+  const activeIframeUrl = activePage?.iframeHtmlPath
+    ? getPublishedFileUrl(projectId, activePage.iframeHtmlPath)
+    : "";
 
   return (
     <div className="flex flex-col h-full">
       <Header
         name={project.name}
         onBack={() => router.push("/")}
-        exportHref={getProjectScaffoldUrl(projectId)}
       />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project && activePage && (
@@ -653,6 +694,9 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     compiledJsUrl: p.compiledJsPath
                       ? getCompiledJsUrl(projectId, p.compiledJsPath)
                       : undefined,
+                    iframeUrl: p.iframeHtmlPath
+                      ? getPublishedFileUrl(projectId, p.iframeHtmlPath)
+                      : undefined,
                     prototypeHtml: p.prototypeHtml,
                     prototypeCss: p.prototypeCss,
                     prototypeMeta: p.prototypeMeta,
@@ -675,7 +719,13 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 <style>{`
                   .preview-single-scroll::-webkit-scrollbar { display: none; }
                 `}</style>
-                {activePage?.runtimeType === "prototype-html-css" ? (
+                {activeIframeUrl ? (
+                  <PublishedIframePreview
+                    src={activeIframeUrl}
+                    title={activePage?.name ?? "页面预览"}
+                    previewSize={previewSize ?? activePage?.previewSize}
+                  />
+                ) : activePage?.runtimeType === "prototype-html-css" ? (
                   <PrototypePagePreview
                     html={activePage.prototypeHtml}
                     css={activePage.prototypeCss}
@@ -810,11 +860,9 @@ function TreeList({
 function Header({
   name,
   onBack,
-  exportHref,
 }: {
   name: string;
   onBack: () => void;
-  exportHref?: string;
 }) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
@@ -827,14 +875,6 @@ function Header({
       </button>
       {name && <h1 className="text-sm font-semibold">{name}</h1>}
       <div className="flex-1" />
-      {exportHref && (
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <a href={exportHref} download>
-            <Download className="h-4 w-4" />
-            导出代码
-          </a>
-        </Button>
-      )}
     </header>
   );
 }

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "page_lib0",
+      "title": "手机 - HTML"
+    },
+    "pad-react": {
+      "pageId": "pad-react_3gok",
+      "title": "pad-HTML"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

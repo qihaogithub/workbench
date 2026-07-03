@@ -4,15 +4,19 @@
   "pages": {
     "demo": {
       "pageId": "demo_1779608460372_f5g6h7",
-      "title": "手机"
+      "title": "手机-react"
     },
     "demo-2": {
       "pageId": "demo_1779608460373_h7i8j9",
-      "title": "demo"
+      "title": "pad-react"
     },
     "page": {
       "pageId": "page_lib0",
-      "title": "手机 - 副本"
+      "title": "手机 - HTML"
+    },
+    "pad-react": {
+      "pageId": "pad-react_3gok",
+      "title": "pad-react - 副本"
     }
   },
   "actions": [],

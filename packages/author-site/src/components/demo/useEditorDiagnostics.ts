@@ -117,7 +117,6 @@ export function useEditorDiagnostics({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ events }),
-        keepalive: events.length <= 20,
       });
       if (!response.ok) {
         setRemoteWriteFailed(true);

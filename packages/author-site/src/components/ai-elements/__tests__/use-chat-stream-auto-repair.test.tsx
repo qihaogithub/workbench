@@ -51,6 +51,75 @@ describe("useChatStream 自动修复发送", () => {
     jest.clearAllMocks();
   });
 
+  it("发送前会等待 beforeSend 完成", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages =
+        typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+    let resolveBeforeSend: () => void = () => undefined;
+    const beforeSend = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBeforeSend = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+        beforeSend,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("删除共享配置");
+    });
+
+    await waitFor(() => {
+      expect(beforeSend).toHaveBeenCalledTimes(1);
+    });
+    expect(mockSendMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveBeforeSend();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "删除共享配置",
+        "/tmp/workspace",
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
   it("不会追加用户消息，但会把 hidden prompt 发给 Agent", async () => {
     let messages: ChatMessage[] = [];
     const messagesRef = { current: messages };
@@ -209,5 +278,43 @@ describe("useChatStream 自动修复发送", () => {
     expect(messages.some((message) => message.queueStatus)).toBe(false);
 
     jest.useRealTimers();
+  });
+
+  it("取消当前回复时清空正在展示的计划", () => {
+    const messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.setPlan({
+        fallbackText: "",
+        items: [
+          { id: "mobile", title: "修复手机版布局", status: "in_progress" },
+        ],
+      });
+    });
+
+    expect(result.current.plan.items).toHaveLength(1);
+
+    act(() => {
+      result.current.handleCancel("", currentMessageRef.current);
+    });
+
+    expect(result.current.plan).toEqual({ items: [], fallbackText: "" });
   });
 });

@@ -6,19 +6,17 @@
   "demoPages": [
     {
       "id": "demo_1779608460500_a1b2c3",
-      "name": "课后服务-手机",
-      "order": 1,
+      "name": "demo",
+      "order": 0,
       "parentId": null,
-      "createdAt": 1779608460500,
-      "updatedAt": 1779785297837
+      "routeKey": "demo"
     },
     {
       "id": "demo_1779608461000_d4e5f6",
-      "name": "课后服务-平板",
-      "order": 2,
+      "name": "demo",
+      "order": 1,
       "parentId": null,
-      "createdAt": 1779608461000,
-      "updatedAt": 1779691009959
+      "routeKey": "demo-2"
     }
   ],
   "demoFolders": [],
@@ -116,7 +114,11 @@
   ],
   "pageVersions": {},
   "createdAt": 1779608458652,
-  "updatedAt": 1782723552829,
+  "updatedAt": 1783060643070,
   "publishedVersion": "v10",
-  "publishedAt": 1780063578252
+  "publishedAt": 1780063578252,
+  "activeWorkspaceId": "live-1783060641371-6spy22bem",
+  "activeWorkspaceUpdatedAt": 1783060641376,
+  "canonicalSyncedWorkspaceId": "live-1783060641371-6spy22bem",
+  "canonicalSyncedAt": 1783060643070
 }

@@ -1,202 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type {
   PreviewDiagnostic,
   PreviewDiagnosticError,
   PreviewPanelProps,
-  PreviewSize,
   PositionableSizeItem,
 } from "./types";
 import type { AppActionPayload, ConsoleLogPayload, VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
 import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
-
-const DEFAULT_PREVIEW_SIZE: PreviewSize = {
-  width: 375,
-  height: 812,
-};
-
-const CONTAINER_PADDING = 32;
+import { computePreviewScale } from "./preview-scale";
 const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
 const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
-
-function parseSizeValue(value: string | number | undefined): number | null {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    const num = parseFloat(value.replace(/px$/, ""));
-    return isNaN(num) ? null : num;
-  }
-  return null;
-}
-
-interface PreviewScaleResult {
-  designWidth: number;
-  designHeight: number;
-  scale: number;
-  wrapperStyle: React.CSSProperties;
-  iframeStyle: React.CSSProperties;
-}
-
-function computePreviewScale(
-  size?: PreviewSize,
-  containerWidth?: number,
-  containerHeight?: number,
-  fillContainer?: boolean,
-  effectiveHeight?: number,
-): PreviewScaleResult {
-  const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
-  const designWidth = parseSizeValue(effectiveSize.width) ?? 375;
-  const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
-  const useEffectiveHeight = effectiveHeight != null && effectiveHeight > designHeight;
-  const iframeHeight = useEffectiveHeight ? effectiveHeight : designHeight;
-
-  if (fillContainer) {
-    if (containerWidth && containerHeight) {
-      if (useEffectiveHeight) {
-        const scale = containerWidth / designWidth;
-        return {
-          designWidth,
-          designHeight: iframeHeight,
-          scale,
-          wrapperStyle: {
-            width: "100%",
-            height: "100%",
-            overflow: "hidden",
-            position: "relative",
-          },
-          iframeStyle: {
-            width: designWidth,
-            height: iframeHeight,
-            border: "none",
-            position: "absolute",
-            top: 0,
-            left: 0,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          },
-        };
-      }
-
-      const scaleX = containerWidth / designWidth;
-      const scaleY = containerHeight / designHeight;
-      const scale = Math.min(scaleX, scaleY);
-
-      const displayWidth = designWidth * scale;
-      const displayHeight = designHeight * scale;
-      const offsetX = (containerWidth - displayWidth) / 2;
-      const offsetY = (containerHeight - displayHeight) / 2;
-
-      return {
-        designWidth,
-        designHeight,
-        scale,
-        wrapperStyle: {
-          width: "100%",
-          height: "100%",
-          overflow: "hidden",
-          position: "relative",
-        },
-        iframeStyle: {
-          width: designWidth,
-          height: designHeight,
-          border: "none",
-          position: "absolute",
-          top: offsetY,
-          left: offsetX,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        },
-      };
-    }
-
-    const fallbackHeight = useEffectiveHeight ? iframeHeight : designHeight;
-    return {
-      designWidth,
-      designHeight: fallbackHeight,
-      scale: 1,
-      wrapperStyle: {
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        position: "relative",
-      },
-      iframeStyle: {
-        width: designWidth,
-        height: fallbackHeight,
-        border: "none",
-        position: "absolute",
-        top: 0,
-        left: 0,
-        transformOrigin: "top left",
-      },
-    };
-  }
-
-  if (!containerWidth || !containerHeight) {
-    return {
-      designWidth,
-      designHeight,
-      scale: 1,
-      wrapperStyle: {
-        width: designWidth,
-        height: designHeight,
-        margin: "0 auto",
-        position: "relative",
-        overflow: "hidden",
-      },
-      iframeStyle: {
-        width: designWidth,
-        height: designHeight,
-        border: "none",
-        position: "absolute",
-        top: 0,
-        left: 0,
-      },
-    };
-  }
-
-  const availableHeight = containerHeight - CONTAINER_PADDING;
-  const availableWidth = containerWidth;
-  const aspectRatio = designWidth / designHeight;
-
-  let displayWidth: number;
-  let displayHeight: number;
-
-  if (availableHeight * aspectRatio <= availableWidth) {
-    displayWidth = availableHeight * aspectRatio;
-    displayHeight = availableHeight;
-  } else {
-    displayWidth = availableWidth;
-    displayHeight = availableWidth / aspectRatio;
-  }
-
-  const scale = displayWidth / designWidth;
-
-  return {
-    designWidth,
-    designHeight,
-    scale,
-    wrapperStyle: {
-      width: displayWidth,
-      height: displayHeight,
-      margin: "auto",
-      position: "relative",
-      overflow: "hidden",
-    },
-    iframeStyle: {
-      width: designWidth,
-      height: designHeight,
-      transform: `scale(${scale})`,
-      transformOrigin: "top left",
-      border: "none",
-      position: "absolute",
-      top: 0,
-      left: 0,
-    },
-  };
-}
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
 
@@ -437,6 +254,32 @@ function extractStaticPrototypeSnapshot(
   }
 }
 
+function normalizeMeasuredSize(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value);
+}
+
+function shouldUsePassiveMeasureFallback(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    /jsdom/i.test(navigator.userAgent)
+  );
+}
+
+function setBooleanStateIfChanged(
+  setter: React.Dispatch<React.SetStateAction<boolean>>,
+  value: boolean,
+) {
+  setter((current) => (current === value ? current : value));
+}
+
+function setNullableStringStateIfChanged(
+  setter: React.Dispatch<React.SetStateAction<string | null>>,
+  value: string | null,
+) {
+  setter((current) => (current === value ? current : value));
+}
+
 export function PreviewPanel({
   code,
   sessionId,
@@ -495,6 +338,8 @@ export function PreviewPanel({
   const [placeholderFailed, setPlaceholderFailed] = useState(false);
   const [visualContextMenu, setVisualContextMenu] =
     useState<VisualContextMenuState | null>(null);
+  const containerSizeRef = useRef({ width: 0, height: 0 });
+  const skipNextPassiveMeasureRef = useRef(false);
   const timingStartRef = useRef<number>(0);
   const compileStartRef = useRef<number | null>(null);
   const updateCodeSentAtRef = useRef<number | null>(null);
@@ -518,7 +363,7 @@ export function PreviewPanel({
   };
 
   const validCode = code ? isValidCode(code) : true;
-  const { designWidth, designHeight, wrapperStyle, iframeStyle } = computePreviewScale(
+  const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
     previewSize,
     containerWidth,
     containerHeight,
@@ -571,9 +416,25 @@ export function PreviewPanel({
   );
 
   const updateContainerSize = useCallback((width: number, height: number) => {
-    if (width <= 0 || height <= 0) return;
-    setContainerWidth((current) => (current === width ? current : width));
-    setContainerHeight((current) => (current === height ? current : height));
+    const nextWidth = normalizeMeasuredSize(width);
+    const nextHeight = normalizeMeasuredSize(height);
+    if (nextWidth <= 0 || nextHeight <= 0) return;
+    const current = containerSizeRef.current;
+    const resolvedWidth =
+      current.width > 0 && Math.abs(current.width - nextWidth) <= 1
+        ? current.width
+        : nextWidth;
+    const resolvedHeight =
+      current.height > 0 && Math.abs(current.height - nextHeight) <= 1
+        ? current.height
+        : nextHeight;
+    if (current.width === resolvedWidth && current.height === resolvedHeight) {
+      return;
+    }
+    containerSizeRef.current = { width: resolvedWidth, height: resolvedHeight };
+    skipNextPassiveMeasureRef.current = true;
+    setContainerWidth(resolvedWidth);
+    setContainerHeight(resolvedHeight);
   }, []);
 
   const measureContainer = useCallback(() => {
@@ -814,7 +675,7 @@ export function PreviewPanel({
   }, [onVisualSelect, onVisualSelectStack, sendVisualEditState]);
 
   useEffect(() => {
-    setContentLoaded(false);
+    setBooleanStateIfChanged(setContentLoaded, false);
 
     if (isUrlMode) {
       if (!compiledJsUrl) {
@@ -826,8 +687,8 @@ export function PreviewPanel({
       nextPreviewRequestIdRef.current = requestId;
       activePreviewRequestIdRef.current = requestId;
 
-      setCompileError(null);
-      setRuntimeError(null);
+      setNullableStringStateIfChanged(setCompileError, null);
+      setNullableStringStateIfChanged(setRuntimeError, null);
 
       const currentConfig = configDataRef.current || {};
       if (iframeReadyRef.current) {
@@ -845,10 +706,10 @@ export function PreviewPanel({
 
     if (code !== undefined && !code) {
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
-      setContentLoaded(false);
-      setIsCompiling(false);
-      setCompileError(null);
-      setRuntimeError(null);
+      setBooleanStateIfChanged(setContentLoaded, false);
+      setBooleanStateIfChanged(setIsCompiling, false);
+      setNullableStringStateIfChanged(setCompileError, null);
+      setNullableStringStateIfChanged(setRuntimeError, null);
       setPendingCompileResult(null);
       setLastSuccessfulResult(null);
       return;
@@ -856,9 +717,9 @@ export function PreviewPanel({
 
     if (!sessionId && (!code || !validCode)) {
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
-      setContentLoaded(false);
-      setIsCompiling(false);
-      setCompileError(null);
+      setBooleanStateIfChanged(setContentLoaded, false);
+      setBooleanStateIfChanged(setIsCompiling, false);
+      setNullableStringStateIfChanged(setCompileError, null);
       setPendingCompileResult(null);
       setLastSuccessfulResult(null);
       return;
@@ -878,10 +739,10 @@ export function PreviewPanel({
     reportTiming("compile_start", {
       cacheScope: sessionId && demoId ? "session-demo" : "request",
     });
-    setContentLoaded(false);
-    setIsCompiling(true);
-    setCompileError(null);
-    setRuntimeError(null);
+    setBooleanStateIfChanged(setContentLoaded, false);
+    setBooleanStateIfChanged(setIsCompiling, true);
+    setNullableStringStateIfChanged(setCompileError, null);
+    setNullableStringStateIfChanged(setRuntimeError, null);
 
     const compile = async () => {
       try {
@@ -902,7 +763,7 @@ export function PreviewPanel({
             } else {
               setPendingCompileResult({ result: compileResult, requestId });
             }
-            setIsCompiling(false);
+            setBooleanStateIfChanged(setIsCompiling, false);
             return;
           }
         }
@@ -942,10 +803,10 @@ export function PreviewPanel({
             codeHash: result.error?.details?.codeHash,
             moduleHash: result.error?.details?.moduleHash,
           };
-          setCompileError(message);
+          setNullableStringStateIfChanged(setCompileError, message);
           onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
           setPendingCompileResult(null);
-          setIsCompiling(false);
+          setBooleanStateIfChanged(setIsCompiling, false);
           const compileMs =
             compileStartRef.current != null && typeof performance !== "undefined"
               ? Math.round(performance.now() - compileStartRef.current)
@@ -974,7 +835,7 @@ export function PreviewPanel({
           setPendingCompileResult({ result: compileResult, requestId });
         }
 
-        setIsCompiling(false);
+        setBooleanStateIfChanged(setIsCompiling, false);
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "编译失败";
@@ -986,10 +847,10 @@ export function PreviewPanel({
           message,
           instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
         };
-        setCompileError(message);
+        setNullableStringStateIfChanged(setCompileError, message);
         onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
         setPendingCompileResult(null);
-        setIsCompiling(false);
+        setBooleanStateIfChanged(setIsCompiling, false);
         const compileMs =
           compileStartRef.current != null && typeof performance !== "undefined"
             ? Math.round(performance.now() - compileStartRef.current)
@@ -1027,7 +888,7 @@ export function PreviewPanel({
     if (!lastSuccessfulResult) return;
 
     if (runtimeError) {
-      setRuntimeError(null);
+      setNullableStringStateIfChanged(setRuntimeError, null);
     }
 
     sendUpdateConfig(configData || {});
@@ -1111,7 +972,7 @@ export function PreviewPanel({
         case "READY":
           reportTiming("iframe_ready");
           iframeReadyRef.current = true;
-          setIframeReady(true);
+          setBooleanStateIfChanged(setIframeReady, true);
           if (isUrlMode && compiledJsUrl) {
             sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], configData || {});
           } else if (pendingCompileResult) {
@@ -1136,9 +997,11 @@ export function PreviewPanel({
                 ? Math.round(performance.now() - updateCodeSentAtRef.current)
                 : undefined,
           });
-          setRuntimeError(null);
-          setContentLoaded(true);
-          onContentLoaded?.();
+          setNullableStringStateIfChanged(setRuntimeError, null);
+          setBooleanStateIfChanged(setContentLoaded, true);
+          if (!contentLoaded) {
+            onContentLoaded?.();
+          }
           sendCollectPositionableSizes();
           break;
 
@@ -1151,7 +1014,7 @@ export function PreviewPanel({
           if (!isCurrentPreviewRequest) return;
           {
             const message = error || "组件运行时发生错误";
-            setRuntimeError(message);
+            setNullableStringStateIfChanged(setRuntimeError, message);
             onErrorRef.current?.(
               createPreviewDiagnosticError(message, {
                 source: "preview_runtime",
@@ -1331,7 +1194,18 @@ export function PreviewPanel({
     );
   }, [onStaticPrototypeSnapshot, staticPrototypeRequestKey]);
 
-  useLayoutEffect(measureContainer);
+  useEffect(() => {
+    measureContainer();
+  }, [measureContainer]);
+
+  useEffect(() => {
+    if (!shouldUsePassiveMeasureFallback()) return;
+    if (skipNextPassiveMeasureRef.current) {
+      skipNextPassiveMeasureRef.current = false;
+      return;
+    }
+    measureContainer();
+  });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1409,7 +1283,7 @@ export function PreviewPanel({
             runtimeBaseUrl: window.location.origin,
             useCdnRuntime: runtimeSource === "cdn",
           }))}`;
-    setIframeSrcUrl(url);
+    setIframeSrcUrl((current) => (current === url ? current : url));
     reportTiming("iframe_html_created", {
       cdnBase: resolvedCdnBaseUrl,
       transport: canUseFixedShell ? "fixed-shell" : "data-url",
@@ -1419,11 +1293,11 @@ export function PreviewPanel({
   }, [isUrlMode, resolvedCdnBaseUrl]);
 
   useEffect(() => {
-    setContentLoaded(false);
+    setBooleanStateIfChanged(setContentLoaded, false);
   }, [iframeSrcUrl]);
 
   useEffect(() => {
-    setPlaceholderFailed(false);
+    setBooleanStateIfChanged(setPlaceholderFailed, false);
   }, [placeholderScreenshotUrl]);
 
   return (
@@ -1484,7 +1358,7 @@ export function PreviewPanel({
                   alt="preview placeholder"
                   className="h-full w-full object-contain"
                   draggable={false}
-                  onError={() => setPlaceholderFailed(true)}
+                  onError={() => setBooleanStateIfChanged(setPlaceholderFailed, true)}
                 />
               </div>
             )}
@@ -1507,7 +1381,7 @@ export function PreviewPanel({
               sandbox="allow-scripts allow-same-origin"
               src={iframeSrcUrl}
               style={{
-                ...iframeStyle,
+                ...contentStyle,
                 opacity: contentLoaded ? 1 : 0,
                 transition: 'opacity 0.2s ease-in-out',
               }}

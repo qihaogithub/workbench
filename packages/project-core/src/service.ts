@@ -368,6 +368,74 @@ export class ProjectAdminService {
     ].forEach(ensureDir);
   }
 
+  private regeneratePublishedProjectsIndex(): void {
+    if (!fs.existsSync(this.publishedDir)) return;
+
+    const projects: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      thumbnail?: string;
+      publishedAt: number;
+      publishedVersion: string;
+      demoCount: number;
+    }> = [];
+
+    for (const dirName of fs.readdirSync(this.publishedDir)) {
+      if (dirName.startsWith(".")) continue;
+      const projectJsonPath = path.join(this.publishedDir, dirName, "project.json");
+      if (!fs.existsSync(projectJsonPath)) continue;
+
+      try {
+        const data = readJsonFile<{
+          id?: unknown;
+          name?: unknown;
+          description?: unknown;
+          thumbnail?: unknown;
+          publishedAt?: unknown;
+          publishedVersion?: unknown;
+          demoPages?: unknown[];
+        }>(projectJsonPath);
+        if (!data) continue;
+        if (
+          typeof data.id !== "string" ||
+          typeof data.name !== "string" ||
+          typeof data.publishedAt !== "number" ||
+          typeof data.publishedVersion !== "string"
+        ) {
+          continue;
+        }
+        projects.push({
+          id: data.id,
+          name: data.name,
+          description: typeof data.description === "string" ? data.description : undefined,
+          thumbnail: typeof data.thumbnail === "string" ? data.thumbnail : undefined,
+          publishedAt: data.publishedAt,
+          publishedVersion: data.publishedVersion,
+          demoCount: Array.isArray(data.demoPages) ? data.demoPages.length : 0,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    projects.sort((a, b) => b.publishedAt - a.publishedAt);
+    writeJsonFile(path.join(this.publishedDir, "projects-index.json"), {
+      projects,
+      generatedAt: Date.now(),
+    });
+  }
+
+  private deletePublishedProjectArtifact(projectId: string): boolean {
+    const artifactPath = path.join(this.publishedDir, projectId);
+    const existed = fs.existsSync(artifactPath);
+    if (existed) {
+      fs.rmSync(artifactPath, { recursive: true, force: true });
+    }
+    this.regeneratePublishedProjectsIndex();
+    return existed;
+  }
+
   capabilities(actor = this.defaultActor()): ProjectAdminResult<CapabilitySummary> {
     const writable = actor.role !== "readonly";
     return ok({
@@ -688,14 +756,19 @@ export class ProjectAdminService {
     const access = this.requireProjectAccess(plan.resourceId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     fs.rmSync(this.getProjectPath(plan.resourceId), { recursive: true, force: true });
+    const deletedPublishedArtifact = this.deletePublishedProjectArtifact(plan.resourceId);
+    const deleted = [
+      `project:${plan.resourceId}`,
+      ...(deletedPublishedArtifact ? [`published:${plan.resourceId}`] : []),
+    ];
     const auditId = this.audit("project_delete_execute", actor, "L3", true, {
       projectId: plan.resourceId,
       resourceId: plan.resourceId,
-      diffSummary: { deleted: [`project:${plan.resourceId}`] },
+      diffSummary: { deleted },
     });
     return ok(
       { deleted: true, projectId: plan.resourceId },
-      { auditId, diffSummary: { deleted: [`project:${plan.resourceId}`] } },
+      { auditId, diffSummary: { deleted } },
     );
   }
 

@@ -249,6 +249,7 @@ interface UseChatStreamOptions {
     level?: "info" | "warn" | "error";
     details?: Record<string, unknown>;
   }) => void;
+  beforeSend?: () => Promise<void> | void;
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
 
@@ -271,6 +272,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onModelsEvent,
     onModelStateError,
     onDiagnosticEvent,
+    beforeSend,
     externalStreamServiceRef,
   } = options;
 
@@ -453,6 +455,8 @@ export function useChatStream(options: UseChatStreamOptions) {
         );
       }
 
+      let beforeSendFailed = false;
+
       try {
         const assistantMessageId = `assistant-${Date.now()}`;
         memoryFilePathsRef.current.clear();
@@ -465,6 +469,13 @@ export function useChatStream(options: UseChatStreamOptions) {
           content: "",
           parts: [],
         });
+
+        try {
+          await beforeSend?.();
+        } catch (error) {
+          beforeSendFailed = true;
+          throw error;
+        }
 
         const streamService = new StreamService();
         streamServiceRef.current = streamService;
@@ -842,6 +853,32 @@ export function useChatStream(options: UseChatStreamOptions) {
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
+        if (beforeSendFailed) {
+          const message =
+            error instanceof Error ? error.message : "同步工作区失败";
+          onDiagnosticEvent?.({
+            name: "ai.before_send_failed",
+            traceId,
+            level: "error",
+            details: { message },
+          });
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content: `错误: ${message}`,
+          };
+          setMessages((prev) => [
+            ...appendMessageBeforeQueued(
+              updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+              errorMessage,
+            ),
+          ]);
+          setStreamContent("");
+          stopSilenceTracking();
+          completeRunAndDrain();
+          return;
+        }
+
         onDiagnosticEvent?.({
           name: "ai.websocket_failed",
           traceId,
@@ -1016,6 +1053,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       onModelsEvent,
       onModelStateError,
       onDiagnosticEvent,
+      beforeSend,
       markActivity,
       startSilenceTracking,
       stopSilenceTracking,
@@ -1147,6 +1185,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     (streamContent: string, currentMessage: ChatMessage) => {
       streamServiceRef.current?.close();
       stopSilenceTracking();
+      setPlan(EMPTY_PLAN);
       if (
         streamContent ||
         (currentMessage.parts && currentMessage.parts.length > 0)

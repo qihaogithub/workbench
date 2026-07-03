@@ -24,8 +24,11 @@ export const DEFAULT_PREVIEW_RUNTIME_IMPORTS: Record<string, string> = {
   "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+  "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
+
+const PREVIEW_RUNTIME_PATH_PREFIX = "/preview-runtime";
 
 let cachedManifest: PreviewRuntimeManifest | null | undefined;
 
@@ -44,6 +47,12 @@ export function resolvePreviewRuntimeUrl(url: string, baseUrl?: string): string 
   }
   const normalizedBase = normalizeBaseUrl(baseUrl);
   if (!normalizedBase) return url;
+  if (
+    normalizedBase.endsWith(PREVIEW_RUNTIME_PATH_PREFIX) &&
+    url.startsWith(`${PREVIEW_RUNTIME_PATH_PREFIX}/`)
+  ) {
+    return `${normalizedBase}${url.slice(PREVIEW_RUNTIME_PATH_PREFIX.length)}`;
+  }
   return `${normalizedBase}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 

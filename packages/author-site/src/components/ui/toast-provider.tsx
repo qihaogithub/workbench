@@ -46,7 +46,7 @@ export function ToastProviderWrapper({
 
   return (
     <ToastContext.Provider value={{ toasts, toast, dismiss }}>
-      <ToastProvider>
+      <ToastProvider duration={3000}>
         {children}
         {toasts.map((t) => (
           <Toast

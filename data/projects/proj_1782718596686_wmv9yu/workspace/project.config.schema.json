@@ -3,11 +3,25 @@
   "title": "通用弹窗 - 项目级共享配置",
   "type": "object",
   "properties": {
+    "mediaType": {
+      "type": "string",
+      "title": "弹窗媒体类型",
+      "description": "二选一：选择图片时使用弹窗图片；选择SVGA动画时使用SVGA动画文件。",
+      "enum": [
+        "image",
+        "svga"
+      ],
+      "enumNames": [
+        "图片",
+        "SVGA动画"
+      ],
+      "default": "image"
+    },
     "modalImage": {
       "type": "string",
       "format": "image",
       "title": "弹窗图片",
-      "description": "上传弹窗展示的图片（宽度670px，高度670~890px）",
+      "description": "媒体类型选择“图片”时生效。建议宽度670px，高度670-890px。",
       "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png",
       "ui:options": {
         "accept": "image/*",
@@ -17,7 +31,21 @@
         "maxWidth": 670,
         "maxHeight": 890
       }
+    },
+    "svgaSrc": {
+      "type": "string",
+      "title": "SVGA动画文件",
+      "description": "媒体类型选择“SVGA动画”时生效。可上传 .svga 文件，或填写可跨域访问的 .svga 地址。",
+      "default": "",
+      "ui:widget": "file",
+      "ui:options": {
+        "accept": ".svga,application/octet-stream",
+        "maxSize": 10485760,
+        "placeholder": "上传或填写 .svga 文件地址"
+      }
     }
   },
-  "required": ["modalImage"]
+  "required": [
+    "mediaType"
+  ]
 }

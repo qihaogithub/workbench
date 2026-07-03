@@ -189,6 +189,7 @@ export interface CanvasPageData {
   runtimeType?: CanvasPageRuntimeType;
   code?: string;
   compiledJsUrl?: string;
+  iframeUrl?: string;
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: Record<string, unknown>;

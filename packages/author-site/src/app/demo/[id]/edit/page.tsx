@@ -55,6 +55,7 @@ import {
   hasPreviewPageCode,
   resolvePreviewPageCode,
 } from "@/lib/preview-page-code";
+import { getPrototypePreviewSize } from "@/lib/prototype-preview-size";
 import {
   applyPrototypePropertyChange,
   applyPrototypeVisualConfiguration,
@@ -104,18 +105,9 @@ import {
   Download,
 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -447,6 +439,14 @@ function replaceCollabText(ytext: { toString: () => string; delete: (index: numb
   if (value) ytext.insert(0, value);
 }
 
+function isAiFileChangeRefreshTarget(normalizedPath: string): boolean {
+  return (
+    normalizedPath === "workspace-tree.json" ||
+    normalizedPath === "project.config.schema.json" ||
+    normalizedPath.startsWith("demos/")
+  );
+}
+
 const WORKSPACE_FLUSH_DELAY_MS = 1200;
 
 function serializeCanvasLayout(projectId: string, state: CanvasState): string {
@@ -494,6 +494,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
   const { id: demoId } = params;
   const { toast } = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [code, setCode] = useState("");
@@ -1205,6 +1207,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const schemaRegenerateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const lastPreviewErrorFingerprintRef = useRef<string | null>(null);
 
   const configData = configDataMap[activeDemoId] ?? {};
   // visualConfigCandidates and selectedVisualConfigCandidate moved to useVisualEditState hook
@@ -1427,15 +1430,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         pageId: diagnostic.pageId || pageId || undefined,
         file: diagnostic.file || (pageId ? `demos/${pageId}/index.tsx` : undefined),
       };
-      recordDiagnosticEvent({
-        category: "preview",
-        name: "preview.error",
-        level: "error",
-        traceId: createDiagnosticTraceId("preview"),
-        details: normalizedDiagnostic,
-      });
-      setPreviewRuntimeError(normalizedDiagnostic);
-
       const repairFingerprint = pageId
         ? buildAutoPreviewRepairFingerprint({
             projectId: demoId,
@@ -1443,12 +1437,41 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             diagnostic: normalizedDiagnostic,
           })
         : null;
+      const diagnosticFingerprint =
+        repairFingerprint ||
+        JSON.stringify({
+          pageId: normalizedDiagnostic.pageId,
+          file: normalizedDiagnostic.file,
+          source: normalizedDiagnostic.source,
+          stage: normalizedDiagnostic.stage,
+          code: normalizedDiagnostic.code,
+          message: normalizedDiagnostic.message,
+        });
+      const isRepeatedPreviewError =
+        lastPreviewErrorFingerprintRef.current === diagnosticFingerprint;
+      if (!isRepeatedPreviewError) {
+        lastPreviewErrorFingerprintRef.current = diagnosticFingerprint;
+      }
+      recordDiagnosticEvent({
+        category: "preview",
+        name: isRepeatedPreviewError ? "preview.error_repeated" : "preview.error",
+        level: "error",
+        traceId: createDiagnosticTraceId("preview"),
+        details: normalizedDiagnostic,
+      });
+      if (!isRepeatedPreviewError) {
+        setPreviewRuntimeError(normalizedDiagnostic);
+      }
+
       const repairCount = repairFingerprint
         ? getAutoPreviewRepairAttemptCount(
             repairFingerprint,
             autoPreviewRepairCountsRef.current,
           )
         : 0;
+      if (isRepeatedPreviewError) {
+        return;
+      }
       if (pageId && repairCount < 2) {
         const nextRepairCount = repairFingerprint
           ? recordAutoPreviewRepairAttempt(
@@ -1523,7 +1546,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   useEffect(() => {
-    setPreviewRuntimeError(null);
+    setPreviewRuntimeError((current) => (current === null ? current : null));
   }, [activeDemoId]);
 
   /**
@@ -1851,19 +1874,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     if (previewMode !== "single" || !activeDemoId) return;
     const activePage = demoPages.find((page) => page.id === activeDemoId);
     if (activePage?.runtimeType === "prototype-html-css") {
-      setSinglePreviewLoaded(true);
+      setSinglePreviewLoaded((current) => (current ? current : true));
     }
   }, [activeDemoId, demoPages, previewMode]);
 
   useEffect(() => {
     if (propertyPanelActive) return;
     setVisualPanelHoverNodeId(null);
-    setVisualLayerTreeOpen(false);
+    setVisualLayerTreeOpen((current) => (current ? false : current));
   }, [propertyPanelActive, setVisualPanelHoverNodeId]);
 
   useEffect(() => {
-    setVisualLayerTreeNodes([]);
-    setVisualLayerTreeOpen(false);
+    setVisualLayerTreeNodes((current) => (current.length === 0 ? current : []));
+    setVisualLayerTreeOpen((current) => (current ? false : current));
   }, [activeDemoId]);
 
   useEffect(() => {
@@ -1896,7 +1919,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           activePageId: activeDemoIdRef.current,
         },
       });
-      setAiIsStreaming(isStreaming);
+      setAiIsStreaming((current) => (current === isStreaming ? current : isStreaming));
       handleVisualPropertySubmissionStreamingChange(isStreaming);
     },
     [
@@ -1971,13 +1994,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       code: activeCodeCollab.value,
       source: "collab",
     });
-    markWorkspaceChanged();
   }, [
     activeCodeCollab.status,
     activeCodeCollab.value,
     activeCodeCollab.ytext,
     applyDemoSnapshot,
-    markWorkspaceChanged,
   ]);
 
   useEffect(() => {
@@ -1999,13 +2020,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       schema: activeSchemaCollab.value,
       source: "collab",
     });
-    markWorkspaceChanged();
   }, [
     activeSchemaCollab.status,
     activeSchemaCollab.value,
     activeSchemaCollab.ytext,
     applyDemoSnapshot,
-    markWorkspaceChanged,
   ]);
 
   useEffect(() => {
@@ -2019,10 +2038,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       replaceCollabText(projectSchemaCollab.ytext, projectConfigSchemaRef.current);
       return;
     }
-    setProjectConfigSchema(projectSchemaCollab.value);
-    markWorkspaceChanged();
+    setProjectConfigSchema((current) =>
+      current === projectSchemaCollab.value ? current : projectSchemaCollab.value,
+    );
   }, [
-    markWorkspaceChanged,
     projectConfigSchema,
     projectSchemaCollab.status,
     projectSchemaCollab.value,
@@ -2065,25 +2084,36 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }
     if (!Array.isArray(parsed.pages) || !Array.isArray(parsed.folders)) return;
 
+    const normalizePages = (
+      pages: Array<Pick<DemoPageMeta, "id" | "name" | "routeKey" | "runtimeType" | "order" | "parentId">>,
+    ) =>
+      pages
+        .map(({ id, name, routeKey, runtimeType, order, parentId }) => ({
+          id,
+          name,
+          routeKey: routeKey ?? null,
+          runtimeType: runtimeType ?? null,
+          order,
+          parentId: parentId ?? null,
+        }))
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    const normalizeFolders = (folders: DemoFolderMeta[]) =>
+      folders
+        .map(({ id, name, order, parentId }) => ({
+          id,
+          name,
+          order,
+          parentId: parentId ?? null,
+        }))
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+
     const current = JSON.stringify({
-      pages: demoPages.map(({ id, name, routeKey, order, parentId }) => ({
-        id,
-        name,
-        routeKey,
-        order,
-        parentId,
-      })),
-      folders: demoFolders,
+      pages: normalizePages(demoPages),
+      folders: normalizeFolders(demoFolders),
     });
     const incoming = JSON.stringify({
-      pages: parsed.pages.map(({ id, name, routeKey, order, parentId }) => ({
-        id,
-        name,
-        routeKey,
-        order,
-        parentId,
-      })),
-      folders: parsed.folders,
+      pages: normalizePages(parsed.pages),
+      folders: normalizeFolders(parsed.folders),
     });
     if (current === incoming) return;
 
@@ -2096,11 +2126,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         .sort((a, b) => a.order - b.order),
     );
     setDemoFolders([...parsed.folders].sort((a, b) => a.order - b.order));
-    markWorkspaceChanged();
   }, [
     demoFolders,
     demoPages,
-    markWorkspaceChanged,
     pagePreviewSizeMap,
     workspaceTreeCollab.status,
     workspaceTreeCollab.value,
@@ -2146,7 +2174,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   useEffect(() => {
     const hasErrors =
       !validationResult.isValid && validationResult.errors.length > 0;
-    setErrorBannerVisible(hasErrors);
+    setErrorBannerVisible((current) => (current === hasErrors ? current : hasErrors));
   }, [validationResult]);
 
   const handleSendErrorToAI = useCallback(
@@ -2383,7 +2411,7 @@ ${context.details}
         // 初始化 Agent 会话
         setAgentSessionId(sessionData.data.sessionId);
       } catch (error) {
-        toast({
+        toastRef.current({
           title: "加载失败",
           description: error instanceof Error ? error.message : "未知错误",
           variant: "destructive",
@@ -2394,7 +2422,7 @@ ${context.details}
     };
 
     loadDemo();
-  }, [demoId, toast]);
+  }, [demoId]);
 
   useEffect(() => {
     const pageId = activeDemoIdRef.current;
@@ -2594,7 +2622,8 @@ ${context.details}
     replaceCollabText(projectSchemaCollab.ytext, newSchema);
     setProjectConfigSchema(newSchema);
     projectConfigSchemaRef.current = newSchema;
-  }, [projectSchemaCollab.ytext]);
+    markWorkspaceChanged();
+  }, [markWorkspaceChanged, projectSchemaCollab.ytext]);
 
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
@@ -2628,12 +2657,20 @@ ${context.details}
     );
   }, []);
 
-  useEffect(() => {
-    if (previewMode !== "canvas" || !sessionId || demoPages.length === 0) return;
-
-    const missingPageIds = demoPages
+  const canvasMissingPageIdsKey = useMemo(() => {
+    if (previewMode !== "canvas" || !sessionId || demoPages.length === 0) {
+      return "";
+    }
+    return demoPages
       .map((page) => page.id)
-      .filter((pageId) => pageCodes[pageId] === undefined);
+      .filter((pageId) => pageCodes[pageId] === undefined)
+      .join("\0");
+  }, [demoPages, pageCodes, previewMode, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !canvasMissingPageIdsKey) return;
+
+    const missingPageIds = canvasMissingPageIdsKey.split("\0");
     if (missingPageIds.length === 0) return;
 
     let cancelled = false;
@@ -2714,10 +2751,8 @@ ${context.details}
       cancelled = true;
     };
   }, [
-    demoPages,
+    canvasMissingPageIdsKey,
     getSafeMergedDefaults,
-    pageCodes,
-    previewMode,
     sessionId,
   ]);
 
@@ -2770,6 +2805,12 @@ ${context.details}
       updatePageSchemaMapFromLoad,
     ],
   );
+  const handleConfigPanelPageSelectRef = useRef(handleConfigPanelPageSelect);
+  handleConfigPanelPageSelectRef.current = handleConfigPanelPageSelect;
+  const fallbackPageId = useMemo(() => {
+    if (demoPages.length === 0) return "";
+    return [...demoPages].sort((a, b) => a.order - b.order)[0]?.id ?? "";
+  }, [demoPages]);
 
   const handleSinglePreviewPageSelect = useCallback(
     async (pageId: string) => {
@@ -2787,11 +2828,9 @@ ${context.details}
   );
 
   useEffect(() => {
-    if (isLoading || activeDemoId || demoPages.length === 0) return;
-    const fallbackPage = [...demoPages].sort((a, b) => a.order - b.order)[0];
-    if (!fallbackPage) return;
-    void handleConfigPanelPageSelect(fallbackPage.id);
-  }, [activeDemoId, demoPages, handleConfigPanelPageSelect, isLoading]);
+    if (isLoading || activeDemoId || !fallbackPageId) return;
+    void handleConfigPanelPageSelectRef.current(fallbackPageId);
+  }, [activeDemoId, fallbackPageId, isLoading]);
 
   const handleSinglePreviewDocumentSelect = useCallback(
     (documentNodeId: string) => {
@@ -2996,7 +3035,7 @@ ${context.details}
       const activePageId = activeDemoIdRef.current;
       const normalizeAiFilePath = (filePath: string) => {
         const normalizedPath = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
-        if (normalizedPath.startsWith("demos/") || normalizedPath === "workspace-tree.json") {
+        if (isAiFileChangeRefreshTarget(normalizedPath)) {
           return normalizedPath;
         }
         if (
@@ -3022,10 +3061,7 @@ ${context.details}
       });
       const hasWorkspaceStructureChange = files.some((file) => {
         const normalizedPath = normalizeAiFilePath(file.path);
-        return (
-          normalizedPath === "workspace-tree.json" ||
-          normalizedPath.startsWith("demos/")
-        );
+        return isAiFileChangeRefreshTarget(normalizedPath);
       });
       if (!hasWorkspaceStructureChange || !sessionId) return;
 
@@ -3067,6 +3103,7 @@ ${context.details}
         setDemoFolders(multi.demoFolders || []);
         setProjectConfigSchema(multi.projectConfigSchema);
         projectConfigSchemaRef.current = multi.projectConfigSchema;
+        replaceCollabText(projectSchemaCollab.ytext, multi.projectConfigSchema ?? "");
 
         const pageIds = rawPages.map((page: DemoPageMeta) => page.id);
         const newPageIds = pageIds.filter((pageId: string) => !previousPageIds.has(pageId));
@@ -3089,7 +3126,21 @@ ${context.details}
             RuntimeConversionFileSnapshot,
           ][]) {
             codes[pageId] = demo.code || "";
-            allDefaults[pageId] = getSafeMergedDefaults(demo.schema || "");
+            try {
+              allDefaults[pageId] = mergeConfigToProps(
+                multi.projectConfigSchema,
+                demo.schema || "",
+              );
+            } catch (err) {
+              if (err instanceof SchemaConflictError) {
+                toast({
+                  title: "Schema 冲突",
+                  description: err.message,
+                  variant: "destructive",
+                });
+              }
+              allDefaults[pageId] = getDefaultValues(demo.schema || "");
+            }
             schemas[pageId] = demo.schema || "";
             if (demo.prototypeHtml !== undefined || demo.prototypeCss !== undefined) {
               prototypes[pageId] = {
@@ -3191,10 +3242,10 @@ ${context.details}
       demoPages,
       applyDemoSnapshot,
       createDiagnosticTraceId,
-      getSafeMergedDefaults,
       handleWorkspaceTreeChanged,
       markWorkspaceChanged,
       previewMode,
+      projectSchemaCollab.ytext,
       reconcileRuntimeConversionsAfterAiFiles,
       recordDiagnosticEvent,
       sessionId,
@@ -3208,7 +3259,9 @@ ${context.details}
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.success && data.data?.username) {
-          setCurrentUsername(data.data.username);
+          setCurrentUsername((current) =>
+            current === data.data.username ? current : data.data.username,
+          );
         }
       })
       .catch(() => {});
@@ -3248,8 +3301,8 @@ ${context.details}
 
   useEffect(() => {
     if (!sessionId || !workspaceId) {
-      setHasPendingWorkspaceFlush(false);
-      setWorkspaceFlushError(null);
+      setHasPendingWorkspaceFlush((current) => (current ? false : current));
+      setWorkspaceFlushError((current) => (current === null ? current : null));
       return;
     }
   }, [sessionId, workspaceId]);
@@ -3266,6 +3319,65 @@ ${context.details}
       );
     }
   }, [sessionId]);
+
+  const flushPendingWorkspaceBeforeAiSend = useCallback(async () => {
+    if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
+
+    const revisionAtStart = workspaceFlushRevisionRef.current;
+    const traceId = createDiagnosticTraceId("ai-send");
+    recordDiagnosticEvent({
+      category: "autosave",
+      name: "autosave.flush_before_ai_send_started",
+      traceId,
+      details: {
+        revision: revisionAtStart,
+        workspaceId,
+      },
+    });
+
+    const startedAt = Date.now();
+    try {
+      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+      await persistWorkspaceToProject();
+      if (workspaceFlushRevisionRef.current === revisionAtStart) {
+        setHasPendingWorkspaceFlush(false);
+        setWorkspaceFlushError(null);
+      }
+      recordDiagnosticEvent({
+        category: "autosave",
+        name: "autosave.flush_before_ai_send_succeeded",
+        traceId,
+        details: {
+          revision: revisionAtStart,
+          elapsedMs: Date.now() - startedAt,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "协同草稿同步失败";
+      setWorkspaceFlushError(message);
+      recordDiagnosticEvent({
+        category: "autosave",
+        name: "autosave.flush_before_ai_send_failed",
+        traceId,
+        level: "error",
+        details: {
+          revision: revisionAtStart,
+          elapsedMs: Date.now() - startedAt,
+          message,
+        },
+      });
+      throw error;
+    }
+  }, [
+    createDiagnosticTraceId,
+    demoId,
+    hasPendingWorkspaceFlush,
+    persistWorkspaceToProject,
+    recordDiagnosticEvent,
+    sessionId,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
@@ -3511,17 +3623,33 @@ ${context.details}
     (filePath: string, content: string) => {
       const normalizedPath = filePath.replace(/^\/+/, "");
       const demoId = extractDemoIdFromPath(normalizedPath);
-      const fileType = normalizedPath.endsWith("index.tsx") ? "code" : "schema";
+      const fileType = normalizedPath.endsWith("index.tsx")
+        ? "code"
+        : normalizedPath.endsWith("prototype.html")
+          ? "prototypeHtml"
+          : normalizedPath.endsWith("prototype.css")
+            ? "prototypeCss"
+            : "schema";
 
       if (demoId && demoId === activeDemoId) {
-        applyDemoSnapshot({
-          [fileType === "code" ? "code" : "schema"]: content,
-          source: "manual-load",
-        });
+        if (fileType === "prototypeHtml" || fileType === "prototypeCss") {
+          setPagePrototypeMap((prev) => ({
+            ...prev,
+            [demoId]: {
+              ...(prev[demoId] ?? {}),
+              [fileType === "prototypeHtml" ? "html" : "css"]: content,
+            },
+          }));
+        } else {
+          applyDemoSnapshot({
+            [fileType === "code" ? "code" : "schema"]: content,
+            source: "manual-load",
+          });
+        }
       }
       markWorkspaceChanged();
     },
-    [activeDemoId, applyDemoSnapshot, markWorkspaceChanged],
+    [activeDemoId, applyDemoSnapshot, markWorkspaceChanged, setPagePrototypeMap],
   );
 
   const activePreviewSize = useMemo(() => {
@@ -3530,10 +3658,25 @@ ${context.details}
       const sizeFromSchema = schemaForActivePage
         ? getPreviewSize(schemaForActivePage)
         : undefined;
-      return sizeFromSchema ?? pagePreviewSizeMap[activeDemoId] ?? previewSize;
+      const sizeFromPrototypeMeta = getPrototypePreviewSize(
+        pagePrototypeMap[activeDemoId]?.meta,
+      );
+      return (
+        sizeFromSchema ??
+        pagePreviewSizeMap[activeDemoId] ??
+        sizeFromPrototypeMeta ??
+        previewSize
+      );
     }
     return schema ? getPreviewSize(schema) ?? previewSize : previewSize;
-  }, [activeDemoId, pagePreviewSizeMap, pageSchemaMap, previewSize, schema]);
+  }, [
+    activeDemoId,
+    pagePreviewSizeMap,
+    pagePrototypeMap,
+    pageSchemaMap,
+    previewSize,
+    schema,
+  ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
     if (singlePreviewTarget?.kind !== "document") return undefined;
     return singlePreviewDocumentNodes.find(
@@ -3553,14 +3696,20 @@ ${context.details}
   useEffect(() => {
     if (!activeDemoId) return;
     if (!singlePreviewTarget) {
-      setSinglePreviewTarget({ kind: "page", pageId: activeDemoId });
+      setSinglePreviewTarget((current) =>
+        current ? current : { kind: "page", pageId: activeDemoId },
+      );
       return;
     }
     if (
       singlePreviewTarget.kind === "page" &&
       singlePreviewTarget.pageId !== activeDemoId
     ) {
-      setSinglePreviewTarget({ kind: "page", pageId: activeDemoId });
+      setSinglePreviewTarget((current) =>
+        current?.kind === "page" && current.pageId === activeDemoId
+          ? current
+          : { kind: "page", pageId: activeDemoId },
+      );
       return;
     }
     if (
@@ -3569,7 +3718,11 @@ ${context.details}
         (node) => node.id === singlePreviewTarget.documentNodeId,
       )
     ) {
-      setSinglePreviewTarget({ kind: "page", pageId: activeDemoId });
+      setSinglePreviewTarget((current) =>
+        current?.kind === "page" && current.pageId === activeDemoId
+          ? current
+          : { kind: "page", pageId: activeDemoId },
+      );
     }
   }, [activeDemoId, singlePreviewDocumentNodes, singlePreviewTarget]);
 
@@ -3594,6 +3747,7 @@ ${context.details}
     },
     [handleSinglePreviewDocumentSelect, handleSinglePreviewPageSelect],
   );
+
   const handleRequestRuntimeConversion = useCallback(
     (
       pageId: string,
@@ -4156,6 +4310,7 @@ ${context.details}
                       details: event.details,
                     });
                   }}
+                  beforeSend={flushPendingWorkspaceBeforeAiSend}
                   onMemoryUpdate={async (filePath) => {
                     try {
                       const res = await fetch(
@@ -5030,98 +5185,36 @@ ${context.details}
                     </Popover>
                     {(demoPages.length > 0 ||
                       singlePreviewDocumentNodes.length > 0) && (
-                      <Select
+                      <select
                         value={singlePreviewSelectValue}
-                        onValueChange={handleSinglePreviewSelectChange}
+                        onChange={(event) =>
+                          handleSinglePreviewSelectChange(event.target.value)
+                        }
+                        aria-label="选择预览对象"
+                        className="h-7 w-44 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm outline-none focus:ring-1 focus:ring-ring"
                       >
-                        <SelectTrigger
-                          className="h-7 w-44 rounded-md text-xs"
-                          aria-label="选择预览对象"
-                        >
-                          <SelectValue placeholder="选择页面或文档" />
-                        </SelectTrigger>
-                        <SelectContent align="end" className="w-56">
-                          {demoPages.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel className="py-1 pl-8 pr-2 text-xs text-muted-foreground">
-                                页面
-                              </SelectLabel>
-                              {demoPages.map((page) => (
-                                <SelectItem
-                                  key={page.id}
-                                  value={`page:${page.id}`}
-                                  className="text-xs"
-                                >
-                                  {page.name}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          )}
-                          {demoPages.length > 0 &&
-                            singlePreviewDocumentNodes.length > 0 && (
-                              <SelectSeparator />
-                            )}
-                          {singlePreviewDocumentNodes.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel className="py-1 pl-8 pr-2 text-xs text-muted-foreground">
-                                文档
-                              </SelectLabel>
-                              {singlePreviewDocumentNodes.map((node) => (
-                                <SelectItem
-                                  key={node.id}
-                                  value={`document:${node.id}`}
-                                  className="text-xs"
-                                >
-                                  {node.title}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {activeDemoPage && !singlePreviewViewingDocument && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title="AI 转换页面运行时"
-                            aria-label="AI 转换页面运行时"
-                          >
-                            <Bot className="h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          {getEffectiveRuntimeType(activeDemoPage) ===
-                          "prototype-html-css" ? (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRequestRuntimeConversion(
-                                  activeDemoPage.id,
-                                  "high-fidelity-react",
-                                )
-                              }
-                            >
-                              <FileCode2 className="mr-2 h-4 w-4" />
-                              AI 转高保真页
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRequestRuntimeConversion(
-                                  activeDemoPage.id,
-                                  "prototype-html-css",
-                                )
-                              }
-                            >
-                              <FileText className="mr-2 h-4 w-4" />
-                              AI 转 HTML/CSS 原型
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        {demoPages.length > 0 && (
+                          <optgroup label="页面">
+                            {demoPages.map((page) => (
+                              <option key={page.id} value={`page:${page.id}`}>
+                                {page.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {singlePreviewDocumentNodes.length > 0 && (
+                          <optgroup label="文档">
+                            {singlePreviewDocumentNodes.map((node) => (
+                              <option
+                                key={node.id}
+                                value={`document:${node.id}`}
+                              >
+                                {node.title}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
                     )}
                     {activeRuntimeConversion && !singlePreviewViewingDocument && (
                       <div className="flex min-w-0 items-center gap-1">
@@ -5164,16 +5257,6 @@ ${context.details}
                           </Button>
                         )}
                       </div>
-                    )}
-                    {activeDemoPage?.runtimeType !== "prototype-html-css" &&
-                      !singlePreviewViewingDocument && (
-                      <Badge
-                        variant="secondary"
-                        className="h-6 rounded-md px-2 text-[11px] font-normal text-muted-foreground"
-                        title="使用高保真运行时，支持真实交互，预览成本更高"
-                      >
-                        高保真
-                      </Badge>
                     )}
                   </div>
                   <div className="relative flex-1 min-h-0">
@@ -5222,34 +5305,33 @@ ${context.details}
                           />
                         </div>
                       ) : activeDemoPage?.runtimeType === "prototype-html-css" ? (
-                        <div className="mx-auto h-full w-full max-w-5xl overflow-hidden rounded-md border bg-white shadow-sm">
-                          <PrototypePagePreview
-                            html={pagePrototypeMap[activeDemoId]?.html}
-                            css={pagePrototypeMap[activeDemoId]?.css}
-                            configData={configData}
-                            visualEditMode={propertyPanelActive}
-                            visualHoverNodeId={
-                              propertyPanelActive ? visualPanelHoverNodeId : null
+                        <PrototypePagePreview
+                          html={pagePrototypeMap[activeDemoId]?.html}
+                          css={pagePrototypeMap[activeDemoId]?.css}
+                          configData={configData}
+                          previewSize={activePreviewSize}
+                          visualEditMode={propertyPanelActive}
+                          visualHoverNodeId={
+                            propertyPanelActive ? visualPanelHoverNodeId : null
+                          }
+                          selectedVisualNodeId={
+                            selectedVisualNode?.domPath ||
+                            selectedVisualNode?.nodeId ||
+                            null
+                          }
+                          visualPropertyChanges={visualPropertyChanges}
+                          onVisualHover={setHoveredVisualNode}
+                          onVisualSelect={handleVisualSelect}
+                          onVisualSelectStack={(nodes) => {
+                            if (nodes.length > 0) {
+                              handleVisualSelect(nodes[nodes.length - 1], nodes);
+                            } else {
+                              handleVisualSelect(null, []);
                             }
-                            selectedVisualNodeId={
-                              selectedVisualNode?.domPath ||
-                              selectedVisualNode?.nodeId ||
-                              null
-                            }
-                            visualPropertyChanges={visualPropertyChanges}
-                            onVisualHover={setHoveredVisualNode}
-                            onVisualSelect={handleVisualSelect}
-                            onVisualSelectStack={(nodes) => {
-                              if (nodes.length > 0) {
-                                handleVisualSelect(nodes[nodes.length - 1], nodes);
-                              } else {
-                                handleVisualSelect(null, []);
-                              }
-                            }}
-                            visualNodeTreeRequestKey={visualLayerTreeRequestKey}
-                            onVisualNodeTreeChange={setVisualLayerTreeNodes}
-                          />
-                        </div>
+                          }}
+                          visualNodeTreeRequestKey={visualLayerTreeRequestKey}
+                          onVisualNodeTreeChange={setVisualLayerTreeNodes}
+                        />
                       ) : (
                         <PreviewPanel
                           code={
@@ -5273,7 +5355,7 @@ ${context.details}
                                 mode: "single",
                               },
                             });
-                            setSinglePreviewLoaded(true);
+                            setSinglePreviewLoaded((current) => (current ? current : true));
                           }}
                           onPositionableSizes={handlePositionableSizes}
                           visualEditMode={propertyPanelActive}
@@ -5363,58 +5445,59 @@ ${context.details}
                     <TabsTrigger value="config">配置</TabsTrigger>
                     <TabsTrigger value="property">属性</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="config" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
-                    <PageConfigPanel
-                      pages={demoPages.map((page) => ({
-                        id: page.id,
-                        name: page.name,
-                        order: page.order,
-                        schema:
-                          pageSchemaMap[page.id] ||
-                          (page.id === activeDemoId ? schema : undefined),
-                        configData: configDataMap[page.id],
-                      }))}
-                      activePageId={activeDemoId}
-                      detailPageId={activeDemoId}
-                      onDetailPageIdChange={(pageId) => {
-                        setConfigPanelDetailPageId(pageId);
-                      }}
-                      onPageSelect={handleConfigPanelPageSelect}
-                      projectConfigSchema={projectConfigSchema}
-                      onProjectConfigChange={handleProjectConfigPanelChange}
-                      onProjectSchemaChange={handleProjectSchemaChange}
-                      onPageConfigChange={handlePageConfigPanelChange}
-                      onPageSchemaChange={handlePageSchemaChange}
-                      sessionId={sessionId}
-                      positionableItemSizes={positionableItemSizes}
-                      hideDetailHeader
-                    />
-                  </TabsContent>
-                  <TabsContent value="property" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
-                    <VisualPropertyPanel
-                      selectedNode={selectedVisualNode}
-                      sessionId={sessionId}
-                      nodeStack={visualNodeStack}
-                      propertyChanges={visualPropertyChanges}
-                      pendingPropertyChanges={visualPendingPropertyChanges}
-                      configMarks={visualConfigMarks}
-                      pendingConfigMarks={visualPendingConfigMarks}
-                      aiInstruction={visualAiInstruction}
-                      hasPendingAiInstruction={hasPendingVisualAiInstruction}
-                      submission={visualPropertySubmission}
-                      sending={visualPropertySending}
-                      usedConfigKeys={visualConfigUsedKeys}
-                      directApplyMode={activeDemoPage?.runtimeType === "prototype-html-css"}
-                      onPropertyChange={handleVisualPropertyChange}
-                      onRestoreProperty={handleRestoreVisualProperty}
-                      onClearChanges={handleClearVisualProperties}
-                      onMarkConfig={handleMarkVisualConfig}
-                      onUpdateConfigMark={handleUpdateVisualConfigMark}
-                      onRemoveConfigMark={handleRemoveVisualConfigMark}
-                      onAiInstructionChange={setVisualAiInstruction}
-                      onSendToAI={handleSendVisualPropertiesToAI}
-                    />
-                  </TabsContent>
+                  <div className="mt-0 min-h-0 flex-1">
+                    {rightPanelTab === "config" ? (
+                      <PageConfigPanel
+                        pages={demoPages.map((page) => ({
+                          id: page.id,
+                          name: page.name,
+                          order: page.order,
+                          schema:
+                            pageSchemaMap[page.id] ||
+                            (page.id === activeDemoId ? schema : undefined),
+                          configData: configDataMap[page.id],
+                        }))}
+                        activePageId={activeDemoId}
+                        detailPageId={activeDemoId}
+                        onDetailPageIdChange={(pageId) => {
+                          setConfigPanelDetailPageId(pageId);
+                        }}
+                        onPageSelect={handleConfigPanelPageSelect}
+                        projectConfigSchema={projectConfigSchema}
+                        onProjectConfigChange={handleProjectConfigPanelChange}
+                        onProjectSchemaChange={handleProjectSchemaChange}
+                        onPageConfigChange={handlePageConfigPanelChange}
+                        onPageSchemaChange={handlePageSchemaChange}
+                        sessionId={sessionId}
+                        positionableItemSizes={positionableItemSizes}
+                        hideDetailHeader
+                      />
+                    ) : (
+                      <VisualPropertyPanel
+                        selectedNode={selectedVisualNode}
+                        sessionId={sessionId}
+                        nodeStack={visualNodeStack}
+                        propertyChanges={visualPropertyChanges}
+                        pendingPropertyChanges={visualPendingPropertyChanges}
+                        configMarks={visualConfigMarks}
+                        pendingConfigMarks={visualPendingConfigMarks}
+                        aiInstruction={visualAiInstruction}
+                        hasPendingAiInstruction={hasPendingVisualAiInstruction}
+                        submission={visualPropertySubmission}
+                        sending={visualPropertySending}
+                        usedConfigKeys={visualConfigUsedKeys}
+                        directApplyMode={activeDemoPage?.runtimeType === "prototype-html-css"}
+                        onPropertyChange={handleVisualPropertyChange}
+                        onRestoreProperty={handleRestoreVisualProperty}
+                        onClearChanges={handleClearVisualProperties}
+                        onMarkConfig={handleMarkVisualConfig}
+                        onUpdateConfigMark={handleUpdateVisualConfigMark}
+                        onRemoveConfigMark={handleRemoveVisualConfigMark}
+                        onAiInstructionChange={setVisualAiInstruction}
+                        onSendToAI={handleSendVisualPropertiesToAI}
+                      />
+                    )}
+                  </div>
                 </Tabs>
               ) : (
                 <PageConfigPanel

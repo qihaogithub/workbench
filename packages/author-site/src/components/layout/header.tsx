@@ -30,7 +30,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
           href="/"
           className="mr-6 flex items-center space-x-2 text-lg font-medium tracking-tight"
         >
-          <span className="text-foreground">UI Demo</span>
+          <span className="text-foreground">OneFlow</span>
         </Link>
 
         <nav className="flex items-center space-x-1 text-sm text-muted-foreground">

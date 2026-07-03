@@ -21,8 +21,62 @@
     }
   ],
   "demoFolders": [],
-  "versions": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1783067074261,
+      "savedBy": "qihao",
+      "sessionId": "session-1783066273533-l0jugcfzs",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v1",
+      "fileCount": 14,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1783067747708,
+      "savedBy": "qihao",
+      "sessionId": "session-1783066273533-l0jugcfzs",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v2",
+      "fileCount": 14,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "named_version",
+      "savedAt": 1783068480671,
+      "savedBy": "qh2",
+      "sessionId": "edit_1783068271536_wz386f",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v3",
+      "fileCount": 9,
+      "note": "支持通用弹窗图片与SVGA二选一"
+    },
+    {
+      "versionId": "v4",
+      "type": "named_version",
+      "savedAt": 1783070274539,
+      "savedBy": "qh2",
+      "sessionId": "edit_1783070214662_jmyvri",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v4",
+      "fileCount": 9,
+      "note": "改用内置SVGA运行时"
+    },
+    {
+      "versionId": "v5",
+      "type": "named_version",
+      "savedAt": 1783070749392,
+      "savedBy": "qh2",
+      "sessionId": "edit_1783070702078_o9h0jh",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v5",
+      "fileCount": 9,
+      "note": "修复SVGA预览运行时解析"
+    }
+  ],
   "pageVersions": {},
   "createdAt": 1782718596693,
-  "updatedAt": 1782723647578
+  "updatedAt": 1783070834356,
+  "canonicalSyncedAt": 1783070749392,
+  "activeWorkspaceId": "live-1783070834336-j9a0rda1a",
+  "activeWorkspaceUpdatedAt": 1783070834356
 }

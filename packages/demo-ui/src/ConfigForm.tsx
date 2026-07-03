@@ -33,7 +33,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   Collapsible,
@@ -1442,7 +1441,7 @@ export function ConfigForm({
 
   return (
     <div className={cn("h-full", className)}>
-      <ScrollArea className="h-full">
+      <div className="h-full overflow-y-auto">
         <div className="px-1 pb-4">
           {orderable && orderable.length >= 2 && (
             <>
@@ -1499,7 +1498,7 @@ export function ConfigForm({
             </div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
 
       {currentNoteField && (
         <NoteDialog

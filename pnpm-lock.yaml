@@ -32,6 +32,9 @@ importers:
       react-dom:
         specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
+      svgaplayerweb:
+        specifier: 2.3.1
+        version: 2.3.1
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -13446,6 +13449,10 @@ packages:
   /supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+    dev: true
+
+  /svgaplayerweb@2.3.1:
+    resolution: {integrity: sha512-i+7NY6juf6Uxj+6vIERB6YA3GYnuVHX8AJY5u0C2PbTt8wXnPg+LXDlgiw+lu+hrvzODw7XZqooeEU89/E+cOA==}
     dev: true
 
   /swr@2.4.1(react@18.3.1):

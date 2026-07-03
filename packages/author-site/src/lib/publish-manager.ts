@@ -166,7 +166,12 @@ export async function publishProject(
     throw new Error("NO_CONTENT_TO_PUBLISH");
   }
 
-  const publishedProjectDir = path.join(PUBLISHED_DIR, projectId);
+  const finalPublishedProjectDir = path.join(PUBLISHED_DIR, projectId);
+  const publishedProjectDir = path.join(
+    PUBLISHED_DIR,
+    ".tmp",
+    `${projectId}-${Date.now()}`,
+  );
 
   let urlMap = new Map<string, string>();
   try {
@@ -193,6 +198,7 @@ export async function publishProject(
   }
   onProgress?.(10, "正在编译页面...");
 
+  fs.rmSync(publishedProjectDir, { recursive: true, force: true });
   fs.mkdirSync(publishedProjectDir, { recursive: true });
   fs.mkdirSync(path.join(publishedProjectDir, "demos"), { recursive: true });
 
@@ -413,6 +419,9 @@ export async function publishProject(
     JSON.stringify(publishedProject, null, 2),
   );
 
+  fs.rmSync(finalPublishedProjectDir, { recursive: true, force: true });
+  fs.renameSync(publishedProjectDir, finalPublishedProjectDir);
+
   project.publishedVersion = currentVersion;
   project.publishedAt = Date.now();
   writeProjectMeta(projectId, project);
@@ -443,6 +452,7 @@ export function regenerateProjectsIndex(): void {
   if (!fs.existsSync(PUBLISHED_DIR)) return;
 
   for (const dirName of fs.readdirSync(PUBLISHED_DIR)) {
+    if (dirName.startsWith(".")) continue;
     const projectJsonPath = path.join(PUBLISHED_DIR, dirName, "project.json");
     if (!fs.existsSync(projectJsonPath)) continue;
 
