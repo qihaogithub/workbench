@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "title": "01 首页概览配置",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "01 首页概览页面结构"
+    }
+  }
+}

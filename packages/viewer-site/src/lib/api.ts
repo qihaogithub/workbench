@@ -1,6 +1,8 @@
 import type { DemoFolderMeta } from "@opencode-workbench/shared";
 import type { CanvasState } from "@opencode-workbench/demo-ui";
 
+export type PublishedPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+
 export interface PreviewSize {
   width?: string | number;
   height?: string | number;
@@ -14,9 +16,16 @@ export interface PublishedDemoPage {
   name: string;
   order: number;
   parentId: string | null;
-  compiledJsPath: string;
+  runtimeType?: PublishedPageRuntimeType;
+  compiledJsPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: Record<string, unknown>;
+  prototypeHtmlPath?: string;
+  prototypeCssPath?: string;
+  prototypeMetaPath?: string;
 }
 
 export interface PublishedProject {

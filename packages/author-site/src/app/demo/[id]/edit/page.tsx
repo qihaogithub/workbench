@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
+  PrototypePagePreview,
   PreviewCanvas,
   LayerTreeMenu,
   PageConfigPanel,
@@ -24,7 +25,9 @@ import type {
   ScreenshotRenderBox,
   VisualNodeInfo,
   VisualNodeTreeItem,
+  VisualPropertyChangeKind,
 } from "../../../../../components/demo";
+import type { DemoPageRuntimeType, PrototypePageMeta } from "@opencode-workbench/shared";
 import {
   useScreenshotGeneration,
   type ScreenshotPriority,
@@ -52,6 +55,12 @@ import {
   hasPreviewPageCode,
   resolvePreviewPageCode,
 } from "@/lib/preview-page-code";
+import {
+  applyPrototypePropertyChange,
+  applyPrototypeVisualConfiguration,
+  type PrototypeVisualConfigTarget,
+  type PrototypeVisualConfigResult,
+} from "@/lib/prototype-visual-editor";
 import {
   buildAutoPreviewRepairFingerprint,
   getAutoPreviewRepairAttemptCount,
@@ -322,7 +331,94 @@ type HistoryEvent =
 type SinglePreviewTarget =
   | { kind: "page"; pageId: string }
   | { kind: "document"; documentNodeId: string };
+
+const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
+  "high-fidelity-react": "高保真 React",
+  "prototype-html-css": "HTML/CSS 原型",
+};
+
+function getEffectiveRuntimeType(
+  page?: Pick<DemoPageMeta, "runtimeType"> | null,
+): DemoPageRuntimeType {
+  return page?.runtimeType === "prototype-html-css"
+    ? "prototype-html-css"
+    : "high-fidelity-react";
+}
+
+function buildRuntimeConversionPrompt(input: {
+  pageId: string;
+  pageName: string;
+  sourceRuntimeType: DemoPageRuntimeType;
+  targetRuntimeType: DemoPageRuntimeType;
+}): string {
+  const sourceLabel = runtimeTypeLabels[input.sourceRuntimeType];
+  const targetLabel = runtimeTypeLabels[input.targetRuntimeType];
+  const base = `请把当前页面从「${sourceLabel}」转换为「${targetLabel}」，并保持产品意图、页面结构、配置字段和视觉层级一致。
+
+页面名称: ${input.pageName}
+页面 ID: ${input.pageId}
+
+必须处理的文件:
+- demos/${input.pageId}/index.tsx
+- demos/${input.pageId}/config.schema.json
+- demos/${input.pageId}/prototype.html
+- demos/${input.pageId}/prototype.css
+- demos/${input.pageId}/prototype.meta.json
+- workspace-tree.json
+
+通用要求:
+- 先读取当前页面已有源文件，不要凭空重做页面。
+- 目标运行时文件生成完成并自检通过后，再更新 workspace-tree.json 中该页面的 runtimeType。
+- 保留源运行时文件作为回退，不要删除 index.tsx、prototype.html 或 prototype.css。
+- 不要新增无关页面、文件夹或依赖。
+- 转换后检查目标运行时的配置 Schema 仍是合法 JSON。`;
+
+  if (input.targetRuntimeType === "prototype-html-css") {
+    return `${base}
+
+HTML/CSS 原型页目标:
+- 从 demos/${input.pageId}/index.tsx 和 config.schema.json 提取可静态表达的界面。
+- 写入 demos/${input.pageId}/prototype.html 和 demos/${input.pageId}/prototype.css。
+- prototype.html 只保留页面主体结构，不要包含远程 script、远程 stylesheet、iframe 或内联事件处理器。
+- prototype.css 内联必要样式，不要通过 @import 拉取远程资源。
+- workspace-tree.json 中该页面 runtimeType 设置为 "prototype-html-css"。`;
+  }
+
+  return `${base}
+
+高保真 React 页目标:
+- 从 demos/${input.pageId}/prototype.html、prototype.css 和 config.schema.json 还原为可交互 React 页面。
+- 写入 demos/${input.pageId}/index.tsx，必要时同步更新 config.schema.json。
+- React 代码必须使用当前项目已支持的导入和 @preview/sdk 约定，不要引入未登记依赖。
+- workspace-tree.json 中该页面 runtimeType 设置为 "high-fidelity-react"。`;
+}
 type ScreenshotBatchScope = "all" | "canvas-initial";
+
+type RuntimeConversionStatus = "running" | "applying" | "completed" | "failed";
+
+interface RuntimeConversionRequestOptions {
+  skipStaticization?: boolean;
+  staticizationFailure?: string;
+}
+
+interface RuntimeConversionState {
+  pageId: string;
+  pageName: string;
+  sourceRuntimeType: DemoPageRuntimeType;
+  targetRuntimeType: DemoPageRuntimeType;
+  status: RuntimeConversionStatus;
+  traceId: string;
+  requestedAt: number;
+  message?: string;
+}
+
+interface RuntimeConversionFileSnapshot {
+  code?: string;
+  schema?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
+}
 
 function toCanvasKnowledgeDocument(item: KnowledgeItem): CanvasKnowledgeDocument {
   return {
@@ -415,6 +511,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const pageSchemaMapRef = useRef(pageSchemaMap);
   pageSchemaMapRef.current = pageSchemaMap;
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
+  const [pagePrototypeMap, setPagePrototypeMap] = useState<Record<string, {
+    html?: string;
+    css?: string;
+    meta?: PrototypePageMeta;
+  }>>({});
+  const pagePrototypeMapRef = useRef(pagePrototypeMap);
+  pagePrototypeMapRef.current = pagePrototypeMap;
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/demo-ui").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
   const handlePositionableSizes = useCallback(
@@ -470,6 +573,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
+  const [runtimeConversions, setRuntimeConversions] = useState<
+    Record<string, RuntimeConversionState>
+  >({});
+  const runtimeConversionsRef = useRef(runtimeConversions);
+  runtimeConversionsRef.current = runtimeConversions;
   const [singlePreviewTarget, setSinglePreviewTarget] =
     useState<SinglePreviewTarget | null>(null);
   const activeDemoIdRef = useRef(activeDemoId);
@@ -572,7 +680,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       Object.fromEntries(
         Object.entries(pageScreenshots)
           .filter(([id, state]) => {
-            if (!state.screenshotUrl || state.loading) return false;
+            if (!state.screenshotUrl) return false;
             if (!state.hash || !state.expectedHash) return false;
             if (state.hash !== state.expectedHash) return false;
             return isCanvasScreenshotRenderBoxCompatible(
@@ -589,7 +697,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       Object.fromEntries(
         Object.entries(pageScreenshots)
           .filter(([id, state]) => {
-            if (!state.screenshotUrl || state.loading) return false;
+            if (!state.screenshotUrl) return false;
             if (!state.hash || !state.expectedHash) return false;
             if (state.hash !== state.expectedHash) return false;
             return isCanvasScreenshotRenderBoxCompatible(
@@ -643,6 +751,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     return demoPages
       .filter((p) =>
+        p.runtimeType !== "prototype-html-css" &&
         hasPreviewPageCode({
           pageId: p.id,
           pageCodes,
@@ -1535,6 +1644,121 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       });
     }, []);
 
+  const isActivePrototypeVisualPage = useCallback(() => {
+    const pageId = activeDemoIdRef.current;
+    return demoPages.some(
+      (page) => page.id === pageId && page.runtimeType === "prototype-html-css",
+    );
+  }, [demoPages]);
+
+  const persistPrototypePageDraft = useCallback(
+    (pageId: string, patch: {
+      html?: string;
+      css?: string;
+      meta?: PrototypePageMeta;
+      schema?: string;
+    }) => {
+      if (!sessionId) return;
+      const currentPrototype = pagePrototypeMapRef.current[pageId] ?? {};
+      void fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schema: patch.schema,
+          prototypeHtml: patch.html ?? currentPrototype.html,
+          prototypeCss: patch.css ?? currentPrototype.css,
+          prototypeMeta: patch.meta ?? currentPrototype.meta,
+        }),
+      }).catch((error) => {
+        console.warn("[prototype] 保存原型页草稿失败", error);
+      });
+    },
+    [sessionId],
+  );
+
+  const applyPrototypeHtmlToActivePage = useCallback((html: string) => {
+    const pageId = activeDemoIdRef.current;
+    if (!pageId) return;
+    setPagePrototypeMap((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] ?? {}),
+        html,
+      },
+    }));
+    persistPrototypePageDraft(pageId, { html });
+    markWorkspaceChanged();
+  }, [markWorkspaceChanged, persistPrototypePageDraft]);
+
+  const applyActivePrototypeVisualPropertyChange = useCallback(
+    (
+      node: VisualNodeInfo,
+      property: string,
+      value: string,
+      kind: VisualPropertyChangeKind,
+    ) => {
+      const pageId = activeDemoIdRef.current;
+      const currentHtml = pageId ? pagePrototypeMapRef.current[pageId]?.html : undefined;
+      if (!pageId || currentHtml === undefined) return false;
+      const result = applyPrototypePropertyChange(
+        currentHtml,
+        node,
+        property,
+        value,
+        kind,
+      );
+      if (!result.ok) {
+        toast({
+          title: "原型页属性写回失败",
+          description: result.error,
+          variant: "destructive",
+        });
+        return false;
+      }
+      applyPrototypeHtmlToActivePage(result.html);
+      return true;
+    },
+    [applyPrototypeHtmlToActivePage, toast],
+  );
+
+  const applyActivePrototypeVisualConfig = useCallback(
+    (params: {
+      node: VisualNodeInfo;
+      target: PrototypeVisualConfigTarget;
+    }): PrototypeVisualConfigResult => {
+      const pageId = activeDemoIdRef.current;
+      const currentHtml = pageId ? pagePrototypeMapRef.current[pageId]?.html : undefined;
+      if (!pageId || currentHtml === undefined) {
+        return { ok: false, error: "当前原型页内容尚未加载" };
+      }
+      const result = applyPrototypeVisualConfiguration({
+        html: currentHtml,
+        schema: schemaRef.current,
+        node: params.node,
+        target: params.target,
+      });
+      if (!result.ok) return result;
+      setPagePrototypeMap((prev) => ({
+        ...prev,
+        [pageId]: {
+          ...(prev[pageId] ?? {}),
+          html: result.html,
+        },
+      }));
+      persistPrototypePageDraft(pageId, {
+        html: result.html,
+        schema: result.schema,
+      });
+      applyDemoSnapshot({
+        schema: result.schema,
+        source: "manual-load",
+      });
+      markWorkspaceChanged();
+      return result;
+    },
+    [applyDemoSnapshot, markWorkspaceChanged, schemaRef],
+  );
+
   // Visual edit state hook
   const visualEditState = useVisualEditState({
     codeRef,
@@ -1548,6 +1772,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setConfigDataMap,
     setTabValue,
     setTriggerAutoSend: setStringTriggerAutoSend,
+    isPrototypeVisualPage: isActivePrototypeVisualPage,
+    applyPrototypeVisualPropertyChange: applyActivePrototypeVisualPropertyChange,
+    applyPrototypeVisualConfig: applyActivePrototypeVisualConfig,
   });
   const {
     hoveredVisualNode,
@@ -1614,8 +1841,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [visualLayerTreeOpen, setVisualLayerTreeOpen] = useState(false);
   const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
   const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<VisualNodeTreeItem[]>([]);
+  const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
+  const pendingStaticPrototypeConversionRef =
+    useRef<RuntimeConversionState | null>(null);
 
   const propertyPanelActive = previewMode === "single" && rightPanelTab === "property";
+
+  useEffect(() => {
+    if (previewMode !== "single" || !activeDemoId) return;
+    const activePage = demoPages.find((page) => page.id === activeDemoId);
+    if (activePage?.runtimeType === "prototype-html-css") {
+      setSinglePreviewLoaded(true);
+    }
+  }, [activeDemoId, demoPages, previewMode]);
 
   useEffect(() => {
     if (propertyPanelActive) return;
@@ -2046,6 +2284,7 @@ ${context.details}
           (page: {
             id: string;
             name: string;
+            runtimeType?: DemoPageRuntimeType;
             order: number;
             parentId: string | null;
           }) => ({
@@ -2101,15 +2340,33 @@ ${context.details}
 
         const allDefaults: Record<string, Record<string, unknown>> = {};
         const codes: Record<string, string> = {};
+        const prototypes: Record<string, {
+          html?: string;
+          css?: string;
+          meta?: PrototypePageMeta;
+        }> = {};
         const schemas: Record<string, string> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
-            { code: string; schema: string },
+            {
+              code: string;
+              schema: string;
+              prototypeHtml?: string;
+              prototypeCss?: string;
+              prototypeMeta?: PrototypePageMeta;
+            },
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
             schemas[pageId] = demo.schema;
             codes[pageId] = demo.code;
+            if (demo.prototypeHtml !== undefined || demo.prototypeCss !== undefined) {
+              prototypes[pageId] = {
+                html: demo.prototypeHtml,
+                css: demo.prototypeCss,
+                meta: demo.prototypeMeta,
+              };
+            }
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
@@ -2117,6 +2374,7 @@ ${context.details}
         }
         setConfigDataMap(allDefaults);
         setPageCodes(codes);
+        setPagePrototypeMap(prototypes);
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
 
         const size = getPreviewSize(loadedSchema);
@@ -2391,12 +2649,20 @@ ${context.details}
               pageId,
               code: data.data.code ?? "",
               schema: data.data.schema ?? "",
+              prototypeHtml: data.data.prototypeHtml as string | undefined,
+              prototypeCss: data.data.prototypeCss as string | undefined,
+              prototypeMeta: data.data.prototypeMeta as PrototypePageMeta | undefined,
             };
           }),
         );
         if (cancelled) return;
 
         const nextCodes: Record<string, string> = {};
+        const nextPrototypes: Record<string, {
+          html?: string;
+          css?: string;
+          meta?: PrototypePageMeta;
+        }> = {};
         const nextSchemas: Record<string, string> = {};
         const nextDefaults: Record<string, Record<string, unknown>> = {};
         const nextPreviewSizes: Record<
@@ -2408,6 +2674,13 @@ ${context.details}
           if (!page) continue;
           nextCodes[page.pageId] = page.code;
           nextSchemas[page.pageId] = page.schema;
+          if (page.prototypeHtml !== undefined || page.prototypeCss !== undefined) {
+            nextPrototypes[page.pageId] = {
+              html: page.prototypeHtml,
+              css: page.prototypeCss,
+              meta: page.prototypeMeta,
+            };
+          }
           nextDefaults[page.pageId] = getSafeMergedDefaults(page.schema);
           const size = getPreviewSize(page.schema);
           if (size) {
@@ -2418,6 +2691,7 @@ ${context.details}
         if (Object.keys(nextCodes).length === 0) return;
 
         setPageCodes((prev) => ({ ...prev, ...nextCodes }));
+        setPagePrototypeMap((prev) => ({ ...prev, ...nextPrototypes }));
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, nextSchemas));
         setConfigDataMap((prev) => {
           const next = { ...prev };
@@ -2560,6 +2834,162 @@ ${context.details}
     [setCanvasState],
   );
 
+  const reconcileRuntimeConversionsAfterAiFiles = useCallback(
+    async (input: {
+      pages: DemoPageMeta[];
+      demos?: Record<string, RuntimeConversionFileSnapshot>;
+      traceId: string;
+    }) => {
+      if (!sessionId) return;
+
+      const activeConversions = Object.values(runtimeConversionsRef.current).filter(
+        (conversion) =>
+          conversion.status === "running" || conversion.status === "applying",
+      );
+      if (activeConversions.length === 0) return;
+
+      const pagesById = new Map(input.pages.map((page) => [page.id, page]));
+      for (const conversion of activeConversions) {
+        const page = pagesById.get(conversion.pageId);
+        const files = input.demos?.[conversion.pageId];
+        if (!page || !files) continue;
+
+        if (getEffectiveRuntimeType(page) === conversion.targetRuntimeType) {
+          setRuntimeConversions((prev) => ({
+            ...prev,
+            [conversion.pageId]: {
+              ...conversion,
+              status: "completed",
+              message: `已转换为${runtimeTypeLabels[conversion.targetRuntimeType]}`,
+            },
+          }));
+          toast({
+            title: "页面类型已转换",
+            description: `${conversion.pageName} 已切换为${runtimeTypeLabels[conversion.targetRuntimeType]}。`,
+          });
+          continue;
+        }
+
+        const hasTargetFiles =
+          conversion.targetRuntimeType === "prototype-html-css"
+            ? typeof files.prototypeHtml === "string"
+            : hasPreviewPageCode({
+                pageId: conversion.pageId,
+                pageCodes: { [conversion.pageId]: files.code },
+              });
+        if (!hasTargetFiles) continue;
+
+        setRuntimeConversions((prev) => ({
+          ...prev,
+          [conversion.pageId]: {
+            ...conversion,
+            status: "applying",
+            message: "正在校验目标运行时文件",
+          },
+        }));
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.runtime_conversion_applying",
+          level: "info",
+          traceId: conversion.traceId || input.traceId,
+          details: {
+            pageId: conversion.pageId,
+            targetRuntimeType: conversion.targetRuntimeType,
+          },
+        });
+
+        try {
+          const response = await projectApiClient.switchSessionDemoPageRuntime(
+            demoId,
+            conversion.pageId,
+            {
+              sessionId,
+              targetRuntimeType: conversion.targetRuntimeType,
+              code: files.code,
+              schema: files.schema,
+              prototypeHtml: files.prototypeHtml,
+              prototypeCss: files.prototypeCss,
+              prototypeMeta: files.prototypeMeta,
+            },
+          );
+          const nextRuntimeType =
+            conversion.targetRuntimeType === "prototype-html-css"
+              ? "prototype-html-css"
+              : undefined;
+          setDemoPages((current) =>
+            current.map((item) =>
+              item.id === conversion.pageId
+                ? {
+                    ...item,
+                    ...(response.meta ?? {}),
+                    runtimeType: response.meta?.runtimeType ?? nextRuntimeType,
+                    previewSize: pagePreviewSizeMap[item.id],
+                  }
+                : item,
+            ),
+          );
+          setRuntimeConversions((prev) => ({
+            ...prev,
+            [conversion.pageId]: {
+              ...conversion,
+              status: "completed",
+              message: `已转换为${runtimeTypeLabels[conversion.targetRuntimeType]}`,
+            },
+          }));
+          recordDiagnosticEvent({
+            category: "ai",
+            name: "ai.runtime_conversion_completed",
+            level: "info",
+            traceId: conversion.traceId || input.traceId,
+            details: {
+              pageId: conversion.pageId,
+              targetRuntimeType: conversion.targetRuntimeType,
+              runtimeValidation: response.runtimeValidation,
+            },
+          });
+          toast({
+            title: "页面类型已转换",
+            description: `${conversion.pageName} 已切换为${runtimeTypeLabels[conversion.targetRuntimeType]}。`,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "页面类型转换失败";
+          setRuntimeConversions((prev) => ({
+            ...prev,
+            [conversion.pageId]: {
+              ...conversion,
+              status: "failed",
+              message,
+            },
+          }));
+          recordDiagnosticEvent({
+            category: "ai",
+            name: "ai.runtime_conversion_failed",
+            level: "error",
+            traceId: conversion.traceId || input.traceId,
+            details: {
+              pageId: conversion.pageId,
+              targetRuntimeType: conversion.targetRuntimeType,
+              message,
+            },
+          });
+          toast({
+            title: "页面类型转换失败",
+            description: message,
+            variant: "destructive",
+          });
+        }
+      }
+    },
+    [
+      demoId,
+      pagePreviewSizeMap,
+      recordDiagnosticEvent,
+      sessionId,
+      toast,
+    ],
+  );
+
   const handleAiFilesChange = useCallback(
     async (files: AiFileChange[]) => {
       const traceId = createDiagnosticTraceId("ai-files");
@@ -2647,16 +3077,28 @@ ${context.details}
         const codes: Record<string, string> = {};
         const allDefaults: Record<string, Record<string, unknown>> = {};
         const schemas: Record<string, string> = {};
+        const prototypes: Record<string, {
+          html?: string;
+          css?: string;
+          meta?: PrototypePageMeta;
+        }> = {};
         const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
-            { code: string; schema: string },
+            RuntimeConversionFileSnapshot,
           ][]) {
-            codes[pageId] = demo.code;
-            allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
-            schemas[pageId] = demo.schema;
-            const pagePreviewSize = getPreviewSize(demo.schema);
+            codes[pageId] = demo.code || "";
+            allDefaults[pageId] = getSafeMergedDefaults(demo.schema || "");
+            schemas[pageId] = demo.schema || "";
+            if (demo.prototypeHtml !== undefined || demo.prototypeCss !== undefined) {
+              prototypes[pageId] = {
+                html: demo.prototypeHtml,
+                css: demo.prototypeCss,
+                meta: demo.prototypeMeta,
+              };
+            }
+            const pagePreviewSize = getPreviewSize(demo.schema || "");
             if (pagePreviewSize) {
               previewSizeMap[pageId] = pagePreviewSize;
             }
@@ -2664,6 +3106,7 @@ ${context.details}
         }
 
         setPageCodes(codes);
+        setPagePrototypeMap(prototypes);
         setConfigDataMap(allDefaults);
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
         setPagePreviewSizeMap(previewSizeMap);
@@ -2721,6 +3164,11 @@ ${context.details}
             activePageId: activeDemoIdRef.current,
           },
         });
+        await reconcileRuntimeConversionsAfterAiFiles({
+          pages: pagesWithSize,
+          demos: multi.demos,
+          traceId,
+        });
         toast({ title: pageIdentityChanged ? "页面列表已刷新" : "页面结构已更新" });
       } catch (error) {
         recordDiagnosticEvent({
@@ -2747,6 +3195,7 @@ ${context.details}
       handleWorkspaceTreeChanged,
       markWorkspaceChanged,
       previewMode,
+      reconcileRuntimeConversionsAfterAiFiles,
       recordDiagnosticEvent,
       sessionId,
       setFocusCanvasPageId,
@@ -2778,7 +3227,13 @@ ${context.details}
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, schema }),
+        body: JSON.stringify({
+          code,
+          schema,
+          prototypeHtml: pagePrototypeMapRef.current[activeDemoId]?.html,
+          prototypeCss: pagePrototypeMapRef.current[activeDemoId]?.css,
+          prototypeMeta: pagePrototypeMapRef.current[activeDemoId]?.meta,
+        }),
       },
     );
 
@@ -3139,6 +3594,251 @@ ${context.details}
     },
     [handleSinglePreviewDocumentSelect, handleSinglePreviewPageSelect],
   );
+  const handleRequestRuntimeConversion = useCallback(
+    (
+      pageId: string,
+      targetRuntimeType: DemoPageRuntimeType,
+      options: RuntimeConversionRequestOptions = {},
+    ) => {
+      const page = demoPages.find((item) => item.id === pageId);
+      if (!page) {
+        toast({
+          title: "未找到页面",
+          description: "请刷新页面列表后重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const sourceRuntimeType = getEffectiveRuntimeType(page);
+      if (sourceRuntimeType === targetRuntimeType) {
+        toast({
+          title: "无需转换",
+          description: `当前页面已经是${runtimeTypeLabels[targetRuntimeType]}。`,
+        });
+        return;
+      }
+
+      setActiveDemoId(pageId);
+      if (previewMode === "canvas") {
+        focusCanvasPage(pageId);
+      } else {
+        setSinglePreviewTarget({ kind: "page", pageId });
+      }
+
+      const traceId = createDiagnosticTraceId("runtime-conversion");
+      const conversion: RuntimeConversionState = {
+        pageId,
+        pageName: page.name,
+        sourceRuntimeType,
+        targetRuntimeType,
+        status: "running",
+        traceId,
+        requestedAt: Date.now(),
+        message: `AI 正在生成${runtimeTypeLabels[targetRuntimeType]}内容`,
+      };
+      setRuntimeConversions((prev) => ({
+        ...prev,
+        [pageId]: conversion,
+      }));
+      recordDiagnosticEvent({
+        category: "ai",
+        name: "ai.runtime_conversion_requested",
+        level: "info",
+        traceId,
+        details: {
+          pageId,
+          pageName: page.name,
+          sourceRuntimeType,
+          targetRuntimeType,
+        },
+      });
+
+      const shouldTryStaticization =
+        targetRuntimeType === "prototype-html-css" &&
+        sourceRuntimeType === "high-fidelity-react" &&
+        !options.skipStaticization;
+      if (shouldTryStaticization) {
+        if (
+          previewMode === "single" &&
+          activeDemoIdRef.current === pageId &&
+          singlePreviewLoaded
+        ) {
+          pendingStaticPrototypeConversionRef.current = {
+            ...conversion,
+            status: "applying",
+            message: "正在尝试静态化当前预览 DOM",
+          };
+          setRuntimeConversions((prev) => ({
+            ...prev,
+            [pageId]: pendingStaticPrototypeConversionRef.current!,
+          }));
+          setStaticPrototypeRequestKey((key) => key + 1);
+          toast({
+            title: "正在尝试静态化页面",
+            description: "如果当前预览无法静态化，将自动交给 AI 生成原型页。",
+          });
+          return;
+        }
+        options.staticizationFailure =
+          "当前页面不在已加载的单页预览中，无法读取可静态化 DOM。";
+      }
+
+      const hiddenPrompt = [
+        buildRuntimeConversionPrompt({
+          pageId,
+          pageName: page.name,
+          sourceRuntimeType,
+          targetRuntimeType,
+        }),
+        options.staticizationFailure
+          ? `程序静态化尝试结果: ${options.staticizationFailure}\n请接管生成目标运行时文件。`
+          : "",
+      ].filter(Boolean).join("\n\n");
+
+      setTabValue("ai");
+      setTriggerAutoSend({
+        kind: "auto_repair",
+        visibleTitle: `转换为${runtimeTypeLabels[targetRuntimeType]}`,
+        visibleSummary: `AI 将基于「${page.name}」现有文件生成目标运行时内容`,
+        hiddenPrompt,
+        debugDetail: [
+          `traceId: ${traceId}`,
+          `页面: ${page.name} (${pageId})`,
+          `源运行时: ${sourceRuntimeType}`,
+          `目标运行时: ${targetRuntimeType}`,
+        ].join("\n"),
+      });
+      toast({ title: `已发送${runtimeTypeLabels[targetRuntimeType]}转换任务` });
+    },
+    [
+      createDiagnosticTraceId,
+      demoPages,
+      focusCanvasPage,
+      previewMode,
+      recordDiagnosticEvent,
+      singlePreviewLoaded,
+      toast,
+    ],
+  );
+
+  const handleStaticPrototypeSnapshot = useCallback(
+    async (result: { ok: true; html: string; css: string } | { ok: false; error: string }) => {
+      const conversion = pendingStaticPrototypeConversionRef.current;
+      pendingStaticPrototypeConversionRef.current = null;
+      if (!conversion || !sessionId) return;
+
+      if (!result.ok) {
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.runtime_conversion_staticization_failed",
+          level: "warn",
+          traceId: conversion.traceId,
+          details: {
+            pageId: conversion.pageId,
+            message: result.error,
+          },
+        });
+        handleRequestRuntimeConversion(conversion.pageId, conversion.targetRuntimeType, {
+          skipStaticization: true,
+          staticizationFailure: result.error,
+        });
+        return;
+      }
+
+      setRuntimeConversions((prev) => ({
+        ...prev,
+        [conversion.pageId]: {
+          ...conversion,
+          status: "applying",
+          message: "正在校验静态化原型页",
+        },
+      }));
+
+      try {
+        const response = await projectApiClient.switchSessionDemoPageRuntime(
+          demoId,
+          conversion.pageId,
+          {
+            sessionId,
+            targetRuntimeType: "prototype-html-css",
+            code: pageCodes[conversion.pageId],
+            schema: pageSchemaMapRef.current[conversion.pageId],
+            prototypeHtml: result.html,
+            prototypeCss: result.css,
+          },
+        );
+        setPagePrototypeMap((prev) => ({
+          ...prev,
+          [conversion.pageId]: {
+            html: result.html,
+            css: result.css,
+            meta: prev[conversion.pageId]?.meta,
+          },
+        }));
+        setDemoPages((current) =>
+          current.map((item) =>
+            item.id === conversion.pageId
+              ? {
+                  ...item,
+                  ...(response.meta ?? {}),
+                  runtimeType: "prototype-html-css",
+                  previewSize: pagePreviewSizeMap[item.id],
+                }
+              : item,
+          ),
+        );
+        setRuntimeConversions((prev) => ({
+          ...prev,
+          [conversion.pageId]: {
+            ...conversion,
+            status: "completed",
+            message: "已通过静态化转换为 HTML/CSS 原型",
+          },
+        }));
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.runtime_conversion_staticization_completed",
+          level: "info",
+          traceId: conversion.traceId,
+          details: {
+            pageId: conversion.pageId,
+            runtimeValidation: response.runtimeValidation,
+          },
+        });
+        toast({
+          title: "页面类型已转换",
+          description: `${conversion.pageName} 已通过静态化切换为 HTML/CSS 原型。`,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "静态化原型页校验失败";
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.runtime_conversion_staticization_failed",
+          level: "warn",
+          traceId: conversion.traceId,
+          details: {
+            pageId: conversion.pageId,
+            message,
+          },
+        });
+        handleRequestRuntimeConversion(conversion.pageId, conversion.targetRuntimeType, {
+          skipStaticization: true,
+          staticizationFailure: message,
+        });
+      }
+    },
+    [
+      demoId,
+      handleRequestRuntimeConversion,
+      pageCodes,
+      pagePreviewSizeMap,
+      recordDiagnosticEvent,
+      sessionId,
+      toast,
+    ],
+  );
 
   if (isLoading) {
     return (
@@ -3163,8 +3863,12 @@ ${context.details}
     (previewMode === "single" && !singlePreviewViewingDocument) ||
     (previewMode === "canvas" && hasAnyConfig);
   const visualConfigUsedKeys = getSchemaPropertyKeys(schema, projectConfigSchema);
+  const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
+  const activeRuntimeConversion = activeDemoId
+    ? runtimeConversions[activeDemoId]
+    : undefined;
   const activePageName =
-    demoPages.find((page) => page.id === activeDemoId)?.name || activeDemoId;
+    activeDemoPage?.name || activeDemoId;
   const projectVersions = versionHistory?.versions ?? [];
   const pageVersions = Object.values(pageVersionHistories).flatMap(
     (history) => history.versions,
@@ -3868,6 +4572,7 @@ ${context.details}
                       toast({ title: "复制失败", variant: "destructive" });
                     }
                   }}
+                  onRequestRuntimeConversion={handleRequestRuntimeConversion}
                   onPageDelete={async (pageId) => {
                     if (!sessionId) {
                       toast({
@@ -4163,6 +4868,7 @@ ${context.details}
                       pages={demoPages.map((p) => ({
                         id: p.id,
                         name: p.name,
+                        runtimeType: p.runtimeType,
                         order: p.order,
                         code: resolvePreviewPageCode({
                           pageId: p.id,
@@ -4173,11 +4879,15 @@ ${context.details}
                               : undefined,
                           activeCode: code,
                         }),
+                        prototypeHtml: pagePrototypeMap[p.id]?.html,
+                        prototypeCss: pagePrototypeMap[p.id]?.css,
+                        prototypeMeta: pagePrototypeMap[p.id]?.meta,
                         configData: configDataMap[p.id],
                         previewSize: pagePreviewSizeMap[p.id],
                       }))}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
+                      onRuntimeConversionRequest={handleRequestRuntimeConversion}
                       focusPageId={focusCanvasPageId}
                       onVisiblePageIdsChange={setVisibleCanvasPageIds}
                       editingPageId={canvasEditingPageId ?? undefined}
@@ -4370,6 +5080,101 @@ ${context.details}
                         </SelectContent>
                       </Select>
                     )}
+                    {activeDemoPage && !singlePreviewViewingDocument && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="AI 转换页面运行时"
+                            aria-label="AI 转换页面运行时"
+                          >
+                            <Bot className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {getEffectiveRuntimeType(activeDemoPage) ===
+                          "prototype-html-css" ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRequestRuntimeConversion(
+                                  activeDemoPage.id,
+                                  "high-fidelity-react",
+                                )
+                              }
+                            >
+                              <FileCode2 className="mr-2 h-4 w-4" />
+                              AI 转高保真页
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRequestRuntimeConversion(
+                                  activeDemoPage.id,
+                                  "prototype-html-css",
+                                )
+                              }
+                            >
+                              <FileText className="mr-2 h-4 w-4" />
+                              AI 转 HTML/CSS 原型
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    {activeRuntimeConversion && !singlePreviewViewingDocument && (
+                      <div className="flex min-w-0 items-center gap-1">
+                        <Badge
+                          variant={
+                            activeRuntimeConversion.status === "failed"
+                              ? "destructive"
+                              : activeRuntimeConversion.status === "completed"
+                                ? "secondary"
+                                : "outline"
+                          }
+                          className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
+                          title={activeRuntimeConversion.message}
+                        >
+                          {(activeRuntimeConversion.status === "running" ||
+                            activeRuntimeConversion.status === "applying") && (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          )}
+                          {activeRuntimeConversion.status === "completed"
+                            ? "转换完成"
+                            : activeRuntimeConversion.status === "failed"
+                              ? "转换失败"
+                              : "转换中"}
+                        </Badge>
+                        {activeRuntimeConversion.status === "failed" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() =>
+                              handleRequestRuntimeConversion(
+                                activeRuntimeConversion.pageId,
+                                activeRuntimeConversion.targetRuntimeType,
+                              )
+                            }
+                            title={activeRuntimeConversion.message || "重试转换"}
+                          >
+                            <RefreshCw className="mr-1 h-3 w-3" />
+                            重试
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {activeDemoPage?.runtimeType !== "prototype-html-css" &&
+                      !singlePreviewViewingDocument && (
+                      <Badge
+                        variant="secondary"
+                        className="h-6 rounded-md px-2 text-[11px] font-normal text-muted-foreground"
+                        title="使用高保真运行时，支持真实交互，预览成本更高"
+                      >
+                        高保真
+                      </Badge>
+                    )}
                   </div>
                   <div className="relative flex-1 min-h-0">
                     <style>{`
@@ -4414,6 +5219,35 @@ ${context.details}
                             onActiveDocumentChange={
                               handleSinglePreviewDocumentActiveChange
                             }
+                          />
+                        </div>
+                      ) : activeDemoPage?.runtimeType === "prototype-html-css" ? (
+                        <div className="mx-auto h-full w-full max-w-5xl overflow-hidden rounded-md border bg-white shadow-sm">
+                          <PrototypePagePreview
+                            html={pagePrototypeMap[activeDemoId]?.html}
+                            css={pagePrototypeMap[activeDemoId]?.css}
+                            configData={configData}
+                            visualEditMode={propertyPanelActive}
+                            visualHoverNodeId={
+                              propertyPanelActive ? visualPanelHoverNodeId : null
+                            }
+                            selectedVisualNodeId={
+                              selectedVisualNode?.domPath ||
+                              selectedVisualNode?.nodeId ||
+                              null
+                            }
+                            visualPropertyChanges={visualPropertyChanges}
+                            onVisualHover={setHoveredVisualNode}
+                            onVisualSelect={handleVisualSelect}
+                            onVisualSelectStack={(nodes) => {
+                              if (nodes.length > 0) {
+                                handleVisualSelect(nodes[nodes.length - 1], nodes);
+                              } else {
+                                handleVisualSelect(null, []);
+                              }
+                            }}
+                            visualNodeTreeRequestKey={visualLayerTreeRequestKey}
+                            onVisualNodeTreeChange={setVisualLayerTreeNodes}
                           />
                         </div>
                       ) : (
@@ -4464,6 +5298,8 @@ ${context.details}
                           }}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
+                          staticPrototypeRequestKey={staticPrototypeRequestKey}
+                          onStaticPrototypeSnapshot={handleStaticPrototypeSnapshot}
                           onVisualInlineEdit={handleVisualInlineEdit}
                           visualAnnotationMode={false}
                           onVisualAnnotationCreate={(
@@ -4568,6 +5404,7 @@ ${context.details}
                       submission={visualPropertySubmission}
                       sending={visualPropertySending}
                       usedConfigKeys={visualConfigUsedKeys}
+                      directApplyMode={activeDemoPage?.runtimeType === "prototype-html-css"}
                       onPropertyChange={handleVisualPropertyChange}
                       onRestoreProperty={handleRestoreVisualProperty}
                       onClearChanges={handleClearVisualProperties}

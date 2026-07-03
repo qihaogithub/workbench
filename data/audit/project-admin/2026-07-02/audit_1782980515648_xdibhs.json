@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782980515648_xdibhs",
+  "at": 1782980515648,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_create",
+  "projectId": "proj_1782980494805_klfp75",
+  "resourceId": "prototype_mvp_28",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page:prototype_mvp_28"
+    ]
+  }
+}

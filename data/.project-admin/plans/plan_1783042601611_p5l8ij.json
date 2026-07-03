@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1783042601611_p5l8ij",
+  "operation": "project_delete",
+  "resourceId": "proj_1782980494805_klfp75",
+  "impact": [
+    "删除项目 MVP-30个HTML/CSS原型页画布体验",
+    "删除 32 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1783042601611_c7gb82"
+}

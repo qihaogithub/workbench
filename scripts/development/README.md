@@ -9,6 +9,8 @@
 | 脚本 | 根目录快捷命令 | 用途 |
 |---|---|---|
 | `detect-sync-status-flap.mjs` | `pnpm test:sync-status-flap` | 用 Playwright 打开编辑页，采样协同同步状态，并调用 Workspace flush 探针复现“同步失败”或连接状态抖动。 |
+| `create-prototype-canvas-performance-fixtures.mjs` | `pnpm test:prototype-canvas-fixtures` | 通过 Project CLI 创建 20 页 HTML/CSS 原型与 20 页高保真 React 性能基线项目，输出可用于采样的项目 ID。 |
+| `measure-prototype-canvas-performance.mjs` | `pnpm test:prototype-canvas-performance` | 用 Playwright 采样创作端画布首屏、滚动、缩放、DOM 数量和 iframe/prototype 数量，生成可对比的性能基线 JSON。 |
 | `knowledge-validation-suite.mjs` | `pnpm test:knowledge-validation` / `pnpm test:knowledge-validation:run` | 通过 Project CLI 构造知识库验证场景、创建模板、实例化项目，并可选调用 Agent 评估知识库回答质量。 |
 | `test-ai-workspace-refresh.mjs` | `pnpm test:ai-workspace-refresh` | 验证 AI 写入 `demos/` 文件后，author-site 是否能刷新工作区状态，并运行相关 agent-service 单测。 |
 
@@ -110,6 +112,52 @@ pnpm test:sync-status-flap -- --project-id proj_1779608460375 --flush-only
 - 截图：`tmp/sync-status-flap/last-page.png`
 
 报告中的 `flushProbe` 字段记录项目 ID、Session 来源、Session/Workspace、`workspace-flush` 响应和错误信息；`trackedResponses` 会摘要 `/api/sessions`、`/api/collab` 和 `/api/agent` 相关请求。脚本可能像正常打开编辑页一样创建或复用编辑 Session，但只写入 `tmp/sync-status-flap/` 诊断产物。
+
+## measure-prototype-canvas-performance.mjs
+
+### 功能
+
+该脚本用于建立 HTML/CSS 原型页画布性能基线。它会打开指定创作端编辑页，切到画布模式，采样：
+
+1. 页面 DOMContentLoaded 到画布可见的时间。
+2. 当前画布页面数量、原型页 Shadow DOM 数量、iframe 数量、图片数量。
+3. 空闲状态和一次滚轮/拖拽交互后的 `requestAnimationFrame` 帧间隔。
+4. 浏览器可用时的 JS heap 使用量。
+
+脚本不创建或修改项目数据。要比较 20 个高保真 iframe、20 个截图占位和 20 个 HTML/CSS 原型页，应分别准备三个项目或三个可复现 URL，用不同 `--label` 跑三次，再对比输出 JSON。
+
+可以先生成本地可复跑的性能基线项目：
+
+```bash
+pnpm test:prototype-canvas-fixtures
+```
+
+该命令会输出 `prototype.projectId` 和 `highFidelity.projectId`。随后分别运行采样命令；高保真项目首次进入画布会产生 iframe 场景，截图服务生成缓存后可用同一项目复测截图占位场景。
+
+### 运行方式
+
+```bash
+pnpm test:prototype-canvas-performance -- --project-id proj_1782980494805_klfp75 --label prototype-20
+pnpm test:prototype-canvas-performance -- --url http://localhost:3200/demo/proj_xxx/edit --label iframe-20
+```
+
+### 常用参数
+
+| 参数 | 说明 |
+|---|---|
+| `--project-id <id>` | 指定项目 ID，脚本会拼成 `<base-url>/demo/<id>/edit`。 |
+| `--url <url>` | 直接指定编辑页 URL，优先级高于 `--project-id`。 |
+| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:3200`。 |
+| `--label <name>` | 报告标签，用于区分 `prototype-20`、`iframe-20`、`screenshot-20` 等场景。 |
+| `--expected-pages <n>` | 记录期望页面数，默认 `20`。 |
+| `--sample-ms <ms>` | RAF 采样时长，默认 `2000`。 |
+| `--headed` / `--headless` | 切换可视/无头浏览器。 |
+| `--user <username>` / `--password <password>` | 覆盖自动登录账号。 |
+| `--report-dir <path>` | 指定报告输出目录。 |
+
+### 输出
+
+- 报告：`tmp/prototype-canvas-performance/<label>-<timestamp>.json`
 
 ## knowledge-validation-suite.mjs
 

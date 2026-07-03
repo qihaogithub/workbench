@@ -1,0 +1,105 @@
+{
+  "id": "reading-map:tmpl_1783042627502_yyiryf",
+  "targetType": "template",
+  "targetId": "tmpl_1783042627502_yyiryf",
+  "overview": {
+    "title": "伴读广告页面 copy source",
+    "scene": "项目复制临时快照",
+    "pageCount": 2,
+    "configCount": 1,
+    "knowledgeCount": 0,
+    "updatedAt": "2026-07-03T01:37:07.507Z"
+  },
+  "structure": {
+    "pages": [
+      {
+        "id": "demo_1779608460372_f5g6h7",
+        "title": "手机",
+        "path": "pages/demo_1779608460372_f5g6h7.tsx",
+        "summary": "页面：手机"
+      },
+      {
+        "id": "demo_1779608460373_h7i8j9",
+        "title": "demo",
+        "path": "pages/demo_1779608460373_h7i8j9.tsx",
+        "summary": "页面：demo"
+      }
+    ],
+    "configs": [
+      {
+        "id": "project-config-schema",
+        "title": "伴读广告页面 - 项目级共享配置",
+        "path": "project.config.schema.json",
+        "summary": "包含配置项：phoneSingleAdImage, padSingleAdImage, carouselAdImage"
+      }
+    ],
+    "knowledgeDocuments": [],
+    "assets": []
+  },
+  "localSummaries": [
+    {
+      "id": "demo_1779608460372_f5g6h7",
+      "title": "手机",
+      "path": "pages/demo_1779608460372_f5g6h7.tsx",
+      "summary": "页面：手机"
+    },
+    {
+      "id": "demo_1779608460373_h7i8j9",
+      "title": "demo",
+      "path": "pages/demo_1779608460373_h7i8j9.tsx",
+      "summary": "页面：demo"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "伴读广告页面 - 项目级共享配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：phoneSingleAdImage, padSingleAdImage, carouselAdImage"
+    }
+  ],
+  "taskEntries": [
+    {
+      "taskType": "修改页面",
+      "description": "先阅读相关页面摘要，再打开页面原文。",
+      "recommendedPaths": [
+        "pages/demo_1779608460372_f5g6h7.tsx",
+        "pages/demo_1779608460373_h7i8j9.tsx"
+      ]
+    },
+    {
+      "taskType": "修改配置",
+      "description": "先确认配置 Schema，再结合知识文档判断业务约束。",
+      "recommendedPaths": [
+        "project.config.schema.json"
+      ]
+    },
+    {
+      "taskType": "排查异常",
+      "description": "从页面、配置和知识文档三个入口交叉确认。",
+      "recommendedPaths": [
+        "pages/demo_1779608460372_f5g6h7.tsx",
+        "pages/demo_1779608460373_h7i8j9.tsx",
+        "project.config.schema.json"
+      ]
+    }
+  ],
+  "originalEntries": [
+    {
+      "id": "demo_1779608460372_f5g6h7",
+      "title": "手机",
+      "path": "pages/demo_1779608460372_f5g6h7.tsx",
+      "summary": "页面：手机"
+    },
+    {
+      "id": "demo_1779608460373_h7i8j9",
+      "title": "demo",
+      "path": "pages/demo_1779608460373_h7i8j9.tsx",
+      "summary": "页面：demo"
+    },
+    {
+      "id": "project-config-schema",
+      "title": "伴读广告页面 - 项目级共享配置",
+      "path": "project.config.schema.json",
+      "summary": "包含配置项：phoneSingleAdImage, padSingleAdImage, carouselAdImage"
+    }
+  ]
+}

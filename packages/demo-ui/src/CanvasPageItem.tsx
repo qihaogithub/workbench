@@ -8,9 +8,11 @@ import {
 } from "./canvas-layout";
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
+import { PrototypePagePreview } from "./PrototypePagePreview";
 import type {
   CanvasPageLayout,
   CanvasPageData,
+  CanvasPageRuntimeType,
   ConsoleLogPayload,
   CanvasToolMode,
   CanvasPageRenderMode,
@@ -34,6 +36,10 @@ interface CanvasPageItemProps {
   selected?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
+  onRuntimeConversionRequest?: (
+    pageId: string,
+    targetRuntimeType: CanvasPageRuntimeType,
+  ) => void;
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onError?: (error: Error) => void;
@@ -191,6 +197,7 @@ export function CanvasPageItem({
   selected = false,
   onLayoutChange,
   onConfigEdit,
+  onRuntimeConversionRequest,
   onConsoleEntry,
   onError,
   onDragStart,
@@ -208,6 +215,10 @@ export function CanvasPageItem({
     x: number;
     y: number;
   } | null>(null);
+  const targetRuntimeType: CanvasPageRuntimeType =
+    page.runtimeType === "prototype-html-css"
+      ? "high-fidelity-react"
+      : "prototype-html-css";
   // 截图加载完成后，静态截图可作为轻量渲染路径。
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
   const [iframeContentLoaded, setIframeContentLoaded] = useState(false);
@@ -298,6 +309,7 @@ export function CanvasPageItem({
 
   const shouldRenderIframe =
     renderMode === "iframe" || renderMode === "sleeping-iframe";
+  const shouldRenderPrototype = renderMode === "prototype";
   const shouldRenderScreenshot =
     !!screenshotUrl &&
     (renderMode === "screenshot" ||
@@ -512,6 +524,16 @@ export function CanvasPageItem({
 
   const pageContent = (
     <>
+      {shouldRenderPrototype && (
+        <div className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none">
+          <PrototypePagePreview
+            html={page.prototypeHtml}
+            css={page.prototypeCss}
+            configData={page.configData}
+          />
+        </div>
+      )}
+
       {shouldRenderIframe && (
         <div
           className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
@@ -699,6 +721,20 @@ export function CanvasPageItem({
             >
               重置大小
             </button>
+            {onRuntimeConversionRequest && (
+              <button
+                type="button"
+                className="w-full border-t px-3 py-1.5 text-left text-sm hover:bg-muted"
+                onClick={() => {
+                  onRuntimeConversionRequest(page.id, targetRuntimeType);
+                  setContextMenu(null);
+                }}
+              >
+                {targetRuntimeType === "prototype-html-css"
+                  ? "AI 转 HTML/CSS 原型"
+                  : "AI 转高保真页"}
+              </button>
+            )}
           </div>
         </>
       )}

@@ -1,0 +1,21 @@
+
+      .screen { min-height: 100%; padding: 28px; background: linear-gradient(180deg, hsl(10 52% 96%), #fff 42%); color: #111827; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; font-size: 13px; color: #4b5563; }
+      .topbar strong { color: #111827; font-size: 15px; }
+      .hero { border: 1px solid #d1d5db; background: rgba(255,255,255,.92); padding: 24px; margin-bottom: 18px; }
+      .eyebrow { margin: 0 0 8px; color: hsl(10 68% 38%); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+      h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.15; }
+      h2 { margin: 0 0 10px; font-size: 18px; }
+      p { line-height: 1.65; }
+      .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+      .metric, .panel, .timeline { border: 1px solid #e5e7eb; background: #fff; padding: 16px; }
+      .metric span, .metric small { display: block; color: #6b7280; }
+      .metric strong { display: block; margin: 8px 0; font-size: 26px; }
+      .content { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+      button { margin-top: 12px; border: 0; background: hsl(10 64% 42%); color: #fff; padding: 10px 14px; font-weight: 700; }
+      .timeline { list-style: none; margin: 0; }
+      .timeline li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f3f4f6; padding: 10px 0; }
+      .timeline li:last-child { border-bottom: 0; }
+      .timeline em { color: hsl(10 64% 36%); font-style: normal; }
+      @media (max-width: 520px) { .content, .metrics { grid-template-columns: 1fr; } .screen { padding: 18px; } }
+    

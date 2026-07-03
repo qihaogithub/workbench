@@ -70,6 +70,7 @@ interface BatchStatusResponseData {
 
 interface ScreenshotMetaResponse {
   currentHash?: string;
+  variant?: ScreenshotRenderMode;
   renderBox?: ScreenshotRenderBox;
 }
 
@@ -128,7 +129,10 @@ export function useScreenshotGeneration(
     setPageScreenshots((prev) => {
       const next = { ...prev };
       for (const page of pages) {
+        const existing = next[page.pageId];
         next[page.pageId] = {
+          ...existing,
+          error: undefined,
           loading: true,
         };
       }
@@ -241,15 +245,19 @@ export function useScreenshotGeneration(
 
             setPageScreenshots((prev) => {
               const existing = prev[pageId];
-              if (existing?.loading || existing?.screenshotUrl) return prev;
+              if (existing?.screenshotUrl) return prev;
 
               return {
                 ...prev,
                 [pageId]: {
-                  screenshotUrl: getScreenshotUrl(pageId, data.currentHash),
+                  screenshotUrl: getScreenshotUrl(
+                    pageId,
+                    data.currentHash,
+                    data.variant || "strict",
+                  ),
                   hash: data.currentHash,
                   expectedHash: data.currentHash,
-                  variant: "strict",
+                  variant: data.variant || "strict",
                   renderBox: data.renderBox,
                   loading: false,
                 },
@@ -448,6 +456,7 @@ export function useScreenshotGeneration(
                 variant: existing?.variant,
                 renderBox: existing?.renderBox,
                 expectedHash: pageResult.hash,
+                error: undefined,
                 loading: true,
               };
             }

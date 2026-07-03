@@ -41,11 +41,18 @@ export interface PublishedDemoPage {
   routeKey?: string;
   order: number;
   parentId: string | null;
-  compiledJsPath: string;
+  runtimeType?: DemoPageMeta["runtimeType"];
+  compiledJsPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
   iframeHtmlPath?: string;
   embedCode?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: Record<string, unknown>;
+  prototypeHtmlPath?: string;
+  prototypeCssPath?: string;
+  prototypeMetaPath?: string;
 }
 
 export interface PublishedProject {
@@ -214,6 +221,71 @@ export async function publishProject(
     const demoDir = getDemoDirPath(workspacePath, page.id);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
+    const prototypeHtmlPath = path.join(demoDir, "prototype.html");
+    const prototypeCssPath = path.join(demoDir, "prototype.css");
+    const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+    const runtimeType = page.runtimeType === "prototype-html-css"
+      ? "prototype-html-css"
+      : "high-fidelity-react";
+
+    const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
+    fs.mkdirSync(demoPublishDir, { recursive: true });
+
+    let previewSize: PreviewSize | undefined;
+    let pageConfigData: Record<string, unknown> = {};
+    let schemaPublishPath: string | undefined;
+    if (fs.existsSync(schemaPath)) {
+      const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+      fs.writeFileSync(path.join(demoPublishDir, "schema.json"), schemaContent);
+      previewSize = extractPreviewSize(schemaContent);
+      pageConfigData = extractSchemaDefaults(schemaContent);
+      schemaPublishPath = `demos/${page.id}/schema.json`;
+    }
+
+    if (runtimeType === "prototype-html-css") {
+      if (!fs.existsSync(prototypeHtmlPath)) continue;
+      const prototypeHtml = urlMap.size > 0
+        ? replacePathsInContent(fs.readFileSync(prototypeHtmlPath, "utf-8"), urlMap, prototypeHtmlPath)
+        : fs.readFileSync(prototypeHtmlPath, "utf-8");
+      const prototypeCss = fs.existsSync(prototypeCssPath)
+        ? urlMap.size > 0
+          ? replacePathsInContent(fs.readFileSync(prototypeCssPath, "utf-8"), urlMap, prototypeCssPath)
+          : fs.readFileSync(prototypeCssPath, "utf-8")
+        : "";
+      fs.writeFileSync(path.join(demoPublishDir, "prototype.html"), prototypeHtml, "utf-8");
+      fs.writeFileSync(path.join(demoPublishDir, "prototype.css"), prototypeCss, "utf-8");
+      let prototypeMeta: Record<string, unknown> | undefined;
+      if (fs.existsSync(prototypeMetaPath)) {
+        const metaContent = fs.readFileSync(prototypeMetaPath, "utf-8");
+        fs.writeFileSync(path.join(demoPublishDir, "prototype.meta.json"), metaContent, "utf-8");
+        try {
+          prototypeMeta = JSON.parse(metaContent) as Record<string, unknown>;
+        } catch {
+          prototypeMeta = undefined;
+        }
+      }
+
+      publishedDemoPages.push({
+        id: page.id,
+        name: page.name,
+        routeKey: page.routeKey,
+        order: page.order,
+        parentId: page.parentId,
+        runtimeType,
+        schemaPath: schemaPublishPath,
+        previewSize,
+        prototypeHtml,
+        prototypeCss,
+        prototypeMeta,
+        prototypeHtmlPath: `demos/${page.id}/prototype.html`,
+        prototypeCssPath: `demos/${page.id}/prototype.css`,
+        prototypeMetaPath: prototypeMeta ? `demos/${page.id}/prototype.meta.json` : undefined,
+      });
+
+      const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+      onProgress?.(pagePercent, `发布原型页 ${i + 1}/${totalPages}...`);
+      continue;
+    }
 
     if (!fs.existsSync(codePath)) continue;
 
@@ -224,9 +296,6 @@ export async function publishProject(
       compileRuntimeOptions,
     );
 
-    const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
-    fs.mkdirSync(demoPublishDir, { recursive: true });
-
     const replacedCode = urlMap.size > 0
       ? replacePathsInContent(compileResult.compiledCode, urlMap, codePath)
       : compileResult.compiledCode;
@@ -235,15 +304,6 @@ export async function publishProject(
       path.join(demoPublishDir, "compiled.js"),
       replacedCode,
     );
-
-    let previewSize: PreviewSize | undefined;
-    let pageConfigData: Record<string, unknown> = {};
-    if (fs.existsSync(schemaPath)) {
-      const schemaContent = fs.readFileSync(schemaPath, "utf-8");
-      fs.writeFileSync(path.join(demoPublishDir, "schema.json"), schemaContent);
-      previewSize = extractPreviewSize(schemaContent);
-      pageConfigData = extractSchemaDefaults(schemaContent);
-    }
 
     const mergedConfigData = { ...projectConfigData, ...pageConfigData };
 
@@ -269,10 +329,9 @@ export async function publishProject(
       routeKey: page.routeKey,
       order: page.order,
       parentId: page.parentId,
+      runtimeType: page.runtimeType,
       compiledJsPath: `demos/${page.id}/compiled.js`,
-      schemaPath: fs.existsSync(schemaPath)
-        ? `demos/${page.id}/schema.json`
-        : undefined,
+      schemaPath: schemaPublishPath,
       previewSize,
       iframeHtmlPath,
       embedCode,

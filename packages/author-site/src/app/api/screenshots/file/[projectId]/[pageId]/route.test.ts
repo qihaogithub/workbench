@@ -179,6 +179,7 @@ describe("screenshot file route", () => {
       success: true,
       data: {
         currentHash: "1111111111111111",
+        variant: "strict",
         url: "/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
         renderBox,
       },

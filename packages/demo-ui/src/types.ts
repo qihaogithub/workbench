@@ -113,6 +113,12 @@ export interface PreviewPanelProps {
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
   visualNodeTreeRequestKey?: number;
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
+  staticPrototypeRequestKey?: number;
+  onStaticPrototypeSnapshot?: (
+    result:
+      | { ok: true; html: string; css: string }
+      | { ok: false; error: string },
+  ) => void;
   /** @deprecated 右键图层菜单已由 PreviewPanel 在预览位置内渲染，仅保留兼容旧调用方。 */
   onVisualLayerMenu?: (nodes: VisualNodeInfo[]) => void;
   onVisualInlineEdit?: (payload: VisualInlineEditPayload) => void;
@@ -175,11 +181,17 @@ export interface CanvasState {
 
 export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
+export type CanvasPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+
 export interface CanvasPageData {
   id: string;
   name: string;
+  runtimeType?: CanvasPageRuntimeType;
   code?: string;
   compiledJsUrl?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
@@ -196,6 +208,7 @@ export type CanvasPageRenderMode =
   | "screenshot"
   | "iframe"
   | "sleeping-iframe"
+  | "prototype"
   | "loading";
 
 export type CanvasFreeNodeKind =
@@ -338,6 +351,10 @@ export interface PreviewCanvasProps {
   canvasState: CanvasState;
   onCanvasStateChange: (state: CanvasState) => void;
   onPageConfigEdit?: (pageId: string) => void;
+  onRuntimeConversionRequest?: (
+    pageId: string,
+    targetRuntimeType: CanvasPageRuntimeType,
+  ) => void;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

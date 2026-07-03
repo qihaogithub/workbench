@@ -119,6 +119,43 @@ try {
   await runCommand("page get", ["page", "get", editId, pageId]);
   await runCommand("page validate-runtime", ["page", "validate-runtime", editId, pageId]);
 
+  const prototypePage = await runCommand("page create prototype", [
+    "page",
+    "create",
+    "--edit-id",
+    editId,
+    "--name",
+    "原型页",
+    "--runtime-type",
+    "prototype-html-css",
+    "--prototype-html",
+    "<main><h1>原型页</h1></main>",
+    "--prototype-css",
+    "main { padding: 24px; }",
+  ]);
+  const prototypePageId = dataOf<{ meta: { id: string } }>(prototypePage).meta.id;
+  await runCommand("page update-prototype", [
+    "page",
+    "update-prototype",
+    editId,
+    prototypePageId,
+    "--prototype-html",
+    "<main><h1>更新原型页</h1></main>",
+    "--prototype-css",
+    "main { padding: 32px; }",
+  ]);
+  await runCommand("page switch-runtime", [
+    "page",
+    "switch-runtime",
+    editId,
+    prototypePageId,
+    "high-fidelity-react",
+    "--code",
+    "export default function Demo(){ return <main>切换后的高保真页</main>; }",
+    "--reason",
+    "CLI 冒烟切换",
+  ]);
+
   const duplicatedPage = await runCommand("page duplicate", ["page", "duplicate", editId, pageId, "首页副本"]);
   const duplicatedPageId = dataOf<{ meta: { id: string } }>(duplicatedPage).meta.id;
   await runCommand("page update-code", [

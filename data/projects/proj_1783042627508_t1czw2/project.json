@@ -1,0 +1,39 @@
+{
+  "id": "proj_1783042627508_t1czw2",
+  "name": "伴读广告页面 副本",
+  "category": "APP资源位",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1783042627508_t1czw2/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460372_f5g6h7",
+      "name": "手机-react",
+      "routeKey": "demo",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779608460373_h7i8j9",
+      "name": "pad-react",
+      "routeKey": "demo-2",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "page_lib0",
+      "name": "手机 - HTML",
+      "routeKey": "page",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "pageVersions": {},
+  "createdAt": 1783042627511,
+  "updatedAt": 1783042891068,
+  "activeWorkspaceId": "live-1783042635396-z18h71ejw",
+  "activeWorkspaceUpdatedAt": 1783042635400,
+  "canonicalSyncedWorkspaceId": "live-1783042635396-z18h71ejw",
+  "canonicalSyncedAt": 1783042891068
+}

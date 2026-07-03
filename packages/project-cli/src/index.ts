@@ -21,6 +21,8 @@ import type {
   CreateProjectInput,
   FolderUpdateInput,
   PageCreateInput,
+  PageSwitchRuntimeInput,
+  PageUpdatePrototypeInput,
   PageUpdateInput,
   ProjectAdminActor,
   ProjectAdminConfig,
@@ -801,9 +803,18 @@ register("page create", "新建页面", (args, _pos, { service, actor }) => {
   const input: PageCreateInput = {
     editId: stringArg(args, "editId"),
     name: stringArg(args, "name"),
+    pageId: optionalStringArg(args, "pageId"),
+    routeKey: optionalStringArg(args, "routeKey"),
     parentId: optionalStringArg(args, "parentId") ?? null,
+    runtimeType: optionalStringArg(args, "runtimeType") as PageCreateInput["runtimeType"],
+    order: numberArg(args, "order"),
     code: optionalStringArg(args, "code"),
     schema: optionalStringArg(args, "schema"),
+    prototypeHtml: optionalStringArg(args, "prototypeHtml"),
+    prototypeCss: optionalStringArg(args, "prototypeCss"),
+    prototypeMeta: args.prototypeMeta && typeof args.prototypeMeta === "object"
+      ? args.prototypeMeta as PageCreateInput["prototypeMeta"]
+      : undefined,
     dryRun: booleanArg(args, "dryRun"),
   };
   return service.createPage(input, actor);
@@ -831,6 +842,38 @@ register("page update-code", "更新页面代码", (args, pos, { service, actor 
   ),
   ["page_update_code"],
 );
+
+register("page update-prototype", "更新 HTML/CSS 原型页内容", (args, pos, { service, actor }) => {
+  const input: PageUpdatePrototypeInput = {
+    editId: stringArg(args, "editId", pos[0]),
+    pageId: stringArg(args, "pageId", pos[1]),
+    prototypeHtml: optionalStringArg(args, "prototypeHtml"),
+    prototypeCss: optionalStringArg(args, "prototypeCss"),
+    prototypeMeta: args.prototypeMeta && typeof args.prototypeMeta === "object"
+      ? args.prototypeMeta as PageUpdatePrototypeInput["prototypeMeta"]
+      : undefined,
+    dryRun: booleanArg(args, "dryRun"),
+  };
+  return service.updatePrototypePage(input, actor);
+}, ["page_update_prototype"]);
+
+register("page switch-runtime", "切换页面运行时类型", (args, pos, { service, actor }) => {
+  const input: PageSwitchRuntimeInput = {
+    editId: stringArg(args, "editId", pos[0]),
+    pageId: stringArg(args, "pageId", pos[1]),
+    targetRuntimeType: stringArg(args, "targetRuntimeType", pos[2]) as PageSwitchRuntimeInput["targetRuntimeType"],
+    code: optionalStringArg(args, "code"),
+    schema: optionalStringArg(args, "schema"),
+    prototypeHtml: optionalStringArg(args, "prototypeHtml"),
+    prototypeCss: optionalStringArg(args, "prototypeCss"),
+    prototypeMeta: args.prototypeMeta && typeof args.prototypeMeta === "object"
+      ? args.prototypeMeta as PageSwitchRuntimeInput["prototypeMeta"]
+      : undefined,
+    reason: optionalStringArg(args, "reason"),
+    dryRun: booleanArg(args, "dryRun"),
+  };
+  return service.switchPageRuntime(input, actor);
+}, ["page_switch_runtime"]);
 
 register("page validate-runtime", "校验页面是否符合创作端预览运行契约", (args, pos, { service }) =>
   service.validatePageRuntime(stringArg(args, "editId", pos[0]), stringArg(args, "pageId", pos[1])),

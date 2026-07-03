@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
+import type {
+  DemoPageMeta,
+  DemoFolderMeta,
+  DemoPageRuntimeType,
+} from "@opencode-workbench/shared";
 import {
   DndContext,
   PointerSensor,
@@ -50,6 +54,10 @@ interface DemoPageTreeProps {
   onPageRename: (pageId: string, name: string) => void;
   onPageCopy: (pageId: string) => void;
   onPageDelete: (pageId: string) => void;
+  onRequestRuntimeConversion?: (
+    pageId: string,
+    targetRuntimeType: DemoPageRuntimeType,
+  ) => void;
   onWorkspaceChange?: () => void;
 }
 
@@ -97,6 +105,7 @@ export function DemoPageTree({
   onPageRename,
   onPageCopy,
   onPageDelete,
+  onRequestRuntimeConversion,
   onWorkspaceChange,
 }: DemoPageTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -507,6 +516,7 @@ export function DemoPageTree({
                       onPageRename={onPageRename}
                       onPageCopy={onPageCopy}
                       onPageDelete={onPageDelete}
+                      onRequestRuntimeConversion={onRequestRuntimeConversion}
                       onRenameFolder={handleRenameFolder}
                       onDeleteFolder={handleDeleteFolder}
                       onCreateSubFolder={(parentId) => {

@@ -1,8 +1,28 @@
 import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@opencode-workbench/preview-contract/runtime';
 import { compilePreviewPageSource } from '@opencode-workbench/preview-contract/compiler';
 
-interface ToolRuntimeValidationIssue extends RuntimeContractIssue {
+type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
+type PrototypeGateDecision =
+  | 'accept_prototype'
+  | 'repair_prototype'
+  | 'upgrade_to_high_fidelity';
+
+interface PrototypeGateResult {
+  decision: PrototypeGateDecision;
+  reasonCodes: string[];
+  summary: string;
+}
+
+interface ToolRuntimeValidationIssue {
   file: string;
+  pageId?: string;
+  stage: ToolRuntimeValidationStage;
+  code: string;
+  message: string;
+  instruction: string;
+  severity: 'error' | 'warning';
+  moduleName?: string;
+  importName?: string;
 }
 
 export interface ToolRuntimeValidation {
@@ -10,19 +30,198 @@ export interface ToolRuntimeValidation {
   file: string;
   pageId?: string;
   issues: ToolRuntimeValidationIssue[];
+  prototypeGate?: PrototypeGateResult;
 }
 
-function getPageIdFromPath(filePath: string): string | undefined {
-  const match = filePath.match(/^demos\/([^/]+)\/index\.tsx$/u);
-  return match?.[1];
+export function formatRuntimeValidationInstruction(
+  runtimeValidation: ToolRuntimeValidation | undefined,
+): string {
+  if (!runtimeValidation || runtimeValidation.ok) return '';
+
+  const gate = runtimeValidation.prototypeGate;
+  const pageId = runtimeValidation.pageId || '<pageId>';
+  const gateInstruction = gate
+    ? gate.decision === 'repair_prototype'
+      ? [
+          '',
+          'Prototype gate decision: repair_prototype.',
+          'Repair the HTML/CSS once and write the corrected prototype file again before ending the task.',
+          'Keep the page as prototype-html-css unless the same page still fails the prototype gate after the repair attempt.',
+        ].join('\n')
+      : gate.decision === 'upgrade_to_high_fidelity'
+        ? [
+            '',
+            'Prototype gate decision: upgrade_to_high_fidelity.',
+            `Regenerate this page as high-fidelity React: write demos/${pageId}/index.tsx, keep config.schema.json valid, and update workspace-tree.json runtimeType to high-fidelity-react only after the React file validates.`,
+            `Tell the user briefly why the page needs isolated runtime: ${gate.summary}`,
+          ].join('\n')
+        : ''
+    : '';
+
+  return `\n\nPreview validation failed. Continue fixing this page before ending the task:${gateInstruction}\n${JSON.stringify(runtimeValidation, null, 2)}`;
+}
+
+function getDemoFileInfo(filePath: string): { pageId: string; fileName: string } | undefined {
+  const match = filePath.match(/^demos\/([^/]+)\/(index\.tsx|config\.schema\.json|prototype\.html|prototype\.css)$/u);
+  return match?.[1] && match?.[2]
+    ? { pageId: match[1], fileName: match[2] }
+    : undefined;
 }
 
 function normalizePath(filePath: string): string {
   return filePath.split('\\').join('/');
 }
 
-function toToolIssue(file: string, issue: RuntimeContractIssue): ToolRuntimeValidationIssue {
-  return { ...issue, file };
+function toToolIssue(file: string, pageId: string, issue: RuntimeContractIssue): ToolRuntimeValidationIssue {
+  return { ...issue, pageId, file };
+}
+
+const MAX_PROTOTYPE_HTML_LENGTH = 200_000;
+const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
+const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
+
+function toPrototypeToolValidation(
+  file: string,
+  pageId: string,
+  html: string,
+  css: string,
+): ToolRuntimeValidation {
+  const issues: ToolRuntimeValidationIssue[] = [];
+  const repairReasonCodes: string[] = [];
+  const upgradeReasonCodes: string[] = [];
+  const addIssue = (
+    code: string,
+    message: string,
+    instruction: string,
+    gateDecision: Exclude<PrototypeGateDecision, 'accept_prototype'>,
+  ) => {
+    issues.push({
+      file,
+      pageId,
+      severity: 'error',
+      stage: 'prototype_contract',
+      code,
+      message,
+      instruction,
+    });
+    if (gateDecision === 'upgrade_to_high_fidelity') {
+      upgradeReasonCodes.push(code);
+    } else {
+      repairReasonCodes.push(code);
+    }
+  };
+
+  if (!html.trim()) {
+    addIssue(
+      'PROTOTYPE_HTML_EMPTY',
+      '原型页 HTML 不能为空',
+      '请提供可渲染的 prototype.html 内容。',
+      'repair_prototype',
+    );
+  }
+  if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
+    addIssue(
+      'PROTOTYPE_HTML_TOO_LARGE',
+      '原型页 HTML 超过 MVP 限制',
+      '请压缩 HTML 结构，避免一次写入过大的页面内容。',
+      'repair_prototype',
+    );
+  }
+  if (css.length > MAX_PROTOTYPE_CSS_LENGTH) {
+    addIssue(
+      'PROTOTYPE_CSS_TOO_LARGE',
+      '原型页 CSS 超过 MVP 限制',
+      '请压缩 CSS，移除不必要的样式规则。',
+      'repair_prototype',
+    );
+  }
+  if (/<\s*script\b/i.test(html)) {
+    addIssue(
+      'PROTOTYPE_SCRIPT_FORBIDDEN',
+      '原型页不允许包含 script 标签',
+      '页面需要执行脚本时应升级为高保真页；否则请移除 script 标签。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/\son[a-z]+\s*=/i.test(html)) {
+    addIssue(
+      'PROTOTYPE_INLINE_EVENT_FORBIDDEN',
+      '原型页不允许包含内联事件属性',
+      '页面需要真实事件处理时应升级为高保真页；否则请移除 onclick、onload 等内联事件属性。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/javascript\s*:/i.test(html) || /javascript\s*:/i.test(css)) {
+    addIssue(
+      'PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN',
+      '原型页不允许包含 javascript: URL',
+      '页面需要执行 JavaScript URL 时应升级为高保真页；否则请将链接改为普通 URL 或占位链接。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/<\s*(iframe|embed|object)\b/i.test(html)) {
+    addIssue(
+      'PROTOTYPE_EMBED_FORBIDDEN',
+      '原型页不允许直接内嵌 iframe、embed 或 object',
+      '需要嵌入第三方运行时内容时应升级为高保真页。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/<\s*form\b[^>]*\saction\s*=/i.test(html)) {
+    addIssue(
+      'PROTOTYPE_FORM_ACTION_FORBIDDEN',
+      '原型页不允许包含会提交的表单 action',
+      '需要真实表单提交时应升级为高保真页；静态表单请移除 action。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/\bposition\s*:\s*fixed\b/i.test(css)) {
+    addIssue(
+      'PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION',
+      '原型页不允许使用 position: fixed',
+      '需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。',
+      'upgrade_to_high_fidelity',
+    );
+  }
+  if (/@import\b/i.test(css)) {
+    addIssue(
+      'PROTOTYPE_CSS_IMPORT_FORBIDDEN',
+      '原型页不允许使用 CSS @import',
+      '请移除远程样式导入，把必要样式内联到 prototype.css。',
+      'repair_prototype',
+    );
+  }
+  if (PROTOTYPE_GLOBAL_SELECTOR_RE.test(css)) {
+    addIssue(
+      'PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN',
+      '原型页 CSS 不允许直接选择 html、body 或 :root',
+      '请把全局选择器改为原型页根节点内的局部 class 选择器。',
+      'repair_prototype',
+    );
+  }
+
+  const decision: PrototypeGateDecision = upgradeReasonCodes.length > 0
+    ? 'upgrade_to_high_fidelity'
+    : issues.length > 0
+      ? 'repair_prototype'
+      : 'accept_prototype';
+  const reasonCodes = Array.from(new Set([
+    ...upgradeReasonCodes,
+    ...repairReasonCodes,
+  ]));
+  const summary = decision === 'accept_prototype'
+    ? 'HTML/CSS 原型页可安全内嵌渲染。'
+    : decision === 'repair_prototype'
+      ? 'HTML/CSS 原型页存在可自动修复的问题，修复后可继续按原型页保存。'
+      : '页面触碰运行时隔离红线，应升级为高保真页。';
+
+  return {
+    ok: issues.length === 0,
+    file,
+    pageId,
+    issues,
+    prototypeGate: { decision, reasonCodes, summary },
+  };
 }
 
 export function validatePreviewFileWrite(
@@ -30,9 +229,10 @@ export function validatePreviewFileWrite(
   content: string,
 ): ToolRuntimeValidation | undefined {
   const normalizedPath = normalizePath(filePath);
-  const pageId = getPageIdFromPath(normalizedPath);
+  const demoFile = getDemoFileInfo(normalizedPath);
+  const pageId = demoFile?.pageId;
 
-  if (pageId) {
+  if (pageId && demoFile.fileName === 'index.tsx') {
     try {
       compilePreviewPageSource(content, {
         resolveDependencyUrl: (specifier) => `/runtime/${specifier}.js`,
@@ -44,7 +244,7 @@ export function validatePreviewFileWrite(
           ok: false,
           file: normalizedPath,
           pageId,
-          issues: error.issues.map((issue) => toToolIssue(normalizedPath, issue)),
+          issues: error.issues.map((issue) => toToolIssue(normalizedPath, pageId, issue)),
         };
       }
       return {
@@ -54,6 +254,7 @@ export function validatePreviewFileWrite(
         issues: [
           {
             file: normalizedPath,
+            pageId,
             stage: 'compile_transform',
             code: 'COMPILE_TRANSFORM_FAILED',
             severity: 'error',
@@ -65,17 +266,27 @@ export function validatePreviewFileWrite(
     }
   }
 
-  if (/^demos\/[^/]+\/config\.schema\.json$/u.test(normalizedPath)) {
+  if (pageId && demoFile.fileName === 'prototype.html') {
+    return toPrototypeToolValidation(normalizedPath, pageId, content, '');
+  }
+
+  if (pageId && demoFile.fileName === 'prototype.css') {
+    return toPrototypeToolValidation(normalizedPath, pageId, '<div></div>', content);
+  }
+
+  if (pageId && demoFile.fileName === 'config.schema.json') {
     try {
       JSON.parse(content);
-      return { ok: true, file: normalizedPath, issues: [] };
+      return { ok: true, file: normalizedPath, pageId, issues: [] };
     } catch {
       return {
         ok: false,
         file: normalizedPath,
+        pageId,
         issues: [
           {
             file: normalizedPath,
+            pageId,
             stage: 'schema_contract',
             code: 'INVALID_JSON',
             severity: 'error',

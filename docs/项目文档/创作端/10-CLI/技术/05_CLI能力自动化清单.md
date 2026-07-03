@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-07-01
+> 更新日期：2026-07-02
 
 ## 用途
 
@@ -72,10 +72,11 @@ covers:
 | edit.extend | 编辑事务 | `edit extend` | 低 | L3 | 已覆盖 | 延长事务有效期 |
 | page.list | 页面 | `page list` | 低 | L3 | 已覆盖 | 查询页面树 |
 | page.get | 页面 | `page get` | 低 | L3 | 已覆盖 | 查询页面代码和配置 |
-| page.runtime.validate | 页面 | `page validate-runtime` | 低 | L3 | 已覆盖 | 校验编辑事务中的单页是否符合创作端预览运行契约 |
-| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建页面 |
+| page.runtime.validate | 页面 | `page validate-runtime` | 低 | L3 | 已覆盖 | React 页面走预览运行契约校验，HTML/CSS 原型页走静态安全边界校验 |
+| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建高保真 React 页面或 HTML/CSS 原型页 |
 | page.duplicate | 页面 | `page duplicate` | 中 | L4 | 已覆盖 | 复制页面 |
-| page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新页面代码 |
+| page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新 React 页面代码 |
+| page.update.prototype | 页面 | `page update-prototype` | 中 | L4 | 已覆盖 | 更新 HTML/CSS 原型页内容和元信息 |
 | page.update.schema | 页面 | `page update-schema` | 中 | L4 | 已覆盖 | 更新页面 Schema |
 | page.update.meta | 页面 | `page update-meta` | 中 | L4 | 已覆盖 | 修改页面元信息 |
 | page.version.list | 页面 | `page version-list` | 低 | L3 | 已覆盖 | 查询页面历史版本列表 |

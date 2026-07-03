@@ -5,7 +5,10 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
-import { validatePreviewFileWrite } from './preview-validation';
+import {
+  formatRuntimeValidationInstruction,
+  validatePreviewFileWrite,
+} from './preview-validation';
 
 const EditFileParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to edit' }),
@@ -90,9 +93,7 @@ export function createEditFileTool(config: AgentConfig): AgentTool<typeof EditFi
 
         const runtimeValidation = validatePreviewFileWrite(args.path, newContent);
         logger.debug({ path: args.path, lineNumber }, 'File edited successfully');
-        const validationText = runtimeValidation && !runtimeValidation.ok
-          ? `\n\nPreview validation failed after edit. Continue fixing this file before ending the task:\n${JSON.stringify(runtimeValidation, null, 2)}`
-          : '';
+        const validationText = formatRuntimeValidationInstruction(runtimeValidation);
         return {
           content: [{
             type: 'text',

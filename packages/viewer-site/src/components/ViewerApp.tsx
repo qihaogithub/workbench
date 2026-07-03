@@ -29,7 +29,7 @@ import type {
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
-import { PreviewPanel, PageConfigPanel } from "@/components/demo";
+import { PreviewPanel, PageConfigPanel, PrototypePagePreview } from "@/components/demo";
 import { PreviewCanvas } from "@/components/demo";
 import type { PreviewMode, CanvasState } from "@/components/demo";
 import {
@@ -554,7 +554,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
 
-  const compiledUrl = activePage
+  const compiledUrl = activePage?.compiledJsPath
     ? getCompiledJsUrl(projectId, activePage.compiledJsPath)
     : "";
 
@@ -649,10 +649,13 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     id: p.id,
                     name: p.name,
                     order: p.order,
-                    compiledJsUrl: getCompiledJsUrl(
-                      projectId,
-                      p.compiledJsPath,
-                    ),
+                    runtimeType: p.runtimeType,
+                    compiledJsUrl: p.compiledJsPath
+                      ? getCompiledJsUrl(projectId, p.compiledJsPath)
+                      : undefined,
+                    prototypeHtml: p.prototypeHtml,
+                    prototypeCss: p.prototypeCss,
+                    prototypeMeta: p.prototypeMeta,
                     configData: configDataMap[p.id],
                     previewSize: p.previewSize,
                   }))}
@@ -672,13 +675,20 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 <style>{`
                   .preview-single-scroll::-webkit-scrollbar { display: none; }
                 `}</style>
-                {activePage && (
+                {activePage?.runtimeType === "prototype-html-css" ? (
+                  <PrototypePagePreview
+                    html={activePage.prototypeHtml}
+                    css={activePage.prototypeCss}
+                    configData={configData}
+                    className="min-h-full"
+                  />
+                ) : activePage ? (
                   <PreviewPanel
                     compiledJsUrl={compiledUrl}
                     configData={configData}
                     previewSize={previewSize}
                   />
-                )}
+                ) : null}
               </div>
             )}
           </div>

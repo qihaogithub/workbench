@@ -16,6 +16,9 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
+import { getProjectAdminService } from "@/lib/project-admin-service";
+import type { PrototypePageMeta } from "@opencode-workbench/shared";
+import type { RuntimeValidationResult } from "@opencode-workbench/project-core";
 
 export async function GET(
   _request: NextRequest,
@@ -136,11 +139,23 @@ export async function PUT(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { code, schema } = body as { code?: string; schema?: string };
+    const { code, schema, prototypeHtml, prototypeCss, prototypeMeta } = body as {
+      code?: string;
+      schema?: string;
+      prototypeHtml?: string;
+      prototypeCss?: string;
+      prototypeMeta?: unknown;
+    };
 
-    if (code === undefined && schema === undefined) {
+    if (
+      code === undefined &&
+      schema === undefined &&
+      prototypeHtml === undefined &&
+      prototypeCss === undefined &&
+      prototypeMeta === undefined
+    ) {
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "code 或 schema 至少需提供一个"),
+        createApiError("INVALID_REQUEST", "code、schema 或 prototype 字段至少需提供一个"),
         { status: 400 },
       );
     }
@@ -153,6 +168,18 @@ export async function PUT(
     if (schema !== undefined && typeof schema !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "schema 必须为字符串"),
+        { status: 400 },
+      );
+    }
+    if (prototypeHtml !== undefined && typeof prototypeHtml !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "prototypeHtml 必须为字符串"),
+        { status: 400 },
+      );
+    }
+    if (prototypeCss !== undefined && typeof prototypeCss !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "prototypeCss 必须为字符串"),
         { status: 400 },
       );
     }
@@ -209,9 +236,46 @@ export async function PUT(
       }
     }
 
+    let runtimeValidation: RuntimeValidationResult | undefined;
+    const pageMeta = listDemoPages(wsPath).find((page) => page.id === demoId);
+    const isPrototypePage = pageMeta?.runtimeType === "prototype-html-css";
+    if (isPrototypePage) {
+      const currentFiles = getWorkspaceDemoPageFiles(meta.workspaceId, demoId);
+      if (!currentFiles) {
+        return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
+          status: 404,
+        });
+      }
+      runtimeValidation = getProjectAdminService().validateDemoPageFilesRuntime(
+        demoId,
+        "prototype-html-css",
+        {
+          ...currentFiles,
+          code: code ?? currentFiles.code,
+          schema: schema ?? currentFiles.schema,
+          prototypeHtml: prototypeHtml ?? currentFiles.prototypeHtml,
+          prototypeCss: prototypeCss ?? currentFiles.prototypeCss,
+          prototypeMeta: (prototypeMeta as PrototypePageMeta | undefined) ?? currentFiles.prototypeMeta,
+        },
+      );
+      if (!runtimeValidation.ok) {
+        return NextResponse.json(
+          createApiError(
+            "VALIDATION_ERROR",
+            "原型页校验未通过，暂不保存页面文件",
+            { runtimeValidation },
+          ),
+          { status: 422 },
+        );
+      }
+    }
+
     const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
       code,
       schema,
+      prototypeHtml,
+      prototypeCss,
+      prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
     });
     if (!success) {
       return NextResponse.json(
@@ -220,7 +284,7 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json(createApiSuccess(null));
+    return NextResponse.json(createApiSuccess(runtimeValidation ? { runtimeValidation } : null));
   } catch (error) {
     console.error("Error updating session demo page files:", error);
     return NextResponse.json(

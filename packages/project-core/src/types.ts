@@ -1,7 +1,9 @@
 import type {
   DemoFiles,
+  DemoPageRuntimeType,
   DemoFolderMeta,
   DemoMeta,
+  PrototypePageMeta,
   DemoPageMeta,
   AppGraph,
   PageVersionInfo,
@@ -39,7 +41,8 @@ export interface ValidationIssue {
     | "render_contract"
     | "schema_contract"
     | "compile_transform"
-    | "module_parse";
+    | "module_parse"
+    | "prototype_contract";
   instruction?: string;
   severity: "blocking" | "warning";
 }
@@ -59,7 +62,8 @@ export interface RuntimeValidationIssue {
     | "render_contract"
     | "schema_contract"
     | "compile_transform"
-    | "module_parse";
+    | "module_parse"
+    | "prototype_contract";
   code: string;
   message: string;
   instruction: string;
@@ -67,10 +71,22 @@ export interface RuntimeValidationIssue {
   importName?: string;
 }
 
+export type PrototypeGateDecision =
+  | "accept_prototype"
+  | "repair_prototype"
+  | "upgrade_to_high_fidelity";
+
+export interface PrototypeGateResult {
+  decision: PrototypeGateDecision;
+  reasonCodes: string[];
+  summary: string;
+}
+
 export interface RuntimeValidationResult {
   ok: boolean;
   issues: RuntimeValidationIssue[];
   pageIds: string[];
+  prototypeGate?: PrototypeGateResult;
 }
 
 export interface DiffSummary {
@@ -335,10 +351,14 @@ export interface PageCreateInput {
   name: string;
   pageId?: string;
   routeKey?: string;
+  runtimeType?: DemoPageRuntimeType;
   parentId?: string | null;
   order?: number;
   code?: string;
   schema?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
   dryRun?: boolean;
 }
 
@@ -351,6 +371,28 @@ export interface PageUpdateInput {
   routeKey?: string;
   parentId?: string | null;
   order?: number;
+  dryRun?: boolean;
+}
+
+export interface PageUpdatePrototypeInput {
+  editId: string;
+  pageId: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
+  dryRun?: boolean;
+}
+
+export interface PageSwitchRuntimeInput {
+  editId: string;
+  pageId: string;
+  targetRuntimeType: DemoPageRuntimeType;
+  code?: string;
+  schema?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
+  reason?: string;
   dryRun?: boolean;
 }
 

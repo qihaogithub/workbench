@@ -17,6 +17,10 @@ import {
   type VisualConfigCandidate,
   type VisualConfigureResult,
 } from "@/lib/visual-configurator";
+import type {
+  PrototypeVisualConfigTarget,
+  PrototypeVisualConfigResult,
+} from "@/lib/prototype-visual-editor";
 import { invalidateCompileCache } from "../../../../../../components/demo";
 
 function createVisualId(prefix: string): string {
@@ -64,6 +68,7 @@ export interface VisualConfigMark {
   changeId: string;
   nodeId: string;
   domPath: string;
+  kind: VisualPropertyChangeKind;
   property: string;
   label: string;
   fieldTitle: string;
@@ -150,6 +155,7 @@ function getConfigMarkSignature(mark: VisualConfigMark): string {
     nodeId: mark.nodeId,
     domPath: mark.domPath,
     property: mark.property,
+    kind: mark.kind,
     label: mark.label,
     fieldTitle: mark.fieldTitle,
     fieldKey: mark.fieldKey,
@@ -210,6 +216,42 @@ function mergeSubmittedConfigMarks(
   return Array.from(next.values());
 }
 
+function createPrototypeConfigTargetFromMark(
+  mark: VisualConfigMark,
+): PrototypeVisualConfigTarget | null {
+  if (mark.kind === "text" || mark.property === "textContent") {
+    return {
+      kind: "text",
+      fieldKey: mark.fieldKey.trim(),
+      title: mark.fieldTitle.trim(),
+      defaultValue: mark.defaultValue,
+    };
+  }
+  if (mark.kind === "attribute" && mark.property === "src") {
+    return {
+      kind: "image",
+      fieldKey: mark.fieldKey.trim(),
+      title: mark.fieldTitle.trim(),
+      defaultValue: mark.defaultValue,
+    };
+  }
+  if (
+    mark.kind === "style" &&
+    (mark.property === "color" ||
+      mark.property === "backgroundColor" ||
+      mark.property === "borderColor")
+  ) {
+    return {
+      kind: "color",
+      fieldKey: mark.fieldKey.trim(),
+      title: mark.fieldTitle.trim(),
+      defaultValue: mark.defaultValue,
+      colorProperty: mark.property,
+    };
+  }
+  return null;
+}
+
 export interface ApplyDemoSnapshotFn {
   (params: {
     code?: string;
@@ -232,6 +274,17 @@ export interface UseVisualEditStateParams {
   >;
   setTabValue: React.Dispatch<React.SetStateAction<string>>;
   setTriggerAutoSend: React.Dispatch<React.SetStateAction<string | null>>;
+  isPrototypeVisualPage?: () => boolean;
+  applyPrototypeVisualPropertyChange?: (
+    node: VisualNodeInfo,
+    property: string,
+    value: string,
+    kind: VisualPropertyChangeKind,
+  ) => boolean;
+  applyPrototypeVisualConfig?: (params: {
+    node: VisualNodeInfo;
+    target: PrototypeVisualConfigTarget;
+  }) => PrototypeVisualConfigResult;
 }
 
 export function useVisualEditState(params: UseVisualEditStateParams) {
@@ -247,6 +300,9 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     setConfigDataMap,
     setTabValue,
     setTriggerAutoSend,
+    isPrototypeVisualPage,
+    applyPrototypeVisualPropertyChange,
+    applyPrototypeVisualConfig,
   } = params;
   const { toast } = useToast();
 
@@ -400,8 +456,11 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         next[index] = change;
         return next;
       });
+      if (isPrototypeVisualPage?.()) {
+        applyPrototypeVisualPropertyChange?.(node, property, value, kind);
+      }
     },
-    [],
+    [applyPrototypeVisualPropertyChange, isPrototypeVisualPage],
   );
 
   const handleRestoreVisualProperty = useCallback((changeId: string) => {
@@ -443,6 +502,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         changeId,
         nodeId: node.nodeId,
         domPath: node.domPath,
+        kind,
         property,
         label,
         fieldTitle,
@@ -500,6 +560,78 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
       }
       if (changes.length === 0 && configMarks.length === 0 && !instructionForPrompt) {
         toast({ title: "请先修改属性或填写补充说明" });
+        return;
+      }
+
+      if (isPrototypeVisualPage?.()) {
+        if (instructionForPrompt && configMarks.length === 0) {
+          toast({
+            title: "原型页属性已直接写回",
+            description: "补充说明仍需要切换到 AI 对话处理。",
+          });
+          return;
+        }
+
+        for (const mark of configMarks) {
+          if (mark.scope !== "page") {
+            toast({
+              title: "原型页暂只支持页面级配置项",
+              description: "请把配置项范围切换为页面级后再应用。",
+              variant: "destructive",
+            });
+            return;
+          }
+          const target = createPrototypeConfigTargetFromMark(mark);
+          if (!target) {
+            toast({
+              title: "该属性暂不能直接配置化",
+              description: "原型页 MVP 先支持文本、图片和颜色配置项。",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (!applyPrototypeVisualConfig) {
+            toast({
+              title: "原型页配置写回入口不可用",
+              variant: "destructive",
+            });
+            return;
+          }
+          const result = applyPrototypeVisualConfig({
+            node: {
+              nodeId: mark.nodeId,
+              domPath: mark.domPath,
+              tagName: "div",
+              rect: { x: 0, y: 0, width: 0, height: 0 },
+              editCapabilities: [],
+            },
+            target,
+          });
+          if (!result.ok) {
+            toast({
+              title: "配置项写回失败",
+              description: result.error,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+
+        setVisualPropertySubmission({
+          status: "sent",
+          submittedAt: Date.now(),
+          changes: singleChange
+            ? mergeSubmittedChanges(visualPropertySubmission.changes, changes)
+            : visualPropertyChanges,
+          configMarks: visualConfigMarks,
+          instruction: "",
+          prompt: "",
+          error: null,
+        });
+        setVisualAiInstruction("");
+        toast({
+          title: configMarks.length > 0 ? "配置项已应用到原型页" : "属性已应用到原型页",
+        });
         return;
       }
 
@@ -572,6 +704,8 @@ ${instructionForPrompt || "无"}
     },
     [
       activeDemoIdRef,
+      applyPrototypeVisualConfig,
+      isPrototypeVisualPage,
       selectedVisualNode,
       setTabValue,
       setTriggerAutoSend,
@@ -655,6 +789,37 @@ ${instructionForPrompt || "无"}
     setVisualConfigApplying(true);
     setVisualConfigError(null);
     try {
+      if (isPrototypeVisualPage?.() && applyPrototypeVisualConfig) {
+        const data = applyPrototypeVisualConfig({
+          node: visualConfigNode,
+          target: {
+            kind: selectedVisualConfigCandidate.kind,
+            fieldKey: visualConfigFieldKey.trim(),
+            title: visualConfigTitle.trim(),
+            defaultValue: visualConfigDefaultValue,
+            colorProperty: selectedVisualConfigCandidate.colorProperty,
+          },
+        });
+        if (!data.ok) {
+          throw new Error(data.error);
+        }
+        setConfigDataMap((prev) => {
+          const pageId = activeDemoIdRef.current;
+          return {
+            ...prev,
+            [pageId]: {
+              ...(prev[pageId] ?? {}),
+              ...data.configPatch,
+            },
+          };
+        });
+        markWorkspaceChanged();
+        setVisualConfigNode(null);
+        setSelectedVisualNode(null);
+        toast({ title: "配置项已添加" });
+        return;
+      }
+
       const response = await fetch("/api/visual-configure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -719,8 +884,10 @@ ${instructionForPrompt || "无"}
     }
   }, [
     applyDemoSnapshot,
+    applyPrototypeVisualConfig,
     codeRef,
     schemaRef,
+    isPrototypeVisualPage,
     markWorkspaceChanged,
     projectConfigSchema,
     selectedVisualConfigCandidate,

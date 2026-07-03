@@ -14,10 +14,12 @@ import type {
   DemoFiles,
   DemoFolderMeta,
   DemoMeta,
+  DemoPageRuntimeType,
   DemoPageMeta,
   AppGraph,
   PageVersionInfo,
   Project,
+  PrototypePageMeta,
   ProjectTemplateMeta,
   VersionInfo,
   VersionHistoryEntryType,
@@ -46,6 +48,8 @@ import type {
   PageVersionDetail,
   PageVersionHistory,
   PageRestoreResult,
+  PageSwitchRuntimeInput,
+  PageUpdatePrototypeInput,
   ProjectPackageExport,
   PageUpdateInput,
   PreviewPlan,
@@ -56,6 +60,7 @@ import type {
   ProjectDetail,
   ProjectSummary,
   PublishStatus,
+  PrototypeGateDecision,
   RuntimeValidationIssue,
   RuntimeValidationResult,
   TemplateHealthReport,
@@ -110,6 +115,42 @@ const DEFAULT_DEMO_SCHEMA = JSON.stringify(
   2,
 );
 
+const DEFAULT_PROTOTYPE_HTML = `<main class="prototype-page">
+  <section class="prototype-hero">
+    <p class="eyebrow">Prototype</p>
+    <h1>HTML/CSS 原型页</h1>
+    <p>用于快速表达页面结构和信息层级。</p>
+  </section>
+</main>`;
+
+const DEFAULT_PROTOTYPE_CSS = `.prototype-page {
+  min-height: 100%;
+  padding: 32px;
+  background: #f8fafc;
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.prototype-hero {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  padding: 28px;
+}
+.eyebrow {
+  color: #2563eb;
+  font-size: 12px;
+  text-transform: uppercase;
+}`;
+
+const DEFAULT_PROTOTYPE_META: PrototypePageMeta = {
+  width: 390,
+  height: 844,
+  generatedBy: "project-core",
+};
+
+const MAX_PROTOTYPE_HTML_LENGTH = 120_000;
+const MAX_PROTOTYPE_CSS_LENGTH = 80_000;
+const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
+
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 const APP_GRAPH_FILENAME = "app.graph.json";
 const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
@@ -144,6 +185,12 @@ function safeId(id: string, label: string): string {
 
 function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function resolvePageRuntimeType(page?: Pick<DemoPageMeta, "runtimeType"> | null): DemoPageRuntimeType {
+  return page?.runtimeType === "prototype-html-css"
+    ? "prototype-html-css"
+    : "high-fidelity-react";
 }
 
 function readJsonFile<T>(filePath: string): T | null {
@@ -1183,6 +1230,9 @@ export class ProjectAdminService {
     if (tree.pages.some((page) => page.id === pageId)) {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
+    const runtimeType = input.runtimeType === "prototype-html-css"
+      ? "prototype-html-css"
+      : "high-fidelity-react";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -1190,12 +1240,21 @@ export class ProjectAdminService {
         input.routeKey ?? input.name,
         new Set(tree.pages.map((page) => page.routeKey).filter(Boolean) as string[]),
       ),
+      runtimeType: runtimeType === "prototype-html-css" ? runtimeType : undefined,
       order: input.order ?? tree.pages.length,
       parentId,
     };
     if (input.dryRun) {
-      const files = { code: input.code ?? DEFAULT_DEMO_CODE, schema: input.schema ?? DEFAULT_DEMO_SCHEMA };
-      const runtimeValidation = this.validatePageRuntimeSource(pageId, files.code);
+      const files: DemoFiles = runtimeType === "prototype-html-css"
+        ? {
+            code: "",
+            schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
+            prototypeHtml: input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+            prototypeCss: input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+            prototypeMeta: input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+          }
+        : { code: input.code ?? DEFAULT_DEMO_CODE, schema: input.schema ?? DEFAULT_DEMO_SCHEMA };
+      const runtimeValidation = this.validatePageFilesRuntime(pageId, runtimeType, files);
       return ok(
         { meta, files },
         {
@@ -1206,7 +1265,13 @@ export class ProjectAdminService {
     }
     const demoDir = this.pageDir(workspacePath, pageId);
     ensureDir(demoDir);
-    fs.writeFileSync(path.join(demoDir, "index.tsx"), input.code ?? DEFAULT_DEMO_CODE, "utf-8");
+    if (runtimeType === "prototype-html-css") {
+      fs.writeFileSync(path.join(demoDir, "prototype.html"), input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
+      fs.writeFileSync(path.join(demoDir, "prototype.css"), input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
+      writeJsonFile(path.join(demoDir, "prototype.meta.json"), input.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+    } else {
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), input.code ?? DEFAULT_DEMO_CODE, "utf-8");
+    }
     fs.writeFileSync(
       path.join(demoDir, "config.schema.json"),
       input.schema ?? DEFAULT_DEMO_SCHEMA,
@@ -1237,8 +1302,12 @@ export class ProjectAdminService {
       editId,
       name: name ?? `${page.data.meta.name} 副本`,
       parentId: page.data.meta.parentId,
+      runtimeType: resolvePageRuntimeType(page.data.meta),
       code: page.data.files.code,
       schema: page.data.files.schema,
+      prototypeHtml: page.data.files.prototypeHtml,
+      prototypeCss: page.data.files.prototypeCss,
+      prototypeMeta: page.data.files.prototypeMeta,
     }, actor);
   }
 
@@ -1304,8 +1373,177 @@ export class ProjectAdminService {
       schema: input.schema ?? "",
     };
     const runtimeValidation = input.code !== undefined
-      ? this.validatePageRuntimeSource(input.pageId, files.code)
+      ? this.validatePageFilesRuntime(input.pageId, resolvePageRuntimeType(nextMeta), files)
       : undefined;
+    return ok(
+      { meta: nextMeta, files },
+      { auditId, diffSummary: diff, validation, runtimeValidation },
+    );
+  }
+
+  updatePrototypePage(
+    input: PageUpdatePrototypeInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageDetail> {
+    const transaction = this.requireEditable(input.editId);
+    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    const workspacePath = transaction.data.workspacePath;
+    const tree = this.readWorkspaceTree(workspacePath);
+    const page = tree.pages.find((item) => item.id === input.pageId);
+    if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    if (resolvePageRuntimeType(page) !== "prototype-html-css") {
+      return fail("INVALID_REQUEST", "当前页面不是 HTML/CSS 原型页");
+    }
+    const currentFiles = this.readPageFiles(workspacePath, input.pageId);
+    if (!currentFiles) return fail("FILE_READ_ERROR", "页面文件不存在");
+    const nextFiles: DemoFiles = {
+      ...currentFiles,
+      prototypeHtml: input.prototypeHtml ?? currentFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+      prototypeCss: input.prototypeCss ?? currentFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+      prototypeMeta: input.prototypeMeta ?? currentFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+    };
+    const runtimeValidation = this.validatePageFilesRuntime(
+      input.pageId,
+      "prototype-html-css",
+      nextFiles,
+    );
+    if (!runtimeValidation.ok) {
+      return fail("VALIDATION_BLOCKED", "原型页校验失败", {
+        validation: this.runtimeToValidationResult(runtimeValidation),
+        runtimeValidation,
+      });
+    }
+    const diff: DiffSummary = { updated: [] };
+    if (input.prototypeHtml !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeHtml`);
+    if (input.prototypeCss !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeCss`);
+    if (input.prototypeMeta !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
+
+    if (!input.dryRun) {
+      const demoDir = this.pageDir(workspacePath, input.pageId);
+      ensureDir(demoDir);
+      if (input.prototypeHtml !== undefined) {
+        fs.writeFileSync(path.join(demoDir, "prototype.html"), input.prototypeHtml, "utf-8");
+      }
+      if (input.prototypeCss !== undefined) {
+        fs.writeFileSync(path.join(demoDir, "prototype.css"), input.prototypeCss, "utf-8");
+      }
+      if (input.prototypeMeta !== undefined) {
+        writeJsonFile(path.join(demoDir, "prototype.meta.json"), input.prototypeMeta);
+      }
+    }
+
+    const files = input.dryRun
+      ? nextFiles
+      : this.readPageFiles(workspacePath, input.pageId) ?? nextFiles;
+    const auditId = input.dryRun
+      ? undefined
+      : this.audit("page_update_prototype", actor, "L1", true, {
+          projectId: transaction.data.projectId,
+          resourceId: input.pageId,
+          diffSummary: diff,
+        });
+    return ok(
+      { meta: page, files },
+      { auditId, diffSummary: diff, runtimeValidation },
+    );
+  }
+
+  switchPageRuntime(
+    input: PageSwitchRuntimeInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageDetail> {
+    const transaction = this.requireEditable(input.editId);
+    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    const workspacePath = transaction.data.workspacePath;
+    const tree = this.readWorkspaceTree(workspacePath);
+    const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
+    if (pageIndex === -1) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const targetRuntimeType = input.targetRuntimeType === "prototype-html-css"
+      ? "prototype-html-css"
+      : input.targetRuntimeType === "high-fidelity-react"
+        ? "high-fidelity-react"
+        : undefined;
+    if (!targetRuntimeType) {
+      return fail("INVALID_REQUEST", "目标页面类型不合法");
+    }
+
+    const current = tree.pages[pageIndex];
+    const currentRuntimeType = resolvePageRuntimeType(current);
+    const currentFiles = this.readPageFiles(workspacePath, input.pageId);
+    if (!currentFiles) return fail("FILE_READ_ERROR", "页面文件不存在");
+
+    const nextFiles: DemoFiles = {
+      ...currentFiles,
+      code: input.code ?? currentFiles.code ?? DEFAULT_DEMO_CODE,
+      schema: input.schema ?? currentFiles.schema ?? DEFAULT_DEMO_SCHEMA,
+      prototypeHtml: input.prototypeHtml ?? currentFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+      prototypeCss: input.prototypeCss ?? currentFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+      prototypeMeta: input.prototypeMeta ?? currentFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+    };
+    const validation = this.validateSchemaPair(
+      this.readProjectConfig(workspacePath),
+      nextFiles.schema,
+    );
+    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+
+    const runtimeValidation = this.validatePageFilesRuntime(
+      input.pageId,
+      targetRuntimeType,
+      nextFiles,
+    );
+    if (!runtimeValidation.ok) {
+      return fail("VALIDATION_BLOCKED", "页面类型切换校验失败，已保留原页面内容", {
+        validation: this.runtimeToValidationResult(runtimeValidation),
+        runtimeValidation,
+      });
+    }
+
+    const nextMeta: DemoPageMeta = {
+      ...current,
+      runtimeType: targetRuntimeType === "prototype-html-css" ? "prototype-html-css" : undefined,
+    };
+    const diff: DiffSummary = {
+      updated: [
+        `page:${input.pageId}:runtimeType:${currentRuntimeType}->${targetRuntimeType}`,
+      ],
+      notes: input.reason ? [input.reason] : undefined,
+    };
+    if (targetRuntimeType === "prototype-html-css") {
+      diff.updated?.push(`page:${input.pageId}:prototypeHtml`, `page:${input.pageId}:prototypeCss`);
+      if (input.prototypeMeta !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
+    } else {
+      diff.updated?.push(`page:${input.pageId}:code`);
+    }
+    if (input.schema !== undefined) diff.updated?.push(`page:${input.pageId}:schema`);
+
+    if (!input.dryRun) {
+      const demoDir = this.pageDir(workspacePath, input.pageId);
+      ensureDir(demoDir);
+      if (targetRuntimeType === "prototype-html-css") {
+        fs.writeFileSync(path.join(demoDir, "prototype.html"), nextFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
+        fs.writeFileSync(path.join(demoDir, "prototype.css"), nextFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
+        writeJsonFile(path.join(demoDir, "prototype.meta.json"), nextFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+      } else {
+        fs.writeFileSync(path.join(demoDir, "index.tsx"), nextFiles.code || DEFAULT_DEMO_CODE, "utf-8");
+      }
+      if (input.schema !== undefined) {
+        fs.writeFileSync(path.join(demoDir, "config.schema.json"), nextFiles.schema, "utf-8");
+      }
+      const pages = [...tree.pages];
+      pages[pageIndex] = nextMeta;
+      this.writeWorkspaceTree(workspacePath, { ...tree, pages });
+    }
+
+    const files = input.dryRun
+      ? nextFiles
+      : this.readPageFiles(workspacePath, input.pageId) ?? nextFiles;
+    const auditId = input.dryRun
+      ? undefined
+      : this.audit("page_switch_runtime", actor, "L2", true, {
+          projectId: transaction.data.projectId,
+          resourceId: input.pageId,
+          diffSummary: diff,
+        });
     return ok(
       { meta: nextMeta, files },
       { auditId, diffSummary: diff, validation, runtimeValidation },
@@ -1346,7 +1584,11 @@ export class ProjectAdminService {
 
     const validation = this.validateSchemaPair(this.readProjectConfig(sourceWorkspacePath), files.schema);
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
-    const runtimeValidation = this.validatePageRuntimeSource(input.pageId, files.code);
+    const runtimeValidation = this.validatePageFilesRuntime(
+      input.pageId,
+      resolvePageRuntimeType(page),
+      files,
+    );
     if (!runtimeValidation.ok) {
       return fail("VALIDATION_BLOCKED", "页面运行契约校验失败，不能创建版本", {
         validation: this.runtimeToValidationResult(runtimeValidation),
@@ -1359,7 +1601,13 @@ export class ProjectAdminService {
     const snapshotPath = path.join(this.snapshotsDir, input.projectId, "pages", input.pageId, versionId);
     fs.rmSync(snapshotPath, { recursive: true, force: true });
     ensureDir(snapshotPath);
-    fs.writeFileSync(path.join(snapshotPath, "index.tsx"), files.code, "utf-8");
+    if (resolvePageRuntimeType(page) === "prototype-html-css") {
+      fs.writeFileSync(path.join(snapshotPath, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
+      fs.writeFileSync(path.join(snapshotPath, "prototype.css"), files.prototypeCss ?? "", "utf-8");
+      writeJsonFile(path.join(snapshotPath, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+    } else {
+      fs.writeFileSync(path.join(snapshotPath, "index.tsx"), files.code, "utf-8");
+    }
     fs.writeFileSync(path.join(snapshotPath, "config.schema.json"), files.schema, "utf-8");
 
     const version: PageVersionInfo = {
@@ -1514,7 +1762,13 @@ export class ProjectAdminService {
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "恢复版本的页面 Schema 校验失败", { validation });
 
     const demoDir = this.pageDir(workspacePath, pageId);
-    fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+    if (resolvePageRuntimeType(page) === "prototype-html-css") {
+      fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
+      writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+    } else {
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+    }
     fs.writeFileSync(path.join(demoDir, "config.schema.json"), files.schema, "utf-8");
 
     const restoredAt = Date.now();
@@ -1917,6 +2171,18 @@ export class ProjectAdminService {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     return ok(this.validateWorkspaceRuntime(transaction.workspacePath, pageId));
+  }
+
+  validateWorkspacePathRuntime(workspacePath: string, pageId?: string): ProjectAdminResult<RuntimeValidationResult> {
+    return ok(this.validateWorkspaceRuntime(workspacePath, pageId));
+  }
+
+  validateDemoPageFilesRuntime(
+    pageId: string,
+    runtimeType: DemoPageRuntimeType,
+    files: DemoFiles,
+  ): RuntimeValidationResult {
+    return this.validatePageFilesRuntime(pageId, runtimeType, files);
   }
 
   validateProjectRuntime(
@@ -2467,11 +2733,24 @@ export class ProjectAdminService {
     const demoDir = this.pageDir(workspacePath, pageId);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
-    if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
-    return {
-      code: fs.readFileSync(codePath, "utf-8"),
+    const prototypeHtmlPath = path.join(demoDir, "prototype.html");
+    const prototypeCssPath = path.join(demoDir, "prototype.css");
+    const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+    if (!fs.existsSync(schemaPath)) return null;
+    const files: DemoFiles = {
+      code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
       schema: fs.readFileSync(schemaPath, "utf-8"),
     };
+    if (fs.existsSync(prototypeHtmlPath)) {
+      files.prototypeHtml = fs.readFileSync(prototypeHtmlPath, "utf-8");
+    }
+    if (fs.existsSync(prototypeCssPath)) {
+      files.prototypeCss = fs.readFileSync(prototypeCssPath, "utf-8");
+    }
+    if (fs.existsSync(prototypeMetaPath)) {
+      files.prototypeMeta = readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined;
+    }
+    return files;
   }
 
   private readPageVersionFiles(project: Project, pageId: string, versionId: string): DemoFiles | null {
@@ -2479,10 +2758,18 @@ export class ProjectAdminService {
     if (!version || !fs.existsSync(version.snapshotPath)) return null;
     const codePath = path.join(version.snapshotPath, "index.tsx");
     const schemaPath = path.join(version.snapshotPath, "config.schema.json");
-    if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+    const prototypeHtmlPath = path.join(version.snapshotPath, "prototype.html");
+    const prototypeCssPath = path.join(version.snapshotPath, "prototype.css");
+    const prototypeMetaPath = path.join(version.snapshotPath, "prototype.meta.json");
+    if (!fs.existsSync(schemaPath)) return null;
     return {
-      code: fs.readFileSync(codePath, "utf-8"),
+      code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
       schema: fs.readFileSync(schemaPath, "utf-8"),
+      prototypeHtml: fs.existsSync(prototypeHtmlPath) ? fs.readFileSync(prototypeHtmlPath, "utf-8") : undefined,
+      prototypeCss: fs.existsSync(prototypeCssPath) ? fs.readFileSync(prototypeCssPath, "utf-8") : undefined,
+      prototypeMeta: fs.existsSync(prototypeMetaPath)
+        ? readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined
+        : undefined,
     };
   }
 
@@ -2626,7 +2913,7 @@ export class ProjectAdminService {
     );
     const pageIds = new Set<string>();
     for (const file of changedFiles) {
-      const match = file.match(/^demos\/([^/]+)\/index\.tsx$/u);
+      const match = file.match(/^demos\/([^/]+)\/(?:index\.tsx|prototype\.(?:html|css)|prototype\.meta\.json)$/u);
       if (match?.[1]) pageIds.add(match[1]);
     }
     return pageIds;
@@ -2642,6 +2929,7 @@ export class ProjectAdminService {
       : tree.pages;
     const issues: RuntimeValidationIssue[] = [];
     const pageIds: string[] = [];
+    let prototypeGate: RuntimeValidationResult["prototypeGate"];
 
     if (pageId && pages.length === 0) {
       issues.push({
@@ -2669,10 +2957,164 @@ export class ProjectAdminService {
         });
         continue;
       }
-      issues.push(...this.validatePageRuntimeSource(page.id, files.code).issues);
+      const pageValidation = this.validatePageFilesRuntime(
+        page.id,
+        resolvePageRuntimeType(page),
+        files,
+      );
+      issues.push(...pageValidation.issues);
+      if (pageId && pageValidation.prototypeGate) {
+        prototypeGate = pageValidation.prototypeGate;
+      }
     }
 
-    return { ok: issues.every((issue) => issue.severity !== "error"), issues, pageIds };
+    return {
+      ok: issues.every((issue) => issue.severity !== "error"),
+      issues,
+      pageIds,
+      prototypeGate,
+    };
+  }
+
+  private validatePageFilesRuntime(
+    pageId: string,
+    runtimeType: DemoPageRuntimeType,
+    files: DemoFiles,
+  ): RuntimeValidationResult {
+    if (runtimeType === "prototype-html-css") {
+      return this.validatePrototypePageSource(
+        pageId,
+        files.prototypeHtml ?? "",
+        files.prototypeCss ?? "",
+      );
+    }
+    return this.validatePageRuntimeSource(pageId, files.code);
+  }
+
+  private validatePrototypePageSource(
+    pageId: string,
+    html: string,
+    css: string,
+  ): RuntimeValidationResult {
+    const issues: RuntimeValidationIssue[] = [];
+    const repairReasonCodes: string[] = [];
+    const upgradeReasonCodes: string[] = [];
+    const addIssue = (
+      issue: Omit<RuntimeValidationIssue, "pageId" | "severity" | "stage">,
+      gateDecision: Exclude<PrototypeGateDecision, "accept_prototype">,
+    ) => {
+      issues.push({
+        pageId,
+        severity: "error",
+        stage: "prototype_contract",
+        ...issue,
+      });
+      if (gateDecision === "upgrade_to_high_fidelity") {
+        upgradeReasonCodes.push(issue.code);
+      } else {
+        repairReasonCodes.push(issue.code);
+      }
+    };
+
+    if (!html.trim()) {
+      addIssue({
+        code: "PROTOTYPE_HTML_EMPTY",
+        message: "原型页 HTML 不能为空",
+        instruction: "请提供可渲染的 prototype.html 内容。",
+      }, "repair_prototype");
+    }
+    if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
+      addIssue({
+        code: "PROTOTYPE_HTML_TOO_LARGE",
+        message: "原型页 HTML 超过 MVP 限制",
+        instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
+      }, "repair_prototype");
+    }
+    if (css.length > MAX_PROTOTYPE_CSS_LENGTH) {
+      addIssue({
+        code: "PROTOTYPE_CSS_TOO_LARGE",
+        message: "原型页 CSS 超过 MVP 限制",
+        instruction: "请压缩 CSS，移除不必要的样式规则。",
+      }, "repair_prototype");
+    }
+    if (/<\s*script\b/i.test(html)) {
+      addIssue({
+        code: "PROTOTYPE_SCRIPT_FORBIDDEN",
+        message: "原型页不允许包含 script 标签",
+        instruction: "页面需要执行脚本时应升级为高保真页；否则请移除 script 标签。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/\son[a-z]+\s*=/i.test(html)) {
+      addIssue({
+        code: "PROTOTYPE_INLINE_EVENT_FORBIDDEN",
+        message: "原型页不允许包含内联事件属性",
+        instruction: "页面需要真实事件处理时应升级为高保真页；否则请移除 onclick、onload 等内联事件属性。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/javascript\s*:/i.test(html) || /javascript\s*:/i.test(css)) {
+      addIssue({
+        code: "PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN",
+        message: "原型页不允许包含 javascript: URL",
+        instruction: "页面需要执行 JavaScript URL 时应升级为高保真页；否则请将链接改为普通 URL 或占位链接。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/<\s*(iframe|embed|object)\b/i.test(html)) {
+      addIssue({
+        code: "PROTOTYPE_EMBED_FORBIDDEN",
+        message: "原型页不允许直接内嵌 iframe、embed 或 object",
+        instruction: "需要嵌入第三方运行时内容时应升级为高保真页。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/<\s*form\b[^>]*\saction\s*=/i.test(html)) {
+      addIssue({
+        code: "PROTOTYPE_FORM_ACTION_FORBIDDEN",
+        message: "原型页不允许包含会提交的表单 action",
+        instruction: "需要真实表单提交时应升级为高保真页；静态表单请移除 action。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/\bposition\s*:\s*fixed\b/i.test(css)) {
+      addIssue({
+        code: "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
+        message: "原型页不允许使用 position: fixed",
+        instruction: "需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。",
+      }, "upgrade_to_high_fidelity");
+    }
+    if (/@import\b/i.test(css)) {
+      addIssue({
+        code: "PROTOTYPE_CSS_IMPORT_FORBIDDEN",
+        message: "原型页不允许使用 CSS @import",
+        instruction: "请移除远程样式导入，把必要样式内联到 prototype.css。",
+      }, "repair_prototype");
+    }
+    if (PROTOTYPE_GLOBAL_SELECTOR_RE.test(css)) {
+      addIssue({
+        code: "PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN",
+        message: "原型页 CSS 不允许直接选择 html、body 或 :root",
+        instruction: "请把全局选择器改为原型页根节点内的局部 class 选择器。",
+      }, "repair_prototype");
+    }
+
+    const decision: PrototypeGateDecision = upgradeReasonCodes.length > 0
+      ? "upgrade_to_high_fidelity"
+      : issues.length > 0
+        ? "repair_prototype"
+        : "accept_prototype";
+    const reasonCodes = Array.from(new Set([
+      ...upgradeReasonCodes,
+      ...repairReasonCodes,
+    ]));
+    const summary = decision === "accept_prototype"
+      ? "HTML/CSS 原型页可安全内嵌渲染。"
+      : decision === "repair_prototype"
+        ? "HTML/CSS 原型页存在可自动修复的问题，修复后可继续按原型页保存。"
+        : "页面触碰运行时隔离红线，应升级为高保真页。";
+
+    return {
+      ok: issues.length === 0,
+      issues,
+      pageIds: [pageId],
+      prototypeGate: { decision, reasonCodes, summary },
+    };
   }
 
   private validatePageRuntimeSource(pageId: string, code: string): RuntimeValidationResult {
@@ -2759,12 +3201,13 @@ export class ProjectAdminService {
 
   private validatePageFiles(workspacePath: string, pageId: string, projectSchema?: string | null): ValidationResult {
     const files = this.readPageFiles(workspacePath, pageId);
+    const page = this.findPage(workspacePath, pageId);
     const issues: ValidationResult["issues"] = [];
     if (!files) {
       issues.push({ code: "FILE_READ_ERROR", message: `页面文件不存在: ${pageId}`, resourceId: pageId, severity: "blocking" });
       return { ok: false, issues };
     }
-    if (!files.code.includes("export default")) {
+    if (resolvePageRuntimeType(page) !== "prototype-html-css" && !files.code.includes("export default")) {
       issues.push({ code: "NO_DEFAULT_EXPORT", message: `页面缺少 default export: ${pageId}`, resourceId: pageId, severity: "blocking" });
     }
     issues.push(...this.validateSchemaPair(projectSchema ?? null, files.schema).issues);

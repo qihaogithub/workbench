@@ -6,7 +6,10 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 import { resolveVirtualKnowledgeFile } from './virtual-knowledge';
-import { validatePreviewFileWrite } from './preview-validation';
+import {
+  formatRuntimeValidationInstruction,
+  validatePreviewFileWrite,
+} from './preview-validation';
 
 const ReadFileParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -92,9 +95,7 @@ export function createWriteFileTool(config: AgentConfig): AgentTool<typeof Write
         await fs.promises.writeFile(filePath, args.content, 'utf-8');
         const runtimeValidation = validatePreviewFileWrite(args.path, args.content);
         logger.debug({ path: args.path }, 'File written successfully');
-        const validationText = runtimeValidation && !runtimeValidation.ok
-          ? `\n\nPreview validation failed after write. Continue fixing this file before ending the task:\n${JSON.stringify(runtimeValidation, null, 2)}`
-          : '';
+        const validationText = formatRuntimeValidationInstruction(runtimeValidation);
         return {
           content: [{ type: 'text', text: `Successfully wrote to ${args.path}${validationText}` }],
           details: { path: args.path, size: args.content.length, runtimeValidation },

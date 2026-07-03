@@ -170,4 +170,32 @@ describe("computeCanvasRenderModes", () => {
       "page_4",
     ]);
   });
+
+  it("HTML/CSS 原型页不占用 iframe 预算", () => {
+    const pages = [
+      { ...makePage("prototype_1"), runtimeType: "prototype-html-css" as const },
+      { ...makePage("prototype_2"), runtimeType: "prototype-html-css" as const },
+      ...Array.from({ length: 6 }, (_, index) => makePage(`react_${index}`)),
+    ];
+    const layouts = Object.fromEntries(
+      pages.map((page, index) => [page.id, makeLayout(index)]),
+    );
+
+    const result = computeCanvasRenderModes({
+      pages,
+      layouts,
+      visiblePageIds: new Set(pages.map((page) => page.id)),
+      viewport: { x: 0, y: 0, zoom: 1 },
+      containerWidth: 900,
+      containerHeight: 300,
+      recentIframeAccess: new Map(),
+      maxActiveIframes: 2,
+      maxSleepingIframes: 0,
+    });
+
+    expect(result.modes.prototype_1).toBe("prototype");
+    expect(result.modes.prototype_2).toBe("prototype");
+    expect(result.activePageIds.every((pageId) => pageId.startsWith("react_"))).toBe(true);
+    expect(result.activePageIds).toHaveLength(2);
+  });
 });

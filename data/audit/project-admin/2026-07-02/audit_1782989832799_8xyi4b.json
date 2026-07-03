@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782989832799_8xyi4b",
+  "at": 1782989832799,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_create",
+  "projectId": "proj_1782989831516_wammag",
+  "resourceId": "high_perf_02",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page:high_perf_02"
+    ]
+  }
+}

@@ -1,0 +1,120 @@
+/* 手机 - 副本 原型样式 */
+/* 与 React 版保持一致的视觉层级和布局 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* 手机容器 */
+.phone-container {
+  position: relative;
+  width: 375px;
+  max-width: 100%;
+  height: 100vh;
+  min-height: 812px;
+  overflow: hidden;
+  background-color: #ffffff;
+  margin: 0 auto;
+}
+
+/* 顶部吸顶内容 */
+.top-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  width: 375px;
+  display: block;
+}
+
+/* 可滚动内容区域 */
+.scroll-area {
+  position: absolute;
+  left: 0;
+  top: 141px;
+  width: 375px;
+  height: 585px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: #ffffff;
+}
+
+/* 隐藏滚动条 - 兼容各浏览器 */
+.scroll-area::-webkit-scrollbar {
+  display: none;
+}
+.scroll-area {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 内容包装器 */
+.content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 章节标题图片 */
+.section-title {
+  width: 344px;
+  display: block;
+}
+
+/* 手机广告图 */
+.ad-image {
+  width: 344px;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+/* 轮播广告图容器 */
+.carousel-container {
+  width: 344px;
+  height: 180px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background-color: #d9d9d9;
+}
+
+/* 轮播广告图 */
+.carousel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 底部内容图片 */
+.bottom-content {
+  width: 375px;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* 底部标签栏 */
+.bottom-tab-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 375px;
+  height: 86px;
+  display: block;
+}

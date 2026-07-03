@@ -16,7 +16,7 @@ covers:
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-01
+> 更新日期：2026-07-02
 
 ## 技术定位
 
@@ -75,6 +75,10 @@ ow project validate-runtime <projectId> --json
 `edit validate` 会全量扫描事务工作区页面，但只把本事务新增或修改过的页面 runtime error 视为 blocking。历史未改页面的 contract 问题降级为 warning，避免一次无关编辑被旧项目债务阻断，同时让代理能看到需要后续治理的页面。
 
 runtime issue 的 JSON 字段包括 `pageId`、`severity`、`stage`、`code`、`message` 和 `instruction`。`severity: "error"` 表示显式 runtime 校验失败；映射到 `edit validate` 时，本次变更页变成 `blocking`，未改历史页变成 `warning`。
+
+HTML/CSS 原型页通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "prototype-html-css"`，并接收 `prototypeHtml`、`prototypeCss` 和 `prototypeMeta`；`page update-prototype` 用于更新原型页内容，不复用 `page update-code`。原型页校验由 `project-core` 执行，只检查静态 HTML/CSS 安全边界，不进入 React 编译和 iframe runtime contract。CLI JSON 会保留 `prototypeGate`，让代理能区分继续修复原型页还是升级为高保真页。
+
+`page switch-runtime` 用于在编辑事务内切换页面运行时类型。命令接收目标 `targetRuntimeType`，并可同时传入目标运行时需要的 `code`、`prototypeHtml`、`prototypeCss`、`prototypeMeta` 和 `schema`。`project-core` 会先按目标运行时校验产物；通过后才更新页面元数据和目标运行时文件，失败时返回 `VALIDATION_BLOCKED` 并保留原页面内容。旧运行时文件不会在切换时删除，用于失败回退、对比或后续 AI 继续转换。
 
 ## JSON 输出契约
 
