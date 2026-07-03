@@ -5,13 +5,15 @@
       "id": "demo_1779608460379_a1b2c3",
       "name": "广场页面-手机",
       "order": 0,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page"
     },
     {
       "id": "demo_1779608460380_d4e5f6",
       "name": "广场页面-平板",
       "order": 1,
-      "parentId": null
+      "parentId": null,
+      "routeKey": "page-2"
     }
   ]
 }

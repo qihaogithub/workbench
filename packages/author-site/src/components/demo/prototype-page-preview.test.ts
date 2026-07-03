@@ -1,10 +1,11 @@
 import {
+  CanvasPageItem,
   PrototypePagePreview,
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
 } from "@opencode-workbench/demo-ui";
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 
 describe("PrototypePagePreview", () => {
   it("清理原型页 HTML 中的脚本、内联事件和 javascript URL", () => {
@@ -47,5 +48,112 @@ describe("PrototypePagePreview", () => {
     expect(shadow?.querySelector("h1")?.textContent).toBe("配置标题");
     expect(shadow?.querySelector("p")?.textContent).toBe("配置摘要");
     expect((shadow?.querySelector("span") as HTMLElement | null)?.style.color).toBe("rgb(37, 99, 235)");
+  });
+
+  it("单页原型页传入 previewSize 时按设计尺寸等比适配容器", async () => {
+    const widthSpy = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(500);
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(700);
+
+    try {
+      const { container } = render(
+        React.createElement(PrototypePagePreview, {
+          html: `<section>手机页面</section>`,
+          css: "",
+          previewSize: { width: 375, height: 812 },
+        }),
+      );
+
+      await waitFor(() => {
+        const scaleContent = container.querySelector(
+          "[style*='transform: scale']",
+        ) as HTMLElement | null;
+        expect(scaleContent).not.toBeNull();
+        expect(scaleContent?.style.width).toBe("375px");
+        expect(scaleContent?.style.height).toBe("812px");
+        expect(scaleContent?.style.transform).toContain("scale(");
+        expect(scaleContent?.style.transform).not.toBe("scale(1)");
+      });
+    } finally {
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
+  it("原型页传入 previewSize 时把 viewport 单位固定到设计画板", async () => {
+    const widthSpy = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(500);
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(700);
+
+    try {
+      const { container } = render(
+        React.createElement(PrototypePagePreview, {
+          html: `<section class="phone-container">手机页面</section>`,
+          css: `.phone-container { width: 100vw; height: 100vh; }`,
+          previewSize: { width: 375, height: 812 },
+        }),
+      );
+
+      await waitFor(() => {
+        const host = container.querySelector("[data-prototype-preview]");
+        const shadow = host?.shadowRoot;
+        const styleText = shadow?.querySelector("style")?.textContent ?? "";
+
+        expect(styleText).toContain("width: 375px");
+        expect(styleText).toContain("height: 812px");
+        expect(styleText).not.toContain("100vw");
+        expect(styleText).not.toContain("100vh");
+      });
+    } finally {
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
+  it("画布原型页调整页面框时保持设计画板整体等比缩放", async () => {
+    const widthSpy = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(300);
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(650);
+
+    try {
+      const { container } = render(
+        React.createElement(CanvasPageItem, {
+          page: {
+            id: "prototype-page",
+            name: "原型页",
+            order: 0,
+            runtimeType: "prototype-html-css",
+            prototypeHtml: `<section><div style="width: 320px">固定宽度内容</div></section>`,
+            prototypeCss: "",
+            previewSize: { width: 375, height: 812 },
+          },
+          layout: { x: 0, y: 0, width: 300, height: 650 },
+          editable: false,
+          renderMode: "prototype",
+        }),
+      );
+
+      await waitFor(() => {
+        const host = container.querySelector("[data-prototype-preview]");
+        const scaleContent = host?.parentElement as HTMLElement | null;
+        expect(scaleContent).not.toBeNull();
+        expect(scaleContent?.style.width).toBe("375px");
+        expect(scaleContent?.style.height).toBe("812px");
+        expect(scaleContent?.style.transform).toContain("scale(");
+        expect(scaleContent?.style.transform).not.toBe("scale(1)");
+      });
+    } finally {
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
   });
 });

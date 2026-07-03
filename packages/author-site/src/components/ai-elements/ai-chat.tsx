@@ -119,6 +119,7 @@ interface AIChatProps {
     level?: "info" | "warn" | "error";
     details?: Record<string, unknown>;
   }) => void;
+  beforeSend?: () => Promise<void> | void;
   /** 外部 StreamService 引用，用于控制台数据转发等场景 */
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
 }
@@ -150,6 +151,7 @@ export function AIChat({
   errorBanner,
   onMemoryUpdate,
   onDiagnosticEvent,
+  beforeSend,
   externalStreamServiceRef,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -219,6 +221,7 @@ export function AIChat({
     onModelsEvent: handleModelsEvent,
     onModelStateError: handleModelError,
     onDiagnosticEvent,
+    beforeSend,
     externalStreamServiceRef,
   });
 

@@ -40,6 +40,7 @@ export async function GET(
       ".gif": "image/gif",
       ".webp": "image/webp",
       ".svg": "image/svg+xml",
+      ".svga": "application/octet-stream",
     };
     const contentType = mimeTypes[ext] || "application/octet-stream";
 

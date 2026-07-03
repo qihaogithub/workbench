@@ -16,7 +16,32 @@ const ALLOWED_MIME_TYPES = [
   "image/svg+xml",
 ];
 
-const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".svga",
+]);
+
+const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+function getFileExtension(filename: string): string {
+  const dotIndex = filename.lastIndexOf(".");
+  if (dotIndex < 0) return "";
+  return filename.slice(dotIndex).toLowerCase();
+}
+
+function isAllowedAssetFile(file: File): boolean {
+  const ext = getFileExtension(file.name);
+  if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+  if (ext === ".svga") {
+    return file.type === "" || file.type === "application/octet-stream";
+  }
+  return ALLOWED_MIME_TYPES.includes(file.type);
+}
 
 export async function POST(
   request: Request,
@@ -56,7 +81,7 @@ export async function POST(
       );
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    if (!isAllowedAssetFile(file)) {
       return NextResponse.json(
         createApiError("INVALID_FILE_TYPE", `不支持的文件类型: ${file.type}`),
         { status: 400 },

@@ -458,8 +458,10 @@
   ],
   "pageVersions": {},
   "createdAt": 1776526720349,
-  "updatedAt": 1782719326213,
+  "updatedAt": 1783060629699,
   "thumbnail": "/thumbnails/proj_1776526720347.png",
   "publishedVersion": "v50",
-  "publishedAt": 1780063481520
+  "publishedAt": 1780063481520,
+  "activeWorkspaceId": "live-1783060629682-db2gp7934",
+  "activeWorkspaceUpdatedAt": 1783060629699
 }

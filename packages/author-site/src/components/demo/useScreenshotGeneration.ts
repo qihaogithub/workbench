@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { ScreenshotRenderBox } from "@opencode-workbench/demo-ui";
 
 const POLL_INTERVAL = 1500;
@@ -90,10 +97,32 @@ function normalizeRetryAfterMs(value: unknown): number {
   );
 }
 
+function setBooleanStateIfChanged(
+  setter: Dispatch<SetStateAction<boolean>>,
+  value: boolean,
+): void {
+  setter((current) => (current === value ? current : value));
+}
+
+function setNullableBooleanStateIfChanged(
+  setter: Dispatch<SetStateAction<boolean | null>>,
+  value: boolean | null,
+): void {
+  setter((current) => (current === value ? current : value));
+}
+
+function setNullableStringStateIfChanged(
+  setter: Dispatch<SetStateAction<string | null>>,
+  value: string | null,
+): void {
+  setter((current) => (current === value ? current : value));
+}
+
 export function useScreenshotGeneration(
   options: UseScreenshotGenerationOptions,
 ) {
   const { projectId, sessionId, enabled = true, pageIds = [] } = options;
+  const pageIdsKey = pageIds.join("\0");
 
   const [pageScreenshots, setPageScreenshots] = useState<
     Record<string, PageScreenshotState>
@@ -141,7 +170,7 @@ export function useScreenshotGeneration(
   }, []);
 
   const setPagesUnavailable = useCallback((pages: BatchPageInput[]) => {
-    setServiceAvailable(false);
+    setNullableBooleanStateIfChanged(setServiceAvailable, false);
     setPageScreenshots((prev) => {
       const next = { ...prev };
       for (const page of pages) {
@@ -184,7 +213,7 @@ export function useScreenshotGeneration(
     }
     pollStartedAtRef.current = null;
     pollFailuresRef.current = 0;
-    setIsGenerating(false);
+    setBooleanStateIfChanged(setIsGenerating, false);
   }, []);
 
   const cancelBatch = useCallback(
@@ -207,7 +236,7 @@ export function useScreenshotGeneration(
     pollFailuresRef.current += 1;
     if (pollFailuresRef.current >= MAX_POLL_FAILURES) {
       stopPolling();
-      setServiceAvailable(false);
+      setNullableBooleanStateIfChanged(setServiceAvailable, false);
     }
   }, [stopPolling]);
 
@@ -218,10 +247,10 @@ export function useScreenshotGeneration(
       });
       const result = await response.json();
       const available = response.ok && result.success;
-      setServiceAvailable(available);
+      setNullableBooleanStateIfChanged(setServiceAvailable, available);
       return available;
     } catch {
-      setServiceAvailable(false);
+      setNullableBooleanStateIfChanged(setServiceAvailable, false);
       return false;
     }
   }, []);
@@ -293,7 +322,7 @@ export function useScreenshotGeneration(
         Date.now() - pollStartedAtRef.current > MAX_POLL_DURATION_MS
       ) {
         stopPolling();
-        setServiceAvailable(false);
+        setNullableBooleanStateIfChanged(setServiceAvailable, false);
         return;
       }
 
@@ -323,7 +352,7 @@ export function useScreenshotGeneration(
         }
 
         pollFailuresRef.current = 0;
-        setServiceAvailable(true);
+        setNullableBooleanStateIfChanged(setServiceAvailable, true);
         const data = result.data as BatchStatusResponseData;
         const statusResults = Array.isArray(data.results)
           ? data.results
@@ -409,7 +438,7 @@ export function useScreenshotGeneration(
       }
       stopPolling();
       setPagesLoading(pages);
-      setIsGenerating(true);
+      setBooleanStateIfChanged(setIsGenerating, true);
 
       try {
         const response = await fetch("/api/screenshots/generate-batch", {
@@ -435,10 +464,10 @@ export function useScreenshotGeneration(
         const result = await response.json();
 
         if (result.success && result.data?.batchId) {
-          setServiceAvailable(true);
+          setNullableBooleanStateIfChanged(setServiceAvailable, true);
           const newBatchId = result.data.batchId;
           batchIdRef.current = newBatchId;
-          setBatchId(newBatchId);
+          setNullableStringStateIfChanged(setBatchId, newBatchId);
           pollStartedAtRef.current = Date.now();
           pollFailuresRef.current = 0;
 
@@ -555,7 +584,7 @@ export function useScreenshotGeneration(
         if (pageRequestVersionsRef.current[pageId] !== requestVersion) return;
 
         if (result.success && result.data?.url && result.data?.hash) {
-          setServiceAvailable(true);
+          setNullableBooleanStateIfChanged(setServiceAvailable, true);
           setPageScreenshots((prev) => ({
             ...prev,
             [pageId]: {
@@ -575,7 +604,7 @@ export function useScreenshotGeneration(
           }));
         } else {
           if (isServiceUnavailable(result)) {
-            setServiceAvailable(false);
+            setNullableBooleanStateIfChanged(setServiceAvailable, false);
           }
 
           setPageScreenshots((prev) => {
@@ -590,7 +619,7 @@ export function useScreenshotGeneration(
         }
       } catch {
         if (pageRequestVersionsRef.current[pageId] !== requestVersion) return;
-        setServiceAvailable(false);
+        setNullableBooleanStateIfChanged(setServiceAvailable, false);
         setPageScreenshots((prev) => {
           return {
             ...prev,
@@ -610,8 +639,9 @@ export function useScreenshotGeneration(
   }, [checkServiceHealth]);
 
   useEffect(() => {
-    void preloadScreenshotMeta(pageIds);
-  }, [pageIds, preloadScreenshotMeta]);
+    const targetPageIds = pageIdsKey ? pageIdsKey.split("\0") : [];
+    void preloadScreenshotMeta(targetPageIds);
+  }, [pageIdsKey, preloadScreenshotMeta]);
 
   useEffect(() => {
     return () => {

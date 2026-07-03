@@ -8,8 +8,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'UI Demo 可配置生成系统',
-  description: '所见即所得的可配置 Demo 生成系统',
+  title: 'OneFlow - AI 协作项目流转平台',
+  description: 'AI 协作项目流转平台',
 }
 
 export default function RootLayout({

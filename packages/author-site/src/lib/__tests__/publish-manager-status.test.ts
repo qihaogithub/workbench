@@ -266,4 +266,37 @@ describe("getPublishStatus", () => {
     );
     expect(workspaceMeta.baseVersion).toBe("v1");
   });
+
+  it("重新发布会替换旧发布目录并排除临时目录索引", async () => {
+    setupPublishableProject("proj-republish-clean");
+
+    await publishProject("proj-republish-clean");
+    const publishedDir = path.join(tempDir, "published", "proj-republish-clean");
+    fs.writeFileSync(path.join(publishedDir, "stale.js"), "old artifact", "utf-8");
+    fs.mkdirSync(path.join(tempDir, "published", ".tmp", "stale-temp"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempDir, "published", ".tmp", "stale-temp", "project.json"),
+      JSON.stringify({
+        id: "stale-temp",
+        name: "临时目录",
+        publishedAt: Date.now(),
+        publishedVersion: "v1",
+        demoPages: [],
+      }),
+      "utf-8",
+    );
+
+    await publishProject("proj-republish-clean");
+
+    expect(fs.existsSync(path.join(publishedDir, "stale.js"))).toBe(false);
+    const index = JSON.parse(
+      fs.readFileSync(path.join(tempDir, "published", "projects-index.json"), "utf-8"),
+    ) as { projects: Array<{ id: string }> };
+    expect(index.projects.map((project) => project.id)).toContain(
+      "proj-republish-clean",
+    );
+    expect(index.projects.map((project) => project.id)).not.toContain(
+      "stale-temp",
+    );
+  });
 });

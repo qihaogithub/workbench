@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-02。
+CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-03。
 
-主线结论：CLI 对账未发现新的注册命令漏登记问题，也未发现全命令测试漏覆盖问题。`commands --json` 与 `register(...)` 列表保持一致，`cli-all-commands` 末尾仍用反查守卫覆盖所有已注册命令。当前工作树新增的 HTML/CSS 原型页能力已经通过 `project-core` 进入共享层，并由 `project-cli` 暴露；剩余 4 个结构性缺口继续维持只报告策略。
+主线结论：CLI 对账未发现新的共享层能力缺口，也未发现全命令测试漏覆盖问题。`commands --json` 与 `register(...)` 列表保持一致，`cli-all-commands` 末尾仍用反查守卫覆盖所有已注册命令。本轮唯一差异是低风险文档漂移：`page switch-runtime` 已完成共享层承载和 CLI 覆盖，但此前未登记到能力清单，现已补齐。剩余 4 个结构性缺口继续维持只报告策略。
 
 ## 当前缺口
 
@@ -21,7 +21,7 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-02。
 - GAP-001：页面版本历史/快照查询缺失已关闭，当前已覆盖 `page version-list`、`page version-get`、`page version-create` 与既有 `page restore-version`。
 - GAP-006：`corepack pnpm` 标准验证环境阻塞已关闭。
 - GAP-007：runtime contract 校验 CLI 缺口已关闭，当前已覆盖 `project validate-runtime`、`page validate-runtime`，并由 `packages/project-core/src/service.ts` 提供共享能力。
-- GAP-008：HTML/CSS 原型页 CLI 缺口已关闭，当前 `page create` 已支持 `runtimeType: "prototype-html-css"` 与原型页文件输入，`page update-prototype` 已注册并复用 `packages/project-core/src/service.ts` 的共享文件读写、版本快照与静态安全校验。
+- GAP-008：HTML/CSS 原型页 CLI 缺口已关闭，当前 `page create` 已支持 `runtimeType: "prototype-html-css"` 与原型页文件输入，`page update-prototype`、`page switch-runtime` 已注册并复用 `packages/project-core/src/service.ts` 的共享文件读写、运行时切换、版本快照与静态安全校验。
 
 ## 验证状态
 
@@ -33,14 +33,17 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-02。
 - `corepack pnpm check:project-cli`：通过，确认 `page update-prototype` 与扩展后的 `page create` 仍满足全命令回归。
 - `corepack pnpm check:author`：失败；失败项集中在既有 `src/components/demo/home-page.test.tsx` 与 `src/components/demo/preview-canvas-interaction-mode.test.tsx` 超时，不属于本轮 CLI 对齐阻塞。
 - 未运行 `corepack pnpm check:project-scaffold`：最近一轮未修改 project-scaffold。
+- 2026-07-03 对账：`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出包含 `page switch-runtime`；同时该命令已存在于 `packages/project-cli/src/index.ts`、`packages/project-cli/src/cli-all-commands.test.ts`、`packages/project-core/src/service.ts` 与 `packages/author-site/src/app/api/projects/[projectId]/demos/[demoId]/runtime/route.ts`，本轮只修正文档登记遗漏。
+- 2026-07-03 当前工作树验证：`corepack pnpm check:project-core` 通过（31 tests passed）；`corepack pnpm check:project-cli` 通过。删除已发布产物的共享层改动未引入新的 CLI 注册或测试覆盖缺口。
 
 ## 当前结论
 
 - `project-core` 仍未提供通用 `session *`、`workspace *`、`knowledge *` 或截图任务级共享服务；当前相关能力仍主要停留在 author-site 路由与本地 manager 层。
-- `packages/project-core/src/service.ts` 现已承载 HTML/CSS 原型页的创建、更新、版本快照、恢复和静态安全校验，`packages/project-cli/src/index.ts` 通过 `page create` 与 `page update-prototype` 复用该能力完成对齐，不需要在 CLI 侧复制 author-site 组件逻辑。
+- `packages/project-core/src/service.ts` 现已承载 HTML/CSS 原型页的创建、更新、运行时切换、版本快照、恢复和静态安全校验，`packages/project-cli/src/index.ts` 通过 `page create`、`page update-prototype` 与 `page switch-runtime` 复用该能力完成对齐，不需要在 CLI 侧复制 author-site 组件逻辑。
 - 原型页能力当前仅确认创作端编辑事务与本地测试链路；根据 [`docs/项目文档/创作端/10-CLI/技术/01_CLI能力层实现设计.md`](../../项目文档/创作端/10-CLI/技术/01_CLI能力层实现设计.md)，发布、viewer 与本地项目包协议仍不应被自动推断为已完整支持。
 - `packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`screenshots/generate-batch/route.ts` 继续证明上述 4 个缺口属于共享层缺口，不适合在 CLI 侧直接复制 Web 逻辑。
-- 外部自动化提示词仍使用历史文件名 `CLI与创作端能力对齐长期跟踪.md`；本轮已补回兼容入口，正文继续只在本文件维护。
+- 当前工作树中的 `packages/project-core/src/service.ts` 已出现 `project_delete_execute` 同步删除已发布产物并重建 `published/projects-index.json` 的语义扩展；它落在删除 / 发布链路，自动化等级继续按 L5 只报告，不触发新的 CLI 自动实现。
+- 外部自动化提示词仍使用历史文件名 `CLI与创作端能力对齐长期跟踪.md`；兼容入口继续保留，但正文仍只在本文件维护。
 
 ## 下次检查重点
 

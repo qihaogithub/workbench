@@ -37,6 +37,19 @@ describe("AI 页面预览运行时策略", () => {
     expect(result.compiledCode).not.toContain("lucide-react?deps=");
   });
 
+  it("将 SVGA 运行时映射为同源 runtime URL", () => {
+    const result = compileCode(`
+      import { SvgaPlayer } from "@preview/sdk";
+
+      export default function Demo() {
+        return <SvgaPlayer src="/api/sessions/session-1/assets/demo.svga" />;
+      }
+    `);
+
+    expect(result.dependencies).toContain("@preview/sdk");
+    expect(result.compiledCode).toContain("/preview-runtime/vendor/preview-sdk.js");
+  });
+
   it("本地 JSX runtime vendor 暴露 React 自动 JSX 转换需要的 named exports", () => {
     const runtimeDir = path.join(
       process.cwd(),
@@ -58,6 +71,19 @@ describe("AI 页面预览运行时策略", () => {
     expect(jsxRuntime).toContain(" as Fragment");
     expect(jsxDevRuntime).toContain(" as jsxDEV");
     expect(jsxDevRuntime).toContain(" as Fragment");
+
+    const svgaRuntime = fs.readFileSync(
+      path.join(runtimeDir, "svgaplayerweb.js"),
+      "utf8",
+    );
+    const previewSdk = fs.readFileSync(
+      path.join(runtimeDir, "preview-sdk.js"),
+      "utf8",
+    );
+
+    expect(svgaRuntime).toContain("Parser");
+    expect(svgaRuntime).toContain("Player");
+    expect(previewSdk).toContain("SvgaPlayer");
   });
 
   it("iframe 可通过可视化编辑脚本采集正式图层树", () => {
@@ -84,6 +110,60 @@ describe("AI 页面预览运行时策略", () => {
 
     expect(result.compiledCode).toContain("lucide-react@0.323.0");
     expect(result.compiledCode).toContain("react@18.3.1");
+  });
+
+  it("支持 SVGA 依赖紧急 CDN 回退", () => {
+    const result = compileCode(
+      `
+        import SVGA from "svgaplayerweb";
+
+        export default function Demo() {
+          return <div>{typeof SVGA.Player}</div>;
+        }
+      `,
+      undefined,
+      { preferCdn: true },
+    );
+
+    expect(result.compiledCode).toContain("svgaplayerweb@2.3.1");
+  });
+
+  it("发布产物挂载到项目 preview-runtime 目录时不会重复拼接路径", () => {
+    const runtimeBaseUrl = "/data/proj-runtime/preview-runtime";
+    const result = compileCode(
+      `
+        import { Trophy } from "lucide-react";
+
+        export default function Demo() {
+          return <Trophy />;
+        }
+      `,
+      undefined,
+      { baseUrl: runtimeBaseUrl },
+    );
+    const html = generateIframeHtml({ runtimeBaseUrl });
+
+    expect(result.compiledCode).toContain(
+      'from "/data/proj-runtime/preview-runtime/vendor/lucide-react.js"',
+    );
+    expect(result.compiledCode).not.toContain("/preview-runtime/preview-runtime/");
+    expect(html).toContain(
+      '"react": "/data/proj-runtime/preview-runtime/vendor/react.js"',
+    );
+    expect(html).toContain(
+      '"svgaplayerweb": "/data/proj-runtime/preview-runtime/vendor/svgaplayerweb.js"',
+    );
+    expect(html).not.toContain("/preview-runtime/preview-runtime/");
+  });
+
+  it("iframe import map 包含 @preview/sdk 内部依赖的 SVGA 运行时", () => {
+    const html = generateIframeHtml();
+    const cdnHtml = generateIframeHtml({ useCdnRuntime: true });
+
+    expect(html).toContain(
+      '"svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js"',
+    );
+    expect(cdnHtml).toContain('"svgaplayerweb": "https://esm.sh/svgaplayerweb@2.3.1"');
   });
 
   it("拒绝未登记 npm 依赖", () => {

@@ -694,14 +694,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center px-4">
-          <div className="mr-8 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 shadow-sm">
-              <span className="text-sm font-bold text-primary-foreground">
-                UI
-              </span>
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Demo Studio
+          <div className="mr-8 flex items-center">
+            <span className="oneflow-wordmark text-lg font-semibold tracking-tight">
+              OneFlow
             </span>
           </div>
 

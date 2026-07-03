@@ -32,6 +32,22 @@
     }
   },
   "variants": {
+    "79ca348769c86ecd:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-03T06:37:35.598Z",
+      "elapsed": 2223,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    },
     "15e37d3b6bd12d7c:fast": {
       "variant": "fast",
       "generatedAt": "2026-06-30T08:31:49.308Z",
@@ -164,22 +180,6 @@
       "variant": "fast",
       "generatedAt": "2026-06-30T05:37:55.256Z",
       "elapsed": 6332,
-      "renderBox": {
-        "width": 375,
-        "height": 812,
-        "viewportWidth": 375,
-        "viewportHeight": 812,
-        "bodyWidth": 375,
-        "bodyHeight": 812,
-        "documentWidth": 375,
-        "documentHeight": 812,
-        "fullPage": true
-      }
-    },
-    "c631f227691689c3:fast": {
-      "variant": "fast",
-      "generatedAt": "2026-06-30T05:33:12.181Z",
-      "elapsed": 2571,
       "renderBox": {
         "width": 375,
         "height": 812,

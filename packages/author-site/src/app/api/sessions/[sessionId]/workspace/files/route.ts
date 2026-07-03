@@ -8,9 +8,13 @@ import {
   createApiSuccess,
   createApiError,
   findWorkspacePath,
+  readDemoPageMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { isHiddenEntry } from "@/lib/workspace-file-utils";
+import {
+  isHiddenEntry,
+  isVisiblePageRuntimeFile,
+} from "@/lib/workspace-file-utils";
 import type { WorkspaceFileNode } from "@/lib/workspace-file-utils";
 
 /**
@@ -112,6 +116,16 @@ export async function GET(
     // 读取目录内容（仅一层）
     const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
     const children: WorkspaceFileNode[] = [];
+    const pageDirectoryMatch = relativePath.match(/^demos\/([^/]+)$/);
+    const pageMeta = pageDirectoryMatch
+      ? readDemoPageMeta(wsPath, pageDirectoryMatch[1])
+      : null;
+    const inferredRuntimeType = pageDirectoryMatch && !pageMeta
+      ? !fs.existsSync(path.join(resolvedPath, "index.tsx")) &&
+          fs.existsSync(path.join(resolvedPath, "prototype.html"))
+        ? "prototype-html-css"
+        : undefined
+      : pageMeta?.runtimeType;
 
     for (const entry of entries) {
       if (isHiddenEntry(entry.name, showKnowledge)) continue;
@@ -128,6 +142,18 @@ export async function GET(
           name: entry.name,
         });
       } else if (entry.isFile()) {
+        if (
+          pageDirectoryMatch &&
+          !isVisiblePageRuntimeFile({
+            fileName: entry.name,
+            runtimeType: inferredRuntimeType,
+            schemaContent: entry.name === "config.schema.json"
+              ? fs.readFileSync(entryAbsPath, "utf-8")
+              : undefined,
+          })
+        ) {
+          continue;
+        }
         const entryStat = fs.statSync(entryAbsPath);
         children.push({
           path: entryRelPath,

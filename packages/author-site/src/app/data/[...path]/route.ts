@@ -8,10 +8,13 @@ const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const MIME_TYPES: Record<string, string> = {
   ".json": "application/json",
   ".js": "application/javascript",
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".svg": "image/svg+xml",
+  ".svga": "application/octet-stream",
   ".webp": "image/webp",
 };
 

@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-07-02
+> 更新日期：2026-07-03
 
 ## 用途
 
@@ -77,6 +77,7 @@ covers:
 | page.duplicate | 页面 | `page duplicate` | 中 | L4 | 已覆盖 | 复制页面 |
 | page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新 React 页面代码 |
 | page.update.prototype | 页面 | `page update-prototype` | 中 | L4 | 已覆盖 | 更新 HTML/CSS 原型页内容和元信息 |
+| page.switch-runtime | 页面 | `page switch-runtime` | 中 | L4 | 已覆盖 | 在编辑事务内切换页面运行时类型，并复用共享层运行时校验与文件写入保护 |
 | page.update.schema | 页面 | `page update-schema` | 中 | L4 | 已覆盖 | 更新页面 Schema |
 | page.update.meta | 页面 | `page update-meta` | 中 | L4 | 已覆盖 | 修改页面元信息 |
 | page.version.list | 页面 | `page version-list` | 低 | L3 | 已覆盖 | 查询页面历史版本列表 |

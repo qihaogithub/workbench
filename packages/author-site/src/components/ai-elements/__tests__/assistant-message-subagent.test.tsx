@@ -404,7 +404,7 @@ describe("AssistantMessage 子 Agent 展示", () => {
     expect(screen.queryByText("日志")).not.toBeInTheDocument();
   });
 
-  it("已有可见处理过程时将点阵处理中动效放入操作栏", () => {
+  it("已有可见处理过程时将点阵处理中动效放入操作栏且不显示复制按钮", () => {
     render(
       <AssistantMessage
         isStreaming
@@ -422,11 +422,9 @@ describe("AssistantMessage 子 Agent 展示", () => {
     );
 
     const actionBar = screen.getByTestId("assistant-message-actions");
-    const copyButton = within(actionBar).getByRole("button", { name: "复制" });
     expect(actionBar).toHaveClass("opacity-100");
     expect(within(actionBar).getByTestId("ai-working-indicator")).toBeInTheDocument();
-    expect(copyButton).toBeDisabled();
-    expect(copyButton).toHaveClass("opacity-70");
+    expect(within(actionBar).queryByRole("button", { name: "复制" })).not.toBeInTheDocument();
     expect(document.body).toHaveTextContent("检查页面问题");
     expect(screen.queryByText("模型响应")).not.toBeInTheDocument();
     expect(screen.queryByText("日志")).not.toBeInTheDocument();

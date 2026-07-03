@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "projectId": "proj_1779608460371",
-  "updatedAt": 1782974417478,
+  "projectId": "proj_1783042627508_t1czw2",
+  "updatedAt": 1783046857335,
   "state": {
     "viewport": {
-      "x": 53.08041832308072,
-      "y": 161.96878837580832,
-      "zoom": 0.3867644930507296
+      "x": 284.6351680760109,
+      "y": 145.37918922073598,
+      "zoom": 0.3265752728553301
     },
     "pages": {
       "demo_1779608460373_h7i8j9": {
@@ -23,6 +23,15 @@
         "width": 375,
         "height": 812,
         "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_lib0": {
+        "x": -397.4989995457845,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
         "sizeMode": "preview",
         "previewSizeKey": "375x812"
       }

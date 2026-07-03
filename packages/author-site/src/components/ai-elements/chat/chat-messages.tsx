@@ -26,6 +26,20 @@ function hasFileChanges(msg: ChatMessage): boolean {
   );
 }
 
+function hasVisibleCurrentMessage(msg: ChatMessage): boolean {
+  return Boolean(
+    msg.content?.trim() ||
+      msg.reasonings?.length ||
+      msg.tools?.length ||
+      msg.parts?.some((part) => {
+        if (part.type === "text" || part.type === "reasoning") {
+          return part.content.trim().length > 0;
+        }
+        return true;
+      }),
+  );
+}
+
 interface ChatMessagesProps {
   messages: ChatMessage[];
   currentMessage: ChatMessage;
@@ -68,6 +82,11 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeMessages = messages.filter((message) => !message.queueStatus);
+  const lastActiveMessage = activeMessages[activeMessages.length - 1];
+  const shouldRenderCurrentMessage =
+    isStreaming &&
+    (hasVisibleCurrentMessage(currentMessage) ||
+      lastActiveMessage?.role !== "assistant");
 
   const renderMessage = (msg: ChatMessage) => {
     if (msg.role === "user" || msg.kind === "auto_repair") {
@@ -136,7 +155,7 @@ export function ChatMessages({
     <>
       {activeMessages.map(renderMessage)}
 
-      {isStreaming && (
+      {shouldRenderCurrentMessage && (
         <AssistantMessage
           content={currentMessage.content || undefined}
           reasonings={currentMessage.reasonings}

@@ -118,6 +118,26 @@ function getNodeSummary(node: VisualNodeInfo): string {
   return `<${node.tagName}> ${node.domPath}${text}${cls}`;
 }
 
+function getVisualNodeIdentity(node: VisualNodeInfo | null): string | null {
+  if (!node) return null;
+  return node.domPath || node.nodeId;
+}
+
+function isSameVisualNode(
+  current: VisualNodeInfo | null,
+  next: VisualNodeInfo | null,
+): boolean {
+  return getVisualNodeIdentity(current) === getVisualNodeIdentity(next);
+}
+
+function isSameVisualNodeStack(
+  current: VisualNodeInfo[],
+  next: VisualNodeInfo[],
+): boolean {
+  if (current.length !== next.length) return false;
+  return current.every((node, index) => isSameVisualNode(node, next[index] ?? null));
+}
+
 function formatChangeValue(change: VisualPropertyChange): string {
   if (change.resource) {
     const parts = [
@@ -410,9 +430,12 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
 
   const handleVisualSelect = useCallback(
     (node: VisualNodeInfo | null, nodeStack?: VisualNodeInfo[]) => {
-      setSelectedVisualNode(node);
-      setVisualNodeStack(nodeStack ?? (node ? [node] : []));
-      setVisualPanelHoverNodeId(null);
+      const nextStack = nodeStack ?? (node ? [node] : []);
+      setSelectedVisualNode((current) => (isSameVisualNode(current, node) ? current : node));
+      setVisualNodeStack((current) =>
+        isSameVisualNodeStack(current, nextStack) ? current : nextStack,
+      );
+      setVisualPanelHoverNodeId((current) => (current === null ? current : null));
       if (!node) return;
 
       if (visualConfigMode) {
@@ -423,8 +446,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleVisualStackSelect = useCallback((node: VisualNodeInfo) => {
-    setSelectedVisualNode(node);
-    setVisualPanelHoverNodeId(null);
+    setSelectedVisualNode((current) => (isSameVisualNode(current, node) ? current : node));
+    setVisualPanelHoverNodeId((current) => (current === null ? current : null));
   }, []);
 
   const handleVisualPropertyChange = useCallback(

@@ -9,6 +9,15 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   parts: [],
 };
 
+function areChatValuesEqual<T>(current: T, next: T): boolean {
+  if (Object.is(current, next)) return true;
+  try {
+    return JSON.stringify(current) === JSON.stringify(next);
+  } catch {
+    return false;
+  }
+}
+
 interface UseChatMessagesOptions {
   externalMessages?: ChatMessage[];
   onMessagesChange?: (messages: ChatMessage[]) => void;
@@ -48,6 +57,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         const prev = messagesRef.current || [];
         const newMessages =
           typeof updater === "function" ? updater(prev) : updater;
+        if (areChatValuesEqual(prev, newMessages)) return;
         messagesRef.current = newMessages;
         onMessagesChange?.(newMessages);
       } else {
@@ -68,9 +78,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const isStreaming = isStreamingControlled
     ? externalIsStreaming
     : internalIsStreaming;
-  const setIsStreaming = isStreamingControlled
-    ? onIsStreamingChange!
-    : setInternalIsStreaming;
+  const setIsStreaming = useCallback(
+    (value: boolean) => {
+      if (isStreamingControlled) {
+        if (externalIsStreaming === value) return;
+        onIsStreamingChange?.(value);
+        return;
+      }
+      setInternalIsStreaming((current) => (current === value ? current : value));
+    },
+    [externalIsStreaming, isStreamingControlled, onIsStreamingChange],
+  );
 
   // --- streamContent ---
   const streamContentControlled = externalStreamContent !== undefined;
@@ -78,18 +96,28 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const streamContent = streamContentControlled
     ? externalStreamContent
     : internalStreamContent;
+  const streamContentRef = useRef(streamContent);
+  useEffect(() => {
+    streamContentRef.current = streamContent;
+  }, [streamContent]);
   const setStreamContent = useCallback(
     (updater: string | ((prev: string) => string)) => {
       if (streamContentControlled) {
-        const prev = internalStreamContent;
+        const prev = streamContentRef.current;
         const newContent =
           typeof updater === "function" ? updater(prev) : updater;
+        if (prev === newContent) return;
+        streamContentRef.current = newContent;
         onStreamContentChange?.(newContent);
       } else {
-        setInternalStreamContent(updater);
+        setInternalStreamContent((prev) => {
+          const newContent =
+            typeof updater === "function" ? updater(prev) : updater;
+          return prev === newContent ? prev : newContent;
+        });
       }
     },
-    [streamContentControlled, onStreamContentChange, internalStreamContent],
+    [streamContentControlled, onStreamContentChange],
   );
 
   // --- currentMessage ---
@@ -111,12 +139,14 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         const prev = currentMessageRef.current || DEFAULT_CURRENT_MESSAGE;
         const newMessage =
           typeof updater === "function" ? updater(prev) : updater;
+        if (areChatValuesEqual(prev, newMessage)) return;
         currentMessageRef.current = newMessage;
         onCurrentMessageChange?.(newMessage);
       } else {
         setInternalCurrentMessage((prev) => {
           const newMessage =
             typeof updater === "function" ? updater(prev) : updater;
+          if (areChatValuesEqual(prev, newMessage)) return prev;
           currentMessageRef.current = newMessage;
           return newMessage;
         });

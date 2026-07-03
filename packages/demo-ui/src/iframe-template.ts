@@ -19,8 +19,11 @@ const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+  "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
+
+const PREVIEW_RUNTIME_PATH_PREFIX = "/preview-runtime";
 
 const consoleInterceptScript = `
 (function() {
@@ -1201,6 +1204,12 @@ function resolveRuntimeUrl(url: string, runtimeBaseUrl?: string): string {
   }
   if (!runtimeBaseUrl) return url;
   const base = runtimeBaseUrl.replace(/\/+$/, "");
+  if (
+    base.endsWith(PREVIEW_RUNTIME_PATH_PREFIX) &&
+    url.startsWith(`${PREVIEW_RUNTIME_PATH_PREFIX}/`)
+  ) {
+    return `${base}${url.slice(PREVIEW_RUNTIME_PATH_PREFIX.length)}`;
+  }
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
@@ -1218,6 +1227,7 @@ function buildRuntimeImports(
       "react/jsx-dev-runtime": `${cdnBase}/react@18.3.1/jsx-dev-runtime`,
       "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
       "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
+      "svgaplayerweb": `${cdnBase}/svgaplayerweb@2.3.1`,
       "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
     };
   }

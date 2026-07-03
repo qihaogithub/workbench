@@ -1,6 +1,4 @@
 interface DemoProps {
-  /** 对应 uiweb-vue updateImage3：轮播广告图 */
-  carouselAdImage?: string;
   /** 替换图片 - 手机广告图，1行1个 */
   field?: string;
 }
@@ -8,7 +6,6 @@ interface DemoProps {
 const phoneAssetBase = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机';
 
 export default function Demo({
-  carouselAdImage = `${phoneAssetBase}/广告图.png`,
   field = `${phoneAssetBase}/一行一个广告图.png`,
 }: DemoProps) {
   return (
@@ -30,7 +27,7 @@ export default function Demo({
         </div>
 
         <div className="h-[180px] w-[344px] shrink-0 overflow-hidden rounded-[10px] bg-[#d9d9d9]">
-          <img src={carouselAdImage} alt="轮播广告图" className="h-full w-full object-cover" />
+          <img src={`${phoneAssetBase}/广告图.png`} alt="轮播广告图" className="h-full w-full object-cover" />
         </div>
 
         <img src={`${phoneAssetBase}/下.png`} alt="底部内容" className="w-[375px] shrink-0" />

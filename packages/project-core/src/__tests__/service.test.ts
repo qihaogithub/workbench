@@ -576,6 +576,63 @@ describe("ProjectAdminService", () => {
     expect(service.getProject(projectId).ok).toBe(false);
   });
 
+  it("删除项目时同步清理已发布产物和发布索引", () => {
+    const keep = service.createProject({ name: "保留项目" });
+    const deleted = service.createProject({ name: "已发布后删除项目" });
+    const keepId = keep.data?.id ?? "";
+    const projectId = deleted.data?.id ?? "";
+    const publishedRoot = path.join(tempDir, "published");
+    const keepPublishedDir = path.join(publishedRoot, keepId);
+    const deletePublishedDir = path.join(publishedRoot, projectId);
+
+    fs.mkdirSync(keepPublishedDir, { recursive: true });
+    fs.mkdirSync(deletePublishedDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(keepPublishedDir, "project.json"),
+      JSON.stringify({
+        id: keepId,
+        name: "保留项目",
+        publishedAt: 20,
+        publishedVersion: "v1",
+        demoPages: [{ id: "home" }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(deletePublishedDir, "project.json"),
+      JSON.stringify({
+        id: projectId,
+        name: "已发布后删除项目",
+        publishedAt: 30,
+        publishedVersion: "v1",
+        demoPages: [{ id: "home" }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(publishedRoot, "projects-index.json"),
+      JSON.stringify({
+        projects: [
+          { id: keepId, name: "保留项目", publishedAt: 20, publishedVersion: "v1", demoCount: 1 },
+          { id: projectId, name: "已发布后删除项目", publishedAt: 30, publishedVersion: "v1", demoCount: 1 },
+        ],
+        generatedAt: 1,
+      }),
+    );
+
+    const preview = service.deleteProjectPreview(projectId);
+    const plan = preview.data as PreviewPlan;
+    const executed = service.deleteProjectExecute(plan.planId, plan.confirmToken);
+
+    expect(executed.ok).toBe(true);
+    expect(executed.diffSummary?.deleted).toContain(`published:${projectId}`);
+    expect(fs.existsSync(deletePublishedDir)).toBe(false);
+    expect(fs.existsSync(keepPublishedDir)).toBe(true);
+
+    const index = JSON.parse(
+      fs.readFileSync(path.join(publishedRoot, "projects-index.json"), "utf-8"),
+    ) as { projects: Array<{ id: string }> };
+    expect(index.projects.map((project) => project.id)).toEqual([keepId]);
+  });
+
   it("上传、替换并删除事务内图片资产", () => {
     const created = service.createProject({ name: "资产项目" });
     const edit = service.beginEdit(created.data?.id ?? "");

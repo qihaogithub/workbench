@@ -46,6 +46,14 @@ export default runtime;`,
     file: "framer-motion.js",
     source: `export * from "framer-motion";`,
   },
+  "svgaplayerweb": {
+    file: "svgaplayerweb.js",
+    source: `import SVGA from "svgaplayerweb";
+export const Parser = SVGA.Parser;
+export const Player = SVGA.Player;
+export const autoload = SVGA.autoload;
+export default SVGA;`,
+  },
 };
 
 function digest(content) {
@@ -124,6 +132,7 @@ async function main() {
   const sdkSource = `
 import React from "react";
 import * as Lucide from "lucide-react";
+import SVGA from "svgaplayerweb";
 
 const semanticIcons = {
   browser: "Globe2", chrome: "Globe2", football: "CircleDot", soccer: "CircleDot",
@@ -203,6 +212,49 @@ export function ImageAsset(props) {
   if ((!src || failed) && fallback) return React.createElement("div", { className: cx("flex items-center justify-center bg-neutral-100 text-neutral-500", className), ...rest }, fallback);
   return React.createElement("img", { src, alt, className, loading: "lazy", onError: () => setFailed(true), ...rest });
 }
+export function SvgaPlayer(props) {
+  const { src, className, style, loops = 0, contentMode = "AspectFit", fallback = null, onError, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !src) return undefined;
+    let disposed = false;
+    let player = null;
+    container.innerHTML = "";
+    setFailed(false);
+    try {
+      player = new SVGA.Player(container);
+      player.loops = loops;
+      if (typeof player.setContentMode === "function") player.setContentMode(contentMode);
+      const parser = new SVGA.Parser();
+      parser.load(src, (videoItem) => {
+        if (disposed || !player) return;
+        player.setVideoItem(videoItem);
+        player.startAnimation();
+      }, (error) => {
+        if (disposed) return;
+        setFailed(true);
+        if (typeof onError === "function") onError(error);
+      });
+    } catch (error) {
+      setFailed(true);
+      if (typeof onError === "function") onError(error);
+    }
+    return () => {
+      disposed = true;
+      if (player) {
+        try {
+          player.stopAnimation();
+          if (typeof player.clear === "function") player.clear();
+        } catch {}
+      }
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [src, loops, contentMode, onError]);
+  if (!src || failed) return fallback ? React.createElement("div", { className, style, ...rest }, fallback) : null;
+  return React.createElement("div", { ref: containerRef, className: cx("overflow-hidden", className), style, ...rest });
+}
 export const Format = {
   number(value, options) { return new Intl.NumberFormat("zh-CN", options).format(Number(value || 0)); },
   currency(value, currency) { return new Intl.NumberFormat("zh-CN", { style: "currency", currency: currency || "CNY" }).format(Number(value || 0)); },
@@ -274,6 +326,7 @@ export function Carousel(props) {
       "react-dom": await readPackageVersion("react-dom"),
       "lucide-react": await readPackageVersion("lucide-react"),
       "framer-motion": await readPackageVersion("framer-motion"),
+      "svgaplayerweb": await readPackageVersion("svgaplayerweb"),
     },
   };
 

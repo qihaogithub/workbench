@@ -6,9 +6,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -668,31 +666,38 @@ export function PromptInputModelSelect({
   const groupEntries = Array.from(groups.entries())
 
   return (
-    <PromptInputSelect
+    <select
       value={currentModelId}
-      onValueChange={onModelChange}
+      onChange={(event) => onModelChange(event.target.value)}
       disabled={!canSwitch || isLoading || context.status !== 'idle'}
+      aria-label="选择模型"
+      className={cn(
+        'h-8 w-auto min-w-[100px] max-w-[150px] rounded-md border-none bg-transparent px-2 text-xs text-foreground shadow-none outline-none focus:ring-0',
+        (!canSwitch || isLoading || context.status !== 'idle') &&
+          'cursor-not-allowed opacity-50',
+      )}
     >
-      <PromptInputSelectTrigger className="text-xs">
-        <span className="truncate max-w-[120px]">{displayLabel}</span>
-      </PromptInputSelectTrigger>
-      <PromptInputSelectContent>
-        {groupEntries.map(([group, groupModels]) => (
-          <SelectGroup key={group || '_default'}>
-            {group && (
-              <SelectLabel className="text-[11px] font-normal text-muted-foreground px-2">
-                {group}
-              </SelectLabel>
-            )}
+      {isLoading && !currentModel ? (
+        <option value={currentModelId}>{displayLabel}</option>
+      ) : null}
+      {groupEntries.map(([group, groupModels]) =>
+        group ? (
+          <optgroup key={group} label={group}>
             {groupModels.map((model) => (
-              <PromptInputSelectItem key={model.id} value={model.id}>
+              <option key={model.id} value={model.id}>
                 {model.label}
-              </PromptInputSelectItem>
+              </option>
             ))}
-          </SelectGroup>
-        ))}
-      </PromptInputSelectContent>
-    </PromptInputSelect>
+          </optgroup>
+        ) : (
+          groupModels.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.label}
+            </option>
+          ))
+        ),
+      )}
+    </select>
   )
 }
 
@@ -720,22 +725,22 @@ export function PromptInputThinkingDepthSelect({
   if (availableDepths.length < 2 || !currentDepth) return null
 
   return (
-    <PromptInputSelect
+    <select
       value={currentDepth}
-      onValueChange={(v) => onDepthChange(v as ThinkingDepth)}
+      onChange={(event) => onDepthChange(event.target.value as ThinkingDepth)}
       disabled={disabled}
+      aria-label="选择思考深度"
+      className={cn(
+        'h-8 w-auto min-w-[40px] rounded-md border-none bg-transparent px-2 text-xs text-foreground shadow-none outline-none focus:ring-0',
+        disabled && 'cursor-not-allowed opacity-50',
+      )}
     >
-      <PromptInputSelectTrigger className="text-xs w-auto min-w-[40px]">
-        <span>{DEPTH_LABELS[currentDepth]}</span>
-      </PromptInputSelectTrigger>
-      <PromptInputSelectContent>
-        {availableDepths.map((depth) => (
-          <PromptInputSelectItem key={depth} value={depth}>
-            {DEPTH_LABELS[depth]}
-          </PromptInputSelectItem>
-        ))}
-      </PromptInputSelectContent>
-    </PromptInputSelect>
+      {availableDepths.map((depth) => (
+        <option key={depth} value={depth}>
+          {DEPTH_LABELS[depth]}
+        </option>
+      ))}
+    </select>
   )
 }
 

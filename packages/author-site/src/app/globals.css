@@ -76,6 +76,26 @@
     background: transparent;
   }
 
+  .oneflow-wordmark {
+    color: hsl(var(--foreground));
+    background-image: linear-gradient(
+      110deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--foreground)) 31%,
+      hsl(var(--muted-foreground)) 43%,
+      hsl(var(--foreground)) 56%,
+      hsl(var(--foreground)) 100%
+    );
+    background-size: 240% 100%;
+    background-position: 140% 50%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 18px hsl(var(--foreground) / 0.08);
+    animation: oneflow-wordmark-sheen 5.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    will-change: background-position, text-shadow;
+  }
+
   /* 代码块折叠 — GitHub 风格统一卡片 */
   .code-card [data-streamdown="code-block"] {
     border: none !important;
@@ -87,6 +107,24 @@
 
   .code-card [data-streamdown="code-block-header"] {
     display: none !important;
+  }
+}
+
+@keyframes oneflow-wordmark-sheen {
+  0%,
+  18% {
+    background-position: 140% 50%;
+    text-shadow: 0 0 16px hsl(var(--foreground) / 0.06);
+  }
+
+  48% {
+    background-position: -40% 50%;
+    text-shadow: 0 0 24px hsl(var(--foreground) / 0.16);
+  }
+
+  100% {
+    background-position: -40% 50%;
+    text-shadow: 0 0 16px hsl(var(--foreground) / 0.06);
   }
 }
 
@@ -127,6 +165,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .oneflow-wordmark {
+    animation: none;
+    background: none;
+    color: hsl(var(--foreground));
+    -webkit-text-fill-color: currentColor;
+    text-shadow: none;
+    will-change: auto;
+  }
+
   .ai-working-dot {
     animation: none;
     will-change: auto;

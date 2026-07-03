@@ -1,10 +1,10 @@
 {
   "projects": [
     {
-      "id": "proj_1779608460371",
+      "id": "proj_1783042627508_t1czw2",
       "name": "伴读广告页面",
-      "publishedAt": 1782838591292,
-      "publishedVersion": "v1",
+      "publishedAt": 1783050200018,
+      "publishedVersion": "v12",
       "demoCount": 2
     },
     {
@@ -46,5 +46,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1782838591294
+  "generatedAt": 1783063310276
 }

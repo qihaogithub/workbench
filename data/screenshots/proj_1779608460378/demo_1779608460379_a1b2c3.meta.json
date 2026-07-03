@@ -21,5 +21,23 @@
       "documentHeight": 812,
       "fullPage": true
     }
+  },
+  "variants": {
+    "b4c5b66f9d86ad31:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-03T06:38:01.616Z",
+      "elapsed": 1667,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    }
   }
 }

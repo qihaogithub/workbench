@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 interface DemoProps {
   modalImage?: string;
@@ -14,7 +14,7 @@ export default function PhonePopup(props: DemoProps) {
   const { modalImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png' } = props;
   const [sizeWarning, setSizeWarning] = useState<string | null>(null);
 
-  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     const { naturalWidth: w, naturalHeight: h } = img;
 
@@ -30,7 +30,7 @@ export default function PhonePopup(props: DemoProps) {
     }
 
     setSizeWarning(violations.length > 0 ? violations.join('；') : null);
-  }, []);
+  }
 
   return (
     <div

@@ -3,6 +3,8 @@
  * 提供文件编辑权限判定、语言类型推断等公共逻辑
  */
 
+import type { DemoPageRuntimeType } from "@opencode-workbench/shared";
+
 /** 编辑器类型 */
 export type FileEditorType = "code" | "markdown";
 
@@ -10,6 +12,8 @@ export type FileEditorType = "code" | "markdown";
 const EDITABLE_PATTERNS: RegExp[] = [
   /^demos\/[^/]+\/index\.tsx$/,
   /^demos\/[^/]+\/config\.schema\.json$/,
+  /^demos\/[^/]+\/prototype\.html$/,
+  /^demos\/[^/]+\/prototype\.css$/,
   /^project\.config\.schema\.json$/,
   /^memory\.md$/,
 ];
@@ -54,6 +58,56 @@ export function isHiddenEntry(name: string, showKnowledge = false): boolean {
   if (HIDDEN_ENTRIES.has(name)) return true;
   if (!showKnowledge && DOC_VIEW_HIDDEN_ENTRIES.has(name)) return true;
   return false;
+}
+
+export function resolvePageRuntimeType(
+  runtimeType?: DemoPageRuntimeType | null,
+): DemoPageRuntimeType {
+  return runtimeType === "prototype-html-css"
+    ? "prototype-html-css"
+    : "high-fidelity-react";
+}
+
+export function isEmptyConfigSchemaContent(content?: string | null): boolean {
+  if (!content || !content.trim()) return true;
+  try {
+    const parsed = JSON.parse(content) as { properties?: unknown };
+    return (
+      parsed.properties !== undefined &&
+      typeof parsed.properties === "object" &&
+      parsed.properties !== null &&
+      !Array.isArray(parsed.properties) &&
+      Object.keys(parsed.properties).length === 0
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isVisiblePageRuntimeFile(input: {
+  fileName: string;
+  runtimeType?: DemoPageRuntimeType | null;
+  schemaContent?: string | null;
+}): boolean {
+  const runtimeType = resolvePageRuntimeType(input.runtimeType);
+
+  if (input.fileName === "prototype.meta.json") return false;
+  if (input.fileName === "config.schema.json") {
+    return !isEmptyConfigSchemaContent(input.schemaContent);
+  }
+  if (runtimeType === "prototype-html-css") {
+    return (
+      input.fileName === "prototype.html" ||
+      input.fileName === "prototype.css"
+    );
+  }
+  if (
+    input.fileName === "prototype.html" ||
+    input.fileName === "prototype.css"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**

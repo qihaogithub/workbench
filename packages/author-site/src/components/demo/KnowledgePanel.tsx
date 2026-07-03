@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   Popover,
@@ -189,7 +188,7 @@ export function KnowledgePanel({
       </div>
 
       {/* 文件树区域 */}
-      <ScrollArea className="flex-1 mt-1">
+      <div className="flex-1 mt-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -283,7 +282,7 @@ export function KnowledgePanel({
             </div>
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <div className="px-4 py-2 border-t bg-muted/20">
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">

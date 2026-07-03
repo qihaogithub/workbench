@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "./utils";
+import { computePreviewScale } from "./preview-scale";
 import type {
+  PreviewSize,
   VisualNodeInfo,
   VisualNodeTreeItem,
   VisualPropertyChange,
@@ -17,6 +19,9 @@ export interface PrototypePagePreviewProps {
   html?: string;
   css?: string;
   configData?: Record<string, unknown>;
+  previewSize?: PreviewSize;
+  fillContainer?: boolean;
+  effectiveHeight?: number;
   className?: string;
   visualEditMode?: boolean;
   visualHoverNodeId?: string | null;
@@ -41,6 +46,35 @@ export function sanitizePrototypeCss(css: string): string {
     .replace(SCRIPT_TAG_RE, "")
     .replace(JAVASCRIPT_URL_RE, "")
     .replace(DANGEROUS_CSS_RE, "");
+}
+
+function normalizePrototypeViewportUnits(
+  css: string,
+  designWidth: number,
+  designHeight: number,
+): string {
+  return css.replace(
+    /(-?\d*\.?\d+)(vmin|vmax|vw|vh)\b/gi,
+    (match, value: string, unit: string) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return match;
+      const normalizedUnit = unit.toLowerCase();
+      const basis =
+        normalizedUnit === "vw"
+          ? designWidth
+          : normalizedUnit === "vh"
+            ? designHeight
+            : normalizedUnit === "vmin"
+              ? Math.min(designWidth, designHeight)
+              : Math.max(designWidth, designHeight);
+      return `${(numeric / 100) * basis}px`;
+    },
+  );
+}
+
+function normalizeMeasuredSize(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value);
 }
 
 function getConfigValue(configData: Record<string, unknown>, key: string): string {
@@ -291,6 +325,9 @@ export function PrototypePagePreview({
   html = "",
   css = "",
   configData = {},
+  previewSize,
+  fillContainer = false,
+  effectiveHeight,
   className,
   visualEditMode = false,
   visualHoverNodeId,
@@ -302,8 +339,61 @@ export function PrototypePagePreview({
   visualNodeTreeRequestKey,
   onVisualNodeTreeChange,
 }: PrototypePagePreviewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerHeight, setContainerHeight] = useState<number>(0);
+  const shouldScaleToPreviewSize = previewSize != null;
+
+  const updateContainerSize = useCallback((width: number, height: number) => {
+    const nextWidth = normalizeMeasuredSize(width);
+    const nextHeight = normalizeMeasuredSize(height);
+    if (nextWidth <= 0 || nextHeight <= 0) return;
+    setContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+    setContainerHeight((current) => (current === nextHeight ? current : nextHeight));
+  }, []);
+
+  const measureContainer = useCallback(() => {
+    if (!shouldScaleToPreviewSize) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const width = el.clientWidth;
+    const height = el.clientHeight;
+    if (width > 0 && height > 0) {
+      updateContainerSize(width, height);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    updateContainerSize(rect.width, rect.height);
+  }, [shouldScaleToPreviewSize, updateContainerSize]);
+
+  useLayoutEffect(() => {
+    if (!shouldScaleToPreviewSize) return;
+    measureContainer();
+  }, [measureContainer, shouldScaleToPreviewSize]);
+
+  useEffect(() => {
+    if (!shouldScaleToPreviewSize) return;
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      updateContainerSize(entry.contentRect.width, entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldScaleToPreviewSize, updateContainerSize]);
+
+  const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
+    previewSize,
+    containerWidth,
+    containerHeight,
+    fillContainer,
+    effectiveHeight,
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -311,16 +401,36 @@ export function PrototypePagePreview({
     const shadow = shadowRef.current ?? host.attachShadow({ mode: "open" });
     shadowRef.current = shadow;
     const safeHtml = sanitizePrototypeHtml(html);
-    const safeCss = sanitizePrototypeCss(css);
+    const safeCss = shouldScaleToPreviewSize
+      ? normalizePrototypeViewportUnits(
+          sanitizePrototypeCss(css),
+          designWidth,
+          designHeight,
+        )
+      : sanitizePrototypeCss(css);
+    const rootWidth = shouldScaleToPreviewSize ? `${designWidth}px` : "100%";
+    const rootHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
+    const rootMinHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
+    const rootOverflow = shouldScaleToPreviewSize ? "hidden" : "visible";
     shadow.innerHTML = `
       <style>
         :host {
           display: block;
-          width: 100%;
-          min-height: 100%;
+          width: ${rootWidth};
+          height: ${rootHeight};
+          min-height: ${rootMinHeight};
+          overflow: ${rootOverflow};
           background: #fff;
           color: #111827;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .prototype-root {
+          position: relative;
+          width: ${rootWidth};
+          height: ${rootHeight};
+          min-height: ${rootMinHeight};
+          overflow: ${rootOverflow};
+          background: #fff;
         }
         *, *::before, *::after {
           box-sizing: border-box;
@@ -348,7 +458,15 @@ export function PrototypePagePreview({
       applyPrototypeBindings(root, configData);
       applyPropertyChanges(root, visualPropertyChanges);
     }
-  }, [configData, css, html, visualPropertyChanges]);
+  }, [
+    configData,
+    css,
+    designHeight,
+    designWidth,
+    html,
+    shouldScaleToPreviewSize,
+    visualPropertyChanges,
+  ]);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -410,11 +528,32 @@ export function PrototypePagePreview({
     };
   }, [onVisualHover, onVisualSelect, onVisualSelectStack, visualEditMode]);
 
-  return (
+  const previewHost = (
     <div
       ref={hostRef}
-      className={cn("h-full w-full overflow-auto bg-white", className)}
+      className={cn(
+        "h-full w-full overflow-auto bg-white",
+        !shouldScaleToPreviewSize && className,
+      )}
       data-prototype-preview
     />
+  );
+
+  if (!shouldScaleToPreviewSize) {
+    return previewHost;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn("flex h-full w-full items-center justify-center", className)}
+    >
+      <div
+        style={wrapperStyle}
+        className={fillContainer ? "relative" : "relative rounded-lg border border-border bg-white shadow-sm"}
+      >
+        <div style={contentStyle}>{previewHost}</div>
+      </div>
+    </div>
   );
 }
