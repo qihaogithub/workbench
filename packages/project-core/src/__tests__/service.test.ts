@@ -220,6 +220,175 @@ describe("ProjectAdminService", () => {
     }));
   });
 
+  it("创建并校验 HTML/CSS 原型页", () => {
+    const created = service.createProject({ name: "原型页项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const page = service.createPage({
+      editId,
+      name: "原型首页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main><h1>原型首页</h1><button>开始</button></main>",
+      prototypeCss: "main { padding: 24px; }",
+      prototypeMeta: { width: 390, height: 844 },
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+
+    expect(page.ok).toBe(true);
+    expect(page.data?.meta.runtimeType).toBe("prototype-html-css");
+    expect(page.data?.files.prototypeHtml).toContain("原型首页");
+    expect(page.runtimeValidation?.ok).toBe(true);
+    expect(page.runtimeValidation?.prototypeGate).toMatchObject({
+      decision: "accept_prototype",
+      reasonCodes: [],
+    });
+    const workspacePath = (edit.data as EditTransaction).workspacePath;
+    expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "prototype.html"))).toBe(true);
+    expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "index.tsx"))).toBe(false);
+    expect(service.editValidate(editId).data?.ok).toBe(true);
+  });
+
+  it("阻止包含脚本的 HTML/CSS 原型页", () => {
+    const created = service.createProject({ name: "危险原型页项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const page = service.createPage({
+      editId,
+      name: "危险页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main onclick=\"alert(1)\"><script>alert(1)</script></main>",
+      prototypeCss: "a { background: url('javascript:alert(1)'); }",
+    });
+
+    expect(page.runtimeValidation?.ok).toBe(false);
+    expect(page.runtimeValidation?.prototypeGate).toMatchObject({
+      decision: "upgrade_to_high_fidelity",
+      reasonCodes: expect.arrayContaining([
+        "PROTOTYPE_SCRIPT_FORBIDDEN",
+        "PROTOTYPE_INLINE_EVENT_FORBIDDEN",
+        "PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN",
+      ]),
+    });
+    expect(page.runtimeValidation?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "PROTOTYPE_SCRIPT_FORBIDDEN" }),
+        expect.objectContaining({ code: "PROTOTYPE_INLINE_EVENT_FORBIDDEN" }),
+        expect.objectContaining({ code: "PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN" }),
+      ]),
+    );
+    expect(service.editValidate(editId).data?.ok).toBe(false);
+  });
+
+  it("原型页闸门区分可修复问题和高保真升级红线", () => {
+    const created = service.createProject({ name: "原型页闸门项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const repairable = service.createPage({
+      editId,
+      name: "可修复页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main><h1>可修复</h1></main>",
+      prototypeCss: "@import url('https://example.com/base.css'); body { margin: 0; }",
+    });
+    expect(repairable.runtimeValidation?.ok).toBe(false);
+    expect(repairable.runtimeValidation?.prototypeGate).toMatchObject({
+      decision: "repair_prototype",
+      reasonCodes: expect.arrayContaining([
+        "PROTOTYPE_CSS_IMPORT_FORBIDDEN",
+        "PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN",
+      ]),
+    });
+
+    const upgrade = service.createPage({
+      editId,
+      name: "升级页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main><iframe src=\"https://example.com\"></iframe></main>",
+      prototypeCss: ".toolbar { position: fixed; inset: 0; }",
+    });
+    expect(upgrade.runtimeValidation?.ok).toBe(false);
+    expect(upgrade.runtimeValidation?.prototypeGate).toMatchObject({
+      decision: "upgrade_to_high_fidelity",
+      reasonCodes: expect.arrayContaining([
+        "PROTOTYPE_EMBED_FORBIDDEN",
+        "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
+      ]),
+    });
+  });
+
+  it("支持在保留旧文件的前提下切换页面运行时类型", () => {
+    const created = service.createProject({ name: "运行时切换项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "切换页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main><h1>原型切换页</h1></main>",
+      prototypeCss: "main { padding: 24px; }",
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+    const workspacePath = (edit.data as EditTransaction).workspacePath;
+
+    const switched = service.switchPageRuntime({
+      editId,
+      pageId,
+      targetRuntimeType: "high-fidelity-react",
+      code: "export default function Demo(){ return <main>高保真页</main>; }",
+      reason: "用户手动设为高保真页",
+    });
+
+    expect(switched.ok).toBe(true);
+    expect(switched.data?.meta.runtimeType).toBeUndefined();
+    expect(switched.runtimeValidation?.ok).toBe(true);
+    expect(fs.readFileSync(path.join(workspacePath, "demos", pageId, "index.tsx"), "utf-8")).toContain("高保真页");
+    expect(fs.readFileSync(path.join(workspacePath, "demos", pageId, "prototype.html"), "utf-8")).toContain("原型切换页");
+
+    const reverted = service.switchPageRuntime({
+      editId,
+      pageId,
+      targetRuntimeType: "prototype-html-css",
+      prototypeHtml: "<main><h1>恢复原型页</h1></main>",
+      prototypeCss: "main { padding: 16px; }",
+    });
+
+    expect(reverted.ok).toBe(true);
+    expect(reverted.data?.meta.runtimeType).toBe("prototype-html-css");
+    expect(reverted.runtimeValidation?.prototypeGate?.decision).toBe("accept_prototype");
+    expect(fs.readFileSync(path.join(workspacePath, "demos", pageId, "prototype.html"), "utf-8")).toContain("恢复原型页");
+    expect(fs.readFileSync(path.join(workspacePath, "demos", pageId, "index.tsx"), "utf-8")).toContain("高保真页");
+  });
+
+  it("运行时切换校验失败时保留原页面类型和内容", () => {
+    const created = service.createProject({ name: "切换失败保留项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "高保真页",
+      code: "export default function Demo(){ return <main>保持高保真</main>; }",
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+    const workspacePath = (edit.data as EditTransaction).workspacePath;
+
+    const failed = service.switchPageRuntime({
+      editId,
+      pageId,
+      targetRuntimeType: "prototype-html-css",
+      prototypeHtml: "<main onclick=\"alert(1)\">危险原型</main>",
+      prototypeCss: "main { padding: 24px; }",
+    });
+
+    expect(failed.ok).toBe(false);
+    expect(failed.error?.code).toBe("VALIDATION_BLOCKED");
+    expect(service.getPage(editId, pageId).data?.meta.runtimeType).toBeUndefined();
+    expect(fs.readFileSync(path.join(workspacePath, "demos", pageId, "index.tsx"), "utf-8")).toContain("保持高保真");
+    expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "prototype.html"))).toBe(false);
+  });
+
   it("旧项目未改页面的运行时契约问题只作为 warning", () => {
     const created = service.createProject({ name: "旧页面兼容项目" });
     const projectId = created.data?.id ?? "";

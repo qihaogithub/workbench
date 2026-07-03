@@ -159,4 +159,74 @@ describe("viewer project data route", () => {
       `demos/${body.data?.demoPages[0]?.id}/iframe.html`,
     );
   });
+
+  it("发布 HTML/CSS 原型页静态内容供 viewer 渲染", async () => {
+    const { ProjectAdminService } = await import("@opencode-workbench/project-core");
+    const { publishProject } = await import("@/lib/publish-manager");
+    const service = new ProjectAdminService({ dataDir: tempDir });
+    const created = service.createProject({ name: "原型发布项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = edit.data?.editId ?? "";
+    const page = service.createPage({
+      editId,
+      name: "原型首页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: "<main><h1>静态原型页</h1></main>",
+      prototypeCss: "main { padding: 24px; }",
+      schema: JSON.stringify({ type: "object", properties: {} }, null, 2),
+    });
+    expect(page.ok).toBe(true);
+    expect(service.commitEdit(editId, "发布原型页").ok).toBe(true);
+
+    const { GET } = await import("./route");
+    const response = await GET({} as NextRequest, { params: { projectId } });
+    const body = await response.json() as {
+      success: boolean;
+      data?: {
+        demoPages: Array<{
+          id: string;
+          runtimeType?: string;
+          prototypeHtml?: string;
+          prototypeCss?: string;
+        }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data?.demoPages[0]).toMatchObject({
+      runtimeType: "prototype-html-css",
+      prototypeHtml: expect.stringContaining("静态原型页"),
+      prototypeCss: expect.stringContaining("padding"),
+    });
+
+    const published = await publishProject(projectId);
+    expect(published.demoCount).toBe(1);
+    const publishedProject = JSON.parse(
+      fs.readFileSync(path.join(tempDir, "published", projectId, "project.json"), "utf-8"),
+    ) as {
+      demoPages: Array<{
+        runtimeType?: string;
+        compiledJsPath?: string;
+        prototypeHtml?: string;
+        prototypeCss?: string;
+        prototypeHtmlPath?: string;
+        prototypeCssPath?: string;
+      }>;
+    };
+    expect(publishedProject.demoPages[0]).toMatchObject({
+      runtimeType: "prototype-html-css",
+      prototypeHtml: expect.stringContaining("静态原型页"),
+      prototypeCss: expect.stringContaining("padding"),
+      prototypeHtmlPath: `demos/${body.data?.demoPages[0]?.id}/prototype.html`,
+      prototypeCssPath: `demos/${body.data?.demoPages[0]?.id}/prototype.css`,
+    });
+    expect(publishedProject.demoPages[0]?.compiledJsPath).toBeUndefined();
+    expect(
+      fs.readFileSync(
+        path.join(tempDir, "published", projectId, "demos", body.data?.demoPages[0]?.id ?? "", "prototype.html"),
+        "utf-8",
+      ),
+    ).toContain("静态原型页");
+  });
 });

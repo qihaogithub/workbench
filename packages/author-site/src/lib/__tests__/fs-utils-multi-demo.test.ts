@@ -228,6 +228,17 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(patched.name).toBe("页面 A");
       expect(patched.routeKey).toBe("a");
       expect(patched.order).toBe(5);
+
+      const prototype = writeDemoPageMeta(ws, demoId, {
+        runtimeType: "prototype-html-css",
+      });
+      expect(prototype.runtimeType).toBe("prototype-html-css");
+      expect(readDemoPageMeta(ws, demoId)?.runtimeType).toBe(
+        "prototype-html-css",
+      );
+
+      const stillPrototype = writeDemoPageMeta(ws, demoId, { name: "页面 B" });
+      expect(stillPrototype.runtimeType).toBe("prototype-html-css");
     });
 
     it("重复 routeKey 写入时应自动生成唯一值", () => {

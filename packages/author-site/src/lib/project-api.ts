@@ -6,10 +6,13 @@ import type {
   RestoreVersionResponse,
   RestoreVersionRequest,
   DemoPageMeta,
+  DemoPageRuntimeType,
   DemoFolderMeta,
   DemoFiles,
   MultiDemoFiles,
+  PrototypePageMeta,
 } from '@opencode-workbench/shared';
+import type { RuntimeValidationResult } from '@opencode-workbench/project-core';
 
 import { getBrowserAgentServiceUrl } from './runtime-config';
 
@@ -27,6 +30,21 @@ export interface ProjectConfigSchema {
 export interface SessionMultiDemoFiles extends MultiDemoFiles {
   demoPages: DemoPageMeta[];
   workspacePath: string;
+}
+
+export interface SwitchSessionDemoPageRuntimeRequest {
+  sessionId: string;
+  targetRuntimeType: DemoPageRuntimeType;
+  code?: string;
+  schema?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
+}
+
+export interface SwitchSessionDemoPageRuntimeResponse {
+  meta: DemoPageMeta | null;
+  runtimeValidation: RuntimeValidationResult;
 }
 
 /**
@@ -520,6 +538,24 @@ export class ProjectApiClient {
     if (!response.success) {
       throw new Error(response.error?.message || '更新页面文件失败');
     }
+  }
+
+  async switchSessionDemoPageRuntime(
+    projectId: string,
+    demoId: string,
+    request: SwitchSessionDemoPageRuntimeRequest,
+  ): Promise<SwitchSessionDemoPageRuntimeResponse> {
+    const response = await this.localRequest<SwitchSessionDemoPageRuntimeResponse>(
+      `/api/projects/${projectId}/demos/${demoId}/runtime`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(request),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '切换页面类型失败');
+    }
+    return response.data;
   }
 
   /**

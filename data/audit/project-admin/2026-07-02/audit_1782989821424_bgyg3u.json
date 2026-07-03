@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782989821424_bgyg3u",
+  "at": 1782989821424,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782989821423_6r2mtj",
+  "inputSummary": {
+    "name": "性能基线-20个HTML/CSS原型页",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782989821423_6r2mtj"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageSizeMode, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
+export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageSizeMode, CanvasPageRuntimeType, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
@@ -11,6 +11,7 @@ export { PageConfigPanel } from './PageConfigPanel';
 export type { PageConfigPanelPage } from './PageConfigPanel';
 export { ConfigForm } from './ConfigForm';
 export { PreviewPanel } from './PreviewPanel';
+export { PrototypePagePreview, sanitizePrototypeCss, sanitizePrototypeHtml } from './PrototypePagePreview';
 export { LayerTreeMenu, getLayerTreeNodeKind, getLayerTreeNodeLabel } from './LayerTreeMenu';
 export { NoteButton } from './NoteButton';
 export { NoteDialog } from './NoteDialog';

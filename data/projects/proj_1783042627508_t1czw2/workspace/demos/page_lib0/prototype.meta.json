@@ -1,0 +1,15 @@
+{
+  "name": "手机 - 副本",
+  "description": "伴读广告手机版页面 - HTML/CSS 原型，包含轮播广告区、推广图片和底部标签栏",
+  "runtimeType": "prototype-html-css",
+  "sourceFiles": {
+    "html": "prototype.html",
+    "css": "prototype.css"
+  },
+  "previewSize": {
+    "width": 375,
+    "height": 812
+  },
+  "configFields": ["field"],
+  "createdAt": "2026-06-29T00:00:00.000Z"
+}

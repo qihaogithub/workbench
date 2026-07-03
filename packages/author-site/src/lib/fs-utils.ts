@@ -7,6 +7,7 @@ import {
 import {
   DemoMeta,
   DemoFiles,
+  PrototypePageMeta,
   ProjectTemplateMeta,
   SessionMeta,
   ErrorCodeType,
@@ -732,6 +733,10 @@ export function writeDemoPageMeta(
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
     routeKey: nextRouteKey,
+    runtimeType:
+      patch.runtimeType !== undefined
+        ? patch.runtimeType
+        : existing?.runtimeType,
     order: patch.order ?? existing?.order ?? 0,
     parentId:
       patch.parentId !== undefined
@@ -760,9 +765,12 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
 
   for (const page of tree.pages) {
     const dir = path.join(demosDir, page.id);
+    const runtimeType = page.runtimeType === "prototype-html-css" ? "prototype-html-css" : "high-fidelity-react";
     if (
-      fs.existsSync(path.join(dir, "index.tsx")) &&
-      fs.existsSync(path.join(dir, "config.schema.json"))
+      fs.existsSync(path.join(dir, "config.schema.json")) &&
+      (runtimeType === "prototype-html-css"
+        ? fs.existsSync(path.join(dir, "prototype.html"))
+        : fs.existsSync(path.join(dir, "index.tsx")))
     ) {
       result.push(page);
     }
@@ -774,14 +782,19 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     if (!entry.isDirectory()) continue;
     if (result.some((p) => p.id === entry.name)) continue;
     const dir = path.join(demosDir, entry.name);
+    const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));
+    const hasReactCode = fs.existsSync(path.join(dir, "index.tsx"));
+    const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
     if (
-      fs.existsSync(path.join(dir, "index.tsx")) &&
-      fs.existsSync(path.join(dir, "config.schema.json"))
+      hasSchema &&
+      (hasReactCode || hasPrototype)
     ) {
+      const runtimeType = !hasReactCode && hasPrototype ? "prototype-html-css" : undefined;
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
         routeKey: makeUniqueRouteKey(entry.name, routeKeys),
+        runtimeType,
         order: result.length,
         parentId: null,
       });
@@ -1560,11 +1573,23 @@ export function readPageVersionFiles(
 
   const codePath = path.join(version.snapshotPath, "index.tsx");
   const schemaPath = path.join(version.snapshotPath, "config.schema.json");
-  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+  const prototypeHtmlPath = path.join(version.snapshotPath, "prototype.html");
+  const prototypeCssPath = path.join(version.snapshotPath, "prototype.css");
+  const prototypeMetaPath = path.join(version.snapshotPath, "prototype.meta.json");
+  if (!fs.existsSync(schemaPath)) return null;
 
   return {
-    code: fs.readFileSync(codePath, "utf-8"),
+    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
     schema: fs.readFileSync(schemaPath, "utf-8"),
+    prototypeHtml: fs.existsSync(prototypeHtmlPath)
+      ? fs.readFileSync(prototypeHtmlPath, "utf-8")
+      : undefined,
+    prototypeCss: fs.existsSync(prototypeCssPath)
+      ? fs.readFileSync(prototypeCssPath, "utf-8")
+      : undefined,
+    prototypeMeta: fs.existsSync(prototypeMetaPath)
+      ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
+      : undefined,
   };
 }
 
@@ -2107,12 +2132,24 @@ export function getWorkspaceMultiDemoFiles(
     for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const dir = path.join(demosDir, entry.name);
-      const codePath = path.join(dir, "index.tsx");
       const schemaPath = path.join(dir, "config.schema.json");
-      if (fs.existsSync(codePath) && fs.existsSync(schemaPath)) {
+      const codePath = path.join(dir, "index.tsx");
+      const prototypeHtmlPath = path.join(dir, "prototype.html");
+      const prototypeCssPath = path.join(dir, "prototype.css");
+      const prototypeMetaPath = path.join(dir, "prototype.meta.json");
+      if (fs.existsSync(schemaPath) && (fs.existsSync(codePath) || fs.existsSync(prototypeHtmlPath))) {
         demos[entry.name] = {
-          code: fs.readFileSync(codePath, "utf-8"),
+          code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
           schema: fs.readFileSync(schemaPath, "utf-8"),
+          prototypeHtml: fs.existsSync(prototypeHtmlPath)
+            ? fs.readFileSync(prototypeHtmlPath, "utf-8")
+            : undefined,
+          prototypeCss: fs.existsSync(prototypeCssPath)
+            ? fs.readFileSync(prototypeCssPath, "utf-8")
+            : undefined,
+          prototypeMeta: fs.existsSync(prototypeMetaPath)
+            ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
+            : undefined,
         };
       }
     }
@@ -2135,11 +2172,23 @@ export function getWorkspaceDemoPageFiles(
   const demoDir = getDemoDirPath(wsPath, demoId);
   const codePath = path.join(demoDir, "index.tsx");
   const schemaPath = path.join(demoDir, "config.schema.json");
+  const prototypeHtmlPath = path.join(demoDir, "prototype.html");
+  const prototypeCssPath = path.join(demoDir, "prototype.css");
+  const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
 
-  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+  if (!fs.existsSync(schemaPath) || (!fs.existsSync(codePath) && !fs.existsSync(prototypeHtmlPath))) return null;
   return {
-    code: fs.readFileSync(codePath, "utf-8"),
+    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
     schema: fs.readFileSync(schemaPath, "utf-8"),
+    prototypeHtml: fs.existsSync(prototypeHtmlPath)
+      ? fs.readFileSync(prototypeHtmlPath, "utf-8")
+      : undefined,
+    prototypeCss: fs.existsSync(prototypeCssPath)
+      ? fs.readFileSync(prototypeCssPath, "utf-8")
+      : undefined,
+    prototypeMeta: fs.existsSync(prototypeMetaPath)
+      ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
+      : undefined,
   };
 }
 
@@ -2167,6 +2216,19 @@ export function updateWorkspaceDemoFiles(
     fs.writeFileSync(
       path.join(demoDir, "config.schema.json"),
       files.schema,
+      "utf-8",
+    );
+  }
+  if (typeof files.prototypeHtml === "string") {
+    fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml, "utf-8");
+  }
+  if (typeof files.prototypeCss === "string") {
+    fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss, "utf-8");
+  }
+  if (files.prototypeMeta) {
+    fs.writeFileSync(
+      path.join(demoDir, "prototype.meta.json"),
+      JSON.stringify(files.prototypeMeta, null, 2),
       "utf-8",
     );
   }

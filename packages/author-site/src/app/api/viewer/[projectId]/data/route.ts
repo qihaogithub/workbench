@@ -37,10 +37,16 @@ export async function GET(
       const demoDir = getDemoDirPath(workspacePath, page.id);
       const codePath = path.join(demoDir, "index.tsx");
       const schemaPath = path.join(demoDir, "config.schema.json");
+      const prototypeHtmlPath = path.join(demoDir, "prototype.html");
+      const prototypeCssPath = path.join(demoDir, "prototype.css");
+      const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
 
       let code = "";
       let schema: string | undefined;
       let previewSize: PreviewSize | undefined;
+      let prototypeHtml: string | undefined;
+      let prototypeCss: string | undefined;
+      let prototypeMeta: Record<string, unknown> | undefined;
 
       if (fs.existsSync(codePath)) {
         code = fs.readFileSync(codePath, "utf-8");
@@ -49,12 +55,28 @@ export async function GET(
         schema = fs.readFileSync(schemaPath, "utf-8");
         previewSize = extractPreviewSize(schema);
       }
+      if (fs.existsSync(prototypeHtmlPath)) {
+        prototypeHtml = fs.readFileSync(prototypeHtmlPath, "utf-8");
+      }
+      if (fs.existsSync(prototypeCssPath)) {
+        prototypeCss = fs.readFileSync(prototypeCssPath, "utf-8");
+      }
+      if (fs.existsSync(prototypeMetaPath)) {
+        try {
+          prototypeMeta = JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as Record<string, unknown>;
+        } catch {
+          prototypeMeta = undefined;
+        }
+      }
 
       return {
         ...page,
         code,
         schema,
         previewSize,
+        prototypeHtml,
+        prototypeCss,
+        prototypeMeta,
       };
     });
 

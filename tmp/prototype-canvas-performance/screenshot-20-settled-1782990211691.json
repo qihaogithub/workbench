@@ -1,0 +1,52 @@
+{
+  "label": "screenshot-20-settled",
+  "targetUrl": "http://localhost:3200/demo/proj_1782989831516_wammag/edit",
+  "expectedPages": 20,
+  "sampledAt": "2026-07-02T11:03:31.689Z",
+  "timings": {
+    "domContentLoadedMs": 16194,
+    "canvasVisibleMs": 32
+  },
+  "counts": {
+    "first": {
+      "canvasPages": 20,
+      "prototypePreviews": 0,
+      "iframes": 15,
+      "images": 0,
+      "memory": {
+        "usedJSHeapSize": 286000000,
+        "totalJSHeapSize": 304000000,
+        "jsHeapSizeLimit": 3760000000
+      }
+    },
+    "final": {
+      "canvasPages": 20,
+      "prototypePreviews": 0,
+      "iframes": 15,
+      "images": 0,
+      "memory": {
+        "usedJSHeapSize": 286000000,
+        "totalJSHeapSize": 304000000,
+        "jsHeapSizeLimit": 3760000000
+      }
+    }
+  },
+  "raf": {
+    "idle": {
+      "frames": 72,
+      "averageFrameMs": 16.674999999503296,
+      "p95FrameMs": 22.5,
+      "approximateFps": 59.970014994290096
+    },
+    "interaction": {
+      "frames": 73,
+      "averageFrameMs": 16.57945205495782,
+      "p95FrameMs": 18.100000023841858,
+      "approximateFps": 60.31562422480459
+    }
+  },
+  "notes": [
+    "Run the script separately for prototype, screenshot and high-fidelity iframe projects, then compare the JSON reports.",
+    "The script measures the current browser/runtime state; it does not create or mutate project data."
+  ]
+}

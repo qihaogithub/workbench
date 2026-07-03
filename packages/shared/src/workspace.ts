@@ -76,10 +76,13 @@ export interface PageVersionInfo extends VersionInfo {
  * 持久化在 workspace/workspace-tree.json 的 pages 数组中。
  * 保存项目时由后端读取 workspace-tree.json 合并到 Project.demoPages。
  */
+export type DemoPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+
 export interface DemoPageMeta {
   id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
   name: string;                // 显示名称，如 "首页"、"详情页"
   routeKey?: string;           // 页面稳定语义标识，供应用逻辑图、AI 和工程交接使用
+  runtimeType?: DemoPageRuntimeType; // 页面运行时类型；旧数据缺省为 high-fidelity-react
   order: number;               // 在页面列表中的展示顺序（小者在前）
   parentId: string | null;     // 所属文件夹 ID，null 表示根级
 }

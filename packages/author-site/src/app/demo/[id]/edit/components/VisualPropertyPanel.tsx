@@ -77,6 +77,7 @@ interface VisualPropertyPanelProps {
   submission: VisualPropertySubmission;
   sending: boolean;
   usedConfigKeys: string[];
+  directApplyMode?: boolean;
   onPropertyChange: (
     node: VisualNodeInfo,
     property: string,
@@ -578,6 +579,7 @@ export function VisualPropertyPanel({
   submission,
   sending,
   usedConfigKeys,
+  directApplyMode = false,
   onPropertyChange,
   onRestoreProperty,
   onClearChanges,
@@ -636,25 +638,41 @@ export function VisualPropertyPanel({
     (!hasPendingDraft && !canRetrySubmission) ||
     pendingConfigKeyConflicts.length > 0;
   const sendButtonLabel = hasPendingDraft
-    ? "发送给 AI"
+    ? directApplyMode
+      ? "应用到原型页"
+      : "发送给 AI"
     : submission.status === "sending"
-      ? "AI 处理中"
+      ? directApplyMode
+        ? "应用中"
+        : "AI 处理中"
       : submission.status === "failed"
         ? "重新发送"
         : submission.status === "queued" || submission.status === "sent"
-          ? "已发送给 AI"
-          : "发送给 AI";
+          ? directApplyMode
+            ? "已应用"
+            : "已发送给 AI"
+          : directApplyMode
+            ? "应用到原型页"
+            : "发送给 AI";
   const submissionNotice =
     hasPendingDraft && submission.status === "sending"
-      ? "AI 正在处理上一批修改，新修改可继续发送。"
+      ? directApplyMode
+        ? "正在应用上一批修改，新修改可继续应用。"
+        : "AI 正在处理上一批修改，新修改可继续发送。"
       : submission.status === "sending"
-        ? "AI 正在处理已发送的属性修改。"
+        ? directApplyMode
+          ? "正在应用属性修改。"
+          : "AI 正在处理已发送的属性修改。"
         : submission.status === "failed"
           ? submission.error || "发送失败，可重新发送。"
           : !hasPendingDraft && submission.status === "sent"
-            ? "本次属性修改已发送给 AI。"
+            ? directApplyMode
+              ? "本次属性修改已应用到原型页。"
+              : "本次属性修改已发送给 AI。"
             : !hasPendingDraft && submission.status === "queued"
-              ? "本次属性修改已提交，等待 AI 接收。"
+              ? directApplyMode
+                ? "本次属性修改已提交，等待应用。"
+                : "本次属性修改已提交，等待 AI 接收。"
               : "";
   const isSubmittedChangeLocked = (changeId: string) =>
     submission.status !== "idle" &&

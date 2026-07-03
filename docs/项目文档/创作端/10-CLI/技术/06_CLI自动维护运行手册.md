@@ -11,7 +11,7 @@ covers:
 
 # CLI 自动维护运行手册
 
-> 更新日期：2026-06-29
+> 更新日期：2026-07-02
 
 ## 读者
 
@@ -28,6 +28,8 @@ covers:
 5. CLI 模块索引和相关模块文档
 
 如果改动涉及项目、模板、页面、配置、资产、发布、AI 会话或审计，还要读取对应模块的项目文档，确认业务语义。
+
+如果页面能力涉及 `runtimeType: "prototype-html-css"`、`prototypeHtml` / `prototypeCss` / `prototypeMeta` 或 `page update-prototype`，还要确认 `project-core` 已承载原型页文件读写、版本快照和静态安全校验；CLI 不得直接复用 author-site 画布或组件逻辑。
 
 ## 允许自动处理的改动
 
@@ -130,6 +132,8 @@ covers:
 | 多包共享类型 | 使用范围内所有相关 `check:*` |
 
 自动任务必须使用 `corepack pnpm`，不要直接调用全局 `pnpm`。当前仓库声明 `pnpm@8.15.0`，直接使用 Codex 运行环境里的全局 pnpm 可能触发锁文件不兼容和依赖重装。
+
+当页面能力同时改动 `project-core`、`shared` 和 author-site 对共享类型的消费端时，至少运行 `corepack pnpm check:project-core` 与 `corepack pnpm check:project-cli`；若 author-site 也消费了新字段或新文件格式，再追加 `corepack pnpm check:author`，并在报告里区分“CLI 相关阻塞”与“仓库内既有独立测试噪声”。
 
 验证结果必须写入运行报告或 PR 描述。
 

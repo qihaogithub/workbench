@@ -1,0 +1,189 @@
+{
+  "id": "proj_1782989821423_6r2mtj",
+  "name": "性能基线-20个HTML/CSS原型页",
+  "category": "未分类",
+  "description": "用于创作端画布性能基线采样，可重复生成。",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782989821423_6r2mtj/workspace",
+  "demoPages": [
+    {
+      "id": "prototype_perf_01",
+      "name": "01 首页概览",
+      "routeKey": "prototype-perf-01",
+      "runtimeType": "prototype-html-css",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_02",
+      "name": "02 登录注册",
+      "routeKey": "prototype-perf-02",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_03",
+      "name": "03 用户中心",
+      "routeKey": "prototype-perf-03",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_04",
+      "name": "04 数据看板",
+      "routeKey": "prototype-perf-04",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_05",
+      "name": "05 列表管理",
+      "routeKey": "prototype-perf-05",
+      "runtimeType": "prototype-html-css",
+      "order": 4,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_06",
+      "name": "06 详情信息",
+      "routeKey": "prototype-perf-06",
+      "runtimeType": "prototype-html-css",
+      "order": 5,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_07",
+      "name": "07 搜索筛选",
+      "routeKey": "prototype-perf-07",
+      "runtimeType": "prototype-html-css",
+      "order": 6,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_08",
+      "name": "08 表单录入",
+      "routeKey": "prototype-perf-08",
+      "runtimeType": "prototype-html-css",
+      "order": 7,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_09",
+      "name": "09 审批流程",
+      "routeKey": "prototype-perf-09",
+      "runtimeType": "prototype-html-css",
+      "order": 8,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_10",
+      "name": "10 消息中心",
+      "routeKey": "prototype-perf-10",
+      "runtimeType": "prototype-html-css",
+      "order": 9,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_11",
+      "name": "11 首页概览",
+      "routeKey": "prototype-perf-11",
+      "runtimeType": "prototype-html-css",
+      "order": 10,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_12",
+      "name": "12 登录注册",
+      "routeKey": "prototype-perf-12",
+      "runtimeType": "prototype-html-css",
+      "order": 11,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_13",
+      "name": "13 用户中心",
+      "routeKey": "prototype-perf-13",
+      "runtimeType": "prototype-html-css",
+      "order": 12,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_14",
+      "name": "14 数据看板",
+      "routeKey": "prototype-perf-14",
+      "runtimeType": "prototype-html-css",
+      "order": 13,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_15",
+      "name": "15 列表管理",
+      "routeKey": "prototype-perf-15",
+      "runtimeType": "prototype-html-css",
+      "order": 14,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_16",
+      "name": "16 详情信息",
+      "routeKey": "prototype-perf-16",
+      "runtimeType": "prototype-html-css",
+      "order": 15,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_17",
+      "name": "17 搜索筛选",
+      "routeKey": "prototype-perf-17",
+      "runtimeType": "prototype-html-css",
+      "order": 16,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_18",
+      "name": "18 表单录入",
+      "routeKey": "prototype-perf-18",
+      "runtimeType": "prototype-html-css",
+      "order": 17,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_19",
+      "name": "19 审批流程",
+      "routeKey": "prototype-perf-19",
+      "runtimeType": "prototype-html-css",
+      "order": 18,
+      "parentId": null
+    },
+    {
+      "id": "prototype_perf_20",
+      "name": "20 消息中心",
+      "routeKey": "prototype-perf-20",
+      "runtimeType": "prototype-html-css",
+      "order": 19,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1782989830724,
+      "savedBy": "qh2",
+      "sessionId": "edit_1782989821814_hmjxmv",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782989821423_6r2mtj/v1",
+      "fileCount": 81,
+      "note": "创建 20 页 prototype 性能基线项目"
+    }
+  ],
+  "pageVersions": {},
+  "createdAt": 1782989821424,
+  "updatedAt": 1783042591783,
+  "canonicalSyncedAt": 1783042591783,
+  "activeWorkspaceId": "live-1782989878377-e79t776m7",
+  "activeWorkspaceUpdatedAt": 1783042531320,
+  "canonicalSyncedWorkspaceId": "live-1782989878377-e79t776m7"
+}

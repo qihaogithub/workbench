@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opencode Workbench 上线宣讲</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           Change these variables to restyle the deck.
+           =========================================== */
+        :root {
+            --stage-bg: #030908;
+            --slide-bg: #07110f;
+            --paper: #f3efe4;
+            --paper-soft: rgba(243, 239, 228, 0.92);
+            --ink: #08110f;
+            --text-primary: #f3efe4;
+            --text-secondary: #a9c4b8;
+            --text-muted: #6f8d82;
+            --accent: #20e6b1;
+            --accent-2: #f5b84b;
+            --accent-3: #ef6f5e;
+            --line: rgba(170, 225, 205, 0.22);
+            --panel: rgba(13, 34, 29, 0.86);
+            --panel-strong: rgba(18, 50, 42, 0.96);
+            --font-display: "Noto Serif SC", serif;
+            --font-body: "Noto Sans SC", sans-serif;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.65s;
+        }
+
+        /* ===========================================
+           BASE RESET
+           Keeps authored 1920x1080 slide geometry stable.
+           =========================================== */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* ===========================================
+           FIXED 16:9 STAGE: MANDATORY BASE STYLES
+           Include this ENTIRE file in every presentation.
+           Slides are authored at 1920×1080 and scaled as a whole.
+           =========================================== */
+
+        /* 1. Lock the browser viewport */
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--stage-bg, #000);
+        }
+
+        /* 2. Full-window deck viewport */
+        .deck-viewport {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: var(--stage-bg, #000);
+        }
+
+        /* 3. Fixed 16:9 design canvas.
+           JavaScript sets transform: translate(...) scale(...). */
+        .deck-stage {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: 0 0;
+            background: var(--slide-bg, #fff);
+        }
+
+        /* 4. Slides stack inside the fixed stage.
+           Content must be laid out at 1920×1080, not reflowed per device. */
+        .slide {
+            position: absolute;
+            inset: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            display: block;
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            background: var(--slide-bg, #fff);
+        }
+
+        .slide.active,
+        .slide.visible {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        /* 5. Keep media inside authored slide bounds */
+        img,
+        video,
+        canvas,
+        svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* 6. Presentation chrome stays outside the slide design system */
+        .deck-controls {
+            position: fixed;
+            left: 50%;
+            bottom: 22px;
+            transform: translateX(-50%);
+            z-index: 1000;
+        }
+
+        /* 7. Print one fixed-size slide per page */
+        @media print {
+            html,
+            body {
+                width: 1920px;
+                height: auto;
+                overflow: visible;
+                background: #fff;
+            }
+
+            .deck-viewport {
+                position: static;
+                overflow: visible;
+                background: #fff;
+            }
+
+            .deck-stage {
+                position: static;
+                width: auto;
+                height: auto;
+                transform: none !important;
+                background: none;
+            }
+
+            .slide {
+                position: relative;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                width: 1920px;
+                height: 1080px;
+                break-after: page;
+                page-break-after: always;
+            }
+
+            .slide:last-child {
+                break-after: auto;
+                page-break-after: auto;
+            }
+
+            .deck-controls {
+                display: none !important;
+            }
+        }
+
+        /* 8. Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+        }
+
+        /* ===========================================
+           TYPOGRAPHY
+           All sizes are authored for the 1920x1080 stage.
+           =========================================== */
+        body {
+            font-family: var(--font-body);
+            color: var(--text-primary);
+        }
+
+        h1,
+        h2,
+        h3,
+        p {
+            margin: 0;
+        }
+
+        h1,
+        h2,
+        .display {
+            font-family: var(--font-display);
+            font-weight: 900;
+            letter-spacing: 0;
+        }
+
+        .eyebrow {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .kicker {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--accent-2);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .headline-xl {
+            max-width: 1280px;
+            font-size: 112px;
+            line-height: 1.05;
+        }
+
+        .headline-lg {
+            max-width: 1200px;
+            font-size: 82px;
+            line-height: 1.08;
+        }
+
+        .headline-md {
+            font-size: 60px;
+            line-height: 1.16;
+        }
+
+        .body-lg {
+            max-width: 980px;
+            font-size: 34px;
+            line-height: 1.55;
+            color: var(--text-secondary);
+        }
+
+        .body-md {
+            font-size: 27px;
+            line-height: 1.55;
+            color: var(--text-secondary);
+        }
+
+        .small-note {
+            font-size: 19px;
+            line-height: 1.4;
+            color: var(--text-muted);
+        }
+
+        strong {
+            color: var(--text-primary);
+            font-weight: 900;
+        }
+
+        /* ===========================================
+           VISUAL SYSTEM
+           Grid, rails, tags, panels, and diagram blocks.
+           =========================================== */
+        .slide::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(32, 230, 177, 0.055) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(32, 230, 177, 0.045) 1px, transparent 1px);
+            background-size: 80px 80px;
+            opacity: 0.72;
+        }
+
+        .slide::after {
+            content: "";
+            position: absolute;
+            left: 112px;
+            right: 112px;
+            bottom: 88px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--line), transparent);
+        }
+
+        .slide-inner {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            padding: 86px 112px;
+        }
+
+        .deck-mark {
+            position: absolute;
+            right: 112px;
+            top: 78px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: var(--text-secondary);
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .mark-dot {
+            width: 16px;
+            height: 16px;
+            border: 3px solid var(--accent);
+            transform: rotate(45deg);
+            background: rgba(32, 230, 177, 0.08);
+        }
+
+        .chapter {
+            position: absolute;
+            left: 112px;
+            bottom: 44px;
+            font-size: 19px;
+            color: var(--text-muted);
+        }
+
+        .rail {
+            position: absolute;
+            left: 80px;
+            top: 86px;
+            bottom: 98px;
+            width: 2px;
+            background: linear-gradient(var(--accent), transparent 45%, var(--accent-2));
+            opacity: 0.6;
+        }
+
+        .rail::before,
+        .rail::after {
+            content: "";
+            position: absolute;
+            left: -8px;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+        }
+
+        .rail::before {
+            top: 0;
+        }
+
+        .rail::after {
+            bottom: 0;
+            background: var(--accent-2);
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: 0 18px 56px rgba(0, 0, 0, 0.28);
+            border-radius: 8px;
+        }
+
+        .paper-panel {
+            color: var(--ink);
+            background: var(--paper-soft);
+            border: 1px solid rgba(243, 239, 228, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            height: 42px;
+            padding: 0 18px;
+            border: 1px solid var(--line);
+            background: rgba(32, 230, 177, 0.08);
+            color: var(--accent);
+            font-size: 20px;
+            font-weight: 900;
+            border-radius: 4px;
+        }
+
+        .metric {
+            font-family: var(--font-display);
+            font-size: 112px;
+            font-weight: 900;
+            line-height: 0.9;
+            color: var(--accent-2);
+        }
+
+        .connector {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), rgba(32, 230, 177, 0));
+            transform-origin: 0 0;
+        }
+
+        .node {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            box-shadow: 0 0 22px rgba(32, 230, 177, 0.45);
+        }
+
+        .node.alt {
+            background: var(--accent-2);
+            box-shadow: 0 0 22px rgba(245, 184, 75, 0.42);
+        }
+
+        /* ===========================================
+           ANIMATIONS
+           Active slides reveal text and diagram elements.
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(28px);
+            transition:
+                opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-42px);
+            transition:
+                opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.94);
+            transition:
+                opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal,
+        .slide.visible .reveal-left,
+        .slide.visible .reveal-scale {
+            opacity: 1;
+            transform: translate(0, 0) scale(1);
+        }
+
+        .delay-1 {
+            transition-delay: 0.08s;
+        }
+
+        .delay-2 {
+            transition-delay: 0.16s;
+        }
+
+        .delay-3 {
+            transition-delay: 0.24s;
+        }
+
+        .delay-4 {
+            transition-delay: 0.32s;
+        }
+
+        .delay-5 {
+            transition-delay: 0.4s;
+        }
+
+        /* ===========================================
+           SLIDE-SPECIFIC LAYOUTS
+           Fixed dimensions prevent reflow at phone sizes.
+           =========================================== */
+        .title-layout {
+            display: grid;
+            grid-template-columns: 1fr 470px;
+            gap: 88px;
+            align-items: end;
+            height: 100%;
+            padding-bottom: 72px;
+        }
+
+        .title-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 34px;
+        }
+
+        .title-aside {
+            height: 720px;
+            padding: 34px;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 28px;
+        }
+
+        .launch-code {
+            font-size: 20px;
+            line-height: 1.75;
+            color: #cce8df;
+        }
+
+        .launch-code span {
+            color: var(--accent-2);
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+            margin-top: 72px;
+        }
+
+        .problem-card {
+            min-height: 380px;
+            padding: 36px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        .problem-card h3 {
+            font-size: 36px;
+            line-height: 1.2;
+        }
+
+        .big-number {
+            font-family: var(--font-display);
+            font-size: 78px;
+            line-height: 1;
+            color: var(--accent);
+        }
+
+        .definition-layout {
+            display: grid;
+            grid-template-columns: 1.02fr 0.98fr;
+            gap: 64px;
+            align-items: center;
+            height: 100%;
+        }
+
+        .loop-diagram {
+            position: relative;
+            height: 720px;
+        }
+
+        .loop-card {
+            position: absolute;
+            width: 360px;
+            min-height: 150px;
+            padding: 26px;
+        }
+
+        .loop-card h3,
+        .role-card h3,
+        .feature-card h3,
+        .service-card h3,
+        .action-card h3 {
+            font-size: 30px;
+            line-height: 1.25;
+        }
+
+        .loop-card p,
+        .role-card p,
+        .feature-card p,
+        .service-card p,
+        .action-card p {
+            margin-top: 12px;
+            font-size: 22px;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        .loop-a {
+            left: 78px;
+            top: 58px;
+        }
+
+        .loop-b {
+            right: 58px;
+            top: 270px;
+        }
+
+        .loop-c {
+            left: 118px;
+            bottom: 54px;
+        }
+
+        .loop-center {
+            position: absolute;
+            left: 316px;
+            top: 280px;
+            width: 235px;
+            height: 235px;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--ink);
+            background: var(--accent-2);
+            border-radius: 8px;
+        }
+
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+            margin-top: 62px;
+        }
+
+        .role-card {
+            min-height: 520px;
+            padding: 34px;
+        }
+
+        .role-card .persona {
+            margin-bottom: 34px;
+            color: var(--accent);
+            font-size: 24px;
+            font-weight: 900;
+        }
+
+        .role-card ul,
+        .feature-card ul,
+        .service-card ul,
+        .action-card ul {
+            margin: 24px 0 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 16px;
+        }
+
+        .role-card li,
+        .feature-card li,
+        .service-card li,
+        .action-card li {
+            position: relative;
+            padding-left: 26px;
+            font-size: 22px;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        .role-card li::before,
+        .feature-card li::before,
+        .service-card li::before,
+        .action-card li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 13px;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-2);
+        }
+
+        .flow-track {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 18px;
+            margin-top: 86px;
+        }
+
+        .flow-step {
+            position: relative;
+            min-height: 390px;
+            padding: 28px 22px;
+        }
+
+        .flow-step:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            right: -26px;
+            top: 50%;
+            width: 34px;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .flow-step .index {
+            font-size: 54px;
+            font-family: var(--font-display);
+            color: var(--accent-2);
+        }
+
+        .flow-step h3 {
+            margin-top: 26px;
+            font-size: 28px;
+            line-height: 1.25;
+        }
+
+        .flow-step p {
+            margin-top: 18px;
+            font-size: 20px;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 0.9fr 1.1fr;
+            gap: 60px;
+            align-items: center;
+            height: 100%;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card,
+        .service-card,
+        .action-card {
+            padding: 30px;
+            min-height: 220px;
+        }
+
+        .mini-terminal {
+            padding: 28px;
+            background: #020605;
+            border: 1px solid rgba(32, 230, 177, 0.28);
+            border-radius: 8px;
+            color: #bdf8e7;
+            font-size: 19px;
+            line-height: 1.85;
+            box-shadow: inset 0 0 0 1px rgba(243, 239, 228, 0.04);
+        }
+
+        .mini-terminal .cmd {
+            color: var(--accent-2);
+        }
+
+        .viewer-layout {
+            display: grid;
+            grid-template-columns: 560px 1fr;
+            gap: 58px;
+            align-items: center;
+            height: 100%;
+        }
+
+        .viewer-window {
+            height: 660px;
+            padding: 28px;
+            background: var(--paper);
+            color: var(--ink);
+            border-radius: 8px;
+            display: grid;
+            grid-template-rows: 54px 1fr;
+            gap: 22px;
+        }
+
+        .window-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .window-bar span {
+            width: 14px;
+            height: 14px;
+            background: var(--accent-3);
+        }
+
+        .window-bar span:nth-child(2) {
+            background: var(--accent-2);
+        }
+
+        .window-bar span:nth-child(3) {
+            background: var(--accent);
+        }
+
+        .mock-preview {
+            display: grid;
+            grid-template-columns: 1fr 250px;
+            gap: 22px;
+        }
+
+        .mock-canvas {
+            background:
+                linear-gradient(135deg, rgba(8, 17, 15, 0.92), rgba(20, 70, 58, 0.9)),
+                linear-gradient(rgba(32, 230, 177, 0.18) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(32, 230, 177, 0.16) 1px, transparent 1px);
+            background-size: auto, 34px 34px, 34px 34px;
+            border-radius: 6px;
+            padding: 24px;
+            color: var(--paper);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            gap: 18px;
+        }
+
+        .mock-canvas .banner {
+            height: 135px;
+            border: 2px solid var(--accent);
+            background: rgba(32, 230, 177, 0.12);
+        }
+
+        .mock-form {
+            display: grid;
+            gap: 14px;
+        }
+
+        .mock-field {
+            height: 62px;
+            border: 1px solid rgba(8, 17, 15, 0.22);
+            border-radius: 6px;
+            background: rgba(8, 17, 15, 0.05);
+        }
+
+        .service-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+            margin-top: 52px;
+        }
+
+        .governance-board {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 48px;
+            align-items: center;
+            height: 760px;
+        }
+
+        .checklist {
+            display: grid;
+            gap: 18px;
+        }
+
+        .check-row {
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 20px;
+            align-items: center;
+            padding: 22px 26px;
+        }
+
+        .check-box {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            color: var(--ink);
+            background: var(--accent);
+            font-weight: 900;
+        }
+
+        .check-row h3 {
+            font-size: 28px;
+            line-height: 1.2;
+        }
+
+        .check-row p {
+            margin-top: 8px;
+            font-size: 20px;
+            color: var(--text-secondary);
+        }
+
+        .matrix {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .matrix-cell {
+            min-height: 150px;
+            padding: 24px;
+        }
+
+        .matrix-cell h3 {
+            font-size: 26px;
+            color: var(--ink);
+        }
+
+        .matrix-cell p {
+            margin-top: 14px;
+            font-size: 20px;
+            line-height: 1.42;
+            color: rgba(8, 17, 15, 0.72);
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-top: 58px;
+        }
+
+        .action-card {
+            min-height: 435px;
+        }
+
+        .timeline {
+            position: relative;
+            margin-top: 78px;
+            height: 480px;
+        }
+
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 238px;
+            height: 2px;
+            background: var(--line);
+        }
+
+        .timeline-item {
+            position: absolute;
+            width: 360px;
+            padding: 28px;
+        }
+
+        .timeline-item:nth-child(1) {
+            left: 0;
+            top: 0;
+        }
+
+        .timeline-item:nth-child(2) {
+            left: 440px;
+            top: 250px;
+        }
+
+        .timeline-item:nth-child(3) {
+            left: 880px;
+            top: 0;
+        }
+
+        .timeline-item:nth-child(4) {
+            right: 0;
+            top: 250px;
+        }
+
+        .timeline-item h3 {
+            font-size: 30px;
+        }
+
+        .timeline-item p {
+            margin-top: 14px;
+            font-size: 21px;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        .closing-layout {
+            display: grid;
+            grid-template-columns: 1fr 480px;
+            gap: 72px;
+            align-items: center;
+            height: 100%;
+        }
+
+        .closing-card {
+            min-height: 620px;
+            padding: 46px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .closing-card .metric {
+            color: var(--ink);
+        }
+
+        .closing-card p {
+            color: rgba(8, 17, 15, 0.72);
+        }
+
+        /* ===========================================
+           OUTSIDE-STAGE CONTROLS
+           Navigation and editing controls stay off-canvas.
+           =========================================== */
+        .deck-controls {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            top: 18px;
+            bottom: auto;
+            padding: 9px 14px;
+            color: var(--text-primary);
+            background: rgba(3, 9, 8, 0.78);
+            border: 1px solid rgba(243, 239, 228, 0.18);
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            font: 600 14px var(--font-body);
+        }
+
+        .deck-controls button,
+        .edit-toggle,
+        .export-button {
+            height: 34px;
+            border: 1px solid rgba(243, 239, 228, 0.2);
+            background: rgba(243, 239, 228, 0.08);
+            color: var(--text-primary);
+            border-radius: 6px;
+            font: 700 14px var(--font-body);
+            cursor: pointer;
+        }
+
+        .deck-controls button {
+            width: 34px;
+        }
+
+        .progress-track {
+            width: 170px;
+            height: 5px;
+            background: rgba(243, 239, 228, 0.16);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 8.33%;
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.25s ease;
+        }
+
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+
+        .edit-toggle {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            width: 72px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10001;
+        }
+
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .export-button {
+            position: fixed;
+            top: 18px;
+            left: 100px;
+            width: 92px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10001;
+        }
+
+        .export-button.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        [contenteditable="true"] {
+            outline: 2px solid rgba(32, 230, 177, 0.7);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="deck-viewport" aria-label="Opencode Workbench 上线宣讲幻灯片">
+        <main class="deck-stage" id="deckStage">
+            <section class="slide active" aria-label="标题页">
+                <div class="slide-inner title-layout">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Opencode Workbench</div>
+                    <div class="title-stack">
+                        <p class="eyebrow reveal-left" data-editable>内部上线宣讲</p>
+                        <h1 class="headline-xl reveal-left delay-1" data-editable>Opencode Workbench</h1>
+                        <p class="body-lg reveal-left delay-2" data-editable>AI 辅助组件创作与使用平台：把组件从想法、代码、配置到预览嵌入，收敛到一个可协作的工作台。</p>
+                    </div>
+                    <aside class="title-aside panel reveal-scale delay-3">
+                        <p class="kicker" data-editable>Launch Briefing</p>
+                        <div class="launch-code" data-editable>
+                            <span>定位</span> 组件化开发工作台<br>
+                            <span>对象</span> 开发者 / 设计师 / 产品运营<br>
+                            <span>能力</span> AI 编码 + 配置驱动 + 实时预览<br>
+                            <span>交付</span> 可版本化 / 可嵌入 / 可复用
+                        </div>
+                        <p class="small-note" data-editable>2026.07 · 上线前内部传播材料</p>
+                    </aside>
+                    <p class="chapter" data-editable>01 / 项目是什么</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="为什么需要">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Why now</div>
+                    <p class="eyebrow reveal-left" data-editable>上线不是终点，协作才是瓶颈</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>组件从“能写出来”到“能被别人稳定使用”，中间有三段断点。</h2>
+                    <div class="problem-grid">
+                        <article class="problem-card panel reveal delay-2">
+                            <div class="big-number">01</div>
+                            <h3 data-editable>代码生成和人工修改割裂</h3>
+                            <p class="body-md" data-editable>需求变化后，代码、预览、文件状态和历史回溯经常分散在不同工具里。</p>
+                        </article>
+                        <article class="problem-card panel reveal delay-3">
+                            <div class="big-number">02</div>
+                            <h3 data-editable>非技术同事难以参与配置</h3>
+                            <p class="body-md" data-editable>组件参数、Schema、预览效果如果依赖开发解释，协作成本会持续增加。</p>
+                        </article>
+                        <article class="problem-card panel reveal delay-4">
+                            <div class="big-number">03</div>
+                            <h3 data-editable>交付之后缺少统一入口</h3>
+                            <p class="body-md" data-editable>组件浏览、版本、嵌入、截图和回归验证需要可被团队复用的标准链路。</p>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>02 / 问题背景</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="一句话定位">
+                <div class="slide-inner definition-layout">
+                    <div>
+                        <div class="rail"></div>
+                        <p class="eyebrow reveal-left" data-editable>一句话定位</p>
+                        <h2 class="headline-lg reveal-left delay-1" data-editable>一个把“创作、使用、集成”打通的组件工作台。</h2>
+                        <p class="body-lg reveal-left delay-2" data-editable>开发侧用 AI 和工作空间推进组件生产；业务侧通过配置和预览参与验收；外部系统通过 iframe 协议把组件直接接入业务场景。</p>
+                    </div>
+                    <div class="loop-diagram reveal-scale delay-3">
+                        <div class="connector" style="left: 280px; top: 205px; width: 390px; transform: rotate(26deg);"></div>
+                        <div class="connector" style="left: 620px; top: 480px; width: 420px; transform: rotate(142deg);"></div>
+                        <div class="connector" style="left: 308px; top: 598px; width: 310px; transform: rotate(-86deg);"></div>
+                        <div class="node" style="left: 248px; top: 198px;"></div>
+                        <div class="node alt" style="left: 676px; top: 414px;"></div>
+                        <div class="node" style="left: 334px; top: 646px;"></div>
+                        <article class="loop-card panel loop-a">
+                            <h3 data-editable>创作端</h3>
+                            <p data-editable>AI 对话、代码修改、Schema、预览、版本</p>
+                        </article>
+                        <article class="loop-card panel loop-b">
+                            <h3 data-editable>使用端</h3>
+                            <p data-editable>浏览项目、调整配置、验收效果</p>
+                        </article>
+                        <article class="loop-card panel loop-c">
+                            <h3 data-editable>嵌入集成</h3>
+                            <p data-editable>iframe + postMessage 接入外部系统</p>
+                        </article>
+                        <div class="loop-center" data-editable>统一项目语义</div>
+                    </div>
+                    <p class="chapter" data-editable>03 / 平台定位</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="目标用户">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Users</div>
+                    <p class="eyebrow reveal-left" data-editable>三类同事都能进入同一条链路</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>不是只给开发用，也不是另一个低代码壳。</h2>
+                    <div class="roles-grid">
+                        <article class="role-card panel reveal delay-2">
+                            <p class="persona" data-editable>开发者 / 设计师</p>
+                            <h3 data-editable>负责把想法变成可维护组件</h3>
+                            <ul>
+                                <li data-editable>用自然语言推进组件生成和修改</li>
+                                <li data-editable>维护配置 Schema 和预览状态</li>
+                                <li data-editable>用快照和版本保护关键变更</li>
+                            </ul>
+                        </article>
+                        <article class="role-card panel reveal delay-3">
+                            <p class="persona" data-editable>产品 / 运营</p>
+                            <h3 data-editable>负责看得懂、调得动、验得准</h3>
+                            <ul>
+                                <li data-editable>在使用端浏览组件项目</li>
+                                <li data-editable>通过表单调整配置参数</li>
+                                <li data-editable>用真实预览参与上线验收</li>
+                            </ul>
+                        </article>
+                        <article class="role-card panel reveal delay-4">
+                            <p class="persona" data-editable>外部系统集成方</p>
+                            <h3 data-editable>负责把组件放进业务现场</h3>
+                            <ul>
+                                <li data-editable>iframe 方式快速嵌入</li>
+                                <li data-editable>postMessage 动态传递配置</li>
+                                <li data-editable>减少重复开发和一次性页面</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>04 / 谁会使用</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="核心流程">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Workflow</div>
+                    <p class="eyebrow reveal-left" data-editable>核心工作流</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>从一句需求，到一个可配置、可预览、可嵌入的组件。</h2>
+                    <div class="flow-track">
+                        <article class="flow-step panel reveal delay-1">
+                            <div class="index">01</div>
+                            <h3 data-editable>创建项目</h3>
+                            <p data-editable>初始化项目基准工作区，定义组件交付边界。</p>
+                        </article>
+                        <article class="flow-step panel reveal delay-2">
+                            <div class="index">02</div>
+                            <h3 data-editable>AI 对话</h3>
+                            <p data-editable>Agent 根据自然语言修改工作区文件。</p>
+                        </article>
+                        <article class="flow-step panel reveal delay-3">
+                            <div class="index">03</div>
+                            <h3 data-editable>配置 Schema</h3>
+                            <p data-editable>把可变参数沉淀为表单和组件 Props。</p>
+                        </article>
+                        <article class="flow-step panel reveal delay-4">
+                            <div class="index">04</div>
+                            <h3 data-editable>实时预览</h3>
+                            <p data-editable>动态编译后立即看效果，配置联动低延迟反馈。</p>
+                        </article>
+                        <article class="flow-step panel reveal delay-5">
+                            <div class="index">05</div>
+                            <h3 data-editable>快照版本</h3>
+                            <p data-editable>关键动作同步当前态并生成可回溯历史。</p>
+                        </article>
+                        <article class="flow-step panel reveal delay-5">
+                            <div class="index">06</div>
+                            <h3 data-editable>发布嵌入</h3>
+                            <p data-editable>使用端验收后，通过 iframe 集成到外部系统。</p>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>05 / 端到端链路</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="创作端能力">
+                <div class="slide-inner two-column">
+                    <div>
+                        <div class="rail"></div>
+                        <p class="eyebrow reveal-left" data-editable>创作端</p>
+                        <h2 class="headline-lg reveal-left delay-1" data-editable>给开发同事的是一个“能落地”的 AI 工作区。</h2>
+                        <p class="body-lg reveal-left delay-2" data-editable>它不只回答问题，而是围绕项目工作区、文件变更、实时预览和版本快照形成可追踪的生产过程。</p>
+                        <div class="mini-terminal reveal-left delay-3" data-editable>
+                            <span class="cmd">$</span> open project workspace<br>
+                            <span class="cmd">$</span> ask agent to adjust component<br>
+                            <span class="cmd">$</span> preview schema-driven props<br>
+                            <span class="cmd">$</span> snapshot before publish
+                        </div>
+                    </div>
+                    <div class="feature-grid">
+                        <article class="feature-card panel reveal delay-2">
+                            <h3 data-editable>AI 辅助编码</h3>
+                            <ul>
+                                <li data-editable>自然语言指令生成或修改组件</li>
+                                <li data-editable>文件读写、截图、控制台等工具协同</li>
+                            </ul>
+                        </article>
+                        <article class="feature-card panel reveal delay-3">
+                            <h3 data-editable>配置与预览</h3>
+                            <ul>
+                                <li data-editable>Schema 解析为可操作表单</li>
+                                <li data-editable>TSX 动态编译后实时渲染</li>
+                            </ul>
+                        </article>
+                        <article class="feature-card panel reveal delay-4">
+                            <h3 data-editable>工作空间语义</h3>
+                            <ul>
+                                <li data-editable>Session 不拥有文件</li>
+                                <li data-editable>项目工作区承载当前态</li>
+                            </ul>
+                        </article>
+                        <article class="feature-card panel reveal delay-5">
+                            <h3 data-editable>知识库上下文</h3>
+                            <ul>
+                                <li data-editable>工作空间参考文档可被 AI 查阅</li>
+                                <li data-editable>降低重复说明和上下文丢失</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>06 / 创作端价值</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="使用端体验">
+                <div class="slide-inner viewer-layout">
+                    <div>
+                        <div class="rail"></div>
+                        <p class="eyebrow reveal-left" data-editable>使用端</p>
+                        <h2 class="headline-lg reveal-left delay-1" data-editable>让非技术同事不用等开发，也能参与验收。</h2>
+                        <p class="body-lg reveal-left delay-2" data-editable>项目列表、配置面板和预览画布共同组成一个低门槛入口：能找项目、能调参数、能看真实效果。</p>
+                    </div>
+                    <div class="viewer-window reveal-scale delay-3">
+                        <div class="window-bar"><span></span><span></span><span></span></div>
+                        <div class="mock-preview">
+                            <div class="mock-canvas">
+                                <div class="banner"></div>
+                                <h3 style="font-size: 36px; margin: 0;" data-editable>活动组件预览</h3>
+                                <p style="font-size: 22px; line-height: 1.42; margin: 0;" data-editable>配置修改后，预览区保持同一组件真实渲染结果。</p>
+                            </div>
+                            <div class="mock-form">
+                                <div class="mock-field"></div>
+                                <div class="mock-field"></div>
+                                <div class="mock-field"></div>
+                                <div class="mock-field" style="background: rgba(32, 230, 177, 0.22);"></div>
+                                <p style="font-size: 20px; line-height: 1.4; margin: 0; color: rgba(8,17,15,0.68);" data-editable>JSON Schema 驱动表单，产品和运营可以直接调参。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="chapter" data-editable>07 / 使用端价值</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="Agent 服务层">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Agent Service</div>
+                    <p class="eyebrow reveal-left" data-editable>独立 Agent 服务层</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>AI 能力独立出来，前端专注 UI，服务层负责业务和工具边界。</h2>
+                    <div class="service-grid">
+                        <article class="service-card panel reveal delay-2">
+                            <h3 data-editable>Pi Agent 单后端</h3>
+                            <p data-editable>采用进程内嵌入式 Agent 后端，不依赖外部 OpenCode Server 或 CLI 子进程。</p>
+                        </article>
+                        <article class="service-card panel reveal delay-3">
+                            <h3 data-editable>HTTP + WebSocket</h3>
+                            <p data-editable>REST 管理项目、Session、文件和模型配置；WebSocket 推送流式响应与文件变更。</p>
+                        </article>
+                        <article class="service-card panel reveal delay-4">
+                            <h3 data-editable>工具权限与变更捕获</h3>
+                            <p data-editable>覆盖文件、截图、控制台、计划审批、页面删除和子 Agent 委派等能力。</p>
+                        </article>
+                        <article class="service-card panel reveal delay-5">
+                            <h3 data-editable>Session Guard + Snapshot</h3>
+                            <p data-editable>通过边界校验、变更比较和快照，把 AI 修改变成可审计的项目行为。</p>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>08 / AI 服务架构</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="工程治理">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <p class="eyebrow reveal-left" data-editable>工程治理</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>能上线，也要能持续维护。</h2>
+                    <div class="governance-board">
+                        <div class="checklist">
+                            <div class="check-row panel reveal delay-2">
+                                <div class="check-box">1</div>
+                                <div>
+                                    <h3 data-editable>共享项目语义</h3>
+                                    <p data-editable>project-core、project-scaffold、project-cli 复用同一项目读写和脚手架能力。</p>
+                                </div>
+                            </div>
+                            <div class="check-row panel reveal delay-3">
+                                <div class="check-box">2</div>
+                                <div>
+                                    <h3 data-editable>诊断与回归</h3>
+                                    <p data-editable>创作端诊断日志、CLI 查询、Jest / Vitest / Playwright 形成问题闭环。</p>
+                                </div>
+                            </div>
+                            <div class="check-row panel reveal delay-4">
+                                <div class="check-box">3</div>
+                                <div>
+                                    <h3 data-editable>部署边界清晰</h3>
+                                    <p data-editable>Docker Compose 覆盖 author、agent、screenshot、viewer 四个服务。</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="matrix reveal-scale delay-3">
+                            <div class="matrix-cell paper-panel">
+                                <h3 data-editable>可验证</h3>
+                                <p data-editable>核心命令收敛到 check:* 和 E2E 流程。</p>
+                            </div>
+                            <div class="matrix-cell paper-panel">
+                                <h3 data-editable>可追踪</h3>
+                                <p data-editable>诊断事件把预览、自动保存、协同和 Session 串起来。</p>
+                            </div>
+                            <div class="matrix-cell paper-panel">
+                                <h3 data-editable>可回滚</h3>
+                                <p data-editable>快照和版本历史支撑关键节点回退。</p>
+                            </div>
+                            <div class="matrix-cell paper-panel">
+                                <h3 data-editable>可扩展</h3>
+                                <p data-editable>嵌入 API 和工具链让组件进入更多业务场景。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="chapter" data-editable>09 / 上线保障</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="同事可以如何参与">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <div class="deck-mark"><span class="mark-dot"></span> Join</div>
+                    <p class="eyebrow reveal-left" data-editable>上线后，同事可以怎么参与</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>这不是“发布一个系统”，而是启动一条新的组件交付方式。</h2>
+                    <div class="actions-grid">
+                        <article class="action-card panel reveal delay-2">
+                            <span class="tag">试用</span>
+                            <h3 data-editable>用一个真实组件跑完整链路</h3>
+                            <p data-editable>从 AI 修改、配置、预览到快照，看每一步是否符合团队实际习惯。</p>
+                        </article>
+                        <article class="action-card panel reveal delay-3">
+                            <span class="tag">沉淀</span>
+                            <h3 data-editable>把常用组件做成模板</h3>
+                            <p data-editable>让后续项目不用重复搭结构、补说明、复制配置。</p>
+                        </article>
+                        <article class="action-card panel reveal delay-4">
+                            <span class="tag">补充</span>
+                            <h3 data-editable>提供知识库材料</h3>
+                            <p data-editable>把规范、品牌、业务说明变成 AI 可查阅的可靠上下文。</p>
+                        </article>
+                        <article class="action-card panel reveal delay-5">
+                            <span class="tag">集成</span>
+                            <h3 data-editable>选择一个外部场景嵌入</h3>
+                            <p data-editable>验证 iframe + postMessage 在业务系统里的真实交付效果。</p>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>10 / 协作入口</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="落地节奏">
+                <div class="slide-inner">
+                    <div class="rail"></div>
+                    <p class="eyebrow reveal-left" data-editable>建议落地节奏</p>
+                    <h2 class="headline-lg reveal-left delay-1" data-editable>先用小范围真实项目验证，再把可复用经验沉淀为模板和规范。</h2>
+                    <div class="timeline">
+                        <article class="timeline-item panel reveal delay-2">
+                            <h3 data-editable>01 宣讲与 Demo</h3>
+                            <p data-editable>让团队先理解定位、角色入口和端到端链路。</p>
+                        </article>
+                        <article class="timeline-item panel reveal delay-3">
+                            <h3 data-editable>02 选择试点组件</h3>
+                            <p data-editable>挑一个真实业务组件，验证 AI 修改、配置预览和嵌入交付。</p>
+                        </article>
+                        <article class="timeline-item panel reveal delay-4">
+                            <h3 data-editable>03 固化模板与知识</h3>
+                            <p data-editable>把稳定流程沉淀成模板、Schema、知识库和验收标准。</p>
+                        </article>
+                        <article class="timeline-item panel reveal delay-5">
+                            <h3 data-editable>04 接入更多业务</h3>
+                            <p data-editable>通过使用端和嵌入 API，把组件能力扩散到更多系统。</p>
+                        </article>
+                    </div>
+                    <p class="chapter" data-editable>11 / 推广路径</p>
+                </div>
+            </section>
+
+            <section class="slide" aria-label="结束页">
+                <div class="slide-inner closing-layout">
+                    <div>
+                        <div class="rail"></div>
+                        <p class="eyebrow reveal-left" data-editable>最后想传达的事</p>
+                        <h2 class="headline-xl reveal-left delay-1" data-editable>从会写代码的工具，到能交付组件的工作台。</h2>
+                        <p class="body-lg reveal-left delay-2" data-editable>Opencode Workbench 的价值不在于单点功能更酷，而在于把团队围绕组件生产、配置验收和外部集成的协作链路统一起来。</p>
+                    </div>
+                    <aside class="closing-card paper-panel reveal-scale delay-3">
+                        <div>
+                            <p class="kicker" style="color: #17483b;" data-editable>Next action</p>
+                            <div class="metric" data-editable>1</div>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 42px; line-height: 1.18; margin: 0 0 20px;" data-editable>找一个真实组件试起来</h3>
+                            <p class="body-md" data-editable>最好的宣传方式，是让同事看到它怎样把一个组件从需求推进到可用交付。</p>
+                        </div>
+                    </aside>
+                    <p class="chapter" data-editable>12 / 结束</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="deck-controls" aria-label="幻灯片导航">
+        <button id="prevBtn" type="button" aria-label="上一页">‹</button>
+        <span id="slideCounter">1 / 12</span>
+        <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+        <button id="nextBtn" type="button" aria-label="下一页">›</button>
+    </div>
+
+    <div class="edit-hotzone" aria-hidden="true"></div>
+    <button class="edit-toggle" id="editToggle" type="button" title="Edit mode (E)">Edit</button>
+    <button class="export-button" id="exportButton" type="button" title="Export current edited HTML">Export</button>
+
+    <script>
+        /* ===========================================
+           SLIDE PRESENTATION CONTROLLER
+           Handles scaling, keyboard, wheel, touch, and progress.
+           =========================================== */
+        class SlidePresentation {
+            constructor() {
+                this.slides = Array.from(document.querySelectorAll(".slide"));
+                this.currentSlide = 0;
+                this.stage = document.getElementById("deckStage");
+                this.counter = document.getElementById("slideCounter");
+                this.progressBar = document.getElementById("progressBar");
+                this.prevBtn = document.getElementById("prevBtn");
+                this.nextBtn = document.getElementById("nextBtn");
+                this.lastWheelTime = 0;
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+                this.setupStageScale();
+                this.setupKeyboardNav();
+                this.setupButtonNav();
+                this.setupTouchNav();
+                this.setupWheelNav();
+                this.showSlide(0);
+            }
+
+            setupStageScale() {
+                const scale = () => {
+                    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+                    const x = (window.innerWidth - 1920 * factor) / 2;
+                    const y = (window.innerHeight - 1080 * factor) / 2;
+                    this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+                };
+                scale();
+                window.addEventListener("resize", scale);
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener("keydown", (event) => {
+                    if (event.target && event.target.getAttribute("contenteditable") === "true") {
+                        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+                            event.preventDefault();
+                            window.deckEditor.save();
+                        }
+                        return;
+                    }
+                    if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(event.key)) {
+                        event.preventDefault();
+                        this.next();
+                    }
+                    if (["ArrowLeft", "ArrowUp", "PageUp"].includes(event.key)) {
+                        event.preventDefault();
+                        this.prev();
+                    }
+                    if (event.key === "Home") {
+                        event.preventDefault();
+                        this.showSlide(0);
+                    }
+                    if (event.key === "End") {
+                        event.preventDefault();
+                        this.showSlide(this.slides.length - 1);
+                    }
+                });
+            }
+
+            setupButtonNav() {
+                this.prevBtn.addEventListener("click", () => this.prev());
+                this.nextBtn.addEventListener("click", () => this.next());
+            }
+
+            setupTouchNav() {
+                document.addEventListener("touchstart", (event) => {
+                    const touch = event.changedTouches[0];
+                    this.touchStartX = touch.clientX;
+                    this.touchStartY = touch.clientY;
+                }, { passive: true });
+                document.addEventListener("touchend", (event) => {
+                    const touch = event.changedTouches[0];
+                    const dx = touch.clientX - this.touchStartX;
+                    const dy = touch.clientY - this.touchStartY;
+                    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+                        dx < 0 ? this.next() : this.prev();
+                    }
+                }, { passive: true });
+            }
+
+            setupWheelNav() {
+                document.addEventListener("wheel", (event) => {
+                    const now = Date.now();
+                    if (now - this.lastWheelTime < 620 || Math.abs(event.deltaY) < 24) {
+                        return;
+                    }
+                    this.lastWheelTime = now;
+                    event.deltaY > 0 ? this.next() : this.prev();
+                }, { passive: true });
+            }
+
+            showSlide(index) {
+                this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+                this.slides.forEach((slide, i) => {
+                    slide.classList.toggle("active", i === this.currentSlide);
+                    slide.classList.toggle("visible", i === this.currentSlide);
+                });
+                this.counter.textContent = `${this.currentSlide + 1} / ${this.slides.length}`;
+                this.progressBar.style.width = `${((this.currentSlide + 1) / this.slides.length) * 100}%`;
+            }
+
+            next() {
+                this.showSlide(this.currentSlide + 1);
+            }
+
+            prev() {
+                this.showSlide(this.currentSlide - 1);
+            }
+        }
+
+        /* ===========================================
+           INLINE EDITOR
+           Enables local text edits, localStorage save, and HTML export.
+           =========================================== */
+        class InlineDeckEditor {
+            constructor() {
+                this.isActive = false;
+                this.storageKey = "opencode-workbench-launch-deck-edits";
+                this.editables = Array.from(document.querySelectorAll("[data-editable]"));
+                this.editToggle = document.getElementById("editToggle");
+                this.exportButton = document.getElementById("exportButton");
+                this.hotzone = document.querySelector(".edit-hotzone");
+                this.hideTimeout = null;
+                this.load();
+                this.setupToggle();
+                this.setupHover();
+                this.setupSaveOnInput();
+                this.setupExport();
+            }
+
+            setupToggle() {
+                this.editToggle.addEventListener("click", () => this.toggleEditMode());
+                this.hotzone.addEventListener("click", () => this.toggleEditMode());
+                document.addEventListener("keydown", (event) => {
+                    const target = event.target;
+                    const editingText = target && target.getAttribute("contenteditable") === "true";
+                    if ((event.key === "e" || event.key === "E") && !editingText) {
+                        this.toggleEditMode();
+                    }
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+                        event.preventDefault();
+                        this.save();
+                    }
+                });
+            }
+
+            setupHover() {
+                this.hotzone.addEventListener("mouseenter", () => {
+                    clearTimeout(this.hideTimeout);
+                    this.editToggle.classList.add("show");
+                    this.exportButton.classList.toggle("show", this.isActive);
+                });
+                this.hotzone.addEventListener("mouseleave", () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) {
+                            this.editToggle.classList.remove("show");
+                            this.exportButton.classList.remove("show");
+                        }
+                    }, 400);
+                });
+                [this.editToggle, this.exportButton].forEach((button) => {
+                    button.addEventListener("mouseenter", () => clearTimeout(this.hideTimeout));
+                    button.addEventListener("mouseleave", () => {
+                        this.hideTimeout = setTimeout(() => {
+                            if (!this.isActive) {
+                                this.editToggle.classList.remove("show");
+                                this.exportButton.classList.remove("show");
+                            }
+                        }, 400);
+                    });
+                });
+            }
+
+            setupSaveOnInput() {
+                this.editables.forEach((element) => {
+                    element.addEventListener("input", () => this.save());
+                });
+            }
+
+            setupExport() {
+                this.exportButton.addEventListener("click", () => {
+                    this.save();
+                    const html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+                    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = "opencode-workbench-launch-deck-edited.html";
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                });
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                this.editables.forEach((element) => {
+                    element.setAttribute("contenteditable", this.isActive ? "true" : "false");
+                });
+                this.editToggle.classList.toggle("active", this.isActive);
+                this.editToggle.classList.add("show");
+                this.exportButton.classList.toggle("show", this.isActive);
+                this.editToggle.textContent = this.isActive ? "Done" : "Edit";
+                if (!this.isActive) {
+                    this.save();
+                }
+            }
+
+            save() {
+                const payload = this.editables.map((element) => element.innerHTML);
+                localStorage.setItem(this.storageKey, JSON.stringify(payload));
+            }
+
+            load() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(this.storageKey) || "null");
+                    if (!Array.isArray(saved)) {
+                        return;
+                    }
+                    this.editables.forEach((element, index) => {
+                        if (typeof saved[index] === "string") {
+                            element.innerHTML = saved[index];
+                        }
+                    });
+                } catch {
+                    localStorage.removeItem(this.storageKey);
+                }
+            }
+        }
+
+        window.presentation = new SlidePresentation();
+        window.deckEditor = new InlineDeckEditor();
+    </script>
+</body>
+</html>

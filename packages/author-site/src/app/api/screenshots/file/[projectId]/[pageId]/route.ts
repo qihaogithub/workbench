@@ -10,8 +10,13 @@ const DATA_DIR =
 const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
 
 interface ScreenshotMeta {
-  currentHash: string;
+  currentHash?: string;
   renderBoxes?: Record<string, unknown>;
+  variants?: Record<string, {
+    variant?: "strict" | "fast";
+    generatedAt?: string;
+    renderBox?: unknown;
+  }>;
 }
 
 function normalizeHash(hash?: string | null): string | null {
@@ -30,6 +35,36 @@ function readScreenshotMeta(
   } catch {
     return null;
   }
+}
+
+function resolveCurrentScreenshotMeta(meta: ScreenshotMeta | null): {
+  hash: string;
+  variant: "strict" | "fast";
+  renderBox?: unknown;
+} | null {
+  if (!meta) return null;
+  if (meta.currentHash) {
+    return {
+      hash: meta.currentHash,
+      variant: "strict",
+      renderBox: meta.renderBoxes?.[meta.currentHash],
+    };
+  }
+
+  const latestVariant = Object.entries(meta.variants ?? {})
+    .map(([key, value]) => {
+      const [hash, variant = "strict"] = key.split(":");
+      return {
+        hash,
+        variant: variant === "fast" ? "fast" as const : "strict" as const,
+        generatedAt: value.generatedAt ?? "",
+        renderBox: value.renderBox,
+      };
+    })
+    .filter((entry) => normalizeHash(entry.hash))
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+
+  return latestVariant ?? null;
 }
 
 async function proxyScreenshotFile(
@@ -94,6 +129,7 @@ function readLocalScreenshot(
   projectId: string,
   pageId: string,
   hash?: string | null,
+  variant: "strict" | "fast" = "strict",
 ): Buffer | null {
   const projectDir = path.join(SCREENSHOTS_DIR, projectId);
   if (!fs.existsSync(projectDir)) return null;
@@ -102,11 +138,22 @@ function readLocalScreenshot(
   if (hash && !normalizedHash) return null;
 
   const filePath = normalizedHash
-    ? path.join(projectDir, `${pageId}.${normalizedHash}.png`)
+    ? path.join(
+        projectDir,
+        variant === "strict"
+          ? `${pageId}.${normalizedHash}.png`
+          : `${pageId}.${normalizedHash}.${variant}.png`,
+      )
     : (() => {
         const meta = readScreenshotMeta(projectId, pageId);
-        return meta?.currentHash
-          ? path.join(projectDir, `${pageId}.${meta.currentHash}.png`)
+        const current = resolveCurrentScreenshotMeta(meta);
+        return current
+          ? path.join(
+              projectDir,
+              current.variant === "strict"
+                ? `${pageId}.${current.hash}.png`
+                : `${pageId}.${current.hash}.${current.variant}.png`,
+            )
           : path.join(projectDir, `${pageId}.png`);
       })();
 
@@ -127,7 +174,8 @@ export async function GET(
     if (proxiedMeta) return proxiedMeta;
 
     const meta = readScreenshotMeta(projectId, pageId);
-    if (!meta?.currentHash) {
+    const current = resolveCurrentScreenshotMeta(meta);
+    if (!current) {
       return NextResponse.json(
         {
           success: false,
@@ -141,13 +189,15 @@ export async function GET(
       JSON.stringify({
         success: true,
         data: {
-          currentHash: meta.currentHash,
+          currentHash: current.hash,
+          variant: current.variant,
           url: `/api/screenshots/file/${encodeURIComponent(
             projectId,
-          )}/${encodeURIComponent(pageId)}?hash=${encodeURIComponent(
-            meta.currentHash,
-          )}`,
-          renderBox: meta.renderBoxes?.[meta.currentHash],
+          )}/${encodeURIComponent(pageId)}?${new URLSearchParams({
+            hash: current.hash,
+            ...(current.variant === "fast" ? { variant: "fast" } : {}),
+          }).toString()}`,
+          renderBox: current.renderBox,
         },
       }),
       {
@@ -167,8 +217,10 @@ export async function GET(
   if (proxied) return proxied;
 
   const rawHash = request.nextUrl.searchParams.get("hash");
+  const variant =
+    request.nextUrl.searchParams.get("variant") === "fast" ? "fast" : "strict";
   const hash = normalizeHash(rawHash);
-  const buffer = readLocalScreenshot(projectId, pageId, rawHash);
+  const buffer = readLocalScreenshot(projectId, pageId, rawHash, variant);
   if (!buffer) {
     return NextResponse.json(
       {

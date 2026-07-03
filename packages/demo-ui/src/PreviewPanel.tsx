@@ -362,6 +362,81 @@ function hideIframeScrollbar(iframe: HTMLIFrameElement) {
   } catch {}
 }
 
+function sanitizeStaticPrototypeElement(root: HTMLElement) {
+  const blockedSelectors = "script, iframe, embed, object";
+  root.querySelectorAll(blockedSelectors).forEach((node) => node.remove());
+  root.querySelectorAll<HTMLElement>("*").forEach((node) => {
+    for (const attr of Array.from(node.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim().toLowerCase();
+      if (name.startsWith("on")) {
+        node.removeAttribute(attr.name);
+        continue;
+      }
+      if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+        node.removeAttribute(attr.name);
+      }
+    }
+  });
+}
+
+function extractStaticPrototypeCss(doc: Document): string {
+  const chunks: string[] = [];
+  doc.querySelectorAll("style").forEach((style) => {
+    if (style.textContent?.trim()) {
+      chunks.push(style.textContent.trim());
+    }
+  });
+  for (const sheet of Array.from(doc.styleSheets)) {
+    try {
+      const rules = Array.from(sheet.cssRules)
+        .map((rule) => rule.cssText)
+        .filter(Boolean);
+      if (rules.length > 0) {
+        chunks.push(rules.join("\n"));
+      }
+    } catch {
+      // Cross-origin stylesheets cannot be read; prototype validation will decide
+      // whether the remaining static output is usable.
+    }
+  }
+  return Array.from(new Set(chunks)).join("\n\n");
+}
+
+function extractStaticPrototypeSnapshot(
+  iframe: HTMLIFrameElement | null,
+): { ok: true; html: string; css: string } | { ok: false; error: string } {
+  try {
+    const doc = iframe?.contentDocument;
+    if (!doc) {
+      return { ok: false, error: "当前预览 iframe 不可读取" };
+    }
+    const sourceRoot =
+      doc.getElementById("root") ||
+      doc.querySelector<HTMLElement>("[data-preview-root]") ||
+      doc.body;
+    if (!sourceRoot) {
+      return { ok: false, error: "未找到可静态化的预览根节点" };
+    }
+    const clone = sourceRoot.cloneNode(true) as HTMLElement;
+    sanitizeStaticPrototypeElement(clone);
+    const html = clone.innerHTML.trim();
+    if (!html) {
+      return { ok: false, error: "预览根节点为空" };
+    }
+    return {
+      ok: true,
+      html,
+      css: extractStaticPrototypeCss(doc),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "预览 DOM 静态化失败",
+    };
+  }
+}
+
 export function PreviewPanel({
   code,
   sessionId,
@@ -395,6 +470,8 @@ export function PreviewPanel({
   onVisualSelectStack,
   visualNodeTreeRequestKey,
   onVisualNodeTreeChange,
+  staticPrototypeRequestKey,
+  onStaticPrototypeSnapshot,
   onVisualInlineEdit,
   onVisualAnnotationCreate,
 }: PreviewPanelProps) {
@@ -1238,6 +1315,21 @@ export function PreviewPanel({
     if (!iframeReadyRef.current) return;
     sendCollectVisualNodeTree();
   }, [sendCollectVisualNodeTree, visualNodeTreeRequestKey]);
+
+  useEffect(() => {
+    if (staticPrototypeRequestKey == null) return;
+    if (staticPrototypeRequestKey <= 0) return;
+    if (!iframeReadyRef.current) {
+      onStaticPrototypeSnapshot?.({
+        ok: false,
+        error: "当前预览尚未加载完成",
+      });
+      return;
+    }
+    onStaticPrototypeSnapshot?.(
+      extractStaticPrototypeSnapshot(iframeRef.current),
+    );
+  }, [onStaticPrototypeSnapshot, staticPrototypeRequestKey]);
 
   useLayoutEffect(measureContainer);
 

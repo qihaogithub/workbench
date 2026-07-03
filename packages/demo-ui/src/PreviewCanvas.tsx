@@ -352,6 +352,7 @@ export function PreviewCanvas({
   canvasState: externalState,
   onCanvasStateChange,
   onPageConfigEdit,
+  onRuntimeConversionRequest,
   onCanvasClick,
   className,
   editingPageId,
@@ -2221,6 +2222,7 @@ export function PreviewCanvas({
               renderMode={renderMode}
               onLayoutChange={handleLayoutChange}
               onConfigEdit={handlePageSelect}
+              onRuntimeConversionRequest={onRuntimeConversionRequest}
               onConsoleEntry={onConsoleEntry}
               onError={onError}
               onDragStart={handleDragStart}

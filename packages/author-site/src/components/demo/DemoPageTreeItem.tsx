@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
+import type {
+  DemoPageMeta,
+  DemoFolderMeta,
+  DemoPageRuntimeType,
+} from "@opencode-workbench/shared";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
@@ -30,6 +34,7 @@ import {
   FolderPlus,
   Copy,
   MoveRight,
+  Bot,
 } from "lucide-react";
 import type { FlatTreeItem } from "./demo-page-tree-utils";
 
@@ -47,6 +52,10 @@ interface DemoPageTreeItemProps {
   onPageRename: (pageId: string, name: string) => void;
   onPageCopy: (pageId: string) => void;
   onPageDelete: (pageId: string) => void;
+  onRequestRuntimeConversion?: (
+    pageId: string,
+    targetRuntimeType: DemoPageRuntimeType,
+  ) => void;
   onRenameFolder: (folderId: string, name: string) => void;
   onDeleteFolder: (folderId: string, deleteContents: boolean) => void;
   onCreateSubFolder: (parentId: string) => void;
@@ -67,6 +76,7 @@ export function DemoPageTreeItem({
   onPageRename,
   onPageCopy,
   onPageDelete,
+  onRequestRuntimeConversion,
   onRenameFolder,
   onDeleteFolder,
   onCreateSubFolder,
@@ -206,11 +216,13 @@ export function DemoPageTreeItem({
             pageId={item.id}
             pageName={item.name}
             pageParentId={(item as DemoPageMeta).parentId ?? null}
+            runtimeType={(item as DemoPageMeta).runtimeType}
             folders={folders}
             onRename={() => startEditing(item.id, item.name)}
             onCopy={() => onPageCopy(item.id)}
             onDelete={() => onPageDelete(item.id)}
             onMoveTo={onMovePageToFolder}
+            onRequestRuntimeConversion={onRequestRuntimeConversion}
           />
         )}
       </div>
@@ -315,22 +327,33 @@ function PageContextMenu({
   pageId,
   pageName,
   pageParentId,
+  runtimeType,
   folders,
   onRename,
   onCopy,
   onDelete,
   onMoveTo,
+  onRequestRuntimeConversion,
 }: {
   pageId: string;
   pageName: string;
   pageParentId: string | null;
+  runtimeType?: DemoPageRuntimeType;
   folders: DemoFolderMeta[];
   onRename: () => void;
   onCopy: () => void;
   onDelete: () => void;
   onMoveTo: (pageId: string, targetParentId: string | null) => void;
+  onRequestRuntimeConversion?: (
+    pageId: string,
+    targetRuntimeType: DemoPageRuntimeType,
+  ) => void;
 }) {
   const moveTargets = folders.filter((f) => f.id !== pageParentId);
+  const isPrototype = runtimeType === "prototype-html-css";
+  const targetRuntimeType: DemoPageRuntimeType = isPrototype
+    ? "high-fidelity-react"
+    : "prototype-html-css";
 
   return (
     <DropdownMenu>
@@ -375,6 +398,14 @@ function PageContextMenu({
           <Copy className="mr-2 h-4 w-4" />
           复制页面
         </DropdownMenuItem>
+        {onRequestRuntimeConversion && (
+          <DropdownMenuItem
+            onClick={() => onRequestRuntimeConversion(pageId, targetRuntimeType)}
+          >
+            <Bot className="mr-2 h-4 w-4" />
+            {isPrototype ? "AI 转高保真页" : "AI 转 HTML/CSS 原型"}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
