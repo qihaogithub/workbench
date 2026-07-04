@@ -39,8 +39,7 @@ const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
 const SNAPSHOTS_DIR = path.join(BASE_DIR, 'snapshots');
 
 function generateVersionId(project: Project): string {
-  const pageVersions = Object.values(project.pageVersions ?? {}).flat();
-  const maxVersion = [...project.versions, ...pageVersions].reduce(
+  const maxVersion = project.versions.reduce(
     (max, version) => {
       const match = /^v(\d+)$/.exec(version.versionId);
       return match ? Math.max(max, Number(match[1])) : max;

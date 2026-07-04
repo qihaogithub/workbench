@@ -38,6 +38,10 @@ import {
 } from "lucide-react";
 import type { FlatTreeItem } from "./demo-page-tree-utils";
 
+interface RuntimeConversionRequestOptions {
+  skipStaticization?: boolean;
+}
+
 interface DemoPageTreeItemProps {
   flatItem: FlatTreeItem;
   projectId: string;
@@ -55,6 +59,7 @@ interface DemoPageTreeItemProps {
   onRequestRuntimeConversion?: (
     pageId: string,
     targetRuntimeType: DemoPageRuntimeType,
+    options?: RuntimeConversionRequestOptions,
   ) => void;
   onRenameFolder: (folderId: string, name: string) => void;
   onDeleteFolder: (folderId: string, deleteContents: boolean) => void;
@@ -347,6 +352,7 @@ function PageContextMenu({
   onRequestRuntimeConversion?: (
     pageId: string,
     targetRuntimeType: DemoPageRuntimeType,
+    options?: RuntimeConversionRequestOptions,
   ) => void;
 }) {
   const moveTargets = folders.filter((f) => f.id !== pageParentId);
@@ -400,7 +406,11 @@ function PageContextMenu({
         </DropdownMenuItem>
         {onRequestRuntimeConversion && (
           <DropdownMenuItem
-            onClick={() => onRequestRuntimeConversion(pageId, targetRuntimeType)}
+            onClick={() =>
+              onRequestRuntimeConversion(pageId, targetRuntimeType, {
+                skipStaticization: true,
+              })
+            }
           >
             <Bot className="mr-2 h-4 w-4" />
             {isPrototype ? "AI 转高保真页" : "AI 转 HTML/CSS 原型"}

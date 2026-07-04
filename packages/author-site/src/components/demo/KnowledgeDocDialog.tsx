@@ -163,8 +163,10 @@ export function KnowledgeDocDialog({
     try {
       if (activeMode === "add") {
         if (!addTitle.trim() || !addContent.trim()) return;
+        const params = new URLSearchParams({ workingDir });
+        if (projectId) params.set("projectId", projectId);
         const res = await fetch(
-          `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}`,
+          `/api/knowledge?${params.toString()}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -194,8 +196,10 @@ export function KnowledgeDocDialog({
         const contentToSave = collabDescriptor
           ? collab.ytext?.toString() ?? editContent
           : editContent;
+        const params = new URLSearchParams({ workingDir });
+        if (projectId) params.set("projectId", projectId);
         const res = await fetch(
-          `/api/knowledge/${item.id}?workingDir=${encodeURIComponent(workingDir)}`,
+          `/api/knowledge/${item.id}?${params.toString()}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

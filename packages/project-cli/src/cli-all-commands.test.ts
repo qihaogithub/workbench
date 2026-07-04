@@ -249,23 +249,27 @@ try {
   await runCommand("edit validate", ["edit", "validate", editId]);
   await runCommand("edit commit", ["edit", "commit", editId, "CLI 全功能提交"]);
 
-  const createdPageVersion = await runCommand("page version-create", [
-    "page",
+  const createdResourceVersion = await runCommand("resource version-create", [
+    "resource",
     "version-create",
     projectId,
+    "page",
     pageId,
     "--note",
-    "CLI 全功能页面版本",
+    "CLI 全功能资源版本",
   ]);
-  const pageVersionId = dataOf<{ versionId: string }>(createdPageVersion).versionId;
-  await runCommand("page version-list", ["page", "version-list", projectId, pageId]);
-  await runCommand("page version-get", ["page", "version-get", projectId, pageId, pageVersionId]);
+  const resourceVersionId = dataOf<{ id: string }>(createdResourceVersion).id;
+  await runCommand("resource version-list", ["resource", "version-list", projectId, "page", pageId]);
+  await runCommand("resource version-get", ["resource", "version-get", projectId, "page", pageId, resourceVersionId]);
   await runCommand("project validate-runtime", ["project", "validate-runtime", projectId]);
+  await runCommand("project commit-list", ["project", "commit-list", projectId]);
+  await runCommand("project materialize", ["project", "materialize", projectId, "--check"]);
+  await runCommand("project content-gc", ["project", "content-gc", projectId, "--dry-run"]);
 
   const discardEdit = await runCommand("edit begin", ["edit", "begin", projectId]);
   await runCommand("edit discard", ["edit", "discard", dataOf<{ editId: string }>(discardEdit).editId]);
 
-  await runCommand("page restore-version", ["page", "restore-version", projectId, pageId, pageVersionId]);
+  await runCommand("resource restore-version", ["resource", "restore-version", projectId, "page", pageId, resourceVersionId]);
 
   await runCommand("publish check", ["publish", "check", projectId]);
   await runCommand("publish project", ["publish", "project", projectId]);

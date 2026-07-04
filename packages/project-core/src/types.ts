@@ -7,10 +7,16 @@ import type {
   DemoPageMeta,
   AppGraph,
   PageVersionInfo,
+  ProjectCommit,
+  ProjectContentState,
+  ProjectResourceKind,
+  ResourceVersion,
   Project,
   ProjectTemplateMeta,
   VersionInfo,
 } from "@opencode-workbench/shared/contracts";
+
+export type { ProjectResourceKind } from "@opencode-workbench/shared/contracts";
 
 export type ProjectAdminRole = "admin" | "creator" | "readonly";
 
@@ -155,7 +161,74 @@ export interface PageVersionCreateInput {
   projectId: string;
   pageId: string;
   editId?: string;
+  sourceWorkspacePath?: string;
   note?: string;
+}
+
+export interface ResourceVersionHistory {
+  projectId: string;
+  kind: ProjectResourceKind;
+  resourceId: string;
+  currentVersion?: string;
+  versions: ResourceVersion[];
+  totalVersions: number;
+}
+
+export interface ResourceVersionDetail {
+  projectId: string;
+  kind: ProjectResourceKind;
+  resourceId: string;
+  version: ResourceVersion;
+  content?: unknown;
+}
+
+export interface ResourceVersionCreateInput {
+  projectId: string;
+  kind: ProjectResourceKind;
+  resourceId: string;
+  editId?: string;
+  sourceWorkspacePath?: string;
+  note?: string;
+  visibility?: ProjectCommit["visibility"];
+  source?: ResourceVersion["source"];
+}
+
+export interface ResourceRestoreInput {
+  projectId: string;
+  kind: ProjectResourceKind;
+  resourceId: string;
+  versionId: string;
+  workspaceId?: string;
+  sessionId?: string;
+}
+
+export interface ProjectCommitHistory {
+  projectId: string;
+  headCommitId?: string;
+  commits: ProjectCommit[];
+  totalCommits: number;
+}
+
+export interface ProjectPublishCommitInput {
+  projectId: string;
+  publishedVersion: string;
+  title?: string;
+}
+
+export interface MaterializationResult {
+  projectId: string;
+  commitId?: string;
+  status: ProjectContentState["materializationStatus"];
+  checked: boolean;
+  writtenFiles: string[];
+  missingBlobs: string[];
+}
+
+export interface BlobGarbageCollectResult {
+  projectId: string;
+  dryRun: boolean;
+  removableBlobs: string[];
+  removedBlobs: string[];
 }
 
 export interface ExportedAsset {
@@ -185,6 +258,7 @@ export interface ProjectPackageExport {
 export interface PageRestoreResult {
   success: true;
   newVersionId: string;
+  commitId?: string;
   restoredAt: number;
   files: DemoFiles;
 }
@@ -220,6 +294,7 @@ export interface PublishStatus {
   projectId: string;
   published: boolean;
   publishedVersion?: string;
+  commitId?: string;
   publishedAt?: number;
   artifactPath?: string;
   artifactSummary?: {

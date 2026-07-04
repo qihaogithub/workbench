@@ -1,6 +1,14 @@
 {
   "projects": [
     {
+      "id": "proj_1782718595285_h4lda7",
+      "name": "我的页面",
+      "description": "资源预览",
+      "publishedAt": 1783157047555,
+      "publishedVersion": "v8",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1782718596686_wmv9yu",
       "name": "App通用广告弹窗",
       "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
@@ -46,5 +54,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1783123791660
+  "generatedAt": 1783157047563
 }

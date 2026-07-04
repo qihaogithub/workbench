@@ -34,6 +34,8 @@ type E2EProjectRegistry = {
   projects: E2EProjectMeta[];
 };
 
+const sharedProjectCache = new Map<string, E2EProjectMeta>();
+
 export const outputRoot = path.join(__dirname, '..', 'test-outputs');
 export const runStatePath = path.join(outputRoot, 'e2e-run.json');
 
@@ -137,6 +139,36 @@ export async function createE2EProject(
   });
   const project = await parseApiResponse<E2EProjectMeta>(response);
   registerE2EProject(project);
+  return project;
+}
+
+export async function getOrCreateSharedE2EProject(
+  page: Page,
+  suiteName: string,
+): Promise<E2EProjectMeta> {
+  const name = e2eProjectName(suiteName);
+  const cached = sharedProjectCache.get(name);
+  if (cached) return cached;
+
+  const existing = (await listProjects(page.request)).find(
+    (project) =>
+      project.name === name && project.category === E2E_PROJECT_CATEGORY,
+  );
+  if (existing) {
+    registerE2EProject(existing);
+    sharedProjectCache.set(name, existing);
+    return existing;
+  }
+
+  const response = await page.request.post('/api/demos', {
+    data: {
+      name,
+      category: E2E_PROJECT_CATEGORY,
+    },
+  });
+  const project = await parseApiResponse<E2EProjectMeta>(response);
+  registerE2EProject(project);
+  sharedProjectCache.set(name, project);
   return project;
 }
 

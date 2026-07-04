@@ -16,7 +16,6 @@ import {
 import type {
   Project,
   VersionInfo,
-  PageVersionInfo,
   VersionHistoryEntryType,
   DemoPageMeta,
   DemoFolderMeta,
@@ -110,14 +109,6 @@ export function getTemplatePath(templateId: string): string {
 
 export function getSnapshotPath(projectId: string, versionId: string): string {
   return path.join(SNAPSHOTS_DIR, projectId, versionId);
-}
-
-export function getPageSnapshotPath(
-  projectId: string,
-  demoId: string,
-  versionId: string,
-): string {
-  return path.join(SNAPSHOTS_DIR, projectId, "pages", demoId, versionId);
 }
 
 export function getSessionPath(sessionId: string, projectId?: string): string {
@@ -1339,12 +1330,6 @@ export function readProjectMeta(projectId: string): Project | null {
       demoPages,
       demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
-      pageVersions:
-        parsed.pageVersions &&
-        typeof parsed.pageVersions === "object" &&
-        !Array.isArray(parsed.pageVersions)
-          ? parsed.pageVersions
-          : {},
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
       activeWorkspaceId:
@@ -1397,8 +1382,7 @@ export function countFiles(dir: string): number {
 }
 
 export function generateVersionId(project: Project): string {
-  const pageVersions = Object.values(project.pageVersions ?? {}).flat();
-  const maxVersion = [...project.versions, ...pageVersions].reduce(
+  const maxVersion = project.versions.reduce(
     (max, version) => {
       const match = /^v(\d+)$/.exec(version.versionId);
       return match ? Math.max(max, Number(match[1])) : max;
@@ -1549,195 +1533,6 @@ export function getLatestVersion(projectId: string): VersionInfo | null {
   const project = readProjectMeta(projectId);
   if (!project || project.versions.length === 0) return null;
   return project.versions[project.versions.length - 1];
-}
-
-export function getPageVersionHistory(
-  projectId: string,
-  demoId: string,
-): PageVersionInfo[] {
-  const project = readProjectMeta(projectId);
-  if (!project) return [];
-  return [...(project.pageVersions?.[demoId] ?? [])].reverse();
-}
-
-export function readPageVersionFiles(
-  projectId: string,
-  demoId: string,
-  versionId: string,
-): DemoFiles | null {
-  const project = readProjectMeta(projectId);
-  const version = project?.pageVersions?.[demoId]?.find(
-    (item) => item.versionId === versionId,
-  );
-  if (!version || !fs.existsSync(version.snapshotPath)) return null;
-
-  const codePath = path.join(version.snapshotPath, "index.tsx");
-  const schemaPath = path.join(version.snapshotPath, "config.schema.json");
-  const prototypeHtmlPath = path.join(version.snapshotPath, "prototype.html");
-  const prototypeCssPath = path.join(version.snapshotPath, "prototype.css");
-  const prototypeMetaPath = path.join(version.snapshotPath, "prototype.meta.json");
-  if (!fs.existsSync(schemaPath)) return null;
-
-  return {
-    code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
-    schema: fs.readFileSync(schemaPath, "utf-8"),
-    prototypeHtml: fs.existsSync(prototypeHtmlPath)
-      ? fs.readFileSync(prototypeHtmlPath, "utf-8")
-      : undefined,
-    prototypeCss: fs.existsSync(prototypeCssPath)
-      ? fs.readFileSync(prototypeCssPath, "utf-8")
-      : undefined,
-    prototypeMeta: fs.existsSync(prototypeMetaPath)
-      ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
-      : undefined,
-  };
-}
-
-export function createPageVersionSnapshot(
-  projectId: string,
-  demoId: string,
-  username?: string,
-  note?: string,
-  sourceWorkspacePath?: string,
-  type: VersionHistoryEntryType = "named_version",
-): { success: boolean; version?: PageVersionInfo; error?: string } {
-  const project = readProjectMeta(projectId);
-  if (!project) {
-    return { success: false, error: "项目不存在" };
-  }
-
-  const workspacePath = path.join(getProjectPath(projectId), "workspace");
-  const snapshotSourceWorkspace = sourceWorkspacePath || workspacePath;
-  const demoDir = getDemoDirPath(snapshotSourceWorkspace, demoId);
-  const codePath = path.join(demoDir, "index.tsx");
-  const schemaPath = path.join(demoDir, "config.schema.json");
-
-  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) {
-    return { success: false, error: "页面文件不存在" };
-  }
-
-  const versionId = generateVersionId(project);
-  const snapshotPath = getPageSnapshotPath(projectId, demoId, versionId);
-  fs.mkdirSync(snapshotPath, { recursive: true });
-  fs.copyFileSync(codePath, path.join(snapshotPath, "index.tsx"));
-  fs.copyFileSync(schemaPath, path.join(snapshotPath, "config.schema.json"));
-
-  const demoMeta =
-    readDemoPageMeta(snapshotSourceWorkspace, demoId) ??
-    readDemoPageMeta(workspacePath, demoId) ??
-    project.demoPages.find((page) => page.id === demoId);
-  const versionInfo: PageVersionInfo = {
-    versionId,
-    type,
-    demoId,
-    demoName: demoMeta?.name,
-    savedAt: Date.now(),
-    savedBy: username || "未知用户",
-    sessionId: `page-${demoId}`,
-    snapshotPath,
-    fileCount: 2,
-    note,
-  };
-
-  project.pageVersions = project.pageVersions ?? {};
-  project.pageVersions[demoId] = [
-    ...(project.pageVersions[demoId] ?? []),
-    versionInfo,
-  ];
-
-  if (project.pageVersions[demoId].length > MAX_VERSIONS_KEEP) {
-    const toDelete = project.pageVersions[demoId].slice(
-      0,
-      project.pageVersions[demoId].length - MAX_VERSIONS_KEEP,
-    );
-    for (const version of toDelete) {
-      if (fs.existsSync(version.snapshotPath)) {
-        fs.rmSync(version.snapshotPath, { recursive: true, force: true });
-      }
-    }
-    project.pageVersions[demoId] = project.pageVersions[demoId].slice(
-      -MAX_VERSIONS_KEEP,
-    );
-  }
-
-  project.updatedAt = Date.now();
-  writeProjectMeta(projectId, project);
-  return { success: true, version: versionInfo };
-}
-
-export function restorePageVersion(
-  projectId: string,
-  demoId: string,
-  versionId: string,
-  username?: string,
-): {
-  success: boolean;
-  newVersionId?: string;
-  restoredAt?: number;
-  files?: DemoFiles;
-  error?: string;
-} {
-  const project = readProjectMeta(projectId);
-  if (!project) {
-    return { success: false, error: "项目不存在" };
-  }
-
-  const targetVersion = project.pageVersions?.[demoId]?.find(
-    (version) => version.versionId === versionId,
-  );
-  if (!targetVersion) {
-    return { success: false, error: `页面版本 ${versionId} 不存在` };
-  }
-
-  const files = readPageVersionFiles(projectId, demoId, versionId);
-  if (!files) {
-    return { success: false, error: `页面版本快照已丢失: ${versionId}` };
-  }
-
-  const workspacePath = path.join(getProjectPath(projectId), "workspace");
-  const demoDir = getDemoDirPath(workspacePath, demoId);
-  if (!fs.existsSync(demoDir)) {
-    return { success: false, error: "目标页面不存在" };
-  }
-
-  fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
-  fs.writeFileSync(
-    path.join(demoDir, "config.schema.json"),
-    files.schema,
-    "utf-8",
-  );
-
-  const newVersionId = generateVersionId(project);
-  const snapshotPath = getSnapshotPath(projectId, newVersionId);
-  fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
-  fs.cpSync(workspacePath, snapshotPath, {
-    recursive: true,
-    filter: (src: string) => !src.includes("node_modules"),
-  });
-
-  const restoredAt = Date.now();
-  const projectVersion: VersionInfo = {
-    versionId: newVersionId,
-    type: "restore_snapshot",
-    savedAt: restoredAt,
-    savedBy: username || "未知用户",
-    sessionId: `restore-page-${demoId}-${versionId}`,
-    snapshotPath,
-    fileCount: countFiles(workspacePath),
-    note: `从页面 ${targetVersion.demoName || demoId} 的历史版本 ${versionId} 恢复`,
-  };
-
-  project.versions.push(projectVersion);
-  project.updatedAt = restoredAt;
-  cleanupOldVersions(project);
-  writeProjectMeta(projectId, project);
-
-  return {
-    success: true,
-    newVersionId,
-    restoredAt,
-    files,
-  };
 }
 
 // ========================================

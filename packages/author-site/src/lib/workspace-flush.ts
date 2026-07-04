@@ -95,8 +95,9 @@ export async function flushWorkspaceBeforeCriticalAction(
     )}/workspaces/${encodeURIComponent(options.workspaceId)}/flush-all?${params.toString()}`,
     { method: "POST" },
   ).catch((error: unknown) => {
+    console.warn("[workspace-flush] agent-service unreachable", error);
     throw new WorkspaceFlushError(
-      error instanceof Error ? error.message : "协同草稿落盘服务不可用",
+      "协同草稿落盘服务不可用，请确认 agent-service 已启动",
     );
   });
 

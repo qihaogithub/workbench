@@ -78,6 +78,7 @@ export interface AgentResult {
 export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
+  model?: string;
   workingDir?: string;
   demoId?: string;
   images?: ImageAttachment[];

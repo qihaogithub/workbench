@@ -73,9 +73,20 @@ function validatePublishedProject(value, label) {
     if (page.parentId !== null && typeof page.parentId !== "string") {
       errors.push(`${prefix}.parentId must be string or null`);
     }
-    expectString(page.compiledJsPath, `${prefix}.compiledJsPath`);
-    if (!page.compiledJsPath.endsWith(".js")) {
-      errors.push(`${prefix}.compiledJsPath must point to a JavaScript artifact`);
+    if (page.runtimeType === "prototype-html-css") {
+      expectString(page.prototypeHtmlPath, `${prefix}.prototypeHtmlPath`);
+      expectString(page.prototypeCssPath, `${prefix}.prototypeCssPath`);
+      if (typeof page.prototypeHtmlPath === "string" && !page.prototypeHtmlPath.endsWith(".html")) {
+        errors.push(`${prefix}.prototypeHtmlPath must point to an HTML artifact`);
+      }
+      if (typeof page.prototypeCssPath === "string" && !page.prototypeCssPath.endsWith(".css")) {
+        errors.push(`${prefix}.prototypeCssPath must point to a CSS artifact`);
+      }
+    } else {
+      expectString(page.compiledJsPath, `${prefix}.compiledJsPath`);
+      if (typeof page.compiledJsPath === "string" && !page.compiledJsPath.endsWith(".js")) {
+        errors.push(`${prefix}.compiledJsPath must point to a JavaScript artifact`);
+      }
     }
     if (page.schemaPath !== undefined && typeof page.schemaPath !== "string") {
       errors.push(`${prefix}.schemaPath must be a string when present`);

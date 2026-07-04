@@ -6,34 +6,141 @@
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782718595285_h4lda7/workspace",
   "demoPages": [
     {
-      "id": "demo_1779934698596_dvvk55",
-      "name": "demo",
-      "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
-    },
-    {
-      "id": "demo_1779935678404_lxsasc",
-      "name": "demo",
-      "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
-    },
-    {
       "id": "demo_omrf",
-      "name": "demo - 副本",
+      "name": "平板",
       "routeKey": "demo-3",
+      "runtimeType": "prototype-html-css",
       "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "demo_71dt",
+      "name": "手机",
+      "routeKey": "demo-4",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
       "parentId": null
     }
   ],
   "demoFolders": [],
-  "versions": [],
-  "pageVersions": {},
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1783134603952,
+      "savedBy": "qihao",
+      "sessionId": "session-1783133236518-mo32rktm0",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v1",
+      "fileCount": 11,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1783138527106,
+      "savedBy": "qihao",
+      "sessionId": "session-1783133236518-mo32rktm0",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v2",
+      "fileCount": 11,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "auto_checkpoint",
+      "savedAt": 1783140032058,
+      "savedBy": "qihao",
+      "sessionId": "session-1783133236518-mo32rktm0",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v3",
+      "fileCount": 11,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v4",
+      "type": "auto_checkpoint",
+      "savedAt": 1783149885143,
+      "savedBy": "qihao",
+      "sessionId": "session-1783147430509-mm1c2th37",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v4",
+      "fileCount": 14,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v5",
+      "type": "auto_checkpoint",
+      "savedAt": 1783150698100,
+      "savedBy": "qihao",
+      "sessionId": "session-1783147430509-mm1c2th37",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v5",
+      "fileCount": 14,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v6",
+      "type": "auto_checkpoint",
+      "savedAt": 1783153822583,
+      "savedBy": "qihao",
+      "sessionId": "session-1783147430509-mm1c2th37",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v6",
+      "fileCount": 19,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v7",
+      "type": "auto_checkpoint",
+      "savedAt": 1783157013644,
+      "savedBy": "qihao",
+      "sessionId": "session-1783147430509-mm1c2th37",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v7",
+      "fileCount": 19,
+      "note": "持续编辑自动保存记录"
+    },
+    {
+      "versionId": "v8",
+      "type": "publish_snapshot",
+      "savedAt": 1783157047552,
+      "savedBy": "system",
+      "sessionId": "publish-1783157047546",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v8",
+      "fileCount": 15,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v9",
+      "type": "auto_checkpoint",
+      "savedAt": 1783157634802,
+      "savedBy": "qihao",
+      "sessionId": "session-1783147430509-mm1c2th37",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v9",
+      "fileCount": 15,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v10",
+      "type": "auto_checkpoint",
+      "savedAt": 1783161188338,
+      "savedBy": "qihao",
+      "sessionId": "session-1783160842166-w3gomn9dc",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v10",
+      "fileCount": 15,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v11",
+      "type": "auto_checkpoint",
+      "savedAt": 1783162228427,
+      "savedBy": "qihao",
+      "sessionId": "session-1783161826443-4zmw49stb",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v11",
+      "fileCount": 15,
+      "note": "停止编辑后自动保存记录"
+    }
+  ],
   "createdAt": 1782718595290,
-  "updatedAt": 1783124849569,
-  "activeWorkspaceId": "live-1783060687297-eacglza0r",
-  "activeWorkspaceUpdatedAt": 1783124598931,
-  "canonicalSyncedWorkspaceId": "live-1783060687297-eacglza0r",
-  "canonicalSyncedAt": 1783124849569
+  "updatedAt": 1783162228706,
+  "activeWorkspaceId": "live-1783140382447-f0k8oo0fs",
+  "activeWorkspaceUpdatedAt": 1783162228429,
+  "canonicalSyncedWorkspaceId": "live-1783140382447-f0k8oo0fs",
+  "canonicalSyncedAt": 1783162228706,
+  "publishedVersion": "v8",
+  "publishedAt": 1783157047556
 }

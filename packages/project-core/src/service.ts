@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 
 import {
@@ -18,8 +19,14 @@ import type {
   DemoPageMeta,
   AppGraph,
   PageVersionInfo,
+  ProjectCommit,
+  ProjectContentState,
+  ProjectResourceKind,
   Project,
   PrototypePageMeta,
+  ResourcePointer,
+  ResourceReference,
+  ResourceVersion,
   ProjectTemplateMeta,
   VersionInfo,
   VersionHistoryEntryType,
@@ -48,9 +55,13 @@ import type {
   PageVersionDetail,
   PageVersionHistory,
   PageRestoreResult,
+  BlobGarbageCollectResult,
+  MaterializationResult,
+  ProjectCommitHistory,
   PageSwitchRuntimeInput,
   PageUpdatePrototypeInput,
   ProjectPackageExport,
+  ProjectPublishCommitInput,
   PageUpdateInput,
   PreviewPlan,
   ProjectAdminActor,
@@ -58,6 +69,10 @@ import type {
   ProjectAdminError,
   ProjectAdminResult,
   ProjectDetail,
+  ResourceRestoreInput,
+  ResourceVersionCreateInput,
+  ResourceVersionDetail,
+  ResourceVersionHistory,
   ProjectSummary,
   PublishStatus,
   PrototypeGateDecision,
@@ -166,6 +181,49 @@ const ALLOWED_ASSET_MIME_TYPES = new Set([
 ]);
 
 const DEFAULT_PROJECT_CATEGORY = "未分类";
+const CONTENT_GRAPH_SCHEMA_VERSION = 1;
+const MATERIALIZER_VERSION = "project-core-content-graph-v1";
+
+interface ResourceBlobMap {
+  code?: string;
+  schema?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: string;
+  markdown?: string;
+}
+
+interface PageResourceMetadata extends Record<string, unknown> {
+  page: DemoPageMeta;
+  files: ResourceBlobMap;
+}
+
+interface KnowledgeItemMeta {
+  id: string;
+  title: string;
+  source: "system" | "user";
+  description: string;
+  fileName: string;
+  addedAt: string;
+  updatedAt: string;
+  sizeBytes?: number;
+  category?: string;
+  tags?: string[];
+  aiSummary?: string;
+  aiKeywords?: string[];
+  summaryStatus?: "ready" | "stale" | "failed";
+  readonly?: boolean;
+}
+
+interface KnowledgeManifest {
+  version: number;
+  items: KnowledgeItemMeta[];
+}
+
+interface KnowledgeResourceMetadata extends Record<string, unknown> {
+  item: KnowledgeItemMeta;
+  files: ResourceBlobMap;
+}
 
 function normalizeProjectCategory(category?: string): string {
   const normalized = category?.trim();
@@ -638,7 +696,6 @@ export class ProjectAdminService {
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
       versions: [],
-      pageVersions: {},
       createdAt: now,
       updatedAt: now,
     };
@@ -1252,20 +1309,456 @@ export class ProjectAdminService {
     return ok({ meta: page, files });
   }
 
+  resourceVersionList(
+    input: {
+      projectId: string;
+      kind: ProjectResourceKind;
+      resourceId: string;
+      includeDraft?: boolean;
+    },
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ResourceVersionHistory> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const versions = this.listResourceVersionsFromDisk(input.projectId, input.kind, input.resourceId)
+      .filter((version) => input.includeDraft || version.source !== "system");
+    return ok({
+      projectId: input.projectId,
+      kind: input.kind,
+      resourceId: input.resourceId,
+      currentVersion: versions[0]?.id,
+      versions,
+      totalVersions: versions.length,
+    });
+  }
+
+  resourceVersionGet(
+    input: {
+      projectId: string;
+      kind: ProjectResourceKind;
+      resourceId: string;
+      versionId: string;
+    },
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ResourceVersionDetail> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const version = this.readResourceVersion(input.projectId, input.kind, input.resourceId, input.versionId);
+    if (!version) return fail("VERSION_NOT_FOUND", `资源版本 ${input.versionId} 不存在`);
+    const content = input.kind === "page"
+      ? this.pageFilesFromResourceVersion(version)
+      : input.kind === "knowledge_document"
+        ? this.knowledgeContentFromResourceVersion(version)
+        : undefined;
+    if (content === null) return fail("VERSION_SNAPSHOT_MISSING", `资源版本内容已丢失: ${input.versionId}`);
+    return ok({
+      projectId: input.projectId,
+      kind: input.kind,
+      resourceId: input.resourceId,
+      version,
+      content,
+    });
+  }
+
+  resourceVersionCreate(
+    input: ResourceVersionCreateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ResourceVersion> {
+    if (input.kind === "page") {
+      const created = this.createPageVersion({
+        projectId: input.projectId,
+        pageId: input.resourceId,
+        editId: input.editId,
+        sourceWorkspacePath: input.sourceWorkspacePath,
+        note: input.note,
+      }, actor);
+      if (!created.ok || !created.data?.resourceVersion) {
+        return fail(created.error?.code ?? "FILE_WRITE_ERROR", created.error?.message ?? "创建页面资源版本失败");
+      }
+      return ok(created.data.resourceVersion);
+    }
+    if (input.kind !== "knowledge_document") {
+      return fail("UNSUPPORTED_RESOURCE_KIND", `暂不支持创建 ${input.kind} 资源版本`);
+    }
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const workspacePath = input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
+    const manifest = this.readKnowledgeManifest(workspacePath);
+    const item = manifest.items.find((entry) => entry.id === input.resourceId);
+    if (!item) return fail("KNOWLEDGE_DOCUMENT_NOT_FOUND", "知识文档不存在");
+    const content = this.knowledgeItemContent(workspacePath, item);
+    if (content === null) return fail("FILE_READ_ERROR", "知识文档文件不存在");
+    const versionId = nowId("krv");
+    const version = this.createKnowledgeResourceVersion({
+      projectId: input.projectId,
+      item,
+      content,
+      versionId,
+      actor,
+      source: input.source ?? "user",
+      note: input.note,
+    });
+    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
+      .find((pointer) => pointer.kind === "knowledge_document" && pointer.resourceId === input.resourceId);
+    const commit = this.createContentCommit({
+      projectId: input.projectId,
+      visibility: input.visibility ?? "semantic",
+      intent: input.source === "ai" ? "ai" : "edit",
+      title: input.note ?? `更新知识文档 ${item.title}`,
+      pointers: [{ kind: "knowledge_document", resourceId: input.resourceId, versionId: version.id }],
+      changedResources: [{
+        kind: "knowledge_document",
+        resourceId: input.resourceId,
+        fromVersionId: previous?.versionId,
+        toVersionId: version.id,
+      }],
+      actor,
+    });
+    this.writeMaterializationManifest(input.projectId, commit.id, [version]);
+    return ok(version, { diffSummary: { created: [`knowledge-version:${input.resourceId}:${version.id}`] } });
+  }
+
+  resourceRestore(input: ResourceRestoreInput, actor = this.defaultActor()): ProjectAdminResult<ProjectCommit> {
+    if (input.kind === "page") {
+      const restored = this.restorePageVersion(input.projectId, input.resourceId, input.versionId, actor);
+      if (!restored.ok || !restored.data?.commitId) {
+        return fail(restored.error?.code ?? "FILE_WRITE_ERROR", restored.error?.message ?? "恢复页面资源失败");
+      }
+      const commit = this.readCommit(input.projectId, restored.data.commitId);
+      return commit ? ok(commit) : fail("COMMIT_NOT_FOUND", "恢复提交不存在");
+    }
+    if (input.kind !== "knowledge_document") {
+      return fail("UNSUPPORTED_RESOURCE_KIND", `暂不支持恢复 ${input.kind} 资源`);
+    }
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const version = this.readResourceVersion(input.projectId, "knowledge_document", input.resourceId, input.versionId);
+    if (!version) return fail("VERSION_NOT_FOUND", `知识文档版本 ${input.versionId} 不存在`);
+    const payload = this.knowledgeContentFromResourceVersion(version);
+    if (!payload) return fail("VERSION_SNAPSHOT_MISSING", `知识文档版本内容已丢失: ${input.versionId}`);
+    if (payload.item.readonly || payload.item.source === "system") {
+      return fail("FORBIDDEN", "系统只读文档不能恢复写入");
+    }
+    const workspacePath = this.projectWorkspacePath(input.projectId);
+    const manifest = this.readKnowledgeManifest(workspacePath);
+    const index = manifest.items.findIndex((item) => item.id === input.resourceId);
+    const restoredItem = {
+      ...payload.item,
+      updatedAt: new Date().toISOString(),
+      sizeBytes: Buffer.byteLength(payload.content),
+    };
+    if (index === -1) {
+      manifest.items.push(restoredItem);
+    } else {
+      manifest.items[index] = restoredItem;
+    }
+    ensureDir(path.join(workspacePath, "knowledge"));
+    fs.writeFileSync(path.join(workspacePath, "knowledge", path.basename(restoredItem.fileName)), payload.content, "utf-8");
+    this.writeKnowledgeManifest(workspacePath, manifest);
+    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
+      .find((pointer) => pointer.kind === "knowledge_document" && pointer.resourceId === input.resourceId);
+    const commit = this.createContentCommit({
+      projectId: input.projectId,
+      visibility: "semantic",
+      intent: "restore",
+      title: `恢复知识文档 ${restoredItem.title}`,
+      pointers: [{ kind: "knowledge_document", resourceId: input.resourceId, versionId: input.versionId }],
+      changedResources: [{
+        kind: "knowledge_document",
+        resourceId: input.resourceId,
+        fromVersionId: previous?.versionId,
+        toVersionId: input.versionId,
+      }],
+      actor,
+      sessionId: input.sessionId,
+      workspaceId: input.workspaceId,
+    });
+    this.writeMaterializationManifest(input.projectId, commit.id, [version]);
+    const project = this.readProject(input.projectId);
+    if (project) this.writeProject(input.projectId, { ...project, updatedAt: Date.now() });
+    return ok(commit, { diffSummary: { updated: [`knowledge:${input.resourceId}`] } });
+  }
+
+  resourceDelete(
+    input: { projectId: string; kind: ProjectResourceKind; resourceId: string; title?: string },
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectCommit> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
+      .find((pointer) => pointer.kind === input.kind && pointer.resourceId === input.resourceId);
+    const commit = this.createContentCommit({
+      projectId: input.projectId,
+      visibility: "semantic",
+      intent: "edit",
+      title: input.title ?? `删除资源 ${input.kind}:${input.resourceId}`,
+      pointers: [{
+        kind: input.kind,
+        resourceId: input.resourceId,
+        versionId: previous?.versionId,
+        deleted: true,
+      }],
+      changedResources: [{
+        kind: input.kind,
+        resourceId: input.resourceId,
+        fromVersionId: previous?.versionId,
+        deleted: true,
+      }],
+      actor,
+    });
+    return ok(commit, { diffSummary: { deleted: [`${input.kind}:${input.resourceId}`] } });
+  }
+
+  projectCommitList(
+    projectId: string,
+    includeDraft = false,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectCommitHistory> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const state = this.readContentState(projectId);
+    const commits = this.listCommitsFromDisk(projectId)
+      .filter((commit) => includeDraft || commit.visibility !== "draft_checkpoint");
+    return ok({
+      projectId,
+      headCommitId: state?.headCommitId,
+      commits,
+      totalCommits: commits.length,
+    });
+  }
+
+  projectCreatePublishCommit(
+    input: ProjectPublishCommitInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectCommit> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const head = this.readHeadCommit(input.projectId);
+    if (!head) {
+      return fail("COMMIT_NOT_FOUND", "项目还没有内容图提交");
+    }
+    const commit = this.createContentCommit({
+      projectId: input.projectId,
+      visibility: "protected",
+      intent: "publish",
+      title: input.title ?? `发布项目 ${input.publishedVersion}`,
+      pointers: head?.resourcePointers ?? [],
+      changedResources: [],
+      actor,
+    });
+    return ok(commit);
+  }
+
+  projectMaterialize(
+    input: { projectId: string; commitId?: string; checkOnly?: boolean },
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<MaterializationResult> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const state = this.readContentState(input.projectId);
+    const commitId = input.commitId ?? state?.headCommitId;
+    if (!commitId) return fail("COMMIT_NOT_FOUND", "项目还没有内容图提交");
+    const commit = this.readCommit(input.projectId, commitId);
+    if (!commit) return fail("COMMIT_NOT_FOUND", `内容图提交不存在: ${commitId}`);
+    const missingBlobs: string[] = [];
+    const versions: ResourceVersion[] = [];
+    for (const pointer of commit.resourcePointers) {
+      if (!pointer.versionId || pointer.deleted) continue;
+      const version = this.readResourceVersion(input.projectId, pointer.kind, pointer.resourceId, pointer.versionId);
+      if (!version) {
+        missingBlobs.push(`${pointer.kind}:${pointer.resourceId}:${pointer.versionId}`);
+        continue;
+      }
+      versions.push(version);
+      for (const hash of version.blobRefs) {
+        if (!fs.existsSync(this.blobPath(input.projectId, hash))) missingBlobs.push(hash);
+      }
+    }
+    if (missingBlobs.length > 0) {
+      this.writeContentState(input.projectId, {
+        projectId: input.projectId,
+        headCommitId: state?.headCommitId ?? commitId,
+        materializationStatus: "failed",
+        materializedCommitId: state?.materializedCommitId,
+        updatedAt: Date.now(),
+      });
+      return ok({
+        projectId: input.projectId,
+        commitId,
+        status: "failed",
+        checked: true,
+        writtenFiles: [],
+        missingBlobs,
+      });
+    }
+    if (input.checkOnly) {
+      return ok({
+        projectId: input.projectId,
+        commitId,
+        status: "ready",
+        checked: true,
+        writtenFiles: [],
+        missingBlobs: [],
+      });
+    }
+    const workspacePath = this.projectWorkspacePath(input.projectId);
+    const writtenFiles: string[] = [];
+    let tree = this.readWorkspaceTree(workspacePath);
+    let knowledgeManifest = this.readKnowledgeManifest(workspacePath);
+    for (const version of versions) {
+      if (version.kind === "page") {
+        const files = this.pageFilesFromResourceVersion(version);
+        const metadata = version.metadata as Partial<PageResourceMetadata>;
+        if (!files || !metadata.page) continue;
+        const demoDir = this.pageDir(workspacePath, version.resourceId);
+        ensureDir(demoDir);
+        if (resolvePageRuntimeType(metadata.page) === "prototype-html-css") {
+          fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+          fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
+          fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
+          writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+          writtenFiles.push(`demos/${version.resourceId}/prototype.html`, `demos/${version.resourceId}/prototype.css`, `demos/${version.resourceId}/prototype.meta.json`);
+        } else {
+          fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+          writtenFiles.push(`demos/${version.resourceId}/index.tsx`);
+        }
+        fs.writeFileSync(path.join(demoDir, "config.schema.json"), files.schema, "utf-8");
+        writtenFiles.push(`demos/${version.resourceId}/config.schema.json`);
+        const materializedPage = metadata.page;
+        const pageIndex = tree.pages.findIndex((page) => page.id === version.resourceId);
+        tree = {
+          ...tree,
+          pages: pageIndex === -1
+            ? [...tree.pages, materializedPage]
+            : tree.pages.map((page) => page.id === version.resourceId ? materializedPage : page),
+        };
+      }
+      if (version.kind === "knowledge_document") {
+        const payload = this.knowledgeContentFromResourceVersion(version);
+        if (!payload) continue;
+        ensureDir(path.join(workspacePath, "knowledge"));
+        fs.writeFileSync(path.join(workspacePath, "knowledge", path.basename(payload.item.fileName)), payload.content, "utf-8");
+        writtenFiles.push(`knowledge/${payload.item.fileName}`);
+        const itemIndex = knowledgeManifest.items.findIndex((item) => item.id === payload.item.id);
+        knowledgeManifest = {
+          ...knowledgeManifest,
+          items: itemIndex === -1
+            ? [...knowledgeManifest.items, payload.item]
+            : knowledgeManifest.items.map((item) => item.id === payload.item.id ? payload.item : item),
+        };
+      }
+    }
+    this.writeWorkspaceTree(workspacePath, tree);
+    this.writeKnowledgeManifest(workspacePath, knowledgeManifest);
+    this.writeMaterializationManifest(input.projectId, commitId, versions);
+    this.writeContentState(input.projectId, {
+      projectId: input.projectId,
+      headCommitId: state?.headCommitId ?? commitId,
+      materializationStatus: "ready",
+      materializedCommitId: commitId,
+      updatedAt: Date.now(),
+    });
+    const project = this.readProject(input.projectId);
+    if (project) {
+      this.writeProject(input.projectId, {
+        ...project,
+        demoPages: sortPages(tree.pages),
+        demoFolders: tree.folders,
+        updatedAt: Date.now(),
+      });
+    }
+    return ok({
+      projectId: input.projectId,
+      commitId,
+      status: "ready",
+      checked: false,
+      writtenFiles,
+      missingBlobs: [],
+    });
+  }
+
+  contentBlobGarbageCollect(
+    projectId: string,
+    options: { dryRun?: boolean } = {},
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<BlobGarbageCollectResult> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const blobRoot = path.join(this.contentDir(projectId), "blobs");
+    if (!fs.existsSync(blobRoot)) {
+      return ok({ projectId, dryRun: options.dryRun ?? true, removableBlobs: [], removedBlobs: [] });
+    }
+    const referenced = new Set<string>();
+    for (const kind of ["page", "knowledge_document", "canvas", "asset", "project_config"] as ProjectResourceKind[]) {
+      const kindDir = path.join(this.contentDir(projectId), "resources", kind);
+      if (!fs.existsSync(kindDir)) continue;
+      for (const resourceId of fs.readdirSync(kindDir)) {
+        for (const version of this.listResourceVersionsFromDisk(projectId, kind, resourceId)) {
+          version.blobRefs.forEach((hash) => referenced.add(hash));
+        }
+      }
+    }
+    const allBlobs = this.walkFiles(blobRoot).filter((file) => fs.statSync(file).isFile());
+    const removableFiles = allBlobs.filter((file) => !referenced.has(path.basename(file)));
+    if (options.dryRun ?? true) {
+      return ok({
+        projectId,
+        dryRun: true,
+        removableBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
+        removedBlobs: [],
+      });
+    }
+    for (const file of removableFiles) fs.rmSync(file, { force: true });
+    return ok({
+      projectId,
+      dryRun: false,
+      removableBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
+      removedBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
+    });
+  }
+
   pageVersionList(
     projectId: string,
     pageId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageVersionHistory> {
-    const access = this.requireProjectAccess(projectId, actor);
-    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
-    const project = this.readProject(projectId);
-    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const versions = [...(project.pageVersions?.[pageId] ?? [])].reverse();
+    const history = this.resourceVersionList({ projectId, kind: "page", resourceId: pageId }, actor);
+    if (!history.ok || !history.data) {
+      return fail(history.error?.code ?? "FILE_READ_ERROR", history.error?.message ?? "读取页面历史失败");
+    }
+    const versions = history.data.versions.map((version): PageVersionInfo => {
+      const metadata = version.metadata as Partial<PageResourceMetadata>;
+      return {
+        versionId: version.id,
+        type: "named_version",
+        demoId: pageId,
+        demoName: metadata.page?.name,
+        savedAt: version.createdAt,
+        savedBy: version.createdBy,
+        sessionId: `resource-${version.id}`,
+        snapshotPath: this.resourceVersionPath(projectId, "page", pageId, version.id),
+        fileCount: version.blobRefs.length,
+        note: version.note,
+        resourceVersion: version,
+      };
+    });
     return ok({
       projectId,
       pageId,
-      currentVersion: versions[0]?.versionId ?? "v0",
+      currentVersion: history.data.currentVersion ?? "v0",
       versions,
       totalVersions: versions.length,
     });
@@ -1277,15 +1770,31 @@ export class ProjectAdminService {
     versionId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageVersionDetail> {
-    const access = this.requireProjectAccess(projectId, actor);
-    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
-    const project = this.readProject(projectId);
-    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const version = project.pageVersions?.[pageId]?.find((item) => item.versionId === versionId);
-    if (!version) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
-    const files = this.readPageVersionFiles(project, pageId, versionId);
-    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本快照已丢失: ${versionId}`);
-    return ok({ projectId, pageId, version, files });
+    const detail = this.resourceVersionGet({ projectId, kind: "page", resourceId: pageId, versionId }, actor);
+    if (!detail.ok || !detail.data) {
+      return fail(detail.error?.code ?? "VERSION_NOT_FOUND", detail.error?.message ?? `页面版本 ${versionId} 不存在`);
+    }
+    const files = detail.data.content as DemoFiles | undefined;
+    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本内容已丢失: ${versionId}`);
+    const metadata = detail.data.version.metadata as Partial<PageResourceMetadata>;
+    return ok({
+      projectId,
+      pageId,
+      version: {
+        versionId,
+        type: "named_version",
+        demoId: pageId,
+        demoName: metadata.page?.name,
+        savedAt: detail.data.version.createdAt,
+        savedBy: detail.data.version.createdBy,
+        sessionId: `resource-${versionId}`,
+        snapshotPath: this.resourceVersionPath(projectId, "page", pageId, versionId),
+        fileCount: detail.data.version.blobRefs.length,
+        note: detail.data.version.note,
+        resourceVersion: detail.data.version,
+      },
+      files,
+    });
   }
 
   createPage(input: PageCreateInput, actor = this.defaultActor()): ProjectAdminResult<PageDetail> {
@@ -1637,7 +2146,7 @@ export class ProjectAdminService {
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
 
-    let sourceWorkspacePath = this.projectWorkspacePath(input.projectId);
+    let sourceWorkspacePath = input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
     if (input.editId) {
       const transaction = this.requireEditable(input.editId);
       if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
@@ -1670,19 +2179,33 @@ export class ProjectAdminService {
     }
 
     const savedAt = Date.now();
-    const versionId = this.generateVersionId(project);
-    const snapshotPath = path.join(this.snapshotsDir, input.projectId, "pages", input.pageId, versionId);
-    fs.rmSync(snapshotPath, { recursive: true, force: true });
-    ensureDir(snapshotPath);
-    if (resolvePageRuntimeType(page) === "prototype-html-css") {
-      fs.writeFileSync(path.join(snapshotPath, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
-      fs.writeFileSync(path.join(snapshotPath, "prototype.css"), files.prototypeCss ?? "", "utf-8");
-      writeJsonFile(path.join(snapshotPath, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
-    } else {
-      fs.writeFileSync(path.join(snapshotPath, "index.tsx"), files.code, "utf-8");
-    }
-    fs.writeFileSync(path.join(snapshotPath, "config.schema.json"), files.schema, "utf-8");
-
+    const versionId = nowId("prv");
+    const resourceVersion = this.createPageResourceVersion({
+      projectId: input.projectId,
+      page,
+      files,
+      versionId,
+      actor,
+      source: "user",
+      note: input.note,
+    });
+    const previousPointer = this.readHeadCommit(input.projectId)?.resourcePointers
+      .find((pointer) => pointer.kind === "page" && pointer.resourceId === input.pageId);
+    const commit = this.createContentCommit({
+      projectId: input.projectId,
+      visibility: "semantic",
+      intent: "edit",
+      title: input.note ?? `保存页面 ${page.name} 历史版本`,
+      pointers: [{ kind: "page", resourceId: input.pageId, versionId }],
+      changedResources: [{
+        kind: "page",
+        resourceId: input.pageId,
+        fromVersionId: previousPointer?.versionId,
+        toVersionId: versionId,
+      }],
+      actor,
+      sessionId: input.editId,
+    });
     const version: PageVersionInfo = {
       versionId,
       type: "named_version",
@@ -1690,27 +2213,17 @@ export class ProjectAdminService {
       demoName: page.name,
       savedAt,
       savedBy: actor.name,
-      sessionId: input.editId ?? `page-${input.pageId}`,
-      snapshotPath,
-      fileCount: 2,
+      sessionId: input.editId ?? `resource-${versionId}`,
+      snapshotPath: this.resourceVersionPath(input.projectId, "page", input.pageId, versionId),
+      fileCount: resourceVersion.blobRefs.length,
       note: input.note,
+      resourceVersion,
+      commitId: commit.id,
     };
-
-    const existingVersions = project.pageVersions?.[input.pageId] ?? [];
-    const overflow = Math.max(existingVersions.length + 1 - MAX_VERSIONS_KEEP, 0);
-    for (const stale of existingVersions.slice(0, overflow)) {
-      fs.rmSync(stale.snapshotPath, { recursive: true, force: true });
-    }
-    const nextVersions = [...existingVersions.slice(overflow), version];
-    const updatedProject: Project = {
-      ...project,
-      pageVersions: {
-        ...(project.pageVersions ?? {}),
-        [input.pageId]: nextVersions,
-      },
-      updatedAt: savedAt,
-    };
-    this.writeProject(input.projectId, updatedProject);
+    version.resourceVersion = resourceVersion;
+    version.commitId = commit.id;
+    this.writeMaterializationManifest(input.projectId, commit.id, [resourceVersion]);
+    this.writeProject(input.projectId, { ...project, updatedAt: savedAt });
 
     const auditId = this.audit("page_create_version", actor, "L2", true, {
       projectId: input.projectId,
@@ -1826,9 +2339,9 @@ export class ProjectAdminService {
     const page = this.findPage(workspacePath, pageId);
     if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
 
-    const targetVersion = project.pageVersions?.[pageId]?.find((version) => version.versionId === versionId);
-    if (!targetVersion) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
-    const files = this.readPageVersionFiles(project, pageId, versionId);
+    const resourceVersion = this.readResourceVersion(projectId, "page", pageId, versionId);
+    if (!resourceVersion) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
+    const files = this.pageFilesFromResourceVersion(resourceVersion);
     if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本快照已丢失: ${versionId}`);
 
     const validation = this.validateSchemaPair(this.readProjectConfig(workspacePath), files.schema);
@@ -1853,6 +2366,23 @@ export class ProjectAdminService {
       `从页面 ${page.name} 的历史版本 ${versionId} 恢复`,
       "restore_snapshot",
     );
+    const previousPointer = this.readHeadCommit(projectId)?.resourcePointers
+      .find((pointer) => pointer.kind === "page" && pointer.resourceId === pageId);
+    const commit = this.createContentCommit({
+      projectId,
+      visibility: "semantic",
+      intent: "restore",
+      title: `恢复页面 ${page.name} 到 ${versionId}`,
+      pointers: [{ kind: "page", resourceId: pageId, versionId: resourceVersion.id }],
+      changedResources: [{
+        kind: "page",
+        resourceId: pageId,
+        fromVersionId: previousPointer?.versionId,
+        toVersionId: resourceVersion.id,
+      }],
+      actor,
+    });
+    this.writeMaterializationManifest(projectId, commit.id, [resourceVersion]);
     const tree = this.readWorkspaceTree(workspacePath);
     const updatedProject: Project = {
       ...project,
@@ -1876,6 +2406,7 @@ export class ProjectAdminService {
       {
         success: true,
         newVersionId: version.versionId,
+        commitId: commit.id,
         restoredAt,
         files,
       },
@@ -1883,7 +2414,7 @@ export class ProjectAdminService {
         auditId,
         diffSummary: {
           updated: [`demos/${pageId}/index.tsx`, `demos/${pageId}/config.schema.json`],
-          notes: [`生成版本 ${version.versionId}`],
+          notes: [`生成版本 ${version.versionId}`, `生成资源提交 ${commit.id}`],
         },
         validation,
         nextActions: ["project_get"],
@@ -2346,6 +2877,7 @@ export class ProjectAdminService {
     input: {
       published: boolean;
       publishedVersion?: string;
+      commitId?: string;
       publishedAt?: number;
       artifactPath?: string;
     },
@@ -2381,6 +2913,7 @@ export class ProjectAdminService {
       projectId,
       published: input.published,
       publishedVersion: input.publishedVersion,
+      commitId: input.commitId,
       publishedAt: input.publishedAt,
       artifactPath: artifactExists ? artifactPath : input.artifactPath,
       artifactSummary: {
@@ -2416,6 +2949,15 @@ export class ProjectAdminService {
       "发布快照",
       "publish_snapshot",
     );
+    const publishCommit = this.createContentCommit({
+      projectId,
+      visibility: "protected",
+      intent: "publish",
+      title: `发布项目 ${snapshot.versionId}`,
+      pointers: this.readHeadCommit(projectId)?.resourcePointers ?? [],
+      changedResources: [],
+      actor,
+    });
     const versionedProject = {
       ...project,
       versions: this.compactProjectVersions([...project.versions, snapshot]),
@@ -2425,6 +2967,7 @@ export class ProjectAdminService {
     const status = this.buildPublishStatus(projectId, {
       published: true,
       publishedVersion: snapshot.versionId,
+      commitId: publishCommit.id,
       publishedAt: Date.now(),
       artifactPath: path.join(this.publishedDir, projectId),
     });
@@ -2451,6 +2994,7 @@ export class ProjectAdminService {
     return ok(this.buildPublishStatus(projectId, {
       published: Boolean(project.publishedVersion),
       publishedVersion: project.publishedVersion,
+      commitId: this.readContentState(projectId)?.headCommitId,
       publishedAt: project.publishedAt,
       artifactPath: fs.existsSync(path.join(this.publishedDir, projectId))
         ? path.join(this.publishedDir, projectId)
@@ -2646,6 +3190,344 @@ export class ProjectAdminService {
     return path.join(this.getProjectPath(projectId), "workspace");
   }
 
+  private contentDir(projectId: string): string {
+    return path.join(this.getProjectPath(projectId), "content");
+  }
+
+  private contentStatePath(projectId: string): string {
+    return path.join(this.contentDir(projectId), "state.json");
+  }
+
+  private commitPath(projectId: string, commitId: string): string {
+    return path.join(this.contentDir(projectId), "commits", `${safeId(commitId, "commit")}.json`);
+  }
+
+  private resourceVersionDir(projectId: string, kind: ProjectResourceKind, resourceId: string): string {
+    return path.join(this.contentDir(projectId), "resources", safeId(kind, "resource_kind"), safeId(resourceId, "resource"));
+  }
+
+  private resourceVersionPath(
+    projectId: string,
+    kind: ProjectResourceKind,
+    resourceId: string,
+    versionId: string,
+  ): string {
+    return path.join(this.resourceVersionDir(projectId, kind, resourceId), `${safeId(versionId, "version")}.json`);
+  }
+
+  private blobPath(projectId: string, hash: string): string {
+    return path.join(this.contentDir(projectId), "blobs", hash.slice(0, 2), hash);
+  }
+
+  private readContentState(projectId: string): ProjectContentState | null {
+    return readJsonFile<ProjectContentState>(this.contentStatePath(projectId));
+  }
+
+  private writeContentState(projectId: string, state: ProjectContentState): void {
+    writeJsonFile(this.contentStatePath(projectId), state);
+  }
+
+  private writeMaterializationManifest(projectId: string, commitId: string, versions: ResourceVersion[]): void {
+    writeJsonFile(path.join(this.contentDir(projectId), "materialization", "manifest.json"), {
+      projectId,
+      commitId,
+      materializerVersion: MATERIALIZER_VERSION,
+      resources: versions.map((version) => ({
+        kind: version.kind,
+        resourceId: version.resourceId,
+        versionId: version.id,
+        contentHash: version.contentHash,
+        blobRefs: version.blobRefs,
+      })),
+      updatedAt: Date.now(),
+    });
+    const references: ResourceReference[] = versions
+      .filter((version) => version.kind === "page" || version.kind === "knowledge_document")
+      .map((version) => ({
+        from: { kind: "canvas", resourceId: "main" },
+        to: { kind: version.kind, resourceId: version.resourceId },
+        reason: "canvas_node",
+      }));
+    writeJsonFile(path.join(this.contentDir(projectId), "refs", "references.json"), {
+      projectId,
+      references,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private readCommit(projectId: string, commitId: string): ProjectCommit | null {
+    return readJsonFile<ProjectCommit>(this.commitPath(projectId, commitId));
+  }
+
+  private writeCommit(commit: ProjectCommit): void {
+    writeJsonFile(this.commitPath(commit.projectId, commit.id), commit);
+  }
+
+  private listCommitsFromDisk(projectId: string): ProjectCommit[] {
+    const dir = path.join(this.contentDir(projectId), "commits");
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => readJsonFile<ProjectCommit>(path.join(dir, entry)))
+      .filter((commit): commit is ProjectCommit => Boolean(commit))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  private readResourceVersion(
+    projectId: string,
+    kind: ProjectResourceKind,
+    resourceId: string,
+    versionId: string,
+  ): ResourceVersion | null {
+    return readJsonFile<ResourceVersion>(this.resourceVersionPath(projectId, kind, resourceId, versionId));
+  }
+
+  private writeResourceVersion(version: ResourceVersion): void {
+    writeJsonFile(
+      this.resourceVersionPath(version.projectId, version.kind, version.resourceId, version.id),
+      version,
+    );
+  }
+
+  private listResourceVersionsFromDisk(
+    projectId: string,
+    kind: ProjectResourceKind,
+    resourceId: string,
+  ): ResourceVersion[] {
+    const dir = this.resourceVersionDir(projectId, kind, resourceId);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => readJsonFile<ResourceVersion>(path.join(dir, entry)))
+      .filter((version): version is ResourceVersion => Boolean(version))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  private hashText(content: string): string {
+    return crypto.createHash("sha256").update(content).digest("hex");
+  }
+
+  private writeBlob(projectId: string, content: string): string {
+    const hash = this.hashText(content);
+    const blobPath = this.blobPath(projectId, hash);
+    if (!fs.existsSync(blobPath)) {
+      ensureDir(path.dirname(blobPath));
+      fs.writeFileSync(blobPath, content, "utf-8");
+    }
+    return hash;
+  }
+
+  private readBlob(projectId: string, hash?: string): string | undefined {
+    if (!hash) return undefined;
+    const blobPath = this.blobPath(projectId, hash);
+    return fs.existsSync(blobPath) ? fs.readFileSync(blobPath, "utf-8") : undefined;
+  }
+
+  private makeResourceContentHash(kind: ProjectResourceKind, resourceId: string, blobRefs: string[], metadata: Record<string, unknown>): string {
+    return this.hashText(JSON.stringify({ kind, resourceId, blobRefs: [...blobRefs].sort(), metadata }));
+  }
+
+  private readHeadCommit(projectId: string): ProjectCommit | null {
+    const state = this.readContentState(projectId);
+    return state?.headCommitId ? this.readCommit(projectId, state.headCommitId) : null;
+  }
+
+  private mergePointers(
+    current: ResourcePointer[],
+    updates: ResourcePointer[],
+  ): ResourcePointer[] {
+    const byKey = new Map<string, ResourcePointer>();
+    for (const pointer of current) {
+      byKey.set(`${pointer.kind}:${pointer.resourceId}`, pointer);
+    }
+    for (const pointer of updates) {
+      byKey.set(`${pointer.kind}:${pointer.resourceId}`, pointer);
+    }
+    return [...byKey.values()].sort((a, b) => `${a.kind}:${a.resourceId}`.localeCompare(`${b.kind}:${b.resourceId}`));
+  }
+
+  private createContentCommit(input: {
+    projectId: string;
+    visibility: ProjectCommit["visibility"];
+    intent: ProjectCommit["intent"];
+    title: string;
+    pointers: ResourcePointer[];
+    changedResources: ProjectCommit["changedResources"];
+    actor: ProjectAdminActor;
+    sessionId?: string;
+    workspaceId?: string;
+  }): ProjectCommit {
+    const previous = this.readHeadCommit(input.projectId);
+    const now = Date.now();
+    const commit: ProjectCommit = {
+      id: nowId("commit"),
+      projectId: input.projectId,
+      parentCommitId: previous?.id,
+      visibility: input.visibility,
+      intent: input.intent,
+      title: input.title,
+      resourcePointers: this.mergePointers(previous?.resourcePointers ?? [], input.pointers),
+      changedResources: input.changedResources,
+      createdAt: now,
+      createdBy: input.actor.name,
+      audit: {
+        actorType: input.actor.source === "project-admin-cli" ? "cli" : input.actor.id === "system" ? "system" : "user",
+        sessionId: input.sessionId,
+        workspaceId: input.workspaceId,
+      },
+    };
+    this.writeCommit(commit);
+    this.writeContentState(input.projectId, {
+      projectId: input.projectId,
+      headCommitId: commit.id,
+      materializationStatus: "pending",
+      materializedCommitId: previous?.id,
+      updatedAt: now,
+    });
+    return commit;
+  }
+
+  private pageResourceMetadata(projectId: string, page: DemoPageMeta, files: DemoFiles): PageResourceMetadata {
+    const fileRefs: ResourceBlobMap = {
+      schema: this.writeBlob(projectId, files.schema),
+    };
+    if (resolvePageRuntimeType(page) === "prototype-html-css") {
+      fileRefs.prototypeHtml = this.writeBlob(projectId, files.prototypeHtml ?? "");
+      fileRefs.prototypeCss = this.writeBlob(projectId, files.prototypeCss ?? "");
+      fileRefs.prototypeMeta = this.writeBlob(projectId, JSON.stringify(files.prototypeMeta ?? DEFAULT_PROTOTYPE_META, null, 2));
+    } else {
+      fileRefs.code = this.writeBlob(projectId, files.code);
+    }
+    return { page, files: fileRefs };
+  }
+
+  private createPageResourceVersion(input: {
+    projectId: string;
+    page: DemoPageMeta;
+    files: DemoFiles;
+    versionId: string;
+    actor: ProjectAdminActor;
+    source: ResourceVersion["source"];
+    note?: string;
+    restoredFromVersionId?: string;
+    migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
+  }): ResourceVersion {
+    const metadata = this.pageResourceMetadata(input.projectId, input.page, input.files);
+    const blobRefs = Object.values(metadata.files).filter((hash): hash is string => Boolean(hash));
+    const previousVersionId = this.listResourceVersionsFromDisk(input.projectId, "page", input.page.id)[0]?.id;
+    const version: ResourceVersion = {
+      id: input.versionId,
+      projectId: input.projectId,
+      kind: "page",
+      resourceId: input.page.id,
+      previousVersionId,
+      restoredFromVersionId: input.restoredFromVersionId,
+      contentHash: this.makeResourceContentHash("page", input.page.id, blobRefs, metadata),
+      blobRefs,
+      metadata,
+      runtime: {
+        schemaVersion: CONTENT_GRAPH_SCHEMA_VERSION,
+        runtimeType: resolvePageRuntimeType(input.page),
+        materializerVersion: MATERIALIZER_VERSION,
+        migrationStatus: input.migrationStatus ?? "native",
+      },
+      createdAt: Date.now(),
+      createdBy: input.actor.name,
+      source: input.source,
+      note: input.note,
+    };
+    this.writeResourceVersion(version);
+    return version;
+  }
+
+  private pageFilesFromResourceVersion(version: ResourceVersion): DemoFiles | null {
+    const metadata = version.metadata as Partial<PageResourceMetadata>;
+    const files = metadata.files;
+    if (!files?.schema) return null;
+    const schema = this.readBlob(version.projectId, files.schema);
+    if (schema === undefined) return null;
+    const result: DemoFiles = {
+      code: this.readBlob(version.projectId, files.code) ?? "",
+      schema,
+    };
+    const prototypeHtml = this.readBlob(version.projectId, files.prototypeHtml);
+    const prototypeCss = this.readBlob(version.projectId, files.prototypeCss);
+    const prototypeMetaText = this.readBlob(version.projectId, files.prototypeMeta);
+    if (prototypeHtml !== undefined) result.prototypeHtml = prototypeHtml;
+    if (prototypeCss !== undefined) result.prototypeCss = prototypeCss;
+    if (prototypeMetaText !== undefined) {
+      result.prototypeMeta = JSON.parse(prototypeMetaText) as PrototypePageMeta;
+    }
+    return result;
+  }
+
+  private readKnowledgeManifest(workspacePath: string): KnowledgeManifest {
+    const manifest = readJsonFile<Partial<KnowledgeManifest>>(path.join(workspacePath, "knowledge", "manifest.json"));
+    return {
+      version: manifest?.version ?? 1,
+      items: Array.isArray(manifest?.items) ? manifest.items as KnowledgeItemMeta[] : [],
+    };
+  }
+
+  private writeKnowledgeManifest(workspacePath: string, manifest: KnowledgeManifest): void {
+    writeJsonFile(path.join(workspacePath, "knowledge", "manifest.json"), manifest);
+  }
+
+  private knowledgeItemContent(workspacePath: string, item: KnowledgeItemMeta): string | null {
+    const filePath = path.join(workspacePath, "knowledge", path.basename(item.fileName));
+    return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : null;
+  }
+
+  private createKnowledgeResourceVersion(input: {
+    projectId: string;
+    item: KnowledgeItemMeta;
+    content: string;
+    versionId: string;
+    actor: ProjectAdminActor;
+    source: ResourceVersion["source"];
+    note?: string;
+    restoredFromVersionId?: string;
+    migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
+  }): ResourceVersion {
+    const metadata: KnowledgeResourceMetadata = {
+      item: input.item,
+      files: {
+        markdown: this.writeBlob(input.projectId, input.content),
+      },
+    };
+    const blobRefs = Object.values(metadata.files).filter((hash): hash is string => Boolean(hash));
+    const previousVersionId = this.listResourceVersionsFromDisk(input.projectId, "knowledge_document", input.item.id)[0]?.id;
+    const version: ResourceVersion = {
+      id: input.versionId,
+      projectId: input.projectId,
+      kind: "knowledge_document",
+      resourceId: input.item.id,
+      previousVersionId,
+      restoredFromVersionId: input.restoredFromVersionId,
+      contentHash: this.makeResourceContentHash("knowledge_document", input.item.id, blobRefs, metadata),
+      blobRefs,
+      metadata,
+      runtime: {
+        schemaVersion: CONTENT_GRAPH_SCHEMA_VERSION,
+        materializerVersion: MATERIALIZER_VERSION,
+        migrationStatus: input.migrationStatus ?? "native",
+      },
+      createdAt: Date.now(),
+      createdBy: input.actor.name,
+      source: input.source,
+      note: input.note,
+    };
+    this.writeResourceVersion(version);
+    return version;
+  }
+
+  private knowledgeContentFromResourceVersion(version: ResourceVersion): { item: KnowledgeItemMeta; content: string } | null {
+    const metadata = version.metadata as Partial<KnowledgeResourceMetadata>;
+    if (!metadata.item || !metadata.files?.markdown) return null;
+    const content = this.readBlob(version.projectId, metadata.files.markdown);
+    return content === undefined ? null : { item: metadata.item, content };
+  }
+
   private readProject(projectId: string): Project | null {
     const parsed = readJsonFile<Partial<Project>>(path.join(this.getProjectPath(projectId), "project.json"));
     if (!parsed) return null;
@@ -2658,7 +3540,6 @@ export class ProjectAdminService {
       demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
       demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
-      pageVersions: parsed.pageVersions ?? {},
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
       lockedDependencies: parsed.lockedDependencies,
@@ -2826,26 +3707,6 @@ export class ProjectAdminService {
     return files;
   }
 
-  private readPageVersionFiles(project: Project, pageId: string, versionId: string): DemoFiles | null {
-    const version = project.pageVersions?.[pageId]?.find((item) => item.versionId === versionId);
-    if (!version || !fs.existsSync(version.snapshotPath)) return null;
-    const codePath = path.join(version.snapshotPath, "index.tsx");
-    const schemaPath = path.join(version.snapshotPath, "config.schema.json");
-    const prototypeHtmlPath = path.join(version.snapshotPath, "prototype.html");
-    const prototypeCssPath = path.join(version.snapshotPath, "prototype.css");
-    const prototypeMetaPath = path.join(version.snapshotPath, "prototype.meta.json");
-    if (!fs.existsSync(schemaPath)) return null;
-    return {
-      code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
-      schema: fs.readFileSync(schemaPath, "utf-8"),
-      prototypeHtml: fs.existsSync(prototypeHtmlPath) ? fs.readFileSync(prototypeHtmlPath, "utf-8") : undefined,
-      prototypeCss: fs.existsSync(prototypeCssPath) ? fs.readFileSync(prototypeCssPath, "utf-8") : undefined,
-      prototypeMeta: fs.existsSync(prototypeMetaPath)
-        ? readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined
-        : undefined,
-    };
-  }
-
   private readProjectConfig(workspacePath: string): string | null {
     const configPath = path.join(workspacePath, PROJECT_CONFIG_FILENAME);
     return fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : null;
@@ -2908,8 +3769,7 @@ export class ProjectAdminService {
   }
 
   private generateVersionId(project: Project): string {
-    const pageVersions = Object.values(project.pageVersions ?? {}).flat();
-    const maxVersion = [...project.versions, ...pageVersions].reduce((max, version) => {
+    const maxVersion = project.versions.reduce((max, version) => {
       const match = /^v(\d+)$/.exec(version.versionId);
       return match ? Math.max(max, Number(match[1])) : max;
     }, 0);

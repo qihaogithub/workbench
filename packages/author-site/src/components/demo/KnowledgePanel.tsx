@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Brain,
   Upload,
+  History,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,18 +34,22 @@ import type { KnowledgeItem, KnowledgeDocDialogMode } from "./KnowledgeDocDialog
 
 interface KnowledgePanelProps {
   workingDir?: string;
+  projectId?: string;
   onDocSelect?: (item: KnowledgeItem, mode: KnowledgeDocDialogMode) => void;
   onDocAdd?: () => void;
   onDocCreated?: (item: KnowledgeItem) => void;
+  onDocHistory?: (item: KnowledgeItem) => void;
   onMemorySelect?: () => void;
   onItemsChange?: (items: KnowledgeItem[]) => void;
 }
 
 export function KnowledgePanel({
   workingDir,
+  projectId,
   onDocSelect,
   onDocAdd,
   onDocCreated,
+  onDocHistory,
   onMemorySelect,
   onItemsChange,
 }: KnowledgePanelProps) {
@@ -61,8 +66,10 @@ export function KnowledgePanel({
     if (!workingDir) return;
     setLoading(true);
     try {
+      const params = new URLSearchParams({ workingDir });
+      if (projectId) params.set("projectId", projectId);
       const res = await fetch(
-        `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}`
+        `/api/knowledge?${params.toString()}`
       );
       const data = await res.json();
       if (data.success) {
@@ -74,7 +81,7 @@ export function KnowledgePanel({
     } finally {
       setLoading(false);
     }
-  }, [workingDir, onItemsChange]);
+  }, [workingDir, projectId, onItemsChange]);
 
   useEffect(() => {
     fetchItems();
@@ -85,8 +92,10 @@ export function KnowledgePanel({
       if (!workingDir) return;
       if (!confirm(`确定要删除「${item.title}」吗？`)) return;
       try {
+        const params = new URLSearchParams({ workingDir });
+        if (projectId) params.set("projectId", projectId);
         const res = await fetch(
-          `/api/knowledge/${item.id}?workingDir=${encodeURIComponent(workingDir)}`,
+          `/api/knowledge/${item.id}?${params.toString()}`,
           { method: "DELETE" }
         );
         const data = await res.json();
@@ -104,7 +113,7 @@ export function KnowledgePanel({
         toast({ title: "删除失败", variant: "destructive" });
       }
     },
-    [workingDir, toast, fetchItems]
+    [workingDir, projectId, toast, fetchItems]
   );
 
   // 上传文件处理
@@ -124,8 +133,10 @@ export function KnowledgePanel({
       try {
         const content = await file.text();
         const title = file.name.replace(/\.md$/, "");
+        const params = new URLSearchParams({ workingDir });
+        if (projectId) params.set("projectId", projectId);
         const res = await fetch(
-          `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}`,
+          `/api/knowledge?${params.toString()}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -156,7 +167,7 @@ export function KnowledgePanel({
       e.target.value = "";
       setAddMenuOpen(false);
     },
-    [workingDir, toast, fetchItems, onDocCreated]
+    [workingDir, projectId, toast, fetchItems, onDocCreated]
   );
 
   // 监听 knowledge-updated 事件
@@ -268,6 +279,7 @@ export function KnowledgePanel({
                       item={item}
                       onSelect={() => onDocSelect?.(item, "read")}
                       onEdit={() => onDocSelect?.(item, "edit")}
+                      onHistory={() => onDocHistory?.(item)}
                       onDelete={() => handleDelete(item)}
                       indent={24}
                     />
@@ -299,12 +311,14 @@ function KnowledgeFileItem({
   item,
   onSelect,
   onEdit,
+  onHistory,
   onDelete,
   indent = 24,
 }: {
   item: KnowledgeItem;
   onSelect: () => void;
   onEdit?: () => void;
+  onHistory?: () => void;
   onDelete?: () => void;
   indent?: number;
 }) {
@@ -342,6 +356,17 @@ function KnowledgeFileItem({
               <Pencil className="h-3.5 w-3.5 mr-2" />
               编辑
             </DropdownMenuItem>
+            {onHistory && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onHistory();
+                }}
+              >
+                <History className="h-3.5 w-3.5 mr-2" />
+                历史
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="text-destructive"
               onClick={(e) => {

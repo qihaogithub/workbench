@@ -515,6 +515,17 @@ export function useVersionControl(params: UseVersionControlParams) {
         await flushCanvasState();
 
         if (latestSnapshotRef.current.activeDemoId) {
+          const checkpointPage = demoPages.find(
+            (page) => page.id === latestSnapshotRef.current.activeDemoId,
+          );
+          const checkpointNote =
+            reason === "idle"
+              ? checkpointPage
+                ? `停止编辑后自动记录${checkpointPage.name}`
+                : "停止编辑后自动记录页面"
+              : checkpointPage
+                ? `持续编辑自动记录${checkpointPage.name}`
+                : "持续编辑自动记录页面";
           const saveRes = await fetch(
             `/api/sessions/${sessionId}/files/${latestSnapshotRef.current.activeDemoId}`,
             {
@@ -530,6 +541,15 @@ export function useVersionControl(params: UseVersionControlParams) {
           if (!saveRes.ok) {
             throw new Error("自动保存页面文件失败");
           }
+
+          await projectApiClient.createPageVersion(
+            demoId,
+            latestSnapshotRef.current.activeDemoId,
+            {
+              sessionId,
+              note: checkpointNote,
+            },
+          );
         }
 
         const checkpointRes = await fetch(`/api/sessions/${sessionId}/checkpoint`, {
@@ -551,7 +571,7 @@ export function useVersionControl(params: UseVersionControlParams) {
         setHasUnsavedChanges(false);
         markCanvasChangesSaved();
         setPublishStatus("unpublished_changes");
-        await loadVersionHistory();
+        await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
         return true;
       } catch (error) {
         console.warn("[auto-checkpoint] failed:", error);
@@ -564,7 +584,9 @@ export function useVersionControl(params: UseVersionControlParams) {
       autoCheckpointSignature,
       demoId,
       flushCanvasState,
+      demoPages,
       loadVersionHistory,
+      loadPageVersionHistories,
       markCanvasChangesSaved,
       sessionId,
       setHasUnsavedChanges,

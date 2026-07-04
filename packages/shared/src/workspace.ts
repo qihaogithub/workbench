@@ -68,6 +68,84 @@ export interface VersionInfo {
 export interface PageVersionInfo extends VersionInfo {
   demoId: string;
   demoName?: string;
+  resourceVersion?: ResourceVersion;
+  commitId?: string;
+}
+
+export type ProjectResourceKind =
+  | "page"
+  | "knowledge_document"
+  | "canvas"
+  | "asset"
+  | "project_config";
+
+export interface ResourcePointer {
+  kind: ProjectResourceKind;
+  resourceId: string;
+  versionId?: string;
+  deleted?: boolean;
+}
+
+export interface ResourceVersion {
+  id: string;
+  projectId: string;
+  kind: ProjectResourceKind;
+  resourceId: string;
+  previousVersionId?: string;
+  restoredFromVersionId?: string;
+  contentHash: string;
+  blobRefs: string[];
+  metadata: Record<string, unknown>;
+  runtime: {
+    schemaVersion: number;
+    runtimeType?: string;
+    previewContractVersion?: string;
+    materializerVersion: string;
+    migrationStatus?: "native";
+  };
+  createdAt: number;
+  createdBy: string;
+  source: "user" | "ai" | "import" | "restore" | "publish" | "system";
+  note?: string;
+}
+
+export interface ProjectCommit {
+  id: string;
+  projectId: string;
+  parentCommitId?: string;
+  visibility: "draft_checkpoint" | "semantic" | "protected";
+  intent: "edit" | "checkpoint" | "restore" | "publish" | "import" | "ai" | "system";
+  title: string;
+  resourcePointers: ResourcePointer[];
+  changedResources: Array<{
+    kind: ProjectResourceKind;
+    resourceId: string;
+    fromVersionId?: string;
+    toVersionId?: string;
+    deleted?: boolean;
+  }>;
+  createdAt: number;
+  createdBy: string;
+  audit: {
+    actorType: "user" | "ai" | "system" | "cli";
+    sessionId?: string;
+    workspaceId?: string;
+    bypassedValidation?: boolean;
+  };
+}
+
+export interface ProjectContentState {
+  projectId: string;
+  headCommitId: string;
+  materializationStatus?: "ready" | "pending" | "failed";
+  materializedCommitId?: string;
+  updatedAt: number;
+}
+
+export interface ResourceReference {
+  from: { kind: ProjectResourceKind; resourceId: string };
+  to: { kind: ProjectResourceKind; resourceId: string };
+  reason: "canvas_node" | "asset_usage" | "config_route" | "knowledge_context";
 }
 
 /**
@@ -182,7 +260,6 @@ export interface Project {
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
   demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
   versions: VersionInfo[];     // 版本历史（最多 50 个）
-  pageVersions?: Record<string, PageVersionInfo[]>; // demoId -> 页面级版本历史
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL

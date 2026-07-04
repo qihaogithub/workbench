@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useChatMessages } from "./chat/hooks/use-chat-messages";
 import { useChatStream } from "./chat/hooks/use-chat-stream";
 import { useChatModels } from "./chat/hooks/use-chat-models";
+import { buildFullModelId } from "@/lib/ai-models";
 import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
@@ -189,6 +190,18 @@ export function AIChat({
     resetModelState,
   } = useChatModels({ agentSessionId, workingDir });
 
+  const selectedModelId = useMemo(
+    () =>
+      buildFullModelId(
+        modelState.currentModelId,
+        modelState.currentDepth ?? undefined,
+        modelState.models,
+      ) ||
+      modelState.currentModelId ||
+      undefined,
+    [modelState.currentDepth, modelState.currentModelId, modelState.models],
+  );
+
   const {
     plan,
     pendingPermissionRequest,
@@ -220,6 +233,7 @@ export function AIChat({
     setCurrentMessage,
     onModelsEvent: handleModelsEvent,
     onModelStateError: handleModelError,
+    selectedModelId,
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,

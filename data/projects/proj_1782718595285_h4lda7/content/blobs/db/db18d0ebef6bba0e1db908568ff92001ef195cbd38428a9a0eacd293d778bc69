@@ -1,0 +1,52 @@
+{
+  "runtimeType": "prototype-html-css",
+  "sourceComponent": "demos/demo_omrf/index.tsx",
+  "sourcePageConfig": "demos/demo_omrf/config.schema.json",
+  "generatedAt": "2026-07-03T00:00:00Z",
+  "description": "Figma 导出的活动页面 HTML/CSS 原型，包含邀友得奖和叫叫商城两个板块",
+  "layout": {
+    "width": 1133,
+    "sections": [
+      {
+        "name": "装饰背景图",
+        "position": "top"
+      },
+      {
+        "name": "邀友得奖",
+        "position": "top-middle"
+      },
+      {
+        "name": "叫叫商城",
+        "position": "middle"
+      },
+      {
+        "name": "底部Logo",
+        "position": "bottom-middle"
+      },
+      {
+        "name": "底部广告",
+        "position": "bottom"
+      }
+    ],
+    "fixedElements": [
+      {
+        "name": "顶部导航栏",
+        "position": "top"
+      },
+      {
+        "name": "底部标签栏",
+        "position": "bottom"
+      }
+    ]
+  },
+  "projectConfigFields": [
+    "inviteColor1",
+    "inviteColor2",
+    "mallColor1",
+    "mallColor2",
+    "inviteImage1URL",
+    "inviteImage2URL",
+    "mallImage1URL",
+    "mallImage2URL"
+  ]
+}

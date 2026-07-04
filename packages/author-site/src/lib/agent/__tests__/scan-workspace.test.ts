@@ -16,6 +16,30 @@ describe('scanWorkspaceContext', () => {
     return pageDir;
   }
 
+  function createPrototypePage(id: string, html = '<main>prototype</main>', css = '.page {}', schema = '{}') {
+    const pageDir = path.join(tmpDir, 'demos', id);
+    fs.mkdirSync(pageDir, { recursive: true });
+    fs.writeFileSync(path.join(pageDir, 'prototype.html'), html);
+    fs.writeFileSync(path.join(pageDir, 'prototype.css'), css);
+    fs.writeFileSync(path.join(pageDir, 'config.schema.json'), schema);
+    fs.writeFileSync(
+      path.join(tmpDir, 'workspace-tree.json'),
+      JSON.stringify({
+        folders: [],
+        pages: [
+          {
+            id,
+            name: '原型页',
+            runtimeType: 'prototype-html-css',
+            order: 0,
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    return pageDir;
+  }
+
   function normalizeSeparators(value: string): string {
     return value.replace(/\\/g, '/');
   }
@@ -84,6 +108,7 @@ describe('scanWorkspaceContext', () => {
     const pageList = normalizeSeparators(ctx.pageList);
     expect(pageList).toMatch(/^- a$/m);
     expect(pageList).toMatch(/id: `a`/);
+    expect(pageList).toMatch(/runtimeType: `high-fidelity-react`/);
     expect(pageList).toMatch(/demos\/a\/index\.tsx/);
     expect(pageList).toMatch(/demos\/a\/config\.schema\.json/);
     expect(pageList).toMatch(/^- b$/m);
@@ -108,6 +133,25 @@ describe('scanWorkspaceContext', () => {
     const ctx = scanWorkspaceContext(tmpDir);
     expect(ctx.pageList).toContain('export default function A()');
     expect(ctx.pageList).toContain('"type":"object"');
+  });
+
+  it('原型页上下文展示 runtimeType 与 prototype.html/css，而不是 index.tsx', () => {
+    createPrototypePage(
+      'prototype_a',
+      '<main><h1 data-bind-text="title">默认标题</h1></main>',
+      '.hero { color: red; }',
+      '{"type":"object","properties":{"title":{"type":"string","default":"默认标题"}}}',
+    );
+
+    const ctx = scanWorkspaceContext(tmpDir);
+    const pageList = normalizeSeparators(ctx.pageList);
+    expect(pageList).toContain('runtimeType: `prototype-html-css`');
+    expect(pageList).toContain('demos/prototype_a/prototype.html');
+    expect(pageList).toContain('demos/prototype_a/prototype.css');
+    expect(pageList).not.toContain('demos/prototype_a/index.tsx');
+    expect(pageList).toContain('data-bind-text="title"');
+    expect(pageList).toContain('.hero { color: red; }');
+    expect(pageList).toContain('"title"');
   });
 
   it('页面数 > 2 时，pageList 不包含文件内容（避免 L3 过大）', () => {

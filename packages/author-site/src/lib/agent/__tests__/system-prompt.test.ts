@@ -14,10 +14,18 @@ describe('buildStaticSystemPrompt', () => {
 
   it('L2 模板内容应包含核心规则章节', () => {
     const prompt = buildStaticSystemPrompt();
-    expect(prompt).toContain('Demo Generator Agent');
+    expect(prompt).toContain('OneFlow Authoring Agent');
+    expect(prompt).toContain('OneFlow 创作工作流助手');
     expect(prompt).toContain('页面管理操作');
     expect(prompt).toContain('项目级配置管理');
     expect(prompt).toContain('禁止行为');
+  });
+
+  it('创作端 Agent 身份应覆盖完整创作工作流', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('你是一位 OneFlow 创作工作流助手');
+    expect(prompt).toContain('活动原型、页面实现、配置资源、知识规范、视觉还原、预览验收和开发交接');
+    expect(prompt).toContain('页面创作、配置管理、知识查阅、资源规范、画布整理、Vibe Coding 和开发上下文准备');
   });
 
   it('L4 权限确认说明应拼接在末尾', () => {
@@ -122,6 +130,18 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('"required": []');
     expect(prompt).toContain('如果 schema 没有配置字段，Props 必须为空');
     expect(prompt).toContain('不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段');
+  });
+
+  it('明确说明 HTML/CSS 原型页支持页面级配置绑定', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('HTML/CSS 原型页和高保真 React 页都支持配置项');
+    expect(prompt).toContain('不得声称原型页不支持配置注入');
+    expect(prompt).toContain('原型页不通过 React Props 注入配置');
+    expect(prompt).toContain('data-bind-text');
+    expect(prompt).toContain('data-bind-src');
+    expect(prompt).toContain('{{fieldKey}}');
+    expect(prompt).toContain('给原型页添加配置项时，应在 `config.schema.json` 中添加字段');
+    expect(prompt).toContain('`prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定');
   });
 
   it('包含共享 preview contract 生成的页面运行规则', () => {

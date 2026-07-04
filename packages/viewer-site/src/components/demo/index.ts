@@ -15,6 +15,7 @@ export {
   ConfigForm,
   ConfigScopeWrapper,
   PageConfigPanel,
+  extractPrototypeConfigBindingKeys,
   NoteButton,
   NoteDialog,
   NotePreview,

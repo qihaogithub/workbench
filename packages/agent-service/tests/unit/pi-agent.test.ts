@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PiAgentBackend } from '../../src/backends/pi-agent';
 import { AgentConfig } from '../../src/core/types';
+import { logger } from '../../src/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -254,6 +255,37 @@ describe('PiAgentBackend', () => {
 
       await expect(backend.sendMessage('hello')).rejects.toThrow(
         '模型返回了空内容',
+      );
+    });
+
+    it('底层发送失败日志应保留 Error 的可诊断字段', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      const loggerErrorSpy = vi
+        .spyOn(logger, 'error')
+        .mockImplementation(() => undefined);
+
+      await backend.start();
+      const providerError = new Error('provider request failed');
+      Object.defineProperty(providerError, 'status', {
+        value: 502,
+        enumerable: false,
+      });
+      piAgentMocks.harnesses[0].prompt = vi.fn().mockRejectedValue(providerError);
+
+      await expect(backend.sendMessage('hello')).rejects.toThrow(
+        'provider request failed',
+      );
+
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorInfo: expect.objectContaining({
+            name: 'Error',
+            message: 'provider request failed',
+            status: 502,
+            stack: expect.any(String),
+          }),
+        }),
+        'Failed to send message',
       );
     });
 

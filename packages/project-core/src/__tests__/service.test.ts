@@ -425,7 +425,7 @@ describe("ProjectAdminService", () => {
     expect(service.commitEdit(followupEditId, "无关配置改动").ok).toBe(true);
   });
 
-  it("恢复页面历史版本并生成新的项目版本", () => {
+  it("恢复页面资源版本并生成新的项目版本", () => {
     const created = service.createProject({ name: "页面恢复项目" });
     const projectId = created.data?.id ?? "";
     const edit = service.beginEdit(projectId);
@@ -439,58 +439,38 @@ describe("ProjectAdminService", () => {
     const committed = service.commitEdit(editId, "当前版本");
     expect(committed.ok).toBe(true);
 
-    const snapshotPath = path.join(tempDir, "snapshots", projectId, "pages", pageId, "pv1");
-    fs.mkdirSync(snapshotPath, { recursive: true });
-    fs.writeFileSync(
-      path.join(snapshotPath, "index.tsx"),
-      "export default function Demo(){ return <div>restored</div>; }",
-      "utf-8",
-    );
-    fs.writeFileSync(
-      path.join(snapshotPath, "config.schema.json"),
-      JSON.stringify({ type: "object", properties: {} }, null, 2),
-      "utf-8",
-    );
-    const projectPath = path.join(tempDir, "projects", projectId, "project.json");
-    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
-    project.pageVersions = {
-      [pageId]: [
-        {
-          versionId: "pv1",
-          demoId: pageId,
-          demoName: "首页",
-          savedAt: Date.now(),
-          savedBy: "tester",
-          sessionId: "page-test",
-          snapshotPath,
-          fileCount: 2,
-          note: "页面旧版本",
-        },
-      ],
-    };
-    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2), "utf-8");
+    const pageVersion = service.createPageVersion({ projectId, pageId, note: "页面资源版本" });
+    expect(pageVersion.ok).toBe(true);
+    const followupEdit = service.beginEdit(projectId);
+    const followupEditId = (followupEdit.data as EditTransaction).editId;
+    expect(service.updatePage({
+      editId: followupEditId,
+      pageId,
+      code: "export default function Demo(){ return <div>changed</div>; }",
+    }).ok).toBe(true);
+    expect(service.commitEdit(followupEditId, "修改当前页面").ok).toBe(true);
 
-    const restored = service.restorePageVersion(projectId, pageId, "pv1", {
+    const restored = service.restorePageVersion(projectId, pageId, pageVersion.data?.versionId ?? "", {
       id: "admin",
       name: "Admin",
       role: "admin",
     });
     expect(restored.ok).toBe(true);
-    expect(restored.data?.newVersionId).toBe("v2");
-    expect(restored.data?.files.code).toContain("restored");
+    expect(restored.data?.newVersionId).toBe("v3");
+    expect(restored.data?.files.code).toContain("current");
 
     const workspaceCode = fs.readFileSync(
       path.join(tempDir, "projects", projectId, "workspace", "demos", pageId, "index.tsx"),
       "utf-8",
     );
-    expect(workspaceCode).toContain("restored");
+    expect(workspaceCode).toContain("current");
 
     const detail = service.getProject(projectId);
-    expect(detail.data?.versions[0]?.versionId).toBe("v2");
-    expect(detail.data?.versions).toHaveLength(2);
+    expect(detail.data?.versions[0]?.versionId).toBe("v3");
+    expect(detail.data?.versions).toHaveLength(3);
   });
 
-  it("创建并读取页面历史版本，且版本号与项目版本共享递增序列", () => {
+  it("创建并读取页面资源历史版本，项目版本号独立递增", () => {
     const created = service.createProject({ name: "页面版本项目" });
     const projectId = created.data?.id ?? "";
     const edit = service.beginEdit(projectId);
@@ -512,14 +492,14 @@ describe("ProjectAdminService", () => {
       note: "命名页面版本",
     });
     expect(pageVersion.ok).toBe(true);
-    expect(pageVersion.data?.versionId).toBe("v2");
+    expect(pageVersion.data?.versionId).toMatch(/^prv_/);
 
     const listed = service.pageVersionList(projectId, pageId);
     expect(listed.ok).toBe(true);
     expect(listed.data?.totalVersions).toBe(1);
-    expect(listed.data?.versions[0]?.versionId).toBe("v2");
+    expect(listed.data?.versions[0]?.versionId).toBe(pageVersion.data?.versionId);
 
-    const loaded = service.pageVersionGet(projectId, pageId, "v2");
+    const loaded = service.pageVersionGet(projectId, pageId, pageVersion.data?.versionId ?? "");
     expect(loaded.ok).toBe(true);
     expect(loaded.data?.version.note).toBe("命名页面版本");
     expect(loaded.data?.files.code).toContain("page-version");
@@ -534,7 +514,7 @@ describe("ProjectAdminService", () => {
     expect(updated.ok).toBe(true);
     const recommitted = service.commitEdit(followupEditId, "再次提交");
     expect(recommitted.ok).toBe(true);
-    expect(recommitted.data?.version.versionId).toBe("v3");
+    expect(recommitted.data?.version.versionId).toBe("v2");
   });
 
   it("阻止项目级 Schema 与页面 Schema 字段冲突", () => {

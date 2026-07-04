@@ -23,6 +23,7 @@ import {
   summarizeAssistantMessageShape,
 } from './managers/assistant-text-utils';
 import { normalizeImageAttachments } from '../utils/image-attachments';
+import { serializeErrorForLog } from '../utils/error-utils';
 
 function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; description?: string }>): string {
   if (!activeTools.length) return '';
@@ -594,7 +595,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
       return text;
     } catch (error) {
       this.status = "error";
-      logger.error({ error }, "Failed to send message");
+      logger.error(
+        {
+          errorInfo: serializeErrorForLog(error),
+          responseDebug: this.lastResponseDebug,
+        },
+        "Failed to send message",
+      );
       throw error;
     }
   }
