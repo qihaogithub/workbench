@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import type { VisualNodeInfo, VisualPropertyChange } from "@opencode-workbench/demo-ui";
 import { VisualPropertyPanel } from "./VisualPropertyPanel";
@@ -50,15 +50,11 @@ function renderPanel(
   return render(
     <VisualPropertyPanel
       selectedNode={selectedNode}
-      nodeStack={[selectedNode]}
       propertyChanges={[]}
       pendingPropertyChanges={[]}
       configMarks={[]}
-      pendingConfigMarks={[]}
       aiInstruction=""
-      hasPendingAiInstruction={false}
       submission={emptySubmission}
-      sending={false}
       usedConfigKeys={[]}
       sessionId="session-1"
       onPropertyChange={jest.fn()}
@@ -74,42 +70,23 @@ function renderPanel(
   );
 }
 
-describe("VisualPropertyPanel 发送状态", () => {
-  it("已发送同一批属性后禁用发送按钮", () => {
-    renderPanel({
-      propertyChanges: [colorChange],
-      submission: {
-        ...emptySubmission,
-        status: "sent",
-        submittedAt: Date.now(),
-        changes: [colorChange],
-        prompt: "属性修改",
-      },
-    });
+describe("VisualPropertyPanel 清空入口", () => {
+  it("当前图层没有修改时禁用清空按钮", () => {
+    renderPanel();
 
-    expect(screen.getByRole("button", { name: /已发送给 AI/ })).toBeDisabled();
-    expect(screen.getByText("本次属性修改已发送给 AI。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "清空" })).toBeDisabled();
   });
 
-  it("AI 处理中产生新草稿后允许再次发送", () => {
-    const pendingChange: VisualPropertyChange = {
-      ...colorChange,
-      value: "#00ff00",
-    };
-
+  it("当前图层有修改时可清空当前图层设置", () => {
+    const onClearChanges = jest.fn();
     renderPanel({
-      propertyChanges: [pendingChange],
-      pendingPropertyChanges: [pendingChange],
-      submission: {
-        ...emptySubmission,
-        status: "sending",
-        submittedAt: Date.now(),
-        changes: [colorChange],
-        prompt: "属性修改",
-      },
+      propertyChanges: [colorChange],
+      onClearChanges,
     });
 
-    expect(screen.getByRole("button", { name: /发送给 AI/ })).toBeEnabled();
-    expect(screen.getByText("AI 正在处理上一批修改，新修改可继续发送。")).toBeInTheDocument();
+    const clearButton = screen.getByRole("button", { name: "清空" });
+    expect(clearButton).toBeEnabled();
+    fireEvent.click(clearButton);
+    expect(onClearChanges).toHaveBeenCalledTimes(1);
   });
 });

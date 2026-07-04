@@ -93,7 +93,7 @@ import {
   MoreVertical,
   Eye,
   Copy,
-  SlidersHorizontal,
+  MousePointer2,
   FileText,
   Map as MapIcon,
   Upload,
@@ -107,7 +107,7 @@ import {
   ArrowLeft,
   Users,
   Download,
-  X,
+  Send,
 } from "lucide-react";
 import {
   Select,
@@ -116,11 +116,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ErrorBanner } from "@/components/demo/ErrorBanner";
 import {
   Dialog,
@@ -175,6 +170,8 @@ import { projectApiClient } from "@/lib/project-api";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+
+const VISUAL_PROPERTY_DRAWER_ANIMATION_MS = 200;
 
 interface DemoEditPageProps {
   params: {
@@ -260,6 +257,37 @@ function getSchemaPropertyKeys(...schemas: Array<string | undefined | null>): st
     }
   }
   return Array.from(keys);
+}
+
+function areConfigValuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function mergeDefaultsPreservingUserValues(
+  currentConfig: Record<string, unknown>,
+  nextDefaults: Record<string, unknown>,
+  previousDefaults: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...nextDefaults };
+
+  for (const [key, currentValue] of Object.entries(currentConfig)) {
+    if (!(key in nextDefaults)) {
+      merged[key] = currentValue;
+      continue;
+    }
+
+    if (
+      key in previousDefaults &&
+      areConfigValuesEqual(currentValue, previousDefaults[key])
+    ) {
+      merged[key] = nextDefaults[key];
+      continue;
+    }
+
+    merged[key] = currentValue;
+  }
+
+  return merged;
 }
 
 const uuidLikePattern =
@@ -1181,6 +1209,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [visualPropertyDrawerOpen, setVisualPropertyDrawerOpen] = useState(false);
+  const [visualPropertyDrawerMounted, setVisualPropertyDrawerMounted] = useState(false);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | AutoRepairTrigger | null>(null);
   // visualEditMode and related state moved to useVisualEditState hook
@@ -1915,6 +1944,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleVisualPropertyChange,
     handleRestoreVisualProperty,
     handleClearVisualProperties,
+    handleClearSelectedVisualProperties,
     handleMarkVisualConfig,
     handleUpdateVisualConfigMark,
     handleRemoveVisualConfigMark,
@@ -1933,6 +1963,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   } = visualEditState;
 
   const [visualLayerTreeOpen, setVisualLayerTreeOpen] = useState(false);
+  const [visualLayerDrawerMounted, setVisualLayerDrawerMounted] = useState(false);
   const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
   const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<VisualNodeTreeItem[]>([]);
   const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
@@ -2456,7 +2487,10 @@ ${context.details}
               prototypeMeta?: PrototypePageMeta;
             },
           ][]) {
-            allDefaults[pageId] = getSafeMergedDefaults(demo.schema);
+            allDefaults[pageId] = getSafeMergedDefaults(
+              demo.schema,
+              multi.projectConfigSchema,
+            );
             schemas[pageId] = demo.schema;
             codes[pageId] = demo.code;
             if (demo.prototypeHtml !== undefined || demo.prototypeCss !== undefined) {
@@ -2468,7 +2502,10 @@ ${context.details}
             }
           }
         } else if (initialDemoId) {
-          allDefaults[initialDemoId] = getSafeMergedDefaults(loadedSchema);
+          allDefaults[initialDemoId] = getSafeMergedDefaults(
+            loadedSchema,
+            multi.projectConfigSchema,
+          );
           schemas[initialDemoId] = loadedSchema;
         }
         setConfigDataMap(allDefaults);
@@ -2691,18 +2728,14 @@ ${context.details}
     [handleSchemaChange],
   );
 
-  const handleProjectSchemaChange = useCallback((newSchema: string) => {
-    replaceCollabText(projectSchemaCollab.ytext, newSchema);
-    setProjectConfigSchema(newSchema);
-    projectConfigSchemaRef.current = newSchema;
-    markWorkspaceChanged();
-  }, [markWorkspaceChanged, projectSchemaCollab.ytext]);
-
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
-    (pageSchema: string) => {
+    (pageSchema: string, projectSchemaOverride?: string) => {
       try {
-        return mergeConfigToProps(projectConfigSchema, pageSchema);
+        return mergeConfigToProps(
+          projectSchemaOverride ?? projectConfigSchemaRef.current,
+          pageSchema,
+        );
       } catch (err) {
         if (err instanceof SchemaConflictError) {
           toast({
@@ -2714,8 +2747,66 @@ ${context.details}
         return getDefaultValues(pageSchema);
       }
     },
-    [projectConfigSchema],
+    [toast],
   );
+
+  const handleProjectSchemaChange = useCallback((newSchema: string) => {
+    const previousProjectSchema = projectConfigSchemaRef.current;
+    replaceCollabText(projectSchemaCollab.ytext, newSchema);
+    setProjectConfigSchema(newSchema);
+    projectConfigSchemaRef.current = newSchema;
+
+    const affectedPageIds = demoPages.map((page) => page.id);
+    invalidatePageScreenshots(affectedPageIds);
+    setConfigDataMap((prev) => {
+      const next = { ...prev };
+      for (const page of demoPages) {
+        const pageSchema =
+          pageSchemaMapRef.current[page.id] ??
+          (page.id === activeDemoIdRef.current ? schemaRef.current : "");
+        const nextDefaults = getSafeMergedDefaults(pageSchema, newSchema);
+        const previousDefaults = getSafeMergedDefaults(
+          pageSchema,
+          previousProjectSchema,
+        );
+        next[page.id] = mergeDefaultsPreservingUserValues(
+          prev[page.id] ?? {},
+          nextDefaults,
+          previousDefaults,
+        );
+      }
+
+      for (const page of demoPages) {
+        const pageCode = resolvePreviewPageCode({
+          pageId: page.id,
+          pageCodes,
+          activeCodePageId:
+            pageCodes[activeDemoIdRef.current] === codeRef.current
+              ? activeDemoIdRef.current
+              : undefined,
+          activeCode: codeRef.current,
+        });
+        if (!pageCode && page.runtimeType !== "prototype-html-css") continue;
+        scheduleScreenshotRegenerate(
+          page.id,
+          pageCode || undefined,
+          next[page.id],
+        );
+      }
+
+      return next;
+    });
+
+    markWorkspaceChanged();
+  }, [
+    demoPages,
+    getSafeMergedDefaults,
+    invalidatePageScreenshots,
+    markWorkspaceChanged,
+    pageCodes,
+    projectSchemaCollab.ytext,
+    scheduleScreenshotRegenerate,
+  ]);
 
   const updatePageSchemaMapFromLoad = useCallback((pageId: string, loadedSchema: string) => {
     setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, { [pageId]: loadedSchema }));
@@ -3778,6 +3869,48 @@ ${context.details}
   const singlePreviewViewingDocument =
     previewMode === "single" &&
     effectiveSinglePreviewTarget?.kind === "document";
+  const visualLayerDrawerActive =
+    propertyPanelActive && visualLayerTreeOpen && !singlePreviewViewingDocument;
+
+  useEffect(() => {
+    if (visualPropertyDrawerOpen && !singlePreviewViewingDocument) {
+      setVisualPropertyDrawerMounted(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVisualPropertyDrawerMounted(false);
+    }, VISUAL_PROPERTY_DRAWER_ANIMATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [singlePreviewViewingDocument, visualPropertyDrawerOpen]);
+
+  useEffect(() => {
+    if (visualLayerDrawerActive) {
+      setVisualLayerDrawerMounted(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVisualLayerDrawerMounted(false);
+    }, VISUAL_PROPERTY_DRAWER_ANIMATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [visualLayerDrawerActive]);
+
+  const handleOpenVisualEditMode = useCallback(() => {
+    if (singlePreviewViewingDocument) return;
+    setVisualPropertyDrawerOpen(true);
+    setVisualLayerTreeOpen(true);
+    setVisualLayerTreeRequestKey((key) => key + 1);
+  }, [singlePreviewViewingDocument]);
+
+  const handleCloseVisualEditMode = useCallback(() => {
+    setVisualPropertyDrawerOpen(false);
+    setVisualLayerTreeOpen(false);
+    setVisualPanelHoverNodeId(null);
+  }, [setVisualPanelHoverNodeId]);
+
   const visualPropertyDrawerTargetRef = useRef({
     activeDemoId,
     previewMode,
@@ -4228,6 +4361,47 @@ ${context.details}
     ],
   );
 
+  const hasProjectConfig = !isSchemaEmpty(projectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(schema);
+  const showProjectConfig = hasProjectConfig;
+  const showPageConfig = hasPageConfig;
+  const hasBothScopes = showProjectConfig && showPageConfig;
+  const hasAnyConfig = showProjectConfig || showPageConfig;
+  const isConfigPanelVisible =
+    (previewMode === "single" && !singlePreviewViewingDocument) ||
+    (previewMode === "canvas" && hasAnyConfig);
+  const visualConfigUsedKeys = getSchemaPropertyKeys(schema, projectConfigSchema);
+  const getVisualNodeChangeCount = useCallback(
+    (node: VisualNodeInfo) => {
+      const matchesNode = (item: { domPath: string; nodeId: string }) =>
+        item.domPath === node.domPath || item.nodeId === node.nodeId;
+      return (
+        visualPropertyChanges.filter(matchesNode).length +
+        visualConfigMarks.filter(matchesNode).length
+      );
+    },
+    [visualConfigMarks, visualPropertyChanges],
+  );
+  const visualTotalChangeCount =
+    visualPropertyChanges.length + visualConfigMarks.length;
+  const hasPendingVisualDraft =
+    visualPendingPropertyChanges.length > 0 ||
+    visualPendingConfigMarks.length > 0 ||
+    hasPendingVisualAiInstruction;
+  const canRetryVisualPropertySubmission =
+    visualPropertySubmission.status === "failed" &&
+    !!visualPropertySubmission.prompt;
+  const visualPendingConfigKeyConflicts = visualPendingConfigMarks.filter((mark) =>
+    visualConfigUsedKeys.includes(mark.fieldKey.trim()),
+  );
+  const visualSendDisabled =
+    visualPropertySending ||
+    (!selectedVisualNode &&
+      !hasPendingVisualAiInstruction &&
+      !canRetryVisualPropertySubmission) ||
+    (!hasPendingVisualDraft && !canRetryVisualPropertySubmission) ||
+    visualPendingConfigKeyConflicts.length > 0;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -4241,16 +4415,6 @@ ${context.details}
     );
   }
 
-  const hasProjectConfig = !isSchemaEmpty(projectConfigSchema);
-  const hasPageConfig = !isSchemaEmpty(schema);
-  const showProjectConfig = hasProjectConfig;
-  const showPageConfig = hasPageConfig;
-  const hasBothScopes = showProjectConfig && showPageConfig;
-  const hasAnyConfig = showProjectConfig || showPageConfig;
-  const isConfigPanelVisible =
-    (previewMode === "single" && !singlePreviewViewingDocument) ||
-    (previewMode === "canvas" && hasAnyConfig);
-  const visualConfigUsedKeys = getSchemaPropertyKeys(schema, projectConfigSchema);
   const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
   const activeRuntimeConversion = activeDemoId
     ? runtimeConversions[activeDemoId]
@@ -4471,7 +4635,7 @@ ${context.details}
           minSizes={isConfigPanelVisible ? [20, 20, 20] : [20, 30]}
           className="h-full"
         >
-          <ResizablePanel className="flex flex-col border-r bg-card">
+          <ResizablePanel className="relative flex flex-col overflow-hidden border-r bg-card">
             <Tabs
               value={tabValue}
               onValueChange={setTabValue}
@@ -5219,6 +5383,54 @@ ${context.details}
               </TabsContent>
 
             </Tabs>
+            {visualLayerDrawerMounted && !singlePreviewViewingDocument && (
+              <div
+                className={`absolute inset-0 z-20 flex flex-col border-r bg-card shadow-2xl transition-[opacity,transform] duration-200 ease-out will-change-transform motion-reduce:transform-none motion-reduce:transition-none ${
+                  visualLayerDrawerActive
+                    ? "translate-x-0 opacity-100"
+                    : "pointer-events-none -translate-x-full opacity-0"
+                }`}
+              >
+                <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Layers className="h-4 w-4 text-muted-foreground" />
+                    <span className="truncate text-sm font-medium">图层</span>
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden p-2">
+                  <LayerTreeMenu
+                    title="当前页面图层"
+                    nodes={visualLayerTreeNodes}
+                    className="h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
+                    scrollClassName="layer-tree-menu-scrollbar max-h-[calc(100vh-180px)]"
+                    selectedNodeId={
+                      selectedVisualNode?.domPath ||
+                      selectedVisualNode?.nodeId ||
+                      null
+                    }
+                    emptyText="正在采集页面图层..."
+                    getNodeBadgeCount={getVisualNodeChangeCount}
+                    onHoverNodeIdChange={setVisualPanelHoverNodeId}
+                    onSelectNode={handleVisualSelect}
+                  />
+                </div>
+                <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-card px-3 py-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {visualTotalChangeCount} 项修改
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 gap-1.5 px-3"
+                    disabled={visualSendDisabled}
+                    onClick={() => handleSendVisualPropertiesToAI()}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    发送给AI
+                  </Button>
+                </div>
+              </div>
+            )}
           </ResizablePanel>
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
@@ -5370,27 +5582,32 @@ ${context.details}
                     <div className="flex-1" />
                     <Button
                       type="button"
-                      variant={visualPropertyDrawerOpen ? "secondary" : "outline"}
+                      variant="outline"
                       size="icon"
-                      className="h-7 w-7"
+                      className={`h-7 w-7 ${
+                        propertyPanelActive
+                          ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                          : ""
+                      }`}
                       disabled={singlePreviewViewingDocument}
                       title={
                         singlePreviewViewingDocument
-                          ? "文档视图无属性"
-                          : "属性"
+                          ? "文档视图不可选择"
+                          : propertyPanelActive
+                            ? "退出选择"
+                            : "选择"
                       }
-                      aria-label="属性"
+                      aria-label="选择"
                       aria-pressed={propertyPanelActive}
                       onClick={() => {
-                        const nextOpen = !visualPropertyDrawerOpen;
-                        setVisualPropertyDrawerOpen(nextOpen);
-                        if (!nextOpen) {
-                          setVisualLayerTreeOpen(false);
-                          setVisualPanelHoverNodeId(null);
+                        if (propertyPanelActive) {
+                          handleCloseVisualEditMode();
+                        } else {
+                          handleOpenVisualEditMode();
                         }
                       }}
                     >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      <MousePointer2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       type="button"
@@ -5412,57 +5629,6 @@ ${context.details}
                         <History className="h-3.5 w-3.5" />
                       )}
                     </Button>
-                    <Popover
-                      open={visualLayerTreeOpen}
-                      onOpenChange={(open) => {
-                        if (singlePreviewViewingDocument) return;
-                        setVisualLayerTreeOpen(open);
-                        if (open) {
-                          setVisualPropertyDrawerOpen(true);
-                          setVisualLayerTreeRequestKey((key) => key + 1);
-                        } else {
-                          setVisualPanelHoverNodeId(null);
-                        }
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          disabled={singlePreviewViewingDocument}
-                          title={
-                            singlePreviewViewingDocument
-                              ? "文档视图无图层"
-                              : "图层"
-                          }
-                        >
-                          <Layers className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="end"
-                        className="w-auto border-0 bg-transparent p-0 shadow-none"
-                      >
-                        <LayerTreeMenu
-                          title="当前页面图层"
-                          nodes={visualLayerTreeNodes}
-                          scrollClassName="layer-tree-menu-scrollbar"
-                          selectedNodeId={
-                            selectedVisualNode?.domPath ||
-                            selectedVisualNode?.nodeId ||
-                            null
-                          }
-                          emptyText="正在采集页面图层..."
-                          onHoverNodeIdChange={setVisualPanelHoverNodeId}
-                          onSelectNode={(node, path) => {
-                            handleVisualSelect(node, path);
-                            setVisualLayerTreeOpen(false);
-                          }}
-                        />
-                      </PopoverContent>
-                    </Popover>
                     {(demoPages.length > 0 ||
                       singlePreviewDocumentNodes.length > 0) && (
                       <select
@@ -5748,42 +5914,26 @@ ${context.details}
                     positionableItemSizes={positionableItemSizes}
                     hideDetailHeader
                   />
-                  {visualPropertyDrawerOpen && !singlePreviewViewingDocument && (
-                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
+                  {visualPropertyDrawerMounted && !singlePreviewViewingDocument && (
+                    <div
+                      className={`absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl transition-[opacity,transform] duration-200 ease-out will-change-transform ${
+                        propertyPanelActive
+                          ? "translate-x-0 opacity-100"
+                          : "pointer-events-none translate-x-full opacity-0"
+                      } motion-reduce:transform-none motion-reduce:transition-none`}
+                    >
                       <VisualPropertyPanel
                         selectedNode={selectedVisualNode}
                         sessionId={sessionId}
-                        nodeStack={visualNodeStack}
                         propertyChanges={visualPropertyChanges}
                         pendingPropertyChanges={visualPendingPropertyChanges}
                         configMarks={visualConfigMarks}
-                        pendingConfigMarks={visualPendingConfigMarks}
                         aiInstruction={visualAiInstruction}
-                        hasPendingAiInstruction={hasPendingVisualAiInstruction}
                         submission={visualPropertySubmission}
-                        sending={visualPropertySending}
                         usedConfigKeys={visualConfigUsedKeys}
-                        directApplyMode={activeDemoPage?.runtimeType === "prototype-html-css"}
-                        headerAction={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setVisualPropertyDrawerOpen(false);
-                              setVisualLayerTreeOpen(false);
-                              setVisualPanelHoverNodeId(null);
-                            }}
-                            aria-label="关闭属性面板"
-                            title="关闭属性面板"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        }
                         onPropertyChange={handleVisualPropertyChange}
                         onRestoreProperty={handleRestoreVisualProperty}
-                        onClearChanges={handleClearVisualProperties}
+                        onClearChanges={handleClearSelectedVisualProperties}
                         onMarkConfig={handleMarkVisualConfig}
                         onUpdateConfigMark={handleUpdateVisualConfigMark}
                         onRemoveConfigMark={handleRemoveVisualConfigMark}

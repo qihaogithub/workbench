@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   AlignCenter,
   AlignJustify,
@@ -33,7 +33,6 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -68,18 +67,12 @@ import type {
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
   sessionId?: string;
-  nodeStack: VisualNodeInfo[];
   propertyChanges: VisualPropertyChange[];
   pendingPropertyChanges: VisualPropertyChange[];
   configMarks: VisualConfigMark[];
-  pendingConfigMarks: VisualConfigMark[];
   aiInstruction: string;
-  hasPendingAiInstruction: boolean;
   submission: VisualPropertySubmission;
-  sending: boolean;
   usedConfigKeys: string[];
-  directApplyMode?: boolean;
-  headerAction?: ReactNode;
   onPropertyChange: (
     node: VisualNodeInfo,
     property: string,
@@ -491,69 +484,9 @@ function getSpecsForNode(node: VisualNodeInfo): PropertySpec[] {
   return specs;
 }
 
-function formatChangeValue(change: VisualPropertyChange): string {
-  if (change.resource) {
-    const parts = [
-      change.resource.fileName ? `文件：${change.resource.fileName}` : null,
-      change.resource.url ? `资源地址：${change.resource.url}` : null,
-      change.resource.mimeType ? `类型：${change.resource.mimeType}` : null,
-      typeof change.resource.size === "number" ? `大小：${change.resource.size} bytes` : null,
-      change.resource.temporary ? "临时 data URL 预览" : null,
-    ].filter(Boolean);
-    return parts.join("；") || change.value;
-  }
-  if (change.value.startsWith("data:")) {
-    return "临时 data URL 预览";
-  }
-  return change.value;
-}
-
 function getDisplayValue(value: string, spec: PropertySpec) {
   if (!value || !spec.unit) return value;
   return value.endsWith(spec.unit) ? value.slice(0, -spec.unit.length).trim() : value;
-}
-
-function buildExportText(params: {
-  selectedNode: VisualNodeInfo;
-  nodeStack: VisualNodeInfo[];
-  propertyChanges: VisualPropertyChange[];
-  configMarks: VisualConfigMark[];
-  aiInstruction: string;
-}) {
-  const stack = (params.nodeStack.length ? params.nodeStack : [params.selectedNode])
-    .map((node, index) => `${index + 1}. <${node.tagName}> ${node.domPath}${node.textContent ? ` ${node.textContent}` : ""}`)
-    .join("\n");
-  const changes = params.propertyChanges.length
-    ? params.propertyChanges
-        .map(
-          (change, index) =>
-            `${index + 1}. ${change.label}（${change.kind}:${change.property}）：${change.previousValue ?? "未设置"} -> ${formatChangeValue(change)}`,
-        )
-        .join("\n")
-    : "无";
-  const configs = params.configMarks.length
-    ? params.configMarks
-        .map(
-          (mark, index) =>
-            `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}`,
-        )
-        .join("\n")
-    : "无";
-
-  return `【点击位置图层】
-${stack}
-
-【最终选中元素】
-<${params.selectedNode.tagName}> ${params.selectedNode.domPath}
-
-【属性变更】
-${changes}
-
-【需要设为配置项的属性】
-${configs}
-
-【补充说明】
-${params.aiInstruction.trim() || "无"}`;
 }
 
 async function readFileAsDataUrl(file: File) {
@@ -571,18 +504,12 @@ async function readFileAsDataUrl(file: File) {
 export function VisualPropertyPanel({
   selectedNode,
   sessionId,
-  nodeStack,
   propertyChanges,
   pendingPropertyChanges,
   configMarks,
-  pendingConfigMarks,
   aiInstruction,
-  hasPendingAiInstruction,
   submission,
-  sending,
   usedConfigKeys,
-  directApplyMode = false,
-  headerAction,
   onPropertyChange,
   onRestoreProperty,
   onClearChanges,
@@ -594,7 +521,6 @@ export function VisualPropertyPanel({
 }: VisualPropertyPanelProps) {
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
   const specsBySection = useMemo(() => {
     if (!selectedNode) return [];
@@ -607,98 +533,11 @@ export function VisualPropertyPanel({
       .filter(([, specs]) => specs.length > 0);
   }, [selectedNode]);
 
-  const configKeyConflicts = configMarks.filter((mark) =>
-    usedConfigKeys.includes(mark.fieldKey.trim()),
-  );
-  const pendingConfigKeyConflicts = pendingConfigMarks.filter((mark) =>
-    usedConfigKeys.includes(mark.fieldKey.trim()),
-  );
-  const hasPendingDraft =
-    pendingPropertyChanges.length > 0 ||
-    pendingConfigMarks.length > 0 ||
-    hasPendingAiInstruction;
-  const canRetrySubmission =
-    submission.status === "failed" &&
-    !!submission.prompt;
-  const exportPropertyChanges = hasPendingDraft
-    ? pendingPropertyChanges
-    : submission.status !== "idle"
-      ? submission.changes
-      : propertyChanges;
-  const exportConfigMarks = hasPendingDraft
-    ? pendingConfigMarks
-    : submission.status !== "idle"
-      ? submission.configMarks
-      : configMarks;
-  const exportInstruction = hasPendingDraft
-    ? aiInstruction
-    : submission.status !== "idle"
-      ? submission.instruction
-      : aiInstruction;
-  const sendDisabled =
-    sending ||
-    (!selectedNode && !hasPendingAiInstruction && !canRetrySubmission) ||
-    (!hasPendingDraft && !canRetrySubmission) ||
-    pendingConfigKeyConflicts.length > 0;
-  const sendButtonLabel = hasPendingDraft
-    ? directApplyMode
-      ? "应用到原型页"
-      : "发送给 AI"
-    : submission.status === "sending"
-      ? directApplyMode
-        ? "应用中"
-        : "AI 处理中"
-      : submission.status === "failed"
-        ? "重新发送"
-        : submission.status === "queued" || submission.status === "sent"
-          ? directApplyMode
-            ? "已应用"
-            : "已发送给 AI"
-          : directApplyMode
-            ? "应用到原型页"
-            : "发送给 AI";
-  const submissionNotice =
-    hasPendingDraft && submission.status === "sending"
-      ? directApplyMode
-        ? "正在应用上一批修改，新修改可继续应用。"
-        : "AI 正在处理上一批修改，新修改可继续发送。"
-      : submission.status === "sending"
-        ? directApplyMode
-          ? "正在应用属性修改。"
-          : "AI 正在处理已发送的属性修改。"
-        : submission.status === "failed"
-          ? submission.error || "发送失败，可重新发送。"
-          : !hasPendingDraft && submission.status === "sent"
-            ? directApplyMode
-              ? "本次属性修改已应用到原型页。"
-              : "本次属性修改已发送给 AI。"
-            : !hasPendingDraft && submission.status === "queued"
-              ? directApplyMode
-                ? "本次属性修改已提交，等待应用。"
-                : "本次属性修改已提交，等待 AI 接收。"
-              : "";
   const isSubmittedChangeLocked = (changeId: string) =>
     submission.status !== "idle" &&
     submission.status !== "failed" &&
     submission.changes.some((change) => change.id === changeId) &&
     !pendingPropertyChanges.some((change) => change.id === changeId);
-  const exportText = selectedNode
-    ? buildExportText({
-        selectedNode,
-        nodeStack,
-        propertyChanges: exportPropertyChanges,
-        configMarks: exportConfigMarks,
-        aiInstruction: exportInstruction,
-      })
-    : "";
-
-  const copyExportText = () => {
-    if (!exportText || !navigator.clipboard) return;
-    void navigator.clipboard.writeText(exportText).then(() => {
-      setCopyNotice("已复制变更说明");
-      window.setTimeout(() => setCopyNotice(null), 1600);
-    });
-  };
 
   const uploadImageReplacement = async (
     file: File,
@@ -769,9 +608,8 @@ export function VisualPropertyPanel({
   if (!selectedNode) {
     return (
       <div className="flex h-full flex-col bg-card">
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex items-center border-b px-4 py-3">
           <h2 className="text-sm font-medium">属性编辑</h2>
-          {headerAction}
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <MousePointer2 className="h-8 w-8 text-muted-foreground" />
@@ -786,9 +624,6 @@ export function VisualPropertyPanel({
     );
   }
 
-  const layers = nodeStack.length ? nodeStack : [selectedNode];
-  const selectedLayerIndex = Math.max(0, layers.findIndex((node) => node.domPath === selectedNode.domPath));
-  const selectedLayerName = getContextualLayerName(selectedNode, layers, selectedLayerIndex);
   const styleRecord = selectedNode.computedStyle as Record<string, string | undefined> | undefined;
   const getStyleChange = (property: string) => {
     const changeId = getChangeId(selectedNode, property, "style");
@@ -881,6 +716,17 @@ export function VisualPropertyPanel({
     Boolean(getStyleChange("filter"));
   const hasVisibleEffect = hasVisibleShadow || hasVisibleFilter || hasEffectChanges;
   const clipContent = getStyleValue("overflow") === "hidden";
+  const selectedNodeChangeCount =
+    propertyChanges.filter(
+      (change) =>
+        change.domPath === selectedNode.domPath ||
+        change.nodeId === selectedNode.nodeId,
+    ).length +
+    configMarks.filter(
+      (mark) =>
+        mark.domPath === selectedNode.domPath ||
+        mark.nodeId === selectedNode.nodeId,
+    ).length;
 
   const applyArrangement = (nextArrangement: "free" | "row" | "column" | "grid") => {
     if (nextArrangement === "free") {
@@ -1456,46 +1302,20 @@ export function VisualPropertyPanel({
     <div className="flex h-full flex-col bg-card">
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
         <h2 className="text-sm font-medium">属性编辑</h2>
-        {headerAction}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          disabled={selectedNodeChangeCount === 0}
+          onClick={onClearChanges}
+        >
+          清空
+        </Button>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 p-3">
-          <section className="rounded-md border bg-muted/20">
-            <div className="flex items-start gap-3 p-3">
-              {selectedNode.attrs?.currentSrc || selectedNode.attrs?.src ? (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border bg-background">
-                  <img
-                    src={selectedNode.attrs.currentSrc ?? selectedNode.attrs.src}
-                    alt={selectedNode.attrs.alt ?? "selected image"}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded border bg-background text-muted-foreground">
-                  {getGroupIcon(getLayerKind(selectedNode) === "文字" ? "文本" : getLayerKind(selectedNode))}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="shrink-0 text-[10px]">
-                    {getLayerKind(selectedNode)}
-                  </Badge>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {Math.round(selectedNode.rect.width)} x {Math.round(selectedNode.rect.height)}
-                  </span>
-                </div>
-                <p className="mt-1 truncate text-sm font-medium">{selectedLayerName}</p>
-                {selectedNode.editCapabilities.includes("text") && selectedNode.textContent && (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                    {selectedNode.textContent}
-                  </p>
-                )}
-              </div>
-            </div>
-
-          </section>
-
           {specsBySection.map(([section, specs]) => {
             if (section === "布局") return renderLayoutSection();
             if (section === "外观") return renderAppearanceSection();
@@ -1876,65 +1696,6 @@ export function VisualPropertyPanel({
         </div>
       </ScrollArea>
 
-      <div className="border-t bg-card p-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant={hasPendingDraft ? "secondary" : "outline"}>
-            {pendingPropertyChanges.length} 项修改
-          </Badge>
-          <Badge variant="outline">{pendingConfigMarks.length} 个配置项</Badge>
-          {!hasPendingDraft && submission.status !== "idle" && (
-            <Badge variant="outline">
-              已提交 {submission.changes.length} 项
-            </Badge>
-          )}
-          {copyNotice && <span>{copyNotice}</span>}
-        </div>
-        {submissionNotice && (
-          <p
-            className={cn(
-              "mb-2 text-xs",
-              submission.status === "failed"
-                ? "text-destructive"
-                : "text-muted-foreground",
-            )}
-          >
-            {submissionNotice}
-          </p>
-        )}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 shrink-0 px-0"
-            disabled={!exportText}
-            title="复制本次变更说明"
-            onClick={copyExportText}
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 flex-1"
-            disabled={!hasPendingDraft}
-            onClick={onClearChanges}
-          >
-            清空
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 flex-[1.4] gap-1.5"
-            disabled={sendDisabled}
-            onClick={() => onSendToAI()}
-          >
-            <Send className="h-3.5 w-3.5" />
-            {sendButtonLabel}
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
