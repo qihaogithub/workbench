@@ -15,6 +15,7 @@ import {
   readAppGraph,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
+import { extractSchemaDefaults } from "@/lib/schema-defaults";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 import type {
   Project,
@@ -121,24 +122,6 @@ function copyPreviewRuntimeForPublish(projectId: string, publishDir: string): st
     force: true,
   });
   return runtimeBasePath;
-}
-
-function extractSchemaDefaults(schemaContent: string): Record<string, unknown> {
-  try {
-    const schema = JSON.parse(schemaContent);
-    const defaults: Record<string, unknown> = {};
-    if (schema.properties) {
-      for (const [key, prop] of Object.entries(schema.properties)) {
-        const p = prop as Record<string, unknown>;
-        if (p.default !== undefined) {
-          defaults[key] = p.default;
-        }
-      }
-    }
-    return defaults;
-  } catch {
-    return {};
-  }
 }
 
 export async function publishProject(

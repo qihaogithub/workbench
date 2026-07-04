@@ -231,6 +231,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const [coverTarget, setCoverTarget] = useState<DemoMeta | null>(null);
   const [templateCoverTarget, setTemplateCoverTarget] =
     useState<ProjectTemplateMeta | null>(null);
+  const [screenshotRevision, setScreenshotRevision] = useState(0);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),
@@ -334,7 +335,10 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       ),
     ).then(() => {
       if (hasGenerated) {
-        setTimeout(() => revalidate(), 5000);
+        setTimeout(() => {
+          setScreenshotRevision(Date.now());
+          revalidate();
+        }, 5000);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -903,6 +907,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                   <DemoCard
                     key={demo.id}
                     demo={demo}
+                    screenshotRevision={screenshotRevision}
                     onDelete={() => setDeleteTarget(demo)}
                     onSaveAsTemplate={() => setTemplateTarget(demo)}
                     onDuplicate={() =>
@@ -932,6 +937,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                       <TemplateProjectCard
                         key={template.id}
                         template={template}
+                        screenshotRevision={screenshotRevision}
                         onDuplicate={(item) =>
                           setDialogAction({
                             type: "duplicate-template",

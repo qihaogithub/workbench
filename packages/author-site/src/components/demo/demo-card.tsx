@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type CSSProperties,
@@ -38,6 +39,7 @@ const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 
 interface DemoCardProps {
   demo: DemoMeta;
+  screenshotRevision?: number;
   onDelete: (id: string) => void;
   onSaveAsTemplate: (demo: DemoMeta) => void;
   onDuplicate: (demo: DemoMeta) => void;
@@ -48,6 +50,7 @@ interface DemoCardProps {
 
 interface TemplateProjectCardProps {
   template: ProjectTemplateMeta;
+  screenshotRevision?: number;
   onDuplicate: (template: ProjectTemplateMeta) => void;
   onRename: (template: ProjectTemplateMeta) => void;
   onChangeCategory: (template: ProjectTemplateMeta) => void;
@@ -91,6 +94,7 @@ function clampScreenshotAspectRatio(ratio: number): number {
 function PageScreenshotCell({
   projectId,
   page,
+  screenshotRevision = 0,
   showOverlay,
   overlayText,
   className,
@@ -99,14 +103,53 @@ function PageScreenshotCell({
 }: {
   projectId: string;
   page: { id: string; name: string };
+  screenshotRevision?: number;
   showOverlay: boolean;
   overlayText?: string;
   className?: string;
   style?: CSSProperties;
   onAspectRatio?: (pageId: string, aspectRatio: number) => void;
 }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const url = `/api/screenshots/file/${projectId}/${page.id}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    const metaUrl = `/api/screenshots/file/${encodeURIComponent(
+      projectId,
+    )}/${encodeURIComponent(page.id)}?meta=1`;
+
+    setImageUrl(null);
+    setFailed(false);
+
+    fetch(metaUrl, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (cancelled) return;
+        const payload = result as
+          | { success?: boolean; data?: { url?: unknown } }
+          | null;
+        const url =
+          payload?.success === true && typeof payload.data?.url === "string"
+            ? payload.data.url
+            : null;
+
+        if (url) {
+          setImageUrl(url);
+        } else {
+          setFailed(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, page.id, screenshotRevision]);
 
   const handleError = useCallback(() => {
     setFailed(true);
@@ -127,9 +170,9 @@ function PageScreenshotCell({
       className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-sm bg-muted/35 ${className ?? ""}`}
       style={style}
     >
-      {!failed ? (
+      {!failed && imageUrl ? (
         <img
-          src={url}
+          src={imageUrl}
           alt={page.name}
           className="h-full w-full object-contain"
           loading="lazy"
@@ -155,7 +198,13 @@ function PageScreenshotCell({
   );
 }
 
-function ScreenshotCover({ demo }: { demo: DemoMeta }) {
+function ScreenshotCover({
+  demo,
+  screenshotRevision,
+}: {
+  demo: DemoMeta;
+  screenshotRevision?: number;
+}) {
   const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
   const pages = demo.demoPages ?? [];
   const displayPages = pages.slice(0, MAX_SCREENSHOT_COVER_ITEMS);
@@ -240,6 +289,7 @@ function ScreenshotCover({ demo }: { demo: DemoMeta }) {
                   key={page.id}
                   projectId={demo.id}
                   page={page}
+                  screenshotRevision={screenshotRevision}
                   className={
                     isDenseLayout
                       ? "min-w-0"
@@ -288,6 +338,7 @@ function PlaceholderIcon() {
 
 export function DemoCard({
   demo,
+  screenshotRevision,
   onDelete,
   onSaveAsTemplate,
   onDuplicate,
@@ -315,7 +366,10 @@ export function DemoCard({
               />
             ) : demo.demoPages && demo.demoPages.length > 0 ? (
               <div className="h-full w-full">
-                <ScreenshotCover demo={demo} />
+                <ScreenshotCover
+                  demo={demo}
+                  screenshotRevision={screenshotRevision}
+                />
               </div>
             ) : (
               <PlaceholderIcon />
@@ -447,6 +501,7 @@ export function DemoCard({
 
 export function TemplateProjectCard({
   template,
+  screenshotRevision,
   onDuplicate,
   onRename,
   onChangeCategory,
@@ -475,6 +530,7 @@ export function TemplateProjectCard({
               <div className="h-full w-full">
                 <ScreenshotCover
                   demo={{ ...template, category: template.category }}
+                  screenshotRevision={screenshotRevision}
                 />
               </div>
             ) : (

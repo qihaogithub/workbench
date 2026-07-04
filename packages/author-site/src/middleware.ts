@@ -36,11 +36,20 @@ function applyCorsHeaders(headers: Headers, origin: string) {
   headers.set("Access-Control-Allow-Credentials", "true");
 }
 
+function applyPublicModuleCorsHeaders(headers: Headers) {
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+}
+
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get("auth_token")?.value;
   const user = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;
   const origin = request.headers.get("origin");
+  const isPreviewRuntimeModuleRoute =
+    pathname.startsWith("/preview-runtime/") ||
+    pathname.startsWith("/api/preview-modules/");
   const isApiOrEmbedRoute =
     pathname.startsWith("/api/") ||
     pathname.startsWith("/embed/") ||
@@ -50,6 +59,12 @@ export async function middleware(request: NextRequest) {
     origin && isApiOrEmbedRoute && getAllowedCorsOrigins().includes(origin)
       ? origin
       : null;
+
+  if (isPreviewRuntimeModuleRoute && request.method === "OPTIONS") {
+    const headers = new Headers();
+    applyPublicModuleCorsHeaders(headers);
+    return new NextResponse(null, { status: 204, headers });
+  }
 
   if (allowedCorsOrigin && request.method === "OPTIONS") {
     const headers = new Headers();
@@ -120,6 +135,10 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+
+  if (isPreviewRuntimeModuleRoute) {
+    applyPublicModuleCorsHeaders(response.headers);
+  }
 
   if (allowedCorsOrigin) {
     applyCorsHeaders(response.headers, allowedCorsOrigin);

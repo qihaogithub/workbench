@@ -81,6 +81,7 @@ interface FieldConfig {
   format?: string;
   uiWidget?: string;
   uiOptions?: Record<string, unknown>;
+  visibleWhen?: VisibleWhenCondition;
   note?: string;
   itemsType?: string;
 }
@@ -92,8 +93,55 @@ interface FieldGroup {
   color?: string;
 }
 
+type VisibleWhenValue = string | number | boolean | null;
+
+interface VisibleWhenCondition {
+  field: string;
+  equals: VisibleWhenValue;
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isVisibleWhenValue(value: unknown): value is VisibleWhenValue {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function parseVisibleWhen(value: unknown): VisibleWhenCondition | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const { field, equals } = value;
+  if (typeof field !== "string" || field.length === 0) return undefined;
+  if (!isVisibleWhenValue(equals)) return undefined;
+  return { field, equals };
+}
+
+function isFieldVisible(
+  field: FieldConfig,
+  formData: Record<string, unknown>,
+): boolean {
+  if (!field.visibleWhen) return true;
+  return Object.is(formData[field.visibleWhen.field], field.visibleWhen.equals);
+}
+
+function buildEffectiveFormData(
+  fieldGroups: FieldGroup[],
+  formData: Record<string, unknown>,
+): Record<string, unknown> {
+  const defaults: Record<string, unknown> = {};
+  for (const group of fieldGroups) {
+    for (const field of group.fields) {
+      if (field.default !== undefined) {
+        defaults[field.key] = field.default;
+      }
+    }
+  }
+  return { ...defaults, ...formData };
 }
 
 function areConfigValuesEqual(left: unknown, right: unknown): boolean {
@@ -140,6 +188,7 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
     const ungrouped: FieldConfig[] = [];
 
     Object.entries(properties).forEach(([key, prop]: [string, any]) => {
+      const uiOptions = isPlainRecord(prop["ui:options"]) ? prop["ui:options"] : undefined;
       const field: FieldConfig = {
         key,
         title: prop.title || formatFieldName(key),
@@ -154,12 +203,14 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
         maxLength: prop.maxLength,
         format: prop.format,
         uiWidget: prop["ui:widget"],
-        uiOptions: prop["ui:options"],
+        uiOptions,
+        visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen),
         note: prop.$demo?.note,
         itemsType: prop.items?.type,
       };
 
-      const groupName = detectGroup(key, prop);
+      const explicitGroup = typeof uiOptions?.group === "string" ? uiOptions.group.trim() : "";
+      const groupName = explicitGroup || detectGroup(key, prop);
       if (!groups[groupName]) {
         groups[groupName] = [];
       }
@@ -1206,6 +1257,22 @@ export function ConfigForm({
   );
 
   const fieldGroups = useMemo(() => parseSchemaToFields(schema), [schema]);
+  const effectiveFormData = useMemo(
+    () => buildEffectiveFormData(fieldGroups, formData),
+    [fieldGroups, formData],
+  );
+  const visibleFieldGroups = useMemo(
+    () =>
+      fieldGroups
+        .map((group) => ({
+          ...group,
+          fields: group.fields.filter((field) =>
+            isFieldVisible(field, effectiveFormData),
+          ),
+        }))
+        .filter((group) => group.fields.length > 0),
+    [fieldGroups, effectiveFormData],
+  );
 
   const orderable = useMemo(() => getOrderable(schema), [schema]);
   const orderableH = useMemo(() => getOrderableHorizontal(schema), [schema]);
@@ -1413,14 +1480,14 @@ export function ConfigForm({
 
   const currentNoteField = useMemo(() => {
     if (!noteDialogField) return null;
-    for (const group of fieldGroups) {
+    for (const group of visibleFieldGroups) {
       const found = group.fields.find((f) => f.key === noteDialogField);
       if (found) return found;
     }
     return null;
-  }, [noteDialogField, fieldGroups]);
+  }, [noteDialogField, visibleFieldGroups]);
 
-  if (fieldGroups.length === 0) {
+  if (visibleFieldGroups.length === 0) {
     return (
       <div
         className={cn(
@@ -1483,12 +1550,12 @@ export function ConfigForm({
               <Separator className="my-2" />
             </>
           )}
-          {fieldGroups.map((group, index) => (
+          {visibleFieldGroups.map((group, index) => (
             <div key={index}>
               {index > 0 && <Separator className="my-2" />}
               <FieldGroupSection
                 group={group}
-                formData={formData}
+                formData={effectiveFormData}
                 onChange={handleFieldChange}
                 isFirst={index === 0}
                 sessionId={sessionId}

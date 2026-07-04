@@ -92,6 +92,19 @@ const EDGE_CURSORS: Record<ResizeEdge, string> = {
   sw: "nesw-resize",
 };
 
+function isResizeEdge(value: string | null | undefined): value is ResizeEdge {
+  return (
+    value === "n" ||
+    value === "s" ||
+    value === "e" ||
+    value === "w" ||
+    value === "ne" ||
+    value === "nw" ||
+    value === "se" ||
+    value === "sw"
+  );
+}
+
 // 根据鼠标在页面元素上的位置判断缩放方向
 function detectResizeEdge(
   localX: number,
@@ -303,7 +316,7 @@ export function CanvasPageItem({
     setContentHeight(null);
   }, [page.previewSize]);
 
-  const canInteract = editable && !isEditing && toolMode === "select";
+  const canInteract = editable && toolMode === "select";
   const showEdgeHandles =
     (isHovering || selected) && canInteract && !isDragging && !isResizing;
 
@@ -349,13 +362,21 @@ export function CanvasPageItem({
       }
       if (e.button !== 0) return;
 
-      // 如果点在边框热区，启动缩放而非拖拽
+      const target = e.target as HTMLElement;
+
+      // 如果点在边框/角点热区，启动缩放而非拖拽
       const el = containerRef.current;
       if (el) {
+        const handleEl = target.closest("[data-resize-handle]");
+        const handleEdge = el.contains(handleEl)
+          ? handleEl?.getAttribute("data-resize-handle")
+          : null;
         const rect = el.getBoundingClientRect();
         const localX = e.clientX - rect.left;
         const localY = e.clientY - rect.top;
-        const edge = detectResizeEdge(localX, localY, rect.width, rect.height);
+        const edge = isResizeEdge(handleEdge)
+          ? handleEdge
+          : detectResizeEdge(localX, localY, rect.width, rect.height);
         if (edge) {
           e.stopPropagation();
           e.preventDefault();
@@ -368,7 +389,6 @@ export function CanvasPageItem({
         }
       }
 
-      const target = e.target as HTMLElement;
       if (target.closest("button")) return;
 
       e.stopPropagation();
@@ -671,6 +691,51 @@ export function CanvasPageItem({
       {/* 边框热区 — 四条边 */}
       {showEdgeHandles && (
         <>
+          {/* 四角热区覆盖选中框外侧的可视化角点 */}
+          <div
+            data-resize-handle="nw"
+            className="absolute z-50"
+            style={{
+              left: -CORNER_HIT_SIZE / 2,
+              top: -CORNER_HIT_SIZE / 2,
+              width: CORNER_HIT_SIZE,
+              height: CORNER_HIT_SIZE,
+              cursor: "nwse-resize",
+            }}
+          />
+          <div
+            data-resize-handle="ne"
+            className="absolute z-50"
+            style={{
+              right: -CORNER_HIT_SIZE / 2,
+              top: -CORNER_HIT_SIZE / 2,
+              width: CORNER_HIT_SIZE,
+              height: CORNER_HIT_SIZE,
+              cursor: "nesw-resize",
+            }}
+          />
+          <div
+            data-resize-handle="sw"
+            className="absolute z-50"
+            style={{
+              left: -CORNER_HIT_SIZE / 2,
+              bottom: -CORNER_HIT_SIZE / 2,
+              width: CORNER_HIT_SIZE,
+              height: CORNER_HIT_SIZE,
+              cursor: "nesw-resize",
+            }}
+          />
+          <div
+            data-resize-handle="se"
+            className="absolute z-50"
+            style={{
+              right: -CORNER_HIT_SIZE / 2,
+              bottom: -CORNER_HIT_SIZE / 2,
+              width: CORNER_HIT_SIZE,
+              height: CORNER_HIT_SIZE,
+              cursor: "nwse-resize",
+            }}
+          />
           {/* 上边 */}
           <div
             data-resize-handle="n"

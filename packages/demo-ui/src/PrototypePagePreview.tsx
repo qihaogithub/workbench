@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  applyPrototypeBindings,
+  buildPrototypePreviewHtmlFragment,
+  sanitizePrototypeCss,
+  sanitizePrototypeHtml,
+} from "@opencode-workbench/shared";
 import { cn } from "./utils";
 import { computePreviewScale } from "./preview-scale";
 import type {
@@ -9,11 +15,6 @@ import type {
   VisualNodeTreeItem,
   VisualPropertyChange,
 } from "./types";
-
-const SCRIPT_TAG_RE = /<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi;
-const INLINE_EVENT_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
-const JAVASCRIPT_URL_RE = /javascript\s*:/gi;
-const DANGEROUS_CSS_RE = /@import\b|expression\s*\(|behavior\s*:/gi;
 
 export interface PrototypePagePreviewProps {
   html?: string;
@@ -34,93 +35,9 @@ export interface PrototypePagePreviewProps {
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
 }
 
-export function sanitizePrototypeHtml(html: string): string {
-  return html
-    .replace(SCRIPT_TAG_RE, "")
-    .replace(INLINE_EVENT_RE, "")
-    .replace(JAVASCRIPT_URL_RE, "");
-}
-
-export function sanitizePrototypeCss(css: string): string {
-  return css
-    .replace(SCRIPT_TAG_RE, "")
-    .replace(JAVASCRIPT_URL_RE, "")
-    .replace(DANGEROUS_CSS_RE, "");
-}
-
-function normalizePrototypeViewportUnits(
-  css: string,
-  designWidth: number,
-  designHeight: number,
-): string {
-  return css.replace(
-    /(-?\d*\.?\d+)(vmin|vmax|vw|vh)\b/gi,
-    (match, value: string, unit: string) => {
-      const numeric = Number(value);
-      if (!Number.isFinite(numeric)) return match;
-      const normalizedUnit = unit.toLowerCase();
-      const basis =
-        normalizedUnit === "vw"
-          ? designWidth
-          : normalizedUnit === "vh"
-            ? designHeight
-            : normalizedUnit === "vmin"
-              ? Math.min(designWidth, designHeight)
-              : Math.max(designWidth, designHeight);
-      return `${(numeric / 100) * basis}px`;
-    },
-  );
-}
-
 function normalizeMeasuredSize(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.round(value);
-}
-
-function getConfigValue(configData: Record<string, unknown>, key: string): string {
-  const value = configData[key];
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return "";
-}
-
-function applyPrototypeBindings(root: ParentNode, configData: Record<string, unknown>) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const textNodes: Text[] = [];
-  while (walker.nextNode()) {
-    textNodes.push(walker.currentNode as Text);
-  }
-  for (const node of textNodes) {
-    node.nodeValue = (node.nodeValue ?? "").replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g, (_match, key: string) =>
-      getConfigValue(configData, key),
-    );
-  }
-
-  root.querySelectorAll<HTMLElement>("[data-bind-text]").forEach((element) => {
-    const key = element.getAttribute("data-bind-text");
-    if (key) element.textContent = getConfigValue(configData, key);
-  });
-  root.querySelectorAll<HTMLElement>("[data-bind-src]").forEach((element) => {
-    const key = element.getAttribute("data-bind-src");
-    if (key) element.setAttribute("src", getConfigValue(configData, key));
-  });
-  root.querySelectorAll<HTMLElement>("[data-bind-href]").forEach((element) => {
-    const key = element.getAttribute("data-bind-href");
-    if (key) element.setAttribute("href", getConfigValue(configData, key));
-  });
-  root.querySelectorAll<HTMLElement>("[data-bind-style-color]").forEach((element) => {
-    const key = element.getAttribute("data-bind-style-color");
-    if (key) element.style.color = getConfigValue(configData, key);
-  });
-  root.querySelectorAll<HTMLElement>("[data-bind-style-background-color]").forEach((element) => {
-    const key = element.getAttribute("data-bind-style-background-color");
-    if (key) element.style.backgroundColor = getConfigValue(configData, key);
-  });
-  root.querySelectorAll<HTMLElement>("[data-bind-style-border-color]").forEach((element) => {
-    const key = element.getAttribute("data-bind-style-border-color");
-    if (key) element.style.borderColor = getConfigValue(configData, key);
-  });
 }
 
 function getOwnText(element: Element): string {
@@ -400,59 +317,14 @@ export function PrototypePagePreview({
     if (!host) return;
     const shadow = shadowRef.current ?? host.attachShadow({ mode: "open" });
     shadowRef.current = shadow;
-    const safeHtml = sanitizePrototypeHtml(html);
-    const safeCss = shouldScaleToPreviewSize
-      ? normalizePrototypeViewportUnits(
-          sanitizePrototypeCss(css),
-          designWidth,
-          designHeight,
-        )
-      : sanitizePrototypeCss(css);
-    const rootWidth = shouldScaleToPreviewSize ? `${designWidth}px` : "100%";
-    const rootHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
-    const rootMinHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
-    const rootOverflow = shouldScaleToPreviewSize ? "hidden" : "visible";
-    shadow.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          width: ${rootWidth};
-          height: ${rootHeight};
-          min-height: ${rootMinHeight};
-          overflow: ${rootOverflow};
-          background: #fff;
-          color: #111827;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        .prototype-root {
-          position: relative;
-          width: ${rootWidth};
-          height: ${rootHeight};
-          min-height: ${rootMinHeight};
-          overflow: ${rootOverflow};
-          background: #fff;
-        }
-        *, *::before, *::after {
-          box-sizing: border-box;
-        }
-        img, svg, video, canvas {
-          max-width: 100%;
-        }
-        a {
-          color: inherit;
-        }
-        [data-prototype-selected] {
-          outline: 2px solid #2563eb !important;
-          outline-offset: 2px !important;
-        }
-        [data-prototype-hovered] {
-          outline: 1px solid #38bdf8 !important;
-          outline-offset: 2px !important;
-        }
-        ${safeCss}
-      </style>
-      <div class="prototype-root">${safeHtml}</div>
-    `;
+    shadow.innerHTML = buildPrototypePreviewHtmlFragment({
+      html,
+      css,
+      configData,
+      previewSize: shouldScaleToPreviewSize
+        ? { width: designWidth, height: designHeight }
+        : undefined,
+    });
     const root = shadow.querySelector(".prototype-root");
     if (root) {
       applyPrototypeBindings(root, configData);

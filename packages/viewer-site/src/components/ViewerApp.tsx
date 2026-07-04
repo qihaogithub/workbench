@@ -258,20 +258,7 @@ function ProjectListPage() {
         )}
 
         {data && filteredProjects.length > 0 && (
-          <div
-            className="grid gap-4"
-            style={
-              {
-                "--available-h": "calc(100vh - 56px - 32px)",
-                "--row-h": "calc((var(--available-h) - 32px) / 2.5)",
-                "--name-h": "44px",
-                "--img-h": "calc(var(--row-h) - var(--name-h))",
-                "--col-w": "calc(var(--img-h) * 375 / 812)",
-                gridTemplateColumns: "repeat(auto-fill, var(--col-w))",
-                gridAutoRows: "var(--row-h)",
-              } as React.CSSProperties
-            }
-          >
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProjects.map((project) => {
               const thumbnailUrl = project.thumbnail
                 ? getThumbnailUrl(project.thumbnail)
@@ -280,31 +267,29 @@ function ProjectListPage() {
                 <button
                   key={project.id}
                   onClick={() => router.push(`/${project.id}`)}
-                  className="group overflow-hidden rounded-lg border border-border bg-card transition-colors hover:bg-accent text-left"
+                  className="group overflow-hidden rounded-lg border border-border/50 bg-card text-left transition-all duration-300 hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`打开项目 ${project.name}`}
                 >
-                  {thumbnailUrl ? (
-                    <div
-                      className="relative w-full overflow-hidden"
-                      style={{ aspectRatio: "375 / 812" }}
-                    >
+                  <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-muted/80 to-muted">
+                    {thumbnailUrl ? (
                       <Image
                         src={thumbnailUrl}
                         alt={project.name}
                         fill
-                        className="object-cover transition-transform duration-200 group-hover:scale-105"
+                        className="object-contain"
                         unoptimized
                       />
-                    </div>
-                  ) : (
-                    <div
-                      className="flex w-full items-center justify-center bg-secondary/50"
-                      style={{ aspectRatio: "375 / 812" }}
-                    >
-                      <FileCode className="h-8 w-8 text-muted-foreground/40" />
-                    </div>
-                  )}
-                  <div className="p-3">
-                    <h2 className="truncate text-sm font-medium group-hover:text-accent-foreground">
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
+                          <FileCode className="h-6 w-6 text-muted-foreground/60" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  </div>
+                  <div className="p-4">
+                    <h2 className="truncate text-base font-medium text-foreground">
                       {project.name}
                     </h2>
                   </div>

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { PageConfigPanel } from "@opencode-workbench/demo-ui";
+import { useState } from "react";
+import { ConfigForm, PageConfigPanel } from "@opencode-workbench/demo-ui";
 
 const sharedSchema = JSON.stringify({
   type: "object",
@@ -13,6 +14,40 @@ const pageSchema = JSON.stringify({
   type: "object",
   properties: {
     title: { type: "string", title: "标题" },
+  },
+});
+
+const conditionalMediaSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    mediaType: {
+      type: "string",
+      title: "弹窗媒体类型",
+      enum: ["image", "svga"],
+      enumNames: ["图片", "SVGA动画"],
+      default: "image",
+      "ui:options": {
+        group: "弹窗素材",
+      },
+    },
+    modalImage: {
+      type: "string",
+      title: "弹窗图片",
+      default: "default-image.png",
+      "ui:options": {
+        group: "弹窗素材",
+        visibleWhen: { field: "mediaType", equals: "image" },
+      },
+    },
+    svgaSrc: {
+      type: "string",
+      title: "SVGA动画文件",
+      default: "",
+      "ui:options": {
+        group: "弹窗素材",
+        visibleWhen: { field: "mediaType", equals: "svga" },
+      },
+    },
   },
 });
 
@@ -86,5 +121,64 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByLabelText("返回所有页面")).not.toBeInTheDocument();
     expect(screen.getByText("共享配置")).toBeInTheDocument();
     expect(screen.getByText("本页配置")).toBeInTheDocument();
+  });
+});
+
+describe("ConfigForm 条件显示", () => {
+  function ConditionalFormHarness() {
+    const [data, setData] = useState<Record<string, unknown>>({
+      mediaType: "image",
+      modalImage: "default-image.png",
+      svgaSrc: "intro.svga",
+    });
+
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setData((prev) => ({ ...prev, mediaType: "svga" }))}
+        >
+          切换SVGA
+        </button>
+        <button
+          type="button"
+          onClick={() => setData((prev) => ({ ...prev, mediaType: "image" }))}
+        >
+          切换图片
+        </button>
+        <ConfigForm
+          key={String(data.mediaType)}
+          schema={conditionalMediaSchema}
+          initialData={data}
+          onChange={(patch) => setData((prev) => ({ ...prev, ...patch }))}
+        />
+        <output data-testid="form-data">{JSON.stringify(data)}</output>
+      </div>
+    );
+  }
+
+  it("按 visibleWhen 展示当前媒体类型对应字段，并保留隐藏字段值", () => {
+    render(<ConditionalFormHarness />);
+
+    expect(screen.getByText("弹窗图片")).toBeInTheDocument();
+    expect(screen.queryByText("SVGA动画文件")).not.toBeInTheDocument();
+    expect(screen.getByText("弹窗素材").parentElement).toHaveTextContent("2");
+    expect(screen.queryByText("基础配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("图片资源")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("切换SVGA"));
+
+    expect(screen.queryByText("弹窗图片")).not.toBeInTheDocument();
+    expect(screen.getByText("SVGA动画文件")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("intro.svga")).toBeInTheDocument();
+    expect(screen.getByText("弹窗素材").parentElement).toHaveTextContent("2");
+    expect(screen.queryByText("图片资源")).not.toBeInTheDocument();
+    expect(screen.getByTestId("form-data")).toHaveTextContent("intro.svga");
+
+    fireEvent.click(screen.getByText("切换图片"));
+
+    expect(screen.getByText("弹窗图片")).toBeInTheDocument();
+    expect(screen.queryByText("SVGA动画文件")).not.toBeInTheDocument();
+    expect(screen.getByTestId("form-data")).toHaveTextContent("intro.svga");
   });
 });

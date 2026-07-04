@@ -428,6 +428,192 @@ describe("screenshot routes", () => {
     await app.close();
   });
 
+  it("force 单页截图会绕过同 hash 缓存但保持 hash 不变", async () => {
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.from("png"),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+      renderTimings,
+    }));
+    const writeScreenshot = vi.fn();
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(async () => ({
+        compiledCode: "function Demo(){return null}",
+        cssImports: [],
+      })),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({
+        renderPage,
+      }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => true),
+      readScreenshotRenderBox: vi.fn(async () => renderBox),
+      readScreenshot: vi.fn(),
+      writeScreenshot,
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "page_1",
+        code: "export default function Demo() { return null; }",
+        configData: {},
+        force: true,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(renderPage).toHaveBeenCalledTimes(1);
+    expect(writeScreenshot).toHaveBeenCalledWith(
+      "proj_1",
+      "page_1",
+      "1111111111111111",
+      Buffer.from("png"),
+      expect.any(Number),
+      renderBox,
+      "strict",
+    );
+    expect(response.json().data).toMatchObject({
+      hash: "1111111111111111",
+      cached: false,
+    });
+    await app.close();
+  });
+
+  it("已有 hash 截图过小时不会作为缓存命中", async () => {
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.alloc(12_000, 1),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+      renderTimings,
+    }));
+    const writeScreenshot = vi.fn();
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(async () => ({
+        compiledCode: "function Demo(){return null}",
+        cssImports: [],
+      })),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({
+        renderPage,
+      }),
+      isLikelyBlankScreenshot: (byteLength: number, box?: { width: number; height: number }) =>
+        Boolean(box && box.width * box.height >= 160_000 && byteLength < 8192),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => true),
+      readScreenshotRenderBox: vi.fn(async () => renderBox),
+      readScreenshot: vi.fn(async () => Buffer.from("png")),
+      writeScreenshot,
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "page_1",
+        code: "export default function Demo() { return null; }",
+        configData: {},
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(renderPage).toHaveBeenCalledTimes(1);
+    expect(writeScreenshot).toHaveBeenCalledWith(
+      "proj_1",
+      "page_1",
+      "1111111111111111",
+      Buffer.alloc(12_000, 1),
+      expect.any(Number),
+      renderBox,
+      "strict",
+    );
+    expect(response.json().data.cached).toBe(false);
+    await app.close();
+  });
+
+  it("HTML/CSS 原型页截图走静态 HTML 分支且不调用 React 编译", async () => {
+    const compileCode = vi.fn();
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.from("png"),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+      renderTimings,
+    }));
+    const writeScreenshot = vi.fn();
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode,
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({
+        renderPage,
+      }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => false),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot: vi.fn(),
+      writeScreenshot,
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "prototype_1",
+        runtimeType: "prototype-html-css",
+        prototypeHtml: "<main>{{title}}<script>window.bad = true</script></main>",
+        prototypeCss: "main { width: 100vw; }",
+        configData: { title: "原型页" },
+        width: 320,
+        height: 640,
+        fullPage: true,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(compileCode).not.toHaveBeenCalled();
+    expect(renderPage).toHaveBeenCalledWith(
+      expect.stringContaining("原型页"),
+      320,
+      640,
+      true,
+      "active",
+      "strict",
+      undefined,
+    );
+    expect(renderPage.mock.calls[0]?.[0]).not.toContain("<script>window.bad");
+    expect(writeScreenshot).toHaveBeenCalledWith(
+      "proj_1",
+      "prototype_1",
+      "1111111111111111",
+      Buffer.from("png"),
+      expect.any(Number),
+      renderBox,
+      "strict",
+    );
+    await app.close();
+  });
+
   it("文件接口按 hash 精确读取并使用不可变缓存", async () => {
     const readScreenshot = vi.fn(async () => Buffer.from("png"));
     vi.doMock("../src/utils/compile-client", () => ({
@@ -435,6 +621,7 @@ describe("screenshot routes", () => {
     }));
     vi.doMock("../src/utils/browser-pool", () => ({
       getBrowserPool: vi.fn(),
+      isLikelyBlankScreenshot: vi.fn(() => false),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({
       computeScreenshotHash: vi.fn(),
@@ -464,6 +651,43 @@ describe("screenshot routes", () => {
     await app.close();
   });
 
+  it("文件 meta 接口遇到过小 current 截图时返回 404", async () => {
+    vi.doMock("../src/utils/compile-client", () => ({
+      compileCode: vi.fn(),
+    }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: vi.fn(),
+      isLikelyBlankScreenshot: (byteLength: number, box?: { width: number; height: number }) =>
+        Boolean(box && box.width * box.height >= 160_000 && byteLength < 8192),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(),
+      screenshotExists: vi.fn(),
+      readScreenshotMeta: vi.fn(async () => ({
+        currentHash: "1111111111111111",
+        generatedAt: new Date().toISOString(),
+        elapsed: 1,
+        history: ["1111111111111111"],
+        renderBoxes: {
+          "1111111111111111": renderBox,
+        },
+      })),
+      readScreenshotRenderBox: vi.fn(async () => renderBox),
+      readScreenshot: vi.fn(async () => Buffer.from("png")),
+      writeScreenshot: vi.fn(),
+      cleanupOldScreenshots: vi.fn(),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/screenshots/file/proj_1/page_1?meta=1",
+    });
+
+    expect(response.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("文件接口按 variant 精确读取 fast 产物", async () => {
     const readScreenshot = vi.fn(async () => Buffer.from("png"));
     vi.doMock("../src/utils/compile-client", () => ({
@@ -471,6 +695,7 @@ describe("screenshot routes", () => {
     }));
     vi.doMock("../src/utils/browser-pool", () => ({
       getBrowserPool: vi.fn(),
+      isLikelyBlankScreenshot: vi.fn(() => false),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({
       computeScreenshotHash: vi.fn(),
@@ -507,6 +732,7 @@ describe("screenshot routes", () => {
     }));
     vi.doMock("../src/utils/browser-pool", () => ({
       getBrowserPool: vi.fn(),
+      isLikelyBlankScreenshot: vi.fn(() => false),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({
       computeScreenshotHash: vi.fn(),

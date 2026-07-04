@@ -71,12 +71,65 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v5",
       "fileCount": 9,
       "note": "修复SVGA预览运行时解析"
+    },
+    {
+      "versionId": "v6",
+      "type": "auto_checkpoint",
+      "savedAt": 1783071204952,
+      "savedBy": "qihao",
+      "sessionId": "session-1783066273533-l0jugcfzs",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v6",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v7",
+      "type": "named_version",
+      "savedAt": 1783072855945,
+      "savedBy": "qh2",
+      "sessionId": "edit_1783072694983_lcsmr8",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v7",
+      "fileCount": 9,
+      "note": "配置面板支持媒体字段条件显示"
+    },
+    {
+      "versionId": "v8",
+      "type": "named_version",
+      "savedAt": 1783073055650,
+      "savedBy": "qh2",
+      "sessionId": "edit_1783072988263_z8ev6d",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v8",
+      "fileCount": 9,
+      "note": "优化弹窗素材配置分组"
+    },
+    {
+      "versionId": "v9",
+      "type": "publish_snapshot",
+      "savedAt": 1783073125243,
+      "savedBy": "system",
+      "sessionId": "publish-1783073125240",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v9",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v10",
+      "type": "publish_snapshot",
+      "savedAt": 1783123336298,
+      "savedBy": "system",
+      "sessionId": "publish-1783123336294",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v10",
+      "fileCount": 9,
+      "note": "发布快照"
     }
   ],
   "pageVersions": {},
   "createdAt": 1782718596693,
-  "updatedAt": 1783070834356,
-  "canonicalSyncedAt": 1783070749392,
-  "activeWorkspaceId": "live-1783070834336-j9a0rda1a",
-  "activeWorkspaceUpdatedAt": 1783070834356
+  "updatedAt": 1783123336298,
+  "canonicalSyncedAt": 1783123336194,
+  "activeWorkspaceId": "live-1783073094111-rcjasjt26",
+  "activeWorkspaceUpdatedAt": 1783123298171,
+  "canonicalSyncedWorkspaceId": "live-1783073094111-rcjasjt26",
+  "publishedVersion": "v10",
+  "publishedAt": 1783123336302
 }

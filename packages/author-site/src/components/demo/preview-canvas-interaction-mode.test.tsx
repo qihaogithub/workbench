@@ -53,7 +53,11 @@ function TestCanvas() {
   );
 }
 
-function TestEditorCanvas() {
+function TestEditorCanvas({
+  editingPageId,
+}: {
+  editingPageId?: string;
+} = {}) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {
@@ -77,6 +81,7 @@ function TestEditorCanvas() {
         ]}
         canvasState={state}
         onCanvasStateChange={setState}
+        editingPageId={editingPageId}
       />
       <output data-testid="canvas-state">{JSON.stringify(state)}</output>
     </>
@@ -1253,6 +1258,79 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(state.pages.page_1).toMatchObject({ x: 130, y: 140 });
       expect(state.pages.page_2).toMatchObject({ x: 330, y: 170 });
       expect(state.pages.page_3).toMatchObject({ x: 520, y: 180 });
+    });
+  });
+
+  it("白色描边的当前配置页面仍可显示缩放光标并调整页面框尺寸", async () => {
+    const { container } = render(<TestEditorCanvas editingPageId="page_1" />);
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 300,
+      pointerId: 2,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 220,
+      clientY: 300,
+      pointerId: 2,
+    });
+
+    fireEvent.pointerMove(page, {
+      clientX: 475,
+      clientY: 500,
+      pointerId: 2,
+    });
+
+    await waitFor(() => {
+      expect(page.style.cursor).toBe("ew-resize");
+    });
+
+    const resizeHandle = await waitFor(() => {
+      const handle = container.querySelector(
+        "[data-page-id='page_1'] [data-resize-handle='se']",
+      ) as HTMLElement | null;
+      expect(handle).not.toBeNull();
+      return handle as HTMLElement;
+    });
+
+    fireEvent.pointerDown(resizeHandle, {
+      button: 0,
+      clientX: 475,
+      clientY: 932,
+      pointerId: 3,
+    });
+    fireEvent.pointerMove(page, {
+      clientX: 525,
+      clientY: 982,
+      pointerId: 3,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 525,
+      clientY: 982,
+      pointerId: 3,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      expect(state.pages.page_1.width).toBeGreaterThan(375);
+      expect(state.pages.page_1.height).toBeGreaterThan(812);
+      expect(state.pages.page_1.sizeMode).toBe("custom");
     });
   });
 

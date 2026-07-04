@@ -93,6 +93,20 @@ const PRIORITY_WEIGHT: Record<ScreenshotPriority, number> = {
   background: 4,
 };
 
+const MIN_MEANINGFUL_SCREENSHOT_BYTES = 8 * 1024;
+const LARGE_RENDER_AREA = 160_000;
+
+export function isLikelyBlankScreenshot(
+  byteLength: number,
+  renderBox?: Pick<ScreenshotRenderBox, "width" | "height">,
+): boolean {
+  if (!renderBox) return false;
+  return (
+    renderBox.width * renderBox.height >= LARGE_RENDER_AREA &&
+    byteLength < MIN_MEANINGFUL_SCREENSHOT_BYTES
+  );
+}
+
 function createEmptyRenderStageTimings(): RenderStageTimings {
   return {
     browserMs: 0,
@@ -412,6 +426,13 @@ class BrowserPool {
           ? await this.waitForStableMeasurement(page, measuredHeight)
           : await this.measureFastPage(page, measuredHeight);
       renderTimings.measurementMs = Date.now() - measurementStart;
+      const hasVisibleContent = await this.hasVisiblePreviewContent(page);
+      if (!hasVisibleContent) {
+        throw new ScreenshotError(
+          "EMPTY_RENDER",
+          "页面预览没有可见内容，已跳过截图写入",
+        );
+      }
       const captureWidth = viewportWidth;
       const captureHeight = fullPage
         ? Math.max(
@@ -454,9 +475,16 @@ class BrowserPool {
             type: "png",
           });
       renderTimings.screenshotMs = Date.now() - screenshotStart;
+      const screenshotBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      if (isLikelyBlankScreenshot(screenshotBuffer.length, renderBox)) {
+        throw new ScreenshotError(
+          "EMPTY_RENDER",
+          "截图结果过小，疑似空白渲染，已跳过截图写入",
+        );
+      }
 
       return {
-        buffer: Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
+        buffer: screenshotBuffer,
         renderBox,
         renderTimings,
       };
@@ -497,6 +525,52 @@ class BrowserPool {
     }
 
     return { error: raw };
+  }
+
+  private async hasVisiblePreviewContent(page: Page): Promise<boolean> {
+    return page.evaluate(() => {
+      const browserGlobal = globalThis as unknown as {
+        document: {
+          querySelector: (selector: string) => unknown;
+        };
+        window: {
+          getComputedStyle: (element: unknown) => {
+            display: string;
+            visibility: string;
+            opacity: string;
+          };
+        };
+      };
+      const root = browserGlobal.document.querySelector("#root") as
+        | {
+            querySelectorAll: (selector: string) => ArrayLike<unknown>;
+            getClientRects?: () => ArrayLike<{ width: number; height: number }>;
+          }
+        | null;
+      if (!root) return false;
+
+      const elements = Array.from(root.querySelectorAll("*"));
+      return elements.some((element) => {
+        const candidate = element as {
+          getClientRects?: () => ArrayLike<{ width: number; height: number }>;
+        };
+        if (typeof candidate.getClientRects !== "function") {
+          return false;
+        }
+
+        const style = browserGlobal.window.getComputedStyle(element);
+        if (
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          Number(style.opacity) === 0
+        ) {
+          return false;
+        }
+
+        const rects = Array.from(candidate.getClientRects());
+        return rects.some((rect) => rect.width > 2 && rect.height > 2);
+      });
+    });
   }
 
   private async waitForStableMeasurement(
