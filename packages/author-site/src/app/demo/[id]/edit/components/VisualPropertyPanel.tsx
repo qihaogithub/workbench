@@ -54,10 +54,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type {
-  VisualNodeInfo,
-  VisualPropertyChange,
-  VisualPropertyChangeKind,
+import {
+  BUILT_IN_CONFIG_CATEGORIES,
+  type VisualNodeInfo,
+  type VisualPropertyChange,
+  type VisualPropertyChangeKind,
 } from "@opencode-workbench/demo-ui";
 import type {
   VisualConfigMark,
@@ -78,6 +79,7 @@ interface VisualPropertyPanelProps {
   sending: boolean;
   usedConfigKeys: string[];
   directApplyMode?: boolean;
+  headerAction?: ReactNode;
   onPropertyChange: (
     node: VisualNodeInfo,
     property: string,
@@ -98,7 +100,7 @@ interface VisualPropertyPanelProps {
   ) => void;
   onUpdateConfigMark: (
     markId: string,
-    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "scope">>,
+    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope">>,
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
@@ -533,7 +535,7 @@ function buildExportText(params: {
     ? params.configMarks
         .map(
           (mark, index) =>
-            `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}`,
+            `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}`,
         )
         .join("\n")
     : "无";
@@ -580,6 +582,7 @@ export function VisualPropertyPanel({
   sending,
   usedConfigKeys,
   directApplyMode = false,
+  headerAction,
   onPropertyChange,
   onRestoreProperty,
   onClearChanges,
@@ -766,8 +769,9 @@ export function VisualPropertyPanel({
   if (!selectedNode) {
     return (
       <div className="flex h-full flex-col bg-card">
-        <div className="border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <h2 className="text-sm font-medium">属性编辑</h2>
+          {headerAction}
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <MousePointer2 className="h-8 w-8 text-muted-foreground" />
@@ -1450,8 +1454,9 @@ export function VisualPropertyPanel({
 
   return (
     <div className="flex h-full flex-col bg-card">
-      <div className="border-b px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
         <h2 className="text-sm font-medium">属性编辑</h2>
+        {headerAction}
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
@@ -1772,6 +1777,11 @@ export function VisualPropertyPanel({
                 <Settings2 className="h-3.5 w-3.5" />
                 配置项设置
               </div>
+              <datalist id="visual-config-mark-category-options">
+                {BUILT_IN_CONFIG_CATEGORIES.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
               <div className="space-y-2">
                 {configMarks.map((mark) => {
                   const hasConflict = usedConfigKeys.includes(mark.fieldKey.trim());
@@ -1815,6 +1825,15 @@ export function VisualPropertyPanel({
                         placeholder="默认值"
                         onChange={(event) =>
                           onUpdateConfigMark(mark.id, { defaultValue: event.target.value })
+                        }
+                      />
+                      <Input
+                        value={mark.category ?? ""}
+                        list="visual-config-mark-category-options"
+                        className="h-8 text-xs"
+                        placeholder="分类（可选，例如 设计）"
+                        onChange={(event) =>
+                          onUpdateConfigMark(mark.id, { category: event.target.value })
                         }
                       />
                       <Select

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { ProjectAdminService } from '@opencode-workbench/project-core';
+import { getDataDir } from '@/lib/fs-utils';
 
 interface KnowledgeItem {
   id: string;
@@ -83,6 +85,25 @@ function generateDocId(): string {
   return `kb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function createKnowledgeVersion(projectId: string | null, workingDir: string, docId: string, note: string): void {
+  if (!projectId) return;
+  new ProjectAdminService({ dataDir: getDataDir() }).resourceVersionCreate(
+    {
+      projectId,
+      kind: 'knowledge_document',
+      resourceId: docId,
+      sourceWorkspacePath: workingDir,
+      note,
+    },
+    {
+      id: 'author-site',
+      name: 'Author Site',
+      role: 'creator',
+      source: 'author-site',
+    },
+  );
+}
+
 // GET - 获取知识库列表
 export async function GET(request: NextRequest) {
   const workingDir = request.nextUrl.searchParams.get('workingDir');
@@ -112,6 +133,7 @@ export async function GET(request: NextRequest) {
 // POST - 添加知识文档（仅 source: "user"）
 export async function POST(request: NextRequest) {
   const workingDir = request.nextUrl.searchParams.get('workingDir');
+  const projectId = request.nextUrl.searchParams.get('projectId');
   if (!workingDir) {
     return NextResponse.json(
       { success: false, error: { code: 'INVALID_REQUEST', message: 'workingDir 必填' } },
@@ -168,6 +190,7 @@ export async function POST(request: NextRequest) {
 
     manifest.items.push(newItem);
     writeManifest(workingDir, manifest);
+    createKnowledgeVersion(projectId, workingDir, newItem.id, `创建知识文档 ${newItem.title}`);
 
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {

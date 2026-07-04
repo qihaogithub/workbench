@@ -43,6 +43,53 @@ export function useChatModels(options: UseChatModelsOptions) {
   const modelStreamRef = useRef<AgentStream | null>(null);
   const modelRetryCountRef = useRef(0);
   const modelRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preferredModelRef = useRef<{
+    fullModelId: string;
+    baseModelId: string;
+    depth: ThinkingDepth | null;
+  } | null>(null);
+  const preferredModelAppliedKeyRef = useRef<string | null>(null);
+
+  const sendSetModel = useCallback((fullModelId: string) => {
+    const ws = (modelStreamRef.current as any)?.ws;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "set_model", modelId: fullModelId }));
+    }
+  }, []);
+
+  const applyPreferredModelToSession = useCallback(
+    (models: ResolvedModel[], eventCurrentModelId: string) => {
+      const preferred = preferredModelRef.current;
+      if (!preferred || !agentSessionId) return null;
+
+      const resolved = resolveCurrentModel(preferred.fullModelId, models);
+      if (!resolved) return null;
+
+      if (preferred.fullModelId === eventCurrentModelId) {
+        preferredModelAppliedKeyRef.current = `${agentSessionId}:${preferred.fullModelId}`;
+        return {
+          ...preferred,
+          baseModelId: resolved.baseModelId,
+          depth: resolved.depth ?? null,
+          isApplying: false,
+        };
+      }
+
+      const applyKey = `${agentSessionId}:${preferred.fullModelId}`;
+      if (preferredModelAppliedKeyRef.current !== applyKey) {
+        preferredModelAppliedKeyRef.current = applyKey;
+        sendSetModel(preferred.fullModelId);
+      }
+
+      return {
+        ...preferred,
+        baseModelId: resolved.baseModelId,
+        depth: resolved.depth ?? null,
+        isApplying: true,
+      };
+    },
+    [agentSessionId, sendSetModel],
+  );
 
   useEffect(() => {
     if (!agentSessionId) return;
@@ -77,14 +124,22 @@ export function useChatModels(options: UseChatModelsOptions) {
           event.currentModelId || "",
           models,
         );
+        const preferred = applyPreferredModelToSession(
+          models,
+          event.currentModelId || "",
+        );
 
         setModelState((prev) => ({
           currentModelId:
-            resolved?.baseModelId || models[0]?.id || prev.currentModelId,
-          currentDepth: resolved?.depth ?? prev.currentDepth,
+            preferred?.baseModelId ||
+            resolved?.baseModelId ||
+            models[0]?.id ||
+            prev.currentModelId,
+          currentDepth:
+            preferred?.depth ?? resolved?.depth ?? prev.currentDepth,
           models: models.length > 0 ? models : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
-          isLoading: false,
+          isLoading: preferred?.isApplying ?? false,
         }));
 
         if (models.length > 0) {
@@ -124,14 +179,7 @@ export function useChatModels(options: UseChatModelsOptions) {
         modelStreamRef.current = null;
       }
     };
-  }, [agentSessionId, workingDir]);
-
-  const sendSetModel = useCallback((fullModelId: string) => {
-    const ws = (modelStreamRef.current as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "set_model", modelId: fullModelId }));
-    }
-  }, []);
+  }, [agentSessionId, workingDir, applyPreferredModelToSession]);
 
   const handleModelChange = useCallback(
     (baseModelId: string) => {
@@ -141,14 +189,17 @@ export function useChatModels(options: UseChatModelsOptions) {
       if (!model) return;
 
       let depth: ThinkingDepth | null = null;
-      let fullModelId = baseModelId;
 
       if (model.supportsThinkingDepth && model.availableDepths.length > 0) {
         depth = model.availableDepths.includes("medium")
           ? "medium"
           : model.availableDepths[0];
-        fullModelId = model.depthVariantIds[depth] || baseModelId;
       }
+      const fullModelId = buildFullModelId(
+        baseModelId,
+        depth ?? undefined,
+        modelState.models,
+      );
 
       setModelState((prev) => ({
         ...prev,
@@ -157,6 +208,11 @@ export function useChatModels(options: UseChatModelsOptions) {
         isLoading: true,
       }));
 
+      preferredModelRef.current = {
+        fullModelId,
+        baseModelId,
+        depth,
+      };
       sendSetModel(fullModelId);
     },
     [modelState.currentModelId, modelState.models, sendSetModel],
@@ -169,7 +225,11 @@ export function useChatModels(options: UseChatModelsOptions) {
       );
       if (!model || !model.supportsThinkingDepth) return;
 
-      const fullModelId = model.depthVariantIds[depth];
+      const fullModelId = buildFullModelId(
+        modelState.currentModelId,
+        depth,
+        modelState.models,
+      );
       if (!fullModelId) return;
 
       setModelState((prev) => ({
@@ -178,6 +238,11 @@ export function useChatModels(options: UseChatModelsOptions) {
         isLoading: true,
       }));
 
+      preferredModelRef.current = {
+        fullModelId,
+        baseModelId: modelState.currentModelId,
+        depth,
+      };
       sendSetModel(fullModelId);
     },
     [modelState.currentModelId, modelState.models, sendSetModel],
@@ -188,16 +253,23 @@ export function useChatModels(options: UseChatModelsOptions) {
       ? await applyModelConfigsAsync(event.models)
       : [];
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
+    const preferred = applyPreferredModelToSession(
+      models,
+      event.currentModelId || "",
+    );
 
     setModelState((prev) => ({
       currentModelId:
-        resolved?.baseModelId || models[0]?.id || prev.currentModelId,
-      currentDepth: resolved?.depth ?? prev.currentDepth,
+        preferred?.baseModelId ||
+        resolved?.baseModelId ||
+        models[0]?.id ||
+        prev.currentModelId,
+      currentDepth: preferred?.depth ?? resolved?.depth ?? prev.currentDepth,
       models: models.length > 0 ? models : prev.models,
       canSwitch: event.canSwitch ?? prev.canSwitch,
-      isLoading: false,
+      isLoading: preferred?.isApplying ?? false,
     }));
-  }, []);
+  }, [applyPreferredModelToSession]);
 
   const handleModelError = useCallback(() => {
     setModelState((prev) => ({ ...prev, isLoading: false }));

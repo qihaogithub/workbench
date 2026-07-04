@@ -11,6 +11,7 @@ export interface PrototypeVisualConfigTarget {
   fieldKey: string;
   title: string;
   defaultValue: string;
+  category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
 }
 
@@ -143,8 +144,16 @@ function validateTarget(target: PrototypeVisualConfigTarget): string | null {
   if (target.fieldKey.startsWith("__")) return "字段 key 不能以双下划线开头";
   if (!target.title.trim()) return "字段标题不能为空";
   if (typeof target.defaultValue !== "string") return "默认值必须是字符串";
+  if (target.category !== undefined && typeof target.category !== "string") {
+    return "配置分类必须是字符串";
+  }
   if (target.kind === "color" && !target.colorProperty) return "颜色配置缺少目标属性";
   return null;
+}
+
+function normalizeCategory(category: string | undefined): string | undefined {
+  const normalized = category?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function parseSchema(schema: string): Record<string, unknown> | null {
@@ -174,6 +183,10 @@ function createSchemaProperty(target: PrototypeVisualConfigTarget): Record<strin
   };
   if (target.kind === "image") property.format = "image";
   if (target.kind === "color") property.format = "color";
+  const category = normalizeCategory(target.category);
+  if (category) {
+    property["ui:options"] = { category };
+  }
   return property;
 }
 

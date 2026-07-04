@@ -1,13 +1,14 @@
 export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageSizeMode, CanvasPageRuntimeType, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
 export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
 export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
+export { BUILT_IN_CONFIG_CATEGORIES, configFieldMatchesCategoryFilter, getAvailableConfigCategories, getConfigFieldCategory, getSchemaConfigCategories, getSchemaFieldCountByCategory, orderConfigCategories } from './config-categories';
 export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
 export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES, MIN_CANVAS_SCREENSHOT_PAGE_COUNT } from './canvas-render-scheduler';
 export { computePreviewRuntimePoolPlan } from './preview-runtime-pool';
 export type { PreviewRuntimePoolInput, PreviewRuntimePoolMode, PreviewRuntimePoolPlan } from './preview-runtime-pool';
 export { buildPreviewResourceFingerprint, clearPreviewResourceCacheForTests, extractPreviewImageUrls, getPreviewPageResourceDescriptor, getPreviewResourceCacheStats, normalizePreviewImageUrl, prewarmPreviewImageUrls, resolvePreviewRelativePath } from './preview-resource-cache';
 export { ConfigScopeWrapper } from './ConfigScopeWrapper';
-export { PageConfigPanel } from './PageConfigPanel';
+export { extractPrototypeConfigBindingKeys, PageConfigPanel } from './PageConfigPanel';
 export type { PageConfigPanelPage } from './PageConfigPanel';
 export { ConfigForm } from './ConfigForm';
 export { PreviewPanel } from './PreviewPanel';

@@ -28,7 +28,12 @@ import type {
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
-import { PreviewPanel, PageConfigPanel, PrototypePagePreview } from "@/components/demo";
+import {
+  extractPrototypeConfigBindingKeys,
+  PreviewPanel,
+  PageConfigPanel,
+  PrototypePagePreview,
+} from "@/components/demo";
 import { PreviewCanvas } from "@/components/demo";
 import type { PreviewMode, CanvasState } from "@/components/demo";
 import {
@@ -738,6 +743,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 order: page.order,
                 schema: pageSchemaMap[page.id],
                 configData: configDataMap[page.id],
+                projectConfigBindings:
+                  page.runtimeType === "prototype-html-css"
+                    ? extractPrototypeConfigBindingKeys(page.prototypeHtml)
+                    : undefined,
               }))}
               activePageId={activePageId}
               detailPageId={

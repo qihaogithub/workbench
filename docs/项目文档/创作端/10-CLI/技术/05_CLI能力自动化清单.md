@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-07-03
+> 更新日期：2026-07-04
 
 ## 用途
 
@@ -47,6 +47,9 @@ covers:
 | project.get | 项目 | `project get` | 低 | L3 | 已覆盖 | 查询项目详情 |
 | project.pull | 项目 | `project pull` | 低 | L3 | 已覆盖 | 拉取项目为本地项目包 |
 | project.runtime.validate | 项目 | `project validate-runtime` | 低 | L3 | 已覆盖 | 校验项目当前版本页面是否符合创作端预览运行契约 |
+| project.commit.list | 项目 | `project commit-list` | 低 | L3 | 已覆盖 | 查询项目内容图提交时间线 |
+| project.materialize | 项目 | `project materialize` | 高 | L5 | 已覆盖 | `--check` 可只读校验 commit/blob 完整性，但命令本身可写入项目基准工作区 |
+| project.content.gc | 项目 | `project content-gc` | 高 | L5 | 已覆盖 | 默认 dry-run，可选删除未引用 blob，不允许自动合入 |
 | project.create | 项目 | `project create` | 中 | L4 | 已覆盖 | 创建项目 |
 | project.update | 项目 | `project update` | 中 | L4 | 已覆盖 | 修改项目基础信息 |
 | project.duplicate | 项目 | `project duplicate` | 中 | L4 | 已覆盖 | 复制项目 |
@@ -80,12 +83,12 @@ covers:
 | page.switch-runtime | 页面 | `page switch-runtime` | 中 | L4 | 已覆盖 | 在编辑事务内切换页面运行时类型，并复用共享层运行时校验与文件写入保护 |
 | page.update.schema | 页面 | `page update-schema` | 中 | L4 | 已覆盖 | 更新页面 Schema |
 | page.update.meta | 页面 | `page update-meta` | 中 | L4 | 已覆盖 | 修改页面元信息 |
-| page.version.list | 页面 | `page version-list` | 低 | L3 | 已覆盖 | 查询页面历史版本列表 |
-| page.version.get | 页面 | `page version-get` | 低 | L3 | 已覆盖 | 读取单个页面历史版本内容 |
-| page.version.create | 页面 | `page version-create` | 中 | L4 | 已覆盖 | 创建命名页面版本快照 |
 | page.delete | 页面 | `page delete-preview`、`page delete-execute` | 高 | L5 | 已覆盖 | 删除页面必须保留预览和确认 |
 | page.reorder | 页面 | `page reorder` | 中 | L4 | 已覆盖 | 页面和文件夹排序 |
-| page.restore | 页面 | `page restore-version` | 高 | L5 | 已覆盖 | 恢复历史版本可能覆盖现状 |
+| resource.version.list | 资源历史 | `resource version-list` | 低 | L3 | 已覆盖 | 查询单个资源的历史版本列表；当前首轮支持 `page`、`knowledge_document` |
+| resource.version.get | 资源历史 | `resource version-get` | 低 | L3 | 已覆盖 | 读取单个资源历史版本内容；页面历史不再通过旧 `page version-*` 命令暴露 |
+| resource.version.create | 资源历史 | `resource version-create` | 中 | L4 | 已覆盖 | 创建页面或知识文档资源版本，并同步写入内容图提交 |
+| resource.restore | 资源历史 | `resource restore-version` | 高 | L5 | 已覆盖 | 恢复单个资源到历史版本，可能覆盖当前工作区内容 |
 | folder.create | 文件夹 | `folder create` | 中 | L4 | 已覆盖 | 创建虚拟文件夹 |
 | folder.update | 文件夹 | `folder update` | 中 | L4 | 已覆盖 | 修改文件夹 |
 | folder.delete | 文件夹 | `folder delete-preview`、`folder delete-execute` | 高 | L5 | 已覆盖 | 删除文件夹必须保留预览和确认 |

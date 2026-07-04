@@ -11,6 +11,7 @@ import type {
   DemoFiles,
   MultiDemoFiles,
   PrototypePageMeta,
+  ResourceVersion,
 } from '@opencode-workbench/shared';
 import type { RuntimeValidationResult } from '@opencode-workbench/project-core';
 
@@ -30,6 +31,37 @@ export interface ProjectConfigSchema {
 export interface SessionMultiDemoFiles extends MultiDemoFiles {
   demoPages: DemoPageMeta[];
   workspacePath: string;
+}
+
+interface ResourceVersionHistoryPayload {
+  projectId: string;
+  kind: string;
+  resourceId: string;
+  currentVersion?: string;
+  versions: ResourceVersion[];
+  totalVersions: number;
+}
+
+interface ResourceVersionDetailPayload {
+  version: ResourceVersion;
+  content?: unknown;
+}
+
+function pageVersionInfoFromResource(version: ResourceVersion): PageVersionInfo {
+  const metadata = version.metadata as { page?: DemoPageMeta };
+  return {
+    versionId: version.id,
+    type: "named_version",
+    demoId: version.resourceId,
+    demoName: metadata.page?.name,
+    savedAt: version.createdAt,
+    savedBy: version.createdBy,
+    sessionId: `resource-${version.id}`,
+    snapshotPath: "",
+    fileCount: version.blobRefs.length,
+    note: version.note,
+    resourceVersion: version,
+  };
 }
 
 export interface SwitchSessionDemoPageRuntimeRequest {
@@ -112,13 +144,19 @@ export class ProjectApiClient {
     projectId: string,
     demoId: string,
   ): Promise<PageVersionHistoryResponse> {
-    const response = await this.localRequest<PageVersionHistoryResponse>(
-      `/api/projects/${projectId}/demos/${demoId}/versions`,
+    const response = await this.localRequest<ResourceVersionHistoryPayload>(
+      `/api/projects/${projectId}/resources/page/${demoId}/versions`,
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '获取页面版本历史失败');
     }
-    return response.data;
+    return {
+      projectId,
+      demoId,
+      currentVersion: response.data.currentVersion ?? "v0",
+      versions: response.data.versions.map(pageVersionInfoFromResource),
+      totalVersions: response.data.totalVersions,
+    };
   }
 
   async createPageVersion(
@@ -126,8 +164,8 @@ export class ProjectApiClient {
     demoId: string,
     request?: { sessionId?: string; note?: string },
   ): Promise<PageVersionInfo> {
-    const response = await this.localRequest<PageVersionInfo>(
-      `/api/projects/${projectId}/demos/${demoId}/versions`,
+    const response = await this.localRequest<ResourceVersion>(
+      `/api/projects/${projectId}/resources/page/${demoId}/versions`,
       {
         method: 'POST',
         body: JSON.stringify(request ?? {}),
@@ -136,7 +174,7 @@ export class ProjectApiClient {
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '创建页面版本失败');
     }
-    return response.data;
+    return pageVersionInfoFromResource(response.data);
   }
 
   async getPageVersionFiles(
@@ -144,13 +182,13 @@ export class ProjectApiClient {
     demoId: string,
     versionId: string,
   ): Promise<DemoFiles> {
-    const response = await this.localRequest<DemoFiles>(
-      `/api/projects/${projectId}/demos/${demoId}/versions/${versionId}`,
+    const response = await this.localRequest<ResourceVersionDetailPayload>(
+      `/api/projects/${projectId}/resources/page/${demoId}/versions/${versionId}`,
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '读取页面版本失败');
     }
-    return response.data;
+    return response.data.content as DemoFiles;
   }
 
   async restorePageVersion(
@@ -160,7 +198,7 @@ export class ProjectApiClient {
     request?: { sessionId?: string },
   ): Promise<RestorePageVersionResponse> {
     const response = await this.localRequest<RestorePageVersionResponse>(
-      `/api/projects/${projectId}/demos/${demoId}/versions/${versionId}`,
+      `/api/projects/${projectId}/resources/page/${demoId}/versions/${versionId}`,
       {
         method: 'POST',
         body: JSON.stringify(request ?? {}),
@@ -438,6 +476,7 @@ export class ProjectApiClient {
   async publishProject(projectId: string, request?: { sessionId?: string; workspaceId?: string }): Promise<{
     projectId: string;
     publishedVersion: string;
+    commitId?: string;
     publishedAt: number;
     demoCount: number;
     duration: number;
@@ -449,6 +488,7 @@ export class ProjectApiClient {
     const response = await this.localRequest<{
       projectId: string;
       publishedVersion: string;
+      commitId?: string;
       publishedAt: number;
       demoCount: number;
       duration: number;

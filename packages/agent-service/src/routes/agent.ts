@@ -36,6 +36,27 @@ interface SendMessageBody {
   };
 }
 
+async function resolveCurrentModelId(agent: unknown): Promise<string | undefined> {
+  if (!agent || typeof agent !== 'object' || !('getModelInfo' in agent)) {
+    return undefined;
+  }
+
+  const modelInfo = await (
+    agent as {
+      getModelInfo: () =>
+        | { currentModelId: string | null }
+        | null
+        | Promise<{ currentModelId: string | null } | null>;
+    }
+  ).getModelInfo();
+  return modelInfo?.currentModelId || undefined;
+}
+
+function normalizeModelId(modelId: string | undefined): string | undefined {
+  const trimmed = modelId?.trim();
+  return trimmed || undefined;
+}
+
 interface ListSessionsQuery {
   status?: string;
   limit?: string;
@@ -78,7 +99,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, demoId, workingDir, customWorkspace, model, systemPrompt, options } = request.body;
+      const { content, demoId, workingDir, customWorkspace, systemPrompt, options } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -105,11 +126,15 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           }
         }
 
+        const existingAgent = manager.get(sessionId);
+        const requestedModelId = normalizeModelId(request.body.model);
+        const currentModelId = await resolveCurrentModelId(existingAgent);
+
         const config: AgentConfig = {
           sessionId,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
-          model: request.body.model,
+          model: requestedModelId || currentModelId,
           toolVersion: getWorkbenchToolCapabilities().toolVersion,
           backendProviders: getSessionModelConfigs().get(sessionId),
           externalAuth: getSessionExternalAuthConfigs().get(sessionId),
@@ -133,6 +158,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
               },
             });
           }
+        }
+
+        if (
+          requestedModelId &&
+          agent instanceof BackendAgent &&
+          requestedModelId !== (await resolveCurrentModelId(agent))
+        ) {
+          await agent.setModel(requestedModelId);
         }
 
         // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）

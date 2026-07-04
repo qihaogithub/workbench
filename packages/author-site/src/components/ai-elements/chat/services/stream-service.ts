@@ -237,6 +237,7 @@ export class StreamService {
     images?: ImageAttachment[],
     demoId?: string,
     activeViewContext?: ActiveViewContext,
+    modelId?: string,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -284,6 +285,7 @@ export class StreamService {
       stream: true,
       workingDir,
       demoId,
+      model: modelId,
       images,
       systemPrompt,
     } as any);

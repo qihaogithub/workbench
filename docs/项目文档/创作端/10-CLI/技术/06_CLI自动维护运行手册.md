@@ -11,7 +11,7 @@ covers:
 
 # CLI 自动维护运行手册
 
-> 更新日期：2026-07-02
+> 更新日期：2026-07-04
 
 ## 读者
 
@@ -31,6 +31,8 @@ covers:
 
 如果页面能力涉及 `runtimeType: "prototype-html-css"`、`prototypeHtml` / `prototypeCss` / `prototypeMeta` 或 `page update-prototype`，还要确认 `project-core` 已承载原型页文件读写、版本快照和静态安全校验；CLI 不得直接复用 author-site 画布或组件逻辑。
 
+如果页面历史、知识文档历史或内容图能力发生变化，还要确认 author-site 已通过 `/api/projects/[projectId]/resources/*`、`/commits/*` 或 `/materialize` 入口复用 `project-core`；CLI 不得恢复旧 `page version-*` 路由，也不能绕过内容图 commit / blob / materialization 状态。
+
 ## 允许自动处理的改动
 
 自动任务可以处理：
@@ -43,6 +45,8 @@ covers:
 | 文档和能力清单 | 与代码行为保持一致 |
 | 命令别名 | 不影响现有命令 |
 
+资源历史与内容图命令里，自动任务只可低风险维护 `project commit-list`、`resource version-list` 和 `resource version-get` 这类纯查询能力；它们必须复用共享层现有接口，不能在 CLI 侧自己拼磁盘结构。
+
 ## 需要人工审核的改动
 
 以下改动可以自动起草，但不能自动合入：
@@ -54,6 +58,7 @@ covers:
 | 资产替换 | 可能影响页面引用 |
 | AI 会话发消息 | 会触发外部服务或在线会话 |
 | 发布前检查策略变化 | 可能影响发布阻断规则 |
+| `resource version-create` | 会新增资源版本和内容图提交，需要确认审计与版本语义 |
 
 ## 必须停止的改动
 
@@ -67,6 +72,12 @@ covers:
 | 需要新增业务规则 | 自动任务不能自行定义产品行为 |
 | 改动需要密钥或真实线上环境 | 自动任务不能依赖不可控外部状态 |
 | 工作区存在冲突且影响目标文件 | 不能覆盖用户改动 |
+
+以下资源历史/内容图命令即使具备只读子模式，也按最高风险原则停止自动合入：
+
+- `project materialize`：未带 `--check` 时会改写项目基准工作区。
+- `project content-gc`：`--dry-run false` 会删除 blob。
+- `resource restore-version`：会覆盖当前资源内容并推进内容图提交。
 
 ## 推荐运行节奏
 
@@ -93,6 +104,8 @@ covers:
 - CLI 命令是否登记对应能力。
 - CLI 测试是否覆盖所有登记命令。
 - 文档是否说明新增或变化的能力。
+
+页面历史相关入口优先检查 `/resources/[kind]/[resourceId]/versions` 是否已替代旧 `/demos/[demoId]/versions`；项目内容图相关入口优先检查 `/commits` 与 `/materialize` 是否已经复用 `project-core`，避免把共享层迁移误判成 CLI 缺口。
 
 ### 3. 选择处理等级
 

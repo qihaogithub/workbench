@@ -41,6 +41,8 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   parts: [],
 };
 
+const DEFAULT_AUTO_REPAIR_TITLE = "检测到预览异常，正在自动修复";
+
 const EMPTY_PLAN: PlanState = {
   items: [],
   fallbackText: "",
@@ -173,10 +175,15 @@ interface QueuedChatMessage {
   runOptions?: SendMessageRunOptions;
   createdAt: number;
   displayMessageId: string;
+  dedupeKey?: string;
 }
 
 function createLocalId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createSystemAutoRepairDedupeKey(title: string, hiddenPrompt: string): string {
+  return `system_auto_repair:${title}:${hiddenPrompt}`;
 }
 
 function updateAutoRepairStatus(
@@ -243,6 +250,7 @@ interface UseChatStreamOptions {
   ) => void;
   onModelsEvent?: (event: StreamEvent) => void;
   onModelStateError?: () => void;
+  selectedModelId?: string;
   onDiagnosticEvent?: (event: {
     name: string;
     traceId?: string;
@@ -271,6 +279,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     setCurrentMessage,
     onModelsEvent,
     onModelStateError,
+    selectedModelId,
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,
@@ -288,6 +297,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const memoryFilePathsRef = useRef<Set<string>>(new Set());
   const queuedMessagesRef = useRef<QueuedChatMessage[]>([]);
   const activeRunRef = useRef(false);
+  const activeRunDedupeKeyRef = useRef<string | null>(null);
   const drainQueueRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef(sessionId);
 
@@ -328,6 +338,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   useEffect(() => {
     return () => {
       activeRunRef.current = false;
+      activeRunDedupeKeyRef.current = null;
       queuedMessagesRef.current = [];
       streamServiceRef.current?.close();
       stopSilenceTracking();
@@ -340,6 +351,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       previousSessionIdRef.current = sessionId;
       queuedMessagesRef.current = [];
       activeRunRef.current = false;
+      activeRunDedupeKeyRef.current = null;
     }
 
     if (
@@ -350,6 +362,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       streamServiceRef.current.close();
       streamSessionIdRef.current = "";
       activeRunRef.current = false;
+      activeRunDedupeKeyRef.current = null;
       queuedMessagesRef.current = [];
       stopSilenceTracking();
       setIsStreaming(false);
@@ -370,6 +383,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
   const completeRunAndDrain = useCallback(() => {
     activeRunRef.current = false;
+    activeRunDedupeKeyRef.current = null;
     setIsStreaming(false);
     setTimeout(() => {
       drainQueueRef.current();
@@ -387,8 +401,15 @@ export function useChatStream(options: UseChatStreamOptions) {
       activeRunRef.current = true;
 
       const source = runOptions?.source ?? "user";
+      const trimmedMessage = userMessage.trim();
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
+      activeRunDedupeKeyRef.current = isSystemAutoRepair
+        ? createSystemAutoRepairDedupeKey(
+            runOptions?.displayMessage?.title || DEFAULT_AUTO_REPAIR_TITLE,
+            trimmedMessage,
+          )
+        : null;
       const isFirstUserMessage =
         !isSystemAutoRepair &&
         messagesRef.current.every((message) => message.role !== "user");
@@ -409,6 +430,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           messageLength: userMessage.trim().length,
           imageCount: images?.length ?? 0,
           hasActiveViewContext: Boolean(activeViewContext),
+          selectedModelId,
         },
       });
 
@@ -421,23 +443,23 @@ export function useChatStream(options: UseChatStreamOptions) {
                 kind: "auto_repair",
                 content:
                   runOptions?.displayMessage?.title ||
-                  "检测到预览异常，正在自动修复",
+                  DEFAULT_AUTO_REPAIR_TITLE,
                 autoRepair: {
                   status: "running",
                   title:
                     runOptions?.displayMessage?.title ||
-                    "检测到预览异常，正在自动修复",
+                    DEFAULT_AUTO_REPAIR_TITLE,
                   summary:
                     runOptions?.displayMessage?.summary ||
                     "AI 将尝试恢复当前页面预览",
                   debugDetail: runOptions?.displayMessage?.debugDetail,
-                  hiddenPrompt: userMessage.trim(),
+                  hiddenPrompt: trimmedMessage,
                 },
               }
             : {
                 id: displayMessageId,
                 role: "user",
-                content: userMessage.trim(),
+                content: trimmedMessage,
                 parts: images?.map((img) => ({
                   type: "image" as const,
                   url: `data:${img.mimeType};base64,${img.data}`,
@@ -841,6 +863,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           images,
           demoId,
           activeViewContext,
+          selectedModelId,
         );
         onDiagnosticEvent?.({
           name: "ai.message_sent",
@@ -942,9 +965,11 @@ export function useChatStream(options: UseChatStreamOptions) {
             {
               demoId,
               workingDir,
+              model: selectedModelId,
               images,
               options: {
                 stream: false,
+                model: selectedModelId,
               },
             },
           );
@@ -1052,6 +1077,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       currentMessageRef,
       onModelsEvent,
       onModelStateError,
+      selectedModelId,
       onDiagnosticEvent,
       beforeSend,
       markActivity,
@@ -1093,9 +1119,26 @@ export function useChatStream(options: UseChatStreamOptions) {
       if (!trimmedMessage || !agentSessionId) return;
 
       const source = runOptions?.source ?? "user";
-      if (source === "user" && activeRunRef.current) {
+      const isSystemAutoRepair = source === "system_auto_repair";
+      const dedupeKey = isSystemAutoRepair
+        ? createSystemAutoRepairDedupeKey(
+            runOptions?.displayMessage?.title || DEFAULT_AUTO_REPAIR_TITLE,
+            trimmedMessage,
+          )
+        : undefined;
+      if (
+        dedupeKey &&
+        (activeRunDedupeKeyRef.current === dedupeKey ||
+          queuedMessagesRef.current.some((message) => message.dedupeKey === dedupeKey))
+      ) {
+        return;
+      }
+
+      if (activeRunRef.current) {
         const queueId = createLocalId("queued");
-        const displayMessageId = createLocalId("user");
+        const displayMessageId = createLocalId(
+          isSystemAutoRepair ? "auto-repair" : "user",
+        );
         queuedMessagesRef.current = [
           ...queuedMessagesRef.current,
           {
@@ -1105,23 +1148,46 @@ export function useChatStream(options: UseChatStreamOptions) {
             runOptions,
             createdAt: Date.now(),
             displayMessageId,
+            dedupeKey,
           },
         ];
 
         setMessages((prev) => [
           ...prev,
-          {
-            id: displayMessageId,
-            role: "user",
-            content: trimmedMessage,
-            queueId,
-            queueStatus: "queued",
-            parts:
-              images?.map((img) => ({
-                type: "image" as const,
-                url: `data:${img.mimeType};base64,${img.data}`,
-              })) || [],
-          },
+          isSystemAutoRepair
+            ? {
+                id: displayMessageId,
+                role: "system",
+                kind: "auto_repair",
+                content:
+                  runOptions?.displayMessage?.title ||
+                  DEFAULT_AUTO_REPAIR_TITLE,
+                queueId,
+                queueStatus: "queued",
+                autoRepair: {
+                  status: "running",
+                  title:
+                    runOptions?.displayMessage?.title ||
+                    DEFAULT_AUTO_REPAIR_TITLE,
+                  summary:
+                    runOptions?.displayMessage?.summary ||
+                    "AI 将尝试恢复当前页面预览",
+                  debugDetail: runOptions?.displayMessage?.debugDetail,
+                  hiddenPrompt: trimmedMessage,
+                },
+              }
+            : {
+                id: displayMessageId,
+                role: "user",
+                content: trimmedMessage,
+                queueId,
+                queueStatus: "queued",
+                parts:
+                  images?.map((img) => ({
+                    type: "image" as const,
+                    url: `data:${img.mimeType};base64,${img.data}`,
+                  })) || [],
+              },
         ]);
         return;
       }

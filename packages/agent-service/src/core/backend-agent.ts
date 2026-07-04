@@ -2,6 +2,7 @@ import { BaseAgent } from "./agent";
 import { AgentConfig, AgentResult, SendMessageOptions, UserChoiceResponse } from "./types";
 import { IBackendAdapter } from "../backends/base";
 import { logger } from "../utils/logger";
+import { getErrorMessage } from "../utils/error-utils";
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
@@ -100,7 +101,7 @@ export class BackendAgent extends BaseAgent {
         success: false,
         error: {
           code: "MESSAGE_SEND_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
+          message: getErrorMessage(error),
           retryable: true,
         },
         metadata: responseDebug ? { emptyResponseDebug: responseDebug } : undefined,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { ProjectAdminService } from '@opencode-workbench/project-core';
+import { getDataDir } from '@/lib/fs-utils';
 
 interface KnowledgeItem {
   id: string;
@@ -39,6 +41,25 @@ function writeManifest(workingDir: string, manifest: Manifest): void {
   );
 }
 
+function createKnowledgeVersion(projectId: string | null, workingDir: string, docId: string, note: string): void {
+  if (!projectId) return;
+  new ProjectAdminService({ dataDir: getDataDir() }).resourceVersionCreate(
+    {
+      projectId,
+      kind: 'knowledge_document',
+      resourceId: docId,
+      sourceWorkspacePath: workingDir,
+      note,
+    },
+    {
+      id: 'author-site',
+      name: 'Author Site',
+      role: 'creator',
+      source: 'author-site',
+    },
+  );
+}
+
 // PUT - 更新知识文档（仅 source: "user"）
 export async function PUT(
   request: NextRequest,
@@ -46,6 +67,7 @@ export async function PUT(
 ) {
   const { docId } = await params;
   const workingDir = request.nextUrl.searchParams.get('workingDir');
+  const projectId = request.nextUrl.searchParams.get('projectId');
   if (!workingDir) {
     return NextResponse.json(
       { success: false, error: { code: 'INVALID_REQUEST', message: 'workingDir 必填' } },
@@ -107,6 +129,7 @@ export async function PUT(
     }
 
     writeManifest(workingDir, manifest);
+    createKnowledgeVersion(projectId, workingDir, docId, `更新知识文档 ${manifest.items[itemIndex].title}`);
 
     return NextResponse.json({ success: true, data: manifest.items[itemIndex] });
   } catch (error) {
@@ -125,6 +148,7 @@ export async function DELETE(
 ) {
   const { docId } = await params;
   const workingDir = request.nextUrl.searchParams.get('workingDir');
+  const projectId = request.nextUrl.searchParams.get('projectId');
   if (!workingDir) {
     return NextResponse.json(
       { success: false, error: { code: 'INVALID_REQUEST', message: 'workingDir 必填' } },
@@ -167,8 +191,25 @@ export async function DELETE(
     }
 
     // 从 manifest 中移除
+    const deletedTitle = item.title;
     manifest.items.splice(itemIndex, 1);
     writeManifest(workingDir, manifest);
+    if (projectId) {
+      new ProjectAdminService({ dataDir: getDataDir() }).resourceDelete(
+        {
+          projectId,
+          kind: 'knowledge_document',
+          resourceId: docId,
+          title: `删除知识文档 ${deletedTitle}`,
+        },
+        {
+          id: 'author-site',
+          name: 'Author Site',
+          role: 'creator',
+          source: 'author-site',
+        },
+      );
+    }
 
     return NextResponse.json({ success: true, data: null });
   } catch (error) {

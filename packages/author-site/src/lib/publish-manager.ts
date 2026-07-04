@@ -23,6 +23,7 @@ import type {
   DemoFolderMeta,
   AppGraph,
 } from "@opencode-workbench/shared";
+import { ProjectAdminService } from "@opencode-workbench/project-core";
 import type { CanvasState } from "@opencode-workbench/demo-ui";
 import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
@@ -62,6 +63,7 @@ export interface PublishedProject {
   description?: string;
   thumbnail?: string;
   publishedVersion: string;
+  commitId?: string;
   publishedAt: number;
   demoPages: PublishedDemoPage[];
   demoFolders: DemoFolderMeta[];
@@ -91,6 +93,7 @@ export interface ProjectsIndex {
 export interface PublishResult {
   projectId: string;
   publishedVersion: string;
+  commitId?: string;
   publishedAt: number;
   demoCount: number;
   duration: number;
@@ -375,6 +378,20 @@ export async function publishProject(
   }
 
   const currentVersion = snapshotResult.version.versionId;
+  const publishCommit = new ProjectAdminService({ dataDir: getDataDir() }).projectCreatePublishCommit(
+    {
+      projectId,
+      publishedVersion: currentVersion,
+      title: `发布项目 ${currentVersion}`,
+    },
+    {
+      id: "author-site",
+      name: "Author Site",
+      role: "creator",
+      source: "author-site",
+    },
+  );
+  const commitId = publishCommit.data?.id;
 
   const publishedProject: PublishedProject = {
     id: project.id,
@@ -384,6 +401,7 @@ export async function publishProject(
       ? `/data/${projectId}/thumbnail${thumbnailExt}`
       : undefined,
     publishedVersion: currentVersion,
+    commitId,
     publishedAt: Date.now(),
     demoPages: publishedDemoPages,
     demoFolders: project.demoFolders,
@@ -422,6 +440,7 @@ export async function publishProject(
   return {
     projectId,
     publishedVersion: currentVersion,
+    commitId,
     publishedAt: project.publishedAt,
     demoCount: publishedDemoPages.length,
     duration: Date.now() - startTime,

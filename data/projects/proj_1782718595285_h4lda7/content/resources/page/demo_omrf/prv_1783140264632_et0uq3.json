@@ -1,0 +1,39 @@
+{
+  "id": "prv_1783140264632_et0uq3",
+  "projectId": "proj_1782718595285_h4lda7",
+  "kind": "page",
+  "resourceId": "demo_omrf",
+  "contentHash": "3c8a2fec9a769be64211c8476fc9881df76968e984ce13cf697de969c5e27245",
+  "blobRefs": [
+    "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+    "d2752676e3a3b93e46a0565635d976b48b708abcab3c0721989e4b1162aca230",
+    "78aa90a4aa5ef8d88e54992eef76d7bfdeb75c6a67a1613a979b3af404b4f726",
+    "db18d0ebef6bba0e1db908568ff92001ef195cbd38428a9a0eacd293d778bc69"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_omrf",
+      "name": "demo - 副本",
+      "routeKey": "demo-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+      "prototypeHtml": "d2752676e3a3b93e46a0565635d976b48b708abcab3c0721989e4b1162aca230",
+      "prototypeCss": "78aa90a4aa5ef8d88e54992eef76d7bfdeb75c6a67a1613a979b3af404b4f726",
+      "prototypeMeta": "db18d0ebef6bba0e1db908568ff92001ef195cbd38428a9a0eacd293d778bc69"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783140264645,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "修改了demo - 副本"
+}

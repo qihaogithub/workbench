@@ -51,6 +51,10 @@ describe("useChatStream 自动修复发送", () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("发送前会等待 beforeSend 完成", async () => {
     let messages: ChatMessage[] = [];
     const messagesRef = { current: messages };
@@ -73,12 +77,14 @@ describe("useChatStream 自动修复发送", () => {
           : updater;
     };
     let resolveBeforeSend: () => void = () => undefined;
-    const beforeSend = jest.fn(
-      () =>
-        new Promise<void>((resolve) => {
+    let beforeSendCallCount = 0;
+    const beforeSend = jest.fn(() => {
+      beforeSendCallCount += 1;
+      if (beforeSendCallCount > 1) return Promise.resolve();
+      return new Promise<void>((resolve) => {
           resolveBeforeSend = resolve;
-        }),
-    );
+      });
+    });
 
     const { result } = renderHook(() =>
       useChatStream({
@@ -107,12 +113,15 @@ describe("useChatStream 自动修复发送", () => {
     await act(async () => {
       resolveBeforeSend();
       await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "删除共享配置",
         "/tmp/workspace",
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -171,6 +180,7 @@ describe("useChatStream 自动修复发送", () => {
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "隐藏的完整技术错误",
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -247,10 +257,13 @@ describe("useChatStream 自动修复发送", () => {
       ),
     ).toBe(true);
 
-    await act(async () => {
-      jest.runOnlyPendingTimers();
-      await Promise.resolve();
-    });
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
 
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
@@ -259,9 +272,11 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       expect(mockSendMessage).toHaveBeenCalledWith(
         "第二条",
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -278,6 +293,298 @@ describe("useChatStream 自动修复发送", () => {
     expect(messages.some((message) => message.queueStatus)).toBe(false);
 
     jest.useRealTimers();
+  });
+
+  it("AI 回复期间触发的系统自动任务会排队，避免并发发送到 Agent", async () => {
+    jest.useFakeTimers();
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages =
+        typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+    let resolveBeforeSend: () => void = () => undefined;
+    const beforeSend = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBeforeSend = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+        beforeSend,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      result.current.handleSend("正在执行的用户任务");
+      await Promise.resolve();
+    });
+
+    expect(beforeSend).toHaveBeenCalledTimes(1);
+
+    const autoRepairOptions = {
+      source: "system_auto_repair" as const,
+      displayMessage: {
+        status: "running" as const,
+        title: "转换为HTML/CSS 原型",
+        summary: "AI 将生成原型页内容",
+        hiddenPrompt: "隐藏的转换提示",
+      },
+    };
+
+    act(() => {
+      result.current.handleSend("隐藏的转换提示", undefined, autoRepairOptions);
+      result.current.handleSend("隐藏的转换提示", undefined, autoRepairOptions);
+    });
+
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(
+      messages.filter(
+        (message) =>
+          message.role === "system" &&
+          message.kind === "auto_repair" &&
+          message.queueStatus === "queued",
+      ),
+    ).toHaveLength(1);
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        role: "system",
+        kind: "auto_repair",
+        content: "转换为HTML/CSS 原型",
+        queueStatus: "queued",
+        autoRepair: expect.objectContaining({
+          status: "running",
+          hiddenPrompt: "隐藏的转换提示",
+        }),
+      }),
+    );
+
+    await act(async () => {
+      resolveBeforeSend();
+      await Promise.resolve();
+    });
+  });
+
+  it("重复触发正在运行的系统自动任务时不会额外排队", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages =
+        typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+    let resolveBeforeSend: () => void = () => undefined;
+    const beforeSend = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBeforeSend = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+        beforeSend,
+      }),
+    );
+
+    const autoRepairOptions = {
+      source: "system_auto_repair" as const,
+      displayMessage: {
+        status: "running" as const,
+        title: "转换为HTML/CSS 原型",
+        summary: "AI 将生成原型页内容",
+        hiddenPrompt: "隐藏的转换提示",
+      },
+    };
+
+    act(() => {
+      result.current.handleSend("隐藏的转换提示", undefined, autoRepairOptions);
+      result.current.handleSend("隐藏的转换提示", undefined, autoRepairOptions);
+    });
+
+    expect(beforeSend).toHaveBeenCalledTimes(1);
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(
+      messages.filter(
+        (message) =>
+          message.role === "system" &&
+          message.kind === "auto_repair",
+      ),
+    ).toHaveLength(1);
+    expect(messages.some((message) => message.queueStatus)).toBe(false);
+
+    await act(async () => {
+      resolveBeforeSend();
+      await Promise.resolve();
+    });
+  });
+
+  it("不同系统自动任务仍会排队等待当前任务结束", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages =
+        typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+    let resolveBeforeSend: () => void = () => undefined;
+    const beforeSend = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBeforeSend = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+        beforeSend,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("隐藏的转换提示 A", undefined, {
+        source: "system_auto_repair",
+        displayMessage: {
+          status: "running",
+          title: "转换为HTML/CSS 原型",
+          summary: "AI 将生成原型页内容",
+          hiddenPrompt: "隐藏的转换提示 A",
+        },
+      });
+      result.current.handleSend("隐藏的转换提示 B", undefined, {
+        source: "system_auto_repair",
+        displayMessage: {
+          status: "running",
+          title: "重新修复预览",
+          summary: "AI 将生成原型页内容",
+          hiddenPrompt: "隐藏的转换提示 B",
+        },
+      });
+    });
+
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(messages.map((message) => message.content)).toEqual([
+      "转换为HTML/CSS 原型",
+      "重新修复预览",
+    ]);
+    expect(messages[1]).toMatchObject({
+      role: "system",
+      kind: "auto_repair",
+      queueStatus: "queued",
+    });
+
+    await act(async () => {
+      resolveBeforeSend();
+      await Promise.resolve();
+    });
+  });
+
+  it("发送消息时会把当前选中的模型传给流式服务", async () => {
+    const messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        selectedModelId: "deepseek/deepseek-v4-pro",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("测试模型选择");
+    });
+
+    await waitFor(() => {
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "测试模型选择",
+        "/tmp/workspace",
+        undefined,
+        undefined,
+        undefined,
+        "deepseek/deepseek-v4-pro",
+      );
+    });
   });
 
   it("取消当前回复时清空正在展示的计划", () => {

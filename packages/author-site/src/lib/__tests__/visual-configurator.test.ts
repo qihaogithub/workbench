@@ -4,6 +4,7 @@ import {
   applyVisualConfiguration,
   buildVisualConfigCandidates,
 } from "../visual-configurator";
+import { applyPrototypeVisualConfiguration } from "../prototype-visual-editor";
 
 function node(overrides: Partial<VisualNodeInfo> = {}): VisualNodeInfo {
   return {
@@ -60,6 +61,7 @@ export default function Demo({}: DemoProps) {
         fieldKey: "heroTitle",
         title: "主标题",
         defaultValue: "Hello",
+        category: "设计",
       },
     });
 
@@ -72,6 +74,7 @@ export default function Demo({}: DemoProps) {
       type: "string",
       title: "主标题",
       default: "Hello",
+      "ui:options": { category: "设计" },
     });
   });
 
@@ -158,5 +161,33 @@ export default function Demo({}: DemoProps) {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toContain("出现多次");
+  });
+
+  it("原型页配置化应保存配置分类", () => {
+    const result = applyPrototypeVisualConfiguration({
+      html: '<h1 data-ow-id="hero-title">Hello</h1>',
+      schema,
+      node: node({
+        nodeId: "hero-title",
+        domPath: "h1:nth-of-type(1)",
+      }),
+      target: {
+        kind: "text",
+        fieldKey: "heroTitle",
+        title: "主标题",
+        defaultValue: "Hello",
+        category: "设计",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.html).toContain('data-bind-text="heroTitle"');
+    expect(JSON.parse(result.schema).properties.heroTitle).toEqual({
+      type: "string",
+      title: "主标题",
+      default: "Hello",
+      "ui:options": { category: "设计" },
+    });
   });
 });

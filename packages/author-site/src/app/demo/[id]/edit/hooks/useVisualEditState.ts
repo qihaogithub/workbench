@@ -74,6 +74,7 @@ export interface VisualConfigMark {
   fieldTitle: string;
   fieldKey: string;
   defaultValue: string;
+  category?: string;
   scope: "page" | "project";
 }
 
@@ -180,6 +181,7 @@ function getConfigMarkSignature(mark: VisualConfigMark): string {
     fieldTitle: mark.fieldTitle,
     fieldKey: mark.fieldKey,
     defaultValue: mark.defaultValue,
+    category: mark.category ?? "",
     scope: mark.scope,
   });
 }
@@ -245,6 +247,7 @@ function createPrototypeConfigTargetFromMark(
       fieldKey: mark.fieldKey.trim(),
       title: mark.fieldTitle.trim(),
       defaultValue: mark.defaultValue,
+      category: mark.category?.trim(),
     };
   }
   if (mark.kind === "attribute" && mark.property === "src") {
@@ -253,6 +256,7 @@ function createPrototypeConfigTargetFromMark(
       fieldKey: mark.fieldKey.trim(),
       title: mark.fieldTitle.trim(),
       defaultValue: mark.defaultValue,
+      category: mark.category?.trim(),
     };
   }
   if (
@@ -266,6 +270,7 @@ function createPrototypeConfigTargetFromMark(
       fieldKey: mark.fieldKey.trim(),
       title: mark.fieldTitle.trim(),
       defaultValue: mark.defaultValue,
+      category: mark.category?.trim(),
       colorProperty: mark.property,
     };
   }
@@ -353,6 +358,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   const [visualConfigTitle, setVisualConfigTitle] = useState("");
   const [visualConfigFieldKey, setVisualConfigFieldKey] = useState("");
   const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState("");
+  const [visualConfigCategory, setVisualConfigCategory] = useState("");
   const [visualConfigError, setVisualConfigError] = useState<string | null>(
     null,
   );
@@ -405,6 +411,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
       );
       setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigCategory("");
       setVisualConfigError(null);
     },
     [projectConfigSchema, schemaRef, toast],
@@ -531,6 +538,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         fieldTitle,
         fieldKey: suggestVisualConfigFieldKey(fieldTitle, usedKeys),
         defaultValue: value,
+        category: "",
         scope: "page",
       };
       setVisualConfigMarks((prev) => {
@@ -545,7 +553,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleUpdateVisualConfigMark = useCallback(
-    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "scope">>) => {
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope">>) => {
       setVisualConfigMarks((prev) =>
         prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
       );
@@ -678,7 +686,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
           ? configMarks
               .map(
                 (mark, index) =>
-                  `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}`,
+                  `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}`,
               )
               .join("\n")
           : "无";
@@ -820,6 +828,7 @@ ${instructionForPrompt || "无"}
             fieldKey: visualConfigFieldKey.trim(),
             title: visualConfigTitle.trim(),
             defaultValue: visualConfigDefaultValue,
+            category: visualConfigCategory.trim(),
             colorProperty: selectedVisualConfigCandidate.colorProperty,
           },
         });
@@ -857,6 +866,7 @@ ${instructionForPrompt || "无"}
             fieldKey: visualConfigFieldKey.trim(),
             title: visualConfigTitle.trim(),
             defaultValue: visualConfigDefaultValue,
+            category: visualConfigCategory.trim(),
             colorProperty: selectedVisualConfigCandidate.colorProperty,
           },
         }),
@@ -915,6 +925,7 @@ ${instructionForPrompt || "无"}
     projectConfigSchema,
     selectedVisualConfigCandidate,
     toast,
+    visualConfigCategory,
     visualConfigDefaultValue,
     visualConfigFieldKey,
     visualConfigNode,
@@ -1188,6 +1199,8 @@ ${context}
     setVisualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigCategory,
+    setVisualConfigCategory,
     visualConfigError,
     setVisualConfigError,
     visualConfigApplying,

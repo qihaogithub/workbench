@@ -12,21 +12,27 @@ interface PageInfo {
   id: string;
   name: string;
   routeKey?: string;
-  indexPath: string;
+  runtimeType: "prototype-html-css" | "high-fidelity-react";
+  sourcePaths: string[];
   schemaPath: string;
-  indexContent?: string;
+  sourceContents?: Array<{ path: string; content: string }>;
   schemaContent?: string;
 }
 
 function readPageFiles(workingDir: string, page: PageInfo): PageInfo {
-  try {
-    page.indexContent = fs.readFileSync(
-      path.join(workingDir, page.indexPath),
-      "utf-8",
-    );
-  } catch {
-    /* 读取失败保持 undefined */
+  const sourceContents: Array<{ path: string; content: string }> = [];
+  for (const sourcePath of page.sourcePaths) {
+    try {
+      sourceContents.push({
+        path: sourcePath,
+        content: fs.readFileSync(path.join(workingDir, sourcePath), "utf-8"),
+      });
+    } catch {
+      /* 读取失败跳过该源码文件 */
+    }
   }
+  if (sourceContents.length > 0) page.sourceContents = sourceContents;
+
   try {
     page.schemaContent = fs.readFileSync(
       path.join(workingDir, page.schemaPath),
@@ -47,17 +53,20 @@ function formatPageList(pages: PageInfo[]): string {
         `- ${p.name}`,
         `  - id: \`${p.id}\``,
         `  - routeKey: \`${p.routeKey ?? p.id}\``,
-        `  - index.tsx: \`${p.indexPath}\``,
+        `  - runtimeType: \`${p.runtimeType}\``,
+        ...p.sourcePaths.map((sourcePath) => `  - 源码: \`${sourcePath}\``),
         `  - config.schema.json: \`${p.schemaPath}\``,
       ];
-      if (p.indexContent !== undefined) {
-        lines.push("  - 代码内容：");
-        lines.push(
-          p.indexContent
-            .split("\n")
-            .map((l) => `    ${l}`)
-            .join("\n"),
-        );
+      if (p.sourceContents !== undefined) {
+        for (const source of p.sourceContents) {
+          lines.push(`  - ${source.path} 内容：`);
+          lines.push(
+            source.content
+              .split("\n")
+              .map((l) => `    ${l}`)
+              .join("\n"),
+          );
+        }
       }
       if (p.schemaContent !== undefined) {
         lines.push("  - 配置内容：");
@@ -104,11 +113,20 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   // 使用 listDemoPages 读取页面列表（自动处理 workspace-tree.json 迁移和磁盘发现）
   const demoPages = listDemoPages(workingDir);
   for (const p of demoPages) {
+    const runtimeType = p.runtimeType === "prototype-html-css"
+      ? "prototype-html-css"
+      : "high-fidelity-react";
     pages.push({
       id: p.id,
       name: p.name,
       routeKey: p.routeKey,
-      indexPath: path.join("demos", p.id, "index.tsx"),
+      runtimeType,
+      sourcePaths: runtimeType === "prototype-html-css"
+        ? [
+            path.join("demos", p.id, "prototype.html"),
+            path.join("demos", p.id, "prototype.css"),
+          ]
+        : [path.join("demos", p.id, "index.tsx")],
       schemaPath: path.join("demos", p.id, "config.schema.json"),
     });
   }

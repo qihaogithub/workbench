@@ -40,6 +40,7 @@ interface ClientMessage {
   id?: string;
   content?: string;
   sessionId?: string;
+  model?: string;
   modelId?: string;
   workingDir?: string;
   demoId?: string;
@@ -93,6 +94,11 @@ async function resolveCurrentModelId(agent: BaseAgent | undefined): Promise<stri
 
 function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function normalizeModelId(modelId: string | undefined): string | undefined {
+  const trimmed = modelId?.trim();
+  return trimmed || undefined;
 }
 
 function heartbeat(): void {
@@ -203,12 +209,13 @@ export async function registerWebSocketRoutes(
             try {
               const existingAgent = manager.get(sessionId);
               const currentModelId = await resolveCurrentModelId(existingAgent);
+              const requestedModelId = normalizeModelId(message.model);
 
               const config: AgentConfig = {
                 sessionId,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
-                model: currentModelId || DEFAULT_MODEL_ID,
+                model: requestedModelId || currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
                 externalAuth: getSessionExternalAuthConfigs().get(sessionId),
@@ -256,6 +263,14 @@ export async function registerWebSocketRoutes(
                 }
               }
 
+              if (
+                requestedModelId &&
+                agent instanceof BackendAgent &&
+                requestedModelId !== (await resolveCurrentModelId(agent))
+              ) {
+                await agent.setModel(requestedModelId);
+              }
+
               // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
               if (message.systemPrompt && agent instanceof BackendAgent) {
                 logger.info({ sessionId, promptLength: message.systemPrompt.length }, 'WebSocket: calling updateSystemPrompt');
@@ -284,7 +299,7 @@ export async function registerWebSocketRoutes(
                 contentLength: message.content.length,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
-                model: config.model,
+                model: requestedModelId || (await resolveCurrentModelId(agent)) || config.model,
               });
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;

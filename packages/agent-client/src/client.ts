@@ -58,6 +58,7 @@ export class AgentClient {
       demoId?: string;
       workingDir?: string;
       customWorkspace?: boolean;
+      model?: string;
       options?: SendMessageOptions;
       images?: import("./types").ImageAttachment[];
     },
@@ -69,6 +70,7 @@ export class AgentClient {
         demoId: options?.demoId,
         workingDir: options?.workingDir,
         customWorkspace: options?.customWorkspace,
+        model: options?.model || options?.options?.model,
         images: options?.images,
         systemPrompt: options?.options?.systemPrompt,
         options: options?.options,
@@ -353,6 +355,7 @@ export class AgentStream {
         content,
         workingDir: options?.workingDir,
         demoId: options?.demoId,
+        model: options?.model,
         images: options?.images,
         systemPrompt: options?.systemPrompt,
         options,

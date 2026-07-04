@@ -16,6 +16,8 @@ import {
   PreviewCanvas,
   LayerTreeMenu,
   PageConfigPanel,
+  BUILT_IN_CONFIG_CATEGORIES,
+  extractPrototypeConfigBindingKeys,
   invalidateCompileCache,
   isSchemaEmpty,
 } from "../../../../../components/demo";
@@ -91,6 +93,7 @@ import {
   MoreVertical,
   Eye,
   Copy,
+  SlidersHorizontal,
   FileText,
   Map as MapIcon,
   Upload,
@@ -104,6 +107,7 @@ import {
   ArrowLeft,
   Users,
   Download,
+  X,
 } from "lucide-react";
 import {
   Select,
@@ -133,13 +137,17 @@ import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
 import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
 import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } from "@/components/demo/KnowledgeDocDialog";
+import { ResourceHistoryDialog } from "@/components/demo/ResourceHistoryDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { VisualPropertyPanel } from "./components/VisualPropertyPanel";
 import { useVisualEditState } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import {
+  resolveSinglePreviewResourceHistoryTarget,
+  type SinglePreviewTarget,
+} from "./single-preview-history";
+import {
   CanvasDocumentContent,
-  getActiveCanvasDocumentEntry,
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
   useCanvasDocumentMarkdown,
@@ -320,10 +328,6 @@ type HistoryEvent =
       savedAt: number;
       version: VersionInfo;
     };
-
-type SinglePreviewTarget =
-  | { kind: "page"; pageId: string }
-  | { kind: "document"; documentNodeId: string };
 
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
@@ -950,6 +954,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
   const [kbDocDialogMode, setKbDocDialogMode] = useState<KnowledgeDocDialogMode>("read");
   const [kbDocDialogItem, setKbDocDialogItem] = useState<KnowledgeItem | null>(null);
+  const [kbHistoryItem, setKbHistoryItem] = useState<KnowledgeItem | null>(null);
+  const [singlePreviewHistoryOpen, setSinglePreviewHistoryOpen] = useState(false);
+  const [singlePreviewHistoryPreparing, setSinglePreviewHistoryPreparing] = useState(false);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
 
   const upsertKnowledgeItem = useCallback((item: KnowledgeItem) => {
@@ -1106,6 +1113,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
   const {
     markdownByDocumentId: singlePreviewDocumentMarkdown,
+    setMarkdownByDocumentId: setSinglePreviewDocumentMarkdown,
   } = useCanvasDocumentMarkdown({
     documentNodes: singlePreviewMarkdownDocumentNodes,
     onReadKnowledgeDocument: readCanvasKnowledgeDocument,
@@ -1172,7 +1180,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
-  const [rightPanelTab, setRightPanelTab] = useState("property");
+  const [visualPropertyDrawerOpen, setVisualPropertyDrawerOpen] = useState(false);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<string | AutoRepairTrigger | null>(null);
   // visualEditMode and related state moved to useVisualEditState hook
@@ -1893,6 +1901,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setVisualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigCategory,
+    setVisualConfigCategory,
     visualConfigError,
     setVisualConfigError,
     visualConfigApplying,
@@ -1928,8 +1938,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
   const pendingStaticPrototypeConversionRef =
     useRef<RuntimeConversionState | null>(null);
-
-  const propertyPanelActive = previewMode === "single" && rightPanelTab === "property";
+  const propertyPanelActive =
+    previewMode === "single" && visualPropertyDrawerOpen;
 
   useEffect(() => {
     if (previewMode !== "single" || !activeDemoId) return;
@@ -3768,6 +3778,43 @@ ${context.details}
   const singlePreviewViewingDocument =
     previewMode === "single" &&
     effectiveSinglePreviewTarget?.kind === "document";
+  const visualPropertyDrawerTargetRef = useRef({
+    activeDemoId,
+    previewMode,
+    singlePreviewViewingDocument,
+  });
+  useEffect(() => {
+    const previous = visualPropertyDrawerTargetRef.current;
+    const targetChanged =
+      previous.activeDemoId !== activeDemoId ||
+      previous.previewMode !== previewMode ||
+      previous.singlePreviewViewingDocument !== singlePreviewViewingDocument;
+
+    visualPropertyDrawerTargetRef.current = {
+      activeDemoId,
+      previewMode,
+      singlePreviewViewingDocument,
+    };
+
+    if (!targetChanged || !visualPropertyDrawerOpen) return;
+    setVisualPropertyDrawerOpen(false);
+    setVisualLayerTreeOpen(false);
+    setVisualPanelHoverNodeId(null);
+  }, [
+    activeDemoId,
+    previewMode,
+    singlePreviewViewingDocument,
+    visualPropertyDrawerOpen,
+  ]);
+  const singlePreviewHistoryTarget = useMemo(
+    () =>
+      resolveSinglePreviewResourceHistoryTarget({
+        target: effectiveSinglePreviewTarget,
+        demoPages,
+        activeDocumentNode: activeSinglePreviewDocumentNode,
+      }),
+    [activeSinglePreviewDocumentNode, demoPages, effectiveSinglePreviewTarget],
+  );
 
   useEffect(() => {
     if (!activeDemoId) return;
@@ -3823,6 +3870,117 @@ ${context.details}
     },
     [handleSinglePreviewDocumentSelect, handleSinglePreviewPageSelect],
   );
+
+  const handleSinglePreviewResourceRestored = useCallback(async () => {
+    if (!singlePreviewHistoryTarget) return;
+
+    if (singlePreviewHistoryTarget.kind === "page" && singlePreviewHistoryTarget.pageId) {
+      await handleConfigPanelPageSelect(singlePreviewHistoryTarget.pageId);
+      setPublishStatus("unpublished_changes");
+      await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
+      return;
+    }
+
+    if (
+      singlePreviewHistoryTarget.kind === "knowledge_document" &&
+      singlePreviewHistoryTarget.documentId
+    ) {
+      const documentId = singlePreviewHistoryTarget.documentId;
+      setSinglePreviewDocumentMarkdown((current) => {
+        if (current[documentId] === undefined) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[documentId];
+        return next;
+      });
+      window.dispatchEvent(new Event("knowledge-updated"));
+    }
+  }, [
+    handleConfigPanelPageSelect,
+    loadPageVersionHistories,
+    loadVersionHistory,
+    setPublishStatus,
+    setSinglePreviewDocumentMarkdown,
+    singlePreviewHistoryTarget,
+  ]);
+
+  const handleOpenSinglePreviewHistory = useCallback(async () => {
+    if (!singlePreviewHistoryTarget) return;
+
+    if (
+      singlePreviewHistoryTarget.kind !== "page" ||
+      !singlePreviewHistoryTarget.pageId ||
+      !hasUnsavedChanges ||
+      singlePreviewHistoryTarget.pageId !== activeDemoId
+    ) {
+      setSinglePreviewHistoryOpen(true);
+      return;
+    }
+
+    if (!sessionId || !workspaceId) {
+      toast({
+        title: "无法记录当前页面历史",
+        description: "当前编辑会话未初始化，请刷新页面后重试。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSinglePreviewHistoryPreparing(true);
+    setIsSaving(true);
+    try {
+      await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+      await flushCanvasState();
+
+      const saveRes = await fetch(
+        `/api/sessions/${sessionId}/files/${singlePreviewHistoryTarget.pageId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, schema }),
+        },
+      );
+      if (!saveRes.ok) {
+        throw new Error("保存当前页面失败");
+      }
+
+      await projectApiClient.createPageVersion(
+        demoId,
+        singlePreviewHistoryTarget.pageId,
+        {
+          sessionId,
+          note: `打开历史前记录${singlePreviewHistoryTarget.title}`,
+        },
+      );
+      setHasUnsavedChanges(false);
+      setPublishStatus("unpublished_changes");
+      await loadPageVersionHistories();
+      setSinglePreviewHistoryOpen(true);
+    } catch (error) {
+      toast({
+        title: "记录页面历史失败",
+        description: error instanceof Error ? error.message : "未知错误",
+        variant: "destructive",
+      });
+    } finally {
+      setSinglePreviewHistoryPreparing(false);
+      setIsSaving(false);
+    }
+  }, [
+    activeDemoId,
+    code,
+    demoId,
+    flushCanvasState,
+    hasUnsavedChanges,
+    loadPageVersionHistories,
+    schema,
+    sessionId,
+    setPublishStatus,
+    singlePreviewHistoryTarget,
+    toast,
+    workspaceId,
+  ]);
 
   const handleRequestRuntimeConversion = useCallback(
     (
@@ -4597,8 +4755,10 @@ ${context.details}
                   {fileView === "doc" ? (
                     <KnowledgePanel
                       workingDir={workspacePath || undefined}
+                      projectId={demoId}
                       onItemsChange={setKnowledgeItems}
                       onDocCreated={upsertKnowledgeItem}
+                      onDocHistory={(item) => setKbHistoryItem(item)}
                       onDocSelect={(item, mode) => {
                         setKbDocDialogItem(item);
                         setKbDocDialogMode(mode);
@@ -5208,13 +5368,57 @@ ${context.details}
                       </button>
                     </div>
                     <div className="flex-1" />
+                    <Button
+                      type="button"
+                      variant={visualPropertyDrawerOpen ? "secondary" : "outline"}
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={singlePreviewViewingDocument}
+                      title={
+                        singlePreviewViewingDocument
+                          ? "文档视图无属性"
+                          : "属性"
+                      }
+                      aria-label="属性"
+                      aria-pressed={propertyPanelActive}
+                      onClick={() => {
+                        const nextOpen = !visualPropertyDrawerOpen;
+                        setVisualPropertyDrawerOpen(nextOpen);
+                        if (!nextOpen) {
+                          setVisualLayerTreeOpen(false);
+                          setVisualPanelHoverNodeId(null);
+                        }
+                      }}
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={!singlePreviewHistoryTarget || singlePreviewHistoryPreparing}
+                      onClick={() => void handleOpenSinglePreviewHistory()}
+                      title={
+                        singlePreviewHistoryTarget
+                          ? `${singlePreviewHistoryTarget.title} 历史`
+                          : "当前对象没有可用历史"
+                      }
+                      aria-label="查看当前对象历史"
+                    >
+                      {singlePreviewHistoryPreparing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <History className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
                     <Popover
                       open={visualLayerTreeOpen}
                       onOpenChange={(open) => {
                         if (singlePreviewViewingDocument) return;
                         setVisualLayerTreeOpen(open);
                         if (open) {
-                          setRightPanelTab("property");
+                          setVisualPropertyDrawerOpen(true);
                           setVisualLayerTreeRequestKey((key) => key + 1);
                         } else {
                           setVisualPanelHoverNodeId(null);
@@ -5510,45 +5714,42 @@ ${context.details}
           </ResizablePanel>
 
           {isConfigPanelVisible && (
-            <ResizablePanel className="border-l bg-card flex flex-col">
+            <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
               {previewMode === "single" ? (
-                <Tabs
-                  value={rightPanelTab}
-                  onValueChange={setRightPanelTab}
-                  className="flex h-full min-h-0 flex-col"
-                >
-                  <TabsList className="grid h-11 w-full grid-cols-2 rounded-none border-b bg-transparent px-2">
-                    <TabsTrigger value="config">配置</TabsTrigger>
-                    <TabsTrigger value="property">属性</TabsTrigger>
-                  </TabsList>
-                  <div className="mt-0 min-h-0 flex-1">
-                    {rightPanelTab === "config" ? (
-                      <PageConfigPanel
-                        pages={demoPages.map((page) => ({
-                          id: page.id,
-                          name: page.name,
-                          order: page.order,
-                          schema:
-                            pageSchemaMap[page.id] ||
-                            (page.id === activeDemoId ? schema : undefined),
-                          configData: configDataMap[page.id],
-                        }))}
-                        activePageId={activeDemoId}
-                        detailPageId={activeDemoId}
-                        onDetailPageIdChange={(pageId) => {
-                          setConfigPanelDetailPageId(pageId);
-                        }}
-                        onPageSelect={handleConfigPanelPageSelect}
-                        projectConfigSchema={projectConfigSchema}
-                        onProjectConfigChange={handleProjectConfigPanelChange}
-                        onProjectSchemaChange={handleProjectSchemaChange}
-                        onPageConfigChange={handlePageConfigPanelChange}
-                        onPageSchemaChange={handlePageSchemaChange}
-                        sessionId={sessionId}
-                        positionableItemSizes={positionableItemSizes}
-                        hideDetailHeader
-                      />
-                    ) : (
+                <>
+                  <PageConfigPanel
+                    pages={demoPages.map((page) => ({
+                      id: page.id,
+                      name: page.name,
+                      order: page.order,
+                      schema:
+                        pageSchemaMap[page.id] ||
+                        (page.id === activeDemoId ? schema : undefined),
+                      configData: configDataMap[page.id],
+                      projectConfigBindings:
+                        page.runtimeType === "prototype-html-css"
+                          ? extractPrototypeConfigBindingKeys(
+                              pagePrototypeMap[page.id]?.html,
+                            )
+                          : undefined,
+                    }))}
+                    activePageId={activeDemoId}
+                    detailPageId={activeDemoId}
+                    onDetailPageIdChange={(pageId) => {
+                      setConfigPanelDetailPageId(pageId);
+                    }}
+                    onPageSelect={handleConfigPanelPageSelect}
+                    projectConfigSchema={projectConfigSchema}
+                    onProjectConfigChange={handleProjectConfigPanelChange}
+                    onProjectSchemaChange={handleProjectSchemaChange}
+                    onPageConfigChange={handlePageConfigPanelChange}
+                    onPageSchemaChange={handlePageSchemaChange}
+                    sessionId={sessionId}
+                    positionableItemSizes={positionableItemSizes}
+                    hideDetailHeader
+                  />
+                  {visualPropertyDrawerOpen && !singlePreviewViewingDocument && (
+                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
                       <VisualPropertyPanel
                         selectedNode={selectedVisualNode}
                         sessionId={sessionId}
@@ -5563,6 +5764,23 @@ ${context.details}
                         sending={visualPropertySending}
                         usedConfigKeys={visualConfigUsedKeys}
                         directApplyMode={activeDemoPage?.runtimeType === "prototype-html-css"}
+                        headerAction={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setVisualPropertyDrawerOpen(false);
+                              setVisualLayerTreeOpen(false);
+                              setVisualPanelHoverNodeId(null);
+                            }}
+                            aria-label="关闭属性面板"
+                            title="关闭属性面板"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        }
                         onPropertyChange={handleVisualPropertyChange}
                         onRestoreProperty={handleRestoreVisualProperty}
                         onClearChanges={handleClearVisualProperties}
@@ -5572,9 +5790,9 @@ ${context.details}
                         onAiInstructionChange={setVisualAiInstruction}
                         onSendToAI={handleSendVisualPropertiesToAI}
                       />
-                    )}
-                  </div>
-                </Tabs>
+                    </div>
+                  )}
+                </>
               ) : (
                 <PageConfigPanel
                   pages={demoPages.map((page) => ({
@@ -5585,6 +5803,12 @@ ${context.details}
                       pageSchemaMap[page.id] ||
                       (page.id === activeDemoId ? schema : undefined),
                     configData: configDataMap[page.id],
+                    projectConfigBindings:
+                      page.runtimeType === "prototype-html-css"
+                        ? extractPrototypeConfigBindingKeys(
+                            pagePrototypeMap[page.id]?.html,
+                          )
+                        : undefined,
                   }))}
                   activePageId={activeDemoId}
                   detailPageId={configPanelDetailPageId}
@@ -5685,6 +5909,24 @@ ${context.details}
                   className="font-mono text-xs"
                 />
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="visual-config-category">分类</Label>
+              <Input
+                id="visual-config-category"
+                list="visual-config-category-options"
+                value={visualConfigCategory}
+                onChange={(event) =>
+                  setVisualConfigCategory(event.target.value)
+                }
+                placeholder="可选，例如 设计"
+              />
+              <datalist id="visual-config-category-options">
+                {BUILT_IN_CONFIG_CATEGORIES.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
             </div>
 
             {visualConfigNode && (
@@ -5795,6 +6037,38 @@ ${context.details}
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
+
+      {kbHistoryItem && (
+        <ResourceHistoryDialog
+          open={Boolean(kbHistoryItem)}
+          onOpenChange={(open) => {
+            if (!open) setKbHistoryItem(null);
+          }}
+          projectId={demoId}
+          kind="knowledge_document"
+          resourceId={kbHistoryItem.id}
+          title={`${kbHistoryItem.title} 历史`}
+          workspaceId={workspaceId}
+          sessionId={sessionId}
+          onRestored={() => {
+            window.dispatchEvent(new Event("knowledge-updated"));
+          }}
+        />
+      )}
+
+      {singlePreviewHistoryOpen && singlePreviewHistoryTarget && (
+        <ResourceHistoryDialog
+          open={singlePreviewHistoryOpen}
+          onOpenChange={setSinglePreviewHistoryOpen}
+          projectId={demoId}
+          kind={singlePreviewHistoryTarget.kind}
+          resourceId={singlePreviewHistoryTarget.resourceId}
+          title={`${singlePreviewHistoryTarget.title} 历史`}
+          workspaceId={workspaceId}
+          sessionId={sessionId}
+          onRestored={handleSinglePreviewResourceRestored}
+        />
+      )}
 
       <Dialog
         open={!!previewVersion}

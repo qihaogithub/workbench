@@ -15,6 +15,10 @@ export function createLogger(name: string): Logger {
   return pino({
     name,
     level: process.env.LOG_LEVEL || 'info',
+    serializers: {
+      err: pino.stdSerializers.err,
+      error: pino.stdSerializers.err,
+    },
     transport: {
       target: 'pino-pretty',
       options: {

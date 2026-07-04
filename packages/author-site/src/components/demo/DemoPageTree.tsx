@@ -41,6 +41,10 @@ import {
 } from "./demo-page-tree-utils";
 import { projectApiClient } from "@/lib/project-api";
 
+interface RuntimeConversionRequestOptions {
+  skipStaticization?: boolean;
+}
+
 interface DemoPageTreeProps {
   projectId: string;
   sessionId: string | null;
@@ -56,6 +60,7 @@ interface DemoPageTreeProps {
   onRequestRuntimeConversion?: (
     pageId: string,
     targetRuntimeType: DemoPageRuntimeType,
+    options?: RuntimeConversionRequestOptions,
   ) => void;
   onWorkspaceChange?: () => void;
 }

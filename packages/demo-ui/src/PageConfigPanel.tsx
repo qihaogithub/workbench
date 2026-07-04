@@ -1,9 +1,19 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, FileText, Settings } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  FileText,
+  ListFilter,
+  Settings,
+} from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
+import {
+  getAvailableConfigCategories,
+  getSchemaFieldCountByCategory,
+} from "./config-categories";
 import { cn } from "./utils";
 import type { PositionableSizeItem } from "./types";
 
@@ -13,6 +23,7 @@ export interface PageConfigPanelPage {
   order?: number;
   schema?: string;
   configData?: Record<string, unknown>;
+  projectConfigBindings?: string[];
 }
 
 interface PageConfigPanelProps {
@@ -34,21 +45,97 @@ interface PageConfigPanelProps {
   hideDetailHeader?: boolean;
 }
 
-function getSchemaFieldCount(schema?: string): number {
-  if (!schema) return 0;
+function getSortedPages(pages: PageConfigPanelPage[]) {
+  return [...pages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+const PROTOTYPE_TEXT_BINDING_RE = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+const PROTOTYPE_ATTRIBUTE_BINDING_RE =
+  /\bdata-bind-(?:text|src|href|style-color|style-background-color|style-border-color)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/g;
+
+export function extractPrototypeConfigBindingKeys(html?: string | null): string[] {
+  if (!html) return [];
+
+  const keys = new Set<string>();
+  for (const match of html.matchAll(PROTOTYPE_TEXT_BINDING_RE)) {
+    if (match[1]) keys.add(match[1]);
+  }
+  for (const match of html.matchAll(PROTOTYPE_ATTRIBUTE_BINDING_RE)) {
+    const key = match[1] ?? match[2] ?? match[3];
+    if (key) keys.add(key);
+  }
+  return [...keys];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getScopedProjectConfigSchema(
+  schema: string | undefined,
+  bindings: string[] | undefined,
+): string | undefined {
+  if (!schema || bindings === undefined) return schema;
+
   try {
-    const parsed = JSON.parse(schema);
-    if (!parsed.properties || typeof parsed.properties !== "object") {
-      return 0;
+    const parsed = JSON.parse(schema) as unknown;
+    if (!isRecord(parsed) || !isRecord(parsed.properties)) return schema;
+
+    const allowedKeys = new Set(bindings);
+    const properties = Object.fromEntries(
+      Object.entries(parsed.properties).filter(([key]) => allowedKeys.has(key)),
+    );
+    const nextSchema: Record<string, unknown> = {
+      ...parsed,
+      properties,
+    };
+
+    if (Array.isArray(parsed.required)) {
+      nextSchema.required = parsed.required.filter(
+        (key): key is string => typeof key === "string" && allowedKeys.has(key),
+      );
     }
-    return Object.keys(parsed.properties).length;
+
+    return JSON.stringify(nextSchema);
   } catch {
-    return 0;
+    return schema;
   }
 }
 
-function getSortedPages(pages: PageConfigPanelPage[]) {
-  return [...pages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+interface ScopedPageConfig {
+  page: PageConfigPanelPage;
+  projectConfigSchema?: string;
+}
+
+function ConfigCategoryFilterSelect({
+  value,
+  onChange,
+  categories,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  categories: string[];
+}) {
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="relative flex shrink-0 items-center">
+      <ListFilter className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
+      <select
+        aria-label="筛选配置分类"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-8 w-[128px] cursor-pointer rounded-md border border-border bg-background pl-7 pr-2 text-xs text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <option value="">全部分类</option>
+        {categories.map((category) => (
+          <option key={category} value={category}>
+            {category}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export function PageConfigPanel({
@@ -69,16 +156,56 @@ export function PageConfigPanel({
   title = "配置面板",
   hideDetailHeader = false,
 }: PageConfigPanelProps) {
-  const [internalDetailPageId, setInternalDetailPageId] = useState<string | null>(null);
+  const [internalDetailPageId, setInternalDetailPageId] = useState<
+    string | null
+  >(null);
+  const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
-  const sharedCount = useMemo(
-    () => getSchemaFieldCount(projectConfigSchema),
-    [projectConfigSchema],
-  );
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
-  const selectedPage =
-    sortedPages.find((page) => page.id === effectiveDetailPageId) ?? null;
+  const scopedPages = useMemo<ScopedPageConfig[]>(
+    () =>
+      sortedPages.map((page) => ({
+        page,
+        projectConfigSchema: getScopedProjectConfigSchema(
+          projectConfigSchema,
+          page.projectConfigBindings,
+        ),
+      })),
+    [projectConfigSchema, sortedPages],
+  );
+  const availableCategories = useMemo(
+    () =>
+      getAvailableConfigCategories([
+        ...scopedPages.map((item) => item.projectConfigSchema),
+        ...sortedPages.map((page) => page.schema),
+      ]),
+    [scopedPages, sortedPages],
+  );
+
+  useEffect(() => {
+    if (
+      configCategoryFilter &&
+      !availableCategories.includes(configCategoryFilter)
+    ) {
+      setConfigCategoryFilter("");
+    }
+  }, [availableCategories, configCategoryFilter]);
+
+  const filteredPages = useMemo(() => {
+    if (!configCategoryFilter) return scopedPages;
+    return scopedPages.filter(
+      ({ page, projectConfigSchema: scopedProjectConfigSchema }) =>
+        getSchemaFieldCountByCategory(
+          scopedProjectConfigSchema,
+          configCategoryFilter,
+        ) + getSchemaFieldCountByCategory(page.schema, configCategoryFilter) >
+        0,
+    );
+  }, [configCategoryFilter, scopedPages]);
+  const selectedPageConfig =
+    scopedPages.find((item) => item.page.id === effectiveDetailPageId) ?? null;
+  const selectedPage = selectedPageConfig?.page ?? null;
 
   const openPageDetail = (pageId: string) => {
     onPageSelect?.(pageId);
@@ -95,56 +222,89 @@ export function PageConfigPanel({
     return (
       <div className={cn("flex h-full flex-col bg-card", className)}>
         <div className="border-b px-4 py-3">
-          <h2 className="text-sm font-medium">{title}</h2>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <h2 className="min-w-0 truncate text-sm font-medium">{title}</h2>
+            <ConfigCategoryFilterSelect
+              value={configCategoryFilter}
+              onChange={setConfigCategoryFilter}
+              categories={availableCategories}
+            />
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          <div className="space-y-1">
-            {sortedPages.map((page) => {
-              const pageCount = getSchemaFieldCount(page.schema);
-              const totalCount = sharedCount + pageCount;
-              const isActive = page.id === activePageId;
-              return (
-                <button
-                  key={page.id}
-                  type="button"
-                  onClick={() => openPageDetail(page.id)}
-                  className={cn(
-                    "flex w-full cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isActive
-                      ? "border-primary/30 bg-primary/10"
-                      : "border-transparent",
-                  )}
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {page.name}
+          {filteredPages.length > 0 ? (
+            <div className="space-y-1">
+              {filteredPages.map(({ page, projectConfigSchema: scopedProjectConfigSchema }) => {
+                const sharedCount = getSchemaFieldCountByCategory(
+                  scopedProjectConfigSchema,
+                  configCategoryFilter,
+                );
+                const pageCount = getSchemaFieldCountByCategory(
+                  page.schema,
+                  configCategoryFilter,
+                );
+                const totalCount = sharedCount + pageCount;
+                const isActive = page.id === activePageId;
+                return (
+                  <button
+                    key={page.id}
+                    type="button"
+                    onClick={() => openPageDetail(page.id)}
+                    className={cn(
+                      "flex w-full cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isActive
+                        ? "border-primary/30 bg-primary/10"
+                        : "border-transparent",
+                    )}
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {page.name}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-xs",
-                        totalCount > 0
-                          ? "bg-muted text-foreground"
-                          : "bg-muted/50 text-muted-foreground",
-                      )}
-                    >
-                      {totalCount}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs",
+                          totalCount > 0
+                            ? "bg-muted text-foreground"
+                            : "bg-muted/50 text-muted-foreground",
+                        )}
+                      >
+                        {totalCount}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex h-full min-h-[160px] flex-col items-center justify-center px-4 text-center">
+              <ListFilter className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">没有匹配的配置项</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
+                换一个配置分类查看
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  const pageCount = getSchemaFieldCount(selectedPage.schema);
-  const showSharedConfig = sharedCount > 0 && !!projectConfigSchema;
+  const pageCount = getSchemaFieldCountByCategory(
+    selectedPage.schema,
+    configCategoryFilter,
+  );
+  const selectedProjectConfigSchema = selectedPageConfig?.projectConfigSchema;
+  const selectedProjectCount = getSchemaFieldCountByCategory(
+    selectedProjectConfigSchema,
+    configCategoryFilter,
+  );
+  const showSharedConfig =
+    selectedProjectCount > 0 && !!selectedProjectConfigSchema;
   const showPageConfig = pageCount > 0 && !!selectedPage.schema;
   const configData = selectedPage.configData ?? {};
 
@@ -152,18 +312,25 @@ export function PageConfigPanel({
     <div className={cn("flex h-full flex-col bg-card", className)}>
       {!hideDetailHeader && (
         <div className="border-b px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={closePageDetail}
-              aria-label="返回所有页面"
-              className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <h2 className="min-w-0 truncate text-sm font-medium">
-              {selectedPage.name}
-            </h2>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={closePageDetail}
+                aria-label="返回所有页面"
+                className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h2 className="min-w-0 truncate text-sm font-medium">
+                {selectedPage.name}
+              </h2>
+            </div>
+            <ConfigCategoryFilterSelect
+              value={configCategoryFilter}
+              onChange={setConfigCategoryFilter}
+              categories={availableCategories}
+            />
           </div>
         </div>
       )}
@@ -182,13 +349,14 @@ export function PageConfigPanel({
               </div>
               <ConfigScopeWrapper scope="project" hideHeader>
                 <ConfigForm
-                  key={`project-${projectConfigSchema}`}
-                  schema={projectConfigSchema!}
+                  key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
+                  schema={selectedProjectConfigSchema!}
                   onChange={(data) => onProjectConfigChange?.(data)}
                   onSchemaChange={onProjectSchemaChange}
                   initialData={configData}
                   sessionId={sessionId}
                   readonly={readonly}
+                  configCategoryFilter={configCategoryFilter}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -217,9 +385,20 @@ export function PageConfigPanel({
                   sessionId={sessionId}
                   positionableItemSizes={positionableItemSizes}
                   readonly={readonly}
+                  configCategoryFilter={configCategoryFilter}
                 />
               </ConfigScopeWrapper>
             </section>
+          )}
+
+          {!showSharedConfig && !showPageConfig && (
+            <div className="flex min-h-[180px] flex-col items-center justify-center px-4 text-center">
+              <ListFilter className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">没有匹配的配置项</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
+                换一个配置分类查看
+              </p>
+            </div>
           )}
         </div>
       </div>

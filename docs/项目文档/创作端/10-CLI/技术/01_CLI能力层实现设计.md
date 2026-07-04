@@ -16,7 +16,7 @@ covers:
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-02
+> 更新日期：2026-07-04
 
 ## 技术定位
 
@@ -46,10 +46,11 @@ CLI 命令按能力域分组：
 |:-----|:-----|
 | `admin` | 查看能力、项目锁定和解锁 |
 | `doctor` / `commands` | 环境诊断和命令自检 |
-| `project` | 项目列表、详情、创建、拉取、更新、复制、封面和删除 |
+| `project` | 项目列表、详情、创建、拉取、更新、复制、封面、删除、内容图提交列表、物化检查、旧数据导入和 blob 清理 dry-run |
 | `template` | 模板列表、详情、创建、更新、健康检查、推荐、实例化、本地初始化和提交 |
 | `edit` | 编辑事务打开、状态、diff、校验、提交、丢弃和续期 |
 | `page` / `folder` | 页面、文件夹、排序、删除预览和恢复历史版本 |
+| `resource` | 通用资源版本列表、版本读取、版本创建和单资源恢复 |
 | `config` | 项目级 Schema、页面 Schema 校验、合并校验和视觉补丁 |
 | `asset` | 资产列表、上传、删除预览、删除执行和替换 |
 | `preview` | 编译预检、预览 URL、截图服务状态、控制台日志、运行时错误和健康检查 |
@@ -106,11 +107,36 @@ CLI 打开的编辑事务使用 `cli_` 前缀标识工作区，审计 actor sour
 
 删除项目、删除页面、删除文件夹、删除资产和发布回滚等操作继续走预览计划与确认执行两阶段。CLI 不绕过 `project-core` 的 dry-run、confirm token、锁定检查和审计规则。
 
+## 资源历史与内容图
+
+资源历史命令是页面版本命令的通用化入口：
+
+```bash
+ow resource version-list <projectId> <kind> <resourceId> --json
+ow resource version-get <projectId> <kind> <resourceId> <versionId> --json
+ow resource version-create <projectId> <kind> <resourceId> --note "..." --json
+ow resource restore-version <projectId> <kind> <resourceId> <versionId> --json
+```
+
+首轮支持 `page` 和 `knowledge_document`。页面历史只通过 `resource version-*` 和 `resource restore-version` 管理；旧 `page version-*` 命令不再注册。
+
+这里的 `knowledge_document` 只表示“知识文档版本历史”已经统一到资源历史模型，不表示知识文档的创建、改名、正文写入和 manifest 维护都已进入 CLI 共享层。当前这些 CRUD 入口仍主要留在 author-site 的 `/api/knowledge/*` 路由，本轮自动维护不能把它误判成可直接补齐的 CLI 低风险能力。
+
+项目内容图命令用于诊断和维护当前资源历史：
+
+```bash
+ow project commit-list <projectId> --json
+ow project materialize <projectId> --check --json
+ow project content-gc <projectId> --dry-run --json
+```
+
+`commit-list` 展示项目提交时间线；`materialize --check` 只校验 commit 指针和 blob，不写工作区；`content-gc --dry-run` 只列出未引用 blob，默认不删除。
+
 ## 发布路径
 
 `publish project` 优先调用 author-site 正式发布 API。该路径需要配置 `AUTHOR_SITE_URL` 和 `AUTHOR_SITE_AUTH_TOKEN`，由 Web 发布链路完成编译、产物写入和可选外部同步。
 
-当远端发布配置缺失时，CLI 会退回到 `project-core` 的本地发布状态更新。这是降级路径，只能用于本地管理状态闭环；输出需要带上对应提示和产物摘要，避免代理误判为完整线上发布。
+当远端发布配置缺失时，CLI 会退回到 `project-core` 的本地发布状态更新。这是降级路径，只能用于本地管理状态闭环；输出需要带上对应提示和产物摘要，避免代理误判为完整线上发布。两条发布路径都会返回或记录内容图 `commitId`，用于把发布结果绑定到当时的资源指针集合。
 
 ## 与其他模块的关系
 

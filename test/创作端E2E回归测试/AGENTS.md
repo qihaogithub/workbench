@@ -101,6 +101,7 @@ pnpm test:e2e -- -t "完整流程"
 ### 创建方式
 
 - 普通业务回归使用 `support/e2e-projects.ts` 的 `createE2EProject(page, caseName)` 创建项目。
+- 同一组回归需要跨多个用例连续编辑同一个项目时，使用 `getOrCreateSharedE2EProject(page, suiteName)`；同一 `runId + suiteName` 只创建一个 `__e2e__` 项目，并登记到本轮清理文件。
 - 专门验证“从首页新建项目 UI”的用例可以继续走 UI，但创建成功后必须调用 `ensureE2EProjectCategory(page.request, project)`，确保项目被标记为 `__e2e__` 并写入登记文件。
 - 不要在新 spec 中复制 `deleteProject` 或 `createProjectFromUi` 这类本地生命周期 helper。
 

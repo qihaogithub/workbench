@@ -2,24 +2,19 @@
   "folders": [],
   "pages": [
     {
-      "id": "demo_1779934698596_dvvk55",
-      "name": "demo",
-      "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
-    },
-    {
-      "id": "demo_1779935678404_lxsasc",
-      "name": "demo",
-      "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
-    },
-    {
       "id": "demo_omrf",
-      "name": "demo - 副本",
+      "name": "平板",
       "routeKey": "demo-3",
+      "runtimeType": "prototype-html-css",
       "order": 2,
+      "parentId": null
+    },
+    {
+      "id": "demo_71dt",
+      "name": "手机",
+      "routeKey": "demo-4",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
       "parentId": null
     }
   ]

@@ -27,6 +27,7 @@ import type {
   ProjectAdminActor,
   ProjectAdminConfig,
   ProjectAdminResult,
+  ProjectResourceKind,
   TemplateScope,
 } from "../../project-core/src/types.js";
 
@@ -46,6 +47,7 @@ interface ApiResponse<T> {
 interface AuthorSitePublishResult {
   projectId: string;
   publishedVersion: string;
+  commitId?: string;
   publishedAt: number;
   demoCount: number;
   duration: number;
@@ -275,6 +277,20 @@ function numberArg(args: JsonObject, key: string): number | undefined {
 function scopeArg(args: JsonObject): TemplateScope | undefined {
   const value = stringArg(args, "scope");
   return value === "personal" || value === "team" || value === "official" ? value : undefined;
+}
+
+function resourceKindArg(args: JsonObject, key: string, positional?: string): ProjectResourceKind {
+  const value = stringArg(args, key, positional);
+  if (
+    value === "page" ||
+    value === "knowledge_document" ||
+    value === "canvas" ||
+    value === "asset" ||
+    value === "project_config"
+  ) {
+    return value;
+  }
+  return "page";
 }
 
 function stringArrayArg(args: JsonObject, key: string): string[] {
@@ -602,6 +618,36 @@ register("project validate-runtime", "校验项目当前版本页面是否符合
   ["project_validate_runtime"],
 );
 
+register("project commit-list", "列出项目内容图提交", (args, pos, { service, actor }) =>
+  service.projectCommitList(
+    stringArg(args, "projectId", pos[0]),
+    booleanArg(args, "includeDraft"),
+    actor,
+  ),
+  ["project_commit_list"],
+);
+
+register("project materialize", "从内容图提交物化项目基准工作区", (args, pos, { service, actor }) =>
+  service.projectMaterialize(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      commitId: optionalStringArg(args, "commit", pos[1]),
+      checkOnly: booleanArg(args, "check"),
+    },
+    actor,
+  ),
+  ["project_materialize"],
+);
+
+register("project content-gc", "扫描或清理内容图未引用 blob", (args, pos, { service, actor }) =>
+  service.contentBlobGarbageCollect(
+    stringArg(args, "projectId", pos[0]),
+    { dryRun: hasArg(args, "dryRun") ? booleanArg(args, "dryRun") : true },
+    actor,
+  ),
+  ["project_content_gc"],
+);
+
 register("project duplicate", "复制项目为独立项目", (args, pos, { service, actor }) =>
   service.duplicateProject(stringArg(args, "projectId", pos[0]), optionalStringArg(args, "name", pos[1]), undefined, actor),
   ["project_duplicate"],
@@ -780,23 +826,57 @@ register("page get", "获取单页代码、Schema 和元信息", (args, pos, { s
   ["page_get"],
 );
 
-register("page version-list", "列出页面历史版本", (args, pos, { service, actor }) =>
-  service.pageVersionList(
-    stringArg(args, "projectId", pos[0]),
-    stringArg(args, "pageId", pos[1]),
+register("resource version-list", "列出资源历史版本", (args, pos, { service, actor }) =>
+  service.resourceVersionList(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      kind: resourceKindArg(args, "kind", pos[1]),
+      resourceId: stringArg(args, "resourceId", pos[2]),
+      includeDraft: booleanArg(args, "includeDraft"),
+    },
     actor,
   ),
-  ["page_version_list"],
+  ["resource_version_list"],
 );
 
-register("page version-get", "读取页面历史版本内容", (args, pos, { service, actor }) =>
-  service.pageVersionGet(
-    stringArg(args, "projectId", pos[0]),
-    stringArg(args, "pageId", pos[1]),
-    stringArg(args, "versionId", pos[2]),
+register("resource version-get", "读取资源历史版本内容", (args, pos, { service, actor }) =>
+  service.resourceVersionGet(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      kind: resourceKindArg(args, "kind", pos[1]),
+      resourceId: stringArg(args, "resourceId", pos[2]),
+      versionId: stringArg(args, "versionId", pos[3]),
+    },
     actor,
   ),
-  ["page_version_get"],
+  ["resource_version_get"],
+);
+
+register("resource version-create", "创建资源历史版本", (args, pos, { service, actor }) =>
+  service.resourceVersionCreate(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      kind: resourceKindArg(args, "kind", pos[1]),
+      resourceId: stringArg(args, "resourceId", pos[2]),
+      editId: optionalStringArg(args, "editId"),
+      note: optionalStringArg(args, "note", pos.slice(3).join(" ")),
+    },
+    actor,
+  ),
+  ["resource_version_create"],
+);
+
+register("resource restore-version", "恢复单个资源到历史版本", (args, pos, { service, actor }) =>
+  service.resourceRestore(
+    {
+      projectId: stringArg(args, "projectId", pos[0]),
+      kind: resourceKindArg(args, "kind", pos[1]),
+      resourceId: stringArg(args, "resourceId", pos[2]),
+      versionId: stringArg(args, "versionId", pos[3]),
+    },
+    actor,
+  ),
+  ["resource_restore_version"],
 );
 
 register("page create", "新建页面", (args, _pos, { service, actor }) => {
@@ -932,29 +1012,6 @@ register("page reorder", "页面和文件夹混合排序", (args, pos, { service
     actor,
   ),
   ["page_reorder"],
-);
-
-register("page version-create", "创建页面历史版本快照", (args, pos, { service, actor }) =>
-  service.createPageVersion(
-    {
-      projectId: stringArg(args, "projectId", pos[0]),
-      pageId: stringArg(args, "pageId", pos[1]),
-      editId: optionalStringArg(args, "editId"),
-      note: optionalStringArg(args, "note", pos.slice(2).join(" ")),
-    },
-    actor,
-  ),
-  ["page_version_create"],
-);
-
-register("page restore-version", "恢复页面历史版本", (args, pos, { service, actor }) =>
-  service.restorePageVersion(
-    stringArg(args, "projectId", pos[0]),
-    stringArg(args, "pageId", pos[1]),
-    stringArg(args, "versionId", pos[2]),
-    actor,
-  ),
-  ["page_restore_version"],
 );
 
 register("folder create", "创建虚拟文件夹", (args, pos, { service, actor }) =>

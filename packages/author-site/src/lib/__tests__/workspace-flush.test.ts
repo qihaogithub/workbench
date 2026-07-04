@@ -120,7 +120,7 @@ describe("workspace-flush", () => {
       name: "WorkspaceFlushError",
       code: "COLLAB_FLUSH_FAILED",
       status: 502,
-      message: "connect ECONNREFUSED",
+      message: "协同草稿落盘服务不可用，请确认 agent-service 已启动",
     } satisfies Partial<WorkspaceFlushError>);
   });
 

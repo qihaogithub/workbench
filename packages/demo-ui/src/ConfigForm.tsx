@@ -65,6 +65,7 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { configFieldMatchesCategoryFilter } from "./config-categories";
 
 interface FieldConfig {
   key: string;
@@ -81,6 +82,7 @@ interface FieldConfig {
   format?: string;
   uiWidget?: string;
   uiOptions?: Record<string, unknown>;
+  category?: string;
   visibleWhen?: VisibleWhenCondition;
   note?: string;
   itemsType?: string;
@@ -204,6 +206,7 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
         format: prop.format,
         uiWidget: prop["ui:widget"],
         uiOptions,
+        category: typeof uiOptions?.category === "string" ? uiOptions.category.trim() : undefined,
         visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen),
         note: prop.$demo?.note,
         itemsType: prop.items?.type,
@@ -1240,6 +1243,7 @@ export function ConfigForm({
   className,
   sessionId,
   positionableItemSizes,
+  configCategoryFilter,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
@@ -1267,16 +1271,18 @@ export function ConfigForm({
         .map((group) => ({
           ...group,
           fields: group.fields.filter((field) =>
-            isFieldVisible(field, effectiveFormData),
+            isFieldVisible(field, effectiveFormData) &&
+            configFieldMatchesCategoryFilter(field, configCategoryFilter),
           ),
         }))
         .filter((group) => group.fields.length > 0),
-    [fieldGroups, effectiveFormData],
+    [fieldGroups, effectiveFormData, configCategoryFilter],
   );
 
   const orderable = useMemo(() => getOrderable(schema), [schema]);
   const orderableH = useMemo(() => getOrderableHorizontal(schema), [schema]);
   const positionable = useMemo(() => getPositionable(schema), [schema]);
+  const showLayoutControls = !configCategoryFilter;
 
   const previewSize = useMemo(() => {
     try {
@@ -1487,7 +1493,19 @@ export function ConfigForm({
     return null;
   }, [noteDialogField, visibleFieldGroups]);
 
-  if (visibleFieldGroups.length === 0) {
+  const hasVisibleOrderable =
+    showLayoutControls && !!orderable && orderable.length >= 2;
+  const hasVisibleOrderableH =
+    showLayoutControls && !!orderableH && orderableH.length >= 2;
+  const hasVisiblePositionable =
+    showLayoutControls && !!positionable && positionable.items.length >= 1;
+  const hasVisibleConfig =
+    visibleFieldGroups.length > 0 ||
+    hasVisibleOrderable ||
+    hasVisibleOrderableH ||
+    hasVisiblePositionable;
+
+  if (!hasVisibleConfig) {
     return (
       <div
         className={cn(
@@ -1500,7 +1518,9 @@ export function ConfigForm({
         </div>
         <p className="text-sm text-muted-foreground">暂无配置项</p>
         <p className="text-xs text-muted-foreground/70 mt-1">
-          请检查 Schema 格式是否正确
+          {!configCategoryFilter
+            ? "请检查 Schema 格式是否正确"
+            : "当前分类下没有可配置字段"}
         </p>
       </div>
     );
@@ -1510,12 +1530,12 @@ export function ConfigForm({
     <div className={cn("h-full", className)}>
       <div className="h-full overflow-y-auto">
         <div className="px-1 pb-4">
-          {orderable && orderable.length >= 2 && (
+          {hasVisibleOrderable && (
             <>
               <OrderControl
-                orderable={orderable}
+                orderable={orderable!}
                 order={currentOrder}
-                defaultOrder={orderable}
+                defaultOrder={orderable!}
                 titleMap={titleMap}
                 onOrderChange={handleOrderChange}
                 direction="vertical"
@@ -1523,12 +1543,12 @@ export function ConfigForm({
               <Separator className="my-2" />
             </>
           )}
-          {orderableH && orderableH.length >= 2 && (
+          {hasVisibleOrderableH && (
             <>
               <OrderControl
-                orderable={orderableH}
+                orderable={orderableH!}
                 order={currentOrderH}
-                defaultOrder={orderableH}
+                defaultOrder={orderableH!}
                 titleMap={titleMapH}
                 onOrderChange={handleOrderHChange}
                 direction="horizontal"
@@ -1536,10 +1556,10 @@ export function ConfigForm({
               <Separator className="my-2" />
             </>
           )}
-          {positionable && positionable.items.length >= 1 && (
+          {hasVisiblePositionable && (
             <>
               <PositionControl
-                positionable={positionable}
+                positionable={positionable!}
                 positions={currentPositions}
                 defaultPositions={defaultPositions}
                 titleMap={titleMapPos}
