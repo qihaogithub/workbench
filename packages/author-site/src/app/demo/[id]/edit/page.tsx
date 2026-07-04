@@ -1971,6 +1971,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     useRef<RuntimeConversionState | null>(null);
   const propertyPanelActive =
     previewMode === "single" && visualPropertyDrawerOpen;
+  const hasPendingVisualPropertyWork =
+    visualPendingPropertyChanges.length > 0 ||
+    visualPendingConfigMarks.length > 0 ||
+    hasPendingVisualAiInstruction;
 
   useEffect(() => {
     if (previewMode !== "single" || !activeDemoId) return;
@@ -1992,11 +1996,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [activeDemoId]);
 
   useEffect(() => {
-    const hasPendingVisualWork =
-      visualPendingPropertyChanges.length > 0 ||
-      visualPendingConfigMarks.length > 0 ||
-      hasPendingVisualAiInstruction;
-    if (!hasPendingVisualWork) return;
+    if (!hasPendingVisualPropertyWork) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -2005,11 +2005,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [
-    hasPendingVisualAiInstruction,
-    visualPendingConfigMarks.length,
-    visualPendingPropertyChanges.length,
-  ]);
+  }, [hasPendingVisualPropertyWork]);
 
   const handleAiStreamingChange = useCallback(
     (isStreaming: boolean) => {
@@ -3906,10 +3902,19 @@ ${context.details}
   }, [singlePreviewViewingDocument]);
 
   const handleCloseVisualEditMode = useCallback(() => {
+    if (hasPendingVisualPropertyWork) {
+      if (!confirmDiscardVisualPropertyWork()) return;
+      handleClearVisualProperties();
+    }
     setVisualPropertyDrawerOpen(false);
     setVisualLayerTreeOpen(false);
     setVisualPanelHoverNodeId(null);
-  }, [setVisualPanelHoverNodeId]);
+  }, [
+    confirmDiscardVisualPropertyWork,
+    handleClearVisualProperties,
+    hasPendingVisualPropertyWork,
+    setVisualPanelHoverNodeId,
+  ]);
 
   const visualPropertyDrawerTargetRef = useRef({
     activeDemoId,
@@ -5926,10 +5931,8 @@ ${context.details}
                         selectedNode={selectedVisualNode}
                         sessionId={sessionId}
                         propertyChanges={visualPropertyChanges}
-                        pendingPropertyChanges={visualPendingPropertyChanges}
                         configMarks={visualConfigMarks}
                         aiInstruction={visualAiInstruction}
-                        submission={visualPropertySubmission}
                         usedConfigKeys={visualConfigUsedKeys}
                         onPropertyChange={handleVisualPropertyChange}
                         onRestoreProperty={handleRestoreVisualProperty}
@@ -5938,7 +5941,6 @@ ${context.details}
                         onUpdateConfigMark={handleUpdateVisualConfigMark}
                         onRemoveConfigMark={handleRemoveVisualConfigMark}
                         onAiInstructionChange={setVisualAiInstruction}
-                        onSendToAI={handleSendVisualPropertiesToAI}
                       />
                     </div>
                   )}

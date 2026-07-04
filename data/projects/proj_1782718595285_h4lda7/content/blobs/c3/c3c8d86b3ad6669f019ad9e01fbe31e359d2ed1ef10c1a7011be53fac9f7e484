@@ -1,0 +1,80 @@
+<meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>demo - 副本</title>
+  <link rel="stylesheet" href="prototype.css">
+
+
+  <div class="page-wrapper">
+
+    <!-- 可滑动内容区域 -->
+    <div class="scroll-content">
+      <div class="page-container">
+
+        <!-- 装饰背景图 -->
+        <img class="deco-bg" src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_e545eaf5.png" alt="装饰背景" data-ow-id="ow_mr6h0rr8_79u5if" style="opacity: 0.1; background-color: rgb(255, 255, 255);">
+
+        <!-- 邀友得奖模块 -->
+        <div class="section section-invite">
+          <div class="section-header">
+            <span class="section-title">邀友得奖</span>
+            <div class="section-more">
+              <span class="section-more-text">邀请奖励记录</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M6 4L10 8L6 12" stroke="#b2b2b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="card-row">
+            <div class="card" style="background-color: #FF6B35;" data-bind-style-background-color="inviteColor1">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A801.png" alt="邀请活动图片1" data-bind-src="inviteImage1URL">
+            </div>
+            <div class="card" style="background-color: rgb(247, 197, 159); overflow: visible;" data-bind-style-background-color="inviteColor2" data-ow-id="ow_mr6fepxy_dkkamn">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E9%82%80%E8%AF%B7%E6%B4%BB%E5%8A%A802.png" alt="邀请活动图片2" data-bind-src="inviteImage2URL">
+            </div>
+          </div>
+        </div>
+
+        <!-- 叫叫商城模块 -->
+        <div class="section section-mall">
+          <div class="section-header">
+            <span class="section-title">叫叫商城</span>
+            <div class="section-more section-more-hidden">
+              <span class="section-more-text">邀请奖励记录</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M6 4L10 8L6 12" stroke="#acb2bb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="card-row">
+            <div class="card" style="background-color: #FEF7E5;" data-bind-style-background-color="mallColor1">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA1.png" alt="商场图片1" data-bind-src="mallImage1URL">
+            </div>
+            <div class="card" style="background-color: #FEF7E5;" data-bind-style-background-color="mallColor2">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E6%88%91%E7%9A%84%E9%A1%B5/%E8%B5%84%E6%BA%90/%E5%95%86%E5%9C%BA2.png" alt="商场图片2" data-bind-src="mallImage2URL">
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部 Logo -->
+        <div class="logo-section">
+          <img class="logo-img" src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_e7e211e2.svg" alt="Logo">
+        </div>
+
+        <!-- 底部广告图 -->
+        <div class="bottom-ad">
+          <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_684bdf65.png" alt="底部广告图">
+        </div>
+      </div>
+    </div>
+
+    <!-- 固定顶部导航栏 -->
+    <div class="fixed-top">
+      <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_3b8dd1f6.png" alt="顶部导航栏">
+    </div>
+
+    <!-- 固定底部标签栏 -->
+    <div class="fixed-bottom">
+      <img src="https://r2-asset-worker.qihaogo.workers.dev/figma/h_684bdf65.png" alt="底部标签栏">
+    </div>
+
+  </div>

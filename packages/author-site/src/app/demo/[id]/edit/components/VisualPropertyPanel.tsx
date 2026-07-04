@@ -9,24 +9,22 @@ import {
   ArrowDown,
   ArrowRight,
   Blend,
+  Bolt,
   Box,
   Brush,
   CornerDownLeft,
   CornerDownRight,
   CornerUpLeft,
   CornerUpRight,
-  Copy,
   Grid3X3,
   ImageIcon,
   Link2,
   LinkIcon,
-  MoreVertical,
   MousePointer2,
   PanelTop,
   Plus,
   Radius,
   RotateCcw,
-  Send,
   Settings2,
   Square,
   TextCursorInput,
@@ -35,11 +33,13 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -59,19 +59,14 @@ import {
   type VisualPropertyChange,
   type VisualPropertyChangeKind,
 } from "@opencode-workbench/demo-ui";
-import type {
-  VisualConfigMark,
-  VisualPropertySubmission,
-} from "../hooks/useVisualEditState";
+import type { VisualConfigMark } from "../hooks/useVisualEditState";
 
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
   sessionId?: string;
   propertyChanges: VisualPropertyChange[];
-  pendingPropertyChanges: VisualPropertyChange[];
   configMarks: VisualConfigMark[];
   aiInstruction: string;
-  submission: VisualPropertySubmission;
   usedConfigKeys: string[];
   onPropertyChange: (
     node: VisualNodeInfo,
@@ -97,7 +92,6 @@ interface VisualPropertyPanelProps {
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
-  onSendToAI: (change?: VisualPropertyChange) => void;
 }
 
 type Option = { value: string; label: string; icon?: ReactNode };
@@ -505,10 +499,8 @@ export function VisualPropertyPanel({
   selectedNode,
   sessionId,
   propertyChanges,
-  pendingPropertyChanges,
   configMarks,
   aiInstruction,
-  submission,
   usedConfigKeys,
   onPropertyChange,
   onRestoreProperty,
@@ -517,11 +509,11 @@ export function VisualPropertyPanel({
   onUpdateConfigMark,
   onRemoveConfigMark,
   onAiInstructionChange,
-  onSendToAI,
 }: VisualPropertyPanelProps) {
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
+  const [editingConfigChangeId, setEditingConfigChangeId] = useState<string | null>(null);
   const specsBySection = useMemo(() => {
     if (!selectedNode) return [];
     const grouped = new Map<string, PropertySpec[]>();
@@ -532,12 +524,6 @@ export function VisualPropertyPanel({
       .map((section) => [section, grouped.get(section) ?? []] as const)
       .filter(([, specs]) => specs.length > 0);
   }, [selectedNode]);
-
-  const isSubmittedChangeLocked = (changeId: string) =>
-    submission.status !== "idle" &&
-    submission.status !== "failed" &&
-    submission.changes.some((change) => change.id === changeId) &&
-    !pendingPropertyChanges.some((change) => change.id === changeId);
 
   const uploadImageReplacement = async (
     file: File,
@@ -727,6 +713,190 @@ export function VisualPropertyPanel({
         mark.domPath === selectedNode.domPath ||
         mark.nodeId === selectedNode.nodeId,
     ).length;
+  const selectedConfigMarks = configMarks.filter(
+    (mark) =>
+      mark.domPath === selectedNode.domPath ||
+      mark.nodeId === selectedNode.nodeId,
+  );
+  const editingConfigMark = editingConfigChangeId
+    ? configMarks.find((mark) => mark.changeId === editingConfigChangeId) ?? null
+    : null;
+
+  const getConfigMarkForSpec = (spec: Pick<PropertySpec, "property" | "kind">) =>
+    configMarks.find(
+      (mark) =>
+        mark.changeId === getChangeId(selectedNode, spec.property, spec.kind),
+    );
+
+  const openConfigMarkEditor = (
+    spec: Pick<PropertySpec, "property" | "label" | "kind">,
+    value: string,
+  ) => {
+    const changeId = getChangeId(selectedNode, spec.property, spec.kind);
+    if (!getConfigMarkForSpec(spec)) {
+      onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind);
+    }
+    setEditingConfigChangeId(changeId);
+  };
+
+  const renderConfigMarkButton = (
+    spec: Pick<PropertySpec, "property" | "label" | "kind">,
+    value: string,
+    className?: string,
+  ) => {
+    const active = Boolean(getConfigMarkForSpec(spec));
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "h-6 w-6 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground",
+          active
+            ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary"
+            : "",
+          className,
+        )}
+        title={active ? "编辑配置项" : "设为配置项"}
+        aria-label={`${spec.label}${active ? "编辑配置项" : "设为配置项"}`}
+        onClick={() => openConfigMarkEditor(spec, value)}
+      >
+        <Settings2 className="h-3.5 w-3.5" />
+      </Button>
+    );
+  };
+
+  const renderConfigMarkDialog = () => {
+    const mark = editingConfigMark;
+    const hasConflict = mark ? usedConfigKeys.includes(mark.fieldKey.trim()) : false;
+    return (
+      <Dialog
+        open={editingConfigChangeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingConfigChangeId(null);
+        }}
+      >
+        <DialogContent className="max-w-sm gap-4 p-4">
+          <DialogHeader>
+            <DialogTitle className="text-base">配置项设置</DialogTitle>
+            <DialogDescription className="text-xs">
+              将当前属性交给 AI 写入配置字段，后续可在配置栏中调整。
+            </DialogDescription>
+          </DialogHeader>
+          {mark ? (
+            <div className="space-y-3">
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <p className="text-xs font-medium">{mark.label}</p>
+                <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                  {mark.kind}:{mark.property}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">配置名称</Label>
+                <Input
+                  value={mark.fieldTitle}
+                  className="h-8 text-xs"
+                  placeholder="配置名称"
+                  onChange={(event) =>
+                    onUpdateConfigMark(mark.id, { fieldTitle: event.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">字段 key</Label>
+                <Input
+                  value={mark.fieldKey}
+                  className={cn(
+                    "h-8 font-mono text-xs",
+                    hasConflict ? "border-destructive focus-visible:ring-destructive" : "",
+                  )}
+                  placeholder="字段标识"
+                  onChange={(event) =>
+                    onUpdateConfigMark(mark.id, { fieldKey: event.target.value })
+                  }
+                />
+                {hasConflict && (
+                  <p className="text-xs text-destructive">
+                    字段 key 与已有配置冲突，请调整后再发送。
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">默认值</Label>
+                <Input
+                  value={mark.defaultValue}
+                  className="h-8 font-mono text-xs"
+                  placeholder="默认值"
+                  onChange={(event) =>
+                    onUpdateConfigMark(mark.id, { defaultValue: event.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">分类</Label>
+                <Input
+                  value={mark.category ?? ""}
+                  list="visual-config-mark-category-options"
+                  className="h-8 text-xs"
+                  placeholder="分类（可选，例如 设计）"
+                  onChange={(event) =>
+                    onUpdateConfigMark(mark.id, { category: event.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">配置范围</Label>
+                <Select
+                  value={mark.scope}
+                  onValueChange={(value) =>
+                    onUpdateConfigMark(mark.id, {
+                      scope: value === "project" ? "project" : "page",
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="page">页面级配置</SelectItem>
+                    <SelectItem value="project">项目级配置</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md border bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
+              正在创建配置项...
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={!mark}
+              onClick={() => {
+                if (!mark) return;
+                onRemoveConfigMark(mark.id);
+                setEditingConfigChangeId(null);
+              }}
+            >
+              移除
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8"
+              onClick={() => setEditingConfigChangeId(null)}
+            >
+              完成
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const applyArrangement = (nextArrangement: "free" | "row" | "column" | "grid") => {
     if (nextArrangement === "free") {
@@ -777,7 +947,14 @@ export function VisualPropertyPanel({
         </div>
         <div className="space-y-3 px-3 pb-3">
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <Label className="text-xs font-medium text-muted-foreground">排列</Label>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-medium text-muted-foreground">排列</Label>
+              {renderConfigMarkButton(
+                { property: "display", label: "排列方式", kind: "style" },
+                getStyleValue("display") || flowValue,
+                "-mr-1",
+              )}
+            </div>
             <div className="inline-flex h-8 w-fit rounded-md border bg-muted/30 p-0.5">
               {flowOptions.map((option) => (
                 <button
@@ -797,7 +974,14 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2">
-            <Label className="pt-1 text-xs font-medium text-muted-foreground">对齐</Label>
+            <div className="flex items-center gap-1 pt-1">
+              <Label className="text-xs font-medium text-muted-foreground">对齐</Label>
+              {renderConfigMarkButton(
+                { property: "justifyContent", label: "内容对齐", kind: "style" },
+                alignValue,
+                "-mr-1",
+              )}
+            </div>
             <div className="grid w-[88px] grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1">
               {alignmentOptions.map(([justifyContent, alignItems]) => {
                 const active = alignValue === `${justifyContent}:${alignItems}`;
@@ -820,7 +1004,14 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <Label className="text-xs font-medium text-muted-foreground">间距</Label>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-medium text-muted-foreground">间距</Label>
+              {renderConfigMarkButton(
+                { property: "gap", label: "元素间距", kind: "style" },
+                getStyleNumberValue("gap"),
+                "-mr-1",
+              )}
+            </div>
             <div className="relative">
               <Input
                 value={getStyleNumberValue("gap")}
@@ -834,7 +1025,14 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <Label className="text-xs font-medium text-muted-foreground">内边距</Label>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-medium text-muted-foreground">内边距</Label>
+              {renderConfigMarkButton(
+                { property: "paddingLeft", label: "左右内边距", kind: "style" },
+                paddingXValue,
+                "-mr-1",
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
                 <Input
@@ -868,7 +1066,14 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <Label className="text-xs font-medium text-muted-foreground">裁剪</Label>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-medium text-muted-foreground">裁剪</Label>
+              {renderConfigMarkButton(
+                { property: "overflow", label: "裁剪内容", kind: "style" },
+                clipContent ? "hidden" : "visible",
+                "-mr-1",
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={clipContent}
@@ -901,7 +1106,14 @@ export function VisualPropertyPanel({
         <div className="space-y-2 px-3 pb-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-[11px] font-medium text-muted-foreground">不透明度</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-[11px] font-medium text-muted-foreground">不透明度</Label>
+                {renderConfigMarkButton(
+                  { property: "opacity", label: "不透明度", kind: "style" },
+                  getOpacityValue(),
+                  "h-5 w-5",
+                )}
+              </div>
               <div className="relative">
                 <Blend className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -917,7 +1129,14 @@ export function VisualPropertyPanel({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-[11px] font-medium text-muted-foreground">圆角</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[11px] font-medium text-muted-foreground">圆角</Label>
+                  {renderConfigMarkButton(
+                    { property: "borderRadius", label: "圆角", kind: "style" },
+                    uniformRadiusValue,
+                    "h-5 w-5",
+                  )}
+                </div>
                 <button
                   type="button"
                   className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -997,7 +1216,14 @@ export function VisualPropertyPanel({
         {hasVisibleBorder && (
           <div className="space-y-2 px-3 pb-3">
             <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-              <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
+                {renderConfigMarkButton(
+                  { property: "borderColor", label: "边框颜色", kind: "style" },
+                  getStyleValue("borderColor"),
+                  "-mr-1",
+                )}
+              </div>
               <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
                 <Input
                   type="color"
@@ -1016,7 +1242,14 @@ export function VisualPropertyPanel({
             </div>
 
             <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-              <Label className="text-xs font-medium text-muted-foreground">宽度</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-medium text-muted-foreground">宽度</Label>
+                {renderConfigMarkButton(
+                  { property: "borderWidth", label: "边框宽度", kind: "style" },
+                  borderWidthValue,
+                  "-mr-1",
+                )}
+              </div>
               <div className="relative">
                 <Input
                   value={borderWidthValue}
@@ -1044,16 +1277,6 @@ export function VisualPropertyPanel({
     const change = propertyChanges.find((item) => item.id === changeId);
     const value = change?.value ?? currentValue;
     const displayValue = formatColorInputValue(value);
-    const sendChange: VisualPropertyChange = {
-      id: changeId,
-      nodeId: selectedNode.nodeId,
-      domPath: selectedNode.domPath,
-      kind: spec.kind,
-      property: spec.property,
-      label: spec.label,
-      value,
-      previousValue: currentValue || undefined,
-    };
 
     return (
       <section key="背景" className="border-b bg-card">
@@ -1078,8 +1301,11 @@ export function VisualPropertyPanel({
 
         {hasBackgroundColor && (
           <div className="px-3 pb-3">
-            <div className="grid grid-cols-[68px_minmax(0,1fr)_30px] items-center gap-2">
-              <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
+            <div className="grid grid-cols-[68px_minmax(0,1fr)_60px] items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
+                {renderConfigMarkButton(spec, value, "-mr-1")}
+              </div>
               <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
                 <Input
                   type="color"
@@ -1124,45 +1350,6 @@ export function VisualPropertyPanel({
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="更多"
-                    >
-                      <MoreVertical className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind)
-                      }
-                    >
-                      设为配置项
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (navigator.clipboard) {
-                          void navigator.clipboard.writeText(displayValue);
-                        }
-                      }}
-                    >
-                      <Copy className="mr-2 h-3.5 w-3.5" />
-                      复制当前值
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={isSubmittedChangeLocked(changeId)}
-                      onClick={() => onSendToAI(sendChange)}
-                    >
-                      <Send className="mr-2 h-3.5 w-3.5" />
-                      发送该属性给 AI 调整
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -1204,23 +1391,16 @@ export function VisualPropertyPanel({
               const currentValue = getCurrentValue(selectedNode, spec);
               const change = propertyChanges.find((item) => item.id === changeId);
               const value = change?.value ?? currentValue;
-              const sendChange: VisualPropertyChange = {
-                id: changeId,
-                nodeId: selectedNode.nodeId,
-                domPath: selectedNode.domPath,
-                kind: spec.kind,
-                property: spec.property,
-                label: spec.label,
-                value,
-                previousValue: currentValue || undefined,
-              };
 
               return (
                 <div
                   key={`${spec.kind}-${spec.property}-${spec.label}`}
                   className="grid grid-cols-[68px_minmax(0,1fr)_30px] items-center gap-2"
                 >
-                  <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
+                    {renderConfigMarkButton(spec, value, "-mr-1")}
+                  </div>
                   <Input
                     value={value}
                     placeholder={spec.placeholder}
@@ -1249,45 +1429,6 @@ export function VisualPropertyPanel({
                         <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="更多"
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind)
-                          }
-                        >
-                          设为配置项
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            if (navigator.clipboard) {
-                              void navigator.clipboard.writeText(value);
-                            }
-                          }}
-                        >
-                          <Copy className="mr-2 h-3.5 w-3.5" />
-                          复制当前值
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={isSubmittedChangeLocked(changeId)}
-                          onClick={() => onSendToAI(sendChange)}
-                        >
-                          <Send className="mr-2 h-3.5 w-3.5" />
-                          发送该属性给 AI 调整
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </div>
               );
@@ -1316,6 +1457,68 @@ export function VisualPropertyPanel({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 p-3">
+          <datalist id="visual-config-mark-category-options">
+            {BUILT_IN_CONFIG_CATEGORIES.map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
+          <section className="space-y-2 rounded-md border bg-muted/20 p-3">
+            <div className="flex items-center gap-2">
+              <Bolt className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-xs font-medium">AI 修改说明</Label>
+            </div>
+            <Textarea
+              value={aiInstruction}
+              className="min-h-[84px] resize-none text-xs"
+              placeholder="补充本次属性修改的意图，或只描述选中元素希望达到的效果。"
+              onChange={(event) => onAiInstructionChange(event.target.value)}
+            />
+          </section>
+
+          {selectedConfigMarks.length > 0 && (
+            <section className="space-y-2">
+              {selectedConfigMarks.map((mark) => {
+                const hasConflict = usedConfigKeys.includes(mark.fieldKey.trim());
+                return (
+                  <div
+                    key={mark.id}
+                    className={cn(
+                      "grid grid-cols-[minmax(0,1fr)_28px] items-center gap-2 rounded-md border bg-muted/20 p-2",
+                      hasConflict ? "border-destructive/70" : "",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="grid min-w-0 cursor-pointer grid-cols-[16px_minmax(0,1fr)] items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`${mark.fieldTitle || mark.label} ${mark.fieldKey || "未命名"} 编辑配置项`}
+                      onClick={() => setEditingConfigChangeId(mark.changeId)}
+                    >
+                      <Settings2 className="h-3.5 w-3.5 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium">
+                          {mark.fieldTitle || mark.label}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                          {mark.fieldKey || "未填写 key"} · {mark.scope === "project" ? "项目级配置" : "页面级配置"}
+                        </span>
+                      </span>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="移除配置标记"
+                      onClick={() => onRemoveConfigMark(mark.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
           {specsBySection.map(([section, specs]) => {
             if (section === "布局") return renderLayoutSection();
             if (section === "外观") return renderAppearanceSection();
@@ -1338,16 +1541,6 @@ export function VisualPropertyPanel({
                       const change = propertyChanges.find((item) => item.id === changeId);
                       const value = change?.value ?? currentValue;
                       const controlValue = getDisplayValue(value, spec);
-                      const sendChange: VisualPropertyChange = {
-                        id: changeId,
-                        nodeId: selectedNode.nodeId,
-                        domPath: selectedNode.domPath,
-                        kind: spec.kind,
-                        property: spec.property,
-                        label: spec.label,
-                        value,
-                        previousValue: currentValue || undefined,
-                      };
                       return (
                         <div
                           key={`${spec.kind}-${spec.property}-${spec.label}`}
@@ -1358,7 +1551,10 @@ export function VisualPropertyPanel({
                               : "grid-cols-[68px_minmax(0,1fr)_30px] items-center",
                           )}
                         >
-                          <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
+                          <div className="flex items-center gap-1">
+                            <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
+                            {renderConfigMarkButton(spec, value, "-mr-1")}
+                          </div>
                       <div className="min-w-0">
                         {spec.input === "textarea" ? (
                           <Textarea
@@ -1540,45 +1736,6 @@ export function VisualPropertyPanel({
                               <RotateCcw className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="更多"
-                              >
-                                <MoreVertical className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind)
-                                }
-                              >
-                                设为配置项
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (navigator.clipboard) {
-                                    void navigator.clipboard.writeText(value);
-                                  }
-                                }}
-                              >
-                                <Copy className="mr-2 h-3.5 w-3.5" />
-                                复制当前值
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={isSubmittedChangeLocked(changeId)}
-                                onClick={() => onSendToAI(sendChange)}
-                              >
-                                <Send className="mr-2 h-3.5 w-3.5" />
-                                发送该属性给 AI 调整
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                           </>
                         )}
                         </div>
@@ -1588,114 +1745,12 @@ export function VisualPropertyPanel({
                 </div>
               </div>
             </section>
-            );
-          })}
-
-          {configMarks.length > 0 && (
-            <section className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Settings2 className="h-3.5 w-3.5" />
-                配置项设置
-              </div>
-              <datalist id="visual-config-mark-category-options">
-                {BUILT_IN_CONFIG_CATEGORIES.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
-              <div className="space-y-2">
-                {configMarks.map((mark) => {
-                  const hasConflict = usedConfigKeys.includes(mark.fieldKey.trim());
-                  return (
-                    <div key={mark.id} className="space-y-2 rounded-md border p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs font-medium">{mark.label}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="移除配置标记"
-                          onClick={() => onRemoveConfigMark(mark.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      <Input
-                        value={mark.fieldTitle}
-                        className="h-8 text-xs"
-                        placeholder="配置名称"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, { fieldTitle: event.target.value })
-                        }
-                      />
-                      <Input
-                        value={mark.fieldKey}
-                        className={cn(
-                          "h-8 font-mono text-xs",
-                          hasConflict ? "border-destructive focus-visible:ring-destructive" : "",
-                        )}
-                        placeholder="字段标识"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, { fieldKey: event.target.value })
-                        }
-                      />
-                      <Input
-                        value={mark.defaultValue}
-                        className="h-8 font-mono text-xs"
-                        placeholder="默认值"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, { defaultValue: event.target.value })
-                        }
-                      />
-                      <Input
-                        value={mark.category ?? ""}
-                        list="visual-config-mark-category-options"
-                        className="h-8 text-xs"
-                        placeholder="分类（可选，例如 设计）"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, { category: event.target.value })
-                        }
-                      />
-                      <Select
-                        value={mark.scope}
-                        onValueChange={(value) =>
-                          onUpdateConfigMark(mark.id, {
-                            scope: value === "project" ? "project" : "page",
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="page">页面级配置</SelectItem>
-                          <SelectItem value="project">项目级配置</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {hasConflict && (
-                        <p className="text-xs text-destructive">
-                          字段 key 与已有配置冲突，请调整后再发送。
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          <section className="space-y-2 pb-2">
-            <Label className="text-xs">AI 修改说明</Label>
-            <Textarea
-              value={aiInstruction}
-              className="min-h-[84px] resize-none text-xs"
-              placeholder="补充本次属性修改的意图，或只描述选中元素希望达到的效果。"
-              onChange={(event) => onAiInstructionChange(event.target.value)}
-            />
-          </section>
+              );
+            })}
         </div>
       </ScrollArea>
 
+      {renderConfigMarkDialog()}
     </div>
   );
 }
