@@ -9,6 +9,7 @@ interface LayerTreeMenuProps {
   emptyText?: string;
   className?: string;
   scrollClassName?: string;
+  getNodeBadgeCount?: (node: VisualNodeInfo) => number;
   onSelectNode?: (node: VisualNodeInfo, path: VisualNodeInfo[]) => void;
   onHoverNodeIdChange?: (nodeId: string | null) => void;
 }
@@ -83,6 +84,7 @@ export function LayerTreeMenu({
   emptyText = "暂无可选图层",
   className = "",
   scrollClassName = "",
+  getNodeBadgeCount,
   onSelectNode,
   onHoverNodeIdChange,
 }: LayerTreeMenuProps) {
@@ -110,7 +112,7 @@ export function LayerTreeMenu({
             const active =
               node.domPath === selectedNodeId || node.nodeId === selectedNodeId;
             const label = getLayerTreeNodeLabel(node);
-            const kind = getLayerTreeNodeKind(node);
+            const badgeCount = getNodeBadgeCount?.(node) ?? 0;
             const secondary =
               node.textContent && node.textContent !== label
                 ? node.textContent
@@ -138,9 +140,11 @@ export function LayerTreeMenu({
                     {secondary}
                   </span>
                 </span>
-                <span className="rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {kind}
-                </span>
+                {badgeCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/70 bg-primary text-[10px] font-medium text-primary-foreground">
+                    {badgeCount}
+                  </span>
+                )}
               </button>
             );
           })}

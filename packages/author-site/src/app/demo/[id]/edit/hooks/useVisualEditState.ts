@@ -516,6 +516,21 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     setVisualPropertySubmission(EMPTY_VISUAL_PROPERTY_SUBMISSION);
   }, [visualPropertySubmission]);
 
+  const handleClearSelectedVisualProperties = useCallback(() => {
+    if (!selectedVisualNode) return;
+    const selectedDomPath = selectedVisualNode.domPath;
+    const selectedNodeId = selectedVisualNode.nodeId;
+    const isSelectedNodeChange = (item: { domPath: string; nodeId: string }) =>
+      item.domPath === selectedDomPath || item.nodeId === selectedNodeId;
+
+    setVisualPropertyChanges((prev) =>
+      prev.filter((item) => !isSelectedNodeChange(item)),
+    );
+    setVisualConfigMarks((prev) =>
+      prev.filter((item) => !isSelectedNodeChange(item)),
+    );
+  }, [selectedVisualNode]);
+
   const handleMarkVisualConfig = useCallback(
     (
       node: VisualNodeInfo,
@@ -1217,6 +1232,7 @@ ${context}
     handleVisualPropertyChange,
     handleRestoreVisualProperty,
     handleClearVisualProperties,
+    handleClearSelectedVisualProperties,
     handleMarkVisualConfig,
     handleUpdateVisualConfigMark,
     handleRemoveVisualConfigMark,
