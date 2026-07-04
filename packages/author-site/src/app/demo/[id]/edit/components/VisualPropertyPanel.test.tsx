@@ -101,7 +101,7 @@ describe("VisualPropertyPanel 配置项入口", () => {
     expect(labels[0]).toBe("AI 修改说明");
   });
 
-  it("属性旁的配置按钮可创建配置项并打开设置弹窗", () => {
+  it("点击属性名可创建配置项并打开设置弹窗", () => {
     const onMarkConfig = jest.fn();
     renderPanel({ onMarkConfig });
 

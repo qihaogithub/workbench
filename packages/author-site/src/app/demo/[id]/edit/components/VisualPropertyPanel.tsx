@@ -25,7 +25,6 @@ import {
   Plus,
   Radius,
   RotateCcw,
-  Settings2,
   Square,
   TextCursorInput,
   Trash2,
@@ -455,7 +454,7 @@ function getGroupIcon(group: string) {
   if (group === "背景") return <PanelTop className="h-3.5 w-3.5" />;
   if (group === "边框") return <Square className="h-3.5 w-3.5" />;
   if (group === "阴影与模糊") return <Brush className="h-3.5 w-3.5" />;
-  return <Settings2 className="h-3.5 w-3.5" />;
+  return <Box className="h-3.5 w-3.5" />;
 }
 
 function getSpecsForNode(node: VisualNodeInfo): PropertySpec[] {
@@ -739,21 +738,20 @@ export function VisualPropertyPanel({
     setEditingConfigChangeId(changeId);
   };
 
-  const renderConfigMarkButton = (
+  const renderConfigMarkLabel = (
     spec: Pick<PropertySpec, "property" | "label" | "kind">,
     value: string,
     className?: string,
+    displayLabel = spec.label,
   ) => {
     const active = Boolean(getConfigMarkForSpec(spec));
     return (
-      <Button
+      <button
         type="button"
-        variant="ghost"
-        size="icon"
         className={cn(
-          "h-6 w-6 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground",
+          "inline-flex max-w-full cursor-pointer items-center rounded-sm px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           active
-            ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary"
+            ? "bg-primary/10 text-primary hover:bg-primary/15"
             : "",
           className,
         )}
@@ -761,8 +759,8 @@ export function VisualPropertyPanel({
         aria-label={`${spec.label}${active ? "编辑配置项" : "设为配置项"}`}
         onClick={() => openConfigMarkEditor(spec, value)}
       >
-        <Settings2 className="h-3.5 w-3.5" />
-      </Button>
+        {displayLabel}
+      </button>
     );
   };
 
@@ -947,12 +945,12 @@ export function VisualPropertyPanel({
         </div>
         <div className="space-y-3 px-3 pb-3">
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Label className="text-xs font-medium text-muted-foreground">排列</Label>
-              {renderConfigMarkButton(
+            <div className="flex items-center">
+              {renderConfigMarkLabel(
                 { property: "display", label: "排列方式", kind: "style" },
                 getStyleValue("display") || flowValue,
-                "-mr-1",
+                undefined,
+                "排列",
               )}
             </div>
             <div className="inline-flex h-8 w-fit rounded-md border bg-muted/30 p-0.5">
@@ -974,12 +972,12 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2">
-            <div className="flex items-center gap-1 pt-1">
-              <Label className="text-xs font-medium text-muted-foreground">对齐</Label>
-              {renderConfigMarkButton(
+            <div className="flex items-center pt-1">
+              {renderConfigMarkLabel(
                 { property: "justifyContent", label: "内容对齐", kind: "style" },
                 alignValue,
-                "-mr-1",
+                undefined,
+                "对齐",
               )}
             </div>
             <div className="grid w-[88px] grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1">
@@ -1004,12 +1002,12 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Label className="text-xs font-medium text-muted-foreground">间距</Label>
-              {renderConfigMarkButton(
+            <div className="flex items-center">
+              {renderConfigMarkLabel(
                 { property: "gap", label: "元素间距", kind: "style" },
                 getStyleNumberValue("gap"),
-                "-mr-1",
+                undefined,
+                "间距",
               )}
             </div>
             <div className="relative">
@@ -1025,12 +1023,12 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Label className="text-xs font-medium text-muted-foreground">内边距</Label>
-              {renderConfigMarkButton(
+            <div className="flex items-center">
+              {renderConfigMarkLabel(
                 { property: "paddingLeft", label: "左右内边距", kind: "style" },
                 paddingXValue,
-                "-mr-1",
+                undefined,
+                "内边距",
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1066,12 +1064,12 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Label className="text-xs font-medium text-muted-foreground">裁剪</Label>
-              {renderConfigMarkButton(
+            <div className="flex items-center">
+              {renderConfigMarkLabel(
                 { property: "overflow", label: "裁剪内容", kind: "style" },
                 clipContent ? "hidden" : "visible",
-                "-mr-1",
+                undefined,
+                "裁剪",
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -1106,12 +1104,11 @@ export function VisualPropertyPanel({
         <div className="space-y-2 px-3 pb-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <Label className="text-[11px] font-medium text-muted-foreground">不透明度</Label>
-                {renderConfigMarkButton(
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
                   { property: "opacity", label: "不透明度", kind: "style" },
                   getOpacityValue(),
-                  "h-5 w-5",
+                  "text-[11px]",
                 )}
               </div>
               <div className="relative">
@@ -1129,12 +1126,11 @@ export function VisualPropertyPanel({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-[11px] font-medium text-muted-foreground">圆角</Label>
-                  {renderConfigMarkButton(
+                <div className="flex items-center">
+                  {renderConfigMarkLabel(
                     { property: "borderRadius", label: "圆角", kind: "style" },
                     uniformRadiusValue,
-                    "h-5 w-5",
+                    "text-[11px]",
                   )}
                 </div>
                 <button
@@ -1216,12 +1212,12 @@ export function VisualPropertyPanel({
         {hasVisibleBorder && (
           <div className="space-y-2 px-3 pb-3">
             <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
-                {renderConfigMarkButton(
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
                   { property: "borderColor", label: "边框颜色", kind: "style" },
                   getStyleValue("borderColor"),
-                  "-mr-1",
+                  undefined,
+                  "颜色",
                 )}
               </div>
               <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
@@ -1242,12 +1238,12 @@ export function VisualPropertyPanel({
             </div>
 
             <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs font-medium text-muted-foreground">宽度</Label>
-                {renderConfigMarkButton(
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
                   { property: "borderWidth", label: "边框宽度", kind: "style" },
                   borderWidthValue,
-                  "-mr-1",
+                  undefined,
+                  "宽度",
                 )}
               </div>
               <div className="relative">
@@ -1302,9 +1298,8 @@ export function VisualPropertyPanel({
         {hasBackgroundColor && (
           <div className="px-3 pb-3">
             <div className="grid grid-cols-[68px_minmax(0,1fr)_60px] items-center gap-2">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs font-medium text-muted-foreground">颜色</Label>
-                {renderConfigMarkButton(spec, value, "-mr-1")}
+              <div className="flex items-center">
+                {renderConfigMarkLabel(spec, value, undefined, "颜色")}
               </div>
               <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
                 <Input
@@ -1397,9 +1392,8 @@ export function VisualPropertyPanel({
                   key={`${spec.kind}-${spec.property}-${spec.label}`}
                   className="grid grid-cols-[68px_minmax(0,1fr)_30px] items-center gap-2"
                 >
-                  <div className="flex items-center gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
-                    {renderConfigMarkButton(spec, value, "-mr-1")}
+                  <div className="flex items-center">
+                    {renderConfigMarkLabel(spec, value)}
                   </div>
                   <Input
                     value={value}
@@ -1489,11 +1483,10 @@ export function VisualPropertyPanel({
                   >
                     <button
                       type="button"
-                      className="grid min-w-0 cursor-pointer grid-cols-[16px_minmax(0,1fr)] items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="grid min-w-0 cursor-pointer grid-cols-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`${mark.fieldTitle || mark.label} ${mark.fieldKey || "未命名"} 编辑配置项`}
                       onClick={() => setEditingConfigChangeId(mark.changeId)}
                     >
-                      <Settings2 className="h-3.5 w-3.5 text-primary" />
                       <span className="min-w-0">
                         <span className="block truncate text-xs font-medium">
                           {mark.fieldTitle || mark.label}
@@ -1551,9 +1544,8 @@ export function VisualPropertyPanel({
                               : "grid-cols-[68px_minmax(0,1fr)_30px] items-center",
                           )}
                         >
-                          <div className="flex items-center gap-1">
-                            <Label className="text-xs font-medium text-muted-foreground">{spec.label}</Label>
-                            {renderConfigMarkButton(spec, value, "-mr-1")}
+                          <div className="flex items-center">
+                            {renderConfigMarkLabel(spec, value)}
                           </div>
                       <div className="min-w-0">
                         {spec.input === "textarea" ? (
