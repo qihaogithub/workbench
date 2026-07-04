@@ -530,6 +530,92 @@ describe("useScreenshotGeneration", () => {
     unmount();
   });
 
+  it("批量截图请求会透传 HTML/CSS 原型页 snapshot payload", async () => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+      const url = getFetchUrl(input);
+      if (url.includes("/api/screenshots/health")) {
+        return jsonFetchResponse({ success: true });
+      }
+      if (url.includes("/api/screenshots/generate-batch")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            batchId: "batch_1",
+            results: [
+              {
+                pageId: "prototype_1",
+                hash: "1111111111111111",
+                status: "pending",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/status/proj_1/batch_1")) {
+        return jsonFetchResponse({
+          success: true,
+          data: {
+            status: "completed",
+            cancelled: false,
+            results: [],
+          },
+        });
+      }
+      if (url.includes("/api/screenshots/cancel/proj_1/batch_1")) {
+        return jsonFetchResponse({ success: true });
+      }
+      return jsonFetchResponse({ success: false }, { status: 404 });
+    }) as jest.Mock;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result, unmount } = renderHook(() =>
+      useScreenshotGeneration({ projectId: "proj_1" }),
+    );
+
+    await act(async () => {
+      await result.current.startBatchGeneration([
+        {
+          pageId: "prototype_1",
+          runtimeType: "prototype-html-css",
+          prototypeHtml: "<main>{{title}}</main>",
+          prototypeCss: "main { width: 100vw; }",
+          prototypeMeta: { width: 375, updatedAt: 123 },
+          configData: { title: "原型页" },
+          previewSize: { width: 375, height: 812 },
+          width: 375,
+          height: 812,
+          priority: "visible",
+        },
+      ]);
+    });
+
+    const generateCall = fetchMock.mock.calls.find(([input]) =>
+      getFetchUrl(input).includes("/api/screenshots/generate-batch"),
+    );
+    const requestInit = generateCall?.[1] as RequestInit;
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      projectId: "proj_1",
+      pages: [
+        {
+          pageId: "prototype_1",
+          runtimeType: "prototype-html-css",
+          prototypeHtml: "<main>{{title}}</main>",
+          prototypeCss: "main { width: 100vw; }",
+          prototypeMeta: { width: 375, updatedAt: 123 },
+          configData: { title: "原型页" },
+          previewSize: { width: 375, height: 812 },
+          width: 375,
+          height: 812,
+          priority: "visible",
+        },
+      ],
+    });
+
+    unmount();
+  });
+
   it("批量截图会透传 renderMode 并优先使用服务端 assetUrl", async () => {
     const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
       const url = getFetchUrl(input);

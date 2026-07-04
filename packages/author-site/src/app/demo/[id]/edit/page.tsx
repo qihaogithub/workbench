@@ -30,6 +30,7 @@ import type {
 import type { DemoPageRuntimeType, PrototypePageMeta } from "@opencode-workbench/shared";
 import {
   useScreenshotGeneration,
+  type ScreenshotBatchPageInput,
   type ScreenshotPriority,
   type ScreenshotRenderMode,
 } from "@/components/demo/useScreenshotGeneration";
@@ -667,7 +668,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     isGenerating: isScreenshotGenerating,
     checkServiceHealth,
     startBatchGeneration,
-    regeneratePage,
+    regeneratePageSnapshot,
     invalidatePageScreenshot,
     invalidatePageScreenshots,
     getScreenshotUrl,
@@ -742,6 +743,58 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [getScreenshotPriority],
   );
 
+  const buildScreenshotPageInput = useCallback(
+    (
+      page: DemoPageMeta,
+      configOverride?: Record<string, unknown>,
+      codeOverride?: string,
+    ): ScreenshotBatchPageInput | null => {
+      const previewSize = pagePreviewSizeMap[page.id];
+      const { width, height } = getScreenshotRequestSize(previewSize);
+      const configData = configOverride ?? configDataMap[page.id] ?? {};
+      const common = {
+        pageId: page.id,
+        configData,
+        previewSize,
+        width,
+        height,
+      };
+
+      if (page.runtimeType === "prototype-html-css") {
+        const prototype = pagePrototypeMapRef.current[page.id] ?? {};
+        if (!prototype.html) return null;
+        return {
+          ...common,
+          runtimeType: "prototype-html-css",
+          prototypeHtml: prototype.html,
+          prototypeCss: prototype.css ?? "",
+          prototypeMeta: prototype.meta,
+        };
+      }
+
+      const pageCode = codeOverride ?? resolvePreviewPageCode({
+        pageId: page.id,
+        pageCodes,
+        activeCodePageId:
+          pageCodes[activeDemoId] === code ? activeDemoId : undefined,
+        activeCode: code,
+      });
+      if (!pageCode) return null;
+      return {
+        ...common,
+        runtimeType: "high-fidelity-react",
+        code: pageCode,
+      };
+    },
+    [
+      activeDemoId,
+      code,
+      configDataMap,
+      pageCodes,
+      pagePreviewSizeMap,
+    ],
+  );
+
   const buildScreenshotBatchPages = useCallback((scope: ScreenshotBatchScope = "all") => {
     const priorityWeight: Record<ScreenshotPriority, number> = {
       active: 0,
@@ -752,27 +805,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     };
 
     return demoPages
-      .filter((p) =>
-        p.runtimeType !== "prototype-html-css" &&
-        hasPreviewPageCode({
-          pageId: p.id,
-          pageCodes,
-          activeCodePageId:
-            pageCodes[activeDemoId] === code ? activeDemoId : undefined,
-          activeCode: code,
-        }),
-      )
       .flatMap((p, index) => {
-        const pageCode = resolvePreviewPageCode({
-          pageId: p.id,
-          pageCodes,
-          activeCodePageId:
-            pageCodes[activeDemoId] === code ? activeDemoId : undefined,
-          activeCode: code,
-        });
-        const { width, height } = getScreenshotRequestSize(
-          pagePreviewSizeMap[p.id],
-        );
+        const snapshotInput = buildScreenshotPageInput(p);
+        if (!snapshotInput) return [];
         const priority = getScreenshotPriority(p.id);
         if (
           scope === "canvas-initial" &&
@@ -784,11 +819,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
         const renderMode = getScreenshotRenderMode(p.id);
         return [{
-          pageId: p.id,
-          code: pageCode,
-          configData: configDataMap[p.id] || {},
-          width,
-          height,
+          ...snapshotInput,
           fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
           priority,
           renderMode,
@@ -804,6 +835,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [
     code,
     activeDemoId,
+    buildScreenshotPageInput,
     configDataMap,
     demoPages,
     getScreenshotRenderMode,
@@ -821,18 +853,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // debounce 3s 触发单页截图再生
   const scheduleScreenshotRegenerate = useCallback((
     pageId: string,
-    pageCode: string,
+    pageCode?: string,
     configOverride?: Record<string, unknown>,
   ) => {
     const timers = screenshotRegenerateTimerRef.current;
     if (timers[pageId]) clearTimeout(timers[pageId]);
     timers[pageId] = setTimeout(() => {
       const config = configOverride ?? configDataMapRef.current[pageId] ?? {};
+      const page = demoPages.find((item) => item.id === pageId);
+      if (!page) {
+        delete timers[pageId];
+        return;
+      }
+      const snapshotInput = buildScreenshotPageInput(page, config, pageCode);
+      if (!snapshotInput) {
+        delete timers[pageId];
+        return;
+      }
+      const regenerateInput =
+        snapshotInput.runtimeType === "prototype-html-css"
+          ? snapshotInput
+          : {
+              ...snapshotInput,
+              runtimeType: "high-fidelity-react" as const,
+            };
       const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[pageId]);
-      regeneratePage(
+      regeneratePageSnapshot(
         pageId,
-        pageCode,
-        config,
+        regenerateInput,
         width,
         height,
         CANVAS_SCREENSHOT_FULL_PAGE,
@@ -843,10 +891,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       delete timers[pageId];
     }, 3000);
   }, [
+    buildScreenshotPageInput,
+    demoPages,
     getScreenshotPriority,
     getScreenshotRenderMode,
     pageScreenshots,
-    regeneratePage,
+    regeneratePageSnapshot,
     pagePreviewSizeMap,
   ]);
 
@@ -1709,9 +1759,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         html,
       },
     }));
+    invalidatePageScreenshot(pageId);
+    scheduleScreenshotRegenerate(
+      pageId,
+      undefined,
+      configDataMapRef.current[pageId],
+    );
     persistPrototypePageDraft(pageId, { html });
     markWorkspaceChanged();
-  }, [markWorkspaceChanged, persistPrototypePageDraft]);
+  }, [
+    invalidatePageScreenshot,
+    markWorkspaceChanged,
+    persistPrototypePageDraft,
+    scheduleScreenshotRegenerate,
+  ]);
 
   const applyActivePrototypeVisualPropertyChange = useCallback(
     (
@@ -2511,8 +2572,9 @@ ${context.details}
       };
       // 配置变更后立即失效旧截图，并 debounce 3s 触发截图再生
       const currentCode = codeRef.current;
-      if (currentCode) {
-        scheduleScreenshotRegenerate(currentPageId, currentCode, nextPageConfig);
+      const currentPage = demoPages.find((page) => page.id === currentPageId);
+      if (currentCode || currentPage?.runtimeType === "prototype-html-css") {
+        scheduleScreenshotRegenerate(currentPageId, currentCode || undefined, nextPageConfig);
       }
       return next;
     });
@@ -2541,14 +2603,15 @@ ${context.details}
                 : undefined,
             activeCode: codeRef.current,
           });
-        if (currentCode) {
-          scheduleScreenshotRegenerate(pageId, currentCode, nextPageConfig);
+        const page = demoPages.find((item) => item.id === pageId);
+        if (currentCode || page?.runtimeType === "prototype-html-css") {
+          scheduleScreenshotRegenerate(pageId, currentCode || undefined, nextPageConfig);
         }
         return next;
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pageCodes],
+    [demoPages, pageCodes],
   );
 
   const handleProjectConfigPanelChange = useCallback(
@@ -2573,10 +2636,10 @@ ${context.details}
               pageCodes[activeDemoId] === code ? activeDemoId : undefined,
             activeCode: code,
           });
-          if (!pageCode) continue;
+          if (!pageCode && page.runtimeType !== "prototype-html-css") continue;
           scheduleScreenshotRegenerate(
             page.id,
-            pageCode,
+            pageCode || undefined,
             next[page.id],
           );
         }
@@ -3633,6 +3696,7 @@ ${context.details}
 
       if (demoId && demoId === activeDemoId) {
         if (fileType === "prototypeHtml" || fileType === "prototypeCss") {
+          invalidatePageScreenshot(demoId);
           setPagePrototypeMap((prev) => ({
             ...prev,
             [demoId]: {
@@ -3640,6 +3704,11 @@ ${context.details}
               [fileType === "prototypeHtml" ? "html" : "css"]: content,
             },
           }));
+          scheduleScreenshotRegenerate(
+            demoId,
+            undefined,
+            configDataMapRef.current[demoId],
+          );
         } else {
           applyDemoSnapshot({
             [fileType === "code" ? "code" : "schema"]: content,
@@ -3649,7 +3718,14 @@ ${context.details}
       }
       markWorkspaceChanged();
     },
-    [activeDemoId, applyDemoSnapshot, markWorkspaceChanged, setPagePrototypeMap],
+    [
+      activeDemoId,
+      applyDemoSnapshot,
+      invalidatePageScreenshot,
+      markWorkspaceChanged,
+      scheduleScreenshotRegenerate,
+      setPagePrototypeMap,
+    ],
   );
 
   const activePreviewSize = useMemo(() => {

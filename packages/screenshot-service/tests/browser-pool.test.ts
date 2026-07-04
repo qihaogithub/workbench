@@ -5,6 +5,7 @@ function createPage(delayMs: number, counters: { active: number; max: number }) 
   counters.max = Math.max(counters.max, counters.active);
 
   return {
+    goto: vi.fn(),
     setViewport: vi.fn(),
     setContent: vi.fn(
       () => new Promise<void>((resolve) => setTimeout(resolve, delayMs)),
@@ -12,6 +13,9 @@ function createPage(delayMs: number, counters: { active: number; max: number }) 
     waitForSelector: vi.fn(),
     waitForNetworkIdle: vi.fn(),
     evaluate: vi.fn(async (fn: () => unknown) => {
+      if (String(fn).includes("querySelector(\"#root\")")) {
+        return true;
+      }
       if (String(fn).includes("bodyWidth")) {
         return {
           bodyWidth: 100,
@@ -117,6 +121,7 @@ describe("BrowserPool", () => {
           on: vi.fn(),
           newPage: vi.fn(() => ({
             setViewport: vi.fn(),
+            goto: vi.fn(),
             setContent: vi.fn(async (html: string) => {
               setContentOrder.push(html);
               if (html.includes("blocking")) {
@@ -126,6 +131,9 @@ describe("BrowserPool", () => {
             waitForSelector: vi.fn(),
             waitForNetworkIdle: vi.fn(),
             evaluate: vi.fn(async (fn: () => unknown) => {
+              if (String(fn).includes("querySelector(\"#root\")")) {
+                return true;
+              }
               if (String(fn).includes("bodyWidth")) {
                 return {
                   bodyWidth: 100,
@@ -189,6 +197,7 @@ describe("BrowserPool", () => {
             counters.max = Math.max(counters.max, counters.active);
             return {
               setViewport: vi.fn(),
+              goto: vi.fn(),
               setContent: vi.fn(),
               waitForSelector: vi.fn(),
               waitForNetworkIdle: vi.fn(),
@@ -224,5 +233,93 @@ describe("BrowserPool", () => {
     await expect(pool.renderPage("<div id=\"root\"></div>", 100, 100, false))
       .rejects.toMatchObject({ code: "RUNTIME_ERROR" });
     expect(screenshot).not.toHaveBeenCalled();
+  });
+
+  it("页面没有可见内容时返回 EMPTY_RENDER 且不截图", async () => {
+    const screenshot = vi.fn(() => Buffer.from("png"));
+
+    vi.doMock("puppeteer-core", () => ({
+      default: {
+        launch: vi.fn(async () => ({
+          connected: true,
+          on: vi.fn(),
+          newPage: vi.fn(() => ({
+            setViewport: vi.fn(),
+            goto: vi.fn(),
+            setContent: vi.fn(),
+            waitForSelector: vi.fn(),
+            waitForNetworkIdle: vi.fn(),
+            evaluate: vi.fn(async (fn: () => unknown) => {
+              if (String(fn).includes("data-preview-runtime-error")) {
+                return null;
+              }
+              if (String(fn).includes("querySelector(\"#root\")")) {
+                return false;
+              }
+              return {
+                bodyWidth: 100,
+                bodyHeight: 180,
+                documentWidth: 100,
+                documentHeight: 180,
+              };
+            }),
+            screenshot,
+            close: vi.fn(() => Promise.resolve()),
+          })),
+          close: vi.fn(),
+        })),
+      },
+    }));
+
+    const { getBrowserPool } = await import("../src/utils/browser-pool");
+    const pool = getBrowserPool();
+
+    await expect(pool.renderPage("<div id=\"root\"></div>", 100, 100, false))
+      .rejects.toMatchObject({ code: "EMPTY_RENDER" });
+    expect(screenshot).not.toHaveBeenCalled();
+  });
+
+  it("大尺寸截图结果过小时返回 EMPTY_RENDER 且不写出截图结果", async () => {
+    const screenshot = vi.fn(() => Buffer.from("png"));
+
+    vi.doMock("puppeteer-core", () => ({
+      default: {
+        launch: vi.fn(async () => ({
+          connected: true,
+          on: vi.fn(),
+          newPage: vi.fn(() => ({
+            setViewport: vi.fn(),
+            goto: vi.fn(),
+            setContent: vi.fn(),
+            waitForSelector: vi.fn(),
+            waitForNetworkIdle: vi.fn(),
+            evaluate: vi.fn(async (fn: () => unknown) => {
+              if (String(fn).includes("data-preview-runtime-error")) {
+                return null;
+              }
+              if (String(fn).includes("querySelector(\"#root\")")) {
+                return true;
+              }
+              return {
+                bodyWidth: 320,
+                bodyHeight: 900,
+                documentWidth: 320,
+                documentHeight: 900,
+              };
+            }),
+            screenshot,
+            close: vi.fn(() => Promise.resolve()),
+          })),
+          close: vi.fn(),
+        })),
+      },
+    }));
+
+    const { getBrowserPool } = await import("../src/utils/browser-pool");
+    const pool = getBrowserPool();
+
+    await expect(pool.renderPage("<div id=\"root\"><main>ok</main></div>", 320, 640, true))
+      .rejects.toMatchObject({ code: "EMPTY_RENDER" });
+    expect(screenshot).toHaveBeenCalled();
   });
 });

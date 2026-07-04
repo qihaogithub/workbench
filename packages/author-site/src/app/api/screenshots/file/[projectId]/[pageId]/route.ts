@@ -8,6 +8,8 @@ import { fetchScreenshotService } from "@/lib/screenshot-service";
 const DATA_DIR =
   process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
 const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
+const MIN_MEANINGFUL_SCREENSHOT_BYTES = 8 * 1024;
+const LARGE_RENDER_AREA = 160_000;
 
 interface ScreenshotMeta {
   currentHash?: string;
@@ -22,6 +24,17 @@ interface ScreenshotMeta {
 function normalizeHash(hash?: string | null): string | null {
   if (!hash) return null;
   return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
+}
+
+function isLikelyBlankScreenshot(byteLength: number, renderBox?: unknown): boolean {
+  if (!renderBox || typeof renderBox !== "object") return false;
+  const box = renderBox as Record<string, unknown>;
+  const width = typeof box.width === "number" ? box.width : 0;
+  const height = typeof box.height === "number" ? box.height : 0;
+  return (
+    width * height >= LARGE_RENDER_AREA &&
+    byteLength < MIN_MEANINGFUL_SCREENSHOT_BYTES
+  );
 }
 
 function readScreenshotMeta(
@@ -43,11 +56,12 @@ function resolveCurrentScreenshotMeta(meta: ScreenshotMeta | null): {
   renderBox?: unknown;
 } | null {
   if (!meta) return null;
-  if (meta.currentHash) {
+  const currentHash = normalizeHash(meta.currentHash);
+  if (currentHash) {
     return {
-      hash: meta.currentHash,
+      hash: currentHash,
       variant: "strict",
-      renderBox: meta.renderBoxes?.[meta.currentHash],
+      renderBox: meta.renderBoxes?.[currentHash],
     };
   }
 
@@ -125,6 +139,21 @@ async function proxyScreenshotMeta(
   }
 }
 
+function getLocalScreenshotPath(
+  projectId: string,
+  pageId: string,
+  hash: string,
+  variant: "strict" | "fast" = "strict",
+): string {
+  const projectDir = path.join(SCREENSHOTS_DIR, projectId);
+  return path.join(
+    projectDir,
+    variant === "strict"
+      ? `${pageId}.${hash}.png`
+      : `${pageId}.${hash}.${variant}.png`,
+  );
+}
+
 function readLocalScreenshot(
   projectId: string,
   pageId: string,
@@ -138,22 +167,12 @@ function readLocalScreenshot(
   if (hash && !normalizedHash) return null;
 
   const filePath = normalizedHash
-    ? path.join(
-        projectDir,
-        variant === "strict"
-          ? `${pageId}.${normalizedHash}.png`
-          : `${pageId}.${normalizedHash}.${variant}.png`,
-      )
+    ? getLocalScreenshotPath(projectId, pageId, normalizedHash, variant)
     : (() => {
         const meta = readScreenshotMeta(projectId, pageId);
         const current = resolveCurrentScreenshotMeta(meta);
         return current
-          ? path.join(
-              projectDir,
-              current.variant === "strict"
-                ? `${pageId}.${current.hash}.png`
-                : `${pageId}.${current.hash}.${current.variant}.png`,
-            )
+          ? getLocalScreenshotPath(projectId, pageId, current.hash, current.variant)
           : path.join(projectDir, `${pageId}.png`);
       })();
 
@@ -175,7 +194,14 @@ export async function GET(
 
     const meta = readScreenshotMeta(projectId, pageId);
     const current = resolveCurrentScreenshotMeta(meta);
-    if (!current) {
+    const currentBuffer = current
+      ? readLocalScreenshot(projectId, pageId, current.hash, current.variant)
+      : null;
+    if (
+      !current ||
+      !currentBuffer ||
+      isLikelyBlankScreenshot(currentBuffer.length, current.renderBox)
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -226,6 +252,19 @@ export async function GET(
       {
         success: false,
         error: { code: "NOT_FOUND", message: "Screenshot file not found" },
+      },
+      { status: 404 },
+    );
+  }
+  const meta = readScreenshotMeta(projectId, pageId);
+  const current = rawHash ? null : resolveCurrentScreenshotMeta(meta);
+  const renderBox =
+    hash && meta?.renderBoxes ? meta.renderBoxes[hash] : current?.renderBox;
+  if (isLikelyBlankScreenshot(buffer.length, renderBox)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "NOT_FOUND", message: "Screenshot file unavailable" },
       },
       { status: 404 },
     );

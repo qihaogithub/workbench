@@ -157,6 +157,10 @@ describe("screenshot file route", () => {
     fs.mkdirSync(projectDir, { recursive: true });
     const renderBox = { width: 375, height: 960, fullPage: true };
     fs.writeFileSync(
+      path.join(projectDir, "page_1.1111111111111111.png"),
+      Buffer.alloc(12_000, 1),
+    );
+    fs.writeFileSync(
       path.join(projectDir, "page_1.meta.json"),
       JSON.stringify({
         currentHash: "1111111111111111",
@@ -184,5 +188,34 @@ describe("screenshot file route", () => {
         renderBox,
       },
     });
+  });
+
+  it("meta 查询遇到本地过小 current 截图时返回 404", async () => {
+    const projectDir = path.join(tempDir, "screenshots", "proj_1");
+    fs.mkdirSync(projectDir, { recursive: true });
+    const renderBox = { width: 375, height: 960, fullPage: true };
+    fs.writeFileSync(
+      path.join(projectDir, "page_1.1111111111111111.png"),
+      Buffer.from("png"),
+    );
+    fs.writeFileSync(
+      path.join(projectDir, "page_1.meta.json"),
+      JSON.stringify({
+        currentHash: "1111111111111111",
+        renderBoxes: {
+          "1111111111111111": renderBox,
+        },
+      }),
+    );
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      createRequest(
+        "http://localhost/api/screenshots/file/proj_1/page_1?meta=1",
+      ),
+      { params: { projectId: "proj_1", pageId: "page_1" } },
+    );
+
+    expect(response.status).toBe(404);
   });
 });

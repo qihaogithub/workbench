@@ -61,12 +61,12 @@ export function computeCanvasRenderModes({
       .filter((page) => page.runtimeType === "prototype-html-css")
       .map((page) => page.id),
   );
-  for (const pageId of prototypePageIds) {
-    modes[pageId] = "prototype";
-  }
   const runtimePages = pages.filter((page) => !prototypePageIds.has(page.id));
 
-  if (runtimePages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
+  if (pages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
+    for (const pageId of prototypePageIds) {
+      modes[pageId] = "prototype";
+    }
     const activePageIds = runtimePages.map((page) => page.id);
     for (const pageId of activePageIds) {
       modes[pageId] = "iframe";
@@ -85,6 +85,14 @@ export function computeCanvasRenderModes({
   };
   const activePageIds: string[] = [];
   const iframeCandidates: Array<{ id: string; distance: number }> = [];
+
+  for (const pageId of prototypePageIds) {
+    if (editingPageId === pageId) {
+      modes[pageId] = "prototype";
+      continue;
+    }
+    modes[pageId] = screenshotUrls?.[pageId] ? "screenshot" : "prototype";
+  }
 
   for (const page of runtimePages) {
     if (!visiblePageIds.has(page.id)) {

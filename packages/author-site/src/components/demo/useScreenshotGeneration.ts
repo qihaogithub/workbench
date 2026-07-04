@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { ScreenshotRenderBox } from "@opencode-workbench/demo-ui";
+import type { PageSnapshotInput } from "@opencode-workbench/shared";
 
 const POLL_INTERVAL = 1500;
 const MIN_POLL_INTERVAL_MS = 300;
@@ -43,17 +44,27 @@ interface UseScreenshotGenerationOptions {
   pageIds?: string[];
 }
 
-interface BatchPageInput {
+type LegacyReactScreenshotInput = Omit<
+  Extract<PageSnapshotInput, { runtimeType: "high-fidelity-react" }>,
+  "runtimeType"
+> & {
+  runtimeType?: "high-fidelity-react";
+};
+
+export type ScreenshotBatchPageInput = (
+  | LegacyReactScreenshotInput
+  | Extract<PageSnapshotInput, { runtimeType: "prototype-html-css" }>
+) & {
   pageId: string;
-  code: string;
-  configData: Record<string, unknown>;
   width?: number;
   height?: number;
   fullPage?: boolean;
   priority?: ScreenshotPriority;
   renderMode?: ScreenshotRenderMode;
   measuredHeight?: number;
-}
+};
+
+type BatchPageInput = ScreenshotBatchPageInput;
 
 interface BatchResult {
   pageId: string;
@@ -448,8 +459,16 @@ export function useScreenshotGeneration(
             projectId,
             pages: pages.map((p) => ({
               pageId: p.pageId,
-              code: p.code,
+              ...(p.runtimeType === "prototype-html-css"
+                ? {
+                    runtimeType: p.runtimeType,
+                    prototypeHtml: p.prototypeHtml,
+                    prototypeCss: p.prototypeCss,
+                    prototypeMeta: p.prototypeMeta,
+                  }
+                : { runtimeType: "high-fidelity-react", code: p.code }),
               configData: p.configData || {},
+              previewSize: p.previewSize,
               width: p.width,
               height: p.height,
               fullPage: p.fullPage,
@@ -534,11 +553,10 @@ export function useScreenshotGeneration(
     ],
   );
 
-  const regeneratePage = useCallback(
+  const regeneratePageSnapshot = useCallback(
     async (
       pageId: string,
-      code: string,
-      configData: Record<string, unknown>,
+      snapshotInput: PageSnapshotInput,
       width?: number,
       height?: number,
       fullPage?: boolean,
@@ -568,8 +586,16 @@ export function useScreenshotGeneration(
           body: JSON.stringify({
             projectId,
             pageId,
-            code,
-            configData: configData || {},
+            runtimeType: snapshotInput.runtimeType,
+            ...(snapshotInput.runtimeType === "prototype-html-css"
+              ? {
+                  prototypeHtml: snapshotInput.prototypeHtml,
+                  prototypeCss: snapshotInput.prototypeCss,
+                  prototypeMeta: snapshotInput.prototypeMeta,
+                }
+              : { code: snapshotInput.code }),
+            configData: snapshotInput.configData || {},
+            previewSize: snapshotInput.previewSize,
             width,
             height,
             fullPage,
@@ -634,6 +660,37 @@ export function useScreenshotGeneration(
     [projectId, sessionId, enabled, getScreenshotUrl],
   );
 
+  const regeneratePage = useCallback(
+    async (
+      pageId: string,
+      code: string,
+      configData: Record<string, unknown>,
+      width?: number,
+      height?: number,
+      fullPage?: boolean,
+      priority: ScreenshotPriority = "active",
+      renderMode: ScreenshotRenderMode = "strict",
+      measuredHeight?: number,
+    ) => {
+      return regeneratePageSnapshot(
+        pageId,
+        {
+          runtimeType: "high-fidelity-react",
+          code,
+          configData: configData || {},
+          previewSize: width || height ? { width, height } : undefined,
+        },
+        width,
+        height,
+        fullPage,
+        priority,
+        renderMode,
+        measuredHeight,
+      );
+    },
+    [regeneratePageSnapshot],
+  );
+
   useEffect(() => {
     checkServiceHealth();
   }, [checkServiceHealth]);
@@ -663,6 +720,7 @@ export function useScreenshotGeneration(
     checkServiceHealth,
     preloadScreenshotMeta,
     startBatchGeneration,
+    regeneratePageSnapshot,
     regeneratePage,
     invalidatePageScreenshot,
     invalidatePageScreenshots,

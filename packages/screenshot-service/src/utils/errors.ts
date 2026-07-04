@@ -3,6 +3,7 @@ export type ScreenshotErrorCode =
   | "RUNTIME_ERROR"
   | "BROWSER_LAUNCH_ERROR"
   | "RENDER_TIMEOUT"
+  | "EMPTY_RENDER"
   | "SELECTOR_TIMEOUT"
   | "QUEUE_TIMEOUT"
   | "SCREENSHOT_WRITE_ERROR"

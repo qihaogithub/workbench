@@ -1,6 +1,14 @@
 {
   "projects": [
     {
+      "id": "proj_1782718596686_wmv9yu",
+      "name": "App通用广告弹窗",
+      "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
+      "publishedAt": 1783123336299,
+      "publishedVersion": "v10",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1783042627508_t1czw2",
       "name": "伴读广告页面",
       "publishedAt": 1783050200018,
@@ -13,14 +21,6 @@
       "thumbnail": "/data/proj_1779608460375/thumbnail.png",
       "publishedAt": 1782830809395,
       "publishedVersion": "v14",
-      "demoCount": 2
-    },
-    {
-      "id": "proj_1779608460377",
-      "name": "通用弹窗",
-      "thumbnail": "/data/proj_1779608460377/thumbnail.webp",
-      "publishedAt": 1782440424755,
-      "publishedVersion": "v28",
       "demoCount": 2
     },
     {
@@ -46,5 +46,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1783063310276
+  "generatedAt": 1783123791660
 }

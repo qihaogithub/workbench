@@ -55,6 +55,7 @@ const mockUpdateDemo = updateDemo as jest.MockedFunction<typeof updateDemo>;
 const mockUpdateProjectTemplate = updateProjectTemplate as jest.MockedFunction<
   typeof updateProjectTemplate
 >;
+const originalFetch = global.fetch;
 
 const demos = [
   {
@@ -119,6 +120,7 @@ describe("HomePage", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    global.fetch = originalFetch;
   });
 
   it("普通项目卡片主体链接到项目编辑页", () => {
@@ -127,6 +129,65 @@ describe("HomePage", () => {
     expect(screen.getByRole("link", { name: "打开项目 活动页" })).toHaveAttribute(
       "href",
       "/demo/proj-1/edit",
+    );
+  });
+
+  it("无手动封面的项目会触发截图 ensure 并使用 hash meta 缩略图", async () => {
+    const revalidate = jest.fn();
+    mockUseDemos.mockReturnValue({
+      demos: [
+        {
+          id: "proj-cover",
+          name: "自动封面项目",
+          category: "活动",
+          createdAt: 1,
+          updatedAt: 2,
+          demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null }],
+        },
+      ],
+      isLoading: false,
+      error: null,
+      revalidate,
+    });
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/screenshots/ensure") {
+        return new Response(
+          JSON.stringify({ success: true, data: { generated: 1 } }),
+        );
+      }
+      if (url.includes("/api/screenshots/file/proj-cover/page-1?meta=1")) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              url: "/api/screenshots/file/proj-cover/page-1?hash=1111111111111111",
+            },
+          }),
+        );
+      }
+      return new Response(JSON.stringify({ success: false }), { status: 404 });
+    }) as typeof fetch;
+
+    render(<HomePage initialDemos={[]} />);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/screenshots/ensure",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ projectId: "proj-cover" }),
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/screenshots/file/proj-cover/page-1?meta=1",
+        { cache: "no-store" },
+      );
+    });
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/screenshots/file/proj-cover/page-1",
     );
   });
 

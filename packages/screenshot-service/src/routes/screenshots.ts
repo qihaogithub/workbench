@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "crypto";
 import { config } from "../config";
-import { getBrowserPool } from "../utils/browser-pool";
+import {
+  getBrowserPool,
+  isLikelyBlankScreenshot,
+} from "../utils/browser-pool";
 import { compileCode } from "../utils/compile-client";
 import { getCompileCache } from "../utils/compile-cache";
 import {
@@ -21,6 +24,11 @@ import {
   type ScreenshotVariant,
 } from "../utils/screenshot-store";
 import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
+import {
+  buildPrototypePreviewDocumentHtml,
+  type PageSnapshotInput,
+  type PrototypePageMeta,
+} from "@opencode-workbench/shared";
 import type {
   RenderStageTimings,
   ScreenshotPriority,
@@ -31,11 +39,18 @@ import { getScreenshotMetrics } from "../utils/screenshot-metrics";
 
 // --- Request schemas ---
 
-interface GenerateRequest {
+type RequestSnapshotInput =
+  | PageSnapshotInput
+  | {
+      runtimeType?: "high-fidelity-react";
+      code: string;
+      configData?: Record<string, unknown>;
+      previewSize?: PageSnapshotInput["previewSize"];
+    };
+
+type GenerateRequest = RequestSnapshotInput & {
   projectId: string;
   pageId: string;
-  code: string;
-  configData: Record<string, unknown>;
   width?: number;
   height?: number;
   fullPage?: boolean;
@@ -43,19 +58,19 @@ interface GenerateRequest {
   priority?: ScreenshotPriority;
   renderMode?: ScreenshotRenderMode;
   measuredHeight?: number;
-}
+  force?: boolean;
+};
 
-interface BatchPage {
+type BatchPage = RequestSnapshotInput & {
   pageId: string;
-  code: string;
-  configData: Record<string, unknown>;
   width?: number;
   height?: number;
   fullPage?: boolean;
   priority?: ScreenshotPriority;
   renderMode?: ScreenshotRenderMode;
   measuredHeight?: number;
-}
+  force?: boolean;
+};
 
 interface GenerateBatchRequest {
   projectId: string;
@@ -237,6 +252,19 @@ function buildScreenshotUrl(
     params.set("variant", variant);
   }
   return `${base}?${params.toString()}`;
+}
+
+async function isReadableHealthyScreenshot(
+  projectId: string,
+  pageId: string,
+  hash: string,
+  variant: ScreenshotVariant = "strict",
+): Promise<boolean> {
+  const [buffer, renderBox] = await Promise.all([
+    readScreenshot(projectId, pageId, hash, variant),
+    readScreenshotRenderBox(projectId, pageId, hash, variant),
+  ]);
+  return Boolean(buffer && !isLikelyBlankScreenshot(buffer.length, renderBox));
 }
 
 function createPriorityStats(): Record<ScreenshotPriority, BatchPriorityStats> {
@@ -424,14 +452,95 @@ function createScreenshotIdentity(sessionId?: string): Record<string, unknown> {
   };
 }
 
-function computePageHash(page: BatchPage, sessionId?: string): string {
+function normalizeConfigData(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function normalizePrototypeMeta(meta: PrototypePageMeta | undefined): Record<string, unknown> | undefined {
+  if (!meta || typeof meta !== "object") return undefined;
+  const visualKeys = ["width", "height", "backgroundColor", "theme"];
+  const result: Record<string, unknown> = {};
+  for (const key of visualKeys) {
+    if (meta[key] !== undefined) result[key] = meta[key];
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizeSnapshotInput(
+  input: RequestSnapshotInput,
+  width: number,
+  height: number,
+): PageSnapshotInput | null {
+  const previewSize = input.previewSize ?? { width, height };
+  const configData = normalizeConfigData(input.configData);
+
+  if (input.runtimeType === "prototype-html-css") {
+    if (typeof input.prototypeHtml !== "string" || input.prototypeHtml.length === 0) {
+      return null;
+    }
+    return {
+      runtimeType: "prototype-html-css",
+      prototypeHtml: input.prototypeHtml,
+      prototypeCss: typeof input.prototypeCss === "string" ? input.prototypeCss : "",
+      prototypeMeta: normalizePrototypeMeta(input.prototypeMeta),
+      configData,
+      previewSize,
+    };
+  }
+
+  if (typeof input.code !== "string" || input.code.length === 0) {
+    return null;
+  }
+  return {
+    runtimeType: "high-fidelity-react",
+    code: input.code,
+    configData,
+    previewSize,
+  };
+}
+
+function getSnapshotHashSource(input: PageSnapshotInput): string {
+  if (input.runtimeType === "high-fidelity-react") {
+    return input.code;
+  }
+  return JSON.stringify({
+    runtimeType: input.runtimeType,
+    prototypeHtml: input.prototypeHtml,
+    prototypeCss: input.prototypeCss || "",
+    prototypeMeta: normalizePrototypeMeta(input.prototypeMeta),
+  });
+}
+
+function computeSnapshotHash(
+  input: PageSnapshotInput,
+  width: number,
+  height: number,
+  fullPage: boolean,
+  sessionId?: string,
+): string {
   return computeScreenshotHash(
-    page.code,
-    page.configData || {},
-    page.width || config.viewport.width,
-    page.height || config.viewport.height,
-    page.fullPage ?? false,
+    getSnapshotHashSource(input),
+    input.configData || {},
+    width,
+    height,
+    fullPage,
     createScreenshotIdentity(sessionId),
+  );
+}
+
+function computePageHash(page: BatchPage, sessionId?: string): string {
+  const width = page.width || config.viewport.width;
+  const height = page.height || config.viewport.height;
+  const snapshotInput = normalizeSnapshotInput(page, width, height);
+  if (!snapshotInput) return "";
+  return computeSnapshotHash(
+    snapshotInput,
+    width,
+    height,
+    page.fullPage ?? false,
+    sessionId,
   );
 }
 
@@ -444,38 +553,44 @@ function getPageVariant(page: Pick<BatchPage, "renderMode">): ScreenshotVariant 
 async function generateScreenshot(
   projectId: string,
   pageId: string,
-  code: string,
-  configData: Record<string, unknown>,
+  snapshotInput: PageSnapshotInput,
   width: number,
   height: number,
   fullPage: boolean,
   requestId: string,
   priority: ScreenshotPriority,
   renderMode: ScreenshotRenderMode,
+  force = false,
   measuredHeight?: number,
   sessionId?: string,
 ): Promise<GenerateScreenshotResult> {
   const startTime = Date.now();
 
-  const hash = computeScreenshotHash(
-    code,
-    configData,
+  const hash = computeSnapshotHash(
+    snapshotInput,
     width,
     height,
     fullPage,
-    createScreenshotIdentity(sessionId),
+    sessionId,
   );
   const variant: ScreenshotVariant = renderMode;
 
   // Check cache
-  if (await screenshotExists(projectId, pageId, hash, variant)) {
+  if (!force && (await screenshotExists(projectId, pageId, hash, variant))) {
     const renderBox = await readScreenshotRenderBox(
       projectId,
       pageId,
       hash,
       variant,
     );
-    if (renderBox) {
+    const buffer = renderBox
+      ? await readScreenshot(projectId, pageId, hash, variant)
+      : null;
+    if (
+      renderBox &&
+      buffer &&
+      !isLikelyBlankScreenshot(buffer.length, renderBox)
+    ) {
       const assetUrl = buildScreenshotUrl(projectId, pageId, hash, variant);
       const elapsed = Date.now() - startTime;
       const renderStages = createEmptyRenderStageTimings();
@@ -523,7 +638,7 @@ async function generateScreenshot(
 
   const inFlightKey = `${projectId}:${pageId}:${hash}:${variant}`;
   const inFlight = inFlightScreenshots.get(inFlightKey);
-  if (inFlight) {
+  if (!force && inFlight) {
     const result = await inFlight;
     return {
       ...result,
@@ -538,8 +653,7 @@ async function generateScreenshot(
   const generatePromise = generateScreenshotUncached(
     projectId,
     pageId,
-    code,
-    configData,
+    snapshotInput,
     width,
     height,
     fullPage,
@@ -561,8 +675,7 @@ async function generateScreenshot(
 async function generateScreenshotUncached(
   projectId: string,
   pageId: string,
-  code: string,
-  configData: Record<string, unknown>,
+  snapshotInput: PageSnapshotInput,
   width: number,
   height: number,
   fullPage: boolean,
@@ -574,38 +687,50 @@ async function generateScreenshotUncached(
   startTime: number,
   sessionId?: string,
 ): Promise<GenerateScreenshotResult> {
-  const compileCache = getCompileCache();
-  const cacheScope = sessionId || "global";
-  const compileStart = Date.now();
-  let compileResult = compileCache.get(code, cacheScope);
-  const compileHit = Boolean(compileResult);
+  let compileMs = 0;
+  let compileHit = false;
+  let html: string;
 
-  if (!compileResult) {
-    try {
-      compileResult = await compileCode(code, sessionId);
-      compileCache.set(code, compileResult, cacheScope);
-    } catch (error) {
-      throw new ScreenshotError(
-        "COMPILE_ERROR",
-        `代码编译失败: ${getErrorMessage(error)}`,
-        error,
-      );
+  if (snapshotInput.runtimeType === "high-fidelity-react") {
+    const compileCache = getCompileCache();
+    const cacheScope = sessionId || "global";
+    const compileStart = Date.now();
+    let compileResult = compileCache.get(snapshotInput.code, cacheScope);
+    compileHit = Boolean(compileResult);
+
+    if (!compileResult) {
+      try {
+        compileResult = await compileCode(snapshotInput.code, sessionId);
+        compileCache.set(snapshotInput.code, compileResult, cacheScope);
+      } catch (error) {
+        throw new ScreenshotError(
+          "COMPILE_ERROR",
+          `代码编译失败: ${getErrorMessage(error)}`,
+          error,
+        );
+      }
     }
-  }
-  const compileMs = Date.now() - compileStart;
+    compileMs = Date.now() - compileStart;
 
-  // Generate HTML
-  const html = generateIframeHtml({
-    compiledCode: compileResult.moduleUrl ? undefined : compileResult.compiledCode,
-    compiledCodeUrl: compileResult.moduleUrl,
-    cssImports: compileResult.cssImports,
-    configData,
-    cdnBaseUrl: config.cdnBaseUrl,
-    runtimeBaseUrl: config.authorSiteUrl,
-    useCdnRuntime: config.previewRuntimeSource === "cdn",
-    supportUrlMode: true,
-    baseOrigin: config.authorSiteUrl,
-  });
+    html = generateIframeHtml({
+      compiledCode: compileResult.moduleUrl ? undefined : compileResult.compiledCode,
+      compiledCodeUrl: compileResult.moduleUrl,
+      cssImports: compileResult.cssImports,
+      configData: snapshotInput.configData,
+      cdnBaseUrl: config.cdnBaseUrl,
+      runtimeBaseUrl: config.authorSiteUrl,
+      useCdnRuntime: config.previewRuntimeSource === "cdn",
+      supportUrlMode: true,
+      baseOrigin: config.authorSiteUrl,
+    });
+  } else {
+    html = buildPrototypePreviewDocumentHtml({
+      html: snapshotInput.prototypeHtml,
+      css: snapshotInput.prototypeCss,
+      configData: snapshotInput.configData,
+      previewSize: snapshotInput.previewSize ?? { width, height },
+    });
+  }
 
   // Render screenshot
   const pool = getBrowserPool();
@@ -689,8 +814,6 @@ async function handleGenerate(
   const {
     projectId,
     pageId,
-    code,
-    configData,
     width,
     height,
     fullPage,
@@ -698,9 +821,10 @@ async function handleGenerate(
     priority,
     renderMode,
     measuredHeight,
+    force,
   } = request.body;
 
-  if (!projectId || !pageId || !code) {
+  if (!projectId || !pageId) {
     return reply.status(400).send({
       success: false,
       error: { code: "INVALID_REQUEST", message: "缺少必要参数" },
@@ -709,19 +833,26 @@ async function handleGenerate(
 
   const w = width || config.viewport.width;
   const h = height || config.viewport.height;
+  const snapshotInput = normalizeSnapshotInput(request.body, w, h);
+  if (!snapshotInput) {
+    return reply.status(400).send({
+      success: false,
+      error: { code: "INVALID_REQUEST", message: "截图输入无效" },
+    });
+  }
 
   try {
     const result = await generateScreenshot(
       projectId,
       pageId,
-      code,
-      configData || {},
+      snapshotInput,
       w,
       h,
       fullPage ?? false,
       requestId,
       normalizePriority(priority || "active"),
       normalizeRenderMode(renderMode),
+      Boolean(force),
       measuredHeight,
       sessionId,
     );
@@ -752,7 +883,11 @@ async function handleGenerate(
 
     request.log.warn({ requestId, projectId, pageId, code, message }, "screenshot failed");
 
-    if (code === "COMPILE_ERROR" || code === "RUNTIME_ERROR") {
+    if (
+      code === "COMPILE_ERROR" ||
+      code === "RUNTIME_ERROR" ||
+      code === "EMPTY_RENDER"
+    ) {
       return reply.status(422).send({
         success: false,
         error: { code, message },
@@ -777,6 +912,20 @@ async function handleGenerateBatch(
     return reply.status(400).send({
       success: false,
       error: { code: "INVALID_REQUEST", message: "缺少必要参数" },
+    });
+  }
+  const invalidPage = pages.find((page) => {
+    const width = page.width || config.viewport.width;
+    const height = page.height || config.viewport.height;
+    return !normalizeSnapshotInput(page, width, height);
+  });
+  if (invalidPage) {
+    return reply.status(400).send({
+      success: false,
+      error: {
+        code: "INVALID_REQUEST",
+        message: `页面 ${invalidPage.pageId || "(unknown)"} 截图输入无效`,
+      },
     });
   }
 
@@ -871,18 +1020,22 @@ async function processBatch(
       try {
         const w = page.width || config.viewport.width;
         const h = page.height || config.viewport.height;
+        const snapshotInput = normalizeSnapshotInput(page, w, h);
+        if (!snapshotInput) {
+          throw new ScreenshotError("COMPILE_ERROR", "截图输入无效");
+        }
 
         const result = await generateScreenshot(
           batch.projectId,
           page.pageId,
-          page.code,
-          page.configData || {},
+          snapshotInput,
           w,
           h,
           page.fullPage ?? false,
           requestId,
           priority,
           normalizeRenderMode(page.renderMode),
+          Boolean(page.force),
           page.measuredHeight,
           sessionId,
         );
@@ -984,6 +1137,18 @@ async function handleFile(
         error: { code: "NOT_FOUND", message: "截图元数据不存在" },
       });
     }
+    const healthy = await isReadableHealthyScreenshot(
+      projectId,
+      pageId,
+      meta.currentHash,
+      "strict",
+    );
+    if (!healthy) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: "NOT_FOUND", message: "截图文件不可用" },
+      });
+    }
 
     return reply.header("Cache-Control", "no-store").send({
       success: true,
@@ -1008,6 +1173,15 @@ async function handleFile(
     return reply.status(404).send({
       success: false,
       error: { code: "NOT_FOUND", message: "截图文件不存在" },
+    });
+  }
+  const renderBox = normalizedHash
+    ? await readScreenshotRenderBox(projectId, pageId, normalizedHash, variant)
+    : undefined;
+  if (isLikelyBlankScreenshot(buffer.length, renderBox)) {
+    return reply.status(404).send({
+      success: false,
+      error: { code: "NOT_FOUND", message: "截图文件不可用" },
     });
   }
 

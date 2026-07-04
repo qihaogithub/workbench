@@ -1,6 +1,15 @@
 import type { DemoPageRuntimeType } from "./workspace";
 
 export type { DemoPageRuntimeType } from "./workspace";
+export {
+  applyPrototypeBindings,
+  applyPrototypeTextBindings,
+  buildPrototypePreviewDocumentHtml,
+  buildPrototypePreviewHtmlFragment,
+  normalizePrototypeViewportUnits,
+  sanitizePrototypeCss,
+  sanitizePrototypeHtml,
+} from "./demo/prototype-preview";
 
 export interface PrototypePageMeta {
   width?: number;
@@ -44,6 +53,30 @@ export interface DemoFiles {
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
 }
+
+interface PageSnapshotBaseInput {
+  configData: Record<string, unknown>;
+  previewSize?: {
+    width?: string | number;
+    height?: string | number;
+  };
+}
+
+export interface HighFidelityReactPageSnapshotInput extends PageSnapshotBaseInput {
+  runtimeType: "high-fidelity-react";
+  code: string;
+}
+
+export interface PrototypeHtmlCssPageSnapshotInput extends PageSnapshotBaseInput {
+  runtimeType: "prototype-html-css";
+  prototypeHtml: string;
+  prototypeCss?: string;
+  prototypeMeta?: PrototypePageMeta;
+}
+
+export type PageSnapshotInput =
+  | HighFidelityReactPageSnapshotInput
+  | PrototypeHtmlCssPageSnapshotInput;
 
 /**
  * 多页面文件集合（取代旧的单页 DemoFiles 顶层结构）
