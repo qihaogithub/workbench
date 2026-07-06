@@ -35,13 +35,10 @@ import type {
   ProjectAuthoringPreferences,
   PrototypePageMeta,
   SketchSceneDocument,
-  SketchScenePatchOperation,
 } from "@workbench/shared";
 import {
-  applySketchScenePatchOperations,
   createDefaultSketchScene,
   parseSketchSceneDocument,
-  validateSketchSceneDocument,
 } from "@workbench/sketch-core";
 import {
   useScreenshotGeneration,
@@ -161,20 +158,6 @@ import { useVisualEditState } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { useCommandHistory } from "./hooks/useCommandHistory";
 import {
-  createOpenPencilPatchSummaryRecord,
-  readOpenPencilPatchSummaryForScene,
-  type OpenPencilPatchSummaryRecord,
-} from "./lib/openpencil-patch-summary";
-import {
-  buildOpenPencilPatchMergeConflictSummary,
-  createOpenPencilMergeConflictError,
-  filterOpenPencilPatchOperationsForMergeResolution,
-  hasOpenPencilPatchMergeConflicts,
-  parseOpenPencilPatchBaseSceneKey,
-  type OpenPencilMergeConflictResolutionMode,
-} from "./lib/openpencil-merge-conflict";
-import { createOpenPencilSaveFailureError } from "./lib/openpencil-save-error";
-import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
 } from "./single-preview-history";
@@ -205,10 +188,6 @@ import type {
   UserAuthoringPreferences,
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
-import {
-  OPENPENCIL_SKETCH_SPIKE_ENABLED,
-  OPENPENCIL_SPIKE_EDITOR_URL,
-} from "@/lib/authoring-feature-flags";
 import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { format } from "date-fns";
@@ -643,9 +622,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }>>({});
   const pageSketchMapRef = useRef(pageSketchMap);
   pageSketchMapRef.current = pageSketchMap;
-  const openPencilPatchSummaryRef = useRef<
-    Record<string, OpenPencilPatchSummaryRecord>
-  >({});
   const [sketchEditing, setSketchEditing] = useState(false);
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@workbench/demo-ui").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
@@ -2268,14 +2244,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ],
   );
 
-  const getOpenPencilPatchSummaryForPage = useCallback((pageId: string) => {
-    const scene = parseSketchSceneDocument(pageSketchMapRef.current[pageId]?.scene);
-    return readOpenPencilPatchSummaryForScene(
-      openPencilPatchSummaryRef.current[pageId],
-      scene,
-    );
-  }, []);
-
   // Version control hook
   const versionControl = useVersionControl({
     demoId,
@@ -2301,7 +2269,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setPageCodes,
     setHasUnsavedChanges,
     setIsSaving,
-    getSketchPatchSummary: getOpenPencilPatchSummaryForPage,
   });
   const {
     publishStatus,
@@ -2390,10 +2357,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     const remoteScene = parseSketchSceneDocument(activeSketchSceneCollab.value);
     if (!remoteScene) return;
 
-    openPencilPatchSummaryRef.current = {
-      ...openPencilPatchSummaryRef.current,
-    };
-    delete openPencilPatchSummaryRef.current[currentPageId];
     pageSketchMapRef.current = {
       ...pageSketchMapRef.current,
       [currentPageId]: {
@@ -4043,90 +4006,6 @@ ${context.details}
     [activeDemoId, pageSketchMap],
   );
 
-  const readLatestOpenPencilScene = useCallback(async () => {
-    if (!activeDemoId || !sessionId) {
-      throw new Error("未选中手绘页面或 Session 未创建");
-    }
-    const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`);
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result?.success) {
-      throw new Error(result?.error?.message || "加载最新手绘内容失败");
-    }
-
-    const latestSceneText =
-      typeof result.data?.sketchScene === "string"
-        ? result.data.sketchScene
-        : undefined;
-    const latestScene = parseSketchSceneDocument(latestSceneText);
-    if (!latestScene || !latestSceneText) {
-      throw new Error("最新手绘内容无法解析，请刷新页面后重试");
-    }
-
-    const latestMeta =
-      result.data?.sketchMeta &&
-      typeof result.data.sketchMeta === "object" &&
-      !Array.isArray(result.data.sketchMeta)
-        ? (result.data.sketchMeta as Record<string, unknown>)
-        : pageSketchMapRef.current[activeDemoId]?.meta;
-
-    return {
-      scene: latestScene,
-      sceneText: latestSceneText,
-      meta: latestMeta,
-    };
-  }, [activeDemoId, sessionId]);
-
-  const handleReloadOpenPencilLatestScene = useCallback(async () => {
-    if (!activeDemoId) {
-      throw new Error("未选中手绘页面");
-    }
-    const latest = await readLatestOpenPencilScene();
-
-    replaceCollabText(activeSketchSceneCollab.ytext, latest.sceneText);
-    pageSketchMapRef.current = {
-      ...pageSketchMapRef.current,
-      [activeDemoId]: {
-        ...(pageSketchMapRef.current[activeDemoId] ?? {}),
-        scene: latest.sceneText,
-        meta: latest.meta,
-      },
-    };
-    setPageSketchMap((prev) => ({
-      ...prev,
-      [activeDemoId]: {
-        ...(prev[activeDemoId] ?? {}),
-        scene: latest.sceneText,
-        meta: latest.meta,
-      },
-    }));
-    delete openPencilPatchSummaryRef.current[activeDemoId];
-    invalidatePageScreenshot(activeDemoId);
-    scheduleScreenshotRegenerate(
-      activeDemoId,
-      undefined,
-      configDataMapRef.current[activeDemoId],
-    );
-    recordDiagnosticEvent({
-      category: "page",
-      name: "page.openpencil_conflict_reloaded",
-      traceId: createDiagnosticTraceId("openpencil-reload"),
-      details: {
-        pageId: activeDemoId,
-        status: "reloaded",
-        success: true,
-        currentNodeCount: latest.scene.nodes.length,
-      },
-    });
-  }, [
-    activeDemoId,
-    activeSketchSceneCollab.ytext,
-    createDiagnosticTraceId,
-    invalidatePageScreenshot,
-    readLatestOpenPencilScene,
-    recordDiagnosticEvent,
-    scheduleScreenshotRegenerate,
-  ]);
-
   // handlePreviewPageVersion and handleRestorePageVersion moved to useVersionControl hook
   // handleCreateVersion moved to useVersionControl hook
   // hasPendingChanges moved to useVersionControl hook
@@ -4151,298 +4030,6 @@ ${context.details}
       );
     }
   }, [sessionId]);
-
-  const handleOpenPencilSceneCommit = useCallback(
-    async (
-      scene: SketchSceneDocument,
-      draft?: {
-        patchBaseSceneKey?: string;
-        patchOperations?: SketchScenePatchOperation[];
-      },
-    ) => {
-      if (!activeDemoId || !sessionId) {
-        throw new Error("未选中手绘页面或 Session 未创建");
-      }
-
-      const sceneText = JSON.stringify(scene, null, 2);
-      const sketchPatch = draft?.patchOperations?.length
-        ? {
-            baseSceneKey: draft.patchBaseSceneKey,
-            operations: draft.patchOperations,
-          }
-        : undefined;
-      const saveTraceId = createDiagnosticTraceId("openpencil-save");
-
-      if (workspaceId) {
-        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-      }
-
-      const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sketchScene: sketchPatch ? undefined : sceneText,
-          sketchMeta: pageSketchMapRef.current[activeDemoId]?.meta,
-          sketchPatch,
-          diagnosticContext: {
-            editorSessionId,
-            traceId: saveTraceId,
-          },
-        }),
-      });
-      if (!response.ok) {
-        const result = await response.json().catch(() => null);
-        throw createOpenPencilSaveFailureError({
-            status: response.status,
-            message: result?.error?.message,
-        });
-      }
-
-      if (!sketchPatch) {
-        const currentScene = pageSketchMapRef.current[activeDemoId]?.scene;
-        const currentNodeCount = currentScene
-          ? parseSketchSceneDocument(currentScene)?.nodes.length
-          : undefined;
-        recordDiagnosticEvent({
-          category: "page",
-          name: "page.openpencil_full_draft_fallback",
-          traceId: saveTraceId,
-          level: "info",
-          details: {
-            pageId: activeDemoId,
-            status: "fallback-saved",
-            success: true,
-            operationCount: 0,
-            hasBaseSceneKey: false,
-            currentNodeCount,
-            targetNodeCount: scene.nodes.length,
-            targetSource: "client_scene",
-          },
-        });
-      }
-
-      await persistWorkspaceToProject();
-      handleSketchSceneChange(scene);
-      const patchSummaryRecord = createOpenPencilPatchSummaryRecord(
-        scene,
-        draft,
-      );
-      if (patchSummaryRecord) {
-        openPencilPatchSummaryRef.current[activeDemoId] = patchSummaryRecord;
-      } else {
-        delete openPencilPatchSummaryRef.current[activeDemoId];
-      }
-      setHasPendingWorkspaceFlush(false);
-      setWorkspaceFlushError(null);
-    },
-    [
-      activeDemoId,
-      createDiagnosticTraceId,
-      demoId,
-      editorSessionId,
-      handleSketchSceneChange,
-      persistWorkspaceToProject,
-      sessionId,
-      workspaceId,
-    ],
-  );
-
-  const handleMergeOpenPencilLatestSceneWithDraft = useCallback(
-    async (draft: {
-      patchBaseSceneKey?: string;
-      patchOperations?: SketchScenePatchOperation[];
-    }, options?: {
-      conflictResolution?: OpenPencilMergeConflictResolutionMode;
-      skipOperationIndices?: number[];
-      overrideFieldConflictKeys?: string[];
-    }) => {
-      if (!activeDemoId || !sessionId) {
-        throw new Error("未选中手绘页面或 Session 未创建");
-      }
-      if (!draft.patchOperations?.length) {
-        throw new Error("本次手绘改动没有可合并的 patch，请加载最新内容后重新编辑");
-      }
-
-      const latest = await readLatestOpenPencilScene();
-      const patchBaseScene = parseOpenPencilPatchBaseSceneKey(
-        draft.patchBaseSceneKey,
-      );
-      const conflictSummary = buildOpenPencilPatchMergeConflictSummary(
-        latest.scene,
-        draft.patchOperations,
-        { baseScene: patchBaseScene },
-      );
-      let operationsToMerge = draft.patchOperations;
-      let skippedOperationIndices: number[] = [];
-      let skippedAffectedNodeIds: string[] = [];
-      if (hasOpenPencilPatchMergeConflicts(conflictSummary)) {
-        const conflictResolution = options?.conflictResolution ?? "strict";
-        const filtered = filterOpenPencilPatchOperationsForMergeResolution(
-          draft.patchOperations,
-          conflictSummary,
-          conflictResolution,
-          {
-            skipOperationIndices: options?.skipOperationIndices,
-          },
-        );
-        if (
-          conflictResolution === "skip-conflicting-operations" ||
-          conflictResolution === "skip-selected-operations"
-        ) {
-          operationsToMerge = filtered.operations;
-          skippedOperationIndices = filtered.skippedOperationIndices;
-          skippedAffectedNodeIds = filtered.skippedAffectedNodeIds;
-        }
-        const remainingConflictSummary = buildOpenPencilPatchMergeConflictSummary(
-          latest.scene,
-          operationsToMerge,
-          {
-            baseScene: patchBaseScene,
-            ignoredFieldConflictKeys:
-              conflictResolution === "override-selected-field-conflicts"
-                ? options?.overrideFieldConflictKeys
-                : undefined,
-          },
-        );
-        if (
-          conflictResolution === "strict" ||
-          operationsToMerge.length === 0 ||
-          hasOpenPencilPatchMergeConflicts(remainingConflictSummary)
-        ) {
-          const summary =
-            conflictResolution === "strict" || operationsToMerge.length === 0
-              ? conflictSummary
-              : remainingConflictSummary;
-          recordDiagnosticEvent({
-            category: "page",
-            name: "page.openpencil_conflict_merge_blocked",
-            traceId: createDiagnosticTraceId("openpencil-merge"),
-            level: "warn",
-            details: {
-              pageId: activeDemoId,
-              status: operationsToMerge.length === 0 ? "blocked-empty" : "blocked",
-              success: false,
-              conflictResolution,
-              operationCount: summary.operationCount,
-              latestNodeCount: summary.latestNodeCount,
-              affectedNodeCount: summary.affectedNodeIds.length,
-              missingNodeCount: summary.missingNodeIds.length,
-              duplicateNodeCount: summary.duplicateNodeIds.length,
-              fieldConflictCount: summary.fieldConflicts.length,
-              incompatibleOperationCount: summary.incompatibleOperationCount,
-              skippedOperationCount: skippedOperationIndices.length,
-              skippedAffectedNodeCount: skippedAffectedNodeIds.length,
-              overriddenFieldConflictCount:
-                conflictResolution === "override-selected-field-conflicts"
-                  ? options?.overrideFieldConflictKeys?.length ?? 0
-                  : 0,
-            },
-          });
-          throw createOpenPencilMergeConflictError(
-            operationsToMerge.length === 0
-              ? "本次手绘改动没有可安全合并的操作，请加载最新内容后重新编辑。"
-              : "本次手绘改动无法自动合并到最新内容，请查看冲突摘要后加载最新内容重新编辑。",
-            summary,
-          );
-        }
-      }
-      const mergedScene = applySketchScenePatchOperations(
-        latest.scene,
-        operationsToMerge,
-      );
-      const validation = validateSketchSceneDocument(mergedScene);
-      if (!validation.valid) {
-        throw new Error("本次手绘改动无法安全合并到最新内容，请加载最新内容后重新编辑");
-      }
-
-      replaceCollabText(activeSketchSceneCollab.ytext, latest.sceneText);
-      pageSketchMapRef.current = {
-        ...pageSketchMapRef.current,
-        [activeDemoId]: {
-          ...(pageSketchMapRef.current[activeDemoId] ?? {}),
-          scene: latest.sceneText,
-          meta: latest.meta,
-        },
-      };
-
-      if (workspaceId) {
-        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
-      }
-
-      const mergedSceneText = JSON.stringify(mergedScene, null, 2);
-      const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sketchScene: mergedSceneText,
-          sketchMeta: latest.meta,
-          sketchPatch: {
-            operations: operationsToMerge,
-          },
-          diagnosticContext: {
-            editorSessionId,
-            traceId: createDiagnosticTraceId("openpencil-merge"),
-          },
-        }),
-      });
-      if (!response.ok) {
-        const result = await response.json().catch(() => null);
-        throw createOpenPencilSaveFailureError({
-          status: response.status,
-          message: result?.error?.message,
-        });
-      }
-
-      await persistWorkspaceToProject();
-      handleSketchSceneChange(mergedScene);
-      const patchSummaryRecord = createOpenPencilPatchSummaryRecord(
-        mergedScene,
-        { patchOperations: operationsToMerge },
-      );
-      if (patchSummaryRecord) {
-        openPencilPatchSummaryRef.current[activeDemoId] = patchSummaryRecord;
-      } else {
-        delete openPencilPatchSummaryRef.current[activeDemoId];
-      }
-      setHasPendingWorkspaceFlush(false);
-      setWorkspaceFlushError(null);
-      recordDiagnosticEvent({
-        category: "page",
-        name: "page.openpencil_conflict_merged",
-        traceId: createDiagnosticTraceId("openpencil-merge"),
-        details: {
-          pageId: activeDemoId,
-          status: "merged",
-          success: true,
-          conflictResolution: options?.conflictResolution ?? "strict",
-          operationCount: operationsToMerge.length,
-          originalOperationCount: draft.patchOperations.length,
-          skippedOperationCount: skippedOperationIndices.length,
-          skippedAffectedNodeCount: skippedAffectedNodeIds.length,
-          overriddenFieldConflictCount:
-            options?.conflictResolution === "override-selected-field-conflicts"
-              ? options?.overrideFieldConflictKeys?.length ?? 0
-              : 0,
-          latestNodeCount: latest.scene.nodes.length,
-          mergedNodeCount: mergedScene.nodes.length,
-        },
-      });
-      return mergedScene;
-    },
-    [
-      activeDemoId,
-      activeSketchSceneCollab.ytext,
-      createDiagnosticTraceId,
-      demoId,
-      editorSessionId,
-      handleSketchSceneChange,
-      persistWorkspaceToProject,
-      readLatestOpenPencilScene,
-      recordDiagnosticEvent,
-      sessionId,
-      workspaceId,
-    ],
-  );
 
   const flushPendingWorkspaceBeforeAiSend = useCallback(async () => {
     if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
@@ -4856,7 +4443,6 @@ ${context.details}
   const visualLayerDrawerActive =
     propertyPanelActive && visualLayerTreeOpen && !singlePreviewViewingDocument;
   const activeSketchEditorEngine = resolveSketchEditorEngine({
-    openPencilEnabled: OPENPENCIL_SKETCH_SPIKE_ENABLED,
     enginePreference: projectAuthoringPreferences?.sketchEditorEngine,
     userEnginePreference: userAuthoringPreferences?.sketchEditorEngine,
     previewMode,
@@ -4864,24 +4450,19 @@ ${context.details}
     sketchEditing,
     viewingDocument: singlePreviewViewingDocument,
   });
-  const openPencilSketchEditingActive =
-    activeSketchEditorEngine === "openpencil";
   const nativeSketchEditingActive = activeSketchEditorEngine === "native";
   const sketchEditorHost = useSketchEditorEngineHost({
     engine: activeSketchEditorEngine,
     scene: activeSketchScene,
     onSceneChange: handleSketchSceneChange,
   });
-  const openPencilLayerDrawerActive = openPencilSketchEditingActive;
   const sketchLayerDrawerActive = nativeSketchEditingActive;
   const layerDrawerMounted =
     (visualLayerDrawerMounted && !singlePreviewViewingDocument) ||
-    sketchLayerDrawerActive ||
-    openPencilLayerDrawerActive;
+    sketchLayerDrawerActive;
   const layerDrawerActive =
     visualLayerDrawerActive ||
-    sketchLayerDrawerActive ||
-    openPencilLayerDrawerActive;
+    sketchLayerDrawerActive;
 
   useEffect(() => {
     if (visualPropertyDrawerOpen && !singlePreviewViewingDocument) {
@@ -6348,12 +5929,7 @@ ${context.details}
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden p-2">
-                  {openPencilLayerDrawerActive ? (
-                    <SketchEditorEngineLayerPanel
-                      host={sketchEditorHost}
-                      scene={activeSketchScene}
-                    />
-                  ) : sketchLayerDrawerActive ? (
+                  {sketchLayerDrawerActive ? (
                     <SketchEditorEngineLayerPanel
                       host={sketchEditorHost}
                       scene={activeSketchScene}
@@ -6380,13 +5956,11 @@ ${context.details}
                 </div>
                 <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-card px-3 py-2">
                   <span className="text-xs font-medium text-muted-foreground">
-                    {openPencilLayerDrawerActive
-                      ? `${sketchEditorHost.openPencilUiState?.layerCount ?? 0} 个手绘图层`
-                      : sketchLayerDrawerActive
+                    {sketchLayerDrawerActive
                       ? `${activeSketchScene.nodes.length} 个对象`
                       : `${visualTotalChangeCount} 项修改`}
                   </span>
-                  {sketchLayerDrawerActive || openPencilLayerDrawerActive ? null : (
+                  {sketchLayerDrawerActive ? null : (
                     <Button
                       type="button"
                       size="sm"
@@ -6788,21 +6362,9 @@ ${context.details}
                             {sketchEditing ? (
                               <SketchEditorEngineStage
                                 host={sketchEditorHost}
-                                editorUrl={OPENPENCIL_SPIKE_EDITOR_URL}
-                                pageId={activeDemoId || "unknown"}
-                                pageName={activeDemoPage?.name}
                                 scene={activeSketchScene}
                                 configData={configData}
                                 previewSize={activePreviewSize}
-                                onOpenPencilSceneCommit={handleOpenPencilSceneCommit}
-                                onOpenPencilMergeLatestSceneWithDraft={handleMergeOpenPencilLatestSceneWithDraft}
-                                onOpenPencilReloadLatestScene={handleReloadOpenPencilLatestScene}
-                                imageProxyDiagnosticContext={{
-                                  editorSessionId,
-                                  projectId: demoId,
-                                  sessionId,
-                                  workspaceId,
-                                }}
                               />
                             ) : (
                               <SketchPagePreview
@@ -6813,7 +6375,7 @@ ${context.details}
                               />
                             )}
                           </div>
-                          {sketchEditing && !openPencilSketchEditingActive ? (
+                          {sketchEditing ? (
                             <SketchEditorEngineToolbar
                               host={sketchEditorHost}
                               scene={activeSketchScene}
@@ -6979,14 +6541,6 @@ ${context.details}
                         onUpdateConfigMark={handleUpdateVisualConfigMark}
                         onRemoveConfigMark={handleRemoveVisualConfigMark}
                         onAiInstructionChange={setVisualAiInstruction}
-                      />
-                    </div>
-                  )}
-                  {openPencilSketchEditingActive && (
-                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
-                      <SketchEditorEngineInspectorPanel
-                        host={sketchEditorHost}
-                        scene={activeSketchScene}
                       />
                     </div>
                   )}

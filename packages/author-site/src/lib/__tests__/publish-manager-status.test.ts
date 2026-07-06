@@ -101,6 +101,12 @@ function setupPublishableProject(projectId: string) {
   );
 }
 
+function setupPageScreenshot(projectId: string, pageId: string) {
+  const screenshotsDir = path.join(tempDir, "screenshots", projectId);
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+  fs.writeFileSync(path.join(screenshotsDir, `${pageId}.png`), "png", "utf-8");
+}
+
 afterAll(() => {
   delete process.env.DATA_DIR;
   if (tempDir && fs.existsSync(tempDir)) {
@@ -203,6 +209,26 @@ describe("getPublishStatus", () => {
       type: "publish_snapshot",
       note: "发布快照",
     });
+  });
+
+  it("发布时应将页面截图复制到发布包并写入静态路径", async () => {
+    setupPublishableProject("proj-publish-screenshot");
+    setupPageScreenshot("proj-publish-screenshot", "home");
+
+    await publishProject("proj-publish-screenshot");
+
+    const publishedProjectDir = path.join(
+      tempDir,
+      "published",
+      "proj-publish-screenshot",
+    );
+    const project = JSON.parse(
+      fs.readFileSync(path.join(publishedProjectDir, "project.json"), "utf-8"),
+    );
+    expect(project.demoPages[0].screenshotPath).toBe("screenshots/home.png");
+    expect(
+      fs.existsSync(path.join(publishedProjectDir, "screenshots", "home.png")),
+    ).toBe(true);
   });
 
   it("发布快照创建后应推进已同步 live workspace 的版本基线", async () => {

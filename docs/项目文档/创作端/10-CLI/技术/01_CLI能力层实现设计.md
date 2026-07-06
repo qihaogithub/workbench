@@ -122,7 +122,7 @@ CLI 支持多种参数来源：
 
 `@file` 只在完整参数形如 `@/abs/path`、`@./rel/path` 或 `@../rel/path` 时展开。CSS `@media`、`@supports`、`@keyframes`、`@font-face` 等 at-rule 保持为普通字符串内容。`help input` 会返回这组规则和示例，`commands --json` 保留 `help input` 入口。
 
-项目元数据命令也走同一套输入契约。`project create` 现在支持 `--category`；`project update` 除了 `--name`、`--description`、`--category` 外，还支持通过 `--sketch-editor-engine native|openpencil`、`--authoring-preferences '{...}'` 或 `--input-json` 传入项目级 `authoringPreferences`，并可用 `--clear-authoring-preferences` 清空该偏好。CLI 只做参数校验和格式适配，实际写入和审计仍由 `project-core` 负责。
+项目元数据命令也走同一套输入契约。`project create` 现在支持 `--category`；`project update` 除了 `--name`、`--description`、`--category` 外，还支持通过 `--sketch-editor-engine native`、`--authoring-preferences '{...}'` 或 `--input-json` 传入项目级 `authoringPreferences`，并可用 `--clear-authoring-preferences` 清空该偏好。CLI 只做参数校验和格式适配，实际写入和审计仍由 `project-core` 负责。
 
 ## 事务与高风险操作
 

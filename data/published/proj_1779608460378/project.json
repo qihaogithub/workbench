@@ -16,7 +16,8 @@
         "height": 812
       },
       "iframeHtmlPath": "demos/demo_1779608460379_a1b2c3/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
+      "screenshotPath": "screenshots/demo_1779608460379_a1b2c3.png"
     },
     {
       "id": "demo_1779608460380_d4e5f6",
@@ -30,7 +31,8 @@
         "height": 768
       },
       "iframeHtmlPath": "demos/demo_1779608460380_d4e5f6/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
+      "screenshotPath": "screenshots/demo_1779608460380_d4e5f6.png"
     }
   ],
   "demoFolders": [],

@@ -36,6 +36,7 @@ import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
+const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
 
 function resolvePublishThumbnailSource(thumbnail: string): string | undefined {
   const candidates: string[] = [];
@@ -67,6 +68,7 @@ export interface PublishedDemoPage {
   compiledJsPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
+  screenshotPath?: string;
   iframeHtmlPath?: string;
   embedCode?: string;
   prototypeHtml?: string;
@@ -79,6 +81,14 @@ export interface PublishedDemoPage {
   sketchMeta?: Record<string, unknown>;
   sketchScenePath?: string;
   sketchMetaPath?: string;
+}
+
+interface ScreenshotMeta {
+  currentHash?: string;
+  variants?: Record<string, {
+    variant?: "strict" | "fast";
+    generatedAt?: string;
+  }>;
 }
 
 export interface PublishedProject {
@@ -149,6 +159,71 @@ function copyPreviewRuntimeForPublish(projectId: string, publishDir: string): st
     force: true,
   });
   return runtimeBasePath;
+}
+
+function normalizeScreenshotHash(hash?: string | null): string | null {
+  if (!hash) return null;
+  return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
+}
+
+function readScreenshotMeta(projectId: string, pageId: string): ScreenshotMeta | null {
+  const metaPath = path.join(SCREENSHOTS_DIR, projectId, `${pageId}.meta.json`);
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as ScreenshotMeta;
+  } catch {
+    return null;
+  }
+}
+
+function resolveCurrentScreenshotPath(projectId: string, pageId: string): string | undefined {
+  const projectScreenshotsDir = path.join(SCREENSHOTS_DIR, projectId);
+  if (!fs.existsSync(projectScreenshotsDir)) return undefined;
+
+  const meta = readScreenshotMeta(projectId, pageId);
+  const currentHash = normalizeScreenshotHash(meta?.currentHash);
+  if (currentHash) {
+    const strictPath = path.join(projectScreenshotsDir, `${pageId}.${currentHash}.png`);
+    if (fs.existsSync(strictPath)) return strictPath;
+  }
+
+  const latestVariant = Object.entries(meta?.variants ?? {})
+    .map(([key, value]) => {
+      const [hash, variant = "strict"] = key.split(":");
+      return {
+        hash: normalizeScreenshotHash(hash),
+        variant: variant === "fast" ? "fast" as const : "strict" as const,
+        generatedAt: value.generatedAt ?? "",
+      };
+    })
+    .filter((entry): entry is { hash: string; variant: "strict" | "fast"; generatedAt: string } => Boolean(entry.hash))
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+
+  if (latestVariant) {
+    const variantPath = path.join(
+      projectScreenshotsDir,
+      latestVariant.variant === "fast"
+        ? `${pageId}.${latestVariant.hash}.fast.png`
+        : `${pageId}.${latestVariant.hash}.png`,
+    );
+    if (fs.existsSync(variantPath)) return variantPath;
+  }
+
+  const legacyPath = path.join(projectScreenshotsDir, `${pageId}.png`);
+  return fs.existsSync(legacyPath) ? legacyPath : undefined;
+}
+
+function copyPageScreenshotForPublish(
+  projectId: string,
+  pageId: string,
+  publishDir: string,
+): string | undefined {
+  const sourcePath = resolveCurrentScreenshotPath(projectId, pageId);
+  if (!sourcePath) return undefined;
+
+  const screenshotsDir = path.join(publishDir, "screenshots");
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+  fs.copyFileSync(sourcePath, path.join(screenshotsDir, `${pageId}.png`));
+  return `screenshots/${pageId}.png`;
 }
 
 export async function publishProject(
@@ -249,6 +324,11 @@ export async function publishProject(
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
+    const screenshotPath = copyPageScreenshotForPublish(
+      projectId,
+      page.id,
+      publishedProjectDir,
+    );
 
     let previewSize: PreviewSize | undefined;
     let pageConfigData: Record<string, unknown> = {};
@@ -293,6 +373,7 @@ export async function publishProject(
         runtimeType,
         schemaPath: schemaPublishPath,
         previewSize,
+        screenshotPath,
         prototypeHtml,
         prototypeCss,
         prototypeMeta,
@@ -336,6 +417,7 @@ export async function publishProject(
         runtimeType,
         schemaPath: schemaPublishPath,
         previewSize,
+        screenshotPath,
         sketchScene,
         sketchMeta,
         sketchScenePath: `demos/${page.id}/sketch.scene.json`,
@@ -393,6 +475,7 @@ export async function publishProject(
       compiledJsPath: `demos/${page.id}/compiled.js`,
       schemaPath: schemaPublishPath,
       previewSize,
+      screenshotPath,
       iframeHtmlPath,
       embedCode,
     });

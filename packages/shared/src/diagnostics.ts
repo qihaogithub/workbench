@@ -210,35 +210,6 @@ const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
     "targetNodeCount",
     "targetSource",
   ],
-  "page.openpencil_full_draft_fallback": [
-    "status",
-    "success",
-    "operationCount",
-    "hasBaseSceneKey",
-    "currentNodeCount",
-    "targetNodeCount",
-    "targetSource",
-  ],
-  "page.openpencil_image_proxy": [
-    "status",
-    "success",
-    "reason",
-    "durationMs",
-    "inputHost",
-    "finalHost",
-    "httpStatus",
-    "contentType",
-    "contentLength",
-    "cacheMaxAgeSeconds",
-    "rateLimitPerMinute",
-    "rateLimitRemaining",
-  ],
-  "page.openpencil_conflict_reloaded": [
-    "pageId",
-    "status",
-    "success",
-    "currentNodeCount",
-  ],
 };
 
 function truncateText(value: string, limit = 500): string {

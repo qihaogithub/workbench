@@ -9,8 +9,7 @@
     "./contracts": "./src/contracts.ts",
     "./demo/iframe-template": "./src/demo/iframe-template.ts",
     "./demo/prototype-preview": "./src/demo/prototype-preview.ts",
-    "./demo/sketch-scene": "./src/demo/sketch-scene.ts",
-    "./openpencil-adapter": "./src/openpencil-adapter.ts"
+    "./demo/sketch-scene": "./src/demo/sketch-scene.ts"
   },
   "dependencies": {
     "@workbench/sketch-core": "workspace:*"

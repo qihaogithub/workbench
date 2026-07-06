@@ -51,7 +51,7 @@ try {
       "--category",
       "CLI 分类更新",
       "--input-json",
-      JSON.stringify({ authoringPreferences: { sketchEditorEngine: "openpencil" } }),
+      JSON.stringify({ authoringPreferences: { sketchEditorEngine: "native" } }),
     ],
     tempDir,
   );
@@ -62,7 +62,7 @@ try {
     authoringPreferences?: { sketchEditorEngine?: string };
   };
   assert.equal(updatedProjectData.category, "CLI 分类更新");
-  assert.equal(updatedProjectData.authoringPreferences?.sketchEditorEngine, "openpencil");
+  assert.equal(updatedProjectData.authoringPreferences?.sketchEditorEngine, "native");
 
   const clearedPreferences = runCli(
     ["project", "update", createdData.id, "--clear-authoring-preferences"],

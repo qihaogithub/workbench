@@ -115,14 +115,14 @@ try {
     "--description",
     "更新描述",
     "--sketch-editor-engine",
-    "openpencil",
+    "native",
   ]);
   const updatedProject = dataOf<{
     category?: string;
     authoringPreferences?: { sketchEditorEngine?: string };
   }>(updated);
   assert.equal(updatedProject.category, "CLI 更新分类");
-  assert.equal(updatedProject.authoringPreferences?.sketchEditorEngine, "openpencil");
+  assert.equal(updatedProject.authoringPreferences?.sketchEditorEngine, "native");
   const refetched = await runCommand("project get", ["project", "get", projectId]);
   const refetchedProject = dataOf<{
     project: {
@@ -131,7 +131,7 @@ try {
     };
   }>(refetched);
   assert.equal(refetchedProject.project.category, "CLI 更新分类");
-  assert.equal(refetchedProject.project.authoringPreferences?.sketchEditorEngine, "openpencil");
+  assert.equal(refetchedProject.project.authoringPreferences?.sketchEditorEngine, "native");
   await runCommand("project set-cover", ["project", "set-cover", projectId, "/covers/demo.png"]);
   await runCommand("project delete-cover", ["project", "delete-cover", projectId]);
 

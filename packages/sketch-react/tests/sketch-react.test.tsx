@@ -982,22 +982,22 @@ describe("sketch-react", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
-    fireEvent.click(screen.getByLabelText("卡片"));
+    fireEvent.click(screen.getByLabelText("便签"));
     dispatchPointerEvent(stage, "pointerdown", 300, 200);
 
     await waitFor(() => {
-      expect(screen.getByTestId("scene-json").textContent).toContain('"x":160');
-      expect(screen.getByTestId("scene-json").textContent).toContain('"y":110');
+      expect(screen.getByTestId("scene-json").textContent).toContain('"x":210');
+      expect(screen.getByTestId("scene-json").textContent).toContain('"y":152');
       expect(selectionEvents.at(-1)).toMatchObject({
         nodeIds: [expect.stringMatching(/^sketch_/)],
-        bounds: { x: 160, y: 110, width: 280, height: 180 },
+        bounds: { x: 210, y: 152, width: 180, height: 96 },
       });
     });
 
     fireEvent.click(screen.getByLabelText("撤销"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("scene-json").textContent).not.toContain('"x":160');
+      expect(screen.getByTestId("scene-json").textContent).not.toContain('"x":210');
       expect(screen.getByText("No selection")).not.toBeNull();
       expect(selectionEvents.at(-1)).toEqual({ nodeIds: [], bounds: null });
     });

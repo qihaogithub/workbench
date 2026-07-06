@@ -41,6 +41,7 @@ export {
   buildIframeHtml,
   PreviewCanvas,
   PrototypePagePreview,
+  IframePreviewFrame,
   CanvasViewport,
   CanvasPageItem,
   CanvasToolbar,

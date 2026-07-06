@@ -185,7 +185,6 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | `@workbench/sketch-core` | `packages/sketch-core/` | 草图页协议、校验、patch、几何、只读渲染 | - | Vitest |
 | `@workbench/sketch-react` | `packages/sketch-react/` | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | - | Vitest + Testing Library |
 | `@workbench/sketch-playground` | `packages/sketch-playground/` | 草图 SDK 独立开发与测试 Playground | 3400 | TypeScript + Playwright |
-| `@workbench/sketch-openpencil-editor` | `packages/sketch-openpencil-editor/` | OpenPencil 手绘编辑器 SDK 与 iframe app | 3410 | TypeScript + Playwright |
 | `@workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
 | `@workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
 | `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
@@ -218,7 +217,6 @@ pnpm dev:viewer
 pnpm dev:screenshot
 pnpm dev:preview
 pnpm dev:sketch
-pnpm dev:sketch-openpencil
 pnpm build
 pnpm build:viewer
 pnpm lint
@@ -230,8 +228,6 @@ pnpm check:screenshot
 pnpm check:sketch-core
 pnpm check:sketch-react
 pnpm check:sketch-playground
-pnpm check:sketch-openpencil
-pnpm check:openpencil-spike
 pnpm check:knowledge-core
 pnpm check:knowledge-service
 pnpm check:project-core
@@ -241,8 +237,6 @@ pnpm check:viewer
 pnpm check:all
 pnpm test:e2e
 pnpm test:e2e:sketch-playground
-pnpm test:e2e:openpencil-spike
-pnpm test:e2e:openpencil-author
 pnpm test:e2e:ui
 pnpm test:e2e:headed
 ```
@@ -302,8 +296,6 @@ pnpm --filter @workbench/project-cli test
 - 前置条件：author-site 等相关服务已启动；首次运行需要 `pnpm playwright install chromium`。
 - 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。根脚本已显式指定 Playwright 配置文件。
 - 草图 SDK playground 的独立浏览器冒烟使用 `pnpm test:e2e:sketch-playground`，配置在 `test/sketch-playground/playwright.config.ts`，会自动启动 `pnpm dev:sketch`。
-- OpenPencil 手绘编辑器 SDK 的独立浏览器映射回归使用 `pnpm test:e2e:openpencil-spike`，配置在 `test/openpencil-spike/playwright.config.ts`，会自动启动 `pnpm dev:sketch-openpencil`；`dev:openpencil-spike` 作为兼容别名保留。
-- OpenPencil 创作端接入回归使用 `pnpm test:e2e:openpencil-author`，配置在 `test/创作端E2E回归测试/openpencil-author.playwright.config.ts`，会用 `NEXT_PUBLIC_OPENPENCIL_SKETCH_SPIKE_ENABLED=true` 自动启动 OpenPencil 手绘编辑器、agent-service 和 author-site，覆盖 dirty draft、显式保存和 workspace 持久化链路。
 - 正式回归用例必须维护在 `test/` 下的 Playwright 测试目录中，优先放入 `test/创作端E2E回归测试/` 并写成 `.spec.ts`。
 - `scripts/development/` 只放开发期诊断、复现、采样和报告生成脚本；脚本可以调用 Playwright，但不作为正式回归用例的长期维护位置。
 - 当某个 `scripts/development/` 脚本需要长期纳入回归验证时，应迁移或补写为 `test/` 下的 Playwright spec，并通过根目录 `package.json` 暴露清晰的测试命令。
@@ -395,7 +387,6 @@ Docker：
 - sketch-core：`pnpm check:sketch-core`。
 - sketch-react：`pnpm check:sketch-react`；如果改动影响 author-site 草图编辑态，也运行 `pnpm check:author` 和 `pnpm test:e2e -- sketch-page-regression.spec.ts`。
 - sketch-playground：`pnpm check:sketch-playground`，涉及交互或 fixture 时运行 `pnpm test:e2e:sketch-playground`。
-- sketch-openpencil-editor：`pnpm check:sketch-openpencil`；`pnpm check:openpencil-spike` 作为兼容别名保留。涉及 OpenPencil scene 导入、导出、图层映射或协议保留时运行 `pnpm test:e2e:openpencil-spike`；涉及 author-site iframe 开关、dirty draft 或显式保存链路时运行 `pnpm test:e2e:openpencil-author`。
 - agent-service：`pnpm check:agent`。
 - screenshot-service：`pnpm check:screenshot`。
 - knowledge-core：`pnpm check:knowledge-core`。

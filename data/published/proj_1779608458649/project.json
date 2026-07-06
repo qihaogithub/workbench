@@ -14,7 +14,8 @@
       "previewSize": {
         "width": 375,
         "height": 812
-      }
+      },
+      "screenshotPath": "screenshots/demo_1779608460500_a1b2c3.png"
     },
     {
       "id": "demo_1779608461000_d4e5f6",
@@ -26,7 +27,8 @@
       "previewSize": {
         "width": 1024,
         "height": 768
-      }
+      },
+      "screenshotPath": "screenshots/demo_1779608461000_d4e5f6.png"
     }
   ],
   "demoFolders": [],

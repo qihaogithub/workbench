@@ -25,6 +25,7 @@ export interface PublishedDemoPage {
   iframeHtmlPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
+  screenshotPath?: string;
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: Record<string, unknown>;
@@ -102,8 +103,34 @@ export async function getDemoSchema(
   );
 }
 
+export function getDataUrl(path: string): string {
+  if (/^(?:https?:|data:|blob:)/.test(path)) {
+    return path;
+  }
+  return `${DATA_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export function getThumbnailUrl(thumbnail: string): string {
-  return `${DATA_BASE}${thumbnail}`;
+  return getDataUrl(thumbnail);
+}
+
+export function getScreenshotFileMetaUrl(
+  projectId: string,
+  pageId: string,
+): string {
+  return getDataUrl(
+    `/api/screenshots/file/${encodeURIComponent(
+      projectId,
+    )}/${encodeURIComponent(pageId)}?meta=1`,
+  );
+}
+
+export function getScreenshotFileUrl(projectId: string, pageId: string): string {
+  return getDataUrl(
+    `/api/screenshots/file/${encodeURIComponent(
+      projectId,
+    )}/${encodeURIComponent(pageId)}`,
+  );
 }
 
 export function getCompiledJsUrl(

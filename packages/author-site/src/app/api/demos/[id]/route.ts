@@ -9,7 +9,7 @@ function parseProjectAuthoringPreferences(value: unknown): ProjectAuthoringPrefe
   const record = value as Record<string, unknown>;
   const sketchEditorEngine = record.sketchEditorEngine;
   if (sketchEditorEngine === undefined) return {};
-  if (sketchEditorEngine === 'native' || sketchEditorEngine === 'openpencil') {
+  if (sketchEditorEngine === 'native') {
     return { sketchEditorEngine };
   }
   return null;

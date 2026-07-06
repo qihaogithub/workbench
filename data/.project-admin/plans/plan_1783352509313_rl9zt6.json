@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1783352509313_rl9zt6",
+  "operation": "project_delete",
+  "resourceId": "proj_1783352503668_e7wqrn",
+  "impact": [
+    "删除项目 E2E:20260706T154141902Z-2qlubg:OpenPencil 创作端接入回归",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1783352509313_878crl"
+}
