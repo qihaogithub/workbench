@@ -276,9 +276,8 @@ export interface Project {
  * 手绘页面编辑引擎偏好
  *
  * 该字段只影响创作端编辑态；底层 runtimeType 仍保持 sketch-scene。
- * OpenPencil 仍受全局 feature flag 保护，项目偏好不能绕过全局开关。
  */
-export type SketchEditorEnginePreference = "native" | "openpencil";
+export type SketchEditorEnginePreference = "native";
 
 export interface ProjectAuthoringPreferences {
   sketchEditorEngine?: SketchEditorEnginePreference;

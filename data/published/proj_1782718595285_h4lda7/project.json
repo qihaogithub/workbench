@@ -36,7 +36,8 @@
       },
       "prototypeHtmlPath": "demos/demo_omrf/prototype.html",
       "prototypeCssPath": "demos/demo_omrf/prototype.css",
-      "prototypeMetaPath": "demos/demo_omrf/prototype.meta.json"
+      "prototypeMetaPath": "demos/demo_omrf/prototype.meta.json",
+      "screenshotPath": "screenshots/demo_omrf.png"
     },
     {
       "id": "demo_71dt",
@@ -68,7 +69,8 @@
       },
       "prototypeHtmlPath": "demos/demo_71dt/prototype.html",
       "prototypeCssPath": "demos/demo_71dt/prototype.css",
-      "prototypeMetaPath": "demos/demo_71dt/prototype.meta.json"
+      "prototypeMetaPath": "demos/demo_71dt/prototype.meta.json",
+      "screenshotPath": "screenshots/demo_71dt.png"
     }
   ],
   "demoFolders": [],

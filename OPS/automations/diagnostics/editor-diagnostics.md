@@ -52,7 +52,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /
 | 打开项目链路 | `project.opened`、`session.created/reused`、`workspace.bound` |
 | 协同是否覆盖 | `collab.snapshot_received`、`snapshot.apply`、外部文件变更命中或遗漏 |
 | 保存是否落盘 | `autosave.flush_*`、`persist-workspace`、退出前保存结果 |
-| 手绘保存走 patch 还是 fallback | `page.sketch_patch_validated`、`page.sketch_patch_rejected`、`page.openpencil_full_draft_fallback`；查看 payload 的 `targetSource` 区分 `server_patch` 回放和兼容 `client_scene` 校验 |
+| 手绘保存 patch 校验 | `page.sketch_patch_validated`、`page.sketch_patch_rejected`；查看 payload 的 `targetSource` 区分 `server_patch` 回放和 `client_scene` 校验 |
 | AI 是否改写 | `ai.run_started`、工具调用摘要、文件变更、`ai.run_finished` |
 | 预览错误来源 | `preview.error`、`post_generation_validation`、iframe runtime 或自动修复事件 |
 
@@ -71,8 +71,7 @@ rg -n "<projectId>|<editorSessionId>|<pageId>|<traceId>" data/editor-diagnostics
 - 前端只记录了浏览器内存态，重新打开后自动修复计数或临时状态丢失。
 - agent-service 活跃协同房间未收到外部文件变更，旧 Y.Doc 重新成为前端权威值。
 - 自动保存 flush 成功但项目当前 workspace 未完成持久化。
-- OpenPencil patch-only 保存成功但诊断 payload 缺少 `targetSource=server_patch`，说明诊断白名单或写入链路没有保留目标来源，无法判断服务端是否真的从 patch 回放生成最终 scene。
-- OpenPencil dirty-state 缺少可验证 patch，保存成功但走 `page.openpencil_full_draft_fallback`，后续需要结合页面版本、协同和 patch 生成链路判断是否可收敛到增量保存。
+- 手绘 patch 保存成功但诊断 payload 缺少 `targetSource=server_patch`，说明诊断白名单或写入链路没有保留目标来源，无法判断服务端是否真的从 patch 回放生成最终 scene。
 - 预览 fast gate 返回结构化错误，但自动修复或诊断导出没有带上稳定 hash、pageId 或 traceId。
 - SQLite 事件库不可用时，CLI fallback 没有明确标记数据缺口。
 

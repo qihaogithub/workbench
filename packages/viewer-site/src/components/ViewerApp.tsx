@@ -1,7 +1,15 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+  type CSSProperties,
+  type SyntheticEvent,
+} from "react";
 import Image from "next/image";
 import {
   Search,
@@ -19,7 +27,10 @@ import {
   getProjects,
   getProjectData,
   getDemoSchema,
+  getDataUrl,
   getThumbnailUrl,
+  getScreenshotFileUrl,
+  getScreenshotFileMetaUrl,
   getCompiledJsUrl,
   getPublishedFileUrl,
 } from "@/lib/api";
@@ -34,6 +45,7 @@ import {
   PageConfigPanel,
   PrototypePagePreview,
   SketchPagePreview,
+  IframePreviewFrame,
 } from "@/components/demo";
 import { PreviewCanvas } from "@/components/demo";
 import type { PreviewMode, CanvasState } from "@/components/demo";
@@ -47,6 +59,12 @@ import { Button } from "@/components/ui/button";
 import { ViewerAiDrawer } from "@/components/ViewerAiDrawer";
 
 type SortOption = "newest" | "oldest" | "name";
+type ProjectListItem = ProjectsIndex["projects"][number];
+
+const MAX_SCREENSHOT_COVER_ITEMS = 10;
+const DEFAULT_SCREENSHOT_ASPECT_RATIO = 9 / 16;
+const MIN_SCREENSHOT_ASPECT_RATIO = 0.45;
+const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "最新更新" },
@@ -72,62 +90,312 @@ function mergeConfigDefaults(
   return { ...projectDefaults, ...pageDefaults };
 }
 
-function getSinglePreviewFrameSize(previewSize?: PreviewSize): {
-  width: number;
-  height: number;
-} {
-  return {
-    width:
-      typeof previewSize?.width === "number" && Number.isFinite(previewSize.width)
-        ? previewSize.width
-        : 375,
-    height:
-      typeof previewSize?.height === "number" && Number.isFinite(previewSize.height)
-        ? previewSize.height
-        : 812,
-  };
+function clampScreenshotAspectRatio(ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return DEFAULT_SCREENSHOT_ASPECT_RATIO;
+  }
+
+  return Math.min(
+    MAX_SCREENSHOT_ASPECT_RATIO,
+    Math.max(MIN_SCREENSHOT_ASPECT_RATIO, ratio),
+  );
 }
 
-function SinglePreviewStage({
-  previewSize,
-  children,
-}: {
-  previewSize?: PreviewSize;
-  children: ReactNode;
-}) {
-  const { width, height } = getSinglePreviewFrameSize(previewSize);
-
+function PlaceholderIcon() {
   return (
-    <div className="flex min-h-full items-start justify-center bg-neutral-950 p-6">
-      <div
-        className="overflow-hidden rounded-[22px] border border-white/10 bg-white shadow-2xl ring-1 ring-black/40"
-        style={{ width, maxWidth: "100%", aspectRatio: `${width} / ${height}` }}
-      >
-        {children}
+    <div className="flex h-full items-center justify-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-6 w-6 text-muted-foreground/60"
+        >
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
       </div>
     </div>
   );
 }
 
-function PublishedIframePreview({
-  src,
-  title,
-  previewSize,
+function PageScreenshotCell({
+  projectId,
+  page,
+  showOverlay,
+  overlayText,
+  className,
+  style,
+  onAspectRatio,
 }: {
-  src: string;
-  title: string;
-  previewSize?: PreviewSize;
+  projectId: string;
+  page: { id: string; name: string; screenshotPath?: string };
+  showOverlay: boolean;
+  overlayText?: string;
+  className?: string;
+  style?: CSSProperties;
+  onAspectRatio?: (pageId: string, aspectRatio: number) => void;
 }) {
-  return (
-    <SinglePreviewStage previewSize={previewSize}>
-      <iframe
-        title={title}
-        src={src}
-        className="h-full w-full border-0"
-        sandbox="allow-scripts"
-      />
-    </SinglePreviewStage>
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const staticImageUrl = page.screenshotPath
+      ? getPublishedFileUrl(projectId, page.screenshotPath)
+      : null;
+    const directImageUrl = staticImageUrl ?? getScreenshotFileUrl(projectId, page.id);
+    const metaUrl = getScreenshotFileMetaUrl(projectId, page.id);
+    setImageUrl(null);
+    setFailed(false);
+    setImageUrl(directImageUrl);
+
+    if (staticImageUrl) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (new URL(metaUrl, window.location.href).origin !== window.location.origin) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetch(metaUrl, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (cancelled) return;
+        const payload = result as
+          | { success?: boolean; data?: { url?: unknown } }
+          | null;
+        const url =
+          payload?.success === true && typeof payload.data?.url === "string"
+            ? payload.data.url
+            : null;
+
+        if (url) {
+          setImageUrl(getDataUrl(url));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, page.id, page.screenshotPath]);
+
+  const handleError = useCallback(() => {
+    setFailed(true);
+  }, []);
+
+  const handleLoad = useCallback(
+    (event: SyntheticEvent<HTMLImageElement>) => {
+      const { naturalWidth, naturalHeight } = event.currentTarget;
+      if (naturalWidth > 0 && naturalHeight > 0) {
+        onAspectRatio?.(page.id, naturalWidth / naturalHeight);
+      }
+    },
+    [onAspectRatio, page.id],
   );
+
+  return (
+    <div
+      className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-sm bg-muted/35 ${className ?? ""}`}
+      style={style}
+    >
+      {!failed && imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={page.name}
+          className="h-full w-full object-contain"
+          loading="lazy"
+          onLoad={handleLoad}
+          onError={handleError}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-muted/60 to-muted">
+          <FileText className="h-4 w-4 text-muted-foreground/50" />
+          <span className="max-w-full truncate px-1 text-center text-[10px] leading-tight text-muted-foreground/60">
+            {page.name}
+          </span>
+        </div>
+      )}
+      {showOverlay && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+          <span className="text-sm font-medium text-foreground">
+            {overlayText}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScreenshotCover({
+  projectId,
+  pages,
+}: {
+  projectId: string;
+  pages: Array<{ id: string; name: string; screenshotPath?: string }>;
+}) {
+  const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
+  const displayPages = pages.slice(0, MAX_SCREENSHOT_COVER_ITEMS);
+  const extraCount = pages.length - displayPages.length;
+
+  const weightedPages = useMemo(
+    () =>
+      displayPages.map((page) => ({
+        page,
+        aspectRatio: clampScreenshotAspectRatio(
+          aspectRatios[page.id] ?? DEFAULT_SCREENSHOT_ASPECT_RATIO,
+        ),
+      })),
+    [aspectRatios, displayPages],
+  );
+
+  const rowGroups = useMemo(() => {
+    if (weightedPages.length <= 2) {
+      return [weightedPages];
+    }
+
+    const totalWeight = weightedPages.reduce(
+      (sum, item) => sum + item.aspectRatio,
+      0,
+    );
+    let bestSplitIndex = Math.ceil(weightedPages.length / 2);
+    let bestBalanceGap = Number.POSITIVE_INFINITY;
+    let leadingWeight = 0;
+
+    for (let index = 1; index < weightedPages.length; index += 1) {
+      leadingWeight += weightedPages[index - 1].aspectRatio;
+      const trailingWeight = totalWeight - leadingWeight;
+      const balanceGap = Math.abs(leadingWeight - trailingWeight);
+
+      if (balanceGap <= bestBalanceGap) {
+        bestBalanceGap = balanceGap;
+        bestSplitIndex = index;
+      }
+    }
+
+    return [
+      weightedPages.slice(0, bestSplitIndex),
+      weightedPages.slice(bestSplitIndex),
+    ].filter((row) => row.length > 0);
+  }, [weightedPages]);
+
+  const handleAspectRatio = useCallback(
+    (pageId: string, aspectRatio: number) => {
+      const normalizedRatio = clampScreenshotAspectRatio(aspectRatio);
+      setAspectRatios((current) => {
+        if (current[pageId] === normalizedRatio) {
+          return current;
+        }
+        return { ...current, [pageId]: normalizedRatio };
+      });
+    },
+    [],
+  );
+
+  if (displayPages.length === 0) {
+    return <PlaceholderIcon />;
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col justify-center gap-1 p-1.5">
+      {rowGroups.map((row, rowIndex) => {
+        const previousRowsCount = rowGroups
+          .slice(0, rowIndex)
+          .reduce((sum, currentRow) => sum + currentRow.length, 0);
+
+        return (
+          <div
+            key={row.map(({ page }) => page.id).join("-")}
+            className="flex min-h-0 flex-1 justify-center gap-1"
+          >
+            {row.map(({ page, aspectRatio }, index) => {
+              const displayIndex = previousRowsCount + index;
+              const isLast = displayIndex === displayPages.length - 1;
+              const isDenseLayout = displayPages.length >= 3;
+
+              return (
+                <PageScreenshotCell
+                  key={page.id}
+                  projectId={projectId}
+                  page={page}
+                  className={
+                    isDenseLayout
+                      ? "min-w-0"
+                      : "h-full max-w-[48%] shrink-0"
+                  }
+                  style={
+                    isDenseLayout
+                      ? { flex: `${aspectRatio} 1 0` }
+                      : { aspectRatio }
+                  }
+                  showOverlay={isLast && extraCount > 0}
+                  overlayText={
+                    isLast && extraCount > 0 ? `+${extraCount}` : undefined
+                  }
+                  onAspectRatio={handleAspectRatio}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProjectCover({ project }: { project: ProjectListItem }) {
+  const [projectData, setProjectData] = useState<PublishedProject | null>(null);
+
+  useEffect(() => {
+    if (project.thumbnail) {
+      setProjectData(null);
+      return;
+    }
+
+    let cancelled = false;
+    getProjectData(project.id)
+      .then((result) => {
+        if (!cancelled) {
+          setProjectData(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProjectData(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, project.thumbnail]);
+
+  if (project.thumbnail) {
+    return (
+      <Image
+        src={getThumbnailUrl(project.thumbnail)}
+        alt={project.name}
+        fill
+        className="object-contain"
+        unoptimized
+      />
+    );
+  }
+
+  const pages = projectData?.demoPages ?? [];
+  if (pages.length > 0) {
+    return <ScreenshotCover projectId={project.id} pages={pages} />;
+  }
+
+  return <PlaceholderIcon />;
 }
 
 function ProjectListPage() {
@@ -289,9 +557,6 @@ function ProjectListPage() {
         {data && filteredProjects.length > 0 && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProjects.map((project) => {
-              const thumbnailUrl = project.thumbnail
-                ? getThumbnailUrl(project.thumbnail)
-                : undefined;
               return (
                 <button
                   key={project.id}
@@ -300,21 +565,7 @@ function ProjectListPage() {
                   aria-label={`打开项目 ${project.name}`}
                 >
                   <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-muted/80 to-muted">
-                    {thumbnailUrl ? (
-                      <Image
-                        src={thumbnailUrl}
-                        alt={project.name}
-                        fill
-                        className="object-contain"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
-                          <FileCode className="h-6 w-6 text-muted-foreground/60" />
-                        </div>
-                      </div>
-                    )}
+                    <ProjectCover project={project} />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   </div>
                   <div className="p-4">
@@ -731,46 +982,40 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <div
-                className="flex-1 overflow-y-auto"
+                className="preview-single-scroll h-full flex-1 overflow-y-auto p-4"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 <style>{`
                   .preview-single-scroll::-webkit-scrollbar { display: none; }
                 `}</style>
                 {activeIframeUrl ? (
-                  <PublishedIframePreview
+                  <IframePreviewFrame
                     src={activeIframeUrl}
                     title={activePage?.name ?? "页面预览"}
                     previewSize={previewSize ?? activePage?.previewSize}
                   />
                 ) : activePage?.runtimeType === "prototype-html-css" ? (
-                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
-                    <PrototypePagePreview
-                      html={activePage.prototypeHtml}
-                      css={activePage.prototypeCss}
-                      configData={configData}
-                      previewSize={previewSize ?? activePage.previewSize}
-                      fillContainer
-                    />
-                  </SinglePreviewStage>
+                  <PrototypePagePreview
+                    html={activePage.prototypeHtml}
+                    css={activePage.prototypeCss}
+                    configData={configData}
+                    previewSize={previewSize ?? activePage.previewSize}
+                  />
                 ) : activePage?.runtimeType === "sketch-scene" ? (
-                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
+                  <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
                     <SketchPagePreview
                       scene={activePage.sketchScene}
                       configData={configData}
                       previewSize={previewSize ?? activePage.previewSize}
                       fillContainer
                     />
-                  </SinglePreviewStage>
+                  </div>
                 ) : activePage ? (
-                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
-                    <PreviewPanel
-                      compiledJsUrl={compiledUrl}
-                      configData={configData}
-                      previewSize={previewSize ?? activePage.previewSize}
-                      fillContainer
-                    />
-                  </SinglePreviewStage>
+                  <PreviewPanel
+                    compiledJsUrl={compiledUrl}
+                    configData={configData}
+                    previewSize={previewSize ?? activePage.previewSize}
+                  />
                 ) : null}
               </div>
             )}

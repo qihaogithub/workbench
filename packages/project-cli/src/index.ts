@@ -532,13 +532,10 @@ function projectAuthoringPreferencesArg(
     return cliOk({});
   }
 
-  if (
-    resolvedSketchEditorEngine !== "native" &&
-    resolvedSketchEditorEngine !== "openpencil"
-  ) {
+  if (resolvedSketchEditorEngine !== "native") {
     return cliFail(
       "INVALID_REQUEST",
-      "sketchEditorEngine 仅支持 native 或 openpencil",
+      "sketchEditorEngine 仅支持 native",
     );
   }
 

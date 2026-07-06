@@ -13,6 +13,7 @@ export type { PageConfigPanelPage } from './PageConfigPanel';
 export { ConfigForm } from './ConfigForm';
 export { PreviewPanel } from './PreviewPanel';
 export { PrototypePagePreview } from './PrototypePagePreview';
+export { IframePreviewFrame } from './IframePreviewFrame';
 export { SketchPageEditor, SketchPagePreview } from './SketchPagePreview';
 export { sanitizePrototypeCss, sanitizePrototypeHtml } from '@workbench/shared';
 export { LayerTreeMenu, getLayerTreeNodeKind, getLayerTreeNodeLabel } from './LayerTreeMenu';

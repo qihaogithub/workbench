@@ -36,7 +36,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -208,7 +207,8 @@ export function ViewerAiDrawer({
           localStorage.getItem(sessionStorageKey) ||
           undefined,
       );
-      setSelectedModel(localStorage.getItem(modelStorageKey) || "");
+      const storedModel = localStorage.getItem(modelStorageKey) || "";
+      setSelectedModel((prev) => storedModel || prev);
       setImages([]);
       setError(null);
       setInput("");
@@ -264,6 +264,13 @@ export function ViewerAiDrawer({
   }, [modelStorageKey, selectedModel]);
 
   useEffect(() => {
+    if (models.length === 0) return;
+    setSelectedModel((prev) =>
+      prev && models.some((model) => model.id === prev) ? prev : models[0].id,
+    );
+  }, [models]);
+
+  useEffect(() => {
     try {
       const storedMessages = toStoredMessages(messages);
       localStorage.setItem(storageKey, JSON.stringify(storedMessages));
@@ -315,6 +322,11 @@ export function ViewerAiDrawer({
     () => chatSessions.find((item) => item.id === activeChatSessionId),
     [activeChatSessionId, chatSessions],
   );
+
+  const selectedModelLabel = useMemo(() => {
+    const model = models.find((item) => item.id === selectedModel);
+    return model?.label || model?.id || "";
+  }, [models, selectedModel]);
 
   const handleSelectChatSession = useCallback(
     (nextSessionId: string) => {
@@ -656,7 +668,9 @@ export function ViewerAiDrawer({
               disabled={isSending || isLoadingModels || models.length === 0}
             >
               <SelectTrigger className="h-11 w-[180px] rounded-2xl text-base font-semibold">
-                <SelectValue placeholder={isLoadingModels ? "加载模型" : "选择模型"} />
+                <span className="truncate">
+                  {isLoadingModels ? "加载模型" : selectedModelLabel || "选择模型"}
+                </span>
               </SelectTrigger>
               <SelectContent>
                 {models.map((model) => (

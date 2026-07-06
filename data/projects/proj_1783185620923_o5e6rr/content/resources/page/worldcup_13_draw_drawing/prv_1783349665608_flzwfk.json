@@ -1,0 +1,39 @@
+{
+  "id": "prv_1783349665608_flzwfk",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "kind": "page",
+  "resourceId": "worldcup_13_draw_drawing",
+  "contentHash": "3f0a31fe24a981b729ce97747ca55a8cce59d8d257000bf473bf76c75202aefe",
+  "blobRefs": [
+    "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+    "671bb7d6d054e87eaec62e26ee913cb1e5c8332469b2cc755efa3d3a826561c8",
+    "01713cb61a92e949d57850de2f4cd761c98cc701fdaae3f7aa8d07de9d759685",
+    "256e30ffa65cc5e5c8ddc63353b87221d32c752288c2b6d872ddd650fc2bada0"
+  ],
+  "metadata": {
+    "page": {
+      "id": "worldcup_13_draw_drawing",
+      "name": "抽奖中",
+      "routeKey": "13drawdrawing",
+      "runtimeType": "prototype-html-css",
+      "order": 13,
+      "parentId": null
+    },
+    "files": {
+      "schema": "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+      "prototypeHtml": "671bb7d6d054e87eaec62e26ee913cb1e5c8332469b2cc755efa3d3a826561c8",
+      "prototypeCss": "01713cb61a92e949d57850de2f4cd761c98cc701fdaae3f7aa8d07de9d759685",
+      "prototypeMeta": "256e30ffa65cc5e5c8ddc63353b87221d32c752288c2b6d872ddd650fc2bada0"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783349665611,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录抽奖中"
+}

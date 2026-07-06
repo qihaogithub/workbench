@@ -22,7 +22,7 @@ function parsePreferences(value: unknown): UserAuthoringPreferences | null {
   const record = value as Record<string, unknown>;
   const sketchEditorEngine = record.sketchEditorEngine;
   if (sketchEditorEngine === undefined || sketchEditorEngine === "") return {};
-  if (sketchEditorEngine === "native" || sketchEditorEngine === "openpencil") {
+  if (sketchEditorEngine === "native") {
     return { sketchEditorEngine };
   }
   return null;

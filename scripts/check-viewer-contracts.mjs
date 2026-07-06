@@ -91,6 +91,13 @@ function validatePublishedProject(value, label) {
     if (page.schemaPath !== undefined && typeof page.schemaPath !== "string") {
       errors.push(`${prefix}.schemaPath must be a string when present`);
     }
+    if (page.screenshotPath !== undefined) {
+      if (typeof page.screenshotPath !== "string") {
+        errors.push(`${prefix}.screenshotPath must be a string when present`);
+      } else if (!page.screenshotPath.endsWith(".png")) {
+        errors.push(`${prefix}.screenshotPath must point to a PNG artifact`);
+      }
+    }
   });
 }
 
@@ -120,6 +127,7 @@ const sampleProject = {
       parentId: null,
       compiledJsPath: "demos/page_home/compiled.js",
       schemaPath: "demos/page_home/schema.json",
+      screenshotPath: "screenshots/page_home.png",
     },
   ],
   demoFolders: [],

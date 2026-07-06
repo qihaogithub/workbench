@@ -20,8 +20,7 @@ jest.mock("@/lib/auth/jwt", () => ({
 }));
 
 jest.mock("@/lib/authoring-feature-flags", () => ({
-  OPENPENCIL_SKETCH_SPIKE_ENABLED: true,
-  isSketchSceneAuthoringEnabled: jest.fn(() => false),
+  isSketchSceneAuthoringEnabled: jest.fn(() => true),
 }));
 
 jest.mock("@/lib/editor-diagnostics/store", () => ({
@@ -185,7 +184,7 @@ describe("session demo page files route sketch patch", () => {
     expect(fsUtils.getWorkspaceDemoPageFiles).not.toHaveBeenCalled();
   });
 
-  it("协同侧已写入新 scene 后拒绝旧基线 OpenPencil patch 并记录诊断", async () => {
+  it("协同侧已写入新 scene 后拒绝旧基线 sketch patch 并记录诊断", async () => {
     const { PUT } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
     const diagnosticsStore = await import("@/lib/editor-diagnostics/store");
@@ -256,7 +255,7 @@ describe("session demo page files route sketch patch", () => {
     ]);
   });
 
-  it("基线匹配时校验 OpenPencil patch 回放后保存目标 scene", async () => {
+  it("基线匹配时校验 sketch patch 回放后保存目标 scene", async () => {
     const { PUT } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
     const diagnosticsStore = await import("@/lib/editor-diagnostics/store");
@@ -322,7 +321,7 @@ describe("session demo page files route sketch patch", () => {
     ]);
   });
 
-  it("只提交 OpenPencil patch 时由服务端回放并保存目标 scene", async () => {
+  it("只提交 sketch patch 时由服务端回放并保存目标 scene", async () => {
     const { PUT } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
     const diagnosticsStore = await import("@/lib/editor-diagnostics/store");

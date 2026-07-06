@@ -15,10 +15,7 @@ import {
   listDemoPages,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import {
-  OPENPENCIL_SKETCH_SPIKE_ENABLED,
-  isSketchSceneAuthoringEnabled,
-} from "@/lib/authoring-feature-flags";
+import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { appendEditorDiagnosticEvents } from "@/lib/editor-diagnostics/store";
 import type { EditorDiagnosticEvent } from "@/lib/editor-diagnostics/types";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
@@ -408,8 +405,7 @@ export async function PUT(
     }
     if (
       (sketchScene !== undefined || sketchMeta !== undefined || sketchPatch !== undefined) &&
-      !isSketchSceneAuthoringEnabled() &&
-      !OPENPENCIL_SKETCH_SPIKE_ENABLED
+      !isSketchSceneAuthoringEnabled()
     ) {
       if (sketchPatch !== undefined) {
         await recordSketchPatchDiagnostic({

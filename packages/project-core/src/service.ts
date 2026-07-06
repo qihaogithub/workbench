@@ -254,7 +254,7 @@ function normalizeProjectAuthoringPreferences(
   preferences?: Project["authoringPreferences"],
 ): Project["authoringPreferences"] | undefined {
   const sketchEditorEngine = preferences?.sketchEditorEngine;
-  if (sketchEditorEngine === "native" || sketchEditorEngine === "openpencil") {
+  if (sketchEditorEngine === "native") {
     return { sketchEditorEngine };
   }
   return undefined;

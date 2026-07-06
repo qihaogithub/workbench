@@ -36,18 +36,18 @@ describe("user authoring preferences", () => {
     await createUser("u1");
 
     const saved = upsertUserAuthoringPreferences("u1", {
-      sketchEditorEngine: "openpencil",
+      sketchEditorEngine: "native",
     });
-    expect(saved.preferences).toEqual({ sketchEditorEngine: "openpencil" });
+    expect(saved.preferences).toEqual({ sketchEditorEngine: "native" });
     expect(readUserAuthoringPreferences("u1")?.preferences).toEqual({
-      sketchEditorEngine: "openpencil",
+      sketchEditorEngine: "native",
     });
 
     deleteUserAuthoringPreferences("u1");
     expect(readUserAuthoringPreferences("u1")).toBeNull();
   });
 
-  it("drops invalid persisted values when reading", async () => {
+  it("drops invalid and legacy persisted values when reading", async () => {
     const { getDb } = await import("@/lib/db");
     const { readUserAuthoringPreferences } = await import(
       "@/lib/user-authoring-preferences"
@@ -58,7 +58,11 @@ describe("user authoring preferences", () => {
       .prepare(
         "INSERT INTO user_authoring_preferences (user_id, preferences_json, updated_at) VALUES (?, ?, ?)",
       )
-      .run("u1", JSON.stringify({ sketchEditorEngine: "unknown" }), Date.now());
+      .run(
+        "u1",
+        JSON.stringify({ sketchEditorEngine: ["open", "pencil"].join("") }),
+        Date.now(),
+      );
 
     expect(readUserAuthoringPreferences("u1")?.preferences).toEqual({});
   });

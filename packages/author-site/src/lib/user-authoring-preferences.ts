@@ -20,7 +20,7 @@ function normalizeUserAuthoringPreferences(
   }
   const record = value as Record<string, unknown>;
   const sketchEditorEngine = record.sketchEditorEngine;
-  if (sketchEditorEngine === "native" || sketchEditorEngine === "openpencil") {
+  if (sketchEditorEngine === "native") {
     return { sketchEditorEngine };
   }
   return {};

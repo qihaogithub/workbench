@@ -8,7 +8,6 @@ import {
   BringToFront,
   Circle,
   Copy,
-  CreditCard,
   Eye,
   EyeOff,
   ImageIcon,
@@ -18,7 +17,6 @@ import {
   SendToBack,
   Square,
   StickyNote,
-  TextCursorInput,
   Trash2,
   Type,
   Undo2,
@@ -57,10 +55,7 @@ export type SketchTool =
   | "arrow"
   | "text"
   | "image"
-  | "sticky"
-  | "button"
-  | "input"
-  | "card";
+  | "sticky";
 
 export type SketchEditorMode = "edit" | "preview";
 
@@ -226,9 +221,6 @@ function createNode(type: SketchTool): SketchSceneNode {
       style: { ...base.style, fill: "#FEF3C7", stroke: "#F59E0B", color: "#78350F" },
     };
   }
-  if (type === "button") return { ...base, type: "button", width: 160, height: 52, text: "按钮" };
-  if (type === "input") return { ...base, type: "input", width: 240, height: 52, text: "输入框" };
-  if (type === "card") return { ...base, type: "card", width: 280, height: 180, text: "卡片" };
   if (type === "line") {
     return {
       ...base,
@@ -779,9 +771,6 @@ const TOOL_OPTIONS: Array<{ tool: SketchTool; label: string; icon: React.Compone
   { tool: "text", label: "文本", icon: Type },
   { tool: "image", label: "图片", icon: ImageIcon },
   { tool: "sticky", label: "便签", icon: StickyNote },
-  { tool: "button", label: "按钮", icon: Square },
-  { tool: "input", label: "输入框", icon: TextCursorInput },
-  { tool: "card", label: "卡片", icon: CreditCard },
 ];
 
 const NODE_TYPE_LABELS: Record<SketchSceneNodeType, string> = {

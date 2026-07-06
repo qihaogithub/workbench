@@ -8,10 +8,10 @@
       },
       "to": {
         "kind": "page",
-        "resourceId": "worldcup_08_prize_drawer_empty"
+        "resourceId": "worldcup_13_draw_drawing"
       },
       "reason": "canvas_node"
     }
   ],
-  "updatedAt": 1783349279837
+  "updatedAt": 1783349665629
 }

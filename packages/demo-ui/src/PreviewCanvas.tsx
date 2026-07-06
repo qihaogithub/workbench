@@ -427,20 +427,36 @@ function resizePageGroupLayout(
   edge: string,
   dx: number,
   dy: number,
+  aspectRatio: number,
 ): CanvasPageLayout {
-  let x = start.x;
-  let y = start.y;
+  const clampedAspectRatio =
+    Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : start.width / start.height;
+  const isNorth = edge.includes("n");
+  const isSouth = edge.includes("s");
+  const isWest = edge.includes("w");
+  const isEast = edge.includes("e");
+  const clampWidth = (value: number) => Math.max(PAGE_GROUP_MIN_WIDTH, value);
+  const clampHeight = (value: number) => Math.max(PAGE_GROUP_MIN_HEIGHT, value);
   let width = start.width;
   let height = start.height;
 
-  if (edge.includes("e")) width = Math.max(PAGE_GROUP_MIN_WIDTH, start.width + dx);
-  if (edge.includes("s")) height = Math.max(PAGE_GROUP_MIN_HEIGHT, start.height + dy);
+  if (isEast) width = clampWidth(start.width + dx);
+  if (isWest) width = clampWidth(start.width - dx);
+  if (isSouth) height = clampHeight(start.height + dy);
+  if (isNorth) height = clampHeight(start.height - dy);
+
+  if (Math.abs(width - start.width) / clampedAspectRatio > Math.abs(height - start.height)) {
+    height = clampHeight(width / clampedAspectRatio);
+  } else {
+    width = clampWidth(height * clampedAspectRatio);
+  }
+
+  let x = start.x;
+  let y = start.y;
   if (edge.includes("w")) {
-    width = Math.max(PAGE_GROUP_MIN_WIDTH, start.width - dx);
     x = start.x + (start.width - width);
   }
   if (edge.includes("n")) {
-    height = Math.max(PAGE_GROUP_MIN_HEIGHT, start.height - dy);
     y = start.y + (start.height - height);
   }
 
@@ -488,6 +504,10 @@ function CanvasPageGroupItem({
     width: Math.max(group.layout.width, 1),
     height: group.layout.height,
   };
+  const activePageSize = activePage
+    ? resolveCanvasPageSize(activePage.previewSize)
+    : { width: group.layout.width, height: group.layout.height };
+  const activePageAspectRatio = activePageSize.width / activePageSize.height;
 
   const updateHoveredEdge = useCallback(
     (event: React.PointerEvent | React.MouseEvent) => {
@@ -540,7 +560,13 @@ function CanvasPageGroupItem({
       const dx = (event.clientX - startPointerRef.current.x) / safeZoom;
       const dy = (event.clientY - startPointerRef.current.y) / safeZoom;
       const nextLayout = resizeEdge
-        ? resizePageGroupLayout(startLayoutRef.current, resizeEdge, dx, dy)
+        ? resizePageGroupLayout(
+            startLayoutRef.current,
+            resizeEdge,
+            dx,
+            dy,
+            activePageAspectRatio,
+          )
         : {
             ...startLayoutRef.current,
             x: startLayoutRef.current.x + dx,
@@ -550,6 +576,7 @@ function CanvasPageGroupItem({
       onDragMove?.(group.id, nextLayout, resizeEdge ?? undefined);
     },
     [
+      activePageAspectRatio,
       group.id,
       isDragging,
       onDragMove,
@@ -939,12 +966,52 @@ export function PreviewCanvas({
     [knowledgeDocuments],
   );
 
-  const selectedPageLayouts = useMemo(
+  const selectedPageLayoutEntries = useMemo(
     () =>
       selectedPageIds
-        .map((pageId) => effectivePages[pageId])
-        .filter((layout): layout is CanvasPageLayout => Boolean(layout)),
+        .map((pageId) => {
+          const layout = effectivePages[pageId];
+          return layout ? { kind: "page" as const, id: pageId, layout } : null;
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            kind: "page";
+            id: string;
+            layout: CanvasPageLayout;
+          } => Boolean(entry),
+        ),
     [effectivePages, selectedPageIds],
+  );
+  const selectedPageGroupLayoutEntries = useMemo(
+    () =>
+      selectedPageGroupIds
+        .map((groupId) => {
+          const group = effectivePageGroups[groupId];
+          return group
+            ? { kind: "page-group" as const, id: groupId, layout: group.layout }
+            : null;
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            kind: "page-group";
+            id: string;
+            layout: CanvasPageLayout;
+          } => Boolean(entry),
+        ),
+    [effectivePageGroups, selectedPageGroupIds],
+  );
+  const selectedPageLikeLayoutEntries = useMemo(
+    () => [...selectedPageLayoutEntries, ...selectedPageGroupLayoutEntries],
+    [selectedPageGroupLayoutEntries, selectedPageLayoutEntries],
+  );
+  const selectedPageLikeCount = selectedPageLikeLayoutEntries.length;
+  const selectedPageLayouts = useMemo(
+    () => selectedPageLikeLayoutEntries.map((entry) => entry.layout),
+    [selectedPageLikeLayoutEntries],
   );
   const selectedPageBounds = useMemo(
     () => getLayoutBounds(selectedPageLayouts),
@@ -1165,90 +1232,104 @@ export function PreviewCanvas({
 
   const updateSelectedPageLayouts = useCallback(
     (action: MultiPageAlignAction) => {
-      if (selectedPageIds.length < 2 || !selectedPageBounds) return;
+      if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds) return;
 
       updateState((prev) => {
-        const selectedLayouts = selectedPageIds
-          .map((pageId) => [pageId, effectivePages[pageId]] as const)
-          .filter((entry): entry is readonly [string, CanvasPageLayout] =>
-            Boolean(entry[1]),
-          );
+        const selectedLayouts = selectedPageLikeLayoutEntries;
         if (selectedLayouts.length < 2) return prev;
 
         const nextPages = { ...prev.pages };
+        const nextPageGroups = { ...(prev.pageGroups ?? {}) };
+        const applyLayout = (
+          entry: (typeof selectedLayouts)[number],
+          layout: CanvasPageLayout,
+        ) => {
+          if (entry.kind === "page") {
+            nextPages[entry.id] = layout;
+            return;
+          }
+          const group = nextPageGroups[entry.id];
+          if (!group) return;
+          nextPageGroups[entry.id] = {
+            ...group,
+            layout,
+            updatedAt: Date.now(),
+          };
+        };
 
         if (action === "distribute-x") {
           if (selectedLayouts.length < 3) return prev;
           const sorted = [...selectedLayouts].sort(
-            ([, a], [, b]) => a.x - b.x,
+            (a, b) => a.layout.x - b.layout.x,
           );
           const totalWidth = sorted.reduce(
-            (sum, [, layout]) => sum + layout.width,
+            (sum, entry) => sum + entry.layout.width,
             0,
           );
           const gap = (selectedPageBounds.width - totalWidth) / (sorted.length - 1);
           let cursor = selectedPageBounds.x;
-          for (const [pageId, layout] of sorted) {
-            nextPages[pageId] = { ...layout, x: cursor };
-            cursor += layout.width + gap;
+          for (const entry of sorted) {
+            applyLayout(entry, { ...entry.layout, x: cursor });
+            cursor += entry.layout.width + gap;
           }
-          return { ...prev, pages: nextPages };
+          return { ...prev, pages: nextPages, pageGroups: nextPageGroups };
         }
 
         if (action === "distribute-y") {
           if (selectedLayouts.length < 3) return prev;
           const sorted = [...selectedLayouts].sort(
-            ([, a], [, b]) => a.y - b.y,
+            (a, b) => a.layout.y - b.layout.y,
           );
           const totalHeight = sorted.reduce(
-            (sum, [, layout]) => sum + layout.height,
+            (sum, entry) => sum + entry.layout.height,
             0,
           );
           const gap =
             (selectedPageBounds.height - totalHeight) / (sorted.length - 1);
           let cursor = selectedPageBounds.y;
-          for (const [pageId, layout] of sorted) {
-            nextPages[pageId] = { ...layout, y: cursor };
-            cursor += layout.height + gap;
+          for (const entry of sorted) {
+            applyLayout(entry, { ...entry.layout, y: cursor });
+            cursor += entry.layout.height + gap;
           }
-          return { ...prev, pages: nextPages };
+          return { ...prev, pages: nextPages, pageGroups: nextPageGroups };
         }
 
-        for (const [pageId, layout] of selectedLayouts) {
+        for (const entry of selectedLayouts) {
+          const { layout } = entry;
           if (action === "left") {
-            nextPages[pageId] = { ...layout, x: selectedPageBounds.x };
+            applyLayout(entry, { ...layout, x: selectedPageBounds.x });
           } else if (action === "center-x") {
-            nextPages[pageId] = {
+            applyLayout(entry, {
               ...layout,
               x: selectedPageBounds.x + selectedPageBounds.width / 2 - layout.width / 2,
-            };
+            });
           } else if (action === "right") {
-            nextPages[pageId] = {
+            applyLayout(entry, {
               ...layout,
               x: selectedPageBounds.x + selectedPageBounds.width - layout.width,
-            };
+            });
           } else if (action === "top") {
-            nextPages[pageId] = { ...layout, y: selectedPageBounds.y };
+            applyLayout(entry, { ...layout, y: selectedPageBounds.y });
           } else if (action === "center-y") {
-            nextPages[pageId] = {
+            applyLayout(entry, {
               ...layout,
               y:
                 selectedPageBounds.y +
                 selectedPageBounds.height / 2 -
                 layout.height / 2,
-            };
+            });
           } else if (action === "bottom") {
-            nextPages[pageId] = {
+            applyLayout(entry, {
               ...layout,
               y: selectedPageBounds.y + selectedPageBounds.height - layout.height,
-            };
+            });
           }
         }
 
-        return { ...prev, pages: nextPages };
+        return { ...prev, pages: nextPages, pageGroups: nextPageGroups };
       });
     },
-    [effectivePages, selectedPageBounds, selectedPageIds, updateState],
+    [selectedPageBounds, selectedPageLikeLayoutEntries, updateState],
   );
 
   const handleNodeLayoutChange = useCallback(
@@ -2019,7 +2100,7 @@ export function PreviewCanvas({
     setSelectedDocumentNodeIds([]);
     setSelectedNodeId(null);
     setEditingTextNodeId(null);
-    setSelectedPageGroupId(id);
+    setSelectedPageGroupIds([id]);
   }, [
     allItemLayouts,
     createNodeId,
@@ -2106,7 +2187,7 @@ export function PreviewCanvas({
 
     setSelectedDocumentNodeIds([]);
     setSelectedPageIds([]);
-    setSelectedPageGroupId(null);
+    setSelectedPageGroupIds([]);
     setEditingTextNodeId(null);
     setSelectedNodeId(id);
   }, [
@@ -2301,7 +2382,7 @@ export function PreviewCanvas({
       });
       setSelectedPageIds([]);
       setSelectedDocumentNodeIds([]);
-      setSelectedPageGroupId(null);
+      setSelectedPageGroupIds([]);
       setSelectedNodeId(id);
       setEditingTextNodeId(null);
       return id;
@@ -2397,7 +2478,7 @@ export function PreviewCanvas({
       if (pendingImageFilesRef.current.length > 0) {
         setSelectedPageIds([]);
         setSelectedDocumentNodeIds([]);
-        setSelectedPageGroupId(null);
+        setSelectedPageGroupIds([]);
         setSelectedNodeId(null);
         setEditingTextNodeId(null);
         setToolMode("image");
@@ -2485,7 +2566,7 @@ export function PreviewCanvas({
         pendingImageFilesRef.current = [];
         setSelectedPageIds([]);
         setSelectedDocumentNodeIds([]);
-        setSelectedPageGroupId(null);
+        setSelectedPageGroupIds([]);
         setSelectedNodeId(null);
         setEditingTextNodeId(null);
         setToolMode("text");
@@ -2512,7 +2593,7 @@ export function PreviewCanvas({
     });
     setSelectedPageIds([]);
     setSelectedDocumentNodeIds([]);
-    setSelectedPageGroupId(null);
+    setSelectedPageGroupIds([]);
     setSelectedNodeId(id);
     setEditingTextNodeId(id);
     setToolMode("select");
@@ -2576,7 +2657,7 @@ export function PreviewCanvas({
   );
 
   const selectionToolbarStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (!selectedPageBounds || selectedPageIds.length < 1) return undefined;
+    if (!selectedPageBounds || selectedPageLikeCount < 1) return undefined;
     const zoom = canvasState.viewport.zoom || 1;
     return {
       left:
@@ -2585,13 +2666,13 @@ export function PreviewCanvas({
       top: Math.max(12, canvasState.viewport.y + selectedPageBounds.y * zoom - 48),
       transform: "translateX(-50%)",
     };
-  }, [canvasState.viewport, selectedPageBounds, selectedPageIds.length]);
+  }, [canvasState.viewport, selectedPageBounds, selectedPageLikeCount]);
 
   const documentSelectionToolbarStyle = useMemo<
     React.CSSProperties | undefined
   >(() => {
     if (
-      selectedPageIds.length > 0 ||
+      selectedPageLikeCount > 0 ||
       !selectedDocumentBounds ||
       selectedDocumentNodeIds.length < 2
     ) {
@@ -2612,7 +2693,7 @@ export function PreviewCanvas({
     canvasState.viewport,
     selectedDocumentBounds,
     selectedDocumentNodeIds.length,
-    selectedPageIds.length,
+    selectedPageLikeCount,
   ]);
 
   const renderAlignmentButton = (
@@ -2754,17 +2835,17 @@ export function PreviewCanvas({
         <div
           role="toolbar"
           aria-label={
-            selectedPageIds.length > 1 ? "多选对齐工具栏" : "单选页面工具栏"
+            selectedPageLikeCount > 1 ? "多选对齐工具栏" : "单选页面工具栏"
           }
           className="absolute z-30 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
           style={selectionToolbarStyle}
         >
-          {selectedPageIds.length === 1 && (
+          {selectedPageLikeCount === 1 && (
             <span className="px-2 text-xs font-medium text-muted-foreground">
               已选中 1 个页面
             </span>
           )}
-          {selectedPageIds.length >= 2 && (
+          {selectedPageLikeCount >= 2 && (
             <>
               {renderAlignmentButton(
                 "left",
@@ -2802,17 +2883,17 @@ export function PreviewCanvas({
                 "distribute-x",
                 "水平均分",
                 <BetweenVerticalStart className="h-4 w-4" />,
-                selectedPageIds.length < 3,
+                selectedPageLikeCount < 3,
               )}
               {renderAlignmentButton(
                 "distribute-y",
                 "垂直均分",
                 <BetweenHorizontalStart className="h-4 w-4" />,
-                selectedPageIds.length < 3,
+                selectedPageLikeCount < 3,
               )}
             </>
           )}
-          {selectedPageIds.length >= 2 && (
+          {selectedPageIds.length >= 2 && selectedPageGroupIds.length === 0 && (
             <>
               <div className="mx-1 h-5 w-px bg-border" />
               <button
@@ -2825,7 +2906,7 @@ export function PreviewCanvas({
               </button>
             </>
           )}
-          {onRequestDeletePages && (
+          {onRequestDeletePages && selectedPageIds.length > 0 && (
             <>
               <div className="mx-1 h-5 w-px bg-border" />
               <button
@@ -2943,7 +3024,7 @@ export function PreviewCanvas({
             group={group}
             pagesById={pagesById}
             editable={isEditorMode}
-            selected={selectedPageGroupId === group.id}
+            selected={selectedPageGroupIds.includes(group.id)}
             zoom={canvasState.viewport.zoom}
             sessionId={sessionId}
             pageRenderModes={pageRenderModes}
@@ -3022,7 +3103,7 @@ export function PreviewCanvas({
             onTextEditStart={(nodeId) => {
               setSelectedPageIds([]);
               setSelectedDocumentNodeIds([]);
-              setSelectedPageGroupId(null);
+              setSelectedPageGroupIds([]);
               setSelectedNodeId(nodeId);
               setEditingTextNodeId(nodeId);
             }}

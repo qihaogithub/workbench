@@ -1,9 +1,8 @@
 import type { SketchEditorEnginePreference } from "@workbench/shared";
 
-export type SketchEditorEngine = "native" | "openpencil";
+export type SketchEditorEngine = "native";
 
 export type ResolveSketchEditorEngineInput = {
-  openPencilEnabled: boolean;
   enginePreference?: SketchEditorEnginePreference;
   userEnginePreference?: SketchEditorEnginePreference;
   previewMode: "single" | "canvas";
@@ -13,7 +12,6 @@ export type ResolveSketchEditorEngineInput = {
 };
 
 export function resolveSketchEditorEngine({
-  openPencilEnabled,
   enginePreference,
   userEnginePreference,
   previewMode,
@@ -32,8 +30,5 @@ export function resolveSketchEditorEngine({
 
   const preferredEngine = enginePreference ?? userEnginePreference;
   if (preferredEngine === "native") return "native";
-  if (preferredEngine === "openpencil") {
-    return openPencilEnabled ? "openpencil" : "native";
-  }
-  return openPencilEnabled ? "openpencil" : "native";
+  return "native";
 }

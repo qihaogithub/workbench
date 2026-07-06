@@ -18,7 +18,8 @@
         "height": 768
       },
       "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
+      "screenshotPath": "screenshots/pad-popup_a3f2.png"
     },
     {
       "id": "phone-popup_k8m2",
@@ -33,7 +34,8 @@
         "height": 812
       },
       "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
+      "screenshotPath": "screenshots/phone-popup_k8m2.png"
     }
   ],
   "demoFolders": [],

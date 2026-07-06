@@ -1094,8 +1094,95 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       const state = getCanvasState();
       const group = Object.values(state.pageGroups ?? {})[0];
       expect(group.layout.width).toBe(140);
+      expect(group.layout.height).toBe(140);
       expect(state.pages.page_1).toEqual({ x: 100, y: 100, width: 100, height: 100 });
       expect(state.pages.page_2).toEqual({ x: 300, y: 130, width: 100, height: 100 });
+    });
+  });
+
+  it("选择工具可以框选页面组并和普通页面一起对齐", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const pageA = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    const pageB = container.querySelector("[data-page-id='page_2']") as HTMLElement;
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    Object.defineProperty(pageA, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 200,
+        bottom: 200,
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(pageB, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 300,
+        top: 130,
+        right: 400,
+        bottom: 230,
+        width: 100,
+        height: 100,
+        x: 300,
+        y: 130,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(pageA, {
+      button: 0,
+      clientX: 120,
+      clientY: 120,
+      pointerId: 47,
+    });
+    fireEvent.pointerUp(pageA, {
+      clientX: 120,
+      clientY: 120,
+      pointerId: 47,
+    });
+    await waitFor(() => {
+      expect(
+        container.querySelector(
+          "[data-page-id='page_1'] [data-canvas-selection-box='true']",
+        ),
+      ).toBeInTheDocument();
+    });
+    fireEvent.pointerDown(pageB, {
+      button: 0,
+      clientX: 320,
+      clientY: 150,
+      pointerId: 48,
+      shiftKey: true,
+    });
+    fireEvent.pointerUp(pageB, {
+      clientX: 320,
+      clientY: 150,
+      pointerId: 48,
+      shiftKey: true,
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
+
+    dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 650, clientY: 320 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("左对齐"));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const group = Object.values(state.pageGroups ?? {})[0];
+      expect(group.layout.x).toBe(100);
+      expect(state.pages.page_3.x).toBe(100);
+      expect(state.pages.page_1.x).toBe(100);
+      expect(state.pages.page_2.x).toBe(300);
     });
   });
 
