@@ -48,7 +48,7 @@ export function normalizeWorkspacePath(workspacePath: string): string {
 }
 
 export function getSystemTempDir(): string {
-  return path.join(os.tmpdir(), 'opencode-workspaces');
+  return path.join(os.tmpdir(), 'workbench-workspaces');
 }
 
 export function generateTempWorkspaceName(): string {

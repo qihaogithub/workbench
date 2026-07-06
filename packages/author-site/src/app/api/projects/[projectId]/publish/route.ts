@@ -110,6 +110,12 @@ export async function POST(
       if (error.message === 'SNAPSHOT_CREATE_ERROR') {
         return NextResponse.json(createApiError('SNAPSHOT_CREATE_ERROR', '创建发布快照失败'), { status: 500 });
       }
+      if (error.message === 'IMAGE_LOCALIZATION_FAILED') {
+        return NextResponse.json(
+          createApiError('PUBLISH_FAILED', '发布图片资源本地化失败，请检查外部图片是否可访问后重试'),
+          { status: 400 },
+        );
+      }
     }
     console.error('发布失败:', error);
     return NextResponse.json(createApiError('PUBLISH_FAILED'), { status: 500 });

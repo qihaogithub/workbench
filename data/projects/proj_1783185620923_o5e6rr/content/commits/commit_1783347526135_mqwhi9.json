@@ -1,0 +1,37 @@
+{
+  "id": "commit_1783347526135_mqwhi9",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "parentCommitId": "commit_1783264749720_p5za3p",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录我的奖品-空状态",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_02_active_no_vote",
+      "versionId": "prv_1783264749717_3c8w8t"
+    },
+    {
+      "kind": "page",
+      "resourceId": "worldcup_08_prize_drawer_empty",
+      "versionId": "prv_1783347526132_vx5n5r"
+    },
+    {
+      "kind": "page",
+      "resourceId": "worldcup_25_outside_browser_guide",
+      "versionId": "prv_1783210596542_9c9fme"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_08_prize_drawer_empty",
+      "toVersionId": "prv_1783347526132_vx5n5r"
+    }
+  ],
+  "createdAt": 1783347526135,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

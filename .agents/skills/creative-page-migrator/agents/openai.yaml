@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creative Page Migrator"
+  short_description: "Code-first migration into creative pages"
+  default_prompt: "Use $creative-page-migrator to migrate a source project page into a 创作端 project."

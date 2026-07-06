@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { ExternalAuthRequiredDetails } from "@opencode-workbench/shared/contracts";
+import type { ExternalAuthRequiredDetails } from "@workbench/shared/contracts";
 import type { AgentConfig } from "../../core/types";
 import type { PermissionHandler } from "./delete-page-tool";
 

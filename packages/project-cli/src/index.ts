@@ -17,6 +17,7 @@ import {
 import type {
   AssetReplaceInput,
   AssetUploadInput,
+  AgentRunReportInput,
   ConfigUpdateInput,
   CreateProjectInput,
   FolderUpdateInput,
@@ -26,6 +27,7 @@ import type {
   PageUpdateInput,
   ProjectAdminActor,
   ProjectAdminConfig,
+  ProjectAuthoringPreferences,
   ProjectAdminResult,
   ProjectResourceKind,
   TemplateScope,
@@ -33,6 +35,36 @@ import type {
 
 type JsonObject = Record<string, unknown>;
 type CommandResult = ProjectAdminResult<unknown> | JsonObject | string;
+
+interface PrototypeManifestPage {
+  pageId?: string;
+  name?: string;
+  routeKey?: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: PageCreateInput["prototypeMeta"];
+  schema?: string;
+  order?: number;
+  parentId?: string | null;
+}
+
+interface PrototypeManifest {
+  pages: PrototypeManifestPage[];
+}
+
+interface BatchCommandItemFailure {
+  item: string;
+  code: string;
+  message: string;
+  resumeCommand?: string;
+}
+
+interface RecipeDefinition {
+  id: string;
+  title: string;
+  commands: string[];
+  evidence: string[];
+}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -221,7 +253,15 @@ async function readStdin(): Promise<string> {
 function readTextValue(value: unknown): string {
   if (typeof value !== "string") return "";
   if (value.startsWith("@")) {
-    return fs.readFileSync(path.resolve(value.slice(1)), "utf-8");
+    const fileReference = value.slice(1);
+    if (
+      !/^(?:\/|\.\/|\.\.\/)/.test(fileReference) ||
+      fileReference.length > 512 ||
+      /[\r\n{};]/.test(fileReference)
+    ) {
+      return value;
+    }
+    return fs.readFileSync(path.resolve(fileReference), "utf-8");
   }
   return value;
 }
@@ -426,6 +466,433 @@ function cliFail<T>(
   };
 }
 
+function cliOk<T>(
+  data: T,
+  extras: Omit<ProjectAdminResult<T>, "ok" | "data"> = {},
+): ProjectAdminResult<T> {
+  return { ok: true, data, ...extras };
+}
+
+function projectAuthoringPreferencesArg(
+  args: JsonObject,
+): ProjectAdminResult<ProjectAuthoringPreferences | undefined> {
+  const clearPreferences = booleanArg(args, "clearAuthoringPreferences");
+  const rawPreferences = args.authoringPreferences;
+  const sketchEditorEngine = optionalStringArg(args, "sketchEditorEngine");
+
+  if (clearPreferences && (rawPreferences !== undefined || sketchEditorEngine !== undefined)) {
+    return cliFail(
+      "INVALID_REQUEST",
+      "--clear-authoring-preferences 不能与 --authoring-preferences 或 --sketch-editor-engine 同时使用",
+    );
+  }
+
+  if (!clearPreferences && rawPreferences === undefined && sketchEditorEngine === undefined) {
+    return cliOk(undefined);
+  }
+
+  if (clearPreferences) {
+    return cliOk({});
+  }
+
+  let record: JsonObject = {};
+  if (rawPreferences !== undefined) {
+    if (rawPreferences && typeof rawPreferences === "object" && !Array.isArray(rawPreferences)) {
+      record = rawPreferences as JsonObject;
+    } else if (typeof rawPreferences === "string") {
+      const parsed = parseJsonValue(readTextValue(rawPreferences));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        record = parsed as JsonObject;
+      } else {
+        return cliFail("INVALID_REQUEST", "authoringPreferences 必须是 JSON object");
+      }
+    } else {
+      return cliFail("INVALID_REQUEST", "authoringPreferences 必须是 JSON object");
+    }
+  }
+
+  if (sketchEditorEngine !== undefined) {
+    record = { ...record, sketchEditorEngine };
+  }
+
+  const unknownKeys = Object.keys(record).filter((key) => key !== "sketchEditorEngine");
+  if (unknownKeys.length > 0) {
+    return cliFail(
+      "INVALID_REQUEST",
+      `authoringPreferences 仅支持 sketchEditorEngine，收到: ${unknownKeys.join(", ")}`,
+    );
+  }
+
+  const resolvedSketchEditorEngine = record.sketchEditorEngine;
+  if (
+    resolvedSketchEditorEngine === undefined ||
+    resolvedSketchEditorEngine === null ||
+    resolvedSketchEditorEngine === ""
+  ) {
+    return cliOk({});
+  }
+
+  if (
+    resolvedSketchEditorEngine !== "native" &&
+    resolvedSketchEditorEngine !== "openpencil"
+  ) {
+    return cliFail(
+      "INVALID_REQUEST",
+      "sketchEditorEngine 仅支持 native 或 openpencil",
+    );
+  }
+
+  return cliOk({ sketchEditorEngine: resolvedSketchEditorEngine });
+}
+
+function withAssetListSummary(result: ProjectAdminResult<{ assets: Array<{ path: string; size: number; references: string[] }> }>): ProjectAdminResult<unknown> {
+  if (!result.ok || !result.data) return result;
+  const totalBytes = result.data.assets.reduce((sum, asset) => sum + asset.size, 0);
+  return {
+    ...result,
+    data: {
+      summary: {
+        count: result.data.assets.length,
+        totalBytes,
+        referenced: result.data.assets.filter((asset) => asset.references.length > 0).length,
+        unreferenced: result.data.assets.filter((asset) => asset.references.length === 0).length,
+      },
+      assets: result.data.assets.map((asset) => ({
+        path: asset.path,
+        size: asset.size,
+        referenceCount: asset.references.length,
+      })),
+    },
+  };
+}
+
+function withDiffSummary(result: ProjectAdminResult<unknown>): ProjectAdminResult<unknown> {
+  if (!result.ok || !result.data || typeof result.data !== "object" || Array.isArray(result.data)) return result;
+  const data = result.data as { created?: string[]; updated?: string[]; deleted?: string[]; unchanged?: string[]; notes?: string[] };
+  return {
+    ...result,
+    data: {
+      summary: {
+        created: data.created?.length ?? 0,
+        updated: data.updated?.length ?? 0,
+        deleted: data.deleted?.length ?? 0,
+        unchanged: data.unchanged?.length ?? 0,
+        notes: data.notes ?? [],
+      },
+      diff: data,
+    },
+  };
+}
+
+function withPageListSummary(result: ProjectAdminResult<{ pages: Array<{ runtimeType?: string }>; folders: unknown[] }>): ProjectAdminResult<unknown> {
+  if (!result.ok || !result.data) return result;
+  const runtimeTypes: Record<string, number> = {};
+  for (const page of result.data.pages) {
+    const runtimeType = page.runtimeType ?? "high-fidelity-react";
+    runtimeTypes[runtimeType] = (runtimeTypes[runtimeType] ?? 0) + 1;
+  }
+  return {
+    ...result,
+    data: {
+      summary: {
+        pages: result.data.pages.length,
+        folders: result.data.folders.length,
+        runtimeTypes,
+      },
+      pages: result.data.pages,
+      folders: result.data.folders,
+    },
+  };
+}
+
+function withRuntimeSummary(result: ProjectAdminResult<unknown>): ProjectAdminResult<unknown> {
+  if (!result.ok || !result.data || typeof result.data !== "object" || Array.isArray(result.data)) return result;
+  const data = result.data as { ok?: boolean; pageIds?: string[]; issues?: Array<{ severity: string; code: string; pageId: string }> };
+  return {
+    ...result,
+    data: {
+      summary: {
+        ok: data.ok === true,
+        pages: data.pageIds?.length ?? 0,
+        issues: data.issues?.length ?? 0,
+        errors: data.issues?.filter((issue) => issue.severity === "error").length ?? 0,
+        warnings: data.issues?.filter((issue) => issue.severity === "warning").length ?? 0,
+      },
+      runtimeValidation: data,
+    },
+  };
+}
+
+const INPUT_HELP = {
+  rules: [
+    "@file expansion only runs when the whole string starts with @/abs/path, @./rel/path, or @../rel/path.",
+    "CSS at-rules such as @media, @supports, @keyframes, @font-face, @container, and @layer are treated as literal content.",
+    "Use --input-json @./args.json for structured arguments and --stdin for piped JSON.",
+  ],
+  examples: [
+    "ow page update-code <editId> <pageId> --code @./src/page.tsx --json",
+    "ow page update-prototype <editId> <pageId> --input-json @./prototype.json --json",
+  ],
+};
+
+const RECIPES: RecipeDefinition[] = [
+  {
+    id: "create-empty-project",
+    title: "Create an empty project through a transaction",
+    commands: ["ow doctor --json", "ow project create --name <name> --json", "ow edit begin <projectId> --json"],
+    evidence: ["projectId", "editId", "auditId"],
+  },
+  {
+    id: "import-prototype-project",
+    title: "Import external HTML/CSS prototype pages",
+    commands: ["ow project import-prototype --name <name> --source <dir> --pages @./prototype-pages.json --assets assets:assets --commit --json"],
+    evidence: ["projectId", "editId", "diff summary", "validation summary"],
+  },
+  {
+    id: "edit-existing-project",
+    title: "Edit an existing project safely",
+    commands: ["ow edit begin <projectId> --json", "ow page list <editId> --summary --json", "ow edit verify <editId> --json", "ow edit commit <editId> --json"],
+    evidence: ["editId", "versionId", "auditId"],
+  },
+  {
+    id: "local-project-package-dev",
+    title: "Develop through the local project package path",
+    commands: ["ow project pull <projectId> <dir> --json", "pnpm install", "pnpm dev", "pnpm preview:check", "ow validate --json", "ow diff --summary --json", "ow submit --json"],
+    evidence: ["projectDir", "diff summary", "submit auditId"],
+  },
+  {
+    id: "publish-project",
+    title: "Check and publish a project",
+    commands: ["ow publish check <projectId> --json", "ow publish project <projectId> --json", "ow publish status <projectId> --json"],
+    evidence: ["publishedVersion", "artifactSummary"],
+  },
+  {
+    id: "recover-edit",
+    title: "Recover or inspect an edit transaction",
+    commands: ["ow edit status <editId> --json", "ow edit diff <editId> --summary --json", "ow edit validate <editId> --json", "ow edit discard <editId> --json"],
+    evidence: ["editId", "changedFiles", "validation issues"],
+  },
+];
+
+function recipeById(id: string): RecipeDefinition | undefined {
+  return RECIPES.find((recipe) => recipe.id === id);
+}
+
+function parsePrototypeManifest(args: JsonObject): ProjectAdminResult<PrototypeManifest> {
+  const raw = args.manifest ?? args.pages;
+  if (raw === undefined) return cliFail("MANIFEST_REQUIRED", "必须提供 --manifest 或 --pages");
+  const parsed = typeof raw === "string" ? JSON.parse(readTextValue(raw)) as unknown : raw;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return cliFail("INVALID_MANIFEST", "manifest 必须是 JSON object");
+  }
+  const pages = (parsed as { pages?: unknown }).pages;
+  if (!Array.isArray(pages)) return cliFail("INVALID_MANIFEST", "manifest.pages 必须是数组");
+  const normalizedPages = pages
+    .filter((item): item is JsonObject => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    .map((item) => ({
+      pageId: optionalStringArg(item, "pageId"),
+      name: optionalStringArg(item, "name"),
+      routeKey: optionalStringArg(item, "routeKey"),
+      prototypeHtml: optionalStringArg(item, "prototypeHtml") ?? optionalStringArg(item, "html"),
+      prototypeCss: optionalStringArg(item, "prototypeCss") ?? optionalStringArg(item, "css"),
+      prototypeMeta: item.prototypeMeta && typeof item.prototypeMeta === "object" && !Array.isArray(item.prototypeMeta)
+        ? item.prototypeMeta as PageCreateInput["prototypeMeta"]
+        : undefined,
+      schema: optionalStringArg(item, "schema"),
+      order: numberArg(item, "order"),
+      parentId: hasArg(item, "parentId") ? stringArg(item, "parentId") || null : undefined,
+    }));
+  return cliOk({ pages: normalizedPages });
+}
+
+function walkLocalFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const files: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...walkLocalFiles(entryPath));
+    else files.push(entryPath);
+  }
+  return files;
+}
+
+function includeFile(filePath: string, include: string | undefined): boolean {
+  if (!include) return /\.(png|jpe?g|gif|webp|svg|svga)$/i.test(filePath);
+  const parts = include.split(",").map((item) => item.trim()).filter(Boolean);
+  if (parts.length === 0) return true;
+  return parts.some((part) => {
+    if (part.startsWith("*.")) return filePath.toLowerCase().endsWith(part.slice(1).toLowerCase());
+    if (part.startsWith(".")) return filePath.toLowerCase().endsWith(part.toLowerCase());
+    return filePath.includes(part);
+  });
+}
+
+function parseAssetSpecs(args: JsonObject): Array<{ from: string; to: string }> {
+  const values = stringArrayArg(args, "assets");
+  const positional = optionalStringArg(args, "asset");
+  const raw = values.length > 0 ? values : positional ? [positional] : [];
+  return raw
+    .map((item) => {
+      const [from, to] = item.split(":");
+      return from && to ? { from, to } : null;
+    })
+    .filter((item): item is { from: string; to: string } => item !== null);
+}
+
+function uploadAssetDirectory(
+  service: ProjectAdminService,
+  actor: ProjectAdminActor,
+  input: {
+    editId: string;
+    from: string;
+    to: string;
+    include?: string;
+    dryRun?: boolean;
+  },
+): ProjectAdminResult<{
+  editId: string;
+  uploaded: Array<{ path: string; size: number }>;
+  skipped: string[];
+  failed: BatchCommandItemFailure[];
+  totalBytes: number;
+  dryRun: boolean;
+  resumeCommand: string;
+}> {
+  const sourceDir = path.resolve(input.from);
+  if (!fs.existsSync(sourceDir)) {
+    return cliFail("SOURCE_DIR_NOT_FOUND", `资产目录不存在: ${sourceDir}`, {
+      nextActions: ["检查 --from 路径", "使用绝对路径重试"],
+    });
+  }
+  const uploaded: Array<{ path: string; size: number }> = [];
+  const skipped: string[] = [];
+  const failed: BatchCommandItemFailure[] = [];
+  for (const file of walkLocalFiles(sourceDir)) {
+    const relative = path.relative(sourceDir, file).split(path.sep).join("/");
+    if (!includeFile(file, input.include)) {
+      skipped.push(relative);
+      continue;
+    }
+    const targetPath = path.join(input.to, relative).split(path.sep).join("/");
+    const result = service.uploadAsset({
+      editId: input.editId,
+      filename: path.basename(file),
+      dataBase64: fs.readFileSync(file).toString("base64"),
+      mimeType: mimeTypeForLocalFile(file),
+      targetPath,
+      dryRun: input.dryRun,
+    }, actor);
+    if (result.ok && result.data) {
+      uploaded.push({ path: result.data.path, size: result.data.size });
+    } else {
+      failed.push({
+        item: relative,
+        code: result.error?.code ?? "UPLOAD_FAILED",
+        message: result.error?.message ?? "资产上传失败",
+        resumeCommand: `ow asset upload-dir ${input.editId} --from ${sourceDir} --to ${input.to} --resume --json`,
+      });
+    }
+  }
+  const resumeCommand = `ow asset upload-dir ${input.editId} --from ${sourceDir} --to ${input.to} --resume --json`;
+  return cliOk({
+    editId: input.editId,
+    uploaded,
+    skipped,
+    failed,
+    totalBytes: uploaded.reduce((sum, item) => sum + item.size, 0),
+    dryRun: input.dryRun === true,
+    resumeCommand,
+  }, {
+    nextActions: failed.length > 0 ? [resumeCommand] : [`ow edit verify ${input.editId} --checks assets --json`],
+    warnings: failed.length > 0 ? [`${failed.length} 个资产上传失败`] : undefined,
+  });
+}
+
+function mimeTypeForLocalFile(file: string): string | undefined {
+  const ext = path.extname(file).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".gif") return "image/gif";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".svg") return "image/svg+xml";
+  return undefined;
+}
+
+function updatePrototypePages(
+  service: ProjectAdminService,
+  actor: ProjectAdminActor,
+  input: {
+    editId: string;
+    manifest: PrototypeManifest;
+    noConfig?: boolean;
+    dryRun?: boolean;
+  },
+): ProjectAdminResult<{
+  editId: string;
+  created: string[];
+  updated: string[];
+  failed: BatchCommandItemFailure[];
+  total: number;
+  dryRun: boolean;
+  resumeCommand: string;
+}> {
+  const created: string[] = [];
+  const updated: string[] = [];
+  const failed: BatchCommandItemFailure[] = [];
+  for (const page of input.manifest.pages) {
+    const pageId = page.pageId;
+    const existing = pageId ? service.getPage(input.editId, pageId) : undefined;
+    const name = page.name ?? pageId ?? "原型页";
+    const result = existing?.ok
+      ? service.updatePrototypePage({
+          editId: input.editId,
+          pageId: pageId ?? "",
+          prototypeHtml: page.prototypeHtml,
+          prototypeCss: page.prototypeCss,
+          prototypeMeta: page.prototypeMeta,
+          dryRun: input.dryRun,
+        }, actor)
+      : service.createPage({
+          editId: input.editId,
+          pageId,
+          name,
+          routeKey: page.routeKey,
+          runtimeType: "prototype-html-css",
+          prototypeHtml: page.prototypeHtml,
+          prototypeCss: page.prototypeCss,
+          prototypeMeta: page.prototypeMeta,
+          schema: input.noConfig ? undefined : page.schema,
+          order: page.order,
+          parentId: page.parentId,
+          dryRun: input.dryRun,
+        }, actor);
+    if (result.ok && result.data) {
+      if (existing?.ok) updated.push(result.data.meta.id);
+      else created.push(result.data.meta.id);
+    } else {
+      failed.push({
+        item: pageId ?? name,
+        code: result.error?.code ?? "PROTOTYPE_UPDATE_FAILED",
+        message: result.error?.message ?? "原型页写入失败",
+        resumeCommand: `ow page update-prototypes ${input.editId} --manifest <manifest> --resume --json`,
+      });
+    }
+  }
+  const resumeCommand = `ow page update-prototypes ${input.editId} --manifest <manifest> --resume --json`;
+  return cliOk({
+    editId: input.editId,
+    created,
+    updated,
+    failed,
+    total: input.manifest.pages.length,
+    dryRun: input.dryRun === true,
+    resumeCommand,
+  }, {
+    nextActions: failed.length > 0 ? [resumeCommand] : [`ow edit verify ${input.editId} --checks runtime,prototype-placeholders,metadata --json`],
+    warnings: failed.length > 0 ? [`${failed.length} 个页面写入失败`] : undefined,
+  });
+}
+
 function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -511,7 +978,7 @@ function helpText(): string {
     .map((command) => `  ${command.name.padEnd(34)} ${command.description}`)
     .join("\n");
   return [
-    "ow - opencode-workbench project admin CLI",
+    "ow - workbench project admin CLI",
     "",
     "Usage:",
     "  ow <command> [args] [--json] [--data-dir <dir>]",
@@ -540,7 +1007,7 @@ register("doctor", "诊断本地 CLI 环境", (_args, _pos, { service, actor }) 
     dataDir: service.dataDir,
     actor,
     node: process.version,
-    package: "@opencode-workbench/project-cli",
+    package: "@workbench/project-cli",
   },
   nextActions: ["project list --json", "template list --json"],
 }));
@@ -550,13 +1017,18 @@ register("commands", "列出 CLI 命令", () => ({
   data: commands.map(({ name, aliases, description }) => ({ name, aliases, description })),
 }));
 
+register("help input", "说明 @file、--input-json 和 CSS at-rule 输入规则", () => cliOk(INPUT_HELP), [
+  "help_input",
+]);
+
 register("validate", "校验本地项目包协议与文件", (args, pos) =>
   validateProjectScaffold(stringArg(args, "dir", pos[0] ?? process.cwd())),
 );
 
-register("diff", "对比本地项目包与拉取基线", (args, pos) =>
-  diffProjectScaffold(stringArg(args, "dir", pos[0] ?? process.cwd())),
-);
+register("diff", "对比本地项目包与拉取基线", (args, pos) => {
+  const result = diffProjectScaffold(stringArg(args, "dir", pos[0] ?? process.cwd()));
+  return booleanArg(args, "summary") ? withDiffSummary(result) : result;
+});
 
 register("upgrade", "升级本地项目脚手架托管文件", (args, pos) =>
   upgradeProjectScaffold(optionalStringArg(args, "dir", pos[0]) ?? process.cwd(), {
@@ -593,6 +1065,7 @@ register("project pull", "拉取项目到本地项目包", (args, pos, { service
 register("project create", "创建空白项目或从模板创建", (args, _pos, { service, actor }) => {
   const input: CreateProjectInput = {
     name: stringArg(args, "name"),
+    category: optionalStringArg(args, "category"),
     templateId: optionalStringArg(args, "templateId"),
     description: optionalStringArg(args, "description"),
     dryRun: booleanArg(args, "dryRun"),
@@ -600,23 +1073,176 @@ register("project create", "创建空白项目或从模板创建", (args, _pos, 
   return service.createProject(input, actor);
 }, ["project_create"]);
 
-register("project update", "修改项目名称或描述", (args, pos, { service, actor }) =>
-  service.updateProject(
+register("project update", "修改项目名称、分类、描述和创作偏好", (args, pos, { service, actor }) => {
+  const preferences = projectAuthoringPreferencesArg(args);
+  if (!preferences.ok) return preferences;
+  return service.updateProject(
     {
       projectId: stringArg(args, "projectId", pos[0]),
       name: optionalStringArg(args, "name", pos[1]),
+      category: hasArg(args, "category") ? stringArg(args, "category") : undefined,
       description: hasArg(args, "description") ? stringArg(args, "description") : undefined,
+      authoringPreferences: preferences.data,
       dryRun: booleanArg(args, "dryRun"),
     },
     actor,
+  );
+}, ["project_rename"]);
+
+register("project validate-runtime", "校验项目当前版本页面是否符合创作端预览运行契约", (args, pos, { service, actor }) => {
+  const result = service.validateProjectRuntime(stringArg(args, "projectId", pos[0]), actor);
+  return booleanArg(args, "summary") ? withRuntimeSummary(result) : result;
+}, ["project_validate_runtime"]);
+
+register("project verify", "聚合验证项目当前版本的 runtime、资产、原型占位和元数据", (args, pos, { service, actor }) =>
+  service.projectVerify(
+    stringArg(args, "projectId", pos[0]),
+    stringArrayArg(args, "checks"),
+    actor,
   ),
-  ["project_rename"],
+  ["project_verify"],
 );
 
-register("project validate-runtime", "校验项目当前版本页面是否符合创作端预览运行契约", (args, pos, { service, actor }) =>
-  service.validateProjectRuntime(stringArg(args, "projectId", pos[0]), actor),
-  ["project_validate_runtime"],
+register("project visual-check", "生成项目页面效果离线检查报告和截图工件", (args, pos, { service, actor }) =>
+  service.visualCheck({
+    projectId: stringArg(args, "projectId", pos[0]),
+    pages: stringArrayArg(args, "pages"),
+    viewport: optionalStringArg(args, "viewport"),
+    checks: stringArrayArg(args, "checks"),
+    outputDir: stringArg(args, "output", pos[1] ?? path.join(process.cwd(), "test-results", "project-visual-check")),
+  }, actor),
+  ["project_visual_check"],
 );
+
+register("project import-prototype", "从外部目录导入 HTML/CSS 原型项目工作流", (args, _pos, { service, actor }) => {
+  const manifestResult = parsePrototypeManifest(args);
+  if (!manifestResult.ok || !manifestResult.data) return manifestResult;
+  const sourceDir = path.resolve(stringArg(args, "source", process.cwd()));
+  const dryRun = booleanArg(args, "dryRun");
+  const shouldCommit = booleanArg(args, "commit");
+  const stages: Array<{ name: string; ok: boolean; data?: unknown }> = [
+    { name: "doctor", ok: true, data: { dataDir: service.dataDir, actor } },
+  ];
+  if (dryRun) {
+    stages.push({
+      name: "plan",
+      ok: true,
+      data: {
+        projectId: optionalStringArg(args, "projectId"),
+        name: optionalStringArg(args, "name"),
+        source: sourceDir,
+        pages: manifestResult.data.pages.length,
+        assets: parseAssetSpecs(args),
+        commit: shouldCommit,
+      },
+    });
+    return cliOk({
+      dryRun: true,
+      stages,
+      nextCommand: "ow project import-prototype ... --commit --json",
+    }, {
+      nextActions: ["确认 manifest 与资产映射后去掉 --dry-run 重试"],
+    });
+  }
+
+  let projectId = optionalStringArg(args, "projectId");
+  if (!projectId) {
+    const created = service.createProject({
+      name: stringArg(args, "name") || "导入原型项目",
+      description: optionalStringArg(args, "description"),
+    }, actor);
+    stages.push({ name: "project create", ok: created.ok, data: created.ok ? created.data : created.error });
+    if (!created.ok || !created.data) return cliFail(created.error?.code ?? "PROJECT_CREATE_FAILED", created.error?.message ?? "项目创建失败", {
+      nextActions: ["修复项目名称或权限后重试"],
+    });
+    projectId = created.data.id;
+  } else {
+    const project = service.getProject(projectId, actor);
+    stages.push({ name: "project get", ok: project.ok, data: project.ok ? { projectId } : project.error });
+    if (!project.ok) return cliFail(project.error?.code ?? "PROJECT_NOT_FOUND", project.error?.message ?? "项目不存在", {
+      nextActions: ["确认 --project-id 后重试"],
+    });
+  }
+
+  const edit = service.beginEdit(projectId, actor);
+  stages.push({ name: "edit begin", ok: edit.ok, data: edit.ok ? edit.data : edit.error });
+  if (!edit.ok || !edit.data) return cliFail(edit.error?.code ?? "EDIT_BEGIN_FAILED", edit.error?.message ?? "无法打开编辑事务");
+  const editId = edit.data.editId;
+
+  for (const spec of parseAssetSpecs(args)) {
+    const uploaded = uploadAssetDirectory(service, actor, {
+      editId,
+      from: path.resolve(sourceDir, spec.from),
+      to: spec.to,
+      include: optionalStringArg(args, "include"),
+      dryRun: false,
+    });
+    stages.push({ name: "asset upload-dir", ok: uploaded.ok, data: uploaded.ok ? uploaded.data : uploaded.error });
+    if (!uploaded.ok || (uploaded.data && uploaded.data.failed.length > 0)) {
+      return cliFail(uploaded.error?.code ?? "IMPORT_ASSET_FAILED", uploaded.error?.message ?? "资产导入失败", {
+        nextActions: [`ow project import-prototype --project-id ${projectId} --resume --json`],
+        warnings: [`editId=${editId}`],
+      });
+    }
+  }
+
+  const pages = updatePrototypePages(service, actor, {
+    editId,
+    manifest: manifestResult.data,
+    noConfig: booleanArg(args, "noConfig"),
+    dryRun: false,
+  });
+  stages.push({ name: "page update-prototypes", ok: pages.ok, data: pages.ok ? pages.data : pages.error });
+  if (!pages.ok || (pages.data && pages.data.failed.length > 0)) {
+    return cliFail(pages.error?.code ?? "IMPORT_PAGES_FAILED", pages.error?.message ?? "原型页导入失败", {
+      nextActions: [`ow page update-prototypes ${editId} --manifest <manifest> --resume --json`],
+      warnings: [`editId=${editId}`],
+    });
+  }
+
+  const validation = service.editValidate(editId);
+  const diff = service.editDiff(editId);
+  const runtime = service.validateProjectRuntime(projectId, actor);
+  stages.push(
+    { name: "edit validate", ok: validation.ok, data: validation.data },
+    { name: "edit diff --summary", ok: diff.ok, data: withDiffSummary(diff).data },
+    { name: "project validate-runtime", ok: runtime.ok, data: withRuntimeSummary(runtime).data },
+  );
+  if (!validation.ok || validation.validation?.ok === false) {
+    return cliFail("VALIDATION_BLOCKED", "导入后事务校验未通过", {
+      validation: validation.validation,
+      nextActions: [`ow edit verify ${editId} --json`, `ow edit diff ${editId} --summary --json`],
+      warnings: [`editId=${editId}`],
+    });
+  }
+
+  const committed = shouldCommit ? service.commitEdit(editId, optionalStringArg(args, "note") ?? "导入原型项目", actor) : undefined;
+  if (committed) stages.push({ name: "edit commit", ok: committed.ok, data: committed.ok ? committed.data : committed.error });
+  if (committed && (!committed.ok || !committed.data)) {
+    return cliFail(committed.error?.code ?? "COMMIT_FAILED", committed.error?.message ?? "提交失败", {
+      nextActions: [`ow edit status ${editId} --json`, `ow edit diff ${editId} --summary --json`],
+      warnings: [`editId=${editId}`],
+    });
+  }
+
+  return cliOk({
+    projectId,
+    editId,
+    versionId: committed?.data?.version.versionId,
+    auditId: committed?.auditId,
+    committed: committed?.ok === true,
+    stages,
+    summary: {
+      pages: manifestResult.data.pages.length,
+      assets: parseAssetSpecs(args).length,
+      validationOk: validation.validation?.ok ?? validation.ok,
+    },
+  }, {
+    nextActions: committed?.ok
+      ? [`ow report agent-run --project-id ${projectId} --edit-id ${editId} --version-id ${committed.data?.version.versionId} --audit-id ${committed.auditId ?? ""} --json`]
+      : [`ow edit diff ${editId} --summary --json`, `ow edit commit ${editId} --json`],
+  });
+}, ["project_import_prototype"]);
 
 register("project commit-list", "列出项目内容图提交", (args, pos, { service, actor }) =>
   service.projectCommitList(
@@ -791,14 +1417,19 @@ register("edit status", "查看事务状态", (args, pos, { service }) =>
   ["edit_status"],
 );
 
-register("edit diff", "查看事务差异", (args, pos, { service }) =>
-  service.editDiff(stringArg(args, "editId", pos[0])),
-  ["edit_diff"],
-);
+register("edit diff", "查看事务差异", (args, pos, { service }) => {
+  const result = service.editDiff(stringArg(args, "editId", pos[0]));
+  return booleanArg(args, "summary") ? withDiffSummary(result) : result;
+}, ["edit_diff"]);
 
 register("edit validate", "校验事务工作区", (args, pos, { service }) =>
   service.editValidate(stringArg(args, "editId", pos[0])),
   ["edit_validate"],
+);
+
+register("edit verify", "聚合验证事务工作区的 runtime、资产、原型占位和元数据", (args, pos, { service }) =>
+  service.editVerify(stringArg(args, "editId", pos[0]), stringArrayArg(args, "checks")),
+  ["edit_verify"],
 );
 
 register("edit commit", "提交编辑事务并生成版本", (args, pos, { service, actor }) =>
@@ -816,10 +1447,10 @@ register("edit extend", "延长事务有效期", (args, pos, { service }) =>
   ["edit_extend"],
 );
 
-register("page list", "列出页面和文件夹树", (args, pos, { service }) =>
-  service.listPages(stringArg(args, "editId", pos[0])),
-  ["page_list"],
-);
+register("page list", "列出页面和文件夹树", (args, pos, { service }) => {
+  const result = service.listPages(stringArg(args, "editId", pos[0]));
+  return booleanArg(args, "summary") ? withPageListSummary(result) : result;
+}, ["page_list"]);
 
 register("page get", "获取单页代码、Schema 和元信息", (args, pos, { service }) =>
   service.getPage(stringArg(args, "editId", pos[0]), stringArg(args, "pageId", pos[1])),
@@ -895,6 +1526,10 @@ register("page create", "新建页面", (args, _pos, { service, actor }) => {
     prototypeMeta: args.prototypeMeta && typeof args.prototypeMeta === "object"
       ? args.prototypeMeta as PageCreateInput["prototypeMeta"]
       : undefined,
+    sketchScene: optionalStringArg(args, "sketchScene"),
+    sketchMeta: args.sketchMeta && typeof args.sketchMeta === "object"
+      ? args.sketchMeta as PageCreateInput["sketchMeta"]
+      : undefined,
     dryRun: booleanArg(args, "dryRun"),
   };
   return service.createPage(input, actor);
@@ -937,6 +1572,31 @@ register("page update-prototype", "更新 HTML/CSS 原型页内容", (args, pos,
   return service.updatePrototypePage(input, actor);
 }, ["page_update_prototype"]);
 
+register("page update-prototypes", "按 manifest 批量创建或更新 HTML/CSS 原型页", (args, pos, { service, actor }) => {
+  const manifest = parsePrototypeManifest(args);
+  if (!manifest.ok || !manifest.data) return manifest;
+  return updatePrototypePages(service, actor, {
+    editId: stringArg(args, "editId", pos[0]),
+    manifest: manifest.data,
+    noConfig: booleanArg(args, "noConfig"),
+    dryRun: booleanArg(args, "dryRun"),
+  });
+}, ["page_update_prototypes"]);
+
+register("page update-sketch", "更新草图页 scene 内容", (args, pos, { service, actor }) => {
+  const input: PageSwitchRuntimeInput = {
+    editId: stringArg(args, "editId", pos[0]),
+    pageId: stringArg(args, "pageId", pos[1]),
+    targetRuntimeType: "sketch-scene",
+    sketchScene: optionalStringArg(args, "sketchScene", pos[2]),
+    sketchMeta: args.sketchMeta && typeof args.sketchMeta === "object"
+      ? args.sketchMeta as PageSwitchRuntimeInput["sketchMeta"]
+      : undefined,
+    dryRun: booleanArg(args, "dryRun"),
+  };
+  return service.switchPageRuntime(input, actor);
+}, ["page_update_sketch"]);
+
 register("page switch-runtime", "切换页面运行时类型", (args, pos, { service, actor }) => {
   const input: PageSwitchRuntimeInput = {
     editId: stringArg(args, "editId", pos[0]),
@@ -948,6 +1608,10 @@ register("page switch-runtime", "切换页面运行时类型", (args, pos, { ser
     prototypeCss: optionalStringArg(args, "prototypeCss"),
     prototypeMeta: args.prototypeMeta && typeof args.prototypeMeta === "object"
       ? args.prototypeMeta as PageSwitchRuntimeInput["prototypeMeta"]
+      : undefined,
+    sketchScene: optionalStringArg(args, "sketchScene"),
+    sketchMeta: args.sketchMeta && typeof args.sketchMeta === "object"
+      ? args.sketchMeta as PageSwitchRuntimeInput["sketchMeta"]
       : undefined,
     reason: optionalStringArg(args, "reason"),
     dryRun: booleanArg(args, "dryRun"),
@@ -1094,10 +1758,10 @@ register("config apply-visual-patch", "应用可视化配置补丁候选", (args
   ["config_apply_visual_patch"],
 );
 
-register("asset list", "列出项目图片和引用摘要", (args, pos, { service }) =>
-  service.listAssets(stringArg(args, "editId", pos[0])),
-  ["asset_list"],
-);
+register("asset list", "列出项目图片和引用摘要", (args, pos, { service }) => {
+  const result = service.listAssets(stringArg(args, "editId", pos[0]));
+  return booleanArg(args, "summary") ? withAssetListSummary(result) : result;
+}, ["asset_list"]);
 
 register("asset upload", "上传图片资产到事务工作区", (args, pos, { service, actor }) => {
   const asset = readAssetInput(args);
@@ -1106,10 +1770,22 @@ register("asset upload", "上传图片资产到事务工作区", (args, pos, { s
     filename: asset.filename,
     dataBase64: asset.dataBase64,
     mimeType: asset.mimeType,
+    targetPath: optionalStringArg(args, "targetPath"),
     dryRun: booleanArg(args, "dryRun"),
   };
   return service.uploadAsset(input, actor);
 }, ["asset_upload"]);
+
+register("asset upload-dir", "批量上传目录内图片资产到事务工作区", (args, pos, { service, actor }) =>
+  uploadAssetDirectory(service, actor, {
+    editId: stringArg(args, "editId", pos[0]),
+    from: stringArg(args, "from"),
+    to: stringArg(args, "to") || "assets/images",
+    include: optionalStringArg(args, "include"),
+    dryRun: booleanArg(args, "dryRun"),
+  }),
+  ["asset_upload_dir"],
+);
 
 register("asset delete-preview", "预览删除图片影响", (args, pos, { service }) =>
   service.deleteAssetPreview(stringArg(args, "editId", pos[0]), stringArg(args, "assetPath", pos[1])),
@@ -1248,6 +1924,28 @@ register("audit get", "查看单次操作详情", (args, pos, { service }) =>
   service.auditGet(stringArg(args, "auditId", pos[0])),
   ["audit_get"],
 );
+
+register("report agent-run", "生成 Agent 本次运行证据包摘要", (args, _pos, { service, actor }) => {
+  const input: AgentRunReportInput = {
+    projectId: optionalStringArg(args, "projectId"),
+    editId: optionalStringArg(args, "editId"),
+    versionId: optionalStringArg(args, "versionId"),
+    auditId: optionalStringArg(args, "auditId"),
+    visualReportPath: optionalStringArg(args, "visualReportPath"),
+  };
+  return service.agentRunReport(input, actor);
+}, ["report_agent_run"]);
+
+register("recipe list", "列出 Agent 工作流配方", () => cliOk({
+  recipes: RECIPES.map(({ id, title }) => ({ id, title })),
+}), ["recipe_list"]);
+
+register("recipe show", "查看单个 Agent 工作流配方", (args, pos) => {
+  const recipe = recipeById(stringArg(args, "recipeId", pos[0]));
+  return recipe
+    ? cliOk(recipe)
+    : cliFail("RECIPE_NOT_FOUND", "配方不存在", { nextActions: ["ow recipe list --json"] });
+}, ["recipe_show"]);
 
 register("admin lock-project", "临时锁定项目", (args, pos, { service, actor }) =>
   service.lockProject(stringArg(args, "projectId", pos[0]), actor),

@@ -13,7 +13,7 @@
 
 ## 验证结果
 
-- `pnpm --filter @opencode-workbench/preview-contract test` 通过。
+- `pnpm --filter @workbench/preview-contract test` 通过。
 - `pnpm check:project-core` 通过。
 - `pnpm check:project-cli` 通过。
 - author-site 定向测试 `PreviewPanel.test.tsx` 与 `preview-runtime-policy.test.ts` 通过。

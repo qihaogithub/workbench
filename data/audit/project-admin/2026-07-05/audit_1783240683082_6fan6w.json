@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783240683082_6fan6w",
+  "at": 1783240683083,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/home/reward-icon-8bc933.webp",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/home/reward-icon-8bc933.webp"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

@@ -3,7 +3,7 @@ import fs from "fs";
 import {
   KnowledgeFileStore,
   indexTemplateSnapshot,
-} from "@opencode-workbench/knowledge-service";
+} from "@workbench/knowledge-service";
 import {
   DemoMeta,
   DemoFiles,
@@ -12,7 +12,8 @@ import {
   SessionMeta,
   ErrorCodeType,
   ERROR_MESSAGES,
-} from "@opencode-workbench/shared";
+  createDefaultSketchScene,
+} from "@workbench/shared";
 import type {
   Project,
   VersionInfo,
@@ -25,8 +26,8 @@ import type {
   AppGraphAction,
   AppGraphValidationIssue,
   AppGraphValidationResult,
-} from "@opencode-workbench/shared";
-import { MAX_VERSIONS_KEEP } from "@opencode-workbench/shared";
+} from "@workbench/shared";
+import { MAX_VERSIONS_KEEP } from "@workbench/shared";
 import { syncBuiltinKnowledge } from "./knowledge/builtin-documents";
 
 export function findProjectRoot(cwd: string): string {
@@ -324,7 +325,7 @@ function shouldCopyWorkspaceEntry(sourceRoot: string, sourcePath: string): boole
   return !segments.some((segment) =>
     segment === "node_modules" ||
     segment === ".next" ||
-    segment === ".opencode" ||
+    segment === ".workbench" ||
     segment === ".git"
   );
 }
@@ -756,12 +757,19 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
 
   for (const page of tree.pages) {
     const dir = path.join(demosDir, page.id);
-    const runtimeType = page.runtimeType === "prototype-html-css" ? "prototype-html-css" : "high-fidelity-react";
+    const runtimeType =
+      page.runtimeType === "prototype-html-css"
+        ? "prototype-html-css"
+        : page.runtimeType === "sketch-scene"
+          ? "sketch-scene"
+          : "high-fidelity-react";
     if (
       fs.existsSync(path.join(dir, "config.schema.json")) &&
       (runtimeType === "prototype-html-css"
         ? fs.existsSync(path.join(dir, "prototype.html"))
-        : fs.existsSync(path.join(dir, "index.tsx")))
+        : runtimeType === "sketch-scene"
+          ? fs.existsSync(path.join(dir, "sketch.scene.json"))
+          : fs.existsSync(path.join(dir, "index.tsx")))
     ) {
       result.push(page);
     }
@@ -776,11 +784,17 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));
     const hasReactCode = fs.existsSync(path.join(dir, "index.tsx"));
     const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
+    const hasSketchScene = fs.existsSync(path.join(dir, "sketch.scene.json"));
     if (
       hasSchema &&
-      (hasReactCode || hasPrototype)
+      (hasReactCode || hasPrototype || hasSketchScene)
     ) {
-      const runtimeType = !hasReactCode && hasPrototype ? "prototype-html-css" : undefined;
+      const runtimeType =
+        !hasReactCode && hasSketchScene
+          ? "sketch-scene"
+          : !hasReactCode && hasPrototype
+            ? "prototype-html-css"
+            : undefined;
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
@@ -1932,7 +1946,9 @@ export function getWorkspaceMultiDemoFiles(
       const prototypeHtmlPath = path.join(dir, "prototype.html");
       const prototypeCssPath = path.join(dir, "prototype.css");
       const prototypeMetaPath = path.join(dir, "prototype.meta.json");
-      if (fs.existsSync(schemaPath) && (fs.existsSync(codePath) || fs.existsSync(prototypeHtmlPath))) {
+      const sketchScenePath = path.join(dir, "sketch.scene.json");
+      const sketchMetaPath = path.join(dir, "sketch.meta.json");
+      if (fs.existsSync(schemaPath) && (fs.existsSync(codePath) || fs.existsSync(prototypeHtmlPath) || fs.existsSync(sketchScenePath))) {
         demos[entry.name] = {
           code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
           schema: fs.readFileSync(schemaPath, "utf-8"),
@@ -1944,6 +1960,12 @@ export function getWorkspaceMultiDemoFiles(
             : undefined,
           prototypeMeta: fs.existsSync(prototypeMetaPath)
             ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
+            : undefined,
+          sketchScene: fs.existsSync(sketchScenePath)
+            ? fs.readFileSync(sketchScenePath, "utf-8")
+            : undefined,
+          sketchMeta: fs.existsSync(sketchMetaPath)
+            ? JSON.parse(fs.readFileSync(sketchMetaPath, "utf-8")) as Record<string, unknown>
             : undefined,
         };
       }
@@ -1970,8 +1992,10 @@ export function getWorkspaceDemoPageFiles(
   const prototypeHtmlPath = path.join(demoDir, "prototype.html");
   const prototypeCssPath = path.join(demoDir, "prototype.css");
   const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+  const sketchScenePath = path.join(demoDir, "sketch.scene.json");
+  const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
 
-  if (!fs.existsSync(schemaPath) || (!fs.existsSync(codePath) && !fs.existsSync(prototypeHtmlPath))) return null;
+  if (!fs.existsSync(schemaPath) || (!fs.existsSync(codePath) && !fs.existsSync(prototypeHtmlPath) && !fs.existsSync(sketchScenePath))) return null;
   return {
     code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
     schema: fs.readFileSync(schemaPath, "utf-8"),
@@ -1983,6 +2007,12 @@ export function getWorkspaceDemoPageFiles(
       : undefined,
     prototypeMeta: fs.existsSync(prototypeMetaPath)
       ? JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as PrototypePageMeta
+      : undefined,
+    sketchScene: fs.existsSync(sketchScenePath)
+      ? fs.readFileSync(sketchScenePath, "utf-8")
+      : undefined,
+    sketchMeta: fs.existsSync(sketchMetaPath)
+      ? JSON.parse(fs.readFileSync(sketchMetaPath, "utf-8")) as Record<string, unknown>
       : undefined,
   };
 }
@@ -2027,6 +2057,16 @@ export function updateWorkspaceDemoFiles(
       "utf-8",
     );
   }
+  if (typeof files.sketchScene === "string") {
+    fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), files.sketchScene, "utf-8");
+  }
+  if (files.sketchMeta) {
+    fs.writeFileSync(
+      path.join(demoDir, "sketch.meta.json"),
+      JSON.stringify(files.sketchMeta, null, 2),
+      "utf-8",
+    );
+  }
   if (meta) {
     writeDemoPageMeta(wsPath, demoId, meta);
   }
@@ -2056,6 +2096,7 @@ export function createWorkspaceDemoPage(
   workspaceId: string,
   name: string,
   parentId?: string | null,
+  runtimeType?: DemoPageMeta["runtimeType"],
 ): DemoPageMeta | null {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return null;
@@ -2070,7 +2111,27 @@ export function createWorkspaceDemoPage(
   const demoId = generateDemoPageId(name);
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.mkdirSync(demoDir, { recursive: true });
-  fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
+  const resolvedRuntimeType =
+    runtimeType === "prototype-html-css" || runtimeType === "sketch-scene"
+      ? runtimeType
+      : undefined;
+  if (resolvedRuntimeType === "sketch-scene") {
+    fs.writeFileSync(
+      path.join(demoDir, "sketch.scene.json"),
+      JSON.stringify(createDefaultSketchScene(), null, 2),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(demoDir, "sketch.meta.json"),
+      JSON.stringify({ generatedBy: "author-site", updatedAt: Date.now() }, null, 2),
+      "utf-8",
+    );
+  } else if (resolvedRuntimeType === "prototype-html-css") {
+    fs.writeFileSync(path.join(demoDir, "prototype.html"), "<main></main>", "utf-8");
+    fs.writeFileSync(path.join(demoDir, "prototype.css"), "", "utf-8");
+  } else {
+    fs.writeFileSync(path.join(demoDir, "index.tsx"), DEFAULT_DEMO_CODE, "utf-8");
+  }
   fs.writeFileSync(
     path.join(demoDir, "config.schema.json"),
     DEFAULT_DEMO_SCHEMA,
@@ -2084,6 +2145,7 @@ export function createWorkspaceDemoPage(
       name?.trim() || "新建页面",
       existing.map((page) => page.routeKey).filter(Boolean) as string[],
     ),
+    runtimeType: resolvedRuntimeType,
     order: nextOrder,
     parentId: parentId ?? null,
   };
@@ -2133,6 +2195,128 @@ export function copyWorkspaceDemoPage(
   writeDemoPageMeta(wsPath, demoId, meta);
   ensureAppGraph(wsPath);
   return meta;
+}
+
+export interface DeletedWorkspaceDemoPageSnapshot {
+  snapshotId: string;
+  page: DemoPageMeta;
+}
+
+export type RestoreDeletedWorkspaceDemoPageSnapshotResult =
+  | { success: true; page: DemoPageMeta }
+  | {
+      success: false;
+      reason:
+        | "WORKSPACE_NOT_FOUND"
+        | "SNAPSHOT_NOT_FOUND"
+        | "SNAPSHOT_INVALID"
+        | "PAGE_EXISTS"
+        | "PARENT_FOLDER_NOT_FOUND"
+        | "FILE_WRITE_ERROR";
+    };
+
+function getDeletedDemoPageSnapshotRoot(wsPath: string): string {
+  return path.join(wsPath, ".workbench", "undo", "deleted-pages");
+}
+
+function getDeletedDemoPageSnapshotPath(
+  wsPath: string,
+  snapshotId: string,
+): string {
+  return path.join(getDeletedDemoPageSnapshotRoot(wsPath), snapshotId);
+}
+
+function readDeletedDemoPageSnapshotMeta(
+  snapshotPath: string,
+): DemoPageMeta | null {
+  try {
+    const raw = fs.readFileSync(path.join(snapshotPath, "page.json"), "utf-8");
+    const parsed = JSON.parse(raw) as Partial<DemoPageMeta>;
+    if (!parsed.id || !parsed.name) return null;
+    return {
+      id: parsed.id,
+      name: parsed.name,
+      routeKey: parsed.routeKey,
+      runtimeType: parsed.runtimeType,
+      order: parsed.order ?? 0,
+      parentId: parsed.parentId ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function createDeletedWorkspaceDemoPageSnapshot(
+  workspaceId: string,
+  demoId: string,
+): DeletedWorkspaceDemoPageSnapshot | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const demoDir = getDemoDirPath(wsPath, demoId);
+  if (!fs.existsSync(demoDir)) return null;
+
+  const page = readDemoPageMeta(wsPath, demoId);
+  if (!page) return null;
+
+  const snapshotId = `page-delete-${demoId}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const snapshotPath = getDeletedDemoPageSnapshotPath(wsPath, snapshotId);
+  fs.mkdirSync(snapshotPath, { recursive: true });
+  fs.writeFileSync(
+    path.join(snapshotPath, "page.json"),
+    JSON.stringify(page, null, 2),
+    "utf-8",
+  );
+  fs.cpSync(demoDir, path.join(snapshotPath, "demos", demoId), {
+    recursive: true,
+  });
+
+  return { snapshotId, page };
+}
+
+export function restoreDeletedWorkspaceDemoPageSnapshot(
+  workspaceId: string,
+  demoId: string,
+  snapshotId: string,
+): RestoreDeletedWorkspaceDemoPageSnapshotResult {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return { success: false, reason: "WORKSPACE_NOT_FOUND" };
+
+  const snapshotPath = getDeletedDemoPageSnapshotPath(wsPath, snapshotId);
+  const snapshotDemoDir = path.join(snapshotPath, "demos", demoId);
+  if (!fs.existsSync(snapshotPath) || !fs.existsSync(snapshotDemoDir)) {
+    return { success: false, reason: "SNAPSHOT_NOT_FOUND" };
+  }
+
+  const page = readDeletedDemoPageSnapshotMeta(snapshotPath);
+  if (!page || page.id !== demoId) {
+    return { success: false, reason: "SNAPSHOT_INVALID" };
+  }
+
+  const targetDemoDir = getDemoDirPath(wsPath, demoId);
+  if (fs.existsSync(targetDemoDir) || readDemoPageMeta(wsPath, demoId)) {
+    return { success: false, reason: "PAGE_EXISTS" };
+  }
+
+  if (page.parentId) {
+    const folders = readFoldersMeta(wsPath);
+    if (!folders.some((folder) => folder.id === page.parentId)) {
+      return { success: false, reason: "PARENT_FOLDER_NOT_FOUND" };
+    }
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(targetDemoDir), { recursive: true });
+    fs.cpSync(snapshotDemoDir, targetDemoDir, { recursive: true });
+    const restored = writeDemoPageMeta(wsPath, demoId, page);
+    ensureAppGraph(wsPath);
+    fs.rmSync(snapshotPath, { recursive: true, force: true });
+    return { success: true, page: restored };
+  } catch {
+    return { success: false, reason: "FILE_WRITE_ERROR" };
+  }
 }
 
 /**

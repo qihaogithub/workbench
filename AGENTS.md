@@ -1,4 +1,4 @@
-# AGENTS.md - opencode-workbench
+# AGENTS.md - workbench
 
 > 面向 AI 编码代理的项目工作指南。目标是让后续代理能快速判断改动边界、选择正确工具、运行合适验证，并避免被历史目录或过期脚本误导。
 
@@ -40,7 +40,7 @@
 - Workspace：`packages/*` 和 `OPS/CLI`
 - 前端：Next.js 14 App Router、Tailwind CSS、shadcn/ui、lucide-react
 - 后端：Fastify
-- 共享包：`@opencode-workbench/shared`
+- 共享包：`@workbench/shared`
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
 - 环境变量文件：`.env` 被 git 忽略，`.env.docker` 用于 Docker 部署覆盖
 - OPS 工程上下文入口：`OPS/AGENTS.md`
@@ -179,18 +179,22 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 | 包名 | 路径 | 类型 | 端口 | 测试 |
 |---|---|---|---|---|
-| `@opencode-workbench/author-site` | `packages/author-site/` | Next.js 14 App Router | 3200 | Jest + Testing Library |
-| `@opencode-workbench/viewer-site` | `packages/viewer-site/` | Next.js 14 App Router | 3300 | 无包内测试脚本 |
-| `@opencode-workbench/shared` | `packages/shared/` | 共享类型和常量 | - | 无测试脚本 |
-| `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
-| `@opencode-workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
-| `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
-| `@opencode-workbench/knowledge-core` | `packages/knowledge-core/` | 知识库领域模型与权限规则 | - | Vitest |
-| `@opencode-workbench/knowledge-service` | `packages/knowledge-service/` | Basic 检索、阅读地图、索引任务、知识报告 | - | Vitest |
-| `@opencode-workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 CLI 复用 | - | Vitest |
-| `@opencode-workbench/project-scaffold` | `packages/project-scaffold/` | 本地项目包协议与脚手架转换器 | - | Node/tsx 命令 |
-| `@opencode-workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
-| `@opencode-workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
+| `@workbench/author-site` | `packages/author-site/` | Next.js 14 App Router | 3200 | Jest + Testing Library |
+| `@workbench/viewer-site` | `packages/viewer-site/` | Next.js 14 App Router | 3300 | 无包内测试脚本 |
+| `@workbench/shared` | `packages/shared/` | 共享类型和常量 | - | 无测试脚本 |
+| `@workbench/sketch-core` | `packages/sketch-core/` | 草图页协议、校验、patch、几何、只读渲染 | - | Vitest |
+| `@workbench/sketch-react` | `packages/sketch-react/` | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | - | Vitest + Testing Library |
+| `@workbench/sketch-playground` | `packages/sketch-playground/` | 草图 SDK 独立开发与测试 Playground | 3400 | TypeScript + Playwright |
+| `@workbench/sketch-openpencil-editor` | `packages/sketch-openpencil-editor/` | OpenPencil 手绘编辑器 SDK 与 iframe app | 3410 | TypeScript + Playwright |
+| `@workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
+| `@workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
+| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
+| `@workbench/knowledge-core` | `packages/knowledge-core/` | 知识库领域模型与权限规则 | - | Vitest |
+| `@workbench/knowledge-service` | `packages/knowledge-service/` | Basic 检索、阅读地图、索引任务、知识报告 | - | Vitest |
+| `@workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 CLI 复用 | - | Vitest |
+| `@workbench/project-scaffold` | `packages/project-scaffold/` | 本地项目包协议与脚手架转换器 | - | Node/tsx 命令 |
+| `@workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
+| `@workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
 
 历史或非 workspace 目录：
 
@@ -198,7 +202,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 - `packages/snapshot-service/` 当前没有 `package.json`。根脚本只保留 `dev:snapshot:legacy` 作为历史排查入口，不参与默认 `pnpm dev`。
 - `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
-`packages/shared/src/index.ts` 是共享类型入口。`@opencode-workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
+`packages/shared/src/index.ts` 是共享类型入口。`@workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
 
 ## 常用命令
 
@@ -213,6 +217,8 @@ pnpm dev:agent
 pnpm dev:viewer
 pnpm dev:screenshot
 pnpm dev:preview
+pnpm dev:sketch
+pnpm dev:sketch-openpencil
 pnpm build
 pnpm build:viewer
 pnpm lint
@@ -221,6 +227,11 @@ pnpm typecheck:viewer
 pnpm check:author
 pnpm check:agent
 pnpm check:screenshot
+pnpm check:sketch-core
+pnpm check:sketch-react
+pnpm check:sketch-playground
+pnpm check:sketch-openpencil
+pnpm check:openpencil-spike
 pnpm check:knowledge-core
 pnpm check:knowledge-service
 pnpm check:project-core
@@ -229,6 +240,9 @@ pnpm check:project-cli
 pnpm check:viewer
 pnpm check:all
 pnpm test:e2e
+pnpm test:e2e:sketch-playground
+pnpm test:e2e:openpencil-spike
+pnpm test:e2e:openpencil-author
 pnpm test:e2e:ui
 pnpm test:e2e:headed
 ```
@@ -239,37 +253,44 @@ pnpm test:e2e:headed
 
 ```bash
 # author-site
-pnpm --filter @opencode-workbench/author-site test
-pnpm --filter @opencode-workbench/author-site test -- --testPathPattern="file.test.ts"
-pnpm --filter @opencode-workbench/author-site test:watch
-pnpm --filter @opencode-workbench/author-site db:init
+pnpm --filter @workbench/author-site test
+pnpm --filter @workbench/author-site test -- --testPathPattern="file.test.ts"
+pnpm --filter @workbench/author-site test:watch
+pnpm --filter @workbench/author-site db:init
 
 # agent-service
-pnpm --filter @opencode-workbench/agent-service test
-pnpm --filter @opencode-workbench/agent-service test:watch
-pnpm --filter @opencode-workbench/agent-service test:coverage
-pnpm --filter @opencode-workbench/agent-service test:smoke
-pnpm --filter @opencode-workbench/agent-service typecheck
+pnpm --filter @workbench/agent-service test
+pnpm --filter @workbench/agent-service test:watch
+pnpm --filter @workbench/agent-service test:coverage
+pnpm --filter @workbench/agent-service test:smoke
+pnpm --filter @workbench/agent-service typecheck
 
 # screenshot-service
-pnpm --filter @opencode-workbench/screenshot-service test
-pnpm --filter @opencode-workbench/screenshot-service typecheck
+pnpm --filter @workbench/screenshot-service test
+pnpm --filter @workbench/screenshot-service typecheck
+
+# sketch-core / sketch-react / sketch-playground
+pnpm --filter @workbench/sketch-core typecheck
+pnpm --filter @workbench/sketch-core test
+pnpm --filter @workbench/sketch-react typecheck
+pnpm --filter @workbench/sketch-react test
+pnpm --filter @workbench/sketch-playground typecheck
 
 # viewer-site
-pnpm --filter @opencode-workbench/viewer-site typecheck
-pnpm --filter @opencode-workbench/viewer-site build
+pnpm --filter @workbench/viewer-site typecheck
+pnpm --filter @workbench/viewer-site build
 
 # project-core
-pnpm --filter @opencode-workbench/project-core typecheck
-pnpm --filter @opencode-workbench/project-core test
+pnpm --filter @workbench/project-core typecheck
+pnpm --filter @workbench/project-core test
 
 # project-scaffold
-pnpm --filter @opencode-workbench/project-scaffold typecheck
-pnpm --filter @opencode-workbench/project-scaffold test
+pnpm --filter @workbench/project-scaffold typecheck
+pnpm --filter @workbench/project-scaffold test
 
 # project-cli
-pnpm --filter @opencode-workbench/project-cli typecheck
-pnpm --filter @opencode-workbench/project-cli test
+pnpm --filter @workbench/project-cli typecheck
+pnpm --filter @workbench/project-cli test
 ```
 
 `test:smoke` 需要 `ACP_SMOKE_REAL=1`，只在明确需要真实集成冒烟时运行。
@@ -280,6 +301,9 @@ pnpm --filter @opencode-workbench/project-cli test
 - baseURL 是 `http://localhost:3200`。
 - 前置条件：author-site 等相关服务已启动；首次运行需要 `pnpm playwright install chromium`。
 - 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。根脚本已显式指定 Playwright 配置文件。
+- 草图 SDK playground 的独立浏览器冒烟使用 `pnpm test:e2e:sketch-playground`，配置在 `test/sketch-playground/playwright.config.ts`，会自动启动 `pnpm dev:sketch`。
+- OpenPencil 手绘编辑器 SDK 的独立浏览器映射回归使用 `pnpm test:e2e:openpencil-spike`，配置在 `test/openpencil-spike/playwright.config.ts`，会自动启动 `pnpm dev:sketch-openpencil`；`dev:openpencil-spike` 作为兼容别名保留。
+- OpenPencil 创作端接入回归使用 `pnpm test:e2e:openpencil-author`，配置在 `test/创作端E2E回归测试/openpencil-author.playwright.config.ts`，会用 `NEXT_PUBLIC_OPENPENCIL_SKETCH_SPIKE_ENABLED=true` 自动启动 OpenPencil 手绘编辑器、agent-service 和 author-site，覆盖 dirty draft、显式保存和 workspace 持久化链路。
 - 正式回归用例必须维护在 `test/` 下的 Playwright 测试目录中，优先放入 `test/创作端E2E回归测试/` 并写成 `.spec.ts`。
 - `scripts/development/` 只放开发期诊断、复现、采样和报告生成脚本；脚本可以调用 Playwright，但不作为正式回归用例的长期维护位置。
 - 当某个 `scripts/development/` 脚本需要长期纳入回归验证时，应迁移或补写为 `test/` 下的 Playwright spec，并通过根目录 `package.json` 暴露清晰的测试命令。
@@ -314,7 +338,7 @@ Agent 后端：
 
 - 当前仅支持 Pi Agent 后端。
 - 后端实现位于 `packages/agent-service/src/backends/pi-agent.ts` 和 `packages/agent-service/src/backends/pi-tools/`。
-- Pi Agent 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖 OpenCode Server 或外部 CLI 子进程。
+- Pi Agent 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖 workbench Server 或外部 CLI 子进程。
 - 模型配置通过 `PI_AGENT_*` 环境变量提供。
 
 Screenshot 服务：
@@ -337,7 +361,7 @@ Docker：
 - 禁止新增 `as any`、`@ts-ignore`、`@ts-expect-error`，除非用户明确要求并说明原因。
 - author-site 路径别名：`@/` 指向 `packages/author-site/src/*`。
 - agent-service 路径别名：`@/` 指向 `packages/agent-service/src/*`。
-- 共享类型优先从 `@opencode-workbench/shared` 引入。
+- 共享类型优先从 `@workbench/shared` 引入。
 - API 响应使用 `{ success: true, data: T }` 或 `{ success: false, error: { code, message } }`。
 - author-site API 响应 helper：`createApiSuccess`、`createApiError`，位于 `packages/author-site/src/lib/fs-utils.ts`。
 - 前端组件使用 shadcn/ui、Tailwind CSS、lucide-react、`class-variance-authority` 和 `cn()`。
@@ -368,6 +392,10 @@ Docker：
 
 - author-site UI 或 API：`pnpm check:author`；只需要类型检查时可用 `pnpm typecheck`。
 - viewer-site：`pnpm check:viewer`，必要时 `pnpm build:viewer`。
+- sketch-core：`pnpm check:sketch-core`。
+- sketch-react：`pnpm check:sketch-react`；如果改动影响 author-site 草图编辑态，也运行 `pnpm check:author` 和 `pnpm test:e2e -- sketch-page-regression.spec.ts`。
+- sketch-playground：`pnpm check:sketch-playground`，涉及交互或 fixture 时运行 `pnpm test:e2e:sketch-playground`。
+- sketch-openpencil-editor：`pnpm check:sketch-openpencil`；`pnpm check:openpencil-spike` 作为兼容别名保留。涉及 OpenPencil scene 导入、导出、图层映射或协议保留时运行 `pnpm test:e2e:openpencil-spike`；涉及 author-site iframe 开关、dirty draft 或显式保存链路时运行 `pnpm test:e2e:openpencil-author`。
 - agent-service：`pnpm check:agent`。
 - screenshot-service：`pnpm check:screenshot`。
 - knowledge-core：`pnpm check:knowledge-core`。

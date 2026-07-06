@@ -61,7 +61,7 @@ export function getChangedFiles(workingDir: string): string[] {
     const entries = fs.readdirSync(workingDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name.startsWith('.') && entry.name !== '.session.json') continue;
-      if (entry.name === 'opencode.json') continue;
+      if (entry.name === 'workbench.json') continue;
       if (entry.isFile()) {
         changed.push(entry.name);
       }

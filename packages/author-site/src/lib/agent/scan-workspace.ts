@@ -1,10 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
-import { summarizeCanvasTextNodes } from "@opencode-workbench/demo-ui";
+import { summarizeCanvasTextNodes } from "@workbench/demo-ui";
 import type { SystemPromptContext } from "./system-prompt";
 import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
 import { listDemoPages } from "../fs-utils";
 import { syncBuiltinKnowledge } from "../knowledge/builtin-documents";
+import { SKETCH_SCENE_AUTHORING_ENABLED } from "../authoring-feature-flags";
 
 const MAX_INLINE_PAGES = 2;
 
@@ -12,7 +13,7 @@ interface PageInfo {
   id: string;
   name: string;
   routeKey?: string;
-  runtimeType: "prototype-html-css" | "high-fidelity-react";
+  runtimeType: "prototype-html-css" | "high-fidelity-react" | "sketch-scene";
   sourcePaths: string[];
   schemaPath: string;
   sourceContents?: Array<{ path: string; content: string }>;
@@ -113,20 +114,29 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   // 使用 listDemoPages 读取页面列表（自动处理 workspace-tree.json 迁移和磁盘发现）
   const demoPages = listDemoPages(workingDir);
   for (const p of demoPages) {
-    const runtimeType = p.runtimeType === "prototype-html-css"
-      ? "prototype-html-css"
-      : "high-fidelity-react";
+    if (p.runtimeType === "sketch-scene" && !SKETCH_SCENE_AUTHORING_ENABLED) {
+      continue;
+    }
+    const runtimeType =
+      p.runtimeType === "prototype-html-css"
+        ? "prototype-html-css"
+        : p.runtimeType === "sketch-scene"
+          ? "sketch-scene"
+          : "high-fidelity-react";
     pages.push({
       id: p.id,
       name: p.name,
       routeKey: p.routeKey,
       runtimeType,
-      sourcePaths: runtimeType === "prototype-html-css"
-        ? [
-            path.join("demos", p.id, "prototype.html"),
-            path.join("demos", p.id, "prototype.css"),
-          ]
-        : [path.join("demos", p.id, "index.tsx")],
+      sourcePaths:
+        runtimeType === "prototype-html-css"
+          ? [
+              path.join("demos", p.id, "prototype.html"),
+              path.join("demos", p.id, "prototype.css"),
+            ]
+          : runtimeType === "sketch-scene"
+            ? [path.join("demos", p.id, "sketch.scene.json")]
+            : [path.join("demos", p.id, "index.tsx")],
       schemaPath: path.join("demos", p.id, "config.schema.json"),
     });
   }

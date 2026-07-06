@@ -6,7 +6,7 @@ export type {
   EditorDiagnosticQueryResult,
   LegacyEditorDiagnosticContext as EditorDiagnosticContext,
   LegacyEditorDiagnosticEvent as EditorDiagnosticEvent,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 export {
   createEditorDiagnosticEvent,
@@ -14,7 +14,7 @@ export {
   normalizeEditorDiagnosticEvent,
   sanitizeDiagnosticDetails,
   sanitizeLegacyEditorDiagnosticEvent as sanitizeDiagnosticEvent,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 export interface EditorDiagnosticAgentRunLogIndex {
   sessionId: string;
@@ -25,14 +25,14 @@ export interface EditorDiagnosticExport {
   editorSessionId: string;
   exportedAt: number;
   events: Array<
-    | import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent
-    | import("@opencode-workbench/shared").EditorDiagnosticEvent
+    | import("@workbench/shared").LegacyEditorDiagnosticEvent
+    | import("@workbench/shared").EditorDiagnosticEvent
   >;
-  normalizedEvents: import("@opencode-workbench/shared").EditorDiagnosticEvent[];
-  fallbackEvents?: import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent[];
-  localEvents?: import("@opencode-workbench/shared").LegacyEditorDiagnosticEvent[];
+  normalizedEvents: import("@workbench/shared").EditorDiagnosticEvent[];
+  fallbackEvents?: import("@workbench/shared").LegacyEditorDiagnosticEvent[];
+  localEvents?: import("@workbench/shared").LegacyEditorDiagnosticEvent[];
   snapshot?: Record<string, unknown>;
   agentRunLogs: EditorDiagnosticAgentRunLogIndex[];
-  diagnostics: import("@opencode-workbench/shared").EditorDiagnosticQueryDiagnostics;
+  diagnostics: import("@workbench/shared").EditorDiagnosticQueryDiagnostics;
   warnings: string[];
 }

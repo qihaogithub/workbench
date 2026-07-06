@@ -10,10 +10,10 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@opencode-workbench/preview-contract": ["../preview-contract/src/index.ts"],
-      "@opencode-workbench/preview-contract/*": ["../preview-contract/src/*"],
-      "@opencode-workbench/project-core": ["../project-core/src/index.ts"],
-      "@opencode-workbench/project-scaffold": ["../project-scaffold/src/index.ts"]
+      "@workbench/preview-contract": ["../preview-contract/src/index.ts"],
+      "@workbench/preview-contract/*": ["../preview-contract/src/*"],
+      "@workbench/project-core": ["../project-core/src/index.ts"],
+      "@workbench/project-scaffold": ["../project-scaffold/src/index.ts"]
     },
     "noEmit": true
   },

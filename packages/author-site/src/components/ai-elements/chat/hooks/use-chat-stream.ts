@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
-import type { StreamEvent, ImageAttachment } from "@opencode-workbench/agent-client";
+import type { StreamEvent, ImageAttachment } from "@workbench/agent-client";
+import { normalizeAiError } from "@workbench/shared";
 import {
   MissingTransactionalDeleteToolsError,
   StreamService,
@@ -40,6 +41,31 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   content: "",
   parts: [],
 };
+
+const MAX_CONTEXT_HISTORY_MESSAGES = 8;
+
+function buildConversationHistoryPrefix(messages: ChatMessage[]): string {
+  const history = messages
+    .filter(
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        !message.queueStatus &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0,
+    )
+    .slice(-MAX_CONTEXT_HISTORY_MESSAGES);
+
+  if (history.length === 0) return "";
+  return [
+    "[系统自动注入：以下是当前对话最近历史，供保持上下文使用。]",
+    ...history.map((message) => {
+      const speaker = message.role === "user" ? "用户" : "AI";
+      return `${speaker}：${message.content.trim().slice(0, 2000)}`;
+    }),
+    "[历史结束]",
+    "",
+  ].join("\n");
+}
 
 const DEFAULT_AUTO_REPAIR_TITLE = "检测到预览异常，正在自动修复";
 
@@ -224,10 +250,21 @@ function appendMessageBeforeQueued(
   ];
 }
 
+function hasVisibleAssistantContent(message: ChatMessage): boolean {
+  if (message.content?.trim()) return true;
+  return Boolean(message.parts?.some((part) => {
+    if (part.type === "text" || part.type === "reasoning") {
+      return part.content.trim().length > 0;
+    }
+    return true;
+  }));
+}
+
 interface UseChatStreamOptions {
   sessionId: string;
   agentSessionId: string;
   workingDir?: string;
+  projectId?: string;
   demoId?: string;
   activeViewContext?: ActiveViewContext;
   onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
@@ -266,6 +303,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     sessionId,
     agentSessionId,
     workingDir,
+    projectId,
     demoId,
     activeViewContext,
     onCodeUpdate,
@@ -404,6 +442,12 @@ export function useChatStream(options: UseChatStreamOptions) {
       const trimmedMessage = userMessage.trim();
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
+      const conversationHistoryPrefix = buildConversationHistoryPrefix(
+        messagesRef.current,
+      );
+      const outboundMessage = conversationHistoryPrefix
+        ? `${conversationHistoryPrefix}${userMessage}`
+        : userMessage;
       activeRunDedupeKeyRef.current = isSystemAutoRepair
         ? createSystemAutoRepairDedupeKey(
             runOptions?.displayMessage?.title || DEFAULT_AUTO_REPAIR_TITLE,
@@ -600,6 +644,23 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onPermission: (request) => {
+            if (request.toolCall.approvalKind === "plan_approval") {
+              stopSilenceTracking();
+              const currentMsg = currentMessageRef.current;
+              if (hasVisibleAssistantContent(currentMsg)) {
+                setMessages((prev) =>
+                  appendMessageBeforeQueued(prev, {
+                    id: currentMsg.id || `assistant-${Date.now()}`,
+                    role: "assistant",
+                    content: currentMsg.content || accumulatedContent,
+                    parts: currentMsg.parts,
+                  }),
+                );
+              }
+              setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
+              setStreamContent("");
+              setIsStreaming(false);
+            }
             setPendingPermissionRequest(request);
           },
 
@@ -793,11 +854,13 @@ export function useChatStream(options: UseChatStreamOptions) {
           onConnectionError: () => {
             // 连接未建立时的错误处理：重置状态并显示错误
             stopSilenceTracking();
+            const normalized = normalizeAiError("WebSocket connection error", {
+              fallbackCode: "AGENT_CONNECTION_ERROR",
+            });
             const errorMessage: ChatMessage = {
               id: `error-${Date.now()}`,
               role: "assistant",
-              content:
-                "WebSocket 连接失败，请检查 Agent Service 是否运行（http://localhost:3201）",
+              content: normalized.userMessage,
             };
             setMessages((prev) => [
               ...appendMessageBeforeQueued(
@@ -840,7 +903,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             const errorMessage: ChatMessage = {
               id: `error-${Date.now()}`,
               role: "assistant",
-              content: `错误: ${error.message}`,
+              content: normalizeAiError(error).userMessage,
             };
             setMessages((prev) => [
               ...appendMessageBeforeQueued(
@@ -857,14 +920,26 @@ export function useChatStream(options: UseChatStreamOptions) {
         await streamService.waitForConnection(stream);
 
         // 等待 L3 / capabilities 拼装完成再发送，确保能力缺失能被当前流程捕获
-        await streamService.sendMessage(
-          userMessage,
-          workingDir,
-          images,
-          demoId,
-          activeViewContext,
-          selectedModelId,
-        );
+        if (projectId) {
+          await streamService.sendMessage(
+            outboundMessage,
+            workingDir,
+            images,
+            demoId,
+            activeViewContext,
+            selectedModelId,
+            projectId,
+          );
+        } else {
+          await streamService.sendMessage(
+            outboundMessage,
+            workingDir,
+            images,
+            demoId,
+            activeViewContext,
+            selectedModelId,
+          );
+        }
         onDiagnosticEvent?.({
           name: "ai.message_sent",
           traceId,
@@ -879,6 +954,9 @@ export function useChatStream(options: UseChatStreamOptions) {
         if (beforeSendFailed) {
           const message =
             error instanceof Error ? error.message : "同步工作区失败";
+          const normalized = normalizeAiError(error, {
+            fallbackMessage: "发送前同步工作区失败，请保存或刷新后重试。",
+          });
           onDiagnosticEvent?.({
             name: "ai.before_send_failed",
             traceId,
@@ -888,7 +966,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
             role: "assistant",
-            content: `错误: ${message}`,
+            content: normalized.userMessage,
           };
           setMessages((prev) => [
             ...appendMessageBeforeQueued(
@@ -956,13 +1034,14 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
           const content = activeViewPrefix
-            ? `${activeViewPrefix}${userMessage}`
-            : userMessage;
+            ? `${activeViewPrefix}${outboundMessage}`
+            : outboundMessage;
 
           const result = await agentClient.sendMessage(
             agentSessionId,
             content,
             {
+              projectId,
               demoId,
               workingDir,
               model: selectedModelId,
@@ -1042,10 +1121,11 @@ export function useChatStream(options: UseChatStreamOptions) {
             }
           }
         } catch (httpError) {
+          const normalized = normalizeAiError(httpError);
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
             role: "assistant",
-            content: `错误: ${httpError instanceof Error ? httpError.message : "未知错误"}。请确保 Agent Service 已启动（http://localhost:3201）`,
+            content: normalized.userMessage,
           };
           setMessages((prev) => [
             ...appendMessageBeforeQueued(
@@ -1064,6 +1144,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       agentSessionId,
       sessionId,
       workingDir,
+      projectId,
       demoId,
       activeViewContext,
       onCodeUpdate,
@@ -1134,6 +1215,22 @@ export function useChatStream(options: UseChatStreamOptions) {
         return;
       }
 
+      if (
+        source === "user" &&
+        pendingPermissionRequest?.toolCall.approvalKind === "plan_approval"
+      ) {
+        streamServiceRef.current?.sendPermissionResponse(
+          pendingPermissionRequest.toolCall.toolCallId,
+          "reject_once",
+        );
+        streamServiceRef.current?.close();
+        stopSilenceTracking();
+        setPendingPermissionRequest(null);
+        activeRunRef.current = false;
+        activeRunDedupeKeyRef.current = null;
+        setIsStreaming(false);
+      }
+
       if (activeRunRef.current) {
         const queueId = createLocalId("queued");
         const displayMessageId = createLocalId(
@@ -1194,7 +1291,14 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       void startMessageRun(trimmedMessage, images, runOptions);
     },
-    [agentSessionId, setMessages, startMessageRun],
+    [
+      agentSessionId,
+      pendingPermissionRequest,
+      setIsStreaming,
+      setMessages,
+      startMessageRun,
+      stopSilenceTracking,
+    ],
   );
 
   const handleCancelQueuedMessage = useCallback(
@@ -1217,10 +1321,15 @@ export function useChatStream(options: UseChatStreamOptions) {
           optionId,
           responseContent,
         );
+        if (pendingPermissionRequest.toolCall.approvalKind === "plan_approval") {
+          activeRunRef.current = true;
+          setIsStreaming(true);
+          startSilenceTracking();
+        }
       }
       setPendingPermissionRequest(null);
     },
-    [pendingPermissionRequest],
+    [pendingPermissionRequest, setIsStreaming, startSilenceTracking],
   );
 
   const handlePermissionCancel = useCallback(() => {

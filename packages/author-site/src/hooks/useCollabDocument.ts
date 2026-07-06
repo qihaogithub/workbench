@@ -8,7 +8,7 @@ import type {
   CollabPresence,
   CollabRoomDescriptor,
   CollabSyncStatus,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 export interface CollabUser {
   userId: string;

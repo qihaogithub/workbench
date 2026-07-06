@@ -1,5 +1,5 @@
-import type { AppGraph, AppGraphAction } from "@opencode-workbench/shared";
-import type { AppActionPayload } from "@opencode-workbench/demo-ui";
+import type { AppGraph, AppGraphAction } from "@workbench/shared";
+import type { AppActionPayload } from "@workbench/demo-ui";
 
 export interface ViewerRuntimePage {
   id: string;

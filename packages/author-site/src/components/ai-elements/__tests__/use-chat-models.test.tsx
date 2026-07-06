@@ -50,6 +50,7 @@ describe("useChatModels", () => {
   beforeEach(() => {
     mockStreams.clear();
     mockStream.mockClear();
+    window.localStorage.clear();
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -133,5 +134,61 @@ describe("useChatModels", () => {
     expect(secondStream.ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "set_model", modelId: "custom/preferred" }),
     );
+  });
+
+  it("AI 面板重挂载后从本地偏好恢复模型选择", async () => {
+    const models = [
+      { id: "custom/default", label: "Default" },
+      { id: "custom/preferred", label: "Preferred" },
+    ];
+    const first = renderHook(() =>
+      useChatModels({
+        agentSessionId: "session-persist-1",
+        persistenceKey: "project-1",
+      }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("session-persist-1")).toBeDefined());
+    const firstStream = mockStreams.get("session-persist-1")!;
+
+    await act(async () => {
+      await firstStream.emit("status", { status: "connected" });
+      await firstStream.emit("models", {
+        models,
+        currentModelId: "custom/default",
+        canSwitch: true,
+      });
+    });
+
+    act(() => {
+      first.result.current.handleModelChange("custom/preferred");
+    });
+    first.unmount();
+
+    const second = renderHook(() =>
+      useChatModels({
+        agentSessionId: "session-persist-2",
+        persistenceKey: "project-1",
+      }),
+    );
+    await waitFor(() => expect(mockStreams.get("session-persist-2")).toBeDefined());
+    const secondStream = mockStreams.get("session-persist-2")!;
+
+    await act(async () => {
+      await secondStream.emit("status", { status: "connected" });
+      await secondStream.emit("models", {
+        models,
+        currentModelId: "custom/default",
+        canSwitch: true,
+      });
+    });
+
+    await waitFor(() =>
+      expect(second.result.current.modelState.currentModelId).toBe("custom/preferred"),
+    );
+    expect(secondStream.ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "set_model", modelId: "custom/preferred" }),
+    );
+    second.unmount();
   });
 });

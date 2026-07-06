@@ -61,6 +61,26 @@ describe('ToolHookManager', () => {
       expect(manager.getFileChangesForTool('writeFile', {}, false, {})).toEqual([]);
     });
 
+    it('sketch patch 工具应捕获真实变更并忽略 no-op patch', () => {
+      expect(
+        manager.getFileChangesForTool(
+          'patchSketchScene',
+          { pageId: 'page-1' },
+          false,
+          { details: { patch: { changed: true } } },
+        ),
+      ).toEqual([{ path: 'demos/page-1/sketch.scene.json', action: 'modified' }]);
+
+      expect(
+        manager.getFileChangesForTool(
+          'patchSketchScene',
+          { pageId: 'page-1' },
+          false,
+          { details: { patch: { changed: false } } },
+        ),
+      ).toEqual([]);
+    });
+
     it('未识别的工具应返回空变更', () => {
       expect(manager.getFileChangesForTool('bash', { command: 'ls' }, false, {})).toEqual([]);
     });
@@ -122,6 +142,19 @@ describe('ToolHookManager', () => {
         '/tmp/workspace',
         [{ path: 'demos/page-1/index.tsx', action: 'modified', content: 'fixed' }],
       );
+    });
+
+    it('no-op sketch patch 不应通知协同房间重载外部变更', () => {
+      manager.handleToolResult(
+        'patchSketchScene',
+        { pageId: 'page-1' },
+        false,
+        { details: { patch: { changed: false } } },
+        'session-1',
+      );
+
+      expect(manager.getFiles()).toEqual([]);
+      expect(collabRoomManager.applyExternalFileChanges).not.toHaveBeenCalled();
     });
 
     it('readFile 知识库路径时应记录到 readKnowledgeFiles', () => {

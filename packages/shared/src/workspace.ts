@@ -154,7 +154,10 @@ export interface ResourceReference {
  * 持久化在 workspace/workspace-tree.json 的 pages 数组中。
  * 保存项目时由后端读取 workspace-tree.json 合并到 Project.demoPages。
  */
-export type DemoPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+export type DemoPageRuntimeType =
+  | "prototype-html-css"
+  | "high-fidelity-react"
+  | "sketch-scene";
 
 export interface DemoPageMeta {
   id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
@@ -263,9 +266,26 @@ export interface Project {
   createdAt: number;           // 创建时间戳
   updatedAt: number;           // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
+  authoringPreferences?: ProjectAuthoringPreferences; // 创作端项目级编辑偏好
   thumbnail?: string;          // 缩略图路径
   publishedVersion?: string;   // 已发布的版本ID，如 "v3"；undefined 表示从未发布
   publishedAt?: number;        // 最后发布时间戳
+}
+
+/**
+ * 手绘页面编辑引擎偏好
+ *
+ * 该字段只影响创作端编辑态；底层 runtimeType 仍保持 sketch-scene。
+ * OpenPencil 仍受全局 feature flag 保护，项目偏好不能绕过全局开关。
+ */
+export type SketchEditorEnginePreference = "native" | "openpencil";
+
+export interface ProjectAuthoringPreferences {
+  sketchEditorEngine?: SketchEditorEnginePreference;
+}
+
+export interface UserAuthoringPreferences {
+  sketchEditorEngine?: SketchEditorEnginePreference;
 }
 
 /**
@@ -478,6 +498,7 @@ export interface ProjectListResponse {
     name: string;
     category?: string;
     description?: string;
+    authoringPreferences?: ProjectAuthoringPreferences;
     thumbnail?: string;
     currentVersion: string;
     lastSavedAt: number;

@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/project-cli",
+  "name": "@workbench/project-cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
   "types": "./src/index.ts",
   "bin": {
     "ow": "./bin/ow.mjs",
-    "opencode-project-admin": "./bin/ow.mjs"
+    "workbench-project-admin": "./bin/ow.mjs"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "esbuild": "^0.20.2",
-    "@opencode-workbench/preview-contract": "workspace:*",
-    "@opencode-workbench/project-core": "workspace:*",
-    "@opencode-workbench/project-scaffold": "workspace:*",
+    "@workbench/preview-contract": "workspace:*",
+    "@workbench/project-core": "workspace:*",
+    "@workbench/project-scaffold": "workspace:*",
     "typescript": "^5.3.3"
   },
   "devDependencies": {

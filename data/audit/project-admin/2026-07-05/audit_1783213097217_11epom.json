@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783213097217_11epom",
+  "at": 1783213097217,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783213097215_7r7v5y",
+  "inputSummary": {
+    "name": "E2E:20260705T005732526Z-h3d752:草图页回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783213097215_7r7v5y"
+    ]
+  }
+}

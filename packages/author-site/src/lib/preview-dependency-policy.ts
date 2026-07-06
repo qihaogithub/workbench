@@ -15,7 +15,7 @@ import {
   type PreviewDependencyKind,
   type RuntimeContractIssue,
   type RuntimeContractValidation,
-} from "@opencode-workbench/preview-contract/runtime";
+} from "@workbench/preview-contract/runtime";
 
 export {
   PREVIEW_DEPENDENCY_POLICY,

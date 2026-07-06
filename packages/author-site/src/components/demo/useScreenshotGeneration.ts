@@ -8,8 +8,8 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import type { ScreenshotRenderBox } from "@opencode-workbench/demo-ui";
-import type { PageSnapshotInput } from "@opencode-workbench/shared";
+import type { ScreenshotRenderBox } from "@workbench/demo-ui";
+import type { PageSnapshotInput } from "@workbench/shared";
 
 const POLL_INTERVAL = 1500;
 const MIN_POLL_INTERVAL_MS = 300;
@@ -54,6 +54,7 @@ type LegacyReactScreenshotInput = Omit<
 export type ScreenshotBatchPageInput = (
   | LegacyReactScreenshotInput
   | Extract<PageSnapshotInput, { runtimeType: "prototype-html-css" }>
+  | Extract<PageSnapshotInput, { runtimeType: "sketch-scene" }>
 ) & {
   pageId: string;
   width?: number;
@@ -466,7 +467,13 @@ export function useScreenshotGeneration(
                     prototypeCss: p.prototypeCss,
                     prototypeMeta: p.prototypeMeta,
                   }
-                : { runtimeType: "high-fidelity-react", code: p.code }),
+                : p.runtimeType === "sketch-scene"
+                  ? {
+                      runtimeType: p.runtimeType,
+                      sketchScene: p.sketchScene,
+                      sketchMeta: p.sketchMeta,
+                    }
+                  : { runtimeType: "high-fidelity-react", code: p.code }),
               configData: p.configData || {},
               previewSize: p.previewSize,
               width: p.width,
@@ -593,7 +600,12 @@ export function useScreenshotGeneration(
                   prototypeCss: snapshotInput.prototypeCss,
                   prototypeMeta: snapshotInput.prototypeMeta,
                 }
-              : { code: snapshotInput.code }),
+              : snapshotInput.runtimeType === "sketch-scene"
+                ? {
+                    sketchScene: snapshotInput.sketchScene,
+                    sketchMeta: snapshotInput.sketchMeta,
+                  }
+                : { code: snapshotInput.code }),
             configData: snapshotInput.configData || {},
             previewSize: snapshotInput.previewSize,
             width,

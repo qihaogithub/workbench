@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
+import { Trash2 } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import {
   getCanvasPreviewSizeKey,
@@ -9,6 +10,7 @@ import {
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
+import { SketchPagePreview } from "./SketchPagePreview";
 import type {
   CanvasPageLayout,
   CanvasPageData,
@@ -35,11 +37,12 @@ interface CanvasPageItemProps {
   visible?: boolean;
   selected?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
-  onConfigEdit?: (pageId: string) => void; // 保留接口，viewer 模式可能需要
+  onConfigEdit?: (pageId: string, event?: React.PointerEvent) => void; // 保留接口，viewer 模式可能需要
   onRuntimeConversionRequest?: (
     pageId: string,
     targetRuntimeType: CanvasPageRuntimeType,
   ) => void;
+  onRequestDelete?: (pageId: string) => void;
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onError?: (error: Error) => void;
@@ -53,6 +56,19 @@ interface CanvasPageItemProps {
   onDragEnd?: () => void;
   // 工具模式
   toolMode?: CanvasToolMode;
+  onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+}
+
+interface CanvasPagePreviewContentProps {
+  page: CanvasPageData;
+  layout: CanvasPageLayout;
+  sessionId?: string;
+  screenshotUrl?: string;
+  screenshotRenderBox?: ScreenshotRenderBox;
+  renderMode?: CanvasPageRenderMode;
+  onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onError?: (error: Error) => void;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
 }
 
@@ -196,58 +212,23 @@ function computeResizeLayout(
   return { x: newX, y: newY, width: newWidth, height: newHeight };
 }
 
-export function CanvasPageItem({
+export function CanvasPagePreviewContent({
   page,
   layout,
-  editable,
-  isEditing = false,
-  zoom = 1,
   sessionId,
   screenshotUrl,
   screenshotRenderBox,
   renderMode = "iframe",
-  visible = true,
-  selected = false,
   onLayoutChange,
-  onConfigEdit,
-  onRuntimeConversionRequest,
   onConsoleEntry,
   onError,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
-  toolMode = "hand",
   onPositionableSizes,
-}: CanvasPageItemProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
-  const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
-  const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
-  // 右键菜单状态
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const targetRuntimeType: CanvasPageRuntimeType =
-    page.runtimeType === "prototype-html-css"
-      ? "high-fidelity-react"
-      : "prototype-html-css";
-  // 截图加载完成后，静态截图可作为轻量渲染路径。
+}: CanvasPagePreviewContentProps) {
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
   const [iframeContentLoaded, setIframeContentLoaded] = useState(false);
-  const startPosRef = useRef({ x: 0, y: 0 });
-  const layoutStartRef = useRef<CanvasPageLayout>({
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-  });
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
-  const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | null>(null);
 
   const handleContentHeightChange = useCallback(
     (newContentHeight: number, measuredWidth?: number) => {
@@ -294,7 +275,6 @@ export function CanvasPageItem({
   const iframeEffectiveHeight =
     effectiveHeight > designHeight + 1 ? effectiveHeight : undefined;
 
-  // 当 screenshotUrl 变化时重置截图加载状态
   React.useEffect(() => {
     setScreenshotLoaded(false);
   }, [screenshotUrl]);
@@ -311,18 +291,16 @@ export function CanvasPageItem({
     );
   }, [screenshotRenderBox, handleContentHeightChange]);
 
-  // 当 previewSize 变化时重置内容高度
   React.useEffect(() => {
     setContentHeight(null);
   }, [page.previewSize]);
 
-  const canInteract = editable && toolMode === "select";
-  const showEdgeHandles =
-    (isHovering || selected) && canInteract && !isDragging && !isResizing;
-
   const shouldRenderIframe =
     renderMode === "iframe" || renderMode === "sleeping-iframe";
-  const shouldRenderPrototype = renderMode === "prototype";
+  const shouldRenderPrototype =
+    renderMode === "prototype" && page.runtimeType === "prototype-html-css";
+  const shouldRenderSketch =
+    renderMode === "prototype" && page.runtimeType === "sketch-scene";
   const shouldRenderScreenshot =
     !!screenshotUrl &&
     (renderMode === "screenshot" ||
@@ -331,6 +309,176 @@ export function CanvasPageItem({
   const shouldRenderLoading =
     renderMode === "loading" ||
     (renderMode === "sleeping-iframe" && !screenshotUrl);
+  const keepScreenshotVisible =
+    shouldRenderScreenshot &&
+    (renderMode === "screenshot" ||
+      renderMode === "sleeping-iframe" ||
+      !iframeContentLoaded ||
+      !screenshotLoaded);
+  const showIframeContent =
+    renderMode === "iframe" && (!screenshotUrl || iframeContentLoaded);
+
+  return (
+    <>
+      {shouldRenderPrototype && (
+        <div className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none">
+          <PrototypePagePreview
+            html={page.prototypeHtml}
+            css={page.prototypeCss}
+            configData={page.configData}
+            sessionId={sessionId}
+            demoId={page.id}
+            previewSize={page.previewSize}
+            fillContainer
+            effectiveHeight={iframeEffectiveHeight}
+          />
+        </div>
+      )}
+
+      {shouldRenderSketch && (
+        <div className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none">
+          <SketchPagePreview
+            scene={page.sketchScene}
+            configData={page.configData}
+            previewSize={page.previewSize}
+            fillContainer
+          />
+        </div>
+      )}
+
+      {shouldRenderIframe && page.iframeUrl && (
+        <iframe
+          title={page.name}
+          src={page.iframeUrl}
+          className="absolute inset-0 h-full w-full border-0 bg-white shadow-md transition-opacity duration-200 ease-out"
+          style={{
+            opacity: showIframeContent ? 1 : 0,
+            pointerEvents: "none",
+          }}
+          sandbox="allow-scripts"
+          onLoad={handleIframeContentLoaded}
+        />
+      )}
+
+      {shouldRenderIframe && !page.iframeUrl && (
+        <div
+          className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
+          style={{
+            opacity: showIframeContent ? 1 : 0,
+            pointerEvents: "none",
+          }}
+        >
+          <PreviewPanel
+            code={page.code}
+            compiledJsUrl={page.compiledJsUrl}
+            sessionId={sessionId}
+            demoId={page.id}
+            configData={page.configData}
+            previewSize={page.previewSize}
+            fillContainer
+            onConsoleEntry={onConsoleEntry}
+            onError={onError}
+            onContentHeightChange={handleContentHeightChange}
+            onContentLoaded={handleIframeContentLoaded}
+            activityState={
+              renderMode === "sleeping-iframe" ? "sleeping" : "active"
+            }
+            effectiveHeight={iframeEffectiveHeight}
+            onPositionableSizes={onPositionableSizes}
+          />
+        </div>
+      )}
+
+      {shouldRenderScreenshot && (
+        <div
+          className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none transition-opacity duration-200 ease-out"
+          style={{ opacity: keepScreenshotVisible ? 1 : 0 }}
+        >
+          <img
+            src={screenshotUrl}
+            alt={page.name}
+            className="block h-full w-full object-contain pointer-events-none"
+            loading="lazy"
+            draggable={false}
+            onLoad={handleScreenshotLoad}
+          />
+        </div>
+      )}
+
+      {shouldRenderLoading && (
+        <div className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none">
+          <div className="flex h-full w-full items-center justify-center bg-muted/35">
+            <div
+              role="status"
+              aria-label="页面预览加载中"
+              className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/25 border-b-muted-foreground"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function CanvasPageItem({
+  page,
+  layout,
+  editable,
+  isEditing = false,
+  zoom = 1,
+  sessionId,
+  screenshotUrl,
+  screenshotRenderBox,
+  renderMode = "iframe",
+  visible = true,
+  selected = false,
+  onLayoutChange,
+  onConfigEdit,
+  onRuntimeConversionRequest,
+  onRequestDelete,
+  onConsoleEntry,
+  onError,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  toolMode = "hand",
+  onPositionableSizes,
+}: CanvasPageItemProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const targetRuntimeType: CanvasPageRuntimeType =
+    page.runtimeType === "prototype-html-css"
+      ? "high-fidelity-react"
+      : page.runtimeType === "sketch-scene"
+        ? "prototype-html-css"
+      : "prototype-html-css";
+  // 截图加载完成后，静态截图可作为轻量渲染路径。
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const layoutStartRef = useRef<CanvasPageLayout>({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
+  const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
+
+  const canInteract = editable && toolMode === "select";
+  const showEdgeHandles =
+    (isHovering || selected) && canInteract && !isDragging && !isResizing;
 
   // 根据鼠标位置更新 cursor 和 hoveredEdge
   const updateEdgeFromPointer = useCallback(
@@ -391,6 +539,13 @@ export function CanvasPageItem({
 
       if (target.closest("button")) return;
 
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        e.stopPropagation();
+        e.preventDefault();
+        onConfigEdit?.(page.id, e);
+        return;
+      }
+
       e.stopPropagation();
       e.preventDefault();
       target.setPointerCapture(e.pointerId);
@@ -400,7 +555,7 @@ export function CanvasPageItem({
       layoutStartRef.current = { ...layoutRef.current };
       onDragStart?.(page.id);
     },
-    [canInteract, page.id, onDragStart],
+    [canInteract, page.id, onConfigEdit, onDragStart],
   );
 
   const handleDragPointerMove = useCallback(
@@ -476,7 +631,7 @@ export function CanvasPageItem({
         const dx = e.clientX - startPosRef.current.x;
         const dy = e.clientY - startPosRef.current.y;
         if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-          onConfigEdit?.(page.id);
+          onConfigEdit?.(page.id, e);
         }
         return;
       }
@@ -512,15 +667,6 @@ export function CanvasPageItem({
     );
   }
 
-  const keepScreenshotVisible =
-    shouldRenderScreenshot &&
-    (renderMode === "screenshot" ||
-      renderMode === "sleeping-iframe" ||
-      !iframeContentLoaded ||
-      !screenshotLoaded);
-  const showIframeContent =
-    renderMode === "iframe" && (!screenshotUrl || iframeContentLoaded);
-
   // 当前 cursor
   const activeCursor =
     isResizing && EDGE_CURSORS[isResizing]
@@ -540,96 +686,6 @@ export function CanvasPageItem({
   const pageLabelTopOffset = Math.min(
     (PAGE_LABEL_SCREEN_FONT_SIZE + PAGE_LABEL_SCREEN_GAP) / safeZoom,
     PAGE_LABEL_MAX_TOP_OFFSET,
-  );
-
-  const pageContent = (
-    <>
-      {shouldRenderPrototype && (
-        <div className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none">
-          <PrototypePagePreview
-            html={page.prototypeHtml}
-            css={page.prototypeCss}
-            configData={page.configData}
-            previewSize={page.previewSize}
-            fillContainer
-            effectiveHeight={iframeEffectiveHeight}
-          />
-        </div>
-      )}
-
-      {shouldRenderIframe && page.iframeUrl && (
-        <iframe
-          title={page.name}
-          src={page.iframeUrl}
-          className="absolute inset-0 h-full w-full border-0 bg-white shadow-md transition-opacity duration-200 ease-out"
-          style={{
-            opacity: showIframeContent ? 1 : 0,
-            pointerEvents: "none",
-          }}
-          sandbox="allow-scripts"
-          onLoad={handleIframeContentLoaded}
-        />
-      )}
-
-      {shouldRenderIframe && !page.iframeUrl && (
-        <div
-          className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
-          style={{
-            opacity: showIframeContent ? 1 : 0,
-            // hand 模式下禁止 iframe 交互（防止误拖图片），select 模式下也禁止（通过外层容器操作）
-            pointerEvents: "none",
-          }}
-        >
-          <PreviewPanel
-            code={page.code}
-            compiledJsUrl={page.compiledJsUrl}
-            sessionId={sessionId}
-            demoId={page.id}
-            configData={page.configData}
-            previewSize={page.previewSize}
-            fillContainer
-            onConsoleEntry={onConsoleEntry}
-            onError={onError}
-            onContentHeightChange={handleContentHeightChange}
-            onContentLoaded={handleIframeContentLoaded}
-            activityState={
-              renderMode === "sleeping-iframe" ? "sleeping" : "active"
-            }
-            effectiveHeight={iframeEffectiveHeight}
-            onPositionableSizes={onPositionableSizes}
-          />
-        </div>
-      )}
-
-      {shouldRenderScreenshot && (
-        <div
-          className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none transition-opacity duration-200 ease-out"
-          style={{ opacity: keepScreenshotVisible ? 1 : 0 }}
-        >
-          <img
-            src={screenshotUrl}
-            alt={page.name}
-            className="block h-full w-full object-contain pointer-events-none"
-            loading="lazy"
-            draggable={false}
-            onLoad={handleScreenshotLoad}
-          />
-        </div>
-      )}
-
-      {shouldRenderLoading && (
-        <div className="absolute inset-0 shadow-md overflow-hidden bg-white pointer-events-none">
-          <div className="flex h-full w-full items-center justify-center bg-muted/35">
-            <div
-              role="status"
-              aria-label="页面预览加载中"
-              className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/25 border-b-muted-foreground"
-            />
-          </div>
-        </div>
-      )}
-
-    </>
   );
 
   return (
@@ -680,7 +736,18 @@ export function CanvasPageItem({
       </div>
 
       <div className="absolute inset-0 rounded-lg overflow-hidden">
-        {pageContent}
+        <CanvasPagePreviewContent
+          page={page}
+          layout={layout}
+          sessionId={sessionId}
+          screenshotUrl={screenshotUrl}
+          screenshotRenderBox={screenshotRenderBox}
+          renderMode={renderMode}
+          onLayoutChange={onLayoutChange}
+          onConsoleEntry={onConsoleEntry}
+          onError={onError}
+          onPositionableSizes={onPositionableSizes}
+        />
       </div>
 
       <CanvasSelectionBox
@@ -815,6 +882,19 @@ export function CanvasPageItem({
                 {targetRuntimeType === "prototype-html-css"
                   ? "AI 转 HTML/CSS 原型"
                   : "AI 转高保真页"}
+              </button>
+            )}
+            {onRequestDelete && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-sm text-destructive hover:bg-muted"
+                onClick={() => {
+                  onRequestDelete(page.id);
+                  setContextMenu(null);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                删除页面
               </button>
             )}
           </div>

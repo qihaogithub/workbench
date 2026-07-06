@@ -24,7 +24,7 @@
 2. **目标服务** 必须已启动：
    - Web 前端服务（默认 <http://localhost:3200）>
    - Agent Service（默认 <http://localhost:3201）>
-   - ACP CLI（如 opencode）已正确配置
+   - ACP CLI（如 workbench）已正确配置
 
 ## 使用方式
 
@@ -141,7 +141,7 @@
 [14:30:20] [WARN]   4. WebSocket 连接中断
 [14:30:20] [WARN] 排查建议:
 [14:30:20] [WARN]   - 检查 agent-service 是否启动: curl http://localhost:3201/health
-[14:30:20] [WARN]   - 检查 ACP CLI 是否可用: opencode acp
+[14:30:20] [WARN]   - 检查 ACP CLI 是否可用: workbench acp
 [14:30:20] [WARN]   - 查看 agent-service 控制台日志
 [14:30:20] [WARN]   - 使用浏览器开发者工具查看 WebSocket 消息
 ```
@@ -297,7 +297,7 @@ npm install -g @playwright/cli
 
 1. 启用 verbose 模式运行脚本，查看详细日志
 2. 检查 agent-service 是否启动：`curl http://localhost:3201/health`
-3. 检查 ACP CLI 是否可用：`opencode acp`（或其他后端 CLI）
+3. 检查 ACP CLI 是否可用：`workbench acp`（或其他后端 CLI）
 4. 查看 agent-service 日志是否有错误
 5. 查看浏览器控制台 WebSocket 消息（脚本会输出 console 错误）
 

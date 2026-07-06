@@ -11,8 +11,8 @@ import type {
   VersionHistoryResponse,
   ProjectListResponse,
   ProjectDetailResponse,
-} from '@opencode-workbench/shared/contracts';
-import { MAX_VERSIONS_KEEP } from '@opencode-workbench/shared/contracts';
+} from '@workbench/shared/contracts';
+import { MAX_VERSIONS_KEEP } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
 function findProjectRoot(cwd: string): string {

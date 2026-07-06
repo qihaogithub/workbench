@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type {
+  SketchEditorEnginePreference,
+  UserAuthoringPreferences,
+} from "@workbench/shared";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +25,7 @@ import {
   KeyRound,
   Link2,
   LogOut,
+  PenTool,
   RefreshCw,
   Settings,
   User,
@@ -31,7 +36,12 @@ interface UserInfo {
   username: string;
 }
 
-type View = "main" | "change-password" | "model-config" | "external-auth";
+type View =
+  | "main"
+  | "change-password"
+  | "model-config"
+  | "external-auth"
+  | "authoring-preferences";
 
 type ExternalProviderStatus = {
   provider: "figma" | "dingtalk";
@@ -87,6 +97,10 @@ export function SettingsButton() {
   const [externalProviders, setExternalProviders] = useState<ExternalProviderStatus[]>([]);
   const [externalMessage, setExternalMessage] = useState("");
   const [loadingExternalAuth, setLoadingExternalAuth] = useState(false);
+  const [loadingAuthoringPreferences, setLoadingAuthoringPreferences] =
+    useState(false);
+  const [sketchEditorEnginePreference, setSketchEditorEnginePreference] =
+    useState<"" | SketchEditorEnginePreference>("");
   const [dingtalkBinding, setDingtalkBinding] =
     useState<DingtalkBindingStatus | null>(null);
 
@@ -192,6 +206,39 @@ export function SettingsButton() {
     setExternalMessage("");
     setView("external-auth");
     await loadExternalAuth();
+  };
+
+  const loadAuthoringPreferences = async () => {
+    setLoadingAuthoringPreferences(true);
+    try {
+      const res = await fetch("/api/user/authoring-preferences");
+      const data = await res.json();
+      if (data.success) {
+        const preferences = data.data?.preferences as
+          | UserAuthoringPreferences
+          | undefined;
+        setSketchEditorEnginePreference(preferences?.sketchEditorEngine ?? "");
+      } else {
+        toast({
+          title: "读取失败",
+          description: data.error?.message || "无法读取创作偏好",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "无法读取创作偏好",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAuthoringPreferences(false);
+    }
+  };
+
+  const handleOpenAuthoringPreferences = async () => {
+    setView("authoring-preferences");
+    await loadAuthoringPreferences();
   };
 
   const handleConnectExternal = async (provider: "figma" | "dingtalk") => {
@@ -314,6 +361,43 @@ export function SettingsButton() {
       toast({
         title: "网络错误",
         description: "保存 AI 模型配置失败",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveAuthoringPreferences = async () => {
+    setSubmitting(true);
+    try {
+      const preferences: UserAuthoringPreferences = {};
+      if (sketchEditorEnginePreference) {
+        preferences.sketchEditorEngine = sketchEditorEnginePreference;
+      }
+      const res = await fetch("/api/user/authoring-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({
+          title: "创作偏好已保存",
+          description: "刷新或新打开编辑页后生效",
+        });
+        setView("main");
+      } else {
+        toast({
+          title: "保存失败",
+          description: data.error?.message || "请检查配置",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "保存创作偏好失败",
         variant: "destructive",
       });
     } finally {
@@ -481,6 +565,19 @@ export function SettingsButton() {
                 </button>
 
                 <button
+                  onClick={handleOpenAuthoringPreferences}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors text-left"
+                >
+                  <PenTool className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">创作偏好</p>
+                    <p className="text-xs text-muted-foreground">
+                      设置手绘页面默认编辑器
+                    </p>
+                  </div>
+                </button>
+
+                <button
                   onClick={handleOpenExternalAuth}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors text-left"
                 >
@@ -600,6 +697,53 @@ export function SettingsButton() {
                   disabled={submitting || loadingModelConfig}
                 >
                   {submitting ? "保存中..." : "保存配置"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : view === "authoring-preferences" ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setView("main")}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <DialogTitle>创作偏好</DialogTitle>
+                </div>
+                <DialogDescription>
+                  设置当前账号打开手绘页面时默认使用的编辑器。
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label>手绘页面默认编辑器</Label>
+                  <select
+                    value={sketchEditorEnginePreference}
+                    onChange={(event) =>
+                      setSketchEditorEnginePreference(
+                        event.target.value as "" | SketchEditorEnginePreference,
+                      )
+                    }
+                    disabled={submitting || loadingAuthoringPreferences}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">跟随系统默认</option>
+                    <option value="openpencil">新版手绘编辑器</option>
+                    <option value="native">经典手绘编辑器</option>
+                  </select>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    项目级设置会优先于这里的默认值；新版编辑器仍需全局实验开关放行。
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={handleSaveAuthoringPreferences}
+                  disabled={submitting || loadingAuthoringPreferences}
+                >
+                  {submitting ? "保存中..." : "保存偏好"}
                 </Button>
               </DialogFooter>
             </>

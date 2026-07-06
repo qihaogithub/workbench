@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783265844456_ofknf2",
+  "at": 1783265844456,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_02_active_no_vote",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_02_active_no_vote:code"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

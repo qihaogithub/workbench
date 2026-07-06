@@ -231,7 +231,7 @@ async function fetchWithValidatedRedirects(
       headers: {
         Accept: "text/html,text/plain,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.5",
         "Accept-Encoding": "gzip, br, deflate",
-        "User-Agent": "opencode-workbench-pi-agent/1.0 webRead",
+        "User-Agent": "workbench-pi-agent/1.0 webRead",
       },
     });
 

@@ -2,7 +2,7 @@ import type {
   VisualNodeInfo,
   VisualPropertyChange,
   VisualPropertyChangeKind,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 export type PrototypeVisualConfigKind = "text" | "image" | "color";
 

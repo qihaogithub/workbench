@@ -4,7 +4,7 @@ import {
   ConfigForm,
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 const sharedSchema = JSON.stringify({
   type: "object",
@@ -90,6 +90,19 @@ const conditionalMediaSchema = JSON.stringify({
 });
 
 describe("PageConfigPanel", () => {
+  it("没有页面时展示明确空状态", () => {
+    render(
+      <PageConfigPanel
+        pages={[]}
+        readonly
+      />,
+    );
+
+    expect(screen.getByText("暂无页面")).toBeInTheDocument();
+    expect(screen.getByText("添加页面后即可配置页面内容")).toBeInTheDocument();
+    expect(screen.queryByText("没有匹配的配置项")).not.toBeInTheDocument();
+  });
+
   it("一级展示页面配置数量，二级展示共享配置和本页配置", () => {
     render(
       <PageConfigPanel
@@ -125,6 +138,13 @@ describe("PageConfigPanel", () => {
 
     expect(screen.queryByText(/项配置/)).not.toBeInTheDocument();
     expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.queryByText("影响多个页面")).not.toBeInTheDocument();
+    expect(screen.queryByText("仅当前页面")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "影响 2 个页面" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "影响 2 个页面" }));
+    expect(screen.getByText("受影响页面")).toBeInTheDocument();
+    expect(screen.getAllByText("页面 A").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("页面 B").length).toBeGreaterThan(0);
     expect(screen.getByText("本页配置")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("返回所有页面"));
@@ -197,6 +217,7 @@ describe("PageConfigPanel", () => {
     fireEvent.click(screen.getByText("页面 A"));
 
     expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "影响 1 个页面" })).toBeInTheDocument();
     expect(screen.getByText("Logo")).toBeInTheDocument();
     expect(screen.queryByText("主题")).not.toBeInTheDocument();
     expect(screen.getByText("本页配置")).toBeInTheDocument();
@@ -333,7 +354,7 @@ describe("ConfigForm 条件显示", () => {
 
     expect(screen.getByText("弹窗图片")).toBeInTheDocument();
     expect(screen.queryByText("SVGA动画文件")).not.toBeInTheDocument();
-    expect(screen.getByText("弹窗素材").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("弹窗素材").parentElement).not.toHaveTextContent("2");
     expect(screen.queryByText("基础配置")).not.toBeInTheDocument();
     expect(screen.queryByText("图片资源")).not.toBeInTheDocument();
 
@@ -342,7 +363,7 @@ describe("ConfigForm 条件显示", () => {
     expect(screen.queryByText("弹窗图片")).not.toBeInTheDocument();
     expect(screen.getByText("SVGA动画文件")).toBeInTheDocument();
     expect(screen.getByDisplayValue("intro.svga")).toBeInTheDocument();
-    expect(screen.getByText("弹窗素材").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("弹窗素材").parentElement).not.toHaveTextContent("2");
     expect(screen.queryByText("图片资源")).not.toBeInTheDocument();
     expect(screen.getByTestId("form-data")).toHaveTextContent("intro.svga");
 

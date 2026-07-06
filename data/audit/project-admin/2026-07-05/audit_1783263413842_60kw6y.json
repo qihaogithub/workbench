@@ -1,0 +1,30 @@
+{
+  "auditId": "audit_1783263413842_60kw6y",
+  "at": 1783263413842,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1783263373417_l9zosv",
+  "resourceId": "edit_1783263380562_4t5mqw",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "demos/openpencil_spike_scene/config.schema.json",
+      "demos/openpencil_spike_scene/sketch.meta.json",
+      "demos/openpencil_spike_scene/sketch.scene.json",
+      "workspace-tree.json"
+    ],
+    "notes": [
+      "生成版本 v1"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

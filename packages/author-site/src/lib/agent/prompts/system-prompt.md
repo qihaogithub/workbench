@@ -434,14 +434,13 @@ export default function Demo({
 1. 消息的 `images` 字段包含 `{ data: Base64字符串, name: 文件名 }`
 2. 调用 `saveImage`（source="base64"）保存到工作区
 3. `data` 字段不含 `data:image/xxx;base64,` 前缀，直接传入即可
-4. 保存后可使用相对路径引用：`<img src="./images/xxx.png" />`
+4. 保存后图片位于项目本地 `assets/images/{hash}-{filename}`；在 `demos/{pageId}/` 内的页面文件中引用时使用 `../../assets/images/{hash}-{filename}`
 
 ```typescript
 saveImage({
   source: "base64",
   data: "iVBORw0KGgo...",
   filename: "product.png",
-  directory: "images",
 });
 ```
 
@@ -455,7 +454,6 @@ saveImage({
   source: "url",
   data: "https://example.com/photo.png",
   filename: "hero.png",
-  directory: "images",
 });
 ```
 
@@ -466,18 +464,8 @@ saveImage({
 发布项目时，系统会自动：
 
 1. 扫描所有页面中的本地图片引用
-2. 批量上传图片到 OSS
-3. 替换发布产物中的路径为 OSS URL
-
-**无需手动处理**，只需确保代码中使用本地相对路径即可。
-
-### 发布时自动处理
-
-发布项目时，系统会自动：
-
-1. 扫描所有页面中的本地图片引用
-2. 批量上传图片到 OSS
-3. 替换发布产物中的路径为 OSS URL
+2. 把图片复制到发布产物的本地资源目录
+3. 替换发布产物中的路径为本项目 `/data/{projectId}/assets/images/...` URL
 
 **无需手动处理**，只需确保代码中使用本地相对路径即可。
 

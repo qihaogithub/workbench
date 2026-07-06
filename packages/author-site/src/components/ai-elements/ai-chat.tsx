@@ -180,6 +180,11 @@ export function AIChat({
     onStreamContentChange,
   });
 
+  const modelPersistenceKey = useMemo(
+    () => projectId || workspaceId || workingDir || agentSessionId,
+    [agentSessionId, projectId, workspaceId, workingDir],
+  );
+
   const {
     modelState,
     currentAvailableDepths,
@@ -188,7 +193,11 @@ export function AIChat({
     handleModelsEvent,
     handleModelError,
     resetModelState,
-  } = useChatModels({ agentSessionId, workingDir });
+  } = useChatModels({
+    agentSessionId,
+    workingDir,
+    persistenceKey: modelPersistenceKey,
+  });
 
   const selectedModelId = useMemo(
     () =>
@@ -220,6 +229,7 @@ export function AIChat({
     sessionId,
     agentSessionId,
     workingDir,
+    projectId,
     demoId,
     activeViewContext,
     onCodeUpdate,
@@ -377,6 +387,14 @@ export function AIChat({
             handleSend={handleSend}
             onUserChoiceResponse={handleUserChoiceResponse}
           />
+          {pendingPermissionRequest && (
+            <PermissionDialog
+              request={pendingPermissionRequest}
+              onRespond={handlePermissionResponse}
+              onCancel={handlePermissionCancel}
+              variant="inline"
+            />
+          )}
         </ConversationContent>
       </Conversation>
 
@@ -422,15 +440,6 @@ export function AIChat({
             </div>
           ))}
         </div>
-      )}
-
-      {pendingPermissionRequest && (
-        <PermissionDialog
-          request={pendingPermissionRequest}
-          onRespond={handlePermissionResponse}
-          onCancel={handlePermissionCancel}
-          variant="inline"
-        />
       )}
 
       <ChatPlan plan={plan} isStreaming={isStreaming} />

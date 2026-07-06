@@ -3,8 +3,8 @@ import path from "path";
 import type {
   DemoPageRuntimeType,
   PrototypePageMeta,
-} from "@opencode-workbench/shared";
-import type { RuntimeValidationResult } from "@opencode-workbench/project-core";
+} from "@workbench/shared";
+import type { RuntimeValidationResult } from "@workbench/project-core";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -24,6 +24,7 @@ import {
   writeDemoPageMeta,
 } from "@/lib/fs-utils";
 import { getProjectAdminService } from "@/lib/project-admin-service";
+import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
 import fs from "fs";
 
@@ -62,6 +63,8 @@ export async function PUT(
       prototypeHtml,
       prototypeCss,
       prototypeMeta,
+      sketchScene,
+      sketchMeta,
     } = body as {
       sessionId?: string;
       targetRuntimeType?: DemoPageRuntimeType;
@@ -70,6 +73,8 @@ export async function PUT(
       prototypeHtml?: string;
       prototypeCss?: string;
       prototypeMeta?: unknown;
+      sketchScene?: string;
+      sketchMeta?: unknown;
     };
 
     if (!sessionId || typeof sessionId !== "string") {
@@ -80,11 +85,21 @@ export async function PUT(
     }
     if (
       targetRuntimeType !== "prototype-html-css" &&
-      targetRuntimeType !== "high-fidelity-react"
+      targetRuntimeType !== "high-fidelity-react" &&
+      targetRuntimeType !== "sketch-scene"
     ) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "targetRuntimeType 不合法"),
         { status: 400 },
+      );
+    }
+    if (
+      targetRuntimeType === "sketch-scene" &&
+      !isSketchSceneAuthoringEnabled()
+    ) {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "手绘页面功能暂未在创作端开放"),
+        { status: 403 },
       );
     }
     if (code !== undefined && typeof code !== "string") {
@@ -108,6 +123,12 @@ export async function PUT(
     if (prototypeCss !== undefined && typeof prototypeCss !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "prototypeCss 必须为字符串"),
+        { status: 400 },
+      );
+    }
+    if (sketchScene !== undefined && typeof sketchScene !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sketchScene 必须为字符串"),
         { status: 400 },
       );
     }
@@ -211,6 +232,8 @@ export async function PUT(
       prototypeHtml: prototypeHtml ?? currentFiles.prototypeHtml,
       prototypeCss: prototypeCss ?? currentFiles.prototypeCss,
       prototypeMeta: (prototypeMeta as PrototypePageMeta | undefined) ?? currentFiles.prototypeMeta,
+      sketchScene: sketchScene ?? currentFiles.sketchScene,
+      sketchMeta: (sketchMeta as Record<string, unknown> | undefined) ?? currentFiles.sketchMeta,
     };
     const runtimeValidation: RuntimeValidationResult =
       getProjectAdminService().validateDemoPageFilesRuntime(
@@ -235,6 +258,8 @@ export async function PUT(
       prototypeHtml: targetRuntimeType === "prototype-html-css" ? nextFiles.prototypeHtml : undefined,
       prototypeCss: targetRuntimeType === "prototype-html-css" ? nextFiles.prototypeCss : undefined,
       prototypeMeta: targetRuntimeType === "prototype-html-css" ? nextFiles.prototypeMeta : undefined,
+      sketchScene: targetRuntimeType === "sketch-scene" ? nextFiles.sketchScene : undefined,
+      sketchMeta: targetRuntimeType === "sketch-scene" ? nextFiles.sketchMeta : undefined,
     });
     if (!success) {
       return NextResponse.json(

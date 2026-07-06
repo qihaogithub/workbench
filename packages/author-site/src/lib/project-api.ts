@@ -12,8 +12,11 @@ import type {
   MultiDemoFiles,
   PrototypePageMeta,
   ResourceVersion,
-} from '@opencode-workbench/shared';
-import type { RuntimeValidationResult } from '@opencode-workbench/project-core';
+} from '@workbench/shared';
+import type {
+  RuntimeValidationResult,
+  SketchPatchVersionSummary,
+} from '@workbench/project-core';
 
 import { getBrowserAgentServiceUrl } from './runtime-config';
 
@@ -162,7 +165,11 @@ export class ProjectApiClient {
   async createPageVersion(
     projectId: string,
     demoId: string,
-    request?: { sessionId?: string; note?: string },
+    request?: {
+      sessionId?: string;
+      note?: string;
+      sketchPatchSummary?: SketchPatchVersionSummary;
+    },
   ): Promise<PageVersionInfo> {
     const response = await this.localRequest<ResourceVersion>(
       `/api/projects/${projectId}/resources/page/${demoId}/versions`,
@@ -195,7 +202,7 @@ export class ProjectApiClient {
     projectId: string,
     demoId: string,
     versionId: string,
-    request?: { sessionId?: string },
+    request?: { sessionId?: string; workspaceId?: string },
   ): Promise<RestorePageVersionResponse> {
     const response = await this.localRequest<RestorePageVersionResponse>(
       `/api/projects/${projectId}/resources/page/${demoId}/versions/${versionId}`,
@@ -233,12 +240,13 @@ export class ProjectApiClient {
     name: string,
     sessionId: string,
     parentId?: string | null,
+    runtimeType?: DemoPageMeta["runtimeType"],
   ): Promise<DemoPageMeta> {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos`,
       {
         method: 'POST',
-        body: JSON.stringify({ sessionId, name, parentId }),
+        body: JSON.stringify({ sessionId, name, parentId, runtimeType }),
       }
     );
     if (!response.success || !response.data) {

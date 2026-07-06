@@ -9,7 +9,8 @@ import type {
   DemoPageRuntimeType,
   PageSnapshotInput,
   PrototypePageMeta,
-} from "@opencode-workbench/shared";
+  SketchSceneDocument,
+} from "@workbench/shared";
 
 const DATA_DIR = getDataDir();
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
@@ -74,6 +75,8 @@ function readWorkspaceRuntimeTypes(
     result[page.id] =
       page.runtimeType === "prototype-html-css"
         ? "prototype-html-css"
+        : page.runtimeType === "sketch-scene"
+          ? "sketch-scene"
         : page.runtimeType === "high-fidelity-react"
           ? "high-fidelity-react"
           : undefined;
@@ -150,11 +153,19 @@ function readProjectThumbnailPages(projectId: string): ThumbnailPageInput[] {
     const code = readTextFile(path.join(pageDir, "index.tsx"));
     const prototypeHtml = readTextFile(path.join(pageDir, "prototype.html"));
     const prototypeCss = readTextFile(path.join(pageDir, "prototype.css")) ?? "";
+    const sketchScene = readJsonFile<SketchSceneDocument>(
+      path.join(pageDir, "sketch.scene.json"),
+    );
     const runtimeType =
       runtimeTypes[entry.name] ??
-      (!code && prototypeHtml ? "prototype-html-css" : "high-fidelity-react");
+      (!code && sketchScene
+        ? "sketch-scene"
+        : !code && prototypeHtml
+          ? "prototype-html-css"
+          : "high-fidelity-react");
     if (runtimeType === "high-fidelity-react" && !code) continue;
     if (runtimeType === "prototype-html-css" && !prototypeHtml) continue;
+    if (runtimeType === "sketch-scene" && !sketchScene) continue;
 
     const schemaPath = path.join(pageDir, "config.schema.json");
     const pageDefaults = readSchemaDefaults(schemaPath);
@@ -185,6 +196,15 @@ function readProjectThumbnailPages(projectId: string): ThumbnailPageInput[] {
             prototypeCss,
             prototypeMeta,
           }
+        : runtimeType === "sketch-scene"
+          ? {
+              ...common,
+              runtimeType: "sketch-scene",
+              sketchScene: sketchScene as SketchSceneDocument,
+              sketchMeta: readJsonFile<Record<string, unknown>>(
+                path.join(pageDir, "sketch.meta.json"),
+              ) ?? undefined,
+            }
         : {
             ...common,
             runtimeType: "high-fidelity-react",

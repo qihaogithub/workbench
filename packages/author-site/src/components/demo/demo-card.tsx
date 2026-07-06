@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { DemoMeta, ProjectTemplateMeta } from "@opencode-workbench/shared";
+import type { DemoMeta, ProjectTemplateMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
 const MAX_SCREENSHOT_COVER_ITEMS = 10;

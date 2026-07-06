@@ -3,7 +3,7 @@
   "name": "我的页面",
   "category": "APP资源位",
   "description": "资源预览",
-  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782718595285_h4lda7/workspace",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1782718595285_h4lda7/workspace",
   "demoPages": [
     {
       "id": "demo_omrf",
@@ -30,7 +30,7 @@
       "savedAt": 1783134603952,
       "savedBy": "qihao",
       "sessionId": "session-1783133236518-mo32rktm0",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v1",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v1",
       "fileCount": 11,
       "note": "停止编辑后自动保存记录"
     },
@@ -40,7 +40,7 @@
       "savedAt": 1783138527106,
       "savedBy": "qihao",
       "sessionId": "session-1783133236518-mo32rktm0",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v2",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v2",
       "fileCount": 11,
       "note": "停止编辑后自动保存记录"
     },
@@ -50,7 +50,7 @@
       "savedAt": 1783140032058,
       "savedBy": "qihao",
       "sessionId": "session-1783133236518-mo32rktm0",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v3",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v3",
       "fileCount": 11,
       "note": "停止编辑后自动保存记录"
     },
@@ -60,7 +60,7 @@
       "savedAt": 1783149885143,
       "savedBy": "qihao",
       "sessionId": "session-1783147430509-mm1c2th37",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v4",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -70,7 +70,7 @@
       "savedAt": 1783150698100,
       "savedBy": "qihao",
       "sessionId": "session-1783147430509-mm1c2th37",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v5",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -80,7 +80,7 @@
       "savedAt": 1783153822583,
       "savedBy": "qihao",
       "sessionId": "session-1783147430509-mm1c2th37",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v6",
       "fileCount": 19,
       "note": "停止编辑后自动保存记录"
     },
@@ -90,7 +90,7 @@
       "savedAt": 1783157013644,
       "savedBy": "qihao",
       "sessionId": "session-1783147430509-mm1c2th37",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v7",
       "fileCount": 19,
       "note": "持续编辑自动保存记录"
     },
@@ -100,7 +100,7 @@
       "savedAt": 1783157047552,
       "savedBy": "system",
       "sessionId": "publish-1783157047546",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v8",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v8",
       "fileCount": 15,
       "note": "发布快照"
     },
@@ -110,7 +110,7 @@
       "savedAt": 1783157634802,
       "savedBy": "qihao",
       "sessionId": "session-1783147430509-mm1c2th37",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v9",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v9",
       "fileCount": 15,
       "note": "停止编辑后自动保存记录"
     },
@@ -120,7 +120,7 @@
       "savedAt": 1783161188338,
       "savedBy": "qihao",
       "sessionId": "session-1783160842166-w3gomn9dc",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v10",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v10",
       "fileCount": 15,
       "note": "停止编辑后自动保存记录"
     },
@@ -130,15 +130,37 @@
       "savedAt": 1783162228427,
       "savedBy": "qihao",
       "sessionId": "session-1783161826443-4zmw49stb",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718595285_h4lda7/v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v11",
       "fileCount": 15,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v12",
+      "type": "restore_snapshot",
+      "savedAt": 1783208470538,
+      "savedBy": "qihao",
+      "sessionId": "restore-page-demo_omrf-prv_1783181410735_4at6e2",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718595285_h4lda7/v12",
+      "fileCount": 15,
+      "note": "从页面 平板 的历史版本 prv_1783181410735_4at6e2 恢复"
+    },
+    {
+      "versionId": "v13",
+      "type": "publish_snapshot",
+      "savedAt": 1783325026605,
+      "savedBy": "system",
+      "sessionId": "publish-1783325026587",
+      "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v13",
+      "fileCount": 15,
+      "note": "发布快照"
     }
   ],
   "createdAt": 1782718595290,
-  "updatedAt": 1783183003864,
-  "publishedVersion": "v8",
-  "publishedAt": 1783157047556,
-  "activeWorkspaceId": "live-1783183003856-tp5e30bzn",
-  "activeWorkspaceUpdatedAt": 1783183003864
+  "updatedAt": 1783325026605,
+  "publishedVersion": "v13",
+  "publishedAt": 1783325026628,
+  "activeWorkspaceId": "live-1783223396146-28hes5yge",
+  "activeWorkspaceUpdatedAt": 1783324999842,
+  "canonicalSyncedWorkspaceId": "live-1783223396146-28hes5yge",
+  "canonicalSyncedAt": 1783325026568
 }

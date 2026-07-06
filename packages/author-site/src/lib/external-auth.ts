@@ -7,7 +7,7 @@ import type {
   ExternalAuthSessionConfig,
   ExternalAuthStatus,
   FigmaExternalAuthCredential,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 import { getDb } from "@/lib/db";
 

@@ -5,11 +5,11 @@ import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   BasicRetrievalBackend,
-} from "@opencode-workbench/knowledge-service";
+} from "@workbench/knowledge-service";
 import type {
   AccessContext,
   KnowledgeItem,
-} from "@opencode-workbench/knowledge-core";
+} from "@workbench/knowledge-core";
 
 import type { AgentConfig } from "../../core/types";
 import { getSystemKnowledgeSnapshot } from "../../config/system-knowledge";

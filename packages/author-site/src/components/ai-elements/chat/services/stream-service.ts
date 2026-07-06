@@ -2,7 +2,7 @@ import {
   AgentStream,
   type StreamEvent,
   type ImageAttachment,
-} from "@opencode-workbench/agent-client";
+} from "@workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
 import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix, buildKnowledgeIndexPrefix } from "@/lib/agent/system-prompt";
@@ -238,6 +238,7 @@ export class StreamService {
     demoId?: string,
     activeViewContext?: ActiveViewContext,
     modelId?: string,
+    projectId?: string,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -284,6 +285,7 @@ export class StreamService {
     this.stream.send(finalContent, `msg-${Date.now()}`, {
       stream: true,
       workingDir,
+      projectId,
       demoId,
       model: modelId,
       images,

@@ -18,7 +18,7 @@ import {
   syncProjectDemoPagesFromWorkspace,
   type WorkspaceMeta,
 } from "./fs-utils";
-import type { MultiDemoFiles } from "@opencode-workbench/shared";
+import type { MultiDemoFiles } from "@workbench/shared";
 
 export interface CreateWorkspaceResult {
   workspaceId: string;

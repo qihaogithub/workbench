@@ -18,11 +18,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@opencode-workbench/preview-contract/runtime': path.resolve(
+      '@workbench/preview-contract/runtime': path.resolve(
         __dirname,
         '../preview-contract/src/runtime.ts',
       ),
-      '@opencode-workbench/preview-contract/compiler': path.resolve(
+      '@workbench/preview-contract/compiler': path.resolve(
         __dirname,
         '../preview-contract/src/compiler.ts',
       ),

@@ -1,10 +1,10 @@
 import { createHash } from 'crypto';
-import { compilePreviewPageSource } from '@opencode-workbench/preview-contract/compiler';
+import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
 import {
   extractImports as extractPreviewImports,
   isNpmPackage,
   rewriteImportsWithResolver,
-} from '@opencode-workbench/preview-contract/runtime';
+} from '@workbench/preview-contract/runtime';
 import {
   readProjectMeta,
   getSessionMeta,

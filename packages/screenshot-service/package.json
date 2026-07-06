@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/screenshot-service",
+  "name": "@workbench/screenshot-service",
   "version": "1.0.0",
   "description": "Screenshot generation service using Puppeteer",
   "main": "dist/server.js",
@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@fastify/cors": "^9.0.0",
-    "@opencode-workbench/shared": "workspace:*",
+    "@workbench/sketch-core": "workspace:*",
+    "@workbench/shared": "workspace:*",
     "dotenv": "^17.4.2",
     "fastify": "^4.26.0",
     "pino": "^8.0.0",

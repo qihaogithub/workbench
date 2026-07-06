@@ -13,6 +13,12 @@ function isLocalPath(p: string): boolean {
   return IMAGE_EXTENSIONS.test(p);
 }
 
+function isExternalImageUrl(p: string): boolean {
+  if (!/^https?:\/\//i.test(p)) return false;
+  if (/placehold\.co|placeholder\.com/i.test(p)) return false;
+  return true;
+}
+
 function isApiImagePath(p: string): boolean {
   return p.startsWith(API_IMAGE_PREFIX) && IMAGE_EXTENSIONS.test(p);
 }
@@ -48,7 +54,14 @@ function addReference(
   sourceFile: string,
   type: ImageReference['type'],
 ): void {
-  if (isApiImagePath(imgPath)) {
+  if (isExternalImageUrl(imgPath)) {
+    references.push({
+      originalPath: imgPath,
+      absolutePath: imgPath,
+      sourceFile,
+      type: 'external-url',
+    });
+  } else if (isApiImagePath(imgPath)) {
     references.push({
       originalPath: imgPath,
       absolutePath: resolveApiImagePath(imgPath),
@@ -87,7 +100,12 @@ function extractImageReferences(
     addReference(references, match[1], sourceFile, 'import');
   }
 
-  return references;
+  const quotedExternalUrlRegex = /["'](https?:\/\/[^"']+)["']/g;
+  while ((match = quotedExternalUrlRegex.exec(content)) !== null) {
+    addReference(references, match[1], sourceFile, 'external-url');
+  }
+
+  return dedupeReferences(references);
 }
 
 export function scanImageReferences(
@@ -104,7 +122,7 @@ export function scanImageReferences(
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walkDir(fullPath);
-      } else if (/\.(tsx|jsx|css)$/i.test(entry.name)) {
+      } else if (/\.(tsx|jsx|css|html)$/i.test(entry.name)) {
         const content = fs.readFileSync(fullPath, 'utf-8');
         const refs = extractImageReferences(content, fullPath);
         references.push(...refs);
@@ -138,3 +156,4 @@ function dedupeReferences(refs: ImageReference[]): ImageReference[] {
 }
 
 export { extractImageReferences, isLocalPath, isApiImagePath };
+export { isExternalImageUrl };

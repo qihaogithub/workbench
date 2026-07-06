@@ -39,7 +39,7 @@ describe("webSearch tool", () => {
     const tool = createWebSearchTool();
 
     const result = await tool.execute("search-1", {
-      query: "OpenCode Workbench",
+      query: "Workbench",
     });
 
     expect(result.isError).toBe(true);
@@ -54,7 +54,7 @@ describe("webSearch tool", () => {
           web: {
             results: [
               {
-                title: "OpenCode Workbench",
+                title: "Workbench",
                 url: "https://example.com/workbench",
                 description: "A workbench result",
                 age: "2 days ago",
@@ -71,15 +71,15 @@ describe("webSearch tool", () => {
     const tool = createWebSearchTool();
 
     const result = await tool.execute("search-1", {
-      query: "OpenCode Workbench",
+      query: "Workbench",
     });
 
     expect(result.isError).toBeFalsy();
-    expect(result.content[0].text).toContain("OpenCode Workbench");
+    expect(result.content[0].text).toContain("Workbench");
     expect(result.content[0].text).toContain("https://example.com/workbench");
     expect(result.details.results).toEqual([
       {
-        title: "OpenCode Workbench",
+        title: "Workbench",
         url: "https://example.com/workbench",
         description: "A workbench result",
         source: "Example",

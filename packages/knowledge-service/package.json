@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/knowledge-service",
+  "name": "@workbench/knowledge-service",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opencode-workbench/knowledge-core": "workspace:*",
-    "@opencode-workbench/shared": "workspace:*"
+    "@workbench/knowledge-core": "workspace:*",
+    "@workbench/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",

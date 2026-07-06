@@ -3,7 +3,7 @@
  * 提供文件编辑权限判定、语言类型推断等公共逻辑
  */
 
-import type { DemoPageRuntimeType } from "@opencode-workbench/shared";
+import type { DemoPageRuntimeType } from "@workbench/shared";
 
 /** 编辑器类型 */
 export type FileEditorType = "code" | "markdown";
@@ -14,6 +14,8 @@ const EDITABLE_PATTERNS: RegExp[] = [
   /^demos\/[^/]+\/config\.schema\.json$/,
   /^demos\/[^/]+\/prototype\.html$/,
   /^demos\/[^/]+\/prototype\.css$/,
+  /^demos\/[^/]+\/sketch\.scene\.json$/,
+  /^demos\/[^/]+\/sketch\.meta\.json$/,
   /^project\.config\.schema\.json$/,
   /^memory\.md$/,
 ];
@@ -63,9 +65,9 @@ export function isHiddenEntry(name: string, showKnowledge = false): boolean {
 export function resolvePageRuntimeType(
   runtimeType?: DemoPageRuntimeType | null,
 ): DemoPageRuntimeType {
-  return runtimeType === "prototype-html-css"
-    ? "prototype-html-css"
-    : "high-fidelity-react";
+  if (runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (runtimeType === "sketch-scene") return "sketch-scene";
+  return "high-fidelity-react";
 }
 
 export function isEmptyConfigSchemaContent(content?: string | null): boolean {
@@ -92,6 +94,7 @@ export function isVisiblePageRuntimeFile(input: {
   const runtimeType = resolvePageRuntimeType(input.runtimeType);
 
   if (input.fileName === "prototype.meta.json") return false;
+  if (input.fileName === "sketch.meta.json") return false;
   if (input.fileName === "config.schema.json") {
     return !isEmptyConfigSchemaContent(input.schemaContent);
   }
@@ -105,6 +108,12 @@ export function isVisiblePageRuntimeFile(input: {
     input.fileName === "prototype.html" ||
     input.fileName === "prototype.css"
   ) {
+    return false;
+  }
+  if (runtimeType === "sketch-scene") {
+    return input.fileName === "sketch.scene.json";
+  }
+  if (input.fileName === "sketch.scene.json") {
     return false;
   }
   return true;

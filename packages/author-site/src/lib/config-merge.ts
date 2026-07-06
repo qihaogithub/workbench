@@ -1,4 +1,4 @@
-import type { DemoSchema } from "@opencode-workbench/demo-ui";
+import type { DemoSchema } from "@workbench/demo-ui";
 
 /**
  * Extract default values from a JSON Schema properties object.

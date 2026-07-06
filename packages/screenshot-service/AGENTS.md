@@ -1,10 +1,10 @@
-# AGENTS.md — @opencode-workbench/screenshot-service
+# AGENTS.md — @workbench/screenshot-service
 
 > 本文件为 AI 编码代理提供在截图服务包中工作的指南。进入本包前仍需先阅读根目录 `AGENTS.md`。
 
 ## 包定位
 
-`@opencode-workbench/screenshot-service` 是 Fastify + Puppeteer Core 截图服务，负责调用 author-site 编译接口、打开本地 Chrome/Chromium、生成页面截图并写入文件系统缓存。
+`@workbench/screenshot-service` 是 Fastify + Puppeteer Core 截图服务，负责调用 author-site 编译接口、打开本地 Chrome/Chromium、生成页面截图并写入文件系统缓存。
 
 ## 关键目录
 
@@ -37,7 +37,7 @@ pnpm check:screenshot
 更小范围验证：
 
 ```bash
-pnpm --filter @opencode-workbench/screenshot-service typecheck
-pnpm --filter @opencode-workbench/screenshot-service test
+pnpm --filter @workbench/screenshot-service typecheck
+pnpm --filter @workbench/screenshot-service test
 ```
 

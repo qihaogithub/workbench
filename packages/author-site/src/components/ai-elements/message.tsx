@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { ImageAttachment } from "@opencode-workbench/agent-client";
+import type { ImageAttachment } from "@workbench/agent-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bot,

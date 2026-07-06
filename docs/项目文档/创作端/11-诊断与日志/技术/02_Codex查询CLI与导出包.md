@@ -39,7 +39,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 OPS CLI 内部命令为：
 
 ```bash
-corepack pnpm --filter @opencode-workbench/cli-tools exec tsx src/index.ts diagnostics <kind>
+corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts diagnostics <kind>
 ```
 
 ## JSON 输出契约

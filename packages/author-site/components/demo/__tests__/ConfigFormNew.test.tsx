@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { ConfigForm } from '@opencode-workbench/demo-ui';
+import { ConfigForm } from '@workbench/demo-ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const mockSchema = JSON.stringify({
@@ -178,7 +178,7 @@ describe('ConfigFormNew', () => {
     expect(screen.getByText('暂无配置项')).toBeInTheDocument();
   });
 
-  it('应显示分组和字段数量徽标', () => {
+  it('应显示分组标题且不显示字段数量徽标', () => {
     renderConfigForm(
       <ConfigForm
         schema={mockSchema}
@@ -187,9 +187,9 @@ describe('ConfigFormNew', () => {
       />
     );
 
-    expect(screen.getByText('基础配置')).toBeInTheDocument();
-    const countBadges = screen.getAllByText('1');
-    expect(countBadges.length).toBeGreaterThan(0);
+    const groupTitle = screen.getByText('基础配置');
+    expect(groupTitle).toBeInTheDocument();
+    expect(groupTitle.parentElement).not.toHaveTextContent('1');
   });
 
   it('应显示滑块数值', () => {

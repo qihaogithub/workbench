@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783240779246_47dm6e",
+  "at": 1783240779246,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/home/task-draw.webp",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/home/task-draw.webp"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

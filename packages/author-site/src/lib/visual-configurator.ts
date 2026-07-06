@@ -1,4 +1,4 @@
-import type { VisualNodeInfo } from "@opencode-workbench/demo-ui";
+import type { VisualNodeInfo } from "@workbench/demo-ui";
 
 export type VisualConfigKind = "text" | "image" | "color";
 

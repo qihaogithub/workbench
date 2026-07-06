@@ -1,4 +1,4 @@
-import type { BackendProvider, BackendProvidersConfig } from '@opencode-workbench/shared/contracts';
+import type { BackendProvider, BackendProvidersConfig } from '@workbench/shared/contracts';
 
 import type { AgentConfig } from '../../core/types';
 import { loadConfig, type ServiceConfig } from '../../utils/config';

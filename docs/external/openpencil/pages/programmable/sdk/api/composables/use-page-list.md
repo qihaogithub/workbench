@@ -1,0 +1,50 @@
+---
+url: 'https://openpencil.dev/programmable/sdk/api/composables/use-page-list.md'
+description: 'Read pages and drive page switching, creation, deletion, and renaming.'
+---
+
+# usePageList
+
+`usePageList()` is the page-management composable behind page list UIs.
+
+It exposes:
+
+* `pages`
+* `currentPageId`
+* `switchPage`
+* `addPage`
+* `deletePage`
+* `renamePage`
+
+## Usage
+
+```ts
+import { usePageList } from '@open-pencil/vue'
+
+const pageList = usePageList()
+```
+
+## Basic example
+
+```ts
+const { pages, currentPageId, switchPage, addPage } = usePageList()
+```
+
+## Practical examples
+
+### Switch pages
+
+```ts
+switchPage(pageId)
+```
+
+### Create a new page
+
+```ts
+addPage()
+```
+
+## Related APIs
+
+* [PageListRoot](../components/page-list-root)
+* [useMenuModel](./use-menu-model)

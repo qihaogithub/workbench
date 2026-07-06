@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 import { parseFigmaMarkdown } from "../../../lib/markdown-parser";
-import type { DemoPageMeta } from "@opencode-workbench/shared";
+import type { DemoPageMeta } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { Loader2 } from "lucide-react";
 
@@ -92,7 +92,7 @@ export function ImportFromFigmaDialog({
         </DialogHeader>
         <Textarea
           autoFocus
-          placeholder={`# OpenCode Workbench Export
+          placeholder={`# Workbench Export
 
 ## Component Code
 

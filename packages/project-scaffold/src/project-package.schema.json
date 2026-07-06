@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://opencode-workbench.local/schemas/opencode-project-package.schema.json",
-  "title": "OpenCode Workbench Project Package",
+  "$id": "https://workbench.local/schemas/workbench-project-package.schema.json",
+  "title": "Workbench Project Package",
   "type": "object",
   "additionalProperties": false,
   "required": [

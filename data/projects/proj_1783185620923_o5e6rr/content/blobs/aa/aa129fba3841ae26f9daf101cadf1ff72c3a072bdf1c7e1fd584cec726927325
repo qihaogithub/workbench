@@ -1,0 +1,13 @@
+{
+  "width": 375,
+  "height": 812,
+  "previewSize": {
+    "width": 375,
+    "height": 812
+  },
+  "generatedBy": "codex-football-vote-lottery-dom-css-import",
+  "source": "football-vote-lottery",
+  "sourceFile": "25-outside-browser-guide.png",
+  "sourceUrl": "http://127.0.0.1:5173/?preview=outside&hideDevtools=1",
+  "implementation": "static-dom-css"
+}

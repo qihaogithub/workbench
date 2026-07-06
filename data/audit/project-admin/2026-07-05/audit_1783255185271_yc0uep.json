@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783255185271_yc0uep",
+  "at": 1783255185271,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_19_preview_skin",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_19_preview_skin:prototypeHtml",
+      "page:worldcup_19_preview_skin:prototypeCss",
+      "page:worldcup_19_preview_skin:prototypeMeta"
+    ]
+  }
+}

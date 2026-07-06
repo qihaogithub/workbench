@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { GitCommitHorizontal, Loader2, RotateCcw } from "lucide-react";
-import type { ProjectResourceKind, ResourceVersion } from "@opencode-workbench/shared";
+import type { ProjectResourceKind, ResourceVersion } from "@workbench/shared";
 
 import { Button } from "@/components/ui/button";
 import {

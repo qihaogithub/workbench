@@ -2,7 +2,7 @@
   "id": "proj_1779608458649",
   "name": "学习页-课后",
   "category": "APP资源位",
-  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\projects\\proj_1779608458649\\workspace",
+  "workspacePath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\projects\\proj_1779608458649\\workspace",
   "demoPages": [
     {
       "id": "demo_1779608460500_a1b2c3",
@@ -26,7 +26,7 @@
       "savedAt": 1779609103772,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779608460597-h440norjk",
-      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v1",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608458649\\v1",
       "fileCount": 6
     },
     {
@@ -34,7 +34,7 @@
       "savedAt": 1779610805669,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779609107354-keugldup8",
-      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v2",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608458649\\v2",
       "fileCount": 4
     },
     {
@@ -42,7 +42,7 @@
       "savedAt": 1779634378986,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779631572532-okluhw2zj",
-      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v3",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608458649\\v3",
       "fileCount": 4
     },
     {
@@ -50,7 +50,7 @@
       "savedAt": 1779681434369,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779681354024-lgz93ktyj",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v4",
       "fileCount": 4
     },
     {
@@ -58,7 +58,7 @@
       "savedAt": 1779681521434,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779681436765-42dfauvl4",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v5",
       "fileCount": 4
     },
     {
@@ -66,7 +66,7 @@
       "savedAt": 1779687305430,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779685579980-17zi8f95j",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v6",
       "fileCount": 4
     },
     {
@@ -74,7 +74,7 @@
       "savedAt": 1779691012773,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779687774467-9stwwju1y",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v7",
       "fileCount": 5
     },
     {
@@ -82,7 +82,7 @@
       "savedAt": 1779691050914,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779691016223-wxifjwnm6",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v8",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v8",
       "fileCount": 5
     },
     {
@@ -90,7 +90,7 @@
       "savedAt": 1779781455467,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779777977143-audpw3ck0",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v9",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v9",
       "fileCount": 5
     },
     {
@@ -98,7 +98,7 @@
       "savedAt": 1779785298718,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
       "sessionId": "session-1779781461510-h6jgitom3",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v10",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v10",
       "fileCount": 5
     },
     {
@@ -107,7 +107,7 @@
       "savedAt": 1782716791246,
       "savedBy": "qihao",
       "sessionId": "session-1782716476223-xffftcacx",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1779608458649/v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v11",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
     }

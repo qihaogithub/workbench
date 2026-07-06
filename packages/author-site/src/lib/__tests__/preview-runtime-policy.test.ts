@@ -5,7 +5,7 @@ import {
   PreviewRuntimeContractError,
   validatePreviewRuntimeContract,
 } from "../preview-dependency-policy";
-import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
+import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 
 describe("AI 页面预览运行时策略", () => {
   it("将 @preview/sdk 映射为受控虚拟模块", () => {

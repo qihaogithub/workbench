@@ -106,6 +106,7 @@ export interface PreviewPanelProps {
   visualEditMode?: boolean;
   visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
+  hiddenVisualNodeIds?: string[];
   visualPropertyChanges?: VisualPropertyChange[];
   visualAnnotations?: VisualAnnotation[];
   onVisualHover?: (node: VisualNodeInfo | null) => void;
@@ -175,6 +176,8 @@ export interface CanvasViewportState {
 export interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
+  pageGroups?: Record<string, CanvasPageGroup>;
+  hiddenPageIds?: string[];
   nodes?: Record<string, CanvasFreeNode>;
   layers?: CanvasLayersState;
   hiddenKnowledgeDocumentIds?: string[];
@@ -182,7 +185,10 @@ export interface CanvasState {
 
 export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
-export type CanvasPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+export type CanvasPageRuntimeType =
+  | "prototype-html-css"
+  | "high-fidelity-react"
+  | "sketch-scene";
 
 export interface CanvasPageData {
   id: string;
@@ -194,9 +200,29 @@ export interface CanvasPageData {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: Record<string, unknown>;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
   order: number;
+}
+
+export interface CanvasPageGroupEntry {
+  id: string;
+  pageId: string;
+  title: string;
+}
+
+export interface CanvasPageGroup {
+  id: string;
+  kind: "page-group";
+  title: string;
+  pages: CanvasPageGroupEntry[];
+  activePageId: string;
+  layout: CanvasPageLayout;
+  directoryCollapsed?: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface CanvasScreenshotState {
@@ -352,6 +378,7 @@ export interface PreviewCanvasProps {
   activePageId?: string;
   canvasState: CanvasState;
   onCanvasStateChange: (state: CanvasState) => void;
+  onRequestDeletePages?: (pageIds: string[]) => void | Promise<void>;
   onPageConfigEdit?: (pageId: string) => void;
   onRuntimeConversionRequest?: (
     pageId: string,

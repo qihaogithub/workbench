@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783319762991_0qlr5u",
+  "at": 1783319762991,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783319762990_q7xf40",
+  "inputSummary": {
+    "name": "E2E:20260706T063544420Z-o0luo2:手绘双引擎互开回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783319762990_q7xf40"
+    ]
+  }
+}

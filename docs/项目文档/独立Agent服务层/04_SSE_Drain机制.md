@@ -10,7 +10,7 @@
 
 ### 1.1 问题描述
 
-在 AI 编辑完成后，OpenCode Server 通过 SSE 推送事件流。存在一个关键的时序竞争问题：
+在 AI 编辑完成后，workbench Server 通过 SSE 推送事件流。存在一个关键的时序竞争问题：
 
 ```
 session.idle（AI 响应完成）
@@ -59,7 +59,7 @@ diffReceived === true?
 ### 2.2 状态字段
 
 ```typescript
-class OpenCodeHttpBackend {
+class workbenchHttpBackend {
   private idleReceived = false; // session.idle 是否已收到
   private diffReceived = false; // session.diff 是否已收到
   private drainTimer: NodeJS.Timeout | null = null; // drain 定时器
@@ -92,7 +92,7 @@ case "session.idle": {
     this.drainTimer = setTimeout(() => {
       this.drainTimer = null;
       this.resolveStream();
-    }, OpenCodeHttpBackend.DRAIN_TIMEOUT_MS);
+    }, workbenchHttpBackend.DRAIN_TIMEOUT_MS);
   }
   break;
 }
@@ -237,7 +237,7 @@ test("should resolve with empty files when drain times out", async () => {
 
 ### 4.3 向后兼容
 
-- 对旧版 OpenCode Server（不发送 `session.diff`）兼容：drain 超时后正常 resolve
+- 对旧版 workbench Server（不发送 `session.diff`）兼容：drain 超时后正常 resolve
 - 对非流式请求无影响：drain 机制仅在 SSE 连接中生效
 
 ---
@@ -246,8 +246,8 @@ test("should resolve with empty files when drain times out", async () => {
 
 | 文件                                                      | 说明              |
 | :-------------------------------------------------------- | :---------------- |
-| `packages/agent-service/src/backends/opencode-http.ts`    | drain 机制实现    |
-| `packages/agent-service/tests/unit/opencode-http.test.ts` | 时序测试覆盖      |
+| `packages/agent-service/src/backends/workbench-http.ts`    | drain 机制实现    |
+| `packages/agent-service/tests/unit/workbench-http.test.ts` | 时序测试覆盖      |
 | `packages/agent-service/src/core/backend-agent.ts`        | SSE-DIAG 日志清理 |
 
 ---

@@ -10,7 +10,7 @@ import {
 
 describe('parseFigmaMarkdown', () => {
   it('应正确解析标准 Markdown Code Block 格式', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Component Code
 
@@ -68,7 +68,7 @@ const hello = "world";
   })
 
   it('应处理缺失 Component Code 区块的情况', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Schema Config
 
@@ -83,7 +83,7 @@ const hello = "world";
   })
 
   it('应处理缺失 Schema Config 区块的情况', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Component Code
 
@@ -154,7 +154,7 @@ const hello = "world";
   })
 
   it('应处理带 JSDoc 注释的组件代码', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Component Code
 
@@ -220,7 +220,7 @@ export default function BannerDemo({ banner, title }: BannerDemoProps) {
   })
 
   it('应处理包含多个代码块的复杂内容（仅提取第一个）', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Component Code
 
@@ -289,7 +289,7 @@ export default function Demo() {
 
     const result = buildFigmaMarkdown(code, schema)
 
-    expect(result).toContain('# OpenCode Workbench Export')
+    expect(result).toContain('# Workbench Export')
     expect(result).toContain('## Component Code')
     expect(result).toContain('```tsx')
     expect(result).toContain('```json')
@@ -334,7 +334,7 @@ export default function Test({ name }: TestProps) {
 
 describe('isFigmaMarkdownFormat', () => {
   it('应识别标准 Markdown Code Block 格式', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Component Code
 
@@ -368,7 +368,7 @@ const x = 1;
   })
 
   it('应拒绝缺少 Component Code 区块的文本', () => {
-    const input = `# OpenCode Workbench Export
+    const input = `# Workbench Export
 
 ## Schema Config
 

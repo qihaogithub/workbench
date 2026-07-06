@@ -1,0 +1,33 @@
+{
+  "id": "commit_1783208375438_25pppw",
+  "projectId": "proj_1782718595285_h4lda7",
+  "parentCommitId": "commit_1783181410744_v5zrhr",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "打开历史前记录平板",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_71dt",
+      "versionId": "prv_1783173765224_kdj56s"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_omrf",
+      "versionId": "prv_1783208375429_ozilpu"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_omrf",
+      "fromVersionId": "prv_1783181410735_4at6e2",
+      "toVersionId": "prv_1783208375429_ozilpu"
+    }
+  ],
+  "createdAt": 1783208375438,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

@@ -12,11 +12,12 @@ import type {
   ProjectResourceKind,
   ResourceVersion,
   Project,
+  ProjectAuthoringPreferences,
   ProjectTemplateMeta,
   VersionInfo,
-} from "@opencode-workbench/shared/contracts";
+} from "@workbench/shared/contracts";
 
-export type { ProjectResourceKind } from "@opencode-workbench/shared/contracts";
+export type { ProjectResourceKind } from "@workbench/shared/contracts";
 
 export type ProjectAdminRole = "admin" | "creator" | "readonly";
 
@@ -122,6 +123,8 @@ export interface ProjectAdminConfig {
   maxBatchSize?: number;
 }
 
+export type { ProjectAuthoringPreferences };
+
 export interface ProjectSummary extends DemoMeta {
   description?: string;
   publishedVersion?: string;
@@ -163,6 +166,14 @@ export interface PageVersionCreateInput {
   editId?: string;
   sourceWorkspacePath?: string;
   note?: string;
+  sketchPatchSummary?: SketchPatchVersionSummary;
+}
+
+export interface SketchPatchVersionSummary {
+  operationCount: number;
+  hasBaseSceneKey: boolean;
+  currentNodeCount?: number;
+  targetNodeCount?: number;
 }
 
 export interface ResourceVersionHistory {
@@ -189,6 +200,7 @@ export interface ResourceVersionCreateInput {
   editId?: string;
   sourceWorkspacePath?: string;
   note?: string;
+  sketchPatchSummary?: SketchPatchVersionSummary;
   visibility?: ProjectCommit["visibility"];
   source?: ResourceVersion["source"];
 }
@@ -329,6 +341,100 @@ export interface AssetReplaceInput extends AssetUploadInput {
   oldPath: string;
 }
 
+export interface VerifySummary {
+  pages: number;
+  runtimeTypes: Record<string, number>;
+  projectConfig: {
+    exists: boolean;
+  };
+  assets: {
+    total: number;
+    totalBytes: number;
+    referenced: number;
+    unreferenced: number;
+  };
+  prototypePlaceholders: Array<{
+    pageId: string;
+    markers: string[];
+  }>;
+  metadataIssues: ValidationIssue[];
+  missingAssetReferences: Array<{
+    pageId: string;
+    reference: string;
+  }>;
+  runtimeIssues: RuntimeValidationIssue[];
+}
+
+export interface VisualCheckInput {
+  projectId: string;
+  pages?: string[];
+  viewport?: string;
+  checks?: string[];
+  outputDir: string;
+}
+
+export interface VisualCheckPageResult {
+  pageId: string;
+  runtimeType: DemoPageRuntimeType;
+  screenshotPath: string;
+  nonblank: boolean;
+  failedRequests: string[];
+  consoleErrors: string[];
+  issues: ValidationIssue[];
+}
+
+export interface VisualCheckResult {
+  projectId: string;
+  viewport: string;
+  checks: string[];
+  outputDir: string;
+  reportPath: string;
+  pages: VisualCheckPageResult[];
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    screenshots: number;
+    failedRequests: number;
+    consoleErrors: number;
+  };
+}
+
+export interface AgentRunReportInput {
+  projectId?: string;
+  editId?: string;
+  versionId?: string;
+  auditId?: string;
+  visualReportPath?: string;
+}
+
+export interface AgentRunReport {
+  projectId?: string;
+  projectName?: string;
+  editId?: string;
+  versionId?: string;
+  auditId?: string;
+  diffSummary?: DiffSummary;
+  validationSummary?: {
+    ok: boolean;
+    issues: number;
+    blocking: number;
+    warnings: number;
+  };
+  visualCheckSummary?: {
+    reportPath: string;
+  };
+  artifacts: Array<{
+    kind: string;
+    path?: string;
+    id?: string;
+  }>;
+  rollback: {
+    restoreCommand?: string;
+    projectGetCommand?: string;
+  };
+}
+
 export interface CapabilitySummary {
   actor: ProjectAdminActor;
   mode: "cli" | "local" | "readonly";
@@ -410,6 +516,7 @@ export interface CreateProjectInput {
   category?: string;
   templateId?: string;
   description?: string;
+  authoringPreferences?: ProjectAuthoringPreferences;
   dryRun?: boolean;
 }
 
@@ -418,6 +525,7 @@ export interface UpdateProjectInput {
   name?: string;
   category?: string;
   description?: string;
+  authoringPreferences?: ProjectAuthoringPreferences;
   dryRun?: boolean;
 }
 
@@ -434,6 +542,8 @@ export interface PageCreateInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
   dryRun?: boolean;
 }
 
@@ -455,6 +565,8 @@ export interface PageUpdatePrototypeInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
   dryRun?: boolean;
 }
 
@@ -467,6 +579,8 @@ export interface PageSwitchRuntimeInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
   reason?: string;
   dryRun?: boolean;
 }

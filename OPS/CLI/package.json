@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/cli-tools",
+  "name": "@workbench/cli-tools",
   "version": "1.0.0",
   "description": "CLI 测试工具 - 用于脱离 Web 端测试 AI 相关功能",
   "main": "dist/index.js",

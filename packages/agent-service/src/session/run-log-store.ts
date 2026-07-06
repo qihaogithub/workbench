@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@opencode-workbench/shared';
+import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@workbench/shared';
 
 import { AgentError, AgentEvent, AgentResult } from '../core/types';
 import { logger } from '../utils/logger';

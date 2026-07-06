@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783209135418_j4g8et",
+  "at": 1783209135418,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_25_outside_browser_guide",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:worldcup_25_outside_browser_guide:prv_1783209135415_h0pvs8"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

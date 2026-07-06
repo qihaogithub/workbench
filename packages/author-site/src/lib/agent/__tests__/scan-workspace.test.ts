@@ -40,6 +40,32 @@ describe('scanWorkspaceContext', () => {
     return pageDir;
   }
 
+  function createSketchPage(id: string) {
+    const pageDir = path.join(tmpDir, 'demos', id);
+    fs.mkdirSync(pageDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pageDir, 'sketch.scene.json'),
+      JSON.stringify({ version: 1, pageSize: { width: 390, height: 844 }, nodes: [] }),
+    );
+    fs.writeFileSync(path.join(pageDir, 'config.schema.json'), '{}');
+    fs.writeFileSync(
+      path.join(tmpDir, 'workspace-tree.json'),
+      JSON.stringify({
+        folders: [],
+        pages: [
+          {
+            id,
+            name: '手绘页面',
+            runtimeType: 'sketch-scene',
+            order: 0,
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    return pageDir;
+  }
+
   function normalizeSeparators(value: string): string {
     return value.replace(/\\/g, '/');
   }
@@ -152,6 +178,18 @@ describe('scanWorkspaceContext', () => {
     expect(pageList).toContain('data-bind-text="title"');
     expect(pageList).toContain('.hero { color: red; }');
     expect(pageList).toContain('"title"');
+  });
+
+  it('默认不把手绘页面暴露给 AI 工作区上下文', () => {
+    createSketchPage('sketch_a');
+
+    const ctx = scanWorkspaceContext(tmpDir);
+
+    expect(ctx.pageCount).toBe(0);
+    expect(ctx.pageList).toBe('（暂无页面）');
+    expect(ctx.pageList).not.toContain('sketch-scene');
+    expect(ctx.pageList).not.toContain('sketch.scene.json');
+    expect(ctx.pageList).not.toContain('手绘页面');
   });
 
   it('页面数 > 2 时，pageList 不包含文件内容（避免 L3 过大）', () => {

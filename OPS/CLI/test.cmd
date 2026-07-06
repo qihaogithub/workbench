@@ -16,7 +16,7 @@ if %errorlevel% neq 0 (
     echo ⚠ Agent Service 未运行
     echo.
     echo 请先启动 Agent Service:
-    echo   cd E:\重要文件\Programming\1_Work\opencode工作台
+    echo   cd E:\重要文件\Programming\1_Work\workbench工作台
     echo   pnpm dev:agent
     echo.
     pause

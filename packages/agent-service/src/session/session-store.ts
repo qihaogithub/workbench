@@ -1,5 +1,5 @@
 import { AgentConfig, AgentStatus } from '../core/types';
-import type { WorkspaceMeta } from '@opencode-workbench/shared/contracts';
+import type { WorkspaceMeta } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
 /** 会话过期时间，与 author-site SESSION_EXPIRY_MS 对齐 */

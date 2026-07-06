@@ -36,7 +36,7 @@ import type {
   ExternalAuthRequiredDetails,
   ExternalAuthStartResponse,
   ExternalAuthStatusResponse,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 import {
   Collapsible,
   CollapsibleContent,

@@ -56,6 +56,7 @@ export class AgentClient {
     content: string,
     options?: {
       demoId?: string;
+      projectId?: string;
       workingDir?: string;
       customWorkspace?: boolean;
       model?: string;
@@ -67,6 +68,7 @@ export class AgentClient {
       method: "POST",
       body: JSON.stringify({
         content,
+        projectId: options?.projectId,
         demoId: options?.demoId,
         workingDir: options?.workingDir,
         customWorkspace: options?.customWorkspace,
@@ -354,6 +356,7 @@ export class AgentStream {
         id: id || `msg-${Date.now()}`,
         content,
         workingDir: options?.workingDir,
+        projectId: options?.projectId,
         demoId: options?.demoId,
         model: options?.model,
         images: options?.images,

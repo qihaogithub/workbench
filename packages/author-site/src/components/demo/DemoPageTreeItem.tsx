@@ -5,7 +5,7 @@ import type {
   DemoPageMeta,
   DemoFolderMeta,
   DemoPageRuntimeType,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
@@ -357,9 +357,9 @@ function PageContextMenu({
 }) {
   const moveTargets = folders.filter((f) => f.id !== pageParentId);
   const isPrototype = runtimeType === "prototype-html-css";
-  const targetRuntimeType: DemoPageRuntimeType = isPrototype
-    ? "high-fidelity-react"
-    : "prototype-html-css";
+  const isSketch = runtimeType === "sketch-scene";
+  const targetRuntimeType: DemoPageRuntimeType =
+    isPrototype || isSketch ? "high-fidelity-react" : "prototype-html-css";
 
   return (
     <DropdownMenu>
@@ -413,7 +413,7 @@ function PageContextMenu({
             }
           >
             <Bot className="mr-2 h-4 w-4" />
-            {isPrototype ? "AI 转高保真页" : "AI 转 HTML/CSS 原型"}
+            {isPrototype || isSketch ? "AI 转高保真页" : "AI 转 HTML/CSS 原型"}
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

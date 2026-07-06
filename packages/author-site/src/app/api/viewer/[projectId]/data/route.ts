@@ -40,6 +40,8 @@ export async function GET(
       const prototypeHtmlPath = path.join(demoDir, "prototype.html");
       const prototypeCssPath = path.join(demoDir, "prototype.css");
       const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+      const sketchScenePath = path.join(demoDir, "sketch.scene.json");
+      const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
 
       let code = "";
       let schema: string | undefined;
@@ -47,6 +49,8 @@ export async function GET(
       let prototypeHtml: string | undefined;
       let prototypeCss: string | undefined;
       let prototypeMeta: Record<string, unknown> | undefined;
+      let sketchScene: Record<string, unknown> | undefined;
+      let sketchMeta: Record<string, unknown> | undefined;
 
       if (fs.existsSync(codePath)) {
         code = fs.readFileSync(codePath, "utf-8");
@@ -68,6 +72,20 @@ export async function GET(
           prototypeMeta = undefined;
         }
       }
+      if (fs.existsSync(sketchScenePath)) {
+        try {
+          sketchScene = JSON.parse(fs.readFileSync(sketchScenePath, "utf-8")) as Record<string, unknown>;
+        } catch {
+          sketchScene = undefined;
+        }
+      }
+      if (fs.existsSync(sketchMetaPath)) {
+        try {
+          sketchMeta = JSON.parse(fs.readFileSync(sketchMetaPath, "utf-8")) as Record<string, unknown>;
+        } catch {
+          sketchMeta = undefined;
+        }
+      }
 
       return {
         ...page,
@@ -77,6 +95,8 @@ export async function GET(
         prototypeHtml,
         prototypeCss,
         prototypeMeta,
+        sketchScene,
+        sketchMeta,
       };
     });
 

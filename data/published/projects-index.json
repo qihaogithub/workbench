@@ -1,11 +1,18 @@
 {
   "projects": [
     {
+      "id": "proj_1783042627508_t1czw2",
+      "name": "伴读广告页面",
+      "publishedAt": 1783325642737,
+      "publishedVersion": "v16",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1782718595285_h4lda7",
       "name": "我的页面",
       "description": "资源预览",
-      "publishedAt": 1783157047555,
-      "publishedVersion": "v8",
+      "publishedAt": 1783325026622,
+      "publishedVersion": "v13",
       "demoCount": 2
     },
     {
@@ -14,21 +21,6 @@
       "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
       "publishedAt": 1783123336299,
       "publishedVersion": "v10",
-      "demoCount": 2
-    },
-    {
-      "id": "proj_1783042627508_t1czw2",
-      "name": "伴读广告页面",
-      "publishedAt": 1783050200018,
-      "publishedVersion": "v12",
-      "demoCount": 2
-    },
-    {
-      "id": "proj_1779608460375",
-      "name": "我的页面",
-      "thumbnail": "/data/proj_1779608460375/thumbnail.png",
-      "publishedAt": 1782830809395,
-      "publishedVersion": "v14",
       "demoCount": 2
     },
     {
@@ -44,15 +36,7 @@
       "publishedAt": 1780063578252,
       "publishedVersion": "v10",
       "demoCount": 2
-    },
-    {
-      "id": "proj_1776526720347",
-      "name": "配置项示例",
-      "thumbnail": "/data/proj_1776526720347/thumbnail.png",
-      "publishedAt": 1780063481520,
-      "publishedVersion": "v50",
-      "demoCount": 2
     }
   ],
-  "generatedAt": 1783157047563
+  "generatedAt": 1783344993727
 }

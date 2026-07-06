@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783300789885_0x72nc",
+  "at": 1783300789885,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783300789877_lcvs68",
+  "inputSummary": {
+    "name": "E2E:20260706T011940098Z-9xc1iq:OpenPencil 创作端接入回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783300789877_lcvs68"
+    ]
+  }
+}

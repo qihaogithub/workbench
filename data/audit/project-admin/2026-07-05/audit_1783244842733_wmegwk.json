@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783244842733_wmegwk",
+  "at": 1783244842733,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_16_draw_plush",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_16_draw_plush:prototypeHtml",
+      "page:worldcup_16_draw_plush:prototypeCss",
+      "page:worldcup_16_draw_plush:prototypeMeta"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "projectId": "proj_1783185620923_o5e6rr",
+  "commitId": "commit_1783349279780_2qgjak",
+  "materializerVersion": "project-core-content-graph-v1",
+  "resources": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_08_prize_drawer_empty",
+      "versionId": "prv_1783349279773_s9mwtk",
+      "contentHash": "d38340744c197c6a573d43281cfe4ad55e231a7436b6e90feec673924e0b5e1e",
+      "blobRefs": [
+        "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+        "bf9afb98147d9324586b5bcf1db82d951145a22bc24a37380a5462179c6ea854",
+        "01713cb61a92e949d57850de2f4cd761c98cc701fdaae3f7aa8d07de9d759685",
+        "87fb0ba60f33b4126f88f6dee3b6e6479e0ace671501c02f7121aaf0e8abc834"
+      ]
+    }
+  ],
+  "updatedAt": 1783349279836
+}

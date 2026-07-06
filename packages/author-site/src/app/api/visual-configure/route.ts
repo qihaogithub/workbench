@@ -6,7 +6,7 @@ import {
   type VisualConfigTarget,
 } from "@/lib/visual-configurator";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
-import type { VisualNodeInfo } from "@opencode-workbench/demo-ui";
+import type { VisualNodeInfo } from "@workbench/demo-ui";
 
 export async function POST(request: NextRequest) {
   try {

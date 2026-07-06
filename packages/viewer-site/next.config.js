@@ -11,7 +11,12 @@ const nextConfig = {
       process.env.PREVIEW_SHELL_MODE ||
       (process.env.NODE_ENV === "production" ? "inline" : "fixed"),
   },
-  transpilePackages: ["@opencode-workbench/shared", "@opencode-workbench/demo-ui"],
+  transpilePackages: [
+    "@workbench/demo-ui",
+    "@workbench/sketch-core",
+    "@workbench/sketch-react",
+    "@workbench/shared",
+  ],
   images: {
     unoptimized: true,
   },

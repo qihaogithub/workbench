@@ -3,7 +3,7 @@ import {
   useCanvasDocumentMarkdown,
   type CanvasDocumentNode,
   type CanvasKnowledgeDocument,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 const document: CanvasKnowledgeDocument = {
   id: "doc-1",

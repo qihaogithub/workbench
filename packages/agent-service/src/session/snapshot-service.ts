@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import type { SnapshotInfo, CompareResult, FileChangeInfo } from '@opencode-workbench/shared/contracts';
+import type { SnapshotInfo, CompareResult, FileChangeInfo } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
-const SNAPSHOT_DIR = '.opencode-snapshot';
+const SNAPSHOT_DIR = '.workbench-snapshot';
 
 interface SnapshotData {
   files: Map<string, { content: string; mtime: number }>;
@@ -81,7 +81,7 @@ export class SnapshotService {
         continue;
       }
 
-      if (entry.name === 'node_modules' || entry.name === 'opencode.json') {
+      if (entry.name === 'node_modules' || entry.name === 'workbench.json') {
         continue;
       }
 
@@ -185,7 +185,7 @@ export class SnapshotService {
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       if (entry.name.startsWith('.') && entry.name !== '.session.json') continue;
-      if (entry.name === 'opencode.json') continue;
+      if (entry.name === 'workbench.json') continue;
 
       const fullPath = path.join(entry.parentPath || entry.path, entry.name);
       const relativePath = path.relative(workingDir, fullPath);

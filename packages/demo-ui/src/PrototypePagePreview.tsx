@@ -6,7 +6,7 @@ import {
   buildPrototypePreviewHtmlFragment,
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 import { cn } from "./utils";
 import { computePreviewScale } from "./preview-scale";
 import type {
@@ -20,6 +20,8 @@ export interface PrototypePagePreviewProps {
   html?: string;
   css?: string;
   configData?: Record<string, unknown>;
+  sessionId?: string;
+  demoId?: string;
   previewSize?: PreviewSize;
   fillContainer?: boolean;
   effectiveHeight?: number;
@@ -27,6 +29,7 @@ export interface PrototypePagePreviewProps {
   visualEditMode?: boolean;
   visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
+  hiddenVisualNodeIds?: string[];
   visualPropertyChanges?: VisualPropertyChange[];
   onVisualHover?: (node: VisualNodeInfo | null) => void;
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
@@ -242,6 +245,8 @@ export function PrototypePagePreview({
   html = "",
   css = "",
   configData = {},
+  sessionId,
+  demoId,
   previewSize,
   fillContainer = false,
   effectiveHeight,
@@ -249,6 +254,7 @@ export function PrototypePagePreview({
   visualEditMode = false,
   visualHoverNodeId,
   selectedVisualNodeId,
+  hiddenVisualNodeIds = [],
   visualPropertyChanges = [],
   onVisualHover,
   onVisualSelect,
@@ -317,17 +323,25 @@ export function PrototypePagePreview({
     if (!host) return;
     const shadow = shadowRef.current ?? host.attachShadow({ mode: "open" });
     shadowRef.current = shadow;
+    const assetRewrite = sessionId && demoId
+      ? {
+          sessionId,
+          demoId,
+          origin: window.location.origin,
+        }
+      : undefined;
     shadow.innerHTML = buildPrototypePreviewHtmlFragment({
       html,
       css,
       configData,
+      assetRewrite,
       previewSize: shouldScaleToPreviewSize
         ? { width: designWidth, height: designHeight }
         : undefined,
     });
     const root = shadow.querySelector(".prototype-root");
     if (root) {
-      applyPrototypeBindings(root, configData);
+      applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
     }
   }, [
@@ -335,7 +349,9 @@ export function PrototypePagePreview({
     css,
     designHeight,
     designWidth,
+    demoId,
     html,
+    sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,
   ]);
@@ -364,6 +380,26 @@ export function PrototypePagePreview({
     const hovered = getElementByVisualId(root, visualHoverNodeId) || queryByDomPath(root, visualHoverNodeId);
     hovered?.setAttribute("data-prototype-hovered", "true");
   }, [selectedVisualNodeId, visualHoverNodeId]);
+
+  useEffect(() => {
+    const shadow = shadowRef.current;
+    if (!shadow) return;
+    shadow.querySelectorAll("[data-prototype-hidden]").forEach((element) => {
+      if (element instanceof HTMLElement) {
+        element.style.removeProperty("display");
+      }
+      element.removeAttribute("data-prototype-hidden");
+    });
+    const root = shadow.querySelector<HTMLElement>(".prototype-root");
+    if (!root) return;
+    hiddenVisualNodeIds.forEach((nodeId) => {
+      const element =
+        getElementByVisualId(root, nodeId) || queryByDomPath(root, nodeId);
+      if (!element) return;
+      element.setAttribute("data-prototype-hidden", "true");
+      element.style.setProperty("display", "none", "important");
+    });
+  }, [configData, css, hiddenVisualNodeIds, html, visualPropertyChanges]);
 
   useEffect(() => {
     const shadow = shadowRef.current;

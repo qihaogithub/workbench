@@ -1,6 +1,6 @@
 # Project Admin CLI 故障排查
 
-> 更新日期：2026-06-25
+> 更新日期：2026-07-05
 
 本文补充 [Project Admin CLI 使用指南](./Project-Admin-CLI使用指南.md) 中的异常处理场景。
 
@@ -19,8 +19,21 @@
 ## 本地项目包校验失败
 
 - 运行 `ow validate --json`，只根据 `validation.issues` 修复 blocking 级问题。
-- 缺少 `.opencode/sync-state.json` 时，重新运行 `ow project pull <projectId> <dir> --force --json`。
+- 缺少 `.workbench/sync-state.json` 时，重新运行 `ow project pull <projectId> <dir> --force --json`。
 - 页面入口、页面 Schema 或项目级 Schema 缺失时，先恢复对应文件，再运行 `ow diff --json`。
+- 如果只是想快速判断改动规模，运行 `ow diff --summary --json`。
+
+## 输入内容被误判
+
+- 运行 `ow help input --json` 查看当前输入契约。
+- `@file` 只有在参数整体形如 `@/abs/path`、`@./rel/path` 或 `@../rel/path` 时才展开。
+- CSS `@media`、`@supports`、`@keyframes`、`@font-face` 等 at-rule 会作为普通内容处理；如果仍然失败，优先改用 `--input-json @./args.json`。
+
+## 批量命令部分失败
+
+- `asset upload-dir` 和 `page update-prototypes` 不会静默吞掉失败项。
+- 先查看 JSON 中的 `failed`、`warnings` 和 `resumeCommand`。
+- 对 `project import-prototype`，先记录返回的 `editId` 和失败阶段，再按 `nextActions` 运行 `edit verify`、`edit diff --summary` 或 resume 命令。
 
 ## 提交冲突
 
@@ -36,6 +49,9 @@
 - 调用 `ow preview healthcheck --json` 查看 screenshot-service 是否可用。
 - 如果 screenshot-service 不可用，先启动 `pnpm dev:screenshot`。
 - 如果页面 Schema 报错，先运行配置校验相关命令或 `ow validate --json`。
+- `ow project visual-check --json` 会生成离线检查报告和 SVG 截图工件。它用于代理证据链，不等同于 author-site/screenshot-service 的浏览器级正式截图。
+- `visual-check` 报 `VISUAL_BLANK_PAGE` 时，先检查页面是否只有透明 GIF、空图片、截图占位或极少文本。
+- `VISUAL_ASSET_MISSING` 表示页面引用了工作区不存在的 `assets/...` 资源，先运行 `ow project verify <projectId> --json` 或 `ow edit verify <editId> --checks assets --json`。
 
 ## 发布失败
 

@@ -1,10 +1,10 @@
-# AGENTS.md — @opencode-workbench/project-cli
+# AGENTS.md — @workbench/project-cli
 
 > 本文件为 AI 编码代理提供在 Project CLI 包中工作的指南。进入本包前仍需先阅读根目录 `AGENTS.md`。
 
 ## 包定位
 
-`@opencode-workbench/project-cli` 是创作端项目管理的本地 CLI 入口，面向 Codex、Claude Code、Cursor Agent 等编码代理。它直接调用 `@opencode-workbench/project-core`。
+`@workbench/project-cli` 是创作端项目管理的本地 CLI 入口，面向 Codex、Claude Code、Cursor Agent 等编码代理。它直接调用 `@workbench/project-core`。
 
 ## 关键目录
 
@@ -35,6 +35,6 @@ pnpm check:project-cli
 更小范围验证：
 
 ```bash
-pnpm --filter @opencode-workbench/project-cli typecheck
-pnpm --filter @opencode-workbench/project-cli test
+pnpm --filter @workbench/project-cli typecheck
+pnpm --filter @workbench/project-cli test
 ```

@@ -1,5 +1,5 @@
-import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@opencode-workbench/preview-contract/runtime';
-import { compilePreviewPageSource } from '@opencode-workbench/preview-contract/compiler';
+import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workbench/preview-contract/runtime';
+import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
 
 type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
 type PrototypeGateDecision =

@@ -5,6 +5,7 @@
 - 重新打开项目后旧内容复原
 - AI 已修复但页面再次报同一错误
 - 自动保存显示成功但项目当前态不一致
+- 手绘保存无法判断是增量 patch 还是全量草稿 fallback
 - 协同快照覆盖磁盘文件
 - 预览异常自动修复反复触发
 - 诊断导出包缺字段、缺事件或无法定位根因
@@ -40,7 +41,7 @@ corepack pnpm diagnostics:operation -- --operation <operationId>
 需要异步复盘时导出摘要包：
 
 ```bash
-corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /tmp/opencode-diagnostics-export.json
+corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /tmp/workbench-diagnostics-export.json
 ```
 
 ## 先判断
@@ -51,6 +52,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /
 | 打开项目链路 | `project.opened`、`session.created/reused`、`workspace.bound` |
 | 协同是否覆盖 | `collab.snapshot_received`、`snapshot.apply`、外部文件变更命中或遗漏 |
 | 保存是否落盘 | `autosave.flush_*`、`persist-workspace`、退出前保存结果 |
+| 手绘保存走 patch 还是 fallback | `page.sketch_patch_validated`、`page.sketch_patch_rejected`、`page.openpencil_full_draft_fallback`；查看 payload 的 `targetSource` 区分 `server_patch` 回放和兼容 `client_scene` 校验 |
 | AI 是否改写 | `ai.run_started`、工具调用摘要、文件变更、`ai.run_finished` |
 | 预览错误来源 | `preview.error`、`post_generation_validation`、iframe runtime 或自动修复事件 |
 
@@ -69,6 +71,8 @@ rg -n "<projectId>|<editorSessionId>|<pageId>|<traceId>" data/editor-diagnostics
 - 前端只记录了浏览器内存态，重新打开后自动修复计数或临时状态丢失。
 - agent-service 活跃协同房间未收到外部文件变更，旧 Y.Doc 重新成为前端权威值。
 - 自动保存 flush 成功但项目当前 workspace 未完成持久化。
+- OpenPencil patch-only 保存成功但诊断 payload 缺少 `targetSource=server_patch`，说明诊断白名单或写入链路没有保留目标来源，无法判断服务端是否真的从 patch 回放生成最终 scene。
+- OpenPencil dirty-state 缺少可验证 patch，保存成功但走 `page.openpencil_full_draft_fallback`，后续需要结合页面版本、协同和 patch 生成链路判断是否可收敛到增量保存。
 - 预览 fast gate 返回结构化错误，但自动修复或诊断导出没有带上稳定 hash、pageId 或 traceId。
 - SQLite 事件库不可用时，CLI fallback 没有明确标记数据缺口。
 
@@ -89,7 +93,7 @@ rg -n "<projectId>|<editorSessionId>|<pageId>|<traceId>" data/editor-diagnostics
 | 修复类型 | 验证 |
 |:---------|:-----|
 | CLI 或自动任务文档 | `corepack pnpm check:automation` |
-| author-site 诊断写入 | `corepack pnpm --filter @opencode-workbench/author-site typecheck` 和相关 Jest |
+| author-site 诊断写入 | `corepack pnpm --filter @workbench/author-site typecheck` 和相关 Jest |
 | agent-service run log | `corepack pnpm check:agent` 或定向 Vitest |
 | 项目 runtime 状态 | `node packages/project-cli/bin/ow.mjs project validate-runtime <projectId> --json` |
 

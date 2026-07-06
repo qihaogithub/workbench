@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ProjectAdminService, type ProjectResourceKind } from "@opencode-workbench/project-core";
+import {
+  ProjectAdminService,
+  type ProjectResourceKind,
+  type SketchPatchVersionSummary,
+} from "@workbench/project-core";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -33,6 +37,36 @@ function normalizeKind(kind: string): ProjectResourceKind | null {
 
 function projectService() {
   return new ProjectAdminService({ dataDir: getDataDir() });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseSketchPatchSummary(value: unknown): SketchPatchVersionSummary | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const operationCount = value.operationCount;
+  const hasBaseSceneKey = value.hasBaseSceneKey;
+  if (
+    typeof operationCount !== "number" ||
+    !Number.isInteger(operationCount) ||
+    operationCount < 0 ||
+    typeof hasBaseSceneKey !== "boolean"
+  ) {
+    return null;
+  }
+  const summary: SketchPatchVersionSummary = {
+    operationCount,
+    hasBaseSceneKey,
+  };
+  if (typeof value.currentNodeCount === "number" && Number.isInteger(value.currentNodeCount)) {
+    summary.currentNodeCount = value.currentNodeCount;
+  }
+  if (typeof value.targetNodeCount === "number" && Number.isInteger(value.targetNodeCount)) {
+    summary.targetNodeCount = value.targetNodeCount;
+  }
+  return summary;
 }
 
 export async function GET(
@@ -82,7 +116,19 @@ export async function POST(
   if (!kind) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "资源类型不合法"), { status: 400 });
   }
-  const body = await request.json().catch(() => ({})) as { note?: string; editId?: string; sessionId?: string };
+  const body = await request.json().catch(() => ({})) as {
+    note?: string;
+    editId?: string;
+    sessionId?: string;
+    sketchPatchSummary?: unknown;
+  };
+  const sketchPatchSummary = parseSketchPatchSummary(body.sketchPatchSummary);
+  if (sketchPatchSummary === null) {
+    return NextResponse.json(
+      createApiError("INVALID_REQUEST", "sketchPatchSummary 格式不合法"),
+      { status: 400 },
+    );
+  }
   let sourceWorkspacePath: string | undefined;
   if (kind === "page" && body.sessionId) {
     if (!sessionExists(body.sessionId)) {
@@ -110,6 +156,7 @@ export async function POST(
       editId: body.editId,
       sourceWorkspacePath,
       note: body.note,
+      sketchPatchSummary,
     },
     {
       id: payload.userId,

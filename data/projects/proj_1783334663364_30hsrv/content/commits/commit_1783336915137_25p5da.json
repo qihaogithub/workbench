@@ -1,0 +1,28 @@
+{
+  "id": "commit_1783336915137_25p5da",
+  "projectId": "proj_1783334663364_30hsrv",
+  "parentCommitId": "commit_1783335923635_qu79h7",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "持续编辑自动记录品牌展示页",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "product-showcase_a3f2",
+      "versionId": "prv_1783336915041_ertlmw"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "product-showcase_a3f2",
+      "fromVersionId": "prv_1783335923587_0t33q6",
+      "toVersionId": "prv_1783336915041_ertlmw"
+    }
+  ],
+  "createdAt": 1783336915137,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

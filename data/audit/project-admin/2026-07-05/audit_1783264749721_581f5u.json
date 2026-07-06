@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783264749721_581f5u",
+  "at": 1783264749721,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_02_active_no_vote",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:worldcup_02_active_no_vote:prv_1783264749717_3c8w8t"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

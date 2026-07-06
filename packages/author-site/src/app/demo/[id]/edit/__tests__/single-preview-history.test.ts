@@ -1,4 +1,4 @@
-import type { CanvasDocumentNode } from "@opencode-workbench/demo-ui/types";
+import type { CanvasDocumentNode } from "@workbench/demo-ui/types";
 
 import {
   resolveSinglePreviewResourceHistoryTarget,

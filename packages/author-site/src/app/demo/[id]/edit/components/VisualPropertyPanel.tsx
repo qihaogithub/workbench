@@ -57,7 +57,7 @@ import {
   type VisualNodeInfo,
   type VisualPropertyChange,
   type VisualPropertyChangeKind,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 import type { VisualConfigMark } from "../hooks/useVisualEditState";
 
 interface VisualPropertyPanelProps {
@@ -293,16 +293,43 @@ function normalizeHexColor(value: string): string | null {
     .toUpperCase()}`;
 }
 
+function parseColorBrightnessValue(value: string): { hex: string; brightness: string } | null {
+  const match = value
+    .trim()
+    .match(/^color-mix\(\s*in\s+srgb\s*,\s*(#[0-9a-f]{3,6})\s+([0-9.]+)%\s*,\s*black\s*\)$/i);
+  if (!match) return null;
+  const hex = normalizeHexColor(match[1]);
+  const brightness = Math.round(Number(match[2]));
+  if (!hex || !Number.isFinite(brightness)) return null;
+  return {
+    hex,
+    brightness: String(Math.max(0, Math.min(100, brightness))),
+  };
+}
+
+function getColorControlValue(value: string): { hex: string; hexText: string; brightness: string } {
+  const mixed = parseColorBrightnessValue(value);
+  const normalizedHex = mixed?.hex ?? normalizeHexColor(value);
+  const hex = normalizedHex ?? "#000000";
+  return {
+    hex,
+    hexText: normalizedHex ? normalizedHex.slice(1) : value,
+    brightness: mixed?.brightness ?? "100",
+  };
+}
+
+function buildColorBrightnessValue(hexValue: string, brightnessValue: string): string {
+  const hex = normalizeHexColor(hexValue);
+  if (!hex) return hexValue;
+  const brightnessNumber = Number(brightnessValue.replace("%", "").trim());
+  if (!Number.isFinite(brightnessNumber)) return hex;
+  const brightness = Math.max(0, Math.min(100, Math.round(brightnessNumber)));
+  if (brightness >= 100) return hex;
+  return `color-mix(in srgb, ${hex} ${brightness}%, black)`;
+}
+
 function colorToHex(value: string): string {
-  return normalizeHexColor(value) ?? "#000000";
-}
-
-function formatColorInputValue(value: string): string {
-  return normalizeHexColor(value) ?? value;
-}
-
-function normalizeColorInputValue(value: string): string {
-  return normalizeHexColor(value) ?? value;
+  return parseColorBrightnessValue(value)?.hex ?? normalizeHexColor(value) ?? "#000000";
 }
 
 function isTransparentColor(value: string): boolean {
@@ -764,6 +791,128 @@ export function VisualPropertyPanel({
     );
   };
 
+  const renderColorControl = (
+    spec: Pick<PropertySpec, "property" | "label" | "kind">,
+    value: string,
+    previousValue?: string,
+  ) => {
+    const color = getColorControlValue(value);
+    const applyColorValue = (hexValue: string, brightnessValue: string) => {
+      onPropertyChange(
+        selectedNode,
+        spec.property,
+        spec.label,
+        buildColorBrightnessValue(hexValue, brightnessValue),
+        spec.kind,
+        previousValue,
+      );
+    };
+
+    return (
+      <div className="grid grid-cols-[32px_minmax(0,1fr)_72px] gap-2">
+        <Input
+          type="color"
+          aria-label={`${spec.label}色值`}
+          value={color.hex}
+          className="h-8 cursor-pointer p-1"
+          onChange={(event) => applyColorValue(event.target.value, color.brightness)}
+        />
+        <Input
+          value={color.hexText}
+          aria-label={`${spec.label}Hex`}
+          className="h-8 font-mono text-xs"
+          onChange={(event) => applyColorValue(event.target.value, color.brightness)}
+        />
+        <div className="relative">
+          <Input
+            value={color.brightness}
+            aria-label={`${spec.label}明度`}
+            inputMode="numeric"
+            className="h-8 pr-6 font-mono text-xs"
+            onChange={(event) => applyColorValue(color.hex, event.target.value)}
+          />
+          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+            %
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPositionSection = () => {
+    const renderPositionField = (
+      spec: PropertySpec,
+      shortLabel: "X" | "Y" | "W" | "H",
+    ) => {
+      const changeId = getChangeId(selectedNode, spec.property, spec.kind);
+      const currentValue = getCurrentValue(selectedNode, spec);
+      const change = propertyChanges.find((item) => item.id === changeId);
+      const value = change?.value ?? currentValue;
+      const controlValue = getDisplayValue(value, spec);
+      const editable = spec.input !== "readonly";
+
+      return (
+        <div
+          key={`${spec.kind}-${spec.property}`}
+          className="relative min-w-0"
+        >
+          <div className="absolute left-2 top-1/2 z-10 flex -translate-y-1/2 items-center">
+            {renderConfigMarkLabel(
+              spec,
+              value,
+              "px-1 py-0 text-xs font-semibold text-foreground hover:bg-primary/10",
+              shortLabel,
+            )}
+          </div>
+          <Input
+            value={controlValue}
+            readOnly={!editable}
+            className={cn(
+              "h-9 pl-9 pr-8 font-mono text-xs",
+              !editable ? "text-muted-foreground" : "",
+            )}
+            onChange={(event) => {
+              if (!editable) return;
+              onPropertyChange(
+                selectedNode,
+                spec.property,
+                spec.label,
+                event.target.value,
+                spec.kind,
+                currentValue || undefined,
+              );
+            }}
+          />
+          {spec.unit && (
+            <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+              {spec.unit}
+            </span>
+          )}
+        </div>
+      );
+    };
+    const specByProperty = new Map(POSITION_SPECS.map((spec) => [spec.property, spec]));
+
+    return (
+      <section key="位置" className="border-b bg-card">
+        <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground">
+          {getGroupIcon("位置")}
+          位置
+        </div>
+        <div className="space-y-2 px-3 pb-3">
+          <div className="grid grid-cols-2 gap-2">
+            {renderPositionField(specByProperty.get("x")!, "X")}
+            {renderPositionField(specByProperty.get("y")!, "Y")}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {renderPositionField(specByProperty.get("width")!, "W")}
+            {renderPositionField(specByProperty.get("height")!, "H")}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderConfigMarkDialog = () => {
     const mark = editingConfigMark;
     const hasConflict = mark ? usedConfigKeys.includes(mark.fieldKey.trim()) : false;
@@ -936,6 +1085,29 @@ export function VisualPropertyPanel({
       ["center", "flex-end"],
       ["flex-end", "flex-end"],
     ] as const;
+    const renderSizeControl = (
+      property: "width" | "height",
+      label: "宽度" | "高度",
+      shortLabel: "W" | "H",
+    ) => (
+      <div className="grid min-w-0 grid-cols-[22px_minmax(0,1fr)_44px] items-center rounded-md border bg-muted/30">
+        <span className="pl-2 text-xs font-semibold text-foreground">{shortLabel}</span>
+        <Input
+          value={getStyleNumberValue(property)}
+          aria-label={`布局${label}`}
+          className="h-8 border-0 bg-transparent px-2 font-mono text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
+          onChange={(event) => applyStyleValue(property, label, event.target.value)}
+        />
+        <button
+          type="button"
+          aria-label={`${label}填充`}
+          className="h-8 cursor-pointer border-l px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => applyStyleValue(property, label, "100%")}
+        >
+          填充
+        </button>
+      </div>
+    );
 
     return (
       <section key="布局" className="border-b bg-card">
@@ -943,23 +1115,32 @@ export function VisualPropertyPanel({
           {getGroupIcon("布局")}
           布局
         </div>
-        <div className="space-y-3 px-3 pb-3">
-          <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center">
+        <div className="space-y-4 px-3 pb-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
               {renderConfigMarkLabel(
                 { property: "display", label: "排列方式", kind: "style" },
                 getStyleValue("display") || flowValue,
                 undefined,
                 "排列",
               )}
+              <button
+                type="button"
+                aria-label="重置排列"
+                className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => applyArrangement("free")}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="inline-flex h-8 w-fit rounded-md border bg-muted/30 p-0.5">
+            <div className="grid h-10 grid-cols-4 rounded-md border bg-muted/30 p-0.5">
               {flowOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  aria-label={option.label}
                   className={cn(
-                    "flex h-7 min-w-8 cursor-pointer items-center justify-center rounded px-2 transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex cursor-pointer items-center justify-center rounded transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     flowValue === option.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
                   )}
                   title={option.label}
@@ -971,58 +1152,69 @@ export function VisualPropertyPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2">
-            <div className="flex items-center pt-1">
-              {renderConfigMarkLabel(
-                { property: "justifyContent", label: "内容对齐", kind: "style" },
-                alignValue,
-                undefined,
-                "对齐",
-              )}
-            </div>
-            <div className="grid w-[88px] grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1">
-              {alignmentOptions.map(([justifyContent, alignItems]) => {
-                const active = alignValue === `${justifyContent}:${alignItems}`;
-                return (
-                  <button
-                    key={`${justifyContent}-${alignItems}`}
-                    type="button"
-                    className={cn(
-                      "flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-                    )}
-                    title="设置内容对齐"
-                    onClick={() => applyAlignment(justifyContent, alignItems)}
-                  >
-                    <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-primary" : "bg-current")} />
-                  </button>
-                );
-              })}
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-foreground">尺寸</div>
+            <div className="grid grid-cols-2 gap-2">
+              {renderSizeControl("width", "宽度", "W")}
+              {renderSizeControl("height", "高度", "H")}
             </div>
           </div>
 
-          <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
-            <div className="flex items-center">
-              {renderConfigMarkLabel(
-                { property: "gap", label: "元素间距", kind: "style" },
-                getStyleNumberValue("gap"),
-                undefined,
-                "间距",
-              )}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
+                  { property: "justifyContent", label: "内容对齐", kind: "style" },
+                  alignValue,
+                  undefined,
+                  "对齐",
+                )}
+              </div>
+              <div className="grid w-[88px] grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1">
+                {alignmentOptions.map(([justifyContent, alignItems]) => {
+                  const active = alignValue === `${justifyContent}:${alignItems}`;
+                  return (
+                    <button
+                      key={`${justifyContent}-${alignItems}`}
+                      type="button"
+                      aria-label="设置内容对齐"
+                      className={cn(
+                        "flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                      )}
+                      title="设置内容对齐"
+                      onClick={() => applyAlignment(justifyContent, alignItems)}
+                    >
+                      <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-primary" : "bg-current")} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="relative">
-              <Input
-                value={getStyleNumberValue("gap")}
-                className="h-8 pr-8 font-mono text-xs"
-                onChange={(event) => applyStyleValue("gap", "元素间距", event.target.value)}
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
-                px
-              </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
+                  { property: "gap", label: "元素间距", kind: "style" },
+                  getStyleNumberValue("gap"),
+                  undefined,
+                  "间距",
+                )}
+              </div>
+              <div className="relative">
+                <Input
+                  value={getStyleNumberValue("gap")}
+                  aria-label="元素间距"
+                  className="h-8 pr-8 font-mono text-xs"
+                  onChange={(event) => applyStyleValue("gap", "元素间距", event.target.value)}
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+                  px
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
+          <div className="space-y-1.5">
             <div className="flex items-center">
               {renderConfigMarkLabel(
                 { property: "paddingLeft", label: "左右内边距", kind: "style" },
@@ -1033,10 +1225,14 @@ export function VisualPropertyPanel({
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  X
+                </span>
                 <Input
                   value={paddingXValue}
                   placeholder="左右"
-                  className="h-8 pr-8 font-mono text-xs"
+                  aria-label="左右内边距"
+                  className="h-8 pl-7 pr-8 font-mono text-xs"
                   onChange={(event) => {
                     applyStyleValue("paddingLeft", "左右内边距", event.target.value);
                     applyStyleValue("paddingRight", "左右内边距", event.target.value);
@@ -1047,10 +1243,14 @@ export function VisualPropertyPanel({
                 </span>
               </div>
               <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  Y
+                </span>
                 <Input
                   value={paddingYValue}
                   placeholder="上下"
-                  className="h-8 pr-8 font-mono text-xs"
+                  aria-label="上下内边距"
+                  className="h-8 pl-7 pr-8 font-mono text-xs"
                   onChange={(event) => {
                     applyStyleValue("paddingTop", "上下内边距", event.target.value);
                     applyStyleValue("paddingBottom", "上下内边距", event.target.value);
@@ -1063,7 +1263,7 @@ export function VisualPropertyPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center">
               {renderConfigMarkLabel(
                 { property: "overflow", label: "裁剪内容", kind: "style" },
@@ -1072,15 +1272,15 @@ export function VisualPropertyPanel({
                 "裁剪",
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
               <Switch
                 checked={clipContent}
                 onCheckedChange={(checked) =>
                   applyStyleValue("overflow", "裁剪内容", checked ? "hidden" : "visible")
                 }
               />
-              <span className="text-xs text-muted-foreground">隐藏超出内容</span>
-            </div>
+              隐藏超出内容
+            </label>
           </div>
         </div>
       </section>
@@ -1220,21 +1420,11 @@ export function VisualPropertyPanel({
                   "颜色",
                 )}
               </div>
-              <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
-                <Input
-                  type="color"
-                  value={colorToHex(getStyleValue("borderColor"))}
-                  className="h-8 cursor-pointer p-1"
-                  onChange={(event) => applyStyleValue("borderColor", "边框颜色", event.target.value)}
-                />
-                <Input
-                  value={formatColorInputValue(getStyleValue("borderColor"))}
-                  className="h-8 font-mono text-xs"
-                  onChange={(event) =>
-                    applyStyleValue("borderColor", "边框颜色", normalizeColorInputValue(event.target.value))
-                  }
-                />
-              </div>
+              {renderColorControl(
+                { property: "borderColor", label: "边框颜色", kind: "style" },
+                getStyleValue("borderColor"),
+                styleRecord?.borderColor || undefined,
+              )}
             </div>
 
             <div className="grid grid-cols-[68px_minmax(0,1fr)] items-center gap-2">
@@ -1272,7 +1462,6 @@ export function VisualPropertyPanel({
     const currentValue = getCurrentValue(selectedNode, spec);
     const change = propertyChanges.find((item) => item.id === changeId);
     const value = change?.value ?? currentValue;
-    const displayValue = formatColorInputValue(value);
 
     return (
       <section key="背景" className="border-b bg-card">
@@ -1301,37 +1490,7 @@ export function VisualPropertyPanel({
               <div className="flex items-center">
                 {renderConfigMarkLabel(spec, value, undefined, "颜色")}
               </div>
-              <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
-                <Input
-                  type="color"
-                  value={colorToHex(value)}
-                  className="h-8 cursor-pointer p-1"
-                  onChange={(event) =>
-                    onPropertyChange(
-                      selectedNode,
-                      spec.property,
-                      spec.label,
-                      event.target.value,
-                      spec.kind,
-                      currentValue || undefined,
-                    )
-                  }
-                />
-                <Input
-                  value={displayValue}
-                  className="h-8 font-mono text-xs"
-                  onChange={(event) =>
-                    onPropertyChange(
-                      selectedNode,
-                      spec.property,
-                      spec.label,
-                      normalizeColorInputValue(event.target.value),
-                      spec.kind,
-                      currentValue || undefined,
-                    )
-                  }
-                />
-              </div>
+              {renderColorControl(spec, value, currentValue || undefined)}
               <div className="flex items-center justify-end gap-1">
                 {change && (
                   <Button
@@ -1513,6 +1672,7 @@ export function VisualPropertyPanel({
           )}
 
           {specsBySection.map(([section, specs]) => {
+            if (section === "位置") return renderPositionSection();
             if (section === "布局") return renderLayoutSection();
             if (section === "外观") return renderAppearanceSection();
             if (section === "背景") return renderBackgroundSection();
@@ -1623,37 +1783,7 @@ export function VisualPropertyPanel({
                             </SelectContent>
                           </Select>
                         ) : spec.input === "color" ? (
-                          <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2">
-                            <Input
-                              type="color"
-                              value={colorToHex(value)}
-                              className="h-8 cursor-pointer p-1"
-                              onChange={(event) =>
-                                onPropertyChange(
-                                  selectedNode,
-                                  spec.property,
-                                  spec.label,
-                                  event.target.value,
-                                  spec.kind,
-                                  currentValue || undefined,
-                                )
-                              }
-                            />
-                            <Input
-                              value={formatColorInputValue(value)}
-                              className="h-8 font-mono text-xs"
-                              onChange={(event) =>
-                                onPropertyChange(
-                                  selectedNode,
-                                  spec.property,
-                                  spec.label,
-                                  normalizeColorInputValue(event.target.value),
-                                  spec.kind,
-                                  currentValue || undefined,
-                                )
-                              }
-                            />
-                          </div>
+                          renderColorControl(spec, value, currentValue || undefined)
                         ) : spec.input === "file" ? (
                           <div className="space-y-1">
                             <Input

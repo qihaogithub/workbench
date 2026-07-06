@@ -1,12 +1,12 @@
-# AGENTS.md — @opencode-workbench/agent-service
+# AGENTS.md — @workbench/agent-service
 
 > 本文件为 AI 编码代理提供在此包中工作的指南。
 
 ## 包概览
 
-`@opencode-workbench/agent-service` 是一个独立的 Agent 服务包，基于 **Pi Agent**（`@earendil-works/pi-agent-core`）进程内嵌入实现，与单个 LLM 通信。
+`@workbench/agent-service` 是一个独立的 Agent 服务包，基于 **Pi Agent**（`@earendil-works/pi-agent-core`）进程内嵌入实现，与单个 LLM 通信。
 
-> **历史**：本包早期基于 ACP (Agent Client Protocol) 协议支持 14 种后端（OpenCode、Claude、Codex、Gemini、Qwen、Goose、Auggie、Kimi、Copilot、Qoder、Vibe、自定义等）。经评估后于 2026-06 全面迁移至 Pi Agent，移除了多后端支持（见 `docs/plans/进行中/全面迁移至Pi-Agent并移除多后端支持方案.md`）。
+> **历史**：本包早期基于 ACP (Agent Client Protocol) 协议支持 14 种后端（workbench、Claude、Codex、Gemini、Qwen、Goose、Auggie、Kimi、Copilot、Qoder、Vibe、自定义等）。经评估后于 2026-06 全面迁移至 Pi Agent，移除了多后端支持（见 `docs/plans/进行中/全面迁移至Pi-Agent并移除多后端支持方案.md`）。
 
 ## 目录结构
 

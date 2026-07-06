@@ -1,4 +1,4 @@
-import type { PreviewSize } from "@opencode-workbench/demo-ui";
+import type { PreviewSize } from "@workbench/demo-ui";
 
 export type {
   ValidationErrorType,
@@ -7,7 +7,7 @@ export type {
   ValidationCheck,
   ValidationCheckIssue,
   ValidateDemoResult,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 export {
   validateAll,
@@ -15,7 +15,7 @@ export {
   validatePropsSchema,
   isValidJson,
   formatValidateDemoResult,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 export {
   getOrderable,
@@ -23,6 +23,6 @@ export {
   getPositionable,
   getDefaultValues,
   getPreviewSize,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 export type { PreviewSize };

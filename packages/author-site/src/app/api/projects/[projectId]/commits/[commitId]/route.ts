@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ProjectAdminService } from "@opencode-workbench/project-core";
+import { ProjectAdminService } from "@workbench/project-core";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess, getDataDir } from "@/lib/fs-utils";

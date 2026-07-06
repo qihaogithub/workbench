@@ -80,6 +80,7 @@ export interface SendMessageOptions {
   stream?: boolean;
   model?: string;
   workingDir?: string;
+  projectId?: string;
   demoId?: string;
   images?: ImageAttachment[];
   /**

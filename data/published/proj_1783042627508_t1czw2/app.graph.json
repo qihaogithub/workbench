@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "entry": "page",
+  "entry": "pad-react",
   "pages": {
     "page": {
       "pageId": "page_lib0",
-      "title": "手机 - HTML"
+      "title": "手机"
     },
     "pad-react": {
       "pageId": "pad-react_3gok",
-      "title": "pad-HTML"
+      "title": "pad"
     }
   },
   "actions": [],

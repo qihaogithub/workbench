@@ -8,7 +8,7 @@
 
 ## 已落地能力
 
-- `@opencode-workbench/preview-contract` 统一 source contract、compile transform 和 module preflight 诊断，module preflight 只做静态解析，不执行用户页面代码。
+- `@workbench/preview-contract` 统一 source contract、compile transform 和 module preflight 诊断，module preflight 只做静态解析，不执行用户页面代码。
 - project-core / project-cli 对当前事务新增或修改页面返回 `runtimeValidation`，blocking diagnostics 可被 Codex 继续读取并修复；历史未改页面的问题降级为 warning。
 - 创作端将 `previewRuntimeError` 兼容升级为 `previewDiagnostic`，fast gate 失败时保留最近一次成功预览，并用系统自动修复任务把技术诊断作为 hidden prompt 交给 Agent。
 - Agent `writeFile` / `editFile` 写入页面或 schema 后返回非阻塞 runtime validation 结果；失败时提示继续修复，但不回滚真实文件写入。
@@ -27,7 +27,7 @@
 - `corepack pnpm check:agent` 通过：31 个 Vitest test file、275 个测试。
 - `corepack pnpm check:project-core` 通过：2 个 Vitest test file、23 个测试。
 - `corepack pnpm check:project-cli` 通过，覆盖 preview-contract 与 project-cli typecheck/test。
-- `corepack pnpm --filter @opencode-workbench/preview-contract test` 通过：12 个测试，覆盖 TSX、重复顶层声明、多个 default export 和 module preflight 不执行代码。
+- `corepack pnpm --filter @workbench/preview-contract test` 通过：12 个测试，覆盖 TSX、重复顶层声明、多个 default export 和 module preflight 不执行代码。
 
 ## 项目文档索引
 

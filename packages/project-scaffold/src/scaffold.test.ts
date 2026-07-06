@@ -22,6 +22,7 @@ import {
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-scaffold-"));
 const service = new ProjectAdminService({ dataDir: tempDir });
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(packageRoot, "../..");
 const actor: ProjectAdminActor = {
   id: "test-agent",
   name: "Test Agent",
@@ -43,11 +44,19 @@ function runPnpm(args: string[], options: { env?: NodeJS.ProcessEnv } = {}) {
   });
 }
 
+function runLocalNode(projectDir: string, args: string[], options: { env?: NodeJS.ProcessEnv } = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: projectDir,
+    encoding: "utf-8",
+    env: options.env,
+  });
+}
+
 try {
   const packageSchema = JSON.parse(
     fs.readFileSync(path.join(packageRoot, "src/project-package.schema.json"), "utf-8"),
   ) as { title?: string };
-  assert.equal(packageSchema.title, "OpenCode Workbench Project Package");
+  assert.equal(packageSchema.title, "Workbench Project Package");
 
   const created = service.createProject({ name: "脚手架项目" }, actor);
   assert.equal(created.ok, true);
@@ -64,6 +73,15 @@ try {
   }, actor);
   assert.equal(page.ok, true);
   const pageId = (page.data as PageDetail).meta.id;
+  const prototypePage = service.createPage({
+    editId,
+    name: "原型活动页",
+    runtimeType: "prototype-html-css",
+    prototypeHtml: "<main><h1>本地真实预览</h1><p>prototype-html-css</p></main>",
+    prototypeCss: "main { width: 375px; height: 812px; margin: 0; background: #ffffff; } h1 { color: #0f172a; }",
+  }, actor);
+  assert.equal(prototypePage.ok, true);
+  const prototypePageId = (prototypePage.data as PageDetail).meta.id;
 
   const committed = service.commitEdit(editId, "初始化项目", actor);
   assert.equal(committed.ok, true);
@@ -72,7 +90,7 @@ try {
   const projectDir = path.join(tempDir, "local-project");
   const pulled = pullProjectScaffold(service, actor, { projectId, targetDir: projectDir });
   assert.equal(pulled.ok, true);
-  assert.equal(fs.existsSync(path.join(projectDir, "opencode.project.json")), true);
+  assert.equal(fs.existsSync(path.join(projectDir, "workbench.project.json")), true);
   assert.equal(fs.existsSync(path.join(projectDir, "scripts/dev-server.mjs")), true);
   assert.equal(fs.existsSync(path.join(projectDir, "src/app.graph.json")), true);
 
@@ -88,7 +106,27 @@ try {
     },
   });
   assert.equal(localDev.status, 0, localDev.stderr || localDev.stdout);
-  assert.match(localDev.stdout, /OpenCode local preview/);
+  assert.match(localDev.stdout, /workbench local preview/);
+  const localPreviewScreenshot = runLocalNode(projectDir, ["scripts/dev-server.mjs", "--screenshot"], {
+    env: {
+      ...process.env,
+      OW_PLAYWRIGHT_IMPORT_PATH: path.join(repoRoot, "node_modules/playwright/index.mjs"),
+    },
+  });
+  assert.equal(localPreviewScreenshot.status, 0, localPreviewScreenshot.stderr || localPreviewScreenshot.stdout);
+  const previewReport = JSON.parse(localPreviewScreenshot.stdout) as {
+    ok: boolean;
+    summary: { screenshots: number; degraded: number };
+    pages: Array<{ pageId: string; runtimeType: string; screenshotPath: string; degraded: boolean }>;
+  };
+  assert.equal(previewReport.ok, true);
+  assert.equal(previewReport.summary.screenshots, 2);
+  assert.equal(previewReport.summary.degraded, 1);
+  const prototypePreview = previewReport.pages.find((item) => item.pageId === prototypePageId);
+  assert.equal(prototypePreview?.runtimeType, "prototype-html-css");
+  assert.equal(prototypePreview?.degraded, false);
+  assert.equal(fs.existsSync(prototypePreview?.screenshotPath ?? ""), true);
+  assert.equal(path.extname(prototypePreview?.screenshotPath ?? ""), ".png");
 
   const validation = validateProjectScaffold(projectDir);
   assert.equal(validation.ok, true);
@@ -98,12 +136,12 @@ try {
   assert.equal(cleanDiff.ok, true);
   assert.deepEqual(cleanDiff.diffSummary?.updated, []);
 
-  const initialManifestPath = path.join(projectDir, "opencode.project.json");
+  const initialManifestPath = path.join(projectDir, "workbench.project.json");
   const initialManifest = JSON.parse(fs.readFileSync(initialManifestPath, "utf-8")) as { scaffoldVersion: string };
   initialManifest.scaffoldVersion = "0.0.1";
   fs.writeFileSync(initialManifestPath, `${JSON.stringify(initialManifest, null, 2)}\n`, "utf-8");
   fs.writeFileSync(path.join(projectDir, "scripts/dev-server.mjs"), "console.log('old scaffold');\n", "utf-8");
-  const initialSyncPath = path.join(projectDir, ".opencode/sync-state.json");
+  const initialSyncPath = path.join(projectDir, ".workbench/sync-state.json");
   const initialSync = JSON.parse(fs.readFileSync(initialSyncPath, "utf-8")) as { scaffoldVersion: string };
   initialSync.scaffoldVersion = "0.0.1";
   fs.writeFileSync(initialSyncPath, `${JSON.stringify(initialSync, null, 2)}\n`, "utf-8");
@@ -111,7 +149,7 @@ try {
   const upgradePreview = upgradeProjectScaffold(projectDir, { dryRun: true });
   assert.equal(upgradePreview.ok, true);
   assert.equal(upgradePreview.data?.dryRun, true);
-  assert.equal(upgradePreview.data?.changedFiles.includes("opencode.project.json"), true);
+  assert.equal(upgradePreview.data?.changedFiles.includes("workbench.project.json"), true);
   assert.equal(upgradePreview.data?.changedFiles.includes("scripts/dev-server.mjs"), true);
 
   const upgraded = upgradeProjectScaffold(projectDir);
@@ -123,13 +161,17 @@ try {
   assert.equal(upgradedDiff.ok, true);
   assert.deepEqual(upgradedDiff.diffSummary?.updated, []);
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "opencode.project.json"), "utf-8")) as {
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "workbench.project.json"), "utf-8")) as {
     appGraph: string | null;
     knowledgeDir?: string | null;
-    pages: Array<{ id: string; routeKey?: string; entry: string }>;
+    pages: Array<{ id: string; routeKey?: string; runtimeType?: string; entry: string; prototypeHtml?: string; prototypeCss?: string }>;
   };
   assert.equal(manifest.pages[0]?.id, pageId);
   assert.equal(manifest.pages[0]?.routeKey, "page");
+  assert.equal(manifest.pages.some((item) => item.id === prototypePageId && item.runtimeType === "prototype-html-css"), true);
+  const pulledPrototype = manifest.pages.find((item) => item.id === prototypePageId);
+  assert.equal(fs.existsSync(path.join(projectDir, pulledPrototype?.prototypeHtml ?? "")), true);
+  assert.equal(fs.existsSync(path.join(projectDir, pulledPrototype?.prototypeCss ?? "")), true);
   assert.equal(manifest.appGraph, "src/app.graph.json");
   assert.equal(manifest.knowledgeDir, "src/knowledge");
   fs.appendFileSync(path.join(projectDir, manifest.pages[0]?.entry ?? ""), "\n// local update\n", "utf-8");
@@ -149,7 +191,7 @@ try {
   assert.equal(submittedDiff.ok, true);
   assert.deepEqual(submittedDiff.diffSummary?.updated, []);
 
-  const nextManifestPath = path.join(projectDir, "opencode.project.json");
+  const nextManifestPath = path.join(projectDir, "workbench.project.json");
   const nextManifest = JSON.parse(fs.readFileSync(nextManifestPath, "utf-8")) as {
     baseVersion: string;
     appGraph: string | null;
@@ -223,14 +265,14 @@ try {
 
   const exportedEntries = exportProjectScaffoldEntries(service, actor, { projectId });
   assert.equal(exportedEntries.ok, true);
-  assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "opencode.project.json"), true);
+  assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "workbench.project.json"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/app.graph.json"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/pages/local_page/index.tsx"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/assets/images/logo.png"), true);
   assert.equal(exportedEntries.data?.entries.some((entry) => entry.path === "src/knowledge/活动规则.md"), true);
   const zip = buildProjectScaffoldZip(exportedEntries.data?.entries ?? []);
   assert.equal(zip.readUInt32LE(0), 0x04034b50);
-  assert.equal(zip.includes(Buffer.from("opencode.project.json", "utf-8")), true);
+  assert.equal(zip.includes(Buffer.from("workbench.project.json", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/app.graph.json", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/pages/local_page/index.tsx", "utf-8")), true);
   assert.equal(zip.includes(Buffer.from("src/knowledge/活动规则.md", "utf-8")), true);
@@ -263,7 +305,7 @@ try {
     name: "模板本地项目",
   });
   assert.equal(initializedTemplate.ok, true);
-  assert.equal(fs.existsSync(path.join(templateDir, "opencode.project.json")), true);
+  assert.equal(fs.existsSync(path.join(templateDir, "workbench.project.json")), true);
   assert.equal(fs.existsSync(path.join(templateDir, "src/knowledge/活动规则.md")), true);
 
   const submittedTemplate = submitTemplateScaffold(service, actor, {

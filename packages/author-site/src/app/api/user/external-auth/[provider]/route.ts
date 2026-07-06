@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { ExternalAuthProvider } from "@opencode-workbench/shared";
+import type { ExternalAuthProvider } from "@workbench/shared";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {

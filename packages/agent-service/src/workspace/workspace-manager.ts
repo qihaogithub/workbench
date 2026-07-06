@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { WorkspaceInfo, CreateWorkspaceOptions } from '@opencode-workbench/shared/contracts';
+import type { WorkspaceInfo, CreateWorkspaceOptions } from '@workbench/shared/contracts';
 import {
   getSystemTempDir,
   generateTempWorkspaceName,

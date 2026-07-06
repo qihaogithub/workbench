@@ -157,14 +157,20 @@ class BrowserPool {
 
     let browser: Browser;
     try {
+      const sandboxArgs = config.puppeteerDisableSandbox
+        ? ["--no-sandbox", "--disable-setuid-sandbox"]
+        : [];
+
       browser = await puppeteer.launch({
         headless: true,
         executablePath: executablePath || undefined,
         args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
+          ...sandboxArgs,
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--disable-breakpad",
+          "--disable-crash-reporter",
+          "--noerrdialogs",
         ],
       });
     } catch (error) {

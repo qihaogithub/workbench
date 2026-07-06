@@ -402,7 +402,7 @@ try {
             Log "" "WARN"
             Log "Troubleshooting:" "WARN"
             Log "  - Check agent-service: curl http://localhost:3201/health" "WARN"
-            Log "  - Check ACP CLI: opencode acp" "WARN"
+            Log "  - Check ACP CLI: workbench acp" "WARN"
             Log "  - View agent-service logs" "WARN"
             exit 1
         } else {

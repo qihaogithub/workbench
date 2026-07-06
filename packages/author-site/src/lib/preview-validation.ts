@@ -2,7 +2,7 @@ import {
   ProjectAdminService,
   type RuntimeValidationIssue,
   type RuntimeValidationResult,
-} from "@opencode-workbench/project-core";
+} from "@workbench/project-core";
 
 export interface PreviewValidationIssue extends RuntimeValidationIssue {
   file: string;

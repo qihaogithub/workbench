@@ -2,7 +2,7 @@ export interface ImageReference {
   originalPath: string;
   absolutePath: string;
   sourceFile: string;
-  type: 'img-src' | 'css-url' | 'import';
+  type: 'img-src' | 'css-url' | 'import' | 'external-url';
 }
 
 export interface UploadResult {

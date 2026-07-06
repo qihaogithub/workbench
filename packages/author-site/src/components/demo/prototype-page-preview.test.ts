@@ -3,7 +3,7 @@ import {
   PrototypePagePreview,
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 import React from "react";
 import { render, waitFor } from "@testing-library/react";
 
@@ -48,6 +48,56 @@ describe("PrototypePagePreview", () => {
     expect(shadow?.querySelector("h1")?.textContent).toBe("配置标题");
     expect(shadow?.querySelector("p")?.textContent).toBe("配置摘要");
     expect((shadow?.querySelector("span") as HTMLElement | null)?.style.color).toBe("rgb(37, 99, 235)");
+  });
+
+  it("支持按图层临时隐藏原型页节点", () => {
+    const { container, rerender } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<section><div data-ow-id="hero">主视觉</div><p>正文</p></section>`,
+        css: "",
+        hiddenVisualNodeIds: ["hero"],
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const shadow = host?.shadowRoot;
+    const hero = shadow?.querySelector("[data-ow-id='hero']") as HTMLElement | null;
+
+    expect(hero?.style.display).toBe("none");
+
+    rerender(
+      React.createElement(PrototypePagePreview, {
+        html: `<section><div data-ow-id="hero">主视觉</div><p>正文</p></section>`,
+        css: "",
+        hiddenVisualNodeIds: [],
+      }),
+    );
+
+    const visibleHero = shadow?.querySelector("[data-ow-id='hero']") as HTMLElement | null;
+    expect(visibleHero?.style.display).toBe("");
+  });
+
+  it("按当前会话和页面目录改写原型页相对图片路径", () => {
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<section><img src="../../assets/football/home/banner.webp" alt="banner" /></section>`,
+        css: `.hero { background-image: url("../../assets/football/home/bg.svg"); }`,
+        sessionId: "session_1",
+        demoId: "page_1",
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const shadow = host?.shadowRoot;
+    const image = shadow?.querySelector("img");
+    const styleText = shadow?.querySelector("style")?.textContent ?? "";
+
+    expect(image?.getAttribute("src")).toContain(
+      "/api/sessions/session_1/workspace/assets/football/home/banner.webp",
+    );
+    expect(styleText).toContain(
+      "/api/sessions/session_1/workspace/assets/football/home/bg.svg",
+    );
   });
 
   it("单页原型页传入 previewSize 时按设计尺寸等比适配容器", async () => {

@@ -115,7 +115,7 @@ function parseBlacklist(): Set<string> {
 /**
  * 从配置数据解析分组名称过滤器
  *
- * 格式: "分组:关键词" 数组,如 ["opencode:Free", "othergroup:Pro"]
+ * 格式: "分组:关键词" 数组,如 ["workbench:Free", "othergroup:Pro"]
  * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
  * 大小写不敏感;未配置的分组不受限制
  */
@@ -141,7 +141,7 @@ function parseNameFiltersFromConfig(
 /**
  * 从环境变量 NEXT_PUBLIC_MODEL_NAME_FILTERS 解析分组名称过滤器
  *
- * 格式: 逗号分隔的 "分组:关键词" 条目,如 "opencode:Free,othergroup:Pro"
+ * 格式: 逗号分隔的 "分组:关键词" 条目,如 "workbench:Free,othergroup:Pro"
  * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
  * 大小写不敏感;未配置的分组不受限制
  *
@@ -209,7 +209,7 @@ export function resolveDefaultModelId(models: ResolvedModel[]): string | null {
  * 模型配置表 — 按分组放行
  *
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
- * 分组即模型 id 中 `/` 前的前缀,如 `opencode/nemotron-3-super` 的分组为 `opencode`。
+ * 分组即模型 id 中 `/` 前的前缀,如 `workbench/nemotron-3-super` 的分组为 `workbench`。
  *
  * 动态前缀通过环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 注入,
  * 无需修改代码即可支持用户自定义的供应商名称。
@@ -217,7 +217,7 @@ export function resolveDefaultModelId(models: ResolvedModel[]): string | null {
 export function buildModelConfigs(): ModelConfig[] {
   return [
     // === 内置分组:始终放行 ===
-    { matcher: "opencode/" },
+    { matcher: "workbench/" },
     { matcher: "jojo/" },
 
     // === 动态分组:通过环境变量注入的用户自定义供应商前缀 ===
@@ -369,7 +369,7 @@ function getEnvFallbackConfig() {
 function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
   return [
     // 内置分组:始终放行
-    { matcher: "opencode/" },
+    { matcher: "workbench/" },
     { matcher: "jojo/" },
     // 动态分组:从数据库或环境变量注入
     ...parseDynamicPrefixesFromConfig(prefixes),
@@ -384,7 +384,7 @@ function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
  * 支持两种模式:
  * 1. 启用列表模式 (enabledModels 存在时):
  *    - 仅放行 enabledModels 中的模型,按列表顺序返回
- *    - 未在列表中的模型若匹配 autoEnableRules,则自动放行(追加在末尾)
+ *    - enabledModels 为空数组表示管理员未启用任何模型
  * 2. 前缀模式 (向后兼容):
  *    - 使用 configs 白名单 + blacklist + nameFilters 过滤
  *
@@ -411,8 +411,7 @@ export function applyModelConfigsWithFullData(
     autoEnableRules,
   } = data;
 
-  const useEnabledList =
-    Array.isArray(enabledModels) && enabledModels.length > 0;
+  const useEnabledList = Array.isArray(enabledModels);
   const enabledSet = useEnabledList ? new Set(enabledModels) : null;
 
   const parsed: Array<{
@@ -427,27 +426,11 @@ export function applyModelConfigsWithFullData(
   }> = [];
 
   for (const m of raw) {
-    // 启用列表模式下: 先放行启用列表中的 + 匹配自动启用规则的
+    // 启用列表模式下严格以管理员启用列表为准。
+    // autoEnableRules 只服务于旧前缀模式和管理后台候选发现，不能绕过显式启用状态。
     if (useEnabledList) {
       const inEnabledList = enabledSet!.has(m.id);
-      const matchedAuto =
-        !inEnabledList &&
-        autoEnableRules &&
-        autoEnableRules.some((rule) => {
-          if (rule.type === "prefix") return m.id.startsWith(rule.value);
-          // nameFilter 格式 "分组:关键词"
-          const idx = rule.value.indexOf(":");
-          if (idx < 0) return false;
-          const g = rule.value.slice(0, idx).trim();
-          const k = rule.value
-            .slice(idx + 1)
-            .trim()
-            .toLowerCase();
-          if (!k) return false;
-          if (extractGroup(m.id) !== g) return false;
-          return m.id.toLowerCase().includes(k);
-        });
-      if (!inEnabledList && !matchedAuto) continue;
+      if (!inEnabledList) continue;
     } else {
       // 前缀模式 (向后兼容)
       const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
@@ -571,27 +554,18 @@ export function applyModelConfigsWithFullData(
     return true;
   });
 
-  // 启用列表模式: 按 enabledModels 顺序排序,自动启用的模型追加在末尾
+  // 启用列表模式: 按 enabledModels 顺序排序
   if (useEnabledList && enabledModels) {
     const orderMap = new Map<string, number>();
     enabledModels.forEach((id, idx) => orderMap.set(id, idx));
 
-    const ordered: ResolvedModel[] = [];
-    const autoEnabled: ResolvedModel[] = [];
-
-    for (const model of filtered) {
-      if (orderMap.has(model.id)) {
-        ordered.push(model);
-      } else {
-        autoEnabled.push(model);
-      }
-    }
+    const ordered = filtered.filter((model) => orderMap.has(model.id));
 
     ordered.sort(
       (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
     );
 
-    return [...ordered, ...autoEnabled];
+    return ordered;
   }
 
   return filtered;

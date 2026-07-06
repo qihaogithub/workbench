@@ -43,6 +43,7 @@ interface ClientMessage {
   model?: string;
   modelId?: string;
   workingDir?: string;
+  projectId?: string;
   demoId?: string;
   images?: ImageAttachment[];
   /** v3.2: 静态 system prompt 注入（L2 + L4） */
@@ -214,6 +215,7 @@ export async function registerWebSocketRoutes(
               const config: AgentConfig = {
                 sessionId,
                 workingDir: message.workingDir,
+                projectId: message.projectId,
                 demoId: message.demoId,
                 model: requestedModelId || currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
@@ -447,6 +449,7 @@ export async function registerWebSocketRoutes(
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 workingDir: message.workingDir,
+                projectId: message.projectId,
                 demoId: message.demoId,
                 model: currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
@@ -568,6 +571,7 @@ export async function registerWebSocketRoutes(
                 const config: AgentConfig = {
                   sessionId,
                   workingDir: message.workingDir || process.cwd(),
+                  projectId: message.projectId,
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
@@ -590,6 +594,7 @@ export async function registerWebSocketRoutes(
                 agent = manager.getOrCreate(sessionId, {
                   ...agent.getConfig(),
                   workingDir: message.workingDir || agent.getConfig().workingDir,
+                  projectId: message.projectId || agent.getConfig().projectId,
                   demoId: message.demoId || agent.getConfig().demoId,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,

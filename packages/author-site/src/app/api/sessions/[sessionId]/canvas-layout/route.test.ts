@@ -1,8 +1,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
-import type { CanvasState } from "@opencode-workbench/demo-ui";
+import { normalizeCanvasStateLayers } from "@workbench/demo-ui";
+import type { CanvasState } from "@workbench/demo-ui";
 
 class TestResponse {
   status: number;
@@ -103,7 +103,25 @@ describe("canvas layout route", () => {
       viewport: { x: 120, y: 80, zoom: 0.75 },
       pages: {
         page_1: { x: 10, y: 20, width: 375, height: 812 },
+        page_2: { x: 430, y: 20, width: 375, height: 812 },
       },
+      pageGroups: {
+        "page-group-1": {
+          id: "page-group-1",
+          kind: "page-group",
+          title: "页面一 等 2 个页面",
+          pages: [
+            { id: "page_1", pageId: "page_1", title: "页面一" },
+            { id: "page_2", pageId: "page_2", title: "页面二" },
+          ],
+          activePageId: "page_2",
+          layout: { x: 10, y: 20, width: 375, height: 812, zIndex: 6 },
+          directoryCollapsed: true,
+          createdAt: 5,
+          updatedAt: 5,
+        },
+      },
+      hiddenPageIds: ["page_1", "page_2"],
       nodes: {
         "doc-kb_1": {
           id: "doc-kb_1",

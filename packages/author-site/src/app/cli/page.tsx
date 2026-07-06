@@ -1,7 +1,7 @@
 import {
   createProjectCliQuickReference,
   createProjectCliUsagePrompt,
-} from "@opencode-workbench/project-core";
+} from "@workbench/project-core";
 
 import { ProjectCliPage } from "@/components/cli/project-cli-page";
 

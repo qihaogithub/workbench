@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783244615875_1jn2qg",
+  "at": 1783244615875,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/toast-success.svg",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/toast-success.svg"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

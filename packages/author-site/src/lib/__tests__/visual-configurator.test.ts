@@ -1,4 +1,4 @@
-import type { VisualNodeInfo } from "@opencode-workbench/demo-ui";
+import type { VisualNodeInfo } from "@workbench/demo-ui";
 
 import {
   applyVisualConfiguration,

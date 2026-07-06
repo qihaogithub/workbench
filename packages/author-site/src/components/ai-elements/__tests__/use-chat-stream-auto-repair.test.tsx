@@ -274,21 +274,17 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
       );
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        "第二条",
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-      );
+      const secondCallContent = mockSendMessage.mock.calls[1]?.[0] as string;
+      expect(secondCallContent).toContain("用户：第一条");
+      expect(secondCallContent).toContain("AI：已处理: 第一条");
+      expect(secondCallContent).toContain("第二条");
     });
 
     expect(messages.map((message) => message.content)).toEqual([
       "第一条",
       "已处理: 第一条",
       "第二条",
-      "已处理: 第二条",
+      expect.stringContaining("第二条"),
     ]);
     expect(messages.some((message) => message.queueStatus)).toBe(false);
 
@@ -584,6 +580,73 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         "deepseek/deepseek-v4-pro",
       );
+    });
+  });
+
+  it("发送第二轮消息时显式注入最近对话历史", async () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "第一轮问题" },
+      { role: "assistant", content: "第一轮回答" },
+    ];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("第二轮问题");
+    });
+
+    await waitFor(() => {
+      const sentContent = mockSendMessage.mock.calls[0]?.[0] as string;
+      expect(sentContent).toContain("用户：第一轮问题");
+      expect(sentContent).toContain("AI：第一轮回答");
+      expect(sentContent).toContain("第二轮问题");
+    });
+  });
+
+  it("流式回复完成后恢复发送状态", async () => {
+    const messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setIsStreaming = jest.fn();
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming,
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("测试完成状态");
+    });
+
+    await waitFor(() => {
+      expect(setIsStreaming).toHaveBeenCalledWith(false);
     });
   });
 

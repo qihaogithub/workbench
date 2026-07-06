@@ -112,4 +112,138 @@ describe("editor diagnostic sanitizers", () => {
       pageId: "page-1",
     });
   });
+
+  it("保留草图 patch 校验摘要但不写入 scene 内容", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-sketch-patch",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "page",
+      name: "page.sketch_patch_validated",
+      details: {
+        status: "validated",
+        success: true,
+        operationCount: 3,
+        hasBaseSceneKey: true,
+        currentNodeCount: 2,
+        targetNodeCount: 3,
+        targetSource: "server_patch",
+        sketchScene: "{\"nodes\":[{\"id\":\"secret\"}]}",
+        operations: [{ op: "add", node: { id: "node-1" } }],
+      },
+    });
+
+    expect(event.payload).toEqual({
+      status: "validated",
+      success: true,
+      operationCount: 3,
+      hasBaseSceneKey: true,
+      currentNodeCount: 2,
+      targetNodeCount: 3,
+      targetSource: "server_patch",
+    });
+  });
+
+  it("保留 OpenPencil 全量草稿 fallback 摘要但不写入 scene 内容", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-openpencil-full-draft",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "page",
+      name: "page.openpencil_full_draft_fallback",
+      details: {
+        status: "fallback-saved",
+        success: true,
+        operationCount: 0,
+        hasBaseSceneKey: false,
+        currentNodeCount: 2,
+        targetNodeCount: 3,
+        targetSource: "client_scene",
+        sketchScene: "{\"nodes\":[{\"id\":\"secret\"}]}",
+        operations: [{ op: "update", nodeId: "secret", patch: { text: "secret" } }],
+      },
+    });
+
+    expect(event.payload).toEqual({
+      status: "fallback-saved",
+      success: true,
+      operationCount: 0,
+      hasBaseSceneKey: false,
+      currentNodeCount: 2,
+      targetNodeCount: 3,
+      targetSource: "client_scene",
+    });
+  });
+
+  it("保留 OpenPencil 图片代理审计摘要但不写入完整 URL", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-image-proxy",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "page",
+      name: "page.openpencil_image_proxy",
+      details: {
+        status: "proxied",
+        success: true,
+        reason: "ok",
+        durationMs: 12,
+        inputHost: "assets.example.com",
+        finalHost: "cdn.example.com",
+        httpStatus: 200,
+        contentType: "image/png",
+        contentLength: 1024,
+        cacheMaxAgeSeconds: 3600,
+        rateLimitPerMinute: 60,
+        rateLimitRemaining: 59,
+        url: "https://assets.example.com/private/image.png?token=secret",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      status: "proxied",
+      success: true,
+      reason: "ok",
+      durationMs: 12,
+      inputHost: "assets.example.com",
+      finalHost: "cdn.example.com",
+      httpStatus: 200,
+      contentType: "image/png",
+      contentLength: 1024,
+      cacheMaxAgeSeconds: 3600,
+      rateLimitPerMinute: 60,
+      rateLimitRemaining: 59,
+    });
+  });
+
+  it("保留 OpenPencil 冲突恢复摘要", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-openpencil-reload",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "page",
+      name: "page.openpencil_conflict_reloaded",
+      details: {
+        pageId: "page-1",
+        status: "reloaded",
+        success: true,
+        currentNodeCount: 2,
+        sketchScene: "{\"nodes\":[{\"id\":\"secret\"}]}",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      pageId: "page-1",
+      status: "reloaded",
+      success: true,
+      currentNodeCount: 2,
+    });
+  });
 });

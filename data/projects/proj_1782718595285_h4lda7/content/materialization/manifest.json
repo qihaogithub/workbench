@@ -1,6 +1,6 @@
 {
   "projectId": "proj_1782718595285_h4lda7",
-  "commitId": "commit_1783181410744_v5zrhr",
+  "commitId": "commit_1783208470541_d0ns71",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
@@ -16,5 +16,5 @@
       ]
     }
   ],
-  "updatedAt": 1783181410745
+  "updatedAt": 1783208470543
 }

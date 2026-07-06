@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   AgentStream,
   type StreamEvent,
-} from "@opencode-workbench/agent-client";
+} from "@workbench/agent-client";
 import {
   applyModelConfigsAsync,
   buildFullModelId,
@@ -34,10 +34,65 @@ interface UseChatModelsOptions {
   agentSessionId: string;
   workingDir?: string;
   onSessionChange?: () => void;
+  persistenceKey?: string;
+}
+
+interface PersistedModelPreference {
+  fullModelId: string;
+  baseModelId: string;
+  depth: ThinkingDepth | null;
+}
+
+const MODEL_PREFERENCE_STORAGE_PREFIX = "workbench:ai-model:";
+
+function readPersistedPreference(
+  persistenceKey?: string,
+): PersistedModelPreference | null {
+  if (!persistenceKey || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(
+      `${MODEL_PREFERENCE_STORAGE_PREFIX}${persistenceKey}`,
+    );
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedModelPreference>;
+    if (
+      typeof parsed.fullModelId !== "string" ||
+      typeof parsed.baseModelId !== "string"
+    ) {
+      return null;
+    }
+    return {
+      fullModelId: parsed.fullModelId,
+      baseModelId: parsed.baseModelId,
+      depth:
+        parsed.depth === "low" ||
+        parsed.depth === "medium" ||
+        parsed.depth === "high"
+          ? parsed.depth
+          : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedPreference(
+  persistenceKey: string | undefined,
+  preference: PersistedModelPreference,
+): void {
+  if (!persistenceKey || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      `${MODEL_PREFERENCE_STORAGE_PREFIX}${persistenceKey}`,
+      JSON.stringify(preference),
+    );
+  } catch {
+    /* localStorage may be unavailable; runtime session preference still applies. */
+  }
 }
 
 export function useChatModels(options: UseChatModelsOptions) {
-  const { agentSessionId, workingDir } = options;
+  const { agentSessionId, workingDir, persistenceKey } = options;
 
   const [modelState, setModelState] = useState<ModelState>(INITIAL_MODEL_STATE);
   const modelStreamRef = useRef<AgentStream | null>(null);
@@ -49,6 +104,11 @@ export function useChatModels(options: UseChatModelsOptions) {
     depth: ThinkingDepth | null;
   } | null>(null);
   const preferredModelAppliedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    preferredModelRef.current = readPersistedPreference(persistenceKey);
+    preferredModelAppliedKeyRef.current = null;
+  }, [persistenceKey]);
 
   const sendSetModel = useCallback((fullModelId: string) => {
     const ws = (modelStreamRef.current as any)?.ws;
@@ -213,9 +273,10 @@ export function useChatModels(options: UseChatModelsOptions) {
         baseModelId,
         depth,
       };
+      writePersistedPreference(persistenceKey, preferredModelRef.current);
       sendSetModel(fullModelId);
     },
-    [modelState.currentModelId, modelState.models, sendSetModel],
+    [modelState.currentModelId, modelState.models, persistenceKey, sendSetModel],
   );
 
   const handleDepthChange = useCallback(
@@ -243,9 +304,10 @@ export function useChatModels(options: UseChatModelsOptions) {
         baseModelId: modelState.currentModelId,
         depth,
       };
+      writePersistedPreference(persistenceKey, preferredModelRef.current);
       sendSetModel(fullModelId);
     },
-    [modelState.currentModelId, modelState.models, sendSetModel],
+    [modelState.currentModelId, modelState.models, persistenceKey, sendSetModel],
   );
 
   const handleModelsEvent = useCallback(async (event: StreamEvent) => {

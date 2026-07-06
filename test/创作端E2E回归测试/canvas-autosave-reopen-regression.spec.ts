@@ -1,5 +1,11 @@
 // maintained-by: h5-test
-import { expect, type APIResponse, type Page, test } from '@playwright/test';
+import {
+  expect,
+  type APIResponse,
+  type Page,
+  type Response as PlaywrightResponse,
+  test,
+} from '@playwright/test';
 import * as crypto from 'crypto';
 
 import { loginE2EUser } from './support/e2e-auth';
@@ -103,12 +109,19 @@ type CanvasLayoutResult = {
   updatedAt?: number;
 };
 
+type ProjectConfigResult = {
+  schema: string | null;
+  exists: boolean;
+};
+
 type AutosaveProjectContext = {
   project: DemoMeta;
   sessionId: string;
 };
 
-async function parseApiResponse<T>(response: APIResponse): Promise<ApiSuccess<T>> {
+async function parseApiResponse<T>(
+  response: APIResponse | PlaywrightResponse,
+): Promise<ApiSuccess<T>> {
   const body = (await response.json()) as ApiResult<T>;
   const maybeRequest =
     'request' in response && typeof response.request === 'function'
@@ -139,7 +152,7 @@ async function openHome(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-function waitForEditSession(page: Page, projectId?: string): Promise<APIResponse> {
+function waitForEditSession(page: Page, projectId?: string): Promise<PlaywrightResponse> {
   return page.waitForResponse(async (response) => {
     if (!response.url().endsWith('/api/sessions')) return false;
     if (response.request().method() !== 'POST') return false;
@@ -195,10 +208,8 @@ async function createDemoPage(
   return body.data;
 }
 
-async function saveSession(page: Page, sessionId: string): Promise<void> {
-  const response = await page.request.post(`/api/sessions/${sessionId}/save`, {
-    data: { note: '画布退出恢复回归测试准备页面' },
-  });
+async function persistWorkspace(page: Page, sessionId: string): Promise<void> {
+  const response = await page.request.post(`/api/sessions/${sessionId}/persist-workspace`);
   await parseApiResponse<unknown>(response);
 }
 
@@ -211,7 +222,7 @@ async function ensureProjectHasCanvasPage(
   if (files.demoPages.length > 0) return sessionId;
 
   await createDemoPage(page, project.id, sessionId);
-  await saveSession(page, sessionId);
+  await persistWorkspace(page, sessionId);
 
   const sessionAfterPageSetupPromise = waitForEditSession(page, project.id);
   await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
@@ -252,9 +263,66 @@ async function updateDemoPageCode(
 ): Promise<void> {
   const files = await getDemoPageFiles(page, sessionId, demoId);
   const nextCode = `${files.code}\n\n// autosave-regression-code: ${marker}\n`;
+  const nextSchema = JSON.stringify(
+    {
+      type: 'object',
+      properties: {
+        autosaveSchemaMarker: {
+          type: 'string',
+          title: `自动保存 Schema ${marker}`,
+          default: `autosave-regression-schema: ${marker}`,
+        },
+      },
+    },
+    null,
+    2,
+  );
   const response = await page.request.put(`/api/sessions/${sessionId}/files/${demoId}`, {
-    data: { code: nextCode },
+    data: { code: nextCode, schema: nextSchema },
   });
+  await parseApiResponse<null>(response);
+}
+
+async function renameDemoPage(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  pageId: string,
+  name: string,
+): Promise<void> {
+  const response = await page.request.patch(`/api/projects/${projectId}/demos/${pageId}`, {
+    data: { sessionId, name },
+  });
+  await parseApiResponse<DemoPageMeta>(response);
+}
+
+async function copyDemoPage(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  sourcePageId: string,
+  name: string,
+): Promise<DemoPageMeta> {
+  const response = await page.request.post(`/api/projects/${projectId}/demos`, {
+    data: {
+      sessionId,
+      name,
+      sourcePageId,
+    },
+  });
+  const body = await parseApiResponse<DemoPageMeta>(response);
+  return body.data;
+}
+
+async function deleteDemoPage(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  pageId: string,
+): Promise<void> {
+  const response = await page.request.delete(
+    `/api/projects/${projectId}/demos/${pageId}?sessionId=${encodeURIComponent(sessionId)}`,
+  );
   await parseApiResponse<null>(response);
 }
 
@@ -273,6 +341,66 @@ async function createDemoFolder(
   });
   const body = await parseApiResponse<DemoFolderMeta>(response);
   expect(body.data.id).toBeTruthy();
+  return body.data;
+}
+
+async function renameDemoFolder(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  folderId: string,
+  name: string,
+): Promise<void> {
+  const response = await page.request.patch(`/api/projects/${projectId}/folders/${folderId}`, {
+    data: { sessionId, name },
+  });
+  await parseApiResponse<DemoFolderMeta>(response);
+}
+
+async function deleteDemoFolder(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  folderId: string,
+): Promise<void> {
+  const response = await page.request.delete(
+    `/api/projects/${projectId}/folders/${folderId}?sessionId=${encodeURIComponent(sessionId)}`,
+  );
+  await parseApiResponse<{ deletedPageIds: string[] }>(response);
+}
+
+async function updateProjectConfigSchema(
+  page: Page,
+  projectId: string,
+  sessionId: string,
+  marker: string,
+): Promise<void> {
+  const schema = JSON.stringify(
+    {
+      type: 'object',
+      properties: {
+        autosaveProjectMarker: {
+          type: 'string',
+          title: `自动保存项目配置 ${marker}`,
+          default: `autosave-regression-project: ${marker}`,
+        },
+      },
+    },
+    null,
+    2,
+  );
+  const response = await page.request.put(`/api/projects/${projectId}/config`, {
+    data: { sessionId, schema },
+  });
+  await parseApiResponse<ProjectConfigResult>(response);
+}
+
+async function getProjectConfig(
+  page: Page,
+  projectId: string,
+): Promise<ProjectConfigResult> {
+  const response = await page.request.get(`/api/projects/${projectId}/config`);
+  const body = await parseApiResponse<ProjectConfigResult>(response);
   return body.data;
 }
 
@@ -379,10 +507,17 @@ async function assertExtendedAutosaveContentPersisted(
   page: Page,
   sessionId: string,
   expected: {
+    projectId: string;
     codePageId: string;
     codeMarker: string;
+    copiedPageId: string;
+    copiedPageName: string;
+    deletedPageId: string;
+    renamedPageName: string;
     firstPageIdAfterReorder: string;
-    folderName: string;
+    renamedFolderName: string;
+    deletedFolderName: string;
+    projectConfigMarker: string;
     memoryMarker: string;
     knowledgeTitle: string;
     knowledgeMarker: string;
@@ -396,14 +531,51 @@ async function assertExtendedAutosaveContentPersisted(
   ).toContain(`autosave-regression-code: ${expected.codeMarker}`);
 
   expect(
+    files.demos[expected.codePageId]?.schema,
+    '页面 Schema 修改应在重新打开后保留',
+  ).toContain(`autosave-regression-schema: ${expected.codeMarker}`);
+
+  expect(
+    files.demoPages.some(
+      (item) => item.id === expected.codePageId && item.name === expected.renamedPageName,
+    ),
+    `页面重命名应在重新打开后保留，当前页面列表: ${JSON.stringify(files.demoPages)}`,
+  ).toBe(true);
+
+  expect(
+    files.demoPages.some(
+      (item) => item.id === expected.copiedPageId && item.name === expected.copiedPageName,
+    ),
+    `页面复制应在重新打开后保留，当前页面列表: ${JSON.stringify(files.demoPages)}`,
+  ).toBe(true);
+  expect(
+    files.demos[expected.copiedPageId]?.code,
+    '复制页面应保留源页面代码内容',
+  ).toContain(`autosave-regression-code: ${expected.codeMarker}`);
+
+  expect(
+    files.demoPages.some((item) => item.id === expected.deletedPageId),
+    `页面删除应在重新打开后保留，当前页面列表: ${JSON.stringify(files.demoPages)}`,
+  ).toBe(false);
+
+  expect(
     files.demoPages[0]?.id,
     `页面列表顺序应在重新打开后保留，当前页面列表: ${JSON.stringify(files.demoPages)}`,
   ).toBe(expected.firstPageIdAfterReorder);
 
   expect(
-    files.demoFolders?.some((folder) => folder.name === expected.folderName),
+    files.demoFolders?.some((folder) => folder.name === expected.renamedFolderName),
     `新增文件夹应在重新打开后保留，当前文件夹: ${JSON.stringify(files.demoFolders ?? [])}`,
   ).toBe(true);
+  expect(
+    files.demoFolders?.some((folder) => folder.name === expected.deletedFolderName),
+    `文件夹删除应在重新打开后保留，当前文件夹: ${JSON.stringify(files.demoFolders ?? [])}`,
+  ).toBe(false);
+
+  const projectConfig = await getProjectConfig(page, expected.projectId);
+  expect(projectConfig.schema, '项目级 Schema 修改应自动保存到项目当前工作区').toContain(
+    `autosave-regression-project: ${expected.projectConfigMarker}`,
+  );
 
   const memory = await getWorkspaceFile(page, sessionId, 'memory.md');
   expect(memory.content, 'AI 记忆文件修改应在重新打开后保留').toContain(
@@ -441,7 +613,7 @@ async function getCanvasLayout(
 function waitForCanvasLayoutSave(
   page: Page,
   timeout = 15000,
-): Promise<APIResponse | null> {
+): Promise<PlaywrightResponse | null> {
   return page
     .waitForResponse(
       (response) =>
@@ -609,7 +781,7 @@ async function addTextNode(page: Page, text: string): Promise<void> {
 
 async function exitEditorToHomeAfterAutosaveFlush(
   page: Page,
-  pendingCanvasSaveResponse: Promise<APIResponse | null>,
+  pendingCanvasSaveResponse: Promise<PlaywrightResponse | null>,
   expected: {
     movedPageId: string;
     markerText: string;
@@ -691,9 +863,13 @@ test.describe('画布自动保存与重新打开回归', () => {
   test('移动页面、编辑工作区内容后直接退出，重新打开应恢复自动保存改动', async ({ page }) => {
     const markerText = `exit-reopen-text-${crypto.randomBytes(3).toString('hex')}`;
     const codeMarker = crypto.randomBytes(3).toString('hex');
+    const projectConfigMarker = crypto.randomBytes(3).toString('hex');
     const memoryMarker = crypto.randomBytes(3).toString('hex');
     const knowledgeMarker = crypto.randomBytes(3).toString('hex');
-    const folderName = `自动保存文件夹-${crypto.randomBytes(3).toString('hex')}`;
+    const renamedPageName = `自动保存重命名页-${crypto.randomBytes(3).toString('hex')}`;
+    const copiedPageName = `自动保存复制页-${crypto.randomBytes(3).toString('hex')}`;
+    const renamedFolderName = `自动保存文件夹-${crypto.randomBytes(3).toString('hex')}`;
+    const deletedFolderName = `自动保存待删文件夹-${crypto.randomBytes(3).toString('hex')}`;
 
     await openHome(page);
 
@@ -710,7 +886,30 @@ test.describe('画布自动保存与重新打开回归', () => {
       '自动保存顺序页',
     );
     await updateDemoPageCode(page, editSessionId, firstPage.id, codeMarker);
-    const folder = await createDemoFolder(page, project.id, editSessionId, folderName);
+    await renameDemoPage(page, project.id, editSessionId, firstPage.id, renamedPageName);
+    const copiedPage = await copyDemoPage(
+      page,
+      project.id,
+      editSessionId,
+      firstPage.id,
+      copiedPageName,
+    );
+    const deletedPage = await createDemoPage(
+      page,
+      project.id,
+      editSessionId,
+      '自动保存待删除页',
+    );
+    await deleteDemoPage(page, project.id, editSessionId, deletedPage.id);
+    const folder = await createDemoFolder(page, project.id, editSessionId, '自动保存原始文件夹');
+    await renameDemoFolder(page, project.id, editSessionId, folder.id, renamedFolderName);
+    const deletedFolder = await createDemoFolder(
+      page,
+      project.id,
+      editSessionId,
+      deletedFolderName,
+    );
+    await deleteDemoFolder(page, project.id, editSessionId, deletedFolder.id);
     await reorderPagesAndFolders(
       page,
       project.id,
@@ -718,16 +917,18 @@ test.describe('画布自动保存与重新打开回归', () => {
       [
         { id: secondPage.id, order: 0, parentId: null },
         { id: firstPage.id, order: 1, parentId: null },
+        { id: copiedPage.id, order: 2, parentId: null },
       ],
       [{ id: folder.id, order: 0, parentId: null }],
     );
+    await updateProjectConfigSchema(page, project.id, editSessionId, projectConfigMarker);
     await updateMemoryFile(page, editSessionId, memoryMarker);
     const knowledgeItem = await createKnowledgeDocument(
       page,
       filesBeforeEdits.workspacePath,
       knowledgeMarker,
     );
-    await saveSession(page, editSessionId);
+    await persistWorkspace(page, editSessionId);
 
     const canvasSessionPromise = waitForEditSession(page, project.id);
     await page.goto(`${E2E_BASE_URL}/demo/${project.id}/edit`, {
@@ -768,10 +969,17 @@ test.describe('画布自动保存与重新打开回归', () => {
       page,
       reopenedSessionBody.data.sessionId,
       {
+        projectId: project.id,
         codePageId: firstPage.id,
         codeMarker,
+        copiedPageId: copiedPage.id,
+        copiedPageName,
+        deletedPageId: deletedPage.id,
+        renamedPageName,
         firstPageIdAfterReorder: secondPage.id,
-        folderName,
+        renamedFolderName,
+        deletedFolderName,
+        projectConfigMarker,
         memoryMarker,
         knowledgeTitle: knowledgeItem.title,
         knowledgeMarker,

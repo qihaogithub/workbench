@@ -1,6 +1,6 @@
 # AGENTS.md - OPS CLI
 
-`OPS/CLI/` 是 `@opencode-workbench/cli-tools` 包，面向开发和 AI 代理的工程诊断工具。它用于脱离 Web 端测试 Agent Service、会话、工作区、文件读取、日志、健康检查和 WebSocket 流式响应。
+`OPS/CLI/` 是 `@workbench/cli-tools` 包，面向开发和 AI 代理的工程诊断工具。它用于脱离 Web 端测试 Agent Service、会话、工作区、文件读取、日志、健康检查和 WebSocket 流式响应。
 
 ## 读取顺序
 

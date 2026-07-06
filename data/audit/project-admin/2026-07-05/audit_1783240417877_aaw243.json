@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783240417877_aaw243",
+  "at": 1783240417877,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/Team_profile_picture/刚果民主共和国.webp",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/Team_profile_picture/刚果民主共和国.webp"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

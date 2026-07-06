@@ -1,0 +1,15 @@
+---
+url: 'https://openpencil.dev/programmable/sdk/api/components/toolbar-root.md'
+description: Headless structural primitive for editor toolbar UIs.
+---
+
+# ToolbarRoot
+
+`ToolbarRoot` is the headless toolbar primitive from `@open-pencil/vue`.
+
+Use it when you want reusable toolbar structure and context with your own buttons, styling, and layout.
+
+## Related APIs
+
+* [useEditorCommands](../composables/use-editor-commands)
+* [useSelectionCapabilities](../composables/use-selection-capabilities)

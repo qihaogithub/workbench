@@ -1,4 +1,4 @@
-import { generatePreviewAuthoringRules } from '@opencode-workbench/preview-contract/rules';
+import { generatePreviewAuthoringRules } from '@workbench/preview-contract/rules';
 
 import SYSTEM_PROMPT from './prompts/system-prompt.md';
 import { WORKSPACE_STATUS_TEMPLATE } from '../agent-prompts/workspace-status.template';

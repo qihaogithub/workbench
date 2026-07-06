@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783308984035_edexp5",
+  "at": 1783308984035,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783308984034_wdafmx",
+  "inputSummary": {
+    "name": "E2E:20260706T033622049Z-ayxfdf:OpenPencil 创作端接入回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783308984034_wdafmx"
+    ]
+  }
+}

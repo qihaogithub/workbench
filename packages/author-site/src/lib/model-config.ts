@@ -9,7 +9,7 @@
 
 import { readDbConfig } from "./db-config";
 import { getModelEnvConfig } from "./runtime-config";
-import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+import type { BackendProvidersConfig } from "@workbench/shared";
 
 const CONFIG_ID = "model_config";
 const CACHE_TTL = 60 * 1000; // 1 分钟缓存
@@ -23,7 +23,7 @@ interface CachedConfig {
  * 自动启用规则
  *
  * - type="prefix"     : 按分组前缀匹配,如 "xjjj/"
- * - type="nameFilter": 按分组+关键词匹配,格式 "分组:关键词",如 "opencode:Free"
+ * - type="nameFilter": 按分组+关键词匹配,格式 "分组:关键词",如 "workbench:Free"
  */
 export type AutoEnableRule =
   | { type: "prefix"; value: string }

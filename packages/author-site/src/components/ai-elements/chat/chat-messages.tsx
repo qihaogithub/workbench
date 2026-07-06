@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import type { ImageAttachment } from "@opencode-workbench/agent-client";
+import type { ImageAttachment } from "@workbench/agent-client";
 import type { UserChoiceResponse } from "./services/stream-service";
 import {
   Message,

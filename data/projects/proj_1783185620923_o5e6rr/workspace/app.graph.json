@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "entry": "01upcominghome",
+  "pages": {
+    "01upcominghome": {
+      "pageId": "worldcup_01_upcoming_home",
+      "title": "预热期首页"
+    },
+    "02activenovote": {
+      "pageId": "worldcup_02_active_no_vote",
+      "title": "进行中-未投票首页"
+    },
+    "03activevoted": {
+      "pageId": "worldcup_03_active_voted",
+      "title": "进行中-已投票待抽奖"
+    },
+    "04activechanceused": {
+      "pageId": "worldcup_04_active_chance_used",
+      "title": "进行中-今日机会已用完"
+    },
+    "05activewithprizes": {
+      "pageId": "worldcup_05_active_with_prizes",
+      "title": "进行中-已有奖品"
+    },
+    "06endedpending": {
+      "pageId": "worldcup_06_ended_pending",
+      "title": "已结束-冠军待揭晓"
+    },
+    "06endedskinunlocked": {
+      "pageId": "worldcup_06_ended_skin_unlocked",
+      "title": "已结束-冠军皮肤达标"
+    },
+    "07endedlost": {
+      "pageId": "worldcup_07_ended_lost",
+      "title": "已结束-未达标"
+    },
+    "08prizedrawerempty": {
+      "pageId": "worldcup_08_prize_drawer_empty",
+      "title": "我的奖品-空状态"
+    },
+    "09prizedrawerwithpri": {
+      "pageId": "worldcup_09_prize_drawer_with_prizes",
+      "title": "我的奖品-已有奖品"
+    },
+    "10teamdialog": {
+      "pageId": "worldcup_10_team_dialog",
+      "title": "球队详情弹窗"
+    },
+    "11teamsuccess": {
+      "pageId": "worldcup_11_team_success",
+      "title": "助威成功弹窗"
+    },
+    "12sharedialog": {
+      "pageId": "worldcup_12_share_dialog",
+      "title": "分享弹窗"
+    },
+    "13drawdrawing": {
+      "pageId": "worldcup_13_draw_drawing",
+      "title": "抽奖中"
+    },
+    "14drawmiss": {
+      "pageId": "worldcup_14_draw_miss",
+      "title": "抽奖结果-未中奖"
+    },
+    "15drawvip": {
+      "pageId": "worldcup_15_draw_vip",
+      "title": "抽奖结果-VIP"
+    },
+    "15drawgold": {
+      "pageId": "worldcup_15_draw_gold",
+      "title": "抽奖结果-金片"
+    },
+    "16drawplush": {
+      "pageId": "worldcup_16_draw_plush",
+      "title": "抽奖结果-公仔"
+    },
+    "16drawtrial": {
+      "pageId": "worldcup_16_draw_trial",
+      "title": "抽奖结果-体验课"
+    },
+    "17addressempty": {
+      "pageId": "worldcup_17_address_empty",
+      "title": "地址表单-未填写"
+    },
+    "18addressfilled": {
+      "pageId": "worldcup_18_address_filled",
+      "title": "地址表单-已填写"
+    },
+    "18addressconfirm": {
+      "pageId": "worldcup_18_address_confirm",
+      "title": "地址确认弹窗"
+    },
+    "18activationvip": {
+      "pageId": "worldcup_18_activation_vip",
+      "title": "VIP激活引导弹窗"
+    },
+    "19previewskin": {
+      "pageId": "worldcup_19_preview_skin",
+      "title": "奖品预览-冠军皮肤"
+    },
+    "19previewvip": {
+      "pageId": "worldcup_19_preview_vip",
+      "title": "奖品预览-VIP"
+    },
+    "19previewtrial": {
+      "pageId": "worldcup_19_preview_trial",
+      "title": "奖品预览-体验包"
+    },
+    "19previewgold": {
+      "pageId": "worldcup_19_preview_gold",
+      "title": "奖品预览-金片"
+    },
+    "20previewplush": {
+      "pageId": "worldcup_20_preview_plush",
+      "title": "奖品预览-公仔"
+    },
+    "20ruledialog": {
+      "pageId": "worldcup_20_rule_dialog",
+      "title": "活动规则弹窗"
+    },
+    "20feedbackdrawer": {
+      "pageId": "worldcup_20_feedback_drawer",
+      "title": "留言反馈抽屉"
+    },
+    "20feedbackerror": {
+      "pageId": "worldcup_20_feedback_error",
+      "title": "留言反馈-校验错误"
+    },
+    "20feedbacksent": {
+      "pageId": "worldcup_20_feedback_sent",
+      "title": "留言反馈-提交成功"
+    },
+    "21activeteamssection": {
+      "pageId": "worldcup_21_active_teams_section",
+      "title": "进行中-球队列表区域"
+    },
+    "22agegateconfirm": {
+      "pageId": "worldcup_22_age_gate_confirm",
+      "title": "年龄确认弹窗"
+    },
+    "23agegateblocked": {
+      "pageId": "worldcup_23_age_gate_blocked",
+      "title": "年龄限制提示"
+    },
+    "24loadingpage": {
+      "pageId": "worldcup_24_loading_page",
+      "title": "活动加载页"
+    },
+    "25outsidebrowserguid": {
+      "pageId": "worldcup_25_outside_browser_guide",
+      "title": "站外浏览器引导页"
+    },
+    "26outsidewechatguide": {
+      "pageId": "worldcup_26_outside_wechat_guide",
+      "title": "站外微信引导页"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

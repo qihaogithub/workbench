@@ -1,0 +1,133 @@
+# OpenPencil 文档本地镜像
+
+- 来源：https://openpencil.dev/llms.txt
+- 完整合订本：https://openpencil.dev/llms-full.txt
+- 下载时间：2026-07-05T12:28:50.899Z
+- 页面数量：117
+- 下载失败：0
+
+## 文件
+
+- `llms.txt`：官方文档目录，适合快速导航。
+- `llms-full.txt`：官方完整 Markdown 合订本，适合全文检索。
+- `pages/`：按官方 URL 路径保存的逐页 Markdown。
+
+## 页面索引
+
+- [pages/user-guide/canvas-navigation.md](./pages/user-guide/canvas-navigation.md) — https://openpencil.dev/user-guide/canvas-navigation.md
+- [pages/user-guide/selection-and-manipulation.md](./pages/user-guide/selection-and-manipulation.md) — https://openpencil.dev/user-guide/selection-and-manipulation.md
+- [pages/user-guide/context-menu.md](./pages/user-guide/context-menu.md) — https://openpencil.dev/user-guide/context-menu.md
+- [pages/user-guide/drawing-shapes.md](./pages/user-guide/drawing-shapes.md) — https://openpencil.dev/user-guide/drawing-shapes.md
+- [pages/user-guide/text-editing.md](./pages/user-guide/text-editing.md) — https://openpencil.dev/user-guide/text-editing.md
+- [pages/user-guide/pen-tool.md](./pages/user-guide/pen-tool.md) — https://openpencil.dev/user-guide/pen-tool.md
+- [pages/user-guide/layers-and-pages.md](./pages/user-guide/layers-and-pages.md) — https://openpencil.dev/user-guide/layers-and-pages.md
+- [pages/user-guide/exporting.md](./pages/user-guide/exporting.md) — https://openpencil.dev/user-guide/exporting.md
+- [pages/user-guide/auto-layout.md](./pages/user-guide/auto-layout.md) — https://openpencil.dev/user-guide/auto-layout.md
+- [pages/user-guide/components.md](./pages/user-guide/components.md) — https://openpencil.dev/user-guide/components.md
+- [pages/user-guide/variables.md](./pages/user-guide/variables.md) — https://openpencil.dev/user-guide/variables.md
+- [pages/programmable/sdk.md](./pages/programmable/sdk.md) — https://openpencil.dev/programmable/sdk.md
+- [pages/programmable/sdk/getting-started.md](./pages/programmable/sdk/getting-started.md) — https://openpencil.dev/programmable/sdk/getting-started.md
+- [pages/programmable/sdk/architecture.md](./pages/programmable/sdk/architecture.md) — https://openpencil.dev/programmable/sdk/architecture.md
+- [pages/programmable/sdk/guides/custom-editor-shell.md](./pages/programmable/sdk/guides/custom-editor-shell.md) — https://openpencil.dev/programmable/sdk/guides/custom-editor-shell.md
+- [pages/programmable/sdk/guides/property-panels.md](./pages/programmable/sdk/guides/property-panels.md) — https://openpencil.dev/programmable/sdk/guides/property-panels.md
+- [pages/programmable/sdk/guides/navigation-panels.md](./pages/programmable/sdk/guides/navigation-panels.md) — https://openpencil.dev/programmable/sdk/guides/navigation-panels.md
+- [pages/programmable/sdk/api.md](./pages/programmable/sdk/api.md) — https://openpencil.dev/programmable/sdk/api.md
+- [pages/programmable/sdk/api/components.md](./pages/programmable/sdk/api/components.md) — https://openpencil.dev/programmable/sdk/api/components.md
+- [pages/programmable/sdk/api/components/canvas-root.md](./pages/programmable/sdk/api/components/canvas-root.md) — https://openpencil.dev/programmable/sdk/api/components/canvas-root.md
+- [pages/programmable/sdk/api/components/canvas-surface.md](./pages/programmable/sdk/api/components/canvas-surface.md) — https://openpencil.dev/programmable/sdk/api/components/canvas-surface.md
+- [pages/programmable/sdk/api/components/layer-tree-root.md](./pages/programmable/sdk/api/components/layer-tree-root.md) — https://openpencil.dev/programmable/sdk/api/components/layer-tree-root.md
+- [pages/programmable/sdk/api/components/layer-tree-item.md](./pages/programmable/sdk/api/components/layer-tree-item.md) — https://openpencil.dev/programmable/sdk/api/components/layer-tree-item.md
+- [pages/programmable/sdk/api/components/toolbar-root.md](./pages/programmable/sdk/api/components/toolbar-root.md) — https://openpencil.dev/programmable/sdk/api/components/toolbar-root.md
+- [pages/programmable/sdk/api/components/toolbar-item.md](./pages/programmable/sdk/api/components/toolbar-item.md) — https://openpencil.dev/programmable/sdk/api/components/toolbar-item.md
+- [pages/programmable/sdk/api/components/page-list-root.md](./pages/programmable/sdk/api/components/page-list-root.md) — https://openpencil.dev/programmable/sdk/api/components/page-list-root.md
+- [pages/programmable/sdk/api/components/property-list-root.md](./pages/programmable/sdk/api/components/property-list-root.md) — https://openpencil.dev/programmable/sdk/api/components/property-list-root.md
+- [pages/programmable/sdk/api/components/property-list-item.md](./pages/programmable/sdk/api/components/property-list-item.md) — https://openpencil.dev/programmable/sdk/api/components/property-list-item.md
+- [pages/programmable/sdk/api/components/color-picker-root.md](./pages/programmable/sdk/api/components/color-picker-root.md) — https://openpencil.dev/programmable/sdk/api/components/color-picker-root.md
+- [pages/programmable/sdk/api/components/color-input-root.md](./pages/programmable/sdk/api/components/color-input-root.md) — https://openpencil.dev/programmable/sdk/api/components/color-input-root.md
+- [pages/programmable/sdk/api/components/fill-picker-root.md](./pages/programmable/sdk/api/components/fill-picker-root.md) — https://openpencil.dev/programmable/sdk/api/components/fill-picker-root.md
+- [pages/programmable/sdk/api/components/font-picker-root.md](./pages/programmable/sdk/api/components/font-picker-root.md) — https://openpencil.dev/programmable/sdk/api/components/font-picker-root.md
+- [pages/programmable/sdk/api/components/gradient-editor-root.md](./pages/programmable/sdk/api/components/gradient-editor-root.md) — https://openpencil.dev/programmable/sdk/api/components/gradient-editor-root.md
+- [pages/programmable/sdk/api/components/gradient-editor-bar.md](./pages/programmable/sdk/api/components/gradient-editor-bar.md) — https://openpencil.dev/programmable/sdk/api/components/gradient-editor-bar.md
+- [pages/programmable/sdk/api/components/gradient-editor-stop.md](./pages/programmable/sdk/api/components/gradient-editor-stop.md) — https://openpencil.dev/programmable/sdk/api/components/gradient-editor-stop.md
+- [pages/programmable/sdk/api/components/scrub-input-root.md](./pages/programmable/sdk/api/components/scrub-input-root.md) — https://openpencil.dev/programmable/sdk/api/components/scrub-input-root.md
+- [pages/programmable/sdk/api/components/scrub-input-field.md](./pages/programmable/sdk/api/components/scrub-input-field.md) — https://openpencil.dev/programmable/sdk/api/components/scrub-input-field.md
+- [pages/programmable/sdk/api/components/scrub-input-display.md](./pages/programmable/sdk/api/components/scrub-input-display.md) — https://openpencil.dev/programmable/sdk/api/components/scrub-input-display.md
+- [pages/programmable/sdk/api/components/layout-controls-root.md](./pages/programmable/sdk/api/components/layout-controls-root.md) — https://openpencil.dev/programmable/sdk/api/components/layout-controls-root.md
+- [pages/programmable/sdk/api/components/appearance-controls-root.md](./pages/programmable/sdk/api/components/appearance-controls-root.md) — https://openpencil.dev/programmable/sdk/api/components/appearance-controls-root.md
+- [pages/programmable/sdk/api/components/position-controls-root.md](./pages/programmable/sdk/api/components/position-controls-root.md) — https://openpencil.dev/programmable/sdk/api/components/position-controls-root.md
+- [pages/programmable/sdk/api/components/typography-controls-root.md](./pages/programmable/sdk/api/components/typography-controls-root.md) — https://openpencil.dev/programmable/sdk/api/components/typography-controls-root.md
+- [pages/programmable/sdk/api/composables.md](./pages/programmable/sdk/api/composables.md) — https://openpencil.dev/programmable/sdk/api/composables.md
+- [pages/programmable/sdk/api/composables/provide-editor.md](./pages/programmable/sdk/api/composables/provide-editor.md) — https://openpencil.dev/programmable/sdk/api/composables/provide-editor.md
+- [pages/programmable/sdk/api/composables/use-editor.md](./pages/programmable/sdk/api/composables/use-editor.md) — https://openpencil.dev/programmable/sdk/api/composables/use-editor.md
+- [pages/programmable/sdk/api/composables/use-canvas.md](./pages/programmable/sdk/api/composables/use-canvas.md) — https://openpencil.dev/programmable/sdk/api/composables/use-canvas.md
+- [pages/programmable/sdk/api/composables/use-canvas-input.md](./pages/programmable/sdk/api/composables/use-canvas-input.md) — https://openpencil.dev/programmable/sdk/api/composables/use-canvas-input.md
+- [pages/programmable/sdk/api/composables/use-text-edit.md](./pages/programmable/sdk/api/composables/use-text-edit.md) — https://openpencil.dev/programmable/sdk/api/composables/use-text-edit.md
+- [pages/programmable/sdk/api/composables/use-selection-state.md](./pages/programmable/sdk/api/composables/use-selection-state.md) — https://openpencil.dev/programmable/sdk/api/composables/use-selection-state.md
+- [pages/programmable/sdk/api/composables/use-selection-capabilities.md](./pages/programmable/sdk/api/composables/use-selection-capabilities.md) — https://openpencil.dev/programmable/sdk/api/composables/use-selection-capabilities.md
+- [pages/programmable/sdk/api/composables/use-editor-commands.md](./pages/programmable/sdk/api/composables/use-editor-commands.md) — https://openpencil.dev/programmable/sdk/api/composables/use-editor-commands.md
+- [pages/programmable/sdk/api/composables/use-menu-model.md](./pages/programmable/sdk/api/composables/use-menu-model.md) — https://openpencil.dev/programmable/sdk/api/composables/use-menu-model.md
+- [pages/programmable/sdk/api/composables/use-position.md](./pages/programmable/sdk/api/composables/use-position.md) — https://openpencil.dev/programmable/sdk/api/composables/use-position.md
+- [pages/programmable/sdk/api/composables/use-layout.md](./pages/programmable/sdk/api/composables/use-layout.md) — https://openpencil.dev/programmable/sdk/api/composables/use-layout.md
+- [pages/programmable/sdk/api/composables/use-appearance.md](./pages/programmable/sdk/api/composables/use-appearance.md) — https://openpencil.dev/programmable/sdk/api/composables/use-appearance.md
+- [pages/programmable/sdk/api/composables/use-typography.md](./pages/programmable/sdk/api/composables/use-typography.md) — https://openpencil.dev/programmable/sdk/api/composables/use-typography.md
+- [pages/programmable/sdk/api/composables/use-export.md](./pages/programmable/sdk/api/composables/use-export.md) — https://openpencil.dev/programmable/sdk/api/composables/use-export.md
+- [pages/programmable/sdk/api/composables/use-fill-controls.md](./pages/programmable/sdk/api/composables/use-fill-controls.md) — https://openpencil.dev/programmable/sdk/api/composables/use-fill-controls.md
+- [pages/programmable/sdk/api/composables/use-stroke-controls.md](./pages/programmable/sdk/api/composables/use-stroke-controls.md) — https://openpencil.dev/programmable/sdk/api/composables/use-stroke-controls.md
+- [pages/programmable/sdk/api/composables/use-effects-controls.md](./pages/programmable/sdk/api/composables/use-effects-controls.md) — https://openpencil.dev/programmable/sdk/api/composables/use-effects-controls.md
+- [pages/programmable/sdk/api/composables/use-variables-editor.md](./pages/programmable/sdk/api/composables/use-variables-editor.md) — https://openpencil.dev/programmable/sdk/api/composables/use-variables-editor.md
+- [pages/programmable/sdk/api/composables/use-page-list.md](./pages/programmable/sdk/api/composables/use-page-list.md) — https://openpencil.dev/programmable/sdk/api/composables/use-page-list.md
+- [pages/programmable/sdk/api/advanced.md](./pages/programmable/sdk/api/advanced.md) — https://openpencil.dev/programmable/sdk/api/advanced.md
+- [pages/programmable/sdk/api/advanced/use-node-props.md](./pages/programmable/sdk/api/advanced/use-node-props.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-node-props.md
+- [pages/programmable/sdk/api/advanced/use-scene-computed.md](./pages/programmable/sdk/api/advanced/use-scene-computed.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-scene-computed.md
+- [pages/programmable/sdk/api/advanced/use-color-variable-binding.md](./pages/programmable/sdk/api/advanced/use-color-variable-binding.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-color-variable-binding.md
+- [pages/programmable/sdk/api/advanced/use-fill-picker.md](./pages/programmable/sdk/api/advanced/use-fill-picker.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-fill-picker.md
+- [pages/programmable/sdk/api/advanced/use-gradient-stops.md](./pages/programmable/sdk/api/advanced/use-gradient-stops.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-gradient-stops.md
+- [pages/programmable/sdk/api/advanced/use-font-picker.md](./pages/programmable/sdk/api/advanced/use-font-picker.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-font-picker.md
+- [pages/programmable/sdk/api/advanced/use-prop-scrub.md](./pages/programmable/sdk/api/advanced/use-prop-scrub.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-prop-scrub.md
+- [pages/programmable/sdk/api/advanced/use-layer-drag.md](./pages/programmable/sdk/api/advanced/use-layer-drag.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-layer-drag.md
+- [pages/programmable/sdk/api/advanced/use-inline-rename.md](./pages/programmable/sdk/api/advanced/use-inline-rename.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-inline-rename.md
+- [pages/programmable/sdk/api/advanced/use-toolbar-state.md](./pages/programmable/sdk/api/advanced/use-toolbar-state.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-toolbar-state.md
+- [pages/programmable/sdk/api/advanced/use-node-font-status.md](./pages/programmable/sdk/api/advanced/use-node-font-status.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-node-font-status.md
+- [pages/programmable/sdk/api/advanced/use-canvas-drop.md](./pages/programmable/sdk/api/advanced/use-canvas-drop.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-canvas-drop.md
+- [pages/programmable/sdk/api/advanced/extract-image-files-from-clipboard.md](./pages/programmable/sdk/api/advanced/extract-image-files-from-clipboard.md) — https://openpencil.dev/programmable/sdk/api/advanced/extract-image-files-from-clipboard.md
+- [pages/programmable/sdk/api/advanced/tool-cursor.md](./pages/programmable/sdk/api/advanced/tool-cursor.md) — https://openpencil.dev/programmable/sdk/api/advanced/tool-cursor.md
+- [pages/programmable/sdk/api/advanced/use-canvas-context.md](./pages/programmable/sdk/api/advanced/use-canvas-context.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-canvas-context.md
+- [pages/programmable/sdk/api/advanced/use-layer-tree.md](./pages/programmable/sdk/api/advanced/use-layer-tree.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-layer-tree.md
+- [pages/programmable/sdk/api/advanced/use-toolbar.md](./pages/programmable/sdk/api/advanced/use-toolbar.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-toolbar.md
+- [pages/programmable/sdk/api/advanced/use-property-list.md](./pages/programmable/sdk/api/advanced/use-property-list.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-property-list.md
+- [pages/programmable/sdk/api/advanced/use-scrub-input.md](./pages/programmable/sdk/api/advanced/use-scrub-input.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-scrub-input.md
+- [pages/programmable.md](./pages/programmable.md) — https://openpencil.dev/programmable.md
+- [pages/reference/cli.md](./pages/reference/cli.md) — https://openpencil.dev/reference/cli.md
+- [pages/programmable/cli/inspecting.md](./pages/programmable/cli/inspecting.md) — https://openpencil.dev/programmable/cli/inspecting.md
+- [pages/programmable/cli/exporting.md](./pages/programmable/cli/exporting.md) — https://openpencil.dev/programmable/cli/exporting.md
+- [pages/programmable/cli/analyzing.md](./pages/programmable/cli/analyzing.md) — https://openpencil.dev/programmable/cli/analyzing.md
+- [pages/programmable/cli/scripting.md](./pages/programmable/cli/scripting.md) — https://openpencil.dev/programmable/cli/scripting.md
+- [pages/programmable/jsx-renderer.md](./pages/programmable/jsx-renderer.md) — https://openpencil.dev/programmable/jsx-renderer.md
+- [pages/programmable/mcp-server.md](./pages/programmable/mcp-server.md) — https://openpencil.dev/programmable/mcp-server.md
+- [pages/programmable/ai-chat.md](./pages/programmable/ai-chat.md) — https://openpencil.dev/programmable/ai-chat.md
+- [pages/programmable/collaboration.md](./pages/programmable/collaboration.md) — https://openpencil.dev/programmable/collaboration.md
+- [pages/reference/keyboard-shortcuts.md](./pages/reference/keyboard-shortcuts.md) — https://openpencil.dev/reference/keyboard-shortcuts.md
+- [pages/reference/node-types.md](./pages/reference/node-types.md) — https://openpencil.dev/reference/node-types.md
+- [pages/reference/scene-graph.md](./pages/reference/scene-graph.md) — https://openpencil.dev/reference/scene-graph.md
+- [pages/reference/dom-css-mapping.md](./pages/reference/dom-css-mapping.md) — https://openpencil.dev/reference/dom-css-mapping.md
+- [pages/reference/file-format.md](./pages/reference/file-format.md) — https://openpencil.dev/reference/file-format.md
+- [pages/guide/getting-started.md](./pages/guide/getting-started.md) — https://openpencil.dev/guide/getting-started.md
+- [pages/guide/features.md](./pages/guide/features.md) — https://openpencil.dev/guide/features.md
+- [pages/guide/architecture.md](./pages/guide/architecture.md) — https://openpencil.dev/guide/architecture.md
+- [pages/guide/tech-stack.md](./pages/guide/tech-stack.md) — https://openpencil.dev/guide/tech-stack.md
+- [pages/guide/comparison.md](./pages/guide/comparison.md) — https://openpencil.dev/guide/comparison.md
+- [pages/guide/figma-comparison.md](./pages/guide/figma-comparison.md) — https://openpencil.dev/guide/figma-comparison.md
+- [pages/development/contributing.md](./pages/development/contributing.md) — https://openpencil.dev/development/contributing.md
+- [pages/development/testing.md](./pages/development/testing.md) — https://openpencil.dev/development/testing.md
+- [pages/development/roadmap.md](./pages/development/roadmap.md) — https://openpencil.dev/development/roadmap.md
+- [pages/programmable/sdk/api/advanced/locale-apis.md](./pages/programmable/sdk/api/advanced/locale-apis.md) — https://openpencil.dev/programmable/sdk/api/advanced/locale-apis.md
+- [pages/development/renderer-profiler.md](./pages/development/renderer-profiler.md) — https://openpencil.dev/development/renderer-profiler.md
+- [pages/programmable/sdk/api/composables/use-i18n.md](./pages/programmable/sdk/api/composables/use-i18n.md) — https://openpencil.dev/programmable/sdk/api/composables/use-i18n.md
+- [pages/programmable/sdk/api/advanced/use-okhcl.md](./pages/programmable/sdk/api/advanced/use-okhcl.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-okhcl.md
+- [pages/user-guide.md](./pages/user-guide.md) — https://openpencil.dev/user-guide.md
+- [pages/programmable/sdk/api/advanced/use-variables.md](./pages/programmable/sdk/api/advanced/use-variables.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-variables.md
+- [pages/programmable/sdk/api/advanced/use-variables-dialog-state.md](./pages/programmable/sdk/api/advanced/use-variables-dialog-state.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-variables-dialog-state.md
+- [pages/programmable/sdk/api/advanced/use-variables-table.md](./pages/programmable/sdk/api/advanced/use-variables-table.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-variables-table.md
+- [pages/programmable/sdk/api/advanced/use-viewport-kind.md](./pages/programmable/sdk/api/advanced/use-viewport-kind.md) — https://openpencil.dev/programmable/sdk/api/advanced/use-viewport-kind.md
+- [pages/development/vector-conversion.md](./pages/development/vector-conversion.md) — https://openpencil.dev/development/vector-conversion.md
+- [pages/user-guide/vector-edit.md](./pages/user-guide/vector-edit.md) — https://openpencil.dev/user-guide/vector-edit.md

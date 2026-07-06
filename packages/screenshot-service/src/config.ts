@@ -16,6 +16,7 @@ export const config = {
 
   // Puppeteer
   puppeteerExecutablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "",
+  puppeteerDisableSandbox: process.env.PUPPETEER_DISABLE_SANDBOX === "true",
   viewport: {
     width: 375,
     height: 812,

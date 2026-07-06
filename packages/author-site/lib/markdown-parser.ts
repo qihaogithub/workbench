@@ -3,7 +3,7 @@
  * 用于解析和构建 Figma 插件导出的 Markdown Code Block 格式
  *
  * 格式规范：
- * # OpenCode Workbench Export
+ * # Workbench Export
  * ## Component Code
  * ```tsx
  * {code}
@@ -21,7 +21,7 @@ export interface ParsedMarkdownContent {
   error?: string;
 }
 
-const MARKDOWN_TITLE = "# OpenCode Workbench Export";
+const MARKDOWN_TITLE = "# Workbench Export";
 const CODE_SECTION = "## Component Code";
 const SCHEMA_SECTION = "## Schema Config";
 

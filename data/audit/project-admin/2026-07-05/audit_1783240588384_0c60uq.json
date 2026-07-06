@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783240588384_0c60uq",
+  "at": 1783240588384,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/cheer-dialog/ip/海地.webp",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/cheer-dialog/ip/海地.webp"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

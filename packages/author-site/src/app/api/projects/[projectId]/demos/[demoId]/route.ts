@@ -13,7 +13,9 @@ import {
   isSessionExpired,
   findWorkspacePath,
   getDemoDirPath,
+  createDeletedWorkspaceDemoPageSnapshot,
   readFoldersMeta,
+  restoreDeletedWorkspaceDemoPageSnapshot,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import fs from "fs";
@@ -248,6 +250,63 @@ export async function PATCH(
   }
 }
 
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { projectId: string; demoId: string } },
+) {
+  try {
+    const { projectId, demoId } = params;
+    if (!projectExists(projectId)) {
+      return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
+    const ctx = await resolveSessionWorkspace(request, projectId);
+    if (!ctx.ok) return ctx.response;
+
+    const body = await request.json().catch(() => ({}));
+    const { action, snapshotId } = body as {
+      action?: string;
+      snapshotId?: string;
+    };
+
+    if (action !== "restoreDeletedSnapshot" || !snapshotId) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "恢复页面参数不完整"),
+        { status: 400 },
+      );
+    }
+
+    const result = restoreDeletedWorkspaceDemoPageSnapshot(
+      ctx.ctx.workspaceId,
+      demoId,
+      snapshotId,
+    );
+    if (!result.success) {
+      const status =
+        result.reason === "PAGE_EXISTS" ||
+        result.reason === "PARENT_FOLDER_NOT_FOUND"
+          ? 409
+          : result.reason === "SNAPSHOT_NOT_FOUND"
+            ? 404
+            : 500;
+      return NextResponse.json(
+        createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+        { status },
+      );
+    }
+
+    return NextResponse.json(createApiSuccess(result.page));
+  } catch (error) {
+    console.error("Error restoring demo page:", error);
+    return NextResponse.json(
+      createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { projectId: string; demoId: string } },
@@ -270,6 +329,17 @@ export async function DELETE(
       });
     }
 
+    const snapshot = createDeletedWorkspaceDemoPageSnapshot(
+      ctx.ctx.workspaceId,
+      demoId,
+    );
+    if (!snapshot) {
+      return NextResponse.json(
+        createApiError("FILE_WRITE_ERROR", "创建页面删除快照失败"),
+        { status: 500 },
+      );
+    }
+
     const success = deleteWorkspaceDemoPage(ctx.ctx.workspaceId, demoId);
     if (!success) {
       return NextResponse.json(
@@ -278,7 +348,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json(createApiSuccess(null));
+    return NextResponse.json(createApiSuccess(snapshot));
   } catch (error) {
     console.error("Error deleting demo page:", error);
     return NextResponse.json(

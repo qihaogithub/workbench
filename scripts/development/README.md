@@ -231,7 +231,7 @@ node scripts/development/knowledge-validation-suite.mjs ai --project-id <project
 3. 运行 agent-service 的相关单测：
 
 ```bash
-pnpm --filter @opencode-workbench/agent-service test -- tests/unit/pi-agent.test.ts tests/unit/ws-event-router.test.ts
+pnpm --filter @workbench/agent-service test -- tests/unit/pi-agent.test.ts tests/unit/ws-event-router.test.ts
 ```
 
 脚本还会扫描 `data/agent-run-logs/` 下最近的 JSONL 运行日志，并摘要其中的 `writeFile` 工具调用结果，方便排查 AI 写文件是否成功。

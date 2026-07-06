@@ -9,7 +9,7 @@
       "title": "Agent Service diagnostics CLI",
       "path": "OPS/CLI/src/index.ts",
       "packagePath": "OPS/CLI/package.json",
-      "command": "corepack pnpm --filter @opencode-workbench/cli-tools dev -- --help",
+      "command": "corepack pnpm --filter @workbench/cli-tools dev -- --help",
       "ownerArea": "agent-service",
       "status": "active",
       "automationLevel": "report-only",

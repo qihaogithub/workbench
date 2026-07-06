@@ -40,7 +40,7 @@ import {
   useDemos,
   useProjectTemplates,
 } from "@/lib/api";
-import type { DemoMeta, ProjectTemplateMeta } from "@opencode-workbench/shared";
+import type { DemoMeta, ProjectTemplateMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
 type SelectedNav =

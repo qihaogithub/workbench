@@ -1,6 +1,6 @@
 {
   "version": "2026-06-preview-runtime-v4",
-  "generatedAt": "2026-06-30T05:35:52.731Z",
+  "generatedAt": "2026-07-06T07:45:08.869Z",
   "imports": {
     "react": "/preview-runtime/vendor/react.js",
     "react-dom": "/preview-runtime/vendor/react-dom.js",
@@ -9,6 +9,7 @@
     "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
     "lucide-react": "/preview-runtime/vendor/lucide-react.js",
     "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+    "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
     "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js"
   },
   "files": {
@@ -52,19 +53,24 @@
       "hash": "be993e4a8dfc0cdb",
       "bytes": 6868
     },
+    "vendor/svgaplayerweb.js": {
+      "hash": "71d0141a6a8a0149",
+      "bytes": 123489
+    },
     "vendor/chunks/chunk-3LQ24N6V.js": {
       "hash": "ef59f50aa92040b6",
       "bytes": 914
     },
     "vendor/preview-sdk.js": {
-      "hash": "59616e653b93e96e",
-      "bytes": 9826
+      "hash": "8a9ff832d9d8b9f8",
+      "bytes": 11511
     }
   },
   "packages": {
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "lucide-react": "0.323.0",
-    "framer-motion": "12.38.0"
+    "framer-motion": "12.38.0",
+    "svgaplayerweb": "2.3.1"
   }
 }
