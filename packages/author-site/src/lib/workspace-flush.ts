@@ -1,4 +1,4 @@
-import type { ErrorCodeType } from "@opencode-workbench/shared";
+import type { ErrorCodeType } from "@workbench/shared";
 
 import { getServerAgentServiceUrl } from "./runtime-config";
 import { renewEditSession } from "./session-manager";

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1783317737408_tjkaex",
+  "at": 1783317737408,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1783317733026_jkt1em",
+  "resourceId": "proj_1783317733026_jkt1em",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1783317733026_jkt1em"
+    ]
+  }
+}

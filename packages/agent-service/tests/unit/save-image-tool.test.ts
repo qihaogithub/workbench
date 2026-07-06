@@ -42,6 +42,7 @@ class MockRequest extends EventEmitter {
 
 const baseConfig: AgentConfig = {
   sessionId: 'test-session',
+  workingDir: '/workspace/project-1',
 };
 
 function createTool(config: AgentConfig = baseConfig) {
@@ -95,7 +96,7 @@ describe('createSaveImageTool', () => {
   });
 
   describe('Base64 来源', () => {
-    it('应正确解码并保存 Base64 图片，返回绝对 URL', async () => {
+    it('应正确解码并保存 Base64 图片到项目工作区', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);
 
@@ -107,13 +108,15 @@ describe('createSaveImageTool', () => {
       } as any);
 
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toMatch(/^Image saved: \/api\/images\/[a-f0-9]{12}-test-image\.png$/);
+      expect(result.content[0].text).toMatch(/^Image saved locally: assets\/images\/[a-f0-9]{12}-test-image\.png/);
+      expect(result.details.url).toMatch(/^assets\/images\/[a-f0-9]{12}-test-image\.png$/);
+      expect(result.details.relativePathFromPage).toMatch(/^\.\.\/\.\.\/assets\/images\/[a-f0-9]{12}-test-image\.png$/);
       expect(result.details.format).toBe('png');
       expect(result.details.source).toBe('base64');
       expect(result.details.sha256).toHaveLength(12);
       expect(fs.promises.writeFile).toHaveBeenCalled();
       const writeCall = (fs.promises.writeFile as any).mock.calls[0];
-      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/images\/[a-f0-9]{12}-test-image\.png$/);
+      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/assets\/images\/[a-f0-9]{12}-test-image\.png$/);
     });
 
     it('空 Base64 数据应被拒绝', async () => {
@@ -128,7 +131,7 @@ describe('createSaveImageTool', () => {
       expect(result.content[0].text).toContain('Empty Base64 data');
     });
 
-    it('directory 参数应被忽略（图床统一存储）', async () => {
+    it('directory 参数应被忽略（统一保存到项目 assets/images）', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);
 
@@ -142,7 +145,19 @@ describe('createSaveImageTool', () => {
 
       expect(result.isError).toBeFalsy();
       const writeCall = (fs.promises.writeFile as any).mock.calls[0];
-      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/images\/[a-f0-9]{12}-hero\.png$/);
+      expect(String(writeCall[0]).replace(/\\/g, '/')).toMatch(/assets\/images\/[a-f0-9]{12}-hero\.png$/);
+    });
+
+    it('缺少项目工作区时应拒绝保存', async () => {
+      const tool = createTool({ sessionId: 'test-session' });
+      const result = await tool.execute('id', {
+        source: 'base64',
+        data: 'dGVzdA==',
+        filename: 'hero.png',
+      } as any);
+
+      expect(result.isError).toBe(true);
+      expect(result.details.error).toBe('missing_working_dir');
     });
   });
 
@@ -227,13 +242,14 @@ describe('createSaveImageTool', () => {
   });
 
   describe('项目图片清单', () => {
-    it('配置了 demoId 时应更新 images.json', async () => {
+    it('配置了 projectId 时应更新项目 images.json', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);
 
       const tool = createTool({
         ...baseConfig,
-        demoId: 'test-project',
+        projectId: 'test-project',
+        demoId: 'page-1',
       });
       const result = await tool.execute('id', {
         source: 'base64',
@@ -243,6 +259,8 @@ describe('createSaveImageTool', () => {
 
       expect(result.isError).toBeFalsy();
       expect(fs.writeFileSync).toHaveBeenCalled();
+      const manifestCall = (fs.writeFileSync as any).mock.calls[0];
+      expect(String(manifestCall[0]).replace(/\\/g, '/')).toContain('/projects/test-project/images.json');
     });
   });
 });

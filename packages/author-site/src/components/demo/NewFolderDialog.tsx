@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DemoFolderMeta } from "@opencode-workbench/shared";
+import type { DemoFolderMeta } from "@workbench/shared";
 import {
   Dialog,
   DialogContent,

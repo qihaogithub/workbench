@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
+import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 
 function shouldUsePreviewRuntimeCdn(): boolean {
   return (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DingtalkExternalAuthCredential } from "@opencode-workbench/shared";
+import type { DingtalkExternalAuthCredential } from "@workbench/shared";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {

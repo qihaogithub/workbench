@@ -1,4 +1,9 @@
-import { extractImageReferences, isLocalPath, isApiImagePath } from '../image-scanner';
+import {
+  extractImageReferences,
+  isApiImagePath,
+  isExternalImageUrl,
+  isLocalPath,
+} from '../image-scanner';
 
 describe('isLocalPath', () => {
   it('本地相对路径返回 true', () => {
@@ -58,6 +63,18 @@ describe('isApiImagePath', () => {
   });
 });
 
+describe('isExternalImageUrl', () => {
+  it('HTTP/HTTPS URL 返回 true', () => {
+    expect(isExternalImageUrl('https://cdn.example.com/image.png')).toBe(true);
+    expect(isExternalImageUrl('http://cdn.example.com/image')).toBe(true);
+  });
+
+  it('非 HTTP 图片 URL 返回 false', () => {
+    expect(isExternalImageUrl('./images/hero.png')).toBe(false);
+    expect(isExternalImageUrl('data:image/png;base64,...')).toBe(false);
+  });
+});
+
 describe('extractImageReferences', () => {
   const sourceFile = '/workspace/demos/home/index.tsx';
 
@@ -112,10 +129,25 @@ describe('extractImageReferences', () => {
     });
   });
 
-  it('跳过 HTTPS 图片 URL', () => {
+  it('提取 HTTPS 图片 URL', () => {
     const content = '<img src="https://cdn.example.com/photo.png" />';
     const refs = extractImageReferences(content, sourceFile);
-    expect(refs).toHaveLength(0);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: 'https://cdn.example.com/photo.png',
+      absolutePath: 'https://cdn.example.com/photo.png',
+      type: 'external-url',
+    });
+  });
+
+  it('提取配置字符串中的 HTTPS 图片 URL', () => {
+    const content = '{"default": "https://cdn.example.com/config-hero.webp"}';
+    const refs = extractImageReferences(content, '/workspace/project.config.schema.json');
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: 'https://cdn.example.com/config-hero.webp',
+      type: 'external-url',
+    });
   });
 
   it('跳过 data URI 图片', () => {
@@ -129,9 +161,10 @@ describe('extractImageReferences', () => {
       import hero from "./images/hero.png";
       <img src="./thumbnail.jpg" />
       <img src="/api/images/a1b2c3d4-product.png" />
+      <img src="https://cdn.example.com/banner.webp" />
       <div style={{ backgroundImage: "url('./bg.svg')" }} />
     `;
     const refs = extractImageReferences(content, sourceFile);
-    expect(refs).toHaveLength(4);
+    expect(refs).toHaveLength(5);
   });
 });

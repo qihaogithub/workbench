@@ -17,7 +17,9 @@ import {
   readFoldersMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
+import type { DemoPageRuntimeType } from "@workbench/shared";
 
 export async function GET(
   request: NextRequest,
@@ -88,7 +90,13 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { sessionId, name, sourcePageId, parentId } = body as { sessionId?: string; name?: string; sourcePageId?: string; parentId?: string | null };
+    const { sessionId, name, sourcePageId, parentId, runtimeType } = body as {
+      sessionId?: string;
+      name?: string;
+      sourcePageId?: string;
+      parentId?: string | null;
+      runtimeType?: DemoPageRuntimeType;
+    };
 
     if (!sessionId || typeof sessionId !== "string") {
       return NextResponse.json(
@@ -104,6 +112,23 @@ export async function POST(
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "name 参数必填且不能为空"),
         { status: 400 },
+      );
+    }
+    if (
+      runtimeType !== undefined &&
+      runtimeType !== "prototype-html-css" &&
+      runtimeType !== "high-fidelity-react" &&
+      runtimeType !== "sketch-scene"
+    ) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "runtimeType 不合法"),
+        { status: 400 },
+      );
+    }
+    if (runtimeType === "sketch-scene" && !isSketchSceneAuthoringEnabled()) {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "手绘页面功能暂未在创作端开放"),
+        { status: 403 },
       );
     }
 
@@ -173,7 +198,7 @@ export async function POST(
 
     const demoMeta = sourcePageId
       ? copyWorkspaceDemoPage(meta.workspaceId, sourcePageId, name.trim())
-      : createWorkspaceDemoPage(meta.workspaceId, name.trim(), parentId);
+      : createWorkspaceDemoPage(meta.workspaceId, name.trim(), parentId, runtimeType);
     if (!demoMeta) {
       return NextResponse.json(
         createApiError("FILE_WRITE_ERROR", "创建页面失败"),

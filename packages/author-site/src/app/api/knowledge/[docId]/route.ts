@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
-import { ProjectAdminService } from '@opencode-workbench/project-core';
+import { ProjectAdminService } from '@workbench/project-core';
 import { getDataDir } from '@/lib/fs-utils';
 
 interface KnowledgeItem {

@@ -2,31 +2,18 @@
   "folders": [],
   "pages": [
     {
-      "id": "demo_1779608460372_f5g6h7",
-      "name": "手机-react",
-      "routeKey": "demo",
+      "id": "page_lib0",
+      "name": "手机",
+      "routeKey": "page",
+      "runtimeType": "prototype-html-css",
       "order": 0,
       "parentId": null
     },
     {
-      "id": "demo_1779608460373_h7i8j9",
-      "name": "pad-react",
-      "routeKey": "demo-2",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "page_lib0",
-      "name": "手机 - HTML",
-      "routeKey": "page",
-      "runtimeType": "prototype-html-css",
-      "order": 3,
-      "parentId": null
-    },
-    {
       "id": "pad-react_3gok",
-      "name": "pad-",
+      "name": "pad",
       "routeKey": "pad-react",
+      "runtimeType": "prototype-html-css",
       "order": 1,
       "parentId": null
     }

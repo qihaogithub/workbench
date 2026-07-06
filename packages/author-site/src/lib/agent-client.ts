@@ -1,4 +1,4 @@
-import { AgentClient } from '@opencode-workbench/agent-client';
+import { AgentClient } from '@workbench/agent-client';
 
 import {
   getAgentServiceApiKey,
@@ -30,4 +30,4 @@ export type {
   ErrorCode,
   StreamEvent,
   ToolCapabilities,
-} from '@opencode-workbench/agent-client';
+} from '@workbench/agent-client';

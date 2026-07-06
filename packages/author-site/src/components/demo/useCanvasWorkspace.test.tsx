@@ -2,7 +2,7 @@
 
 import { renderHook, waitFor } from "@testing-library/react";
 import { act } from "react";
-import type { CanvasState } from "@opencode-workbench/demo-ui";
+import type { CanvasState } from "@workbench/demo-ui";
 import { useCanvasWorkspace } from "./useCanvasWorkspace";
 
 function getFetchUrl(input: RequestInfo | URL): string {

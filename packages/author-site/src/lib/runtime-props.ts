@@ -11,7 +11,7 @@
  * 详见 docs/plans/进行中/项目多Demo页面支持方案.md §2.3 / §2.6 / §4.6
  */
 
-import { getDefaultValues } from "@opencode-workbench/demo-ui";
+import { getDefaultValues } from "@workbench/demo-ui";
 
 /**
  * 字段冲突错误：项目级 Schema 与页面级 Schema 出现同名字段。

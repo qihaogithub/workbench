@@ -1,7 +1,7 @@
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
-} from "@opencode-workbench/shared/contracts";
+} from "@workbench/shared/contracts";
 
 // ============================================================
 // 基础类型
@@ -39,6 +39,7 @@ export type ErrorCode =
 export interface AgentConfig {
   sessionId: string;
   workingDir?: string;
+  projectId?: string;
   demoId?: string;
   model?: string;
   toolMode?: "workbench" | "viewer-readonly";

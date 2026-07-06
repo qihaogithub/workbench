@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -33,6 +33,7 @@ import {
   PreviewPanel,
   PageConfigPanel,
   PrototypePagePreview,
+  SketchPagePreview,
 } from "@/components/demo";
 import { PreviewCanvas } from "@/components/demo";
 import type { PreviewMode, CanvasState } from "@/components/demo";
@@ -40,7 +41,7 @@ import {
   isSchemaEmpty,
 } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
-import type { PreviewSize } from "@opencode-workbench/demo-ui";
+import type { PreviewSize } from "@workbench/demo-ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ViewerAiDrawer } from "@/components/ViewerAiDrawer";
@@ -71,6 +72,43 @@ function mergeConfigDefaults(
   return { ...projectDefaults, ...pageDefaults };
 }
 
+function getSinglePreviewFrameSize(previewSize?: PreviewSize): {
+  width: number;
+  height: number;
+} {
+  return {
+    width:
+      typeof previewSize?.width === "number" && Number.isFinite(previewSize.width)
+        ? previewSize.width
+        : 375,
+    height:
+      typeof previewSize?.height === "number" && Number.isFinite(previewSize.height)
+        ? previewSize.height
+        : 812,
+  };
+}
+
+function SinglePreviewStage({
+  previewSize,
+  children,
+}: {
+  previewSize?: PreviewSize;
+  children: ReactNode;
+}) {
+  const { width, height } = getSinglePreviewFrameSize(previewSize);
+
+  return (
+    <div className="flex min-h-full items-start justify-center bg-neutral-950 p-6">
+      <div
+        className="overflow-hidden rounded-[22px] border border-white/10 bg-white shadow-2xl ring-1 ring-black/40"
+        style={{ width, maxWidth: "100%", aspectRatio: `${width} / ${height}` }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function PublishedIframePreview({
   src,
   title,
@@ -80,29 +118,15 @@ function PublishedIframePreview({
   title: string;
   previewSize?: PreviewSize;
 }) {
-  const width =
-    typeof previewSize?.width === "number" && Number.isFinite(previewSize.width)
-      ? previewSize.width
-      : 375;
-  const height =
-    typeof previewSize?.height === "number" && Number.isFinite(previewSize.height)
-      ? previewSize.height
-      : 812;
-
   return (
-    <div className="flex min-h-full items-start justify-center bg-muted/20 p-6">
-      <div
-        className="overflow-hidden bg-white shadow-sm"
-        style={{ width, maxWidth: "100%", aspectRatio: `${width} / ${height}` }}
-      >
-        <iframe
-          title={title}
-          src={src}
-          className="h-full w-full border-0"
-          sandbox="allow-scripts"
-        />
-      </div>
-    </div>
+    <SinglePreviewStage previewSize={previewSize}>
+      <iframe
+        title={title}
+        src={src}
+        className="h-full w-full border-0"
+        sandbox="allow-scripts"
+      />
+    </SinglePreviewStage>
   );
 }
 
@@ -690,6 +714,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     prototypeHtml: p.prototypeHtml,
                     prototypeCss: p.prototypeCss,
                     prototypeMeta: p.prototypeMeta,
+                    sketchScene: p.sketchScene
+                      ? JSON.stringify(p.sketchScene)
+                      : undefined,
+                    sketchMeta: p.sketchMeta,
                     configData: configDataMap[p.id],
                     previewSize: p.previewSize,
                   }))}
@@ -716,18 +744,33 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     previewSize={previewSize ?? activePage?.previewSize}
                   />
                 ) : activePage?.runtimeType === "prototype-html-css" ? (
-                  <PrototypePagePreview
-                    html={activePage.prototypeHtml}
-                    css={activePage.prototypeCss}
-                    configData={configData}
-                    className="min-h-full"
-                  />
+                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
+                    <PrototypePagePreview
+                      html={activePage.prototypeHtml}
+                      css={activePage.prototypeCss}
+                      configData={configData}
+                      previewSize={previewSize ?? activePage.previewSize}
+                      fillContainer
+                    />
+                  </SinglePreviewStage>
+                ) : activePage?.runtimeType === "sketch-scene" ? (
+                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
+                    <SketchPagePreview
+                      scene={activePage.sketchScene}
+                      configData={configData}
+                      previewSize={previewSize ?? activePage.previewSize}
+                      fillContainer
+                    />
+                  </SinglePreviewStage>
                 ) : activePage ? (
-                  <PreviewPanel
-                    compiledJsUrl={compiledUrl}
-                    configData={configData}
-                    previewSize={previewSize}
-                  />
+                  <SinglePreviewStage previewSize={previewSize ?? activePage.previewSize}>
+                    <PreviewPanel
+                      compiledJsUrl={compiledUrl}
+                      configData={configData}
+                      previewSize={previewSize ?? activePage.previewSize}
+                      fillContainer
+                    />
+                  </SinglePreviewStage>
                 ) : null}
               </div>
             )}

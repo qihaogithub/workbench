@@ -47,7 +47,7 @@ cat > "$DEPLOY_DIR/_headers" << 'EOF'
   Cache-Control: public, immutable
 EOF
 
-CLOUDFLARE_PROJECT_NAME="${CLOUDFLARE_PROJECT_NAME:-opencode-viewer}"
+CLOUDFLARE_PROJECT_NAME="${CLOUDFLARE_PROJECT_NAME:-workbench-viewer}"
 
 npx wrangler pages deploy "$DEPLOY_DIR" \
   --project-name="$CLOUDFLARE_PROJECT_NAME" \

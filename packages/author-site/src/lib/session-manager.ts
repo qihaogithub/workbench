@@ -30,7 +30,7 @@ import type {
   VersionInfo,
   MultiDemoFiles,
   VersionHistoryEntryType,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 const DIRECTORY_REPLACE_RETRY_DELAYS_MS = [80, 160, 320, 640];
 
@@ -472,7 +472,7 @@ export async function createEditSession(
     workspaceId,
     status: 'editing' as const,
     basedOnVersion: latestVersion?.versionId || 'v0',
-    opencodeSessionId: null,
+    workbenchSessionId: null,
     createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
   };

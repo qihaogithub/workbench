@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
 import { uploadCover, deleteCover } from '@/lib/api'
 import { ImagePlus, Trash2, RefreshCcw, Loader2 } from 'lucide-react'
-import type { ApiResponse } from '@opencode-workbench/shared'
+import type { ApiResponse } from '@workbench/shared'
 
 interface CoverImageDialogProps {
   open: boolean

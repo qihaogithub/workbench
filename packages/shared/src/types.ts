@@ -1,3 +1,5 @@
+import type { ProjectAuthoringPreferences } from "./workspace";
+
 export interface DemoMeta {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface DemoMeta {
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;
+  authoringPreferences?: ProjectAuthoringPreferences;
   demoCount?: number;
 }
 
@@ -22,7 +25,7 @@ export interface SessionMeta {
   expiresAt: number;
   status?: 'editing' | 'saved' | 'discarded' | 'archived';
   basedOnVersion?: string;
-  opencodeSessionId?: string | null;
+  workbenchSessionId?: string | null;
   workspaceId?: string;
 }
 

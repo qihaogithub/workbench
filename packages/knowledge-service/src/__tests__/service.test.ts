@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { AccessContext, KnowledgeItem } from "@opencode-workbench/knowledge-core";
+import type { AccessContext, KnowledgeItem } from "@workbench/knowledge-core";
 import {
   BasicRetrievalBackend,
   KnowledgeFileStore,

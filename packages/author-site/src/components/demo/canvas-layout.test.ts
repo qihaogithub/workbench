@@ -3,11 +3,11 @@ import {
   normalizeCanvasPageLayout,
   normalizeCanvasPageLayouts,
   resolveCanvasContentHeightLayout,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 import type {
   CanvasPageData,
   CanvasPageLayout,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 function makePage(id = "page_1"): CanvasPageData {
   return {

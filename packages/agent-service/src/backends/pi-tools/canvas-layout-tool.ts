@@ -265,6 +265,14 @@ function parseCanvasState(value: unknown): CanvasState | null {
     pages,
     ...(value.nodes === undefined ? {} : { nodes: value.nodes }),
     ...(value.layers === undefined ? {} : { layers: value.layers }),
+    ...(value.pageGroups === undefined ? {} : { pageGroups: value.pageGroups }),
+    ...(Array.isArray(value.hiddenPageIds)
+      ? {
+          hiddenPageIds: value.hiddenPageIds.filter(
+            (item): item is string => typeof item === 'string',
+          ),
+        }
+      : {}),
     ...(Array.isArray(value.hiddenKnowledgeDocumentIds)
       ? {
           hiddenKnowledgeDocumentIds: value.hiddenKnowledgeDocumentIds.filter(

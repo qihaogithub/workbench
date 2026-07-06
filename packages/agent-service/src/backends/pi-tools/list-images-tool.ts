@@ -54,14 +54,15 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
       'List all images that have been uploaded to the current project. Use this to check what images are already available before creating new ones, to avoid duplicate uploads.',
     parameters: ListImagesParams,
     execute: async (_toolCallId: string) => {
-      if (!config.demoId) {
+      const manifestProjectId = config.projectId || config.demoId;
+      if (!manifestProjectId) {
         return {
           content: [{ type: 'text', text: 'No project associated with this session. Images are not tracked.' }],
           details: { images: [] },
         };
       }
 
-      const manifestPath = path.join(getProjectsDir(), config.demoId, 'images.json');
+      const manifestPath = path.join(getProjectsDir(), manifestProjectId, 'images.json');
 
       if (!fs.existsSync(manifestPath)) {
         return {
@@ -99,7 +100,7 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ demoId: config.demoId, error: message }, 'listImages: failed to read manifest');
+        logger.error({ projectId: manifestProjectId, error: message }, 'listImages: failed to read manifest');
         return {
           content: [{ type: 'text', text: `Error reading project images: ${message}` }],
           details: { error: 'read_failed' },

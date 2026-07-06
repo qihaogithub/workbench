@@ -1,0 +1,28 @@
+{
+  "id": "proj_1783334663364_30hsrv",
+  "name": "测试",
+  "category": "测试",
+  "workspacePath": "/app/data/projects/proj_1783334663364_30hsrv/workspace",
+  "demoPages": [
+    {
+      "id": "product-showcase_a3f2",
+      "name": "品牌展示页",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "contact-section_k8m2",
+      "name": "联系我们页",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1783334663371,
+  "updatedAt": 1783337563965,
+  "activeWorkspaceId": "live-1783337563691-erfd75ipb",
+  "activeWorkspaceUpdatedAt": 1783337563965
+}

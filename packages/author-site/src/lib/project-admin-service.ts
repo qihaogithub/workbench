@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import {
   ProjectAdminService,
   type ProjectAdminResult,
-} from "@opencode-workbench/project-core";
-import type { ErrorCodeType } from "@opencode-workbench/shared";
+} from "@workbench/project-core";
+import type { ErrorCodeType } from "@workbench/shared";
 
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 

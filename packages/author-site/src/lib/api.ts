@@ -2,9 +2,10 @@ import useSWR, { mutate } from 'swr'
 import type {
   ApiResponse,
   DemoMeta,
+  ProjectAuthoringPreferences,
   ProjectTemplateMeta,
   SessionMeta,
-} from '@opencode-workbench/shared'
+} from '@workbench/shared'
 
 // 真实 API 调用
 const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
@@ -92,8 +93,17 @@ export async function duplicateDemo(
 
 export async function updateDemo(
   id: string,
-  input: { name?: string; category?: string },
-): Promise<ApiResponse<{ id: string; name?: string; category?: string }>> {
+  input: {
+    name?: string;
+    category?: string;
+    authoringPreferences?: ProjectAuthoringPreferences;
+  },
+): Promise<ApiResponse<{
+  id: string;
+  name?: string;
+  category?: string;
+  authoringPreferences?: ProjectAuthoringPreferences;
+}>> {
   const response = await fetch(`/api/demos/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

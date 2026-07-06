@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783208669655_3oqno6",
+  "at": 1783208669655,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_21_active_teams_section",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_21_active_teams_section:prototypeHtml",
+      "page:worldcup_21_active_teams_section:prototypeCss",
+      "page:worldcup_21_active_teams_section:prototypeMeta"
+    ]
+  }
+}

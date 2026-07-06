@@ -23,12 +23,17 @@ import {
   cleanupOldScreenshots,
   type ScreenshotVariant,
 } from "../utils/screenshot-store";
-import { generateIframeHtml } from "@opencode-workbench/shared/demo/iframe-template";
+import { generateIframeHtml } from "@workbench/shared/demo/iframe-template";
 import {
   buildPrototypePreviewDocumentHtml,
   type PageSnapshotInput,
   type PrototypePageMeta,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
+import {
+  buildSketchScenePreviewDocumentHtml,
+  getSketchSceneHashSource,
+  parseSketchSceneDocument,
+} from "@workbench/sketch-core";
 import type {
   RenderStageTimings,
   ScreenshotPriority,
@@ -490,6 +495,21 @@ function normalizeSnapshotInput(
     };
   }
 
+  if (input.runtimeType === "sketch-scene") {
+    const sketchScene = parseSketchSceneDocument(input.sketchScene);
+    if (!sketchScene) return null;
+    return {
+      runtimeType: "sketch-scene",
+      sketchScene,
+      sketchMeta:
+        input.sketchMeta && typeof input.sketchMeta === "object"
+          ? input.sketchMeta as Record<string, unknown>
+          : undefined,
+      configData,
+      previewSize,
+    };
+  }
+
   if (typeof input.code !== "string" || input.code.length === 0) {
     return null;
   }
@@ -504,6 +524,9 @@ function normalizeSnapshotInput(
 function getSnapshotHashSource(input: PageSnapshotInput): string {
   if (input.runtimeType === "high-fidelity-react") {
     return input.code;
+  }
+  if (input.runtimeType === "sketch-scene") {
+    return getSketchSceneHashSource(input.sketchScene, input.configData);
   }
   return JSON.stringify({
     runtimeType: input.runtimeType,
@@ -723,12 +746,21 @@ async function generateScreenshotUncached(
       supportUrlMode: true,
       baseOrigin: config.authorSiteUrl,
     });
-  } else {
+  } else if (snapshotInput.runtimeType === "prototype-html-css") {
     html = buildPrototypePreviewDocumentHtml({
       html: snapshotInput.prototypeHtml,
       css: snapshotInput.prototypeCss,
       configData: snapshotInput.configData,
       previewSize: snapshotInput.previewSize ?? { width, height },
+    });
+  } else {
+    html = buildSketchScenePreviewDocumentHtml({
+      scene: snapshotInput.sketchScene,
+      configData: snapshotInput.configData,
+      previewSize: {
+        width,
+        height,
+      },
     });
   }
 

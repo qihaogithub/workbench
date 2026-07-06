@@ -1,4 +1,4 @@
-import type { DemoMeta, ApiResponse } from '@opencode-workbench/shared'
+import type { DemoMeta, ApiResponse } from '@workbench/shared'
 
 const mockDemos: DemoMeta[] = [
   {

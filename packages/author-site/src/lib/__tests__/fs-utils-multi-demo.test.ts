@@ -12,8 +12,10 @@ import {
   ensureAppGraph,
   validateAppGraph,
   readAppGraph,
+  createDeletedWorkspaceDemoPageSnapshot,
   deleteWorkspaceDemoPage,
   getWorkspacesDir,
+  restoreDeletedWorkspaceDemoPageSnapshot,
 } from "../fs-utils";
 
 function makeTempWorkspace(prefix: string): string {
@@ -347,6 +349,113 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(deleted).toBe(true);
       expect(graph.pages.detail).toBeUndefined();
       expect(graph.actions).toEqual([]);
+    });
+
+    it("删除页面快照可按原 pageId 恢复页面目录和 workspace-tree", () => {
+      const workspaceId = `ws-restore-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      ws = path.join(getWorkspacesDir(), workspaceId);
+      const pageId = "detail_1234";
+      const demoDir = path.join(ws, "demos", pageId);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      const page = writeDemoPageMeta(ws, pageId, {
+        name: "Detail",
+        routeKey: "detail",
+        order: 2,
+        parentId: null,
+      });
+
+      const snapshot = createDeletedWorkspaceDemoPageSnapshot(workspaceId, pageId);
+      expect(snapshot?.page).toEqual(page);
+      expect(deleteWorkspaceDemoPage(workspaceId, pageId)).toBe(true);
+      expect(readDemoPageMeta(ws, pageId)).toBeNull();
+
+      const restored = restoreDeletedWorkspaceDemoPageSnapshot(
+        workspaceId,
+        pageId,
+        snapshot!.snapshotId,
+      );
+
+      expect(restored.success).toBe(true);
+      if (restored.success) {
+        expect(restored.page).toMatchObject({
+          id: pageId,
+          name: "Detail",
+          routeKey: "detail",
+          order: 2,
+        });
+      }
+      expect(fs.existsSync(path.join(demoDir, "index.tsx"))).toBe(true);
+      expect(readDemoPageMeta(ws, pageId)?.id).toBe(pageId);
+    });
+
+    it("恢复删除快照时如果原 pageId 已存在则失败", () => {
+      const workspaceId = `ws-restore-conflict-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      ws = path.join(getWorkspacesDir(), workspaceId);
+      const pageId = "detail_1234";
+      const demoDir = path.join(ws, "demos", pageId);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      writeDemoPageMeta(ws, pageId, { name: "Detail", routeKey: "detail" });
+
+      const snapshot = createDeletedWorkspaceDemoPageSnapshot(workspaceId, pageId);
+      expect(deleteWorkspaceDemoPage(workspaceId, pageId)).toBe(true);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Conflict() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      writeDemoPageMeta(ws, pageId, { name: "Conflict", routeKey: "conflict" });
+
+      const restored = restoreDeletedWorkspaceDemoPageSnapshot(
+        workspaceId,
+        pageId,
+        snapshot!.snapshotId,
+      );
+
+      expect(restored).toEqual({ success: false, reason: "PAGE_EXISTS" });
+    });
+
+    it("恢复删除快照时如果原父文件夹不存在则失败", () => {
+      const workspaceId = `ws-restore-parent-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      ws = path.join(getWorkspacesDir(), workspaceId);
+      const pageId = "detail_1234";
+      const demoDir = path.join(ws, "demos", pageId);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      fs.writeFileSync(
+        path.join(ws, "workspace-tree.json"),
+        JSON.stringify({
+          folders: [{ id: "folder_1", name: "Folder", order: 0, parentId: null }],
+          pages: [],
+        }),
+        "utf-8",
+      );
+      writeDemoPageMeta(ws, pageId, {
+        name: "Detail",
+        routeKey: "detail",
+        parentId: "folder_1",
+      });
+
+      const snapshot = createDeletedWorkspaceDemoPageSnapshot(workspaceId, pageId);
+      expect(deleteWorkspaceDemoPage(workspaceId, pageId)).toBe(true);
+      fs.writeFileSync(
+        path.join(ws, "workspace-tree.json"),
+        JSON.stringify({ folders: [], pages: [] }),
+        "utf-8",
+      );
+
+      const restored = restoreDeletedWorkspaceDemoPageSnapshot(
+        workspaceId,
+        pageId,
+        snapshot!.snapshotId,
+      );
+
+      expect(restored).toEqual({
+        success: false,
+        reason: "PARENT_FOLDER_NOT_FOUND",
+      });
     });
   });
 

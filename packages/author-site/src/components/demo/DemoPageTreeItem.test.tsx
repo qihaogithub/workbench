@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { DemoPageMeta } from "@opencode-workbench/shared";
+import type { DemoPageMeta } from "@workbench/shared";
 import type { ReactNode } from "react";
 
 import { DemoPageTreeItem } from "./DemoPageTreeItem";

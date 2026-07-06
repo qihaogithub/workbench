@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { DemoPageMeta, Project, WorkspaceTree } from "@opencode-workbench/shared/contracts";
+import type { DemoPageMeta, Project, WorkspaceTree } from "@workbench/shared/contracts";
 import { getSystemKnowledgeSnapshot } from "../config/system-knowledge";
 
 const MAX_TEXT_CHARS = 12000;
@@ -211,7 +211,7 @@ export function buildViewerAiPromptContext(input: ViewerAiContextInput): string 
 export function buildViewerAiSystemPrompt(): string {
   return `# 使用端只读 AI 助手
 
-你在 OpenCode Workbench 的使用端中回答问题。你的回答对象是只读、非技术用户。
+你在 Workbench 的使用端中回答问题。你的回答对象是只读、非技术用户。
 
 ## 回答风格
 

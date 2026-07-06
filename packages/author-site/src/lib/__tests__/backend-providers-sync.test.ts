@@ -1,4 +1,4 @@
-import type { BackendProvidersConfig } from "@opencode-workbench/shared";
+import type { BackendProvidersConfig } from "@workbench/shared";
 
 const savedConfig: BackendProvidersConfig = {
   providers: [

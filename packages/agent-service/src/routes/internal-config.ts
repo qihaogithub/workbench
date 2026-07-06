@@ -30,7 +30,7 @@ import { logger } from "../utils/logger";
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
-} from "@opencode-workbench/shared/contracts";
+} from "@workbench/shared/contracts";
 
 const TOKEN_HEADER = "x-internal-token";
 const execFileAsync = promisify(execFile);

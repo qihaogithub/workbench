@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-07-04
+> 更新日期：2026-07-06
 
 ## 用途
 
@@ -38,20 +38,27 @@ covers:
 |:-----|:-----|:-----|:-----|:-----|:-----|:-----|
 | system.doctor | 系统 | `doctor` | 低 | L3 | 已覆盖 | 本地环境诊断 |
 | system.commands | 系统 | `commands` | 低 | L3 | 已覆盖 | 输出机器可读命令清单 |
+| system.input.help | 系统 | `help input` | 低 | L3 | 已覆盖 | 输出 `@file`、`--input-json`、stdin 与 CSS at-rule 输入契约 |
+| system.recipe | 系统 | `recipe list`、`recipe show` | 低 | L3 | 已覆盖 | 输出 Agent 常见项目管理 workflow 配方 |
+| system.agent.report | 系统 | `report agent-run` | 低 | L3 | 已覆盖 | 聚合项目、事务、版本、审计、验证和视觉检查证据 |
 | admin.capabilities | 管理 | `admin capabilities` | 低 | L3 | 已覆盖 | 查看当前能力和权限 |
 | scaffold.validate | 本地项目包 | `validate` | 低 | L3 | 已覆盖 | 校验本地项目包 |
 | scaffold.diff | 本地项目包 | `diff` | 低 | L3 | 已覆盖 | 查看本地改动摘要 |
+| scaffold.preview.check | 本地项目包 | `pnpm preview:check`、`pnpm preview:screenshot` | 低 | L3 | 已覆盖 | 本地脚手架生成页面效果检查报告和截图工件 |
 | scaffold.upgrade | 本地项目包 | `upgrade` | 中 | L4 | 已覆盖 | 更新脚手架托管文件 |
 | scaffold.submit | 本地项目包 | `submit` | 中 | L4 | 已覆盖 | 提交本地项目包变更 |
 | project.list | 项目 | `project list` | 低 | L3 | 已覆盖 | 查询项目列表 |
 | project.get | 项目 | `project get` | 低 | L3 | 已覆盖 | 查询项目详情 |
 | project.pull | 项目 | `project pull` | 低 | L3 | 已覆盖 | 拉取项目为本地项目包 |
 | project.runtime.validate | 项目 | `project validate-runtime` | 低 | L3 | 已覆盖 | 校验项目当前版本页面是否符合创作端预览运行契约 |
+| project.verify | 项目 | `project verify` | 低 | L3 | 已覆盖 | 聚合验证项目当前版本的 runtime、资产引用、原型占位和元数据 |
+| project.visual.check | 项目 | `project visual-check` | 低 | L3 | 已覆盖 | 生成页面效果离线检查报告和截图工件 |
+| project.import.prototype | 项目 | `project import-prototype` | 中 | L4 | 已覆盖 | 按固定事务工作流导入外部 HTML/CSS 原型项目，显式 `--commit` 才提交 |
 | project.commit.list | 项目 | `project commit-list` | 低 | L3 | 已覆盖 | 查询项目内容图提交时间线 |
 | project.materialize | 项目 | `project materialize` | 高 | L5 | 已覆盖 | `--check` 可只读校验 commit/blob 完整性，但命令本身可写入项目基准工作区 |
 | project.content.gc | 项目 | `project content-gc` | 高 | L5 | 已覆盖 | 默认 dry-run，可选删除未引用 blob，不允许自动合入 |
-| project.create | 项目 | `project create` | 中 | L4 | 已覆盖 | 创建项目 |
-| project.update | 项目 | `project update` | 中 | L4 | 已覆盖 | 修改项目基础信息 |
+| project.create | 项目 | `project create` | 中 | L4 | 已覆盖 | 创建项目，支持模板来源和项目分类 |
+| project.update | 项目 | `project update` | 中 | L4 | 已覆盖 | 修改项目名称、分类、描述和项目级创作偏好 |
 | project.duplicate | 项目 | `project duplicate` | 中 | L4 | 已覆盖 | 复制项目 |
 | project.delete | 项目 | `project delete-preview`、`project delete-execute` | 高 | L5 | 已覆盖 | 删除项目必须保留预览和确认 |
 | project.cover.set | 项目 | `project set-cover` | 中 | L4 | 已覆盖 | 设置封面 |
@@ -70,17 +77,20 @@ covers:
 | edit.status | 编辑事务 | `edit status` | 低 | L3 | 已覆盖 | 查看事务状态 |
 | edit.diff | 编辑事务 | `edit diff` | 低 | L3 | 已覆盖 | 查看事务差异 |
 | edit.validate | 编辑事务 | `edit validate` | 低 | L3 | 已覆盖 | 校验事务工作区 |
+| edit.verify | 编辑事务 | `edit verify` | 低 | L3 | 已覆盖 | 聚合验证事务工作区的 runtime、资产引用、原型占位和元数据 |
 | edit.commit | 编辑事务 | `edit commit` | 中 | L4 | 已覆盖 | 提交事务生成版本 |
 | edit.discard | 编辑事务 | `edit discard` | 中 | L4 | 已覆盖 | 丢弃事务 |
 | edit.extend | 编辑事务 | `edit extend` | 低 | L3 | 已覆盖 | 延长事务有效期 |
 | page.list | 页面 | `page list` | 低 | L3 | 已覆盖 | 查询页面树 |
 | page.get | 页面 | `page get` | 低 | L3 | 已覆盖 | 查询页面代码和配置 |
 | page.runtime.validate | 页面 | `page validate-runtime` | 低 | L3 | 已覆盖 | React 页面走预览运行契约校验，HTML/CSS 原型页走静态安全边界校验 |
-| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建高保真 React 页面或 HTML/CSS 原型页 |
+| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建高保真 React 页面、HTML/CSS 原型页或草图页 |
 | page.duplicate | 页面 | `page duplicate` | 中 | L4 | 已覆盖 | 复制页面 |
 | page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新 React 页面代码 |
 | page.update.prototype | 页面 | `page update-prototype` | 中 | L4 | 已覆盖 | 更新 HTML/CSS 原型页内容和元信息 |
-| page.switch-runtime | 页面 | `page switch-runtime` | 中 | L4 | 已覆盖 | 在编辑事务内切换页面运行时类型，并复用共享层运行时校验与文件写入保护 |
+| page.update.prototypes | 页面 | `page update-prototypes` | 中 | L4 | 已覆盖 | 按 manifest 批量创建或更新 HTML/CSS 原型页并输出失败项和恢复命令 |
+| page.update.sketch | 页面 | `page update-sketch` | 中 | L4 | 已覆盖 | 更新草图页 scene 内容和元信息 |
+| page.switch-runtime | 页面 | `page switch-runtime` | 中 | L4 | 已覆盖 | 在编辑事务内切换高保真 React、HTML/CSS 原型页或草图页运行时类型，并复用共享层运行时校验与文件写入保护 |
 | page.update.schema | 页面 | `page update-schema` | 中 | L4 | 已覆盖 | 更新页面 Schema |
 | page.update.meta | 页面 | `page update-meta` | 中 | L4 | 已覆盖 | 修改页面元信息 |
 | page.delete | 页面 | `page delete-preview`、`page delete-execute` | 高 | L5 | 已覆盖 | 删除页面必须保留预览和确认 |
@@ -101,6 +111,7 @@ covers:
 | config.visual.patch | 配置 | `config apply-visual-patch` | 中 | L4 | 已覆盖 | 应用可视化配置补丁 |
 | asset.list | 资产 | `asset list` | 低 | L3 | 已覆盖 | 查询资产 |
 | asset.upload | 资产 | `asset upload` | 中 | L4 | 已覆盖 | 上传资产 |
+| asset.upload.dir | 资产 | `asset upload-dir` | 中 | L4 | 已覆盖 | 批量上传目录图片资产，输出 uploaded、skipped、failed、totalBytes 和 resumeCommand |
 | asset.replace | 资产 | `asset replace` | 中 | L4 | 已覆盖 | 替换资产并改引用 |
 | asset.delete | 资产 | `asset delete-preview`、`asset delete-execute` | 高 | L5 | 已覆盖 | 删除资产必须保留预览和确认 |
 | preview.compile | 预览 | `preview compile` | 低 | L3 | 已覆盖 | 源码运行契约校验与编译预检 |

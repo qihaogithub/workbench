@@ -2,7 +2,7 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 
-import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
+import type { CollabResourceKind } from "@workbench/shared/contracts";
 
 export interface SessionValidation {
   ok: boolean;
@@ -177,6 +177,7 @@ export class WorkspaceFilePersistence {
   private isAllowedResource(resourcePath: string, kind: CollabResourceKind): boolean {
     if (kind === "page-code") return /^demos\/[^/]+\/index\.tsx$/.test(resourcePath);
     if (kind === "page-schema") return /^demos\/[^/]+\/config\.schema\.json$/.test(resourcePath);
+    if (kind === "page-sketch-scene") return /^demos\/[^/]+\/sketch\.scene\.json$/.test(resourcePath);
     if (kind === "project-schema") return resourcePath === "project.config.schema.json";
     if (kind === "workspace-tree") return resourcePath === "workspace-tree.json";
     if (kind === "canvas-layout") return resourcePath === ".canvas-layout.json";

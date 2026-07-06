@@ -1,4 +1,4 @@
-import type { AppGraph } from "@opencode-workbench/shared";
+import type { AppGraph } from "@workbench/shared";
 
 import {
   isViewerAppActionResolution,

@@ -24,7 +24,7 @@ import { ModelSelectWithGuard } from "./model-select-with-guard";
 import { History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResolvedModel, ThinkingDepth } from "@/lib/ai-models";
-import type { ImageAttachment } from "@opencode-workbench/agent-client";
+import type { ImageAttachment } from "@workbench/agent-client";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

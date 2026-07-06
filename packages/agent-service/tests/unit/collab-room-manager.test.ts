@@ -36,6 +36,7 @@ let tempDir: string;
 let workspacePath: string;
 let pagePath: string;
 let schemaPath: string;
+let sketchScenePath: string;
 
 function writeJson(filePath: string, value: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -46,9 +47,11 @@ function setupWorkspace(): void {
   workspacePath = path.join(tempDir, "workspaces", "projects", "proj-1", "ws-1");
   pagePath = path.join(workspacePath, "demos", "page-1", "index.tsx");
   schemaPath = path.join(workspacePath, "demos", "page-1", "config.schema.json");
+  sketchScenePath = path.join(workspacePath, "demos", "page-1", "sketch.scene.json");
   fs.mkdirSync(path.dirname(pagePath), { recursive: true });
   fs.writeFileSync(pagePath, "old file", "utf-8");
   fs.writeFileSync(schemaPath, `{"type":"object"}`, "utf-8");
+  fs.writeFileSync(sketchScenePath, `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[]}`, "utf-8");
   writeJson(path.join(workspacePath, ".workspace.json"), {
     workspaceId: "ws-1",
     projectId: "proj-1",
@@ -87,6 +90,21 @@ async function createSchemaRoom(manager: CollabRoomManager): Promise<TestRoom> {
     sessionId: "session-1",
     resourcePath: "demos/page-1/config.schema.json",
     kind: "page-schema",
+  });
+
+  const rooms = (manager as unknown as { rooms: Map<string, TestRoom> }).rooms;
+  const room = Array.from(rooms.values())[0];
+  if (!room) throw new Error("Expected collab room to be created");
+  return room;
+}
+
+async function createSketchSceneRoom(manager: CollabRoomManager): Promise<TestRoom> {
+  await manager.handleConnection(new MockSocket() as unknown as WebSocket, {
+    projectId: "proj-1",
+    workspaceId: "ws-1",
+    sessionId: "session-1",
+    resourcePath: "demos/page-1/sketch.scene.json",
+    kind: "page-sketch-scene",
   });
 
   const rooms = (manager as unknown as { rooms: Map<string, TestRoom> }).rooms;
@@ -203,5 +221,25 @@ describe("CollabRoomManager", () => {
     expect(room.text.toString()).toBe(schema);
     expect(room.dirty).toBe(false);
     expect(fs.readFileSync(schemaPath, "utf-8")).toBe(schema);
+  });
+
+  it("手绘 scene 协同房间在外部 patch 写入后重载，flush 不会覆盖新 scene", async () => {
+    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const room = await createSketchSceneRoom(manager);
+    const externalScene = `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[{"id":"a"}]}`;
+
+    room.text.delete(0, room.text.length);
+    room.text.insert(0, `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[{"id":"stale"}]}`);
+    fs.writeFileSync(sketchScenePath, externalScene, "utf-8");
+
+    const result = manager.applyExternalFileChanges(workspacePath, [
+      { path: "demos/page-1/sketch.scene.json", action: "modified" },
+    ]);
+    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
+
+    expect(result.reloadedRooms).toBe(1);
+    expect(room.text.toString()).toBe(externalScene);
+    expect(room.dirty).toBe(false);
+    expect(fs.readFileSync(sketchScenePath, "utf-8")).toBe(externalScene);
   });
 });

@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783244842060_rr8vdp",
+  "at": 1783244842060,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_15_draw_gold",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_15_draw_gold:prototypeHtml",
+      "page:worldcup_15_draw_gold:prototypeCss",
+      "page:worldcup_15_draw_gold:prototypeMeta"
+    ]
+  }
+}

@@ -10,6 +10,8 @@
 - 2026-07-03 同步主文档结论：`page switch-runtime` 属于已实现但此前未登记的能力清单漂移，已在主文档与项目文档中补齐。
 - 2026-07-03 再次对账未发现新的 L3 只读 CLI 缺口；当前工作树中的 `project-core` 删除项目时同步清理已发布产物 / 重建索引变更属于删除、发布语义，继续按 L5 只报告。
 - 2026-07-04 同步主文档结论：当前工作树已新增 `project commit-list`、`project materialize`、`project content-gc` 与 `resource version-*`，共享层与 author-site API 已完成迁移；本轮仅补齐能力清单、运行手册与状态文档，未发现新的低风险 CLI 命令缺口。另已复核知识文档 CRUD 仍直接操作 `knowledge/manifest.json` 与文件系统，GAP-004 继续保持 L1。
+- 2026-07-05 同步主文档结论：当前工作树已新增 `page update-sketch`，`page create --runtime-type sketch-scene`、`project-core` 与 author-site `/demos` / `/runtime` 入口已完成共享层对齐；本轮仅补齐能力清单、运行手册、state 与长期跟踪文档，未发现新的低风险 CLI 命令缺口。
+- 2026-07-06 同步主文档结论：本轮发现 CLI `project create` / `project update` 的项目元数据参数面落后于 `project-core` 与 author-site 项目路由，已补齐 `--category`、`--authoring-preferences`、`--sketch-editor-engine` 与 `--clear-authoring-preferences`，并通过 CLI 回归验证；该能力继续按 L4 维护。
 - 为避免自动任务因文件名漂移中断，本文件仅保留兼容入口职责，不重复维护事实正文。
 
 ## 待办
@@ -19,8 +21,9 @@
 ## 验证状态
 
 - `corepack pnpm check:automation`：通过。
-- `corepack pnpm check:project-core`：通过（31 tests passed）。
-- `corepack pnpm check:project-cli`：通过。
+- `corepack pnpm check:project-core`：通过（31 tests passed，沿用上一轮共享层验证）。
+- `corepack pnpm check:project-cli`：通过（含 2026-07-06 的项目元数据参数回归）。
+- `corepack pnpm check:author`：通过（85 test suites / 577 tests，沿用上一轮 Web 本地测试结论）。
 
 ## 风险
 

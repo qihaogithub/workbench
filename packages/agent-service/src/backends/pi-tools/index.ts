@@ -18,6 +18,13 @@ import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool"
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
 import { createDingtalkTool } from "./dingtalk-tool";
 import { createFigmaMcpTool } from "./figma-mcp-tool";
+import {
+  createBindSketchConfigTool,
+  createConvertSketchPageTool,
+  createCreateSketchNodesTool,
+  createPatchSketchSceneTool,
+  createReadSketchSceneTool,
+} from "./sketch-scene-tool";
 import { createWebSearchTool, isWebSearchEnabled } from "./web-search-tool";
 import { createWebReadTool, isWebReadEnabled } from "./web-read-tool";
 import { createRequestPlanApprovalTool, type PlanApprovalHandler } from "./plan-approval-tool";
@@ -34,7 +41,10 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 13;
+export const WORKBENCH_TOOL_VERSION = 15;
+
+const SKETCH_SCENE_TOOLS_ENABLED =
+  process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -79,6 +89,15 @@ export function createWorkbenchTools(
     createKnowledgeReportTool(config),
     createReadPreinstalledSkillTool(),
     createArrangeCanvasPagesTool(config),
+    ...(SKETCH_SCENE_TOOLS_ENABLED
+      ? [
+          createReadSketchSceneTool(config),
+          createPatchSketchSceneTool(config),
+          createCreateSketchNodesTool(config),
+          createBindSketchConfigTool(config),
+          createConvertSketchPageTool(config),
+        ]
+      : []),
     ...(isWebReadEnabled() ? [createWebReadTool()] : []),
     ...(isWebSearchEnabled() ? [createWebSearchTool()] : []),
     createFigmaMcpTool(config, permissionHandler),

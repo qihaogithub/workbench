@@ -2,7 +2,7 @@ import fs from "fs";
 import type { NextRequest } from "next/server";
 import os from "os";
 import path from "path";
-import type { CanvasState } from "@opencode-workbench/demo-ui";
+import type { CanvasState } from "@workbench/demo-ui";
 
 class TestResponse {
   status: number;
@@ -67,8 +67,8 @@ describe("viewer project data route", () => {
   });
 
   it("读取 CLI 提交后的项目数据", async () => {
-    const { ProjectAdminService } = await import("@opencode-workbench/project-core");
-    const { pullProjectScaffold, submitProjectScaffold } = await import("@opencode-workbench/project-scaffold");
+    const { ProjectAdminService } = await import("@workbench/project-core");
+    const { pullProjectScaffold, submitProjectScaffold } = await import("@workbench/project-scaffold");
     const { publishProject } = await import("@/lib/publish-manager");
     const service = new ProjectAdminService({ dataDir: tempDir });
     const created = service.createProject({ name: "CLI 写入项目" });
@@ -88,7 +88,7 @@ describe("viewer project data route", () => {
     const projectDir = path.join(tempDir, "local-project");
     const pulled = pullProjectScaffold(service, service.defaultActor(), { projectId, targetDir: projectDir });
     expect(pulled.ok).toBe(true);
-    const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "opencode.project.json"), "utf-8")) as {
+    const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "workbench.project.json"), "utf-8")) as {
       pages: Array<{ entry: string }>;
     };
     fs.writeFileSync(
@@ -161,7 +161,7 @@ describe("viewer project data route", () => {
   });
 
   it("发布 HTML/CSS 原型页静态内容供 viewer 渲染", async () => {
-    const { ProjectAdminService } = await import("@opencode-workbench/project-core");
+    const { ProjectAdminService } = await import("@workbench/project-core");
     const { publishProject } = await import("@/lib/publish-manager");
     const service = new ProjectAdminService({ dataDir: tempDir });
     const created = service.createProject({ name: "原型发布项目" });

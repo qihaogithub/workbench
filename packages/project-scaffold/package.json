@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/project-scaffold",
+  "name": "@workbench/project-scaffold",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test": "node --import tsx src/scaffold.test.ts"
   },
   "dependencies": {
-    "@opencode-workbench/project-core": "workspace:*"
+    "@workbench/project-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",

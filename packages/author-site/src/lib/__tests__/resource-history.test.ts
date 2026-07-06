@@ -2,8 +2,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { ProjectAdminService } from "@opencode-workbench/project-core";
-import type { EditTransaction, PageDetail } from "@opencode-workbench/project-core";
+import { ProjectAdminService } from "@workbench/project-core";
+import type { EditTransaction, PageDetail } from "@workbench/project-core";
 
 function makeTempDataDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "owb-resource-history-"));
@@ -63,6 +63,47 @@ describe("资源级历史", () => {
     });
     expect(loaded.ok).toBe(true);
     expect(JSON.stringify(loaded.data?.content)).toContain("v1");
+  });
+
+  it("手绘页面资源版本记录已验证 patch 摘要", () => {
+    const created = service.createProject({ name: "手绘资源历史项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const page = service.createPage({
+      editId,
+      name: "手绘页",
+      runtimeType: "sketch-scene",
+      sketchScene: JSON.stringify({
+        version: 1,
+        pageSize: { width: 320, height: 180 },
+        nodes: [],
+      }),
+    });
+    const pageId = (page.data as PageDetail).meta.id;
+    expect(service.commitEdit(editId, "初始手绘页").ok).toBe(true);
+
+    const pageVersion = service.createPageVersion({
+      projectId,
+      pageId,
+      note: "保存手绘 patch",
+      sketchPatchSummary: {
+        operationCount: 2,
+        hasBaseSceneKey: true,
+        currentNodeCount: 1,
+        targetNodeCount: 2,
+      },
+    });
+
+    expect(pageVersion.ok).toBe(true);
+    expect(pageVersion.data?.resourceVersion?.metadata).toMatchObject({
+      sketchPatchSummary: {
+        operationCount: 2,
+        hasBaseSceneKey: true,
+        currentNodeCount: 1,
+        targetNodeCount: 2,
+      },
+    });
   });
 
   it("恢复页面资源版本只替换目标页面", () => {

@@ -1,4 +1,4 @@
-import type { DemoPageMeta, DemoFolderMeta } from "@opencode-workbench/shared";
+import type { DemoPageMeta, DemoFolderMeta } from "@workbench/shared";
 
 type DemoPageItem = DemoPageMeta | DemoFolderMeta;
 

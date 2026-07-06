@@ -27,8 +27,8 @@ interface CanvasViewportProps {
   editable?: boolean;
   interactionMode?: CanvasInteractionMode;
   onCanvasClick?: () => void;
-  onPageClick?: (pageId: string) => void;
-  onNodeClick?: (nodeId: string) => void;
+  onPageClick?: (pageId: string, event?: React.PointerEvent) => void;
+  onNodeClick?: (nodeId: string, event?: React.PointerEvent) => void;
   onFitToScreen?: () => void;
   onToolModeChange?: (mode: CanvasToolMode) => void;
   children?: React.ReactNode;
@@ -431,9 +431,9 @@ export function CanvasViewport({
       if (isClick) {
         if (clickedPageIdRef.current) {
           // hand 模式下点击页面 → 触发配置面板
-          onPageClick?.(clickedPageIdRef.current);
+          onPageClick?.(clickedPageIdRef.current, e);
         } else if (clickedNodeIdRef.current) {
-          onNodeClick?.(clickedNodeIdRef.current);
+          onNodeClick?.(clickedNodeIdRef.current, e);
         } else {
           // 点击画布空白区域 → 取消选中
           onCanvasClick?.();

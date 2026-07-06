@@ -8,7 +8,7 @@
 
 ## 文档概览
 
-本系列文档用于指导 Web 前端（`@opencode-workbench/author-site`）的开发工作，基于 Next.js 14 App Router 架构，实现 Demo 管理、项目管理、配置预览和 AI 对话功能。
+本系列文档用于指导 Web 前端（`@workbench/author-site`）的开发工作，基于 Next.js 14 App Router 架构，实现 Demo 管理、项目管理、配置预览和 AI 对话功能。
 
 **核心设计理念**：
 
@@ -300,7 +300,7 @@ AI 对话上下文，关联用户、项目和 `workspaceId`，不拥有文件副
 
 ### Pi Agent 会话配置
 
-AI 会话配置不再依赖工作空间内的 OpenCode 配置目录。创作端把系统提示词、模型选择、工作空间和图片附件发送到 agent-service；agent-service 通过 Pi Agent 后端、Pi Tools 权限和 SessionGuard 约束 AI 行为。
+AI 会话配置不再依赖工作空间内的 workbench 配置目录。创作端把系统提示词、模型选择、工作空间和图片附件发送到 agent-service；agent-service 通过 Pi Agent 后端、Pi Tools 权限和 SessionGuard 约束 AI 行为。
 
 ---
 

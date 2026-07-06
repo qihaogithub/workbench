@@ -31,7 +31,7 @@ services:
       - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
     volumes:
-      - ${APP_DATA_DIR:-/opt/opencode-workbench/data}:/app/data
+      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     cpus: "1.0"
     mem_limit: 1g
     pids_limit: 512
@@ -73,7 +73,7 @@ services:
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - ADMIN_SECRET=${ADMIN_SECRET:-}
     volumes:
-      - ${APP_DATA_DIR:-/opt/opencode-workbench/data}:/app/data
+      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
       - agent-service
     cpus: "1.0"
@@ -82,6 +82,9 @@ services:
     restart: unless-stopped
 
   screenshot-service:
+    profiles:
+      - screenshot
+    platform: ${SCREENSHOT_SERVICE_PLATFORM:-linux/amd64}
     build:
       context: .
       dockerfile: docker/screenshot-service/Dockerfile
@@ -92,10 +95,11 @@ services:
       - HOST=0.0.0.0
       - AUTHOR_SITE_URL=http://author-site:3200
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - PUPPETEER_DISABLE_SANDBOX=${PUPPETEER_DISABLE_SANDBOX:-true}
       - DATA_DIR=/app/data
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
     volumes:
-      - ${APP_DATA_DIR:-/opt/opencode-workbench/data}:/app/data
+      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
       - author-site
     cpus: "1.0"
@@ -103,6 +107,11 @@ services:
     pids_limit: 768
     shm_size: 256m
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3202/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   viewer-site:
     build:
@@ -114,7 +123,7 @@ services:
     ports:
       - "3300:80"
     volumes:
-      - ${APP_DATA_DIR:-/opt/opencode-workbench/data}:/app/data:ro
+      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data:ro
     depends_on:
       - author-site
     cpus: "0.5"

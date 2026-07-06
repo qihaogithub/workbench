@@ -56,7 +56,7 @@
               - generic [ref=e46]:
                 - generic [ref=e47]:
                   - generic [ref=e49]: 品牌名称
-                  - textbox "请输入品牌名称" [ref=e51]: OpenCode Workbench
+                  - textbox "请输入品牌名称" [ref=e51]: Workbench
                 - generic [ref=e52]:
                   - generic [ref=e54]: 深色模式
                   - switch [ref=e57] [cursor=pointer]

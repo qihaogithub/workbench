@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { ProjectTemplateMeta } from "@opencode-workbench/shared";
+import type { ProjectTemplateMeta } from "@workbench/shared";
 
 interface TemplateRecommendation {
   templateId: string;

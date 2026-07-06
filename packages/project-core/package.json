@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-workbench/project-core",
+  "name": "@workbench/project-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,9 +13,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opencode-workbench/knowledge-service": "workspace:*",
-    "@opencode-workbench/preview-contract": "workspace:*",
-    "@opencode-workbench/shared": "workspace:*"
+    "@workbench/knowledge-service": "workspace:*",
+    "@workbench/preview-contract": "workspace:*",
+    "@workbench/sketch-core": "workspace:*",
+    "@workbench/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",

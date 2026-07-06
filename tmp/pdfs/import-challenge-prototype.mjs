@@ -396,7 +396,7 @@ function copyWorkspace(source, target) {
         return true;
       const segments = relative.split(path3.sep);
       return !segments.some(
-        (segment) => ["node_modules", ".next", ".opencode", ".git"].includes(segment)
+        (segment) => ["node_modules", ".next", ".workbench", ".git"].includes(segment)
       );
     }
   });

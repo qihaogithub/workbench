@@ -306,6 +306,7 @@ export function PreviewPanel({
   visualAnnotationMode = false,
   visualHoverNodeId,
   selectedVisualNodeId,
+  hiddenVisualNodeIds = [],
   visualPropertyChanges = [],
   visualAnnotations = [],
   onVisualHover,
@@ -350,6 +351,7 @@ export function PreviewPanel({
     annotationMode: visualAnnotationMode,
     hoverNodeId: visualHoverNodeId ?? null,
     selectedNodeId: selectedVisualNodeId ?? null,
+    hiddenNodeIds: hiddenVisualNodeIds,
     propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,
   });
@@ -358,6 +360,7 @@ export function PreviewPanel({
     annotationMode: visualAnnotationMode,
     hoverNodeId: visualHoverNodeId ?? null,
     selectedNodeId: selectedVisualNodeId ?? null,
+    hiddenNodeIds: hiddenVisualNodeIds,
     propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,
   };
@@ -616,6 +619,7 @@ export function PreviewPanel({
         annotationMode: state.annotationMode,
         hoverNodeId: state.hoverNodeId,
         selectedNodeId: state.selectedNodeId,
+        hiddenNodeIds: state.hiddenNodeIds,
         propertyChanges: state.propertyChanges,
         annotations: state.annotations,
       },
@@ -1168,6 +1172,7 @@ export function PreviewPanel({
     visualAnnotationMode,
     visualHoverNodeId,
     selectedVisualNodeId,
+    hiddenVisualNodeIds,
     visualPropertyChanges,
     visualAnnotations,
     sendVisualEditState,
@@ -1252,6 +1257,7 @@ export function PreviewPanel({
 
   const hasPreviewSource = isUrlMode || (typeof code === "string" && code.length > 0);
   const showPreviewLoading = hasPreviewSource && (isCompiling || !contentLoaded);
+  const showPreviewPendingText = showPreviewLoading && !isCompiling;
   const showPlaceholder =
     !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;
   const showLoadingOverlay =
@@ -1369,6 +1375,11 @@ export function PreviewPanel({
                   aria-label="预览加载中"
                   className="animate-spin rounded-full h-8 w-8 border-2 border-muted-foreground/30 border-b-muted-foreground"
                 />
+                {showPreviewPendingText && (
+                  <p className="absolute mt-14 text-xs text-muted-foreground">
+                    正在加载页面预览，若页面没有生成预览产物会继续尝试渲染源码
+                  </p>
+                )}
               </div>
             )}
             {showEmptyPreview && (

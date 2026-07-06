@@ -70,9 +70,9 @@ describe('Workspace Utils', () => {
   });
 
   describe('getSystemTempDir', () => {
-    it('应返回系统临时目录下的 opencode-workspaces 目录', () => {
+    it('应返回系统临时目录下的 workbench-workspaces 目录', () => {
       const tempDir = getSystemTempDir();
-      expect(tempDir).toContain('opencode-workspaces');
+      expect(tempDir).toContain('workbench-workspaces');
     });
   });
 

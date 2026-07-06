@@ -1,0 +1,26 @@
+{
+  "id": "commit_1783335923635_qu79h7",
+  "projectId": "proj_1783334663364_30hsrv",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录品牌展示页",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "product-showcase_a3f2",
+      "versionId": "prv_1783335923587_0t33q6"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "product-showcase_a3f2",
+      "toVersionId": "prv_1783335923587_0t33q6"
+    }
+  ],
+  "createdAt": 1783335923635,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

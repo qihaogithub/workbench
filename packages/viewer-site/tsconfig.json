@@ -21,9 +21,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@opencode-workbench/shared": ["../shared/src"],
-      "@opencode-workbench/demo-ui": ["../demo-ui/src/index.ts"],
-      "@opencode-workbench/demo-ui/*": ["../demo-ui/src/*"]
+      "@workbench/sketch-core": ["../sketch-core/src"],
+      "@workbench/sketch-react": ["../sketch-react/src/index.tsx"],
+      "@workbench/sketch-react/*": ["../sketch-react/src/*"],
+      "@workbench/shared": ["../shared/src"],
+      "@workbench/demo-ui": ["../demo-ui/src/index.ts"],
+      "@workbench/demo-ui/*": ["../demo-ui/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

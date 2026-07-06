@@ -11,8 +11,8 @@ import { Settings, Loader2 } from "lucide-react";
 import type {
   AppGraph,
   AppGraphValidationResult,
-} from "@opencode-workbench/shared";
-import type { AppActionPayload } from "@opencode-workbench/demo-ui";
+} from "@workbench/shared";
+import type { AppActionPayload } from "@workbench/demo-ui";
 import {
   isViewerAppActionResolution,
   resolveViewerAppAction,

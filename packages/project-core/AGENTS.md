@@ -1,10 +1,10 @@
-# AGENTS.md — @opencode-workbench/project-core
+# AGENTS.md — @workbench/project-core
 
 > 本文件为 AI 编码代理提供在项目核心服务包中工作的指南。进入本包前仍需先阅读根目录 `AGENTS.md`。
 
 ## 包定位
 
-`@opencode-workbench/project-core` 是 Node-only 项目读写领域服务层，目标是让创作端 Web API、Project Admin CLI 和未来自动化入口复用同一套项目管理能力。
+`@workbench/project-core` 是 Node-only 项目读写领域服务层，目标是让创作端 Web API、Project Admin CLI 和未来自动化入口复用同一套项目管理能力。
 
 ## 关键目录
 
@@ -41,6 +41,6 @@ pnpm check:project-core
 更小范围验证：
 
 ```bash
-pnpm --filter @opencode-workbench/project-core typecheck
-pnpm --filter @opencode-workbench/project-core test
+pnpm --filter @workbench/project-core typecheck
+pnpm --filter @workbench/project-core test
 ```

@@ -2,35 +2,22 @@
   "id": "proj_1783042627508_t1czw2",
   "name": "伴读广告页面",
   "category": "APP资源位",
-  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1783042627508_t1czw2/workspace",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1783042627508_t1czw2/workspace",
   "demoPages": [
     {
-      "id": "demo_1779608460372_f5g6h7",
-      "name": "手机-react",
-      "routeKey": "demo",
+      "id": "page_lib0",
+      "name": "手机",
+      "routeKey": "page",
+      "runtimeType": "prototype-html-css",
       "order": 0,
       "parentId": null
     },
     {
       "id": "pad-react_3gok",
-      "name": "pad-",
+      "name": "pad",
       "routeKey": "pad-react",
-      "order": 1,
-      "parentId": null
-    },
-    {
-      "id": "demo_1779608460373_h7i8j9",
-      "name": "pad-react",
-      "routeKey": "demo-2",
-      "order": 2,
-      "parentId": null
-    },
-    {
-      "id": "page_lib0",
-      "name": "手机 - HTML",
-      "routeKey": "page",
       "runtimeType": "prototype-html-css",
-      "order": 3,
+      "order": 1,
       "parentId": null
     }
   ],
@@ -42,7 +29,7 @@
       "savedAt": 1783043734304,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v1",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v1",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -52,7 +39,7 @@
       "savedAt": 1783044519997,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v2",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v2",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -62,7 +49,7 @@
       "savedAt": 1783045526858,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v3",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v3",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -72,7 +59,7 @@
       "savedAt": 1783046034277,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v4",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -82,7 +69,7 @@
       "savedAt": 1783046780761,
       "savedBy": "system",
       "sessionId": "publish-1783046780753",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v5",
       "fileCount": 14,
       "note": "发布快照"
     },
@@ -92,7 +79,7 @@
       "savedAt": 1783047435291,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v6",
       "fileCount": 16,
       "note": "停止编辑后自动保存记录"
     },
@@ -102,7 +89,7 @@
       "savedAt": 1783047961415,
       "savedBy": "system",
       "sessionId": "publish-1783047961374",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v7",
       "fileCount": 14,
       "note": "发布快照"
     },
@@ -112,7 +99,7 @@
       "savedAt": 1783048075393,
       "savedBy": "system",
       "sessionId": "publish-1783048075334",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v8",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v8",
       "fileCount": 14,
       "note": "发布快照"
     },
@@ -122,7 +109,7 @@
       "savedAt": 1783048611149,
       "savedBy": "system",
       "sessionId": "publish-1783048611145",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v9",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v9",
       "fileCount": 10,
       "note": "发布快照"
     },
@@ -132,7 +119,7 @@
       "savedAt": 1783049121943,
       "savedBy": "qihao",
       "sessionId": "session-1783042635404-zxr04zcrw",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v10",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v10",
       "fileCount": 10,
       "note": "停止编辑后自动保存记录"
     },
@@ -142,7 +129,7 @@
       "savedAt": 1783049591004,
       "savedBy": "system",
       "sessionId": "publish-1783049591000",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v11",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v11",
       "fileCount": 11,
       "note": "发布快照"
     },
@@ -152,7 +139,7 @@
       "savedAt": 1783050200016,
       "savedBy": "system",
       "sessionId": "publish-1783050200006",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v12",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v12",
       "fileCount": 11,
       "note": "发布快照"
     },
@@ -162,7 +149,7 @@
       "savedAt": 1783050602606,
       "savedBy": "qihao",
       "sessionId": "restore",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v13",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v13",
       "fileCount": 12,
       "note": "从 v10 恢复"
     },
@@ -172,7 +159,7 @@
       "savedAt": 1783050623361,
       "savedBy": "qihao",
       "sessionId": "restore",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v14",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v14",
       "fileCount": 16,
       "note": "从 v7 恢复"
     },
@@ -182,18 +169,28 @@
       "savedAt": 1783050634321,
       "savedBy": "qihao",
       "sessionId": "restore",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1783042627508_t1czw2/v15",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1783042627508_t1czw2/v15",
       "fileCount": 16,
       "note": "从 v6 恢复"
+    },
+    {
+      "versionId": "v16",
+      "type": "publish_snapshot",
+      "savedAt": 1783325642733,
+      "savedBy": "system",
+      "sessionId": "publish-1783325642720",
+      "snapshotPath": "/app/data/snapshots/proj_1783042627508_t1czw2/v16",
+      "fileCount": 13,
+      "note": "发布快照"
     }
   ],
   "pageVersions": {},
   "createdAt": 1783042627511,
-  "updatedAt": 1783050762800,
+  "updatedAt": 1783325642733,
   "activeWorkspaceId": "live-1783050659019-h2bw6qh8p",
-  "activeWorkspaceUpdatedAt": 1783050659030,
+  "activeWorkspaceUpdatedAt": 1783325629792,
   "canonicalSyncedWorkspaceId": "live-1783050659019-h2bw6qh8p",
-  "canonicalSyncedAt": 1783050762800,
-  "publishedVersion": "v12",
-  "publishedAt": 1783050200023
+  "canonicalSyncedAt": 1783325642683,
+  "publishedVersion": "v16",
+  "publishedAt": 1783325642743
 }

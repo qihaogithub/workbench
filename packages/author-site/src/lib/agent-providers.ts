@@ -8,7 +8,7 @@
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 import {
   getInternalApiToken,

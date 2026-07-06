@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { Project } from '@opencode-workbench/shared/contracts';
+import type { Project } from '@workbench/shared/contracts';
 import { buildViewerAiPromptContext, buildViewerAiSystemPrompt } from '../../src/services/viewer-ai-context';
 import { setSystemKnowledgeSnapshot } from '../../src/config/system-knowledge';
 

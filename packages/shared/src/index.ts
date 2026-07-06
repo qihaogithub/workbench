@@ -1,12 +1,92 @@
-import type { DemoPageRuntimeType } from "./workspace";
+import type {
+  DemoPageRuntimeType,
+  ProjectAuthoringPreferences,
+  UserAuthoringPreferences,
+} from "./workspace";
 
 export type { DemoPageRuntimeType } from "./workspace";
+export type {
+  ProjectAuthoringPreferences,
+  SketchEditorEnginePreference,
+  UserAuthoringPreferences,
+} from "./workspace";
+export {
+  SKETCH_SCENE_PROTOCOL_VERSION,
+  DEFAULT_SKETCH_SCENE_PAGE_SIZE,
+  applySketchScenePatchOperations,
+  bindSketchSceneConfigField,
+  buildSketchScenePreviewDocumentHtml,
+  createDefaultSketchScene,
+  getSketchSceneHashSource,
+  parseSketchSceneDocument,
+  renderSketchSceneToSvgMarkup,
+  validateSketchSceneDocument,
+} from "./demo/sketch-scene";
+export type {
+  SketchSceneAsset,
+  SketchSceneDocument,
+  SketchSceneNode,
+  SketchSceneNodeBindings,
+  SketchSceneTextStyleOverride,
+  SketchSceneTextStyleRun,
+  SketchSceneNodeType,
+  SketchScenePageSize,
+  SketchScenePatchOperation,
+  SketchSceneStyle,
+  SketchSceneValidationIssue,
+  SketchSceneValidationResult,
+} from "./demo/sketch-scene";
+export {
+  OPENPENCIL_EDITOR_MESSAGE_TYPES,
+  OPENPENCIL_ADAPTER_SOURCE,
+  OPENPENCIL_HOST_MESSAGE_TYPES,
+  createOpenPencilCommandMessage,
+  createOpenPencilDirtyStateMessage,
+  createOpenPencilDocumentLoadedMessage,
+  createOpenPencilErrorMessage,
+  createOpenPencilLoadDocumentMessage,
+  createOpenPencilReadyMessage,
+  createOpenPencilSelectNodeMessage,
+  createOpenPencilUiStateMessage,
+  isOpenPencilEditCommand,
+  isOpenPencilEditorMessage,
+  isOpenPencilHostMessage,
+  isOpenPencilUpdateNodeCommand,
+} from "./openpencil-adapter";
+export type {
+  OpenPencilCommandAvailability,
+  OpenPencilCommandMessage,
+  OpenPencilDirtyStateMessage,
+  OpenPencilDocumentLoadedMessage,
+  OpenPencilEditCommand,
+  OpenPencilEditorError,
+  OpenPencilEditorMessage,
+  OpenPencilErrorCode,
+  OpenPencilErrorMessage,
+  OpenPencilHostCommand,
+  OpenPencilHostMessage,
+  OpenPencilInspectorNode,
+  OpenPencilLayerItem,
+  OpenPencilLoadDocumentMessage,
+  OpenPencilNodeUpdateChanges,
+  OpenPencilPreviewSize,
+  OpenPencilReadyMessage,
+  OpenPencilSelectCommand,
+  OpenPencilSelectNodeMessage,
+  OpenPencilSelectNodesCommand,
+  OpenPencilSelectionInfo,
+  OpenPencilTextSelectionRange,
+  OpenPencilUiState,
+  OpenPencilUiStateMessage,
+  OpenPencilUpdateNodeCommand,
+} from "./openpencil-adapter";
 export {
   applyPrototypeBindings,
   applyPrototypeTextBindings,
   buildPrototypePreviewDocumentHtml,
   buildPrototypePreviewHtmlFragment,
   normalizePrototypeViewportUnits,
+  rewritePrototypeAssetUrls,
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
 } from "./demo/prototype-preview";
@@ -26,6 +106,7 @@ export interface DemoMeta {
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;
+  authoringPreferences?: ProjectAuthoringPreferences;
   demoCount?: number;
   demoPages?: Array<{ id: string; name: string; routeKey?: string; runtimeType?: DemoPageRuntimeType; order: number; parentId: string | null }>;
   locked?: boolean;
@@ -52,6 +133,8 @@ export interface DemoFiles {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
 }
 
 interface PageSnapshotBaseInput {
@@ -74,9 +157,16 @@ export interface PrototypeHtmlCssPageSnapshotInput extends PageSnapshotBaseInput
   prototypeMeta?: PrototypePageMeta;
 }
 
+export interface SketchScenePageSnapshotInput extends PageSnapshotBaseInput {
+  runtimeType: "sketch-scene";
+  sketchScene: import("./demo/sketch-scene").SketchSceneDocument;
+  sketchMeta?: Record<string, unknown>;
+}
+
 export type PageSnapshotInput =
   | HighFidelityReactPageSnapshotInput
-  | PrototypeHtmlCssPageSnapshotInput;
+  | PrototypeHtmlCssPageSnapshotInput
+  | SketchScenePageSnapshotInput;
 
 /**
  * 多页面文件集合（取代旧的单页 DemoFiles 顶层结构）
@@ -107,13 +197,14 @@ export interface SessionMeta {
   expiresAt: number;
   status?: "editing" | "saved" | "discarded" | "archived";
   basedOnVersion?: string;
-  opencodeSessionId?: string | null;
+  workbenchSessionId?: string | null;
   workspaceId?: string;
 }
 
 export type CollabResourceKind =
   | "page-code"
   | "page-schema"
+  | "page-sketch-scene"
   | "project-schema"
   | "workspace-tree"
   | "canvas-layout"
@@ -236,6 +327,7 @@ export * from "./agent-config";
 export * from "./knowledge";
 export * from "./external-auth";
 export * from "./diagnostics";
+export * from "./ai-error-normalizer";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

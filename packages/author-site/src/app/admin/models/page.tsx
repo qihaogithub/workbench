@@ -46,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { BackendProvider, BackendProvidersConfig } from "@opencode-workbench/shared";
+import type { BackendProvider, BackendProvidersConfig } from "@workbench/shared";
 
 /* ============================================================
    类型定义
@@ -1311,7 +1311,7 @@ function ModelConfigTab() {
           />
           <RuleInput
             label="名称过滤器 (分组:关键词)"
-            placeholder="如 opencode:Free"
+            placeholder="如 workbench:Free"
             value={newNameFilter}
             onChange={setNewNameFilter}
             onAdd={() => {

@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   PreviewPanel,
   PrototypePagePreview,
+  SketchPagePreview,
   PreviewCanvas,
   LayerTreeMenu,
   PageConfigPanel,
@@ -29,7 +30,19 @@ import type {
   VisualNodeTreeItem,
   VisualPropertyChangeKind,
 } from "../../../../../components/demo";
-import type { DemoPageRuntimeType, PrototypePageMeta } from "@opencode-workbench/shared";
+import type {
+  DemoPageRuntimeType,
+  ProjectAuthoringPreferences,
+  PrototypePageMeta,
+  SketchSceneDocument,
+  SketchScenePatchOperation,
+} from "@workbench/shared";
+import {
+  applySketchScenePatchOperations,
+  createDefaultSketchScene,
+  parseSketchSceneDocument,
+  validateSketchSceneDocument,
+} from "@workbench/sketch-core";
 import {
   useScreenshotGeneration,
   type ScreenshotBatchPageInput,
@@ -108,6 +121,8 @@ import {
   Users,
   Download,
   Send,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import {
   Select,
@@ -135,8 +150,30 @@ import { KnowledgeDocDialog, type KnowledgeItem, type KnowledgeDocDialogMode } f
 import { ResourceHistoryDialog } from "@/components/demo/ResourceHistoryDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { VisualPropertyPanel } from "./components/VisualPropertyPanel";
+import {
+  SketchEditorEngineInspectorPanel,
+  SketchEditorEngineLayerPanel,
+  SketchEditorEngineStage,
+  SketchEditorEngineToolbar,
+  useSketchEditorEngineHost,
+} from "./components/SketchEditorEngineHost";
 import { useVisualEditState } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
+import { useCommandHistory } from "./hooks/useCommandHistory";
+import {
+  createOpenPencilPatchSummaryRecord,
+  readOpenPencilPatchSummaryForScene,
+  type OpenPencilPatchSummaryRecord,
+} from "./lib/openpencil-patch-summary";
+import {
+  buildOpenPencilPatchMergeConflictSummary,
+  createOpenPencilMergeConflictError,
+  filterOpenPencilPatchOperationsForMergeResolution,
+  hasOpenPencilPatchMergeConflicts,
+  parseOpenPencilPatchBaseSceneKey,
+  type OpenPencilMergeConflictResolutionMode,
+} from "./lib/openpencil-merge-conflict";
+import { createOpenPencilSaveFailureError } from "./lib/openpencil-save-error";
 import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
@@ -147,7 +184,7 @@ import {
   getCanvasDocumentEntries,
   useCanvasDocumentMarkdown,
   withCanvasAnnotationNodes,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 import type {
   CanvasDocumentNode,
   CanvasState,
@@ -155,7 +192,7 @@ import type {
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
   PreviewDiagnosticError,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -165,8 +202,14 @@ import type {
   VersionHistoryResponse,
   VersionInfo,
   WorkspaceTree,
-} from "@opencode-workbench/shared";
+  UserAuthoringPreferences,
+} from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import {
+  OPENPENCIL_SKETCH_SPIKE_ENABLED,
+  OPENPENCIL_SPIKE_EDITOR_URL,
+} from "@/lib/authoring-feature-flags";
+import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -183,6 +226,11 @@ type AiFileChange = {
   path: string;
   action: "created" | "modified" | "deleted";
   content?: string;
+};
+
+type DeletedDemoPageSnapshot = {
+  snapshotId: string;
+  page: DemoPageMeta;
 };
 
 type PreviewRuntimeErrorContext = NonNullable<
@@ -360,14 +408,15 @@ type HistoryEvent =
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
   "prototype-html-css": "HTML/CSS 原型",
+  "sketch-scene": "手绘页面",
 };
 
 function getEffectiveRuntimeType(
   page?: Pick<DemoPageMeta, "runtimeType"> | null,
 ): DemoPageRuntimeType {
-  return page?.runtimeType === "prototype-html-css"
-    ? "prototype-html-css"
-    : "high-fidelity-react";
+  if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (page?.runtimeType === "sketch-scene") return "sketch-scene";
+  return "high-fidelity-react";
 }
 
 function buildRuntimeConversionPrompt(input: {
@@ -443,6 +492,8 @@ interface RuntimeConversionFileSnapshot {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sketchScene?: string;
+  sketchMeta?: Record<string, unknown>;
 }
 
 function toCanvasKnowledgeDocument(item: KnowledgeItem): CanvasKnowledgeDocument {
@@ -523,12 +574,45 @@ function arePositionableSizesEqual(
   });
 }
 
+function getCanvasContentHistorySignature(state: CanvasState): string {
+  return JSON.stringify({
+    pages: state.pages ?? {},
+    nodes: state.nodes ?? {},
+    layers: state.layers ?? {},
+    hiddenKnowledgeDocumentIds: state.hiddenKnowledgeDocumentIds ?? [],
+  });
+}
+
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
   const { id: demoId } = params;
   const { toast } = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  const handleCommandHistoryError = useCallback(
+    (error: unknown, command: { label: string }, phase: "undo" | "redo") => {
+      toast({
+        title: phase === "undo" ? "撤回失败" : "重做失败",
+        description:
+          error instanceof Error ? error.message : `${command.label}执行失败`,
+        variant: "destructive",
+      });
+    },
+    [toast],
+  );
+  const commandHistory = useCommandHistory({
+    onError: handleCommandHistoryError,
+  });
+  const {
+    bindKeyboardShortcuts,
+    canRedo,
+    canUndo,
+    executeCommand,
+    recordCommand,
+    redo,
+    reset: resetCommandHistory,
+    undo,
+  } = commandHistory;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [code, setCode] = useState("");
@@ -553,7 +637,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }>>({});
   const pagePrototypeMapRef = useRef(pagePrototypeMap);
   pagePrototypeMapRef.current = pagePrototypeMap;
-  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@opencode-workbench/demo-ui").PreviewSize>>({});
+  const [pageSketchMap, setPageSketchMap] = useState<Record<string, {
+    scene?: string;
+    meta?: Record<string, unknown>;
+  }>>({});
+  const pageSketchMapRef = useRef(pageSketchMap);
+  pageSketchMapRef.current = pageSketchMap;
+  const openPencilPatchSummaryRef = useRef<
+    Record<string, OpenPencilPatchSummaryRecord>
+  >({});
+  const [sketchEditing, setSketchEditing] = useState(false);
+  const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<Record<string, import("@workbench/demo-ui").PreviewSize>>({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<Record<string, PositionableSizeItem>>({});
   const handlePositionableSizes = useCallback(
     (sizes: Record<string, PositionableSizeItem>) => {
@@ -578,7 +672,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspaceId, setWorkspaceId] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
   const [previewSize, setPreviewSize] =
-    useState<import("@opencode-workbench/demo-ui").PreviewSize>();
+    useState<import("@workbench/demo-ui").PreviewSize>();
+
+  useEffect(() => bindKeyboardShortcuts(), [bindKeyboardShortcuts]);
+
+  useEffect(() => {
+    resetCommandHistory();
+  }, [resetCommandHistory, sessionId]);
 
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -593,6 +693,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
   );
+  const [projectAuthoringPreferences, setProjectAuthoringPreferences] =
+    useState<ProjectAuthoringPreferences | undefined>(undefined);
+  const [userAuthoringPreferences, setUserAuthoringPreferences] =
+    useState<UserAuthoringPreferences | undefined>(undefined);
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
     setHasPendingWorkspaceFlush(true);
@@ -606,6 +710,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 多页面状态
   const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
+  const demoPagesRef = useRef<DemoPageMeta[]>([]);
+  demoPagesRef.current = demoPages;
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [runtimeConversions, setRuntimeConversions] = useState<
@@ -629,7 +735,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     previewMode,
     setPreviewMode,
     canvasState,
-    setCanvasState,
+    setCanvasState: setCanvasStateRaw,
     canvasEditingPageId,
     setCanvasEditingPageId,
     focusCanvasPageId,
@@ -646,6 +752,79 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   });
   const canvasStateRef = useRef(canvasState);
   canvasStateRef.current = canvasState;
+  const suppressCanvasHistoryRef = useRef(false);
+  const pendingCanvasHistoryRef = useRef<{
+    before: CanvasState;
+    after: CanvasState;
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  const flushPendingCanvasHistory = useCallback(() => {
+    const pending = pendingCanvasHistoryRef.current;
+    if (!pending) return;
+    if (pending.timer) {
+      clearTimeout(pending.timer);
+    }
+    pendingCanvasHistoryRef.current = null;
+
+    const beforeSignature = getCanvasContentHistorySignature(pending.before);
+    const afterSignature = getCanvasContentHistorySignature(pending.after);
+    if (beforeSignature === afterSignature) return;
+
+    const before = pending.before;
+    const after = pending.after;
+    recordCommand({
+      label: "画布变更",
+      undo: () => {
+        suppressCanvasHistoryRef.current = true;
+        canvasStateRef.current = before;
+        setCanvasStateRaw(before);
+        suppressCanvasHistoryRef.current = false;
+      },
+      redo: () => {
+        suppressCanvasHistoryRef.current = true;
+        canvasStateRef.current = after;
+        setCanvasStateRaw(after);
+        suppressCanvasHistoryRef.current = false;
+      },
+    });
+  }, [recordCommand, setCanvasStateRaw]);
+  const setCanvasState = useCallback(
+    (nextState: CanvasState) => {
+      const previousState = canvasStateRef.current;
+      canvasStateRef.current = nextState;
+      setCanvasStateRaw(nextState);
+
+      if (suppressCanvasHistoryRef.current) return;
+      if (
+        getCanvasContentHistorySignature(previousState) ===
+        getCanvasContentHistorySignature(nextState)
+      ) {
+        return;
+      }
+
+      const existing = pendingCanvasHistoryRef.current;
+      if (existing) {
+        existing.after = nextState;
+        if (existing.timer) clearTimeout(existing.timer);
+        existing.timer = setTimeout(flushPendingCanvasHistory, 350);
+        return;
+      }
+
+      pendingCanvasHistoryRef.current = {
+        before: previousState,
+        after: nextState,
+        timer: setTimeout(flushPendingCanvasHistory, 350),
+      };
+    },
+    [flushPendingCanvasHistory, setCanvasStateRaw],
+  );
+  useEffect(() => {
+    return () => {
+      const pending = pendingCanvasHistoryRef.current;
+      if (pending?.timer) clearTimeout(pending.timer);
+      pendingCanvasHistoryRef.current = null;
+    };
+  }, []);
   const lastAppliedCanvasCollabValueRef = useRef<string | null>(null);
   const [fitCanvasToScreenOnMount, setFitCanvasToScreenOnMount] = useState(false);
   const initialCanvasFitRequestedRef = useRef(false);
@@ -804,6 +983,23 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         };
       }
 
+      if (page.runtimeType === "sketch-scene") {
+        const sketch = pageSketchMapRef.current[page.id] ?? {};
+        if (!sketch.scene) return null;
+        let sketchScene: SketchSceneDocument;
+        try {
+          sketchScene = JSON.parse(sketch.scene) as SketchSceneDocument;
+        } catch {
+          return null;
+        }
+        return {
+          ...common,
+          runtimeType: "sketch-scene",
+          sketchScene,
+          sketchMeta: sketch.meta,
+        };
+      }
+
       const pageCode = codeOverride ?? resolvePreviewPageCode({
         pageId: page.id,
         pageCodes,
@@ -902,14 +1098,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         delete timers[pageId];
         return;
       }
+      const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[pageId]);
       const regenerateInput =
-        snapshotInput.runtimeType === "prototype-html-css"
+        snapshotInput.runtimeType === "prototype-html-css" ||
+        snapshotInput.runtimeType === "sketch-scene"
           ? snapshotInput
           : {
               ...snapshotInput,
               runtimeType: "high-fidelity-react" as const,
             };
-      const { width, height } = getScreenshotRequestSize(pagePreviewSizeMap[pageId]);
       regeneratePageSnapshot(
         pageId,
         regenerateInput,
@@ -1228,6 +1425,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }),
     [currentUsername, sessionId],
   );
+  const activeDemoRuntimeTypeForCollab = demoPages.find(
+    (page) => page.id === activeDemoId,
+  )?.runtimeType;
   const activeCodeCollab = useCollabDocument(
     sessionId && workspaceId && activeDemoId
       ? {
@@ -1248,6 +1448,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           sessionId,
           resourcePath: `demos/${activeDemoId}/config.schema.json`,
           kind: "page-schema",
+        }
+      : null,
+    collabUser,
+  );
+  const activeSketchSceneCollab = useCollabDocument(
+    sessionId &&
+      workspaceId &&
+      activeDemoId &&
+      activeDemoRuntimeTypeForCollab === "sketch-scene"
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: `demos/${activeDemoId}/sketch.scene.json`,
+          kind: "page-sketch-scene",
         }
       : null,
     collabUser,
@@ -1352,6 +1567,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           : undefined,
         kind: "page-schema",
       },
+      activeSketchScene: {
+        status: activeSketchSceneCollab.status,
+        error: activeSketchSceneCollab.error,
+        awarenessCount: activeSketchSceneCollab.awareness.length,
+        resourcePath: activeDemoId && activeDemoRuntimeTypeForCollab === "sketch-scene"
+          ? `demos/${activeDemoId}/sketch.scene.json`
+          : undefined,
+        kind: "page-sketch-scene",
+      },
       projectSchema: {
         status: projectSchemaCollab.status,
         error: projectSchemaCollab.error,
@@ -1379,9 +1603,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       activeCodeCollab.error,
       activeCodeCollab.status,
       activeDemoId,
+      activeDemoRuntimeTypeForCollab,
       activeSchemaCollab.awareness.length,
       activeSchemaCollab.error,
       activeSchemaCollab.status,
+      activeSketchSceneCollab.awareness.length,
+      activeSketchSceneCollab.error,
+      activeSketchSceneCollab.status,
       canvasLayoutCollab.awareness.length,
       canvasLayoutCollab.error,
       canvasLayoutCollab.status,
@@ -1395,6 +1623,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const {
+    editorSessionId,
     diagnosticsEnabled,
     remoteWriteFailed: diagnosticsRemoteWriteFailed,
     recordEvent: recordDiagnosticEvent,
@@ -1966,6 +2195,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [visualLayerDrawerMounted, setVisualLayerDrawerMounted] = useState(false);
   const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
   const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<VisualNodeTreeItem[]>([]);
+  const [hiddenVisualNodeIds, setHiddenVisualNodeIds] = useState<string[]>([]);
   const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
   const pendingStaticPrototypeConversionRef =
     useRef<RuntimeConversionState | null>(null);
@@ -1979,7 +2209,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   useEffect(() => {
     if (previewMode !== "single" || !activeDemoId) return;
     const activePage = demoPages.find((page) => page.id === activeDemoId);
-    if (activePage?.runtimeType === "prototype-html-css") {
+    if (activePage?.runtimeType === "prototype-html-css" || activePage?.runtimeType === "sketch-scene") {
       setSinglePreviewLoaded((current) => (current ? current : true));
     }
   }, [activeDemoId, demoPages, previewMode]);
@@ -1992,8 +2222,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   useEffect(() => {
     setVisualLayerTreeNodes((current) => (current.length === 0 ? current : []));
+    setHiddenVisualNodeIds((current) => (current.length === 0 ? current : []));
     setVisualLayerTreeOpen((current) => (current ? false : current));
   }, [activeDemoId]);
+
+  const handleToggleVisualNodeHidden = useCallback((node: VisualNodeInfo) => {
+    const nodeId = node.domPath || node.nodeId;
+    if (!nodeId) return;
+    setHiddenVisualNodeIds((current) =>
+      current.includes(nodeId)
+        ? current.filter((id) => id !== nodeId)
+        : [...current, nodeId],
+    );
+  }, []);
 
   useEffect(() => {
     if (!hasPendingVisualPropertyWork) return;
@@ -2027,6 +2268,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ],
   );
 
+  const getOpenPencilPatchSummaryForPage = useCallback((pageId: string) => {
+    const scene = parseSketchSceneDocument(pageSketchMapRef.current[pageId]?.scene);
+    return readOpenPencilPatchSummaryForScene(
+      openPencilPatchSummaryRef.current[pageId],
+      scene,
+    );
+  }, []);
+
   // Version control hook
   const versionControl = useVersionControl({
     demoId,
@@ -2052,6 +2301,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setPageCodes,
     setHasUnsavedChanges,
     setIsSaving,
+    getSketchPatchSummary: getOpenPencilPatchSummaryForPage,
   });
   const {
     publishStatus,
@@ -2123,6 +2373,53 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     activeSchemaCollab.value,
     activeSchemaCollab.ytext,
     applyDemoSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (activeSketchSceneCollab.status !== "synced") return;
+    const currentPageId = activeDemoIdRef.current;
+    if (!currentPageId) return;
+
+    const currentSceneText = pageSketchMapRef.current[currentPageId]?.scene ?? "";
+    if (activeSketchSceneCollab.value === currentSceneText) return;
+    if (activeSketchSceneCollab.value === "" && currentSceneText.trim()) {
+      replaceCollabText(activeSketchSceneCollab.ytext, currentSceneText);
+      return;
+    }
+
+    const remoteScene = parseSketchSceneDocument(activeSketchSceneCollab.value);
+    if (!remoteScene) return;
+
+    openPencilPatchSummaryRef.current = {
+      ...openPencilPatchSummaryRef.current,
+    };
+    delete openPencilPatchSummaryRef.current[currentPageId];
+    pageSketchMapRef.current = {
+      ...pageSketchMapRef.current,
+      [currentPageId]: {
+        ...(pageSketchMapRef.current[currentPageId] ?? {}),
+        scene: activeSketchSceneCollab.value,
+      },
+    };
+    setPageSketchMap((prev) => ({
+      ...prev,
+      [currentPageId]: {
+        ...(prev[currentPageId] ?? {}),
+        scene: activeSketchSceneCollab.value,
+      },
+    }));
+    invalidatePageScreenshot(currentPageId);
+    scheduleScreenshotRegenerate(
+      currentPageId,
+      undefined,
+      configDataMapRef.current[currentPageId],
+    );
+  }, [
+    activeSketchSceneCollab.status,
+    activeSketchSceneCollab.value,
+    activeSketchSceneCollab.ytext,
+    invalidatePageScreenshot,
+    scheduleScreenshotRegenerate,
   ]);
 
   useEffect(() => {
@@ -2360,12 +2657,31 @@ ${context.details}
         const demosData = await demosRes.json();
         if (demosData.success) {
           const demo = demosData.data.find(
-            (d: { id: string; name: string; thumbnail?: string }) =>
+            (d: {
+              id: string;
+              name: string;
+              thumbnail?: string;
+              authoringPreferences?: ProjectAuthoringPreferences;
+            }) =>
               d.id === demoId,
           );
           if (demo) {
             setDemoName(demo.name);
             setCurrentThumbnail(demo.thumbnail);
+            setProjectAuthoringPreferences(demo.authoringPreferences);
+          }
+        }
+
+        const userAuthoringPreferencesRes = await fetch(
+          "/api/user/authoring-preferences",
+        );
+        if (userAuthoringPreferencesRes.ok) {
+          const userAuthoringPreferencesData =
+            await userAuthoringPreferencesRes.json();
+          if (userAuthoringPreferencesData.success) {
+            setUserAuthoringPreferences(
+              userAuthoringPreferencesData.data?.preferences,
+            );
           }
         }
 
@@ -2426,7 +2742,7 @@ ${context.details}
         projectConfigSchemaRef.current = multi.projectConfigSchema;
 
         // 记录每个页面的 previewSize
-        const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
+        const previewSizeMap: Record<string, import("@workbench/demo-ui").PreviewSize> = {};
         for (const page of pagesWithSize) {
           if (page.previewSize) {
             previewSizeMap[page.id] = page.previewSize;
@@ -2471,6 +2787,10 @@ ${context.details}
           css?: string;
           meta?: PrototypePageMeta;
         }> = {};
+        const sketches: Record<string, {
+          scene?: string;
+          meta?: Record<string, unknown>;
+        }> = {};
         const schemas: Record<string, string> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
@@ -2481,6 +2801,8 @@ ${context.details}
               prototypeHtml?: string;
               prototypeCss?: string;
               prototypeMeta?: PrototypePageMeta;
+              sketchScene?: string;
+              sketchMeta?: Record<string, unknown>;
             },
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(
@@ -2496,6 +2818,12 @@ ${context.details}
                 meta: demo.prototypeMeta,
               };
             }
+            if (demo.sketchScene !== undefined || demo.sketchMeta !== undefined) {
+              sketches[pageId] = {
+                scene: demo.sketchScene,
+                meta: demo.sketchMeta,
+              };
+            }
           }
         } else if (initialDemoId) {
           allDefaults[initialDemoId] = getSafeMergedDefaults(
@@ -2507,6 +2835,7 @@ ${context.details}
         setConfigDataMap(allDefaults);
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
+        setPageSketchMap(sketches);
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
 
         const size = getPreviewSize(loadedSchema);
@@ -2849,6 +3178,8 @@ ${context.details}
               prototypeHtml: data.data.prototypeHtml as string | undefined,
               prototypeCss: data.data.prototypeCss as string | undefined,
               prototypeMeta: data.data.prototypeMeta as PrototypePageMeta | undefined,
+              sketchScene: data.data.sketchScene as string | undefined,
+              sketchMeta: data.data.sketchMeta as Record<string, unknown> | undefined,
             };
           }),
         );
@@ -2860,11 +3191,15 @@ ${context.details}
           css?: string;
           meta?: PrototypePageMeta;
         }> = {};
+        const nextSketches: Record<string, {
+          scene?: string;
+          meta?: Record<string, unknown>;
+        }> = {};
         const nextSchemas: Record<string, string> = {};
         const nextDefaults: Record<string, Record<string, unknown>> = {};
         const nextPreviewSizes: Record<
           string,
-          import("@opencode-workbench/demo-ui").PreviewSize
+          import("@workbench/demo-ui").PreviewSize
         > = {};
 
         for (const page of loadedPages) {
@@ -2878,6 +3213,12 @@ ${context.details}
               meta: page.prototypeMeta,
             };
           }
+          if (page.sketchScene !== undefined || page.sketchMeta !== undefined) {
+            nextSketches[page.pageId] = {
+              scene: page.sketchScene,
+              meta: page.sketchMeta,
+            };
+          }
           nextDefaults[page.pageId] = getSafeMergedDefaults(page.schema);
           const size = getPreviewSize(page.schema);
           if (size) {
@@ -2889,6 +3230,7 @@ ${context.details}
 
         setPageCodes((prev) => ({ ...prev, ...nextCodes }));
         setPagePrototypeMap((prev) => ({ ...prev, ...nextPrototypes }));
+        setPageSketchMap((prev) => ({ ...prev, ...nextSketches }));
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, nextSchemas));
         setConfigDataMap((prev) => {
           const next = { ...prev };
@@ -2971,6 +3313,194 @@ ${context.details}
     if (demoPages.length === 0) return "";
     return [...demoPages].sort((a, b) => a.order - b.order)[0]?.id ?? "";
   }, [demoPages]);
+
+  const clearPageLocalCaches = useCallback((pageIds: string[]) => {
+    const deleted = new Set(pageIds);
+    setPageCodes((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setPagePrototypeMap((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setPageSketchMap((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setPageSchemaMap((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setConfigDataMap((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setPagePreviewSizeMap((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    setRuntimeConversions((prev) => {
+      const next = { ...prev };
+      pageIds.forEach((pageId) => delete next[pageId]);
+      return next;
+    });
+    pageIds.forEach((pageId) => invalidatePageScreenshot(pageId));
+    if (canvasEditingPageId && deleted.has(canvasEditingPageId)) {
+      setCanvasEditingPageId(null);
+      setConfigPanelDetailPageId(null);
+      clearCanvasSelection();
+    }
+  }, [
+    canvasEditingPageId,
+    clearCanvasSelection,
+    invalidatePageScreenshot,
+    setCanvasEditingPageId,
+  ]);
+
+  const applyDeletedPagesLocally = useCallback(
+    async (pageIds: string[]) => {
+      const deleted = new Set(pageIds);
+      const previousPages = demoPagesRef.current;
+      const remaining = previousPages
+        .filter((page) => !deleted.has(page.id))
+        .sort((a, b) => a.order - b.order);
+      setDemoPages(remaining);
+      clearPageLocalCaches(pageIds);
+      handleWorkspaceTreeChanged();
+
+      if (deleted.has(activeDemoIdRef.current)) {
+        const nextPage = remaining[0];
+        if (nextPage) {
+          await handleConfigPanelPageSelectRef.current(nextPage.id);
+        } else {
+          setActiveDemoId("");
+          activeDemoIdRef.current = "";
+          setCode("");
+          setSchema("");
+          setEditorContent(buildFigmaText("", ""));
+          setPreviewSize(undefined);
+          setSinglePreviewTarget(null);
+        }
+      }
+    },
+    [clearPageLocalCaches, handleWorkspaceTreeChanged],
+  );
+
+  const restoreDeletedPageSnapshot = useCallback(
+    async (snapshot: DeletedDemoPageSnapshot): Promise<DemoPageMeta> => {
+      if (!sessionId) throw new Error("当前编辑会话未初始化");
+      const response = await fetch(
+        `/api/projects/${demoId}/demos/${snapshot.page.id}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            action: "restoreDeletedSnapshot",
+            snapshotId: snapshot.snapshotId,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.data) {
+        throw new Error(data.error?.message || "恢复页面失败");
+      }
+      return data.data as DemoPageMeta;
+    },
+    [demoId, sessionId],
+  );
+
+  const deletePageWithSnapshot = useCallback(
+    async (pageId: string): Promise<DeletedDemoPageSnapshot> => {
+      if (!sessionId) throw new Error("当前编辑会话未初始化");
+      const response = await fetch(
+        `/api/projects/${demoId}/demos/${pageId}?sessionId=${encodeURIComponent(sessionId)}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.data?.snapshotId) {
+        throw new Error(data.error?.message || "删除页面失败");
+      }
+      return data.data as DeletedDemoPageSnapshot;
+    },
+    [demoId, sessionId],
+  );
+
+  const requestDeletePages = useCallback(
+    async (pageIds: string[]) => {
+      const uniquePageIds = Array.from(new Set(pageIds)).filter(Boolean);
+      if (uniquePageIds.length === 0) return;
+      const pagesToDelete = uniquePageIds
+        .map((pageId) => demoPagesRef.current.find((page) => page.id === pageId))
+        .filter((page): page is DemoPageMeta => Boolean(page));
+      if (pagesToDelete.length === 0) return;
+
+      const confirmed = confirm(
+        pagesToDelete.length === 1
+          ? `确定要删除页面「${pagesToDelete[0].name}」吗？`
+          : `确定要删除选中的 ${pagesToDelete.length} 个页面吗？`,
+      );
+      if (!confirmed) return;
+
+      let snapshots: DeletedDemoPageSnapshot[] = [];
+      await executeCommand({
+        label: pagesToDelete.length === 1 ? "删除页面" : "删除多个页面",
+        redo: async () => {
+          const nextSnapshots: DeletedDemoPageSnapshot[] = [];
+          for (const pageId of uniquePageIds) {
+            nextSnapshots.push(await deletePageWithSnapshot(pageId));
+          }
+          snapshots = nextSnapshots;
+          await applyDeletedPagesLocally(uniquePageIds);
+          toast({
+            title: pagesToDelete.length === 1 ? "页面已删除" : "页面已批量删除",
+          });
+        },
+        undo: async () => {
+          if (snapshots.length === 0) {
+            throw new Error("缺少页面删除快照，无法撤回");
+          }
+          const restoredPages: DemoPageMeta[] = [];
+          for (const snapshot of [...snapshots].sort(
+            (a, b) => (a.page.order ?? 0) - (b.page.order ?? 0),
+          )) {
+            restoredPages.push(await restoreDeletedPageSnapshot(snapshot));
+          }
+          setDemoPages((current) =>
+            [
+              ...current.filter(
+                (page) => !restoredPages.some((restored) => restored.id === page.id),
+              ),
+              ...restoredPages,
+            ].sort((a, b) => a.order - b.order),
+          );
+          handleWorkspaceTreeChanged();
+          const firstRestored = restoredPages[0];
+          if (firstRestored) {
+            await handleConfigPanelPageSelectRef.current(firstRestored.id);
+          }
+          toast({
+            title: pagesToDelete.length === 1 ? "已撤回删除页面" : "已撤回批量删除",
+          });
+        },
+      });
+    },
+    [
+      applyDeletedPagesLocally,
+      executeCommand,
+      deletePageWithSnapshot,
+      handleWorkspaceTreeChanged,
+      restoreDeletedPageSnapshot,
+      toast,
+    ],
+  );
 
   const handleSinglePreviewPageSelect = useCallback(
     async (pageId: string) => {
@@ -3279,7 +3809,11 @@ ${context.details}
           css?: string;
           meta?: PrototypePageMeta;
         }> = {};
-        const previewSizeMap: Record<string, import("@opencode-workbench/demo-ui").PreviewSize> = {};
+        const sketches: Record<string, {
+          scene?: string;
+          meta?: Record<string, unknown>;
+        }> = {};
+        const previewSizeMap: Record<string, import("@workbench/demo-ui").PreviewSize> = {};
         if (multi.demos) {
           for (const [pageId, demo] of Object.entries(multi.demos) as [
             string,
@@ -3309,6 +3843,12 @@ ${context.details}
                 meta: demo.prototypeMeta,
               };
             }
+            if (demo.sketchScene !== undefined || demo.sketchMeta !== undefined) {
+              sketches[pageId] = {
+                scene: demo.sketchScene,
+                meta: demo.sketchMeta,
+              };
+            }
             const pagePreviewSize = getPreviewSize(demo.schema || "");
             if (pagePreviewSize) {
               previewSizeMap[pageId] = pagePreviewSize;
@@ -3318,6 +3858,7 @@ ${context.details}
 
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
+        setPageSketchMap(sketches);
         setConfigDataMap(allDefaults);
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
         setPagePreviewSizeMap(previewSizeMap);
@@ -3430,7 +3971,7 @@ ${context.details}
   // loadVersionHistory, loadPageVersionHistories, publish status effect, handlePublish,
   // and handleRestoreVersion moved to useVersionControl hook
 
-  const persistActivePageToSession = async () => {
+  const persistActivePageToSession = useCallback(async () => {
     if (!sessionId || !activeDemoId) {
       throw new Error("未选中页面或 Session 未创建");
     }
@@ -3446,6 +3987,8 @@ ${context.details}
           prototypeHtml: pagePrototypeMapRef.current[activeDemoId]?.html,
           prototypeCss: pagePrototypeMapRef.current[activeDemoId]?.css,
           prototypeMeta: pagePrototypeMapRef.current[activeDemoId]?.meta,
+          sketchScene: pageSketchMapRef.current[activeDemoId]?.scene,
+          sketchMeta: pageSketchMapRef.current[activeDemoId]?.meta,
         }),
       },
     );
@@ -3453,7 +3996,136 @@ ${context.details}
     if (!saveRes.ok) {
       throw new Error("保存当前页面到临时工作区失败");
     }
-  };
+  }, [activeDemoId, code, schema, sessionId]);
+
+  const handleSketchSceneChange = useCallback(
+    (scene: SketchSceneDocument) => {
+      if (!activeDemoId) return;
+      const sceneText = JSON.stringify(scene, null, 2);
+      replaceCollabText(activeSketchSceneCollab.ytext, sceneText);
+      pageSketchMapRef.current = {
+        ...pageSketchMapRef.current,
+        [activeDemoId]: {
+          ...(pageSketchMapRef.current[activeDemoId] ?? {}),
+          scene: sceneText,
+        },
+      };
+      setPageSketchMap((prev) => ({
+        ...prev,
+        [activeDemoId]: {
+          ...(prev[activeDemoId] ?? {}),
+          scene: sceneText,
+        },
+      }));
+      invalidatePageScreenshot(activeDemoId);
+      markWorkspaceChanged();
+      scheduleScreenshotRegenerate(
+        activeDemoId,
+        undefined,
+        configDataMapRef.current[activeDemoId],
+      );
+    },
+    [
+      activeDemoId,
+      activeSketchSceneCollab.ytext,
+      invalidatePageScreenshot,
+      markWorkspaceChanged,
+      scheduleScreenshotRegenerate,
+      setPageSketchMap,
+    ],
+  );
+
+  const activeSketchScene = useMemo(
+    () =>
+      parseSketchSceneDocument(
+        activeDemoId ? pageSketchMap[activeDemoId]?.scene : undefined,
+      ) ?? createDefaultSketchScene(),
+    [activeDemoId, pageSketchMap],
+  );
+
+  const readLatestOpenPencilScene = useCallback(async () => {
+    if (!activeDemoId || !sessionId) {
+      throw new Error("未选中手绘页面或 Session 未创建");
+    }
+    const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`);
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error?.message || "加载最新手绘内容失败");
+    }
+
+    const latestSceneText =
+      typeof result.data?.sketchScene === "string"
+        ? result.data.sketchScene
+        : undefined;
+    const latestScene = parseSketchSceneDocument(latestSceneText);
+    if (!latestScene || !latestSceneText) {
+      throw new Error("最新手绘内容无法解析，请刷新页面后重试");
+    }
+
+    const latestMeta =
+      result.data?.sketchMeta &&
+      typeof result.data.sketchMeta === "object" &&
+      !Array.isArray(result.data.sketchMeta)
+        ? (result.data.sketchMeta as Record<string, unknown>)
+        : pageSketchMapRef.current[activeDemoId]?.meta;
+
+    return {
+      scene: latestScene,
+      sceneText: latestSceneText,
+      meta: latestMeta,
+    };
+  }, [activeDemoId, sessionId]);
+
+  const handleReloadOpenPencilLatestScene = useCallback(async () => {
+    if (!activeDemoId) {
+      throw new Error("未选中手绘页面");
+    }
+    const latest = await readLatestOpenPencilScene();
+
+    replaceCollabText(activeSketchSceneCollab.ytext, latest.sceneText);
+    pageSketchMapRef.current = {
+      ...pageSketchMapRef.current,
+      [activeDemoId]: {
+        ...(pageSketchMapRef.current[activeDemoId] ?? {}),
+        scene: latest.sceneText,
+        meta: latest.meta,
+      },
+    };
+    setPageSketchMap((prev) => ({
+      ...prev,
+      [activeDemoId]: {
+        ...(prev[activeDemoId] ?? {}),
+        scene: latest.sceneText,
+        meta: latest.meta,
+      },
+    }));
+    delete openPencilPatchSummaryRef.current[activeDemoId];
+    invalidatePageScreenshot(activeDemoId);
+    scheduleScreenshotRegenerate(
+      activeDemoId,
+      undefined,
+      configDataMapRef.current[activeDemoId],
+    );
+    recordDiagnosticEvent({
+      category: "page",
+      name: "page.openpencil_conflict_reloaded",
+      traceId: createDiagnosticTraceId("openpencil-reload"),
+      details: {
+        pageId: activeDemoId,
+        status: "reloaded",
+        success: true,
+        currentNodeCount: latest.scene.nodes.length,
+      },
+    });
+  }, [
+    activeDemoId,
+    activeSketchSceneCollab.ytext,
+    createDiagnosticTraceId,
+    invalidatePageScreenshot,
+    readLatestOpenPencilScene,
+    recordDiagnosticEvent,
+    scheduleScreenshotRegenerate,
+  ]);
 
   // handlePreviewPageVersion and handleRestorePageVersion moved to useVersionControl hook
   // handleCreateVersion moved to useVersionControl hook
@@ -3480,6 +4152,298 @@ ${context.details}
     }
   }, [sessionId]);
 
+  const handleOpenPencilSceneCommit = useCallback(
+    async (
+      scene: SketchSceneDocument,
+      draft?: {
+        patchBaseSceneKey?: string;
+        patchOperations?: SketchScenePatchOperation[];
+      },
+    ) => {
+      if (!activeDemoId || !sessionId) {
+        throw new Error("未选中手绘页面或 Session 未创建");
+      }
+
+      const sceneText = JSON.stringify(scene, null, 2);
+      const sketchPatch = draft?.patchOperations?.length
+        ? {
+            baseSceneKey: draft.patchBaseSceneKey,
+            operations: draft.patchOperations,
+          }
+        : undefined;
+      const saveTraceId = createDiagnosticTraceId("openpencil-save");
+
+      if (workspaceId) {
+        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+      }
+
+      const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sketchScene: sketchPatch ? undefined : sceneText,
+          sketchMeta: pageSketchMapRef.current[activeDemoId]?.meta,
+          sketchPatch,
+          diagnosticContext: {
+            editorSessionId,
+            traceId: saveTraceId,
+          },
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw createOpenPencilSaveFailureError({
+            status: response.status,
+            message: result?.error?.message,
+        });
+      }
+
+      if (!sketchPatch) {
+        const currentScene = pageSketchMapRef.current[activeDemoId]?.scene;
+        const currentNodeCount = currentScene
+          ? parseSketchSceneDocument(currentScene)?.nodes.length
+          : undefined;
+        recordDiagnosticEvent({
+          category: "page",
+          name: "page.openpencil_full_draft_fallback",
+          traceId: saveTraceId,
+          level: "info",
+          details: {
+            pageId: activeDemoId,
+            status: "fallback-saved",
+            success: true,
+            operationCount: 0,
+            hasBaseSceneKey: false,
+            currentNodeCount,
+            targetNodeCount: scene.nodes.length,
+            targetSource: "client_scene",
+          },
+        });
+      }
+
+      await persistWorkspaceToProject();
+      handleSketchSceneChange(scene);
+      const patchSummaryRecord = createOpenPencilPatchSummaryRecord(
+        scene,
+        draft,
+      );
+      if (patchSummaryRecord) {
+        openPencilPatchSummaryRef.current[activeDemoId] = patchSummaryRecord;
+      } else {
+        delete openPencilPatchSummaryRef.current[activeDemoId];
+      }
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+    },
+    [
+      activeDemoId,
+      createDiagnosticTraceId,
+      demoId,
+      editorSessionId,
+      handleSketchSceneChange,
+      persistWorkspaceToProject,
+      sessionId,
+      workspaceId,
+    ],
+  );
+
+  const handleMergeOpenPencilLatestSceneWithDraft = useCallback(
+    async (draft: {
+      patchBaseSceneKey?: string;
+      patchOperations?: SketchScenePatchOperation[];
+    }, options?: {
+      conflictResolution?: OpenPencilMergeConflictResolutionMode;
+      skipOperationIndices?: number[];
+      overrideFieldConflictKeys?: string[];
+    }) => {
+      if (!activeDemoId || !sessionId) {
+        throw new Error("未选中手绘页面或 Session 未创建");
+      }
+      if (!draft.patchOperations?.length) {
+        throw new Error("本次手绘改动没有可合并的 patch，请加载最新内容后重新编辑");
+      }
+
+      const latest = await readLatestOpenPencilScene();
+      const patchBaseScene = parseOpenPencilPatchBaseSceneKey(
+        draft.patchBaseSceneKey,
+      );
+      const conflictSummary = buildOpenPencilPatchMergeConflictSummary(
+        latest.scene,
+        draft.patchOperations,
+        { baseScene: patchBaseScene },
+      );
+      let operationsToMerge = draft.patchOperations;
+      let skippedOperationIndices: number[] = [];
+      let skippedAffectedNodeIds: string[] = [];
+      if (hasOpenPencilPatchMergeConflicts(conflictSummary)) {
+        const conflictResolution = options?.conflictResolution ?? "strict";
+        const filtered = filterOpenPencilPatchOperationsForMergeResolution(
+          draft.patchOperations,
+          conflictSummary,
+          conflictResolution,
+          {
+            skipOperationIndices: options?.skipOperationIndices,
+          },
+        );
+        if (
+          conflictResolution === "skip-conflicting-operations" ||
+          conflictResolution === "skip-selected-operations"
+        ) {
+          operationsToMerge = filtered.operations;
+          skippedOperationIndices = filtered.skippedOperationIndices;
+          skippedAffectedNodeIds = filtered.skippedAffectedNodeIds;
+        }
+        const remainingConflictSummary = buildOpenPencilPatchMergeConflictSummary(
+          latest.scene,
+          operationsToMerge,
+          {
+            baseScene: patchBaseScene,
+            ignoredFieldConflictKeys:
+              conflictResolution === "override-selected-field-conflicts"
+                ? options?.overrideFieldConflictKeys
+                : undefined,
+          },
+        );
+        if (
+          conflictResolution === "strict" ||
+          operationsToMerge.length === 0 ||
+          hasOpenPencilPatchMergeConflicts(remainingConflictSummary)
+        ) {
+          const summary =
+            conflictResolution === "strict" || operationsToMerge.length === 0
+              ? conflictSummary
+              : remainingConflictSummary;
+          recordDiagnosticEvent({
+            category: "page",
+            name: "page.openpencil_conflict_merge_blocked",
+            traceId: createDiagnosticTraceId("openpencil-merge"),
+            level: "warn",
+            details: {
+              pageId: activeDemoId,
+              status: operationsToMerge.length === 0 ? "blocked-empty" : "blocked",
+              success: false,
+              conflictResolution,
+              operationCount: summary.operationCount,
+              latestNodeCount: summary.latestNodeCount,
+              affectedNodeCount: summary.affectedNodeIds.length,
+              missingNodeCount: summary.missingNodeIds.length,
+              duplicateNodeCount: summary.duplicateNodeIds.length,
+              fieldConflictCount: summary.fieldConflicts.length,
+              incompatibleOperationCount: summary.incompatibleOperationCount,
+              skippedOperationCount: skippedOperationIndices.length,
+              skippedAffectedNodeCount: skippedAffectedNodeIds.length,
+              overriddenFieldConflictCount:
+                conflictResolution === "override-selected-field-conflicts"
+                  ? options?.overrideFieldConflictKeys?.length ?? 0
+                  : 0,
+            },
+          });
+          throw createOpenPencilMergeConflictError(
+            operationsToMerge.length === 0
+              ? "本次手绘改动没有可安全合并的操作，请加载最新内容后重新编辑。"
+              : "本次手绘改动无法自动合并到最新内容，请查看冲突摘要后加载最新内容重新编辑。",
+            summary,
+          );
+        }
+      }
+      const mergedScene = applySketchScenePatchOperations(
+        latest.scene,
+        operationsToMerge,
+      );
+      const validation = validateSketchSceneDocument(mergedScene);
+      if (!validation.valid) {
+        throw new Error("本次手绘改动无法安全合并到最新内容，请加载最新内容后重新编辑");
+      }
+
+      replaceCollabText(activeSketchSceneCollab.ytext, latest.sceneText);
+      pageSketchMapRef.current = {
+        ...pageSketchMapRef.current,
+        [activeDemoId]: {
+          ...(pageSketchMapRef.current[activeDemoId] ?? {}),
+          scene: latest.sceneText,
+          meta: latest.meta,
+        },
+      };
+
+      if (workspaceId) {
+        await flushWorkspaceCollab(demoId, workspaceId, sessionId);
+      }
+
+      const mergedSceneText = JSON.stringify(mergedScene, null, 2);
+      const response = await fetch(`/api/sessions/${sessionId}/files/${activeDemoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sketchScene: mergedSceneText,
+          sketchMeta: latest.meta,
+          sketchPatch: {
+            operations: operationsToMerge,
+          },
+          diagnosticContext: {
+            editorSessionId,
+            traceId: createDiagnosticTraceId("openpencil-merge"),
+          },
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw createOpenPencilSaveFailureError({
+          status: response.status,
+          message: result?.error?.message,
+        });
+      }
+
+      await persistWorkspaceToProject();
+      handleSketchSceneChange(mergedScene);
+      const patchSummaryRecord = createOpenPencilPatchSummaryRecord(
+        mergedScene,
+        { patchOperations: operationsToMerge },
+      );
+      if (patchSummaryRecord) {
+        openPencilPatchSummaryRef.current[activeDemoId] = patchSummaryRecord;
+      } else {
+        delete openPencilPatchSummaryRef.current[activeDemoId];
+      }
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+      recordDiagnosticEvent({
+        category: "page",
+        name: "page.openpencil_conflict_merged",
+        traceId: createDiagnosticTraceId("openpencil-merge"),
+        details: {
+          pageId: activeDemoId,
+          status: "merged",
+          success: true,
+          conflictResolution: options?.conflictResolution ?? "strict",
+          operationCount: operationsToMerge.length,
+          originalOperationCount: draft.patchOperations.length,
+          skippedOperationCount: skippedOperationIndices.length,
+          skippedAffectedNodeCount: skippedAffectedNodeIds.length,
+          overriddenFieldConflictCount:
+            options?.conflictResolution === "override-selected-field-conflicts"
+              ? options?.overrideFieldConflictKeys?.length ?? 0
+              : 0,
+          latestNodeCount: latest.scene.nodes.length,
+          mergedNodeCount: mergedScene.nodes.length,
+        },
+      });
+      return mergedScene;
+    },
+    [
+      activeDemoId,
+      activeSketchSceneCollab.ytext,
+      createDiagnosticTraceId,
+      demoId,
+      editorSessionId,
+      handleSketchSceneChange,
+      persistWorkspaceToProject,
+      readLatestOpenPencilScene,
+      recordDiagnosticEvent,
+      sessionId,
+      workspaceId,
+    ],
+  );
+
   const flushPendingWorkspaceBeforeAiSend = useCallback(async () => {
     if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
 
@@ -3497,6 +4461,7 @@ ${context.details}
 
     const startedAt = Date.now();
     try {
+      await persistActivePageToSession();
       await flushWorkspaceCollab(demoId, workspaceId, sessionId);
       await persistWorkspaceToProject();
       if (workspaceFlushRevisionRef.current === revisionAtStart) {
@@ -3533,6 +4498,7 @@ ${context.details}
     createDiagnosticTraceId,
     demoId,
     hasPendingWorkspaceFlush,
+    persistActivePageToSession,
     persistWorkspaceToProject,
     recordDiagnosticEvent,
     sessionId,
@@ -3566,7 +4532,8 @@ ${context.details}
           workspaceId,
         },
       });
-      flushWorkspaceCollab(demoId, workspaceId, sessionId)
+      persistActivePageToSession()
+        .then(() => flushWorkspaceCollab(demoId, workspaceId, sessionId))
         .then(() => persistWorkspaceToProject())
         .then(() => {
           if (workspaceFlushRevisionRef.current !== revisionAtStart) return;
@@ -3617,6 +4584,7 @@ ${context.details}
     createDiagnosticTraceId,
     demoId,
     hasPendingWorkspaceFlush,
+    persistActivePageToSession,
     persistWorkspaceToProject,
     recordDiagnosticEvent,
     sessionId,
@@ -3663,6 +4631,7 @@ ${context.details}
     }
     try {
       if (hasPendingWorkspaceFlush) {
+        await persistActivePageToSession();
         await flushWorkspaceCollab(demoId, workspaceId, sessionId);
       }
       if (shouldPersistWorkspace) {
@@ -3701,6 +4670,7 @@ ${context.details}
     hasUnsavedChanges,
     hasPendingWorkspaceFlush,
     hasUnsavedCanvasChanges,
+    persistActivePageToSession,
     persistWorkspaceToProject,
     recordDiagnosticEvent,
     sessionId,
@@ -3789,7 +4759,9 @@ ${context.details}
           ? "prototypeHtml"
           : normalizedPath.endsWith("prototype.css")
             ? "prototypeCss"
-            : "schema";
+            : normalizedPath.endsWith("sketch.scene.json")
+              ? "sketchScene"
+              : "schema";
 
       if (demoId && demoId === activeDemoId) {
         if (fileType === "prototypeHtml" || fileType === "prototypeCss") {
@@ -3799,6 +4771,20 @@ ${context.details}
             [demoId]: {
               ...(prev[demoId] ?? {}),
               [fileType === "prototypeHtml" ? "html" : "css"]: content,
+            },
+          }));
+          scheduleScreenshotRegenerate(
+            demoId,
+            undefined,
+            configDataMapRef.current[demoId],
+          );
+        } else if (fileType === "sketchScene") {
+          invalidatePageScreenshot(demoId);
+          setPageSketchMap((prev) => ({
+            ...prev,
+            [demoId]: {
+              ...(prev[demoId] ?? {}),
+              scene: content,
             },
           }));
           scheduleScreenshotRegenerate(
@@ -3822,9 +4808,11 @@ ${context.details}
       markWorkspaceChanged,
       scheduleScreenshotRegenerate,
       setPagePrototypeMap,
+      setPageSketchMap,
     ],
   );
 
+  const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
   const activePreviewSize = useMemo(() => {
     if (activeDemoId) {
       const schemaForActivePage = pageSchemaMap[activeDemoId];
@@ -3867,6 +4855,33 @@ ${context.details}
     effectiveSinglePreviewTarget?.kind === "document";
   const visualLayerDrawerActive =
     propertyPanelActive && visualLayerTreeOpen && !singlePreviewViewingDocument;
+  const activeSketchEditorEngine = resolveSketchEditorEngine({
+    openPencilEnabled: OPENPENCIL_SKETCH_SPIKE_ENABLED,
+    enginePreference: projectAuthoringPreferences?.sketchEditorEngine,
+    userEnginePreference: userAuthoringPreferences?.sketchEditorEngine,
+    previewMode,
+    runtimeType: activeDemoPage?.runtimeType,
+    sketchEditing,
+    viewingDocument: singlePreviewViewingDocument,
+  });
+  const openPencilSketchEditingActive =
+    activeSketchEditorEngine === "openpencil";
+  const nativeSketchEditingActive = activeSketchEditorEngine === "native";
+  const sketchEditorHost = useSketchEditorEngineHost({
+    engine: activeSketchEditorEngine,
+    scene: activeSketchScene,
+    onSceneChange: handleSketchSceneChange,
+  });
+  const openPencilLayerDrawerActive = openPencilSketchEditingActive;
+  const sketchLayerDrawerActive = nativeSketchEditingActive;
+  const layerDrawerMounted =
+    (visualLayerDrawerMounted && !singlePreviewViewingDocument) ||
+    sketchLayerDrawerActive ||
+    openPencilLayerDrawerActive;
+  const layerDrawerActive =
+    visualLayerDrawerActive ||
+    sketchLayerDrawerActive ||
+    openPencilLayerDrawerActive;
 
   useEffect(() => {
     if (visualPropertyDrawerOpen && !singlePreviewViewingDocument) {
@@ -4420,7 +5435,6 @@ ${context.details}
     );
   }
 
-  const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
   const activeRuntimeConversion = activeDemoId
     ? runtimeConversions[activeDemoId]
     : undefined;
@@ -4494,6 +5508,8 @@ ${context.details}
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
+  const browserOnline =
+    typeof navigator === "undefined" ? true : navigator.onLine;
   let collabStatusLabel = "已自动保存";
   if (workspaceFlushError) {
     collabStatusLabel = "同步失败";
@@ -4501,6 +5517,8 @@ ${context.details}
     collabStatusLabel = "同步中";
   } else if (collabStatuses.includes("error")) {
     collabStatusLabel = "协同异常";
+  } else if (aiIsStreaming && browserOnline) {
+    collabStatusLabel = "AI 正在更新";
   } else if (collabStatuses.includes("offline")) {
     collabStatusLabel = "离线待同步";
   } else if (collabStatuses.includes("saving")) {
@@ -4554,6 +5572,32 @@ ${context.details}
           </Button>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-md border p-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="撤回 (Cmd/Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={() => {
+                void undo();
+              }}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="重做 (Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y)"
+              disabled={!canRedo}
+              onClick={() => {
+                void redo();
+              }}
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
           {diagnosticsEnabled && (
             <Button
               variant="ghost"
@@ -5133,107 +6177,8 @@ ${context.details}
                     }
                   }}
                   onRequestRuntimeConversion={handleRequestRuntimeConversion}
-                  onPageDelete={async (pageId) => {
-                    if (!sessionId) {
-                      toast({
-                        title: "未创建 Session",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    const page = demoPages.find((p) => p.id === pageId);
-                    if (!page || !confirm(`确定要删除页面「${page.name}」吗？`))
-                      return;
-                    try {
-                      const res = await fetch(
-                        `/api/projects/${demoId}/demos/${pageId}?sessionId=${encodeURIComponent(sessionId)}`,
-                        { method: "DELETE" },
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        handleWorkspaceTreeChanged();
-                        setDemoPages((prev) =>
-                          prev.filter((p) => p.id !== pageId),
-                        );
-                        setPageCodes((prev) => {
-                          const rest = { ...prev };
-                          delete rest[pageId];
-                          return rest;
-                        });
-                        setConfigDataMap((prev) => {
-                          const rest = { ...prev };
-                          delete rest[pageId];
-                          return rest;
-                        });
-                        setPagePreviewSizeMap((prev) => {
-                          const rest = { ...prev };
-                          delete rest[pageId];
-                          return rest;
-                        });
-                        if (activeDemoId === pageId) {
-                          const remaining = demoPages.filter(
-                            (p) => p.id !== pageId,
-                          );
-                          const nextPage = remaining[0];
-                          if (nextPage) {
-                            setActiveDemoId(nextPage.id);
-                            activeDemoIdRef.current = nextPage.id;
-                            const fileRes = await fetch(
-                              `/api/sessions/${sessionId}/files/${nextPage.id}`,
-                            );
-                            const fileData = await fileRes.json();
-                            if (fileData.success) {
-                              setPageCodes((prev) => ({
-                                ...prev,
-                                [nextPage.id]: fileData.data.code,
-                              }));
-                              setCode(fileData.data.code);
-                              setSchema(fileData.data.schema);
-                              setPageSchemaMap((prev) => ({
-                                ...prev,
-                                [nextPage.id]: fileData.data.schema,
-                              }));
-                              setEditorContent(
-                                buildFigmaText(
-                                  fileData.data.code,
-                                  fileData.data.schema,
-                                ),
-                              );
-                              setConfigDataMap((prev) => {
-                                if (!prev[nextPage.id]) {
-                                  const defaults = getSafeMergedDefaults(
-                                    fileData.data.schema,
-                                  );
-                                  return {
-                                    ...prev,
-                                    [nextPage.id]: defaults,
-                                  };
-                                }
-                                return prev;
-                              });
-                              const size = getPreviewSize(fileData.data.schema);
-                              setPreviewSize(size);
-                            }
-                          } else {
-                            setActiveDemoId("");
-                            activeDemoIdRef.current = "";
-                            setCode("");
-                            setSchema("");
-                            setEditorContent(buildFigmaText("", ""));
-                            setPreviewSize(undefined);
-                          }
-                        }
-                        toast({ title: "页面已删除" });
-                      } else {
-                        toast({
-                          title: "删除失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({ title: "删除失败", variant: "destructive" });
-                    }
+                  onPageDelete={(pageId) => {
+                    void requestDeletePages([pageId]);
                   }}
                 />
               </TabsContent>
@@ -5388,10 +6333,10 @@ ${context.details}
               </TabsContent>
 
             </Tabs>
-            {visualLayerDrawerMounted && !singlePreviewViewingDocument && (
+            {layerDrawerMounted && (
               <div
                 className={`absolute inset-0 z-20 flex flex-col border-r bg-card shadow-2xl transition-[opacity,transform] duration-200 ease-out will-change-transform motion-reduce:transform-none motion-reduce:transition-none ${
-                  visualLayerDrawerActive
+                  layerDrawerActive
                     ? "translate-x-0 opacity-100"
                     : "pointer-events-none -translate-x-full opacity-0"
                 }`}
@@ -5403,36 +6348,56 @@ ${context.details}
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden p-2">
-                  <LayerTreeMenu
-                    title="当前页面图层"
-                    nodes={visualLayerTreeNodes}
-                    className="h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
-                    scrollClassName="layer-tree-menu-scrollbar max-h-[calc(100vh-180px)]"
-                    selectedNodeId={
-                      selectedVisualNode?.domPath ||
-                      selectedVisualNode?.nodeId ||
-                      null
-                    }
-                    emptyText="正在采集页面图层..."
-                    getNodeBadgeCount={getVisualNodeChangeCount}
-                    onHoverNodeIdChange={setVisualPanelHoverNodeId}
-                    onSelectNode={handleVisualSelect}
-                  />
+                  {openPencilLayerDrawerActive ? (
+                    <SketchEditorEngineLayerPanel
+                      host={sketchEditorHost}
+                      scene={activeSketchScene}
+                    />
+                  ) : sketchLayerDrawerActive ? (
+                    <SketchEditorEngineLayerPanel
+                      host={sketchEditorHost}
+                      scene={activeSketchScene}
+                    />
+                  ) : (
+                    <LayerTreeMenu
+                      title="当前页面图层"
+                      nodes={visualLayerTreeNodes}
+                      className="h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
+                      scrollClassName="layer-tree-menu-scrollbar max-h-[calc(100vh-180px)]"
+                      selectedNodeId={
+                        selectedVisualNode?.domPath ||
+                        selectedVisualNode?.nodeId ||
+                        null
+                      }
+                      emptyText="正在采集页面图层..."
+                      hiddenNodeIds={hiddenVisualNodeIds}
+                      getNodeBadgeCount={getVisualNodeChangeCount}
+                      onHoverNodeIdChange={setVisualPanelHoverNodeId}
+                      onSelectNode={handleVisualSelect}
+                      onToggleNodeHidden={handleToggleVisualNodeHidden}
+                    />
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-card px-3 py-2">
                   <span className="text-xs font-medium text-muted-foreground">
-                    {visualTotalChangeCount} 项修改
+                    {openPencilLayerDrawerActive
+                      ? `${sketchEditorHost.openPencilUiState?.layerCount ?? 0} 个手绘图层`
+                      : sketchLayerDrawerActive
+                      ? `${activeSketchScene.nodes.length} 个对象`
+                      : `${visualTotalChangeCount} 项修改`}
                   </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 gap-1.5 px-3"
-                    disabled={visualSendDisabled}
-                    onClick={() => handleSendVisualPropertiesToAI()}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    发送给AI
-                  </Button>
+                  {sketchLayerDrawerActive || openPencilLayerDrawerActive ? null : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1.5 px-3"
+                      disabled={visualSendDisabled}
+                      onClick={() => handleSendVisualPropertiesToAI()}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      发送给AI
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -5490,11 +6455,14 @@ ${context.details}
                         prototypeHtml: pagePrototypeMap[p.id]?.html,
                         prototypeCss: pagePrototypeMap[p.id]?.css,
                         prototypeMeta: pagePrototypeMap[p.id]?.meta,
+                        sketchScene: pageSketchMap[p.id]?.scene,
+                        sketchMeta: pageSketchMap[p.id]?.meta,
                         configData: configDataMap[p.id],
                         previewSize: pagePreviewSizeMap[p.id],
                       }))}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
+                      onRequestDeletePages={requestDeletePages}
                       onRuntimeConversionRequest={handleRequestRuntimeConversion}
                       focusPageId={focusCanvasPageId}
                       onVisiblePageIdsChange={setVisibleCanvasPageIds}
@@ -5590,7 +6558,11 @@ ${context.details}
                       variant="outline"
                       size="icon"
                       className={`h-7 w-7 ${
-                        propertyPanelActive
+                        activeDemoPage?.runtimeType === "sketch-scene"
+                          ? sketchEditing
+                            ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                            : ""
+                          : propertyPanelActive
                           ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
                           : ""
                       }`}
@@ -5598,17 +6570,29 @@ ${context.details}
                       title={
                         singlePreviewViewingDocument
                           ? "文档视图不可选择"
-                          : propertyPanelActive
-                            ? "退出选择"
-                            : "选择"
+                          : activeDemoPage?.runtimeType === "sketch-scene"
+                            ? sketchEditing
+                              ? "退出手绘编辑"
+                              : "手绘编辑"
+                            : propertyPanelActive
+                              ? "退出选择"
+                              : "选择"
                       }
-                      aria-label="选择"
-                      aria-pressed={propertyPanelActive}
+                      aria-label={activeDemoPage?.runtimeType === "sketch-scene" ? "手绘编辑" : "选择"}
+                      aria-pressed={
+                        activeDemoPage?.runtimeType === "sketch-scene"
+                          ? sketchEditing
+                          : propertyPanelActive
+                      }
                       onClick={() => {
-                        if (propertyPanelActive) {
-                          handleCloseVisualEditMode();
+                        if (activeDemoPage?.runtimeType === "sketch-scene") {
+                          setSketchEditing((current) => !current);
                         } else {
-                          handleOpenVisualEditMode();
+                          if (propertyPanelActive) {
+                            handleCloseVisualEditMode();
+                          } else {
+                            handleOpenVisualEditMode();
+                          }
                         }
                       }}
                     >
@@ -5755,11 +6739,25 @@ ${context.details}
                             }
                           />
                         </div>
+                      ) : !activeDemoId ? (
+                        <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
+                          <div className="max-w-sm">
+                            <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/60" />
+                            <p className="text-sm font-medium text-foreground">
+                              暂无页面
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                              请在左侧页面列表点击“添加页面”，或让 AI 创建新页面。
+                            </p>
+                          </div>
+                        </div>
                       ) : activeDemoPage?.runtimeType === "prototype-html-css" ? (
                         <PrototypePagePreview
                           html={pagePrototypeMap[activeDemoId]?.html}
                           css={pagePrototypeMap[activeDemoId]?.css}
                           configData={configData}
+                          sessionId={sessionId}
+                          demoId={activeDemoId}
                           previewSize={activePreviewSize}
                           visualEditMode={propertyPanelActive}
                           visualHoverNodeId={
@@ -5770,6 +6768,7 @@ ${context.details}
                             selectedVisualNode?.nodeId ||
                             null
                           }
+                          hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualPropertyChanges={visualPropertyChanges}
                           onVisualHover={setHoveredVisualNode}
                           onVisualSelect={handleVisualSelect}
@@ -5783,6 +6782,44 @@ ${context.details}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
                         />
+                      ) : activeDemoPage?.runtimeType === "sketch-scene" ? (
+                        <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
+                          <div className="min-h-0 flex-1 overflow-hidden">
+                            {sketchEditing ? (
+                              <SketchEditorEngineStage
+                                host={sketchEditorHost}
+                                editorUrl={OPENPENCIL_SPIKE_EDITOR_URL}
+                                pageId={activeDemoId || "unknown"}
+                                pageName={activeDemoPage?.name}
+                                scene={activeSketchScene}
+                                configData={configData}
+                                previewSize={activePreviewSize}
+                                onOpenPencilSceneCommit={handleOpenPencilSceneCommit}
+                                onOpenPencilMergeLatestSceneWithDraft={handleMergeOpenPencilLatestSceneWithDraft}
+                                onOpenPencilReloadLatestScene={handleReloadOpenPencilLatestScene}
+                                imageProxyDiagnosticContext={{
+                                  editorSessionId,
+                                  projectId: demoId,
+                                  sessionId,
+                                  workspaceId,
+                                }}
+                              />
+                            ) : (
+                              <SketchPagePreview
+                                scene={pageSketchMap[activeDemoId]?.scene}
+                                configData={configData}
+                                previewSize={activePreviewSize}
+                                fillContainer
+                              />
+                            )}
+                          </div>
+                          {sketchEditing && !openPencilSketchEditingActive ? (
+                            <SketchEditorEngineToolbar
+                              host={sketchEditorHost}
+                              scene={activeSketchScene}
+                            />
+                          ) : null}
+                        </div>
                       ) : (
                         <PreviewPanel
                           code={
@@ -5818,6 +6855,7 @@ ${context.details}
                             selectedVisualNode?.nodeId ||
                             null
                           }
+                          hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualPropertyChanges={visualPropertyChanges}
                           visualAnnotations={visualAnnotations}
                           onVisualHover={setHoveredVisualNode}
@@ -5941,6 +6979,22 @@ ${context.details}
                         onUpdateConfigMark={handleUpdateVisualConfigMark}
                         onRemoveConfigMark={handleRemoveVisualConfigMark}
                         onAiInstructionChange={setVisualAiInstruction}
+                      />
+                    </div>
+                  )}
+                  {openPencilSketchEditingActive && (
+                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
+                      <SketchEditorEngineInspectorPanel
+                        host={sketchEditorHost}
+                        scene={activeSketchScene}
+                      />
+                    </div>
+                  )}
+                  {sketchLayerDrawerActive && (
+                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
+                      <SketchEditorEngineInspectorPanel
+                        host={sketchEditorHost}
+                        scene={activeSketchScene}
                       />
                     </div>
                   )}

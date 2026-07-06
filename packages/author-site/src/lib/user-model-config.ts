@@ -3,7 +3,7 @@ import crypto from "crypto";
 import type {
   BackendProvider,
   BackendProvidersConfig,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 
 import { getDb } from "@/lib/db";
 

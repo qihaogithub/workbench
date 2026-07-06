@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket from "ws";
 
-import type { CollabResourceKind } from "@opencode-workbench/shared/contracts";
+import type { CollabResourceKind } from "@workbench/shared/contracts";
 import { collabRoomManager } from "../collab/collab-room-manager";
 
 interface CollabParams {
@@ -19,6 +19,7 @@ interface CollabQuery {
 const RESOURCE_KINDS: CollabResourceKind[] = [
   "page-code",
   "page-schema",
+  "page-sketch-scene",
   "project-schema",
   "workspace-tree",
   "canvas-layout",

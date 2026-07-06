@@ -5,12 +5,17 @@ import path from "node:path";
 import {
   KnowledgeFileStore,
   indexTemplateSnapshot,
-} from "@opencode-workbench/knowledge-service";
+} from "@workbench/knowledge-service";
 import {
   PreviewRuntimeContractError,
   type RuntimeContractIssue,
-} from "@opencode-workbench/preview-contract/runtime";
-import { compilePreviewPageSource } from "@opencode-workbench/preview-contract/compiler";
+} from "@workbench/preview-contract/runtime";
+import { compilePreviewPageSource } from "@workbench/preview-contract/compiler";
+import {
+  createDefaultSketchScene,
+  validateSketchSceneDocument,
+  type SketchSceneDocument,
+} from "@workbench/sketch-core";
 import type {
   DemoFiles,
   DemoFolderMeta,
@@ -31,7 +36,7 @@ import type {
   VersionInfo,
   VersionHistoryEntryType,
   WorkspaceTree,
-} from "@opencode-workbench/shared/contracts";
+} from "@workbench/shared/contracts";
 
 import type {
   AuditEvent,
@@ -42,6 +47,8 @@ import type {
   AssetReplaceInput,
   AssetSummary,
   AssetUploadInput,
+  AgentRunReport,
+  AgentRunReportInput,
   CapabilitySummary,
   ConfigUpdateInput,
   CreateProjectInput,
@@ -78,10 +85,16 @@ import type {
   PrototypeGateDecision,
   RuntimeValidationIssue,
   RuntimeValidationResult,
+  SketchPatchVersionSummary,
   TemplateHealthReport,
   TemplateListFilter,
   TemplateMetaInput,
+  UpdateProjectInput,
   ValidationResult,
+  VerifySummary,
+  VisualCheckInput,
+  VisualCheckPageResult,
+  VisualCheckResult,
 } from "./types.js";
 import {
   getAgentServiceUrl,
@@ -161,6 +174,10 @@ const DEFAULT_PROTOTYPE_META: PrototypePageMeta = {
   height: 844,
   generatedBy: "project-core",
 };
+const DEFAULT_SKETCH_META: Record<string, unknown> = {
+  generatedBy: "project-core",
+  updatedAt: 0,
+};
 
 const MAX_PROTOTYPE_HTML_LENGTH = 120_000;
 const MAX_PROTOTYPE_CSS_LENGTH = 80_000;
@@ -190,12 +207,15 @@ interface ResourceBlobMap {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: string;
+  sketchScene?: string;
+  sketchMeta?: string;
   markdown?: string;
 }
 
 interface PageResourceMetadata extends Record<string, unknown> {
   page: DemoPageMeta;
   files: ResourceBlobMap;
+  sketchPatchSummary?: SketchPatchVersionSummary;
 }
 
 interface KnowledgeItemMeta {
@@ -230,6 +250,16 @@ function normalizeProjectCategory(category?: string): string {
   return normalized || DEFAULT_PROJECT_CATEGORY;
 }
 
+function normalizeProjectAuthoringPreferences(
+  preferences?: Project["authoringPreferences"],
+): Project["authoringPreferences"] | undefined {
+  const sketchEditorEngine = preferences?.sketchEditorEngine;
+  if (sketchEditorEngine === "native" || sketchEditorEngine === "openpencil") {
+    return { sketchEditorEngine };
+  }
+  return undefined;
+}
+
 function nowId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -246,9 +276,21 @@ function ensureDir(dir: string): void {
 }
 
 function resolvePageRuntimeType(page?: Pick<DemoPageMeta, "runtimeType"> | null): DemoPageRuntimeType {
-  return page?.runtimeType === "prototype-html-css"
-    ? "prototype-html-css"
-    : "high-fidelity-react";
+  if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (page?.runtimeType === "sketch-scene") return "sketch-scene";
+  return "high-fidelity-react";
+}
+
+function createDefaultSketchSceneText(): string {
+  return JSON.stringify(createDefaultSketchScene(), null, 2);
+}
+
+function parseSketchSceneText(text: string): SketchSceneDocument | null {
+  try {
+    return JSON.parse(text) as SketchSceneDocument;
+  } catch {
+    return null;
+  }
 }
 
 function readJsonFile<T>(filePath: string): T | null {
@@ -273,7 +315,7 @@ function copyWorkspace(source: string, target: string): void {
       if (!relative) return true;
       const segments = relative.split(path.sep);
       return !segments.some((segment) =>
-        ["node_modules", ".next", ".opencode", ".git"].includes(segment),
+        ["node_modules", ".next", ".workbench", ".git"].includes(segment),
       );
     },
   });
@@ -291,7 +333,7 @@ function copyWorkspaceWithoutRuntimeMetadata(source: string, target: string): vo
       if (!relative) return true;
       const segments = relative.split(path.sep);
       if (segments.some((segment) =>
-        ["node_modules", ".next", ".opencode", ".git"].includes(segment),
+        ["node_modules", ".next", ".workbench", ".git"].includes(segment),
       )) {
         return false;
       }
@@ -543,6 +585,7 @@ export class ProjectAdminService {
         name: project?.name ?? entry.name,
         category: normalizeProjectCategory(project?.category),
         description: project?.description,
+        authoringPreferences: project?.authoringPreferences,
         createdAt: project?.createdAt ?? stats.birthtimeMs,
         updatedAt: project?.updatedAt ?? stats.mtimeMs,
         thumbnail: project?.thumbnail,
@@ -692,6 +735,7 @@ export class ProjectAdminService {
       name,
       category,
       description: input.description,
+      authoringPreferences: input.authoringPreferences,
       workspacePath,
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
@@ -705,6 +749,7 @@ export class ProjectAdminService {
       id: projectId,
       name,
       category,
+      authoringPreferences: project.authoringPreferences,
       createdAt: stats.birthtimeMs,
       updatedAt: stats.mtimeMs,
       demoCount: project.demoPages.length,
@@ -723,7 +768,7 @@ export class ProjectAdminService {
   }
 
   updateProject(
-    input: { projectId: string; name?: string; category?: string; description?: string; dryRun?: boolean },
+    input: UpdateProjectInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<Project> {
     if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
@@ -746,6 +791,10 @@ export class ProjectAdminService {
     if (input.description !== undefined) {
       next.description = input.description;
       diff.updated?.push("project.description");
+    }
+    if (input.authoringPreferences !== undefined) {
+      next.authoringPreferences = input.authoringPreferences;
+      diff.updated?.push("project.authoringPreferences");
     }
     next.updatedAt = Date.now();
     if (!input.dryRun) this.writeProject(project.id, next);
@@ -1375,6 +1424,7 @@ export class ProjectAdminService {
         editId: input.editId,
         sourceWorkspacePath: input.sourceWorkspacePath,
         note: input.note,
+        sketchPatchSummary: input.sketchPatchSummary,
       }, actor);
       if (!created.ok || !created.data?.resourceVersion) {
         return fail(created.error?.code ?? "FILE_WRITE_ERROR", created.error?.message ?? "创建页面资源版本失败");
@@ -1625,13 +1675,22 @@ export class ProjectAdminService {
         if (!files || !metadata.page) continue;
         const demoDir = this.pageDir(workspacePath, version.resourceId);
         ensureDir(demoDir);
-        if (resolvePageRuntimeType(metadata.page) === "prototype-html-css") {
+        const runtimeType = resolvePageRuntimeType(metadata.page);
+        if (runtimeType === "prototype-html-css") {
           fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
           fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
           fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
           writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
           writtenFiles.push(`demos/${version.resourceId}/prototype.html`, `demos/${version.resourceId}/prototype.css`, `demos/${version.resourceId}/prototype.meta.json`);
+        } else if (runtimeType === "sketch-scene") {
+          fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+          fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+          fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+          fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), files.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
+          writeJsonFile(path.join(demoDir, "sketch.meta.json"), files.sketchMeta ?? DEFAULT_SKETCH_META);
+          writtenFiles.push(`demos/${version.resourceId}/sketch.scene.json`, `demos/${version.resourceId}/sketch.meta.json`);
         } else {
+          fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
           fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
           writtenFiles.push(`demos/${version.resourceId}/index.tsx`);
         }
@@ -1812,9 +1871,12 @@ export class ProjectAdminService {
     if (tree.pages.some((page) => page.id === pageId)) {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
-    const runtimeType = input.runtimeType === "prototype-html-css"
-      ? "prototype-html-css"
-      : "high-fidelity-react";
+    const runtimeType: DemoPageRuntimeType =
+      input.runtimeType === "prototype-html-css"
+        ? "prototype-html-css"
+        : input.runtimeType === "sketch-scene"
+          ? "sketch-scene"
+          : "high-fidelity-react";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -1822,20 +1884,31 @@ export class ProjectAdminService {
         input.routeKey ?? input.name,
         new Set(tree.pages.map((page) => page.routeKey).filter(Boolean) as string[]),
       ),
-      runtimeType: runtimeType === "prototype-html-css" ? runtimeType : undefined,
+      runtimeType: runtimeType === "high-fidelity-react" ? undefined : runtimeType,
       order: input.order ?? tree.pages.length,
       parentId,
     };
     if (input.dryRun) {
-      const files: DemoFiles = runtimeType === "prototype-html-css"
-        ? {
-            code: "",
-            schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
-            prototypeHtml: input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
-            prototypeCss: input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
-            prototypeMeta: input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
-          }
-        : { code: input.code ?? DEFAULT_DEMO_CODE, schema: input.schema ?? DEFAULT_DEMO_SCHEMA };
+      const files: DemoFiles =
+        runtimeType === "prototype-html-css"
+          ? {
+              code: "",
+              schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
+              prototypeHtml: input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+              prototypeCss: input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+              prototypeMeta: input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+            }
+          : runtimeType === "sketch-scene"
+            ? {
+                code: "",
+                schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
+                sketchScene: input.sketchScene ?? createDefaultSketchSceneText(),
+                sketchMeta: input.sketchMeta ?? DEFAULT_SKETCH_META,
+              }
+            : {
+                code: input.code ?? DEFAULT_DEMO_CODE,
+                schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
+              };
       const runtimeValidation = this.validatePageFilesRuntime(pageId, runtimeType, files);
       return ok(
         { meta, files },
@@ -1851,6 +1924,9 @@ export class ProjectAdminService {
       fs.writeFileSync(path.join(demoDir, "prototype.html"), input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
       fs.writeFileSync(path.join(demoDir, "prototype.css"), input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
       writeJsonFile(path.join(demoDir, "prototype.meta.json"), input.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+    } else if (runtimeType === "sketch-scene") {
+      fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), input.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
+      writeJsonFile(path.join(demoDir, "sketch.meta.json"), input.sketchMeta ?? DEFAULT_SKETCH_META);
     } else {
       fs.writeFileSync(path.join(demoDir, "index.tsx"), input.code ?? DEFAULT_DEMO_CODE, "utf-8");
     }
@@ -2040,11 +2116,14 @@ export class ProjectAdminService {
     const tree = this.readWorkspaceTree(workspacePath);
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
     if (pageIndex === -1) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
-    const targetRuntimeType = input.targetRuntimeType === "prototype-html-css"
-      ? "prototype-html-css"
-      : input.targetRuntimeType === "high-fidelity-react"
-        ? "high-fidelity-react"
-        : undefined;
+    const targetRuntimeType =
+      input.targetRuntimeType === "prototype-html-css"
+        ? "prototype-html-css"
+        : input.targetRuntimeType === "high-fidelity-react"
+          ? "high-fidelity-react"
+          : input.targetRuntimeType === "sketch-scene"
+            ? "sketch-scene"
+            : undefined;
     if (!targetRuntimeType) {
       return fail("INVALID_REQUEST", "目标页面类型不合法");
     }
@@ -2061,6 +2140,8 @@ export class ProjectAdminService {
       prototypeHtml: input.prototypeHtml ?? currentFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
       prototypeCss: input.prototypeCss ?? currentFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
       prototypeMeta: input.prototypeMeta ?? currentFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+      sketchScene: input.sketchScene ?? currentFiles.sketchScene ?? createDefaultSketchSceneText(),
+      sketchMeta: input.sketchMeta ?? currentFiles.sketchMeta ?? DEFAULT_SKETCH_META,
     };
     const validation = this.validateSchemaPair(
       this.readProjectConfig(workspacePath),
@@ -2082,7 +2163,7 @@ export class ProjectAdminService {
 
     const nextMeta: DemoPageMeta = {
       ...current,
-      runtimeType: targetRuntimeType === "prototype-html-css" ? "prototype-html-css" : undefined,
+      runtimeType: targetRuntimeType === "high-fidelity-react" ? undefined : targetRuntimeType,
     };
     const diff: DiffSummary = {
       updated: [
@@ -2093,6 +2174,9 @@ export class ProjectAdminService {
     if (targetRuntimeType === "prototype-html-css") {
       diff.updated?.push(`page:${input.pageId}:prototypeHtml`, `page:${input.pageId}:prototypeCss`);
       if (input.prototypeMeta !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
+    } else if (targetRuntimeType === "sketch-scene") {
+      diff.updated?.push(`page:${input.pageId}:sketchScene`);
+      if (input.sketchMeta !== undefined) diff.updated?.push(`page:${input.pageId}:sketchMeta`);
     } else {
       diff.updated?.push(`page:${input.pageId}:code`);
     }
@@ -2105,7 +2189,15 @@ export class ProjectAdminService {
         fs.writeFileSync(path.join(demoDir, "prototype.html"), nextFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
         fs.writeFileSync(path.join(demoDir, "prototype.css"), nextFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
         writeJsonFile(path.join(demoDir, "prototype.meta.json"), nextFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+        fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+      } else if (targetRuntimeType === "sketch-scene") {
+        fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+        fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), nextFiles.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
+        writeJsonFile(path.join(demoDir, "sketch.meta.json"), nextFiles.sketchMeta ?? DEFAULT_SKETCH_META);
       } else {
+        fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
         fs.writeFileSync(path.join(demoDir, "index.tsx"), nextFiles.code || DEFAULT_DEMO_CODE, "utf-8");
       }
       if (input.schema !== undefined) {
@@ -2188,6 +2280,7 @@ export class ProjectAdminService {
       actor,
       source: "user",
       note: input.note,
+      sketchPatchSummary: input.sketchPatchSummary,
     });
     const previousPointer = this.readHeadCommit(input.projectId)?.resourcePointers
       .find((pointer) => pointer.kind === "page" && pointer.resourceId === input.pageId);
@@ -2348,10 +2441,14 @@ export class ProjectAdminService {
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "恢复版本的页面 Schema 校验失败", { validation });
 
     const demoDir = this.pageDir(workspacePath, pageId);
-    if (resolvePageRuntimeType(page) === "prototype-html-css") {
+    const runtimeType = resolvePageRuntimeType(page);
+    if (runtimeType === "prototype-html-css") {
       fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
       fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
       writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+    } else if (runtimeType === "sketch-scene") {
+      fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), files.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
+      writeJsonFile(path.join(demoDir, "sketch.meta.json"), files.sketchMeta ?? DEFAULT_SKETCH_META);
     } else {
       fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
     }
@@ -2630,18 +2727,7 @@ export class ProjectAdminService {
   listAssets(editId: string): ProjectAdminResult<{ assets: AssetSummary[] }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    const assets: AssetSummary[] = [];
-    for (const file of this.walkFiles(transaction.workspacePath)) {
-      if (/\.(png|jpe?g|gif|webp|svg)$/i.test(file)) {
-        const relative = path.relative(transaction.workspacePath, file);
-        assets.push({
-          path: relative,
-          size: fs.statSync(file).size,
-          references: this.findReferences(transaction.workspacePath, relative),
-        });
-      }
-    }
-    return ok({ assets });
+    return ok({ assets: this.collectAssetSummaries(transaction.workspacePath) });
   }
 
   uploadAsset(input: AssetUploadInput, actor = this.defaultActor()): ProjectAdminResult<AssetSummary> {
@@ -2798,6 +2884,179 @@ export class ProjectAdminService {
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     return ok(this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId)));
+  }
+
+  editVerify(editId: string, checks: string[] = []): ProjectAdminResult<VerifySummary> {
+    const transaction = this.readEdit(editId);
+    if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    return ok(this.verifyWorkspace(transaction.projectId, transaction.workspacePath, checks), {
+      nextActions: ["edit diff --summary --json", "edit validate --json"],
+    });
+  }
+
+  projectVerify(
+    projectId: string,
+    checks: string[] = [],
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<VerifySummary> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    return ok(this.verifyWorkspace(projectId, this.projectWorkspacePath(projectId), checks), {
+      nextActions: [`project validate-runtime ${projectId} --summary --json`],
+    });
+  }
+
+  visualCheck(
+    input: VisualCheckInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<VisualCheckResult> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+
+    const viewport = input.viewport ?? "375x812";
+    const checks = input.checks && input.checks.length > 0
+      ? input.checks
+      : ["nonblank", "assets", "layout", "console"];
+    const workspacePath = this.projectWorkspacePath(input.projectId);
+    const tree = this.readWorkspaceTree(workspacePath);
+    const selectedPages = input.pages && input.pages.length > 0 && input.pages[0] !== "all"
+      ? tree.pages.filter((page) => input.pages?.includes(page.id))
+      : tree.pages;
+    const outputDir = path.resolve(input.outputDir);
+    ensureDir(outputDir);
+
+    const pages: VisualCheckPageResult[] = selectedPages.map((page) => {
+      const runtimeType = resolvePageRuntimeType(page);
+      const files = this.readPageFiles(workspacePath, page.id);
+      const runtimeValidation = files
+        ? this.validatePageFilesRuntime(page.id, runtimeType, files)
+        : {
+            ok: false,
+            pageIds: [page.id],
+            issues: [{
+              pageId: page.id,
+              severity: "error" as const,
+              stage: "source_contract" as const,
+              code: "FILE_READ_ERROR",
+              message: "页面文件不存在",
+              instruction: "请修复页面文件后重试 visual-check。",
+            }],
+          };
+      const failedRequests = files && checks.includes("assets")
+        ? this.findMissingAssetReferences(workspacePath, page.id, files).map((item) => item.reference)
+        : [];
+      const content = files
+        ? [files.code, files.prototypeHtml, files.prototypeCss, files.sketchScene].filter(Boolean).join("\n")
+        : "";
+      const nonblank = this.isPageContentNonblank(content);
+      const issues = [
+        ...this.runtimeToValidationResult(runtimeValidation).issues,
+        ...(!nonblank && checks.includes("nonblank")
+          ? [{
+              code: "VISUAL_BLANK_PAGE",
+              message: "页面内容为空或疑似透明占位",
+              resourceId: page.id,
+              pageId: page.id,
+              severity: "blocking" as const,
+            }]
+          : []),
+        ...failedRequests.map((reference) => ({
+          code: "VISUAL_ASSET_MISSING",
+          message: `资产引用不存在: ${reference}`,
+          resourceId: page.id,
+          pageId: page.id,
+          severity: "blocking" as const,
+        })),
+      ];
+      const screenshotPath = path.join(outputDir, `${page.id}.svg`);
+      this.writeVisualCheckSvg(screenshotPath, {
+        projectName: project.name,
+        pageName: page.name,
+        pageId: page.id,
+        runtimeType,
+        viewport,
+        nonblank,
+      });
+      return {
+        pageId: page.id,
+        runtimeType,
+        screenshotPath,
+        nonblank,
+        failedRequests,
+        consoleErrors: [],
+        issues,
+      };
+    });
+
+    const reportPath = path.join(outputDir, "visual-check-report.json");
+    const result: VisualCheckResult = {
+      projectId: input.projectId,
+      viewport,
+      checks,
+      outputDir,
+      reportPath,
+      pages,
+      summary: {
+        total: pages.length,
+        passed: pages.filter((page) => page.issues.length === 0).length,
+        failed: pages.filter((page) => page.issues.length > 0).length,
+        screenshots: pages.length,
+        failedRequests: pages.reduce((sum, page) => sum + page.failedRequests.length, 0),
+        consoleErrors: pages.reduce((sum, page) => sum + page.consoleErrors.length, 0),
+      },
+    };
+    writeJsonFile(reportPath, result);
+    return ok(result, {
+      validation: {
+        ok: result.summary.failed === 0,
+        issues: pages.flatMap((page) => page.issues),
+      },
+      warnings: ["visual-check 生成离线检查报告；浏览器级截图仍需 author-site 或 screenshot-service 复验"],
+      nextActions: [`打开报告 ${reportPath}`, `project verify ${input.projectId} --json`],
+    });
+  }
+
+  agentRunReport(input: AgentRunReportInput, actor = this.defaultActor()): ProjectAdminResult<AgentRunReport> {
+    const projectId = input.projectId ?? (input.editId ? this.readEdit(input.editId)?.projectId : undefined);
+    const project = projectId ? this.readProject(projectId) : null;
+    const diff = input.editId ? this.editDiff(input.editId) : undefined;
+    const validation = input.editId ? this.editValidate(input.editId) : undefined;
+    const validationIssues = validation?.validation?.issues ?? [];
+    const report: AgentRunReport = {
+      projectId,
+      projectName: project?.name,
+      editId: input.editId,
+      versionId: input.versionId,
+      auditId: input.auditId,
+      diffSummary: diff?.data,
+      validationSummary: validation
+        ? {
+            ok: validation.validation?.ok ?? validation.ok,
+            issues: validationIssues.length,
+            blocking: validationIssues.filter((issue) => issue.severity === "blocking").length,
+            warnings: validationIssues.filter((issue) => issue.severity === "warning").length,
+          }
+        : undefined,
+      visualCheckSummary: input.visualReportPath ? { reportPath: input.visualReportPath } : undefined,
+      artifacts: [
+        ...(input.visualReportPath ? [{ kind: "visual-check-report", path: input.visualReportPath }] : []),
+        ...(input.auditId ? [{ kind: "audit", id: input.auditId }] : []),
+      ],
+      rollback: {
+        restoreCommand: projectId && input.versionId
+          ? `ow resource restore-version ${projectId} page <pageId> ${input.versionId} --json`
+          : undefined,
+        projectGetCommand: projectId ? `ow project get ${projectId} --json` : undefined,
+      },
+    };
+    return ok(report, {
+      nextActions: projectId ? [`project get ${projectId} --json`, "audit list --json"] : ["commands --json"],
+      warnings: actor.role === "readonly" ? ["当前 actor 为 readonly，报告只包含可读取证据"] : undefined,
+    });
   }
 
   previewRender(editId: string, pageId: string): ProjectAdminResult<{ url?: string; html?: string }> {
@@ -3387,18 +3646,31 @@ export class ProjectAdminService {
     return commit;
   }
 
-  private pageResourceMetadata(projectId: string, page: DemoPageMeta, files: DemoFiles): PageResourceMetadata {
+  private pageResourceMetadata(
+    projectId: string,
+    page: DemoPageMeta,
+    files: DemoFiles,
+    sketchPatchSummary?: SketchPatchVersionSummary,
+  ): PageResourceMetadata {
     const fileRefs: ResourceBlobMap = {
       schema: this.writeBlob(projectId, files.schema),
     };
-    if (resolvePageRuntimeType(page) === "prototype-html-css") {
+    const runtimeType = resolvePageRuntimeType(page);
+    if (runtimeType === "prototype-html-css") {
       fileRefs.prototypeHtml = this.writeBlob(projectId, files.prototypeHtml ?? "");
       fileRefs.prototypeCss = this.writeBlob(projectId, files.prototypeCss ?? "");
       fileRefs.prototypeMeta = this.writeBlob(projectId, JSON.stringify(files.prototypeMeta ?? DEFAULT_PROTOTYPE_META, null, 2));
+    } else if (runtimeType === "sketch-scene") {
+      fileRefs.sketchScene = this.writeBlob(projectId, files.sketchScene ?? createDefaultSketchSceneText());
+      fileRefs.sketchMeta = this.writeBlob(projectId, JSON.stringify(files.sketchMeta ?? DEFAULT_SKETCH_META, null, 2));
     } else {
       fileRefs.code = this.writeBlob(projectId, files.code);
     }
-    return { page, files: fileRefs };
+    return {
+      page,
+      files: fileRefs,
+      ...(sketchPatchSummary ? { sketchPatchSummary } : {}),
+    };
   }
 
   private createPageResourceVersion(input: {
@@ -3409,10 +3681,16 @@ export class ProjectAdminService {
     actor: ProjectAdminActor;
     source: ResourceVersion["source"];
     note?: string;
+    sketchPatchSummary?: SketchPatchVersionSummary;
     restoredFromVersionId?: string;
     migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
   }): ResourceVersion {
-    const metadata = this.pageResourceMetadata(input.projectId, input.page, input.files);
+    const metadata = this.pageResourceMetadata(
+      input.projectId,
+      input.page,
+      input.files,
+      input.sketchPatchSummary,
+    );
     const blobRefs = Object.values(metadata.files).filter((hash): hash is string => Boolean(hash));
     const previousVersionId = this.listResourceVersionsFromDisk(input.projectId, "page", input.page.id)[0]?.id;
     const version: ResourceVersion = {
@@ -3453,10 +3731,16 @@ export class ProjectAdminService {
     const prototypeHtml = this.readBlob(version.projectId, files.prototypeHtml);
     const prototypeCss = this.readBlob(version.projectId, files.prototypeCss);
     const prototypeMetaText = this.readBlob(version.projectId, files.prototypeMeta);
+    const sketchScene = this.readBlob(version.projectId, files.sketchScene);
+    const sketchMetaText = this.readBlob(version.projectId, files.sketchMeta);
     if (prototypeHtml !== undefined) result.prototypeHtml = prototypeHtml;
     if (prototypeCss !== undefined) result.prototypeCss = prototypeCss;
     if (prototypeMetaText !== undefined) {
       result.prototypeMeta = JSON.parse(prototypeMetaText) as PrototypePageMeta;
+    }
+    if (sketchScene !== undefined) result.sketchScene = sketchScene;
+    if (sketchMetaText !== undefined) {
+      result.sketchMeta = JSON.parse(sketchMetaText) as Record<string, unknown>;
     }
     return result;
   }
@@ -3543,6 +3827,7 @@ export class ProjectAdminService {
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
       lockedDependencies: parsed.lockedDependencies,
+      authoringPreferences: normalizeProjectAuthoringPreferences(parsed.authoringPreferences),
       thumbnail: parsed.thumbnail,
       publishedVersion: parsed.publishedVersion,
       publishedAt: parsed.publishedAt,
@@ -3690,6 +3975,8 @@ export class ProjectAdminService {
     const prototypeHtmlPath = path.join(demoDir, "prototype.html");
     const prototypeCssPath = path.join(demoDir, "prototype.css");
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+    const sketchScenePath = path.join(demoDir, "sketch.scene.json");
+    const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
     if (!fs.existsSync(schemaPath)) return null;
     const files: DemoFiles = {
       code: fs.existsSync(codePath) ? fs.readFileSync(codePath, "utf-8") : "",
@@ -3703,6 +3990,12 @@ export class ProjectAdminService {
     }
     if (fs.existsSync(prototypeMetaPath)) {
       files.prototypeMeta = readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined;
+    }
+    if (fs.existsSync(sketchScenePath)) {
+      files.sketchScene = fs.readFileSync(sketchScenePath, "utf-8");
+    }
+    if (fs.existsSync(sketchMetaPath)) {
+      files.sketchMeta = readJsonFile<Record<string, unknown>>(sketchMetaPath) ?? undefined;
     }
     return files;
   }
@@ -3920,6 +4213,22 @@ export class ProjectAdminService {
         files.prototypeHtml ?? "",
         files.prototypeCss ?? "",
       );
+    }
+    if (runtimeType === "sketch-scene") {
+      const parsed = files.sketchScene ? parseSketchSceneText(files.sketchScene) : null;
+      const validation = validateSketchSceneDocument(parsed);
+      return {
+        ok: validation.valid,
+        issues: validation.issues.map((issue) => ({
+          pageId,
+          severity: issue.severity,
+          stage: "schema_contract",
+          code: issue.code,
+          message: issue.message,
+          instruction: "请修复 sketch.scene.json，确保版本、页面尺寸、节点 ID 和几何信息有效。",
+        })),
+        pageIds: [pageId],
+      };
     }
     return this.validatePageRuntimeSource(pageId, files.code);
   }
@@ -4140,7 +4449,7 @@ export class ProjectAdminService {
       issues.push({ code: "FILE_READ_ERROR", message: `页面文件不存在: ${pageId}`, resourceId: pageId, severity: "blocking" });
       return { ok: false, issues };
     }
-    if (resolvePageRuntimeType(page) !== "prototype-html-css" && !files.code.includes("export default")) {
+    if (resolvePageRuntimeType(page) === "high-fidelity-react" && !files.code.includes("export default")) {
       issues.push({ code: "NO_DEFAULT_EXPORT", message: `页面缺少 default export: ${pageId}`, resourceId: pageId, severity: "blocking" });
     }
     issues.push(...this.validateSchemaPair(projectSchema ?? null, files.schema).issues);
@@ -4436,7 +4745,7 @@ export class ProjectAdminService {
     if (path.isAbsolute(normalized) || normalized.startsWith("..")) {
       throw new Error("INVALID_ASSET_PATH");
     }
-    if (!/\.(png|jpe?g|gif|webp|svg)$/i.test(normalized)) {
+    if (!/\.(png|jpe?g|gif|webp|svg|svga)$/i.test(normalized)) {
       throw new Error("INVALID_FILE_TYPE");
     }
     return normalized;
@@ -4452,6 +4761,175 @@ export class ProjectAdminService {
       updated.push(path.relative(workspacePath, file).split(path.sep).join("/"));
     }
     return updated;
+  }
+
+  private verifyWorkspace(_projectId: string, workspacePath: string, checks: string[]): VerifySummary {
+    const tree = this.readWorkspaceTree(workspacePath);
+    const runtimeTypes: Record<string, number> = {};
+    const assets = this.collectAssetSummaries(workspacePath);
+    const runtimeValidation = checks.length === 0 || checks.includes("runtime")
+      ? this.validateWorkspaceRuntime(workspacePath)
+      : { ok: true, issues: [], pageIds: tree.pages.map((page) => page.id) };
+    const prototypePlaceholders: VerifySummary["prototypePlaceholders"] = [];
+    const missingAssetReferences: VerifySummary["missingAssetReferences"] = [];
+    const metadataIssues: ValidationResult["issues"] = [];
+
+    for (const page of tree.pages) {
+      const runtimeType = resolvePageRuntimeType(page);
+      runtimeTypes[runtimeType] = (runtimeTypes[runtimeType] ?? 0) + 1;
+      const files = this.readPageFiles(workspacePath, page.id);
+      if (!files) continue;
+      if (checks.length === 0 || checks.includes("assets")) {
+        missingAssetReferences.push(...this.findMissingAssetReferences(workspacePath, page.id, files));
+      }
+      if (runtimeType === "prototype-html-css") {
+        if (checks.length === 0 || checks.includes("prototype-placeholders")) {
+          const markers = this.findPrototypePlaceholderMarkers(files);
+          if (markers.length > 0) prototypePlaceholders.push({ pageId: page.id, markers });
+        }
+        if (checks.length === 0 || checks.includes("metadata")) {
+          metadataIssues.push(...this.validatePrototypeMetadata(page.id, files.prototypeMeta));
+        }
+      }
+    }
+
+    const referencedAssets = assets.filter((asset) => asset.references.length > 0).length;
+    return {
+      pages: tree.pages.length,
+      runtimeTypes,
+      projectConfig: { exists: this.readProjectConfig(workspacePath) !== null },
+      assets: {
+        total: assets.length,
+        totalBytes: assets.reduce((sum, asset) => sum + asset.size, 0),
+        referenced: referencedAssets,
+        unreferenced: assets.length - referencedAssets,
+      },
+      prototypePlaceholders,
+      metadataIssues,
+      missingAssetReferences,
+      runtimeIssues: runtimeValidation.issues,
+    };
+  }
+
+  private collectAssetSummaries(workspacePath: string): AssetSummary[] {
+    const assets: AssetSummary[] = [];
+    for (const file of this.walkFiles(workspacePath)) {
+      if (/\.(png|jpe?g|gif|webp|svg|svga)$/i.test(file)) {
+        const relative = path.relative(workspacePath, file).split(path.sep).join("/");
+        assets.push({
+          path: relative,
+          size: fs.statSync(file).size,
+          references: this.findReferences(workspacePath, relative),
+        });
+      }
+    }
+    return assets;
+  }
+
+  private findMissingAssetReferences(
+    workspacePath: string,
+    pageId: string,
+    files: DemoFiles,
+  ): Array<{ pageId: string; reference: string }> {
+    const content = [
+      files.code,
+      files.prototypeHtml,
+      files.prototypeCss,
+      files.schema,
+      files.sketchScene,
+    ].filter(Boolean).join("\n");
+    const references = new Set<string>();
+    const assetReferencePattern = /(?:["'(]|url\()\s*(assets\/[^"')\s]+\.(?:png|jpe?g|gif|webp|svg|svga))/gi;
+    for (const match of content.matchAll(assetReferencePattern)) {
+      if (match[1]) references.add(match[1]);
+    }
+    return [...references]
+      .filter((reference) => !fs.existsSync(path.join(workspacePath, reference)))
+      .map((reference) => ({ pageId, reference }));
+  }
+
+  private findPrototypePlaceholderMarkers(files: DemoFiles): string[] {
+    const content = `${files.prototypeHtml ?? ""}\n${files.prototypeCss ?? ""}`;
+    const markers: string[] = [];
+    if (/data:image\/gif;base64,R0lGODlhAQAB/i.test(content)) markers.push("transparent-gif");
+    if (/\b(screenshot|placeholder|mockup|wireframe|占位|截图)\b/i.test(content)) markers.push("placeholder-marker");
+    if (/<img\b[^>]*src=["']\s*["']/i.test(content)) markers.push("empty-image-src");
+    return [...new Set(markers)];
+  }
+
+  private validatePrototypeMetadata(pageId: string, metadata: DemoFiles["prototypeMeta"]): ValidationResult["issues"] {
+    const issues: ValidationResult["issues"] = [];
+    const record = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+    if (!record.previewSize || typeof record.previewSize !== "object") {
+      issues.push({
+        code: "PROTOTYPE_META_PREVIEW_SIZE_MISSING",
+        message: "prototype.meta.json 缺少 previewSize",
+        resourceId: pageId,
+        pageId,
+        severity: "warning",
+      });
+    }
+    if (typeof record.source !== "string" || !record.source.trim()) {
+      issues.push({
+        code: "PROTOTYPE_META_SOURCE_MISSING",
+        message: "prototype.meta.json 缺少 source",
+        resourceId: pageId,
+        pageId,
+        severity: "warning",
+      });
+    }
+    if (typeof record.generatedBy !== "string" || !record.generatedBy.trim()) {
+      issues.push({
+        code: "PROTOTYPE_META_GENERATED_BY_MISSING",
+        message: "prototype.meta.json 缺少 generatedBy",
+        resourceId: pageId,
+        pageId,
+        severity: "warning",
+      });
+    }
+    return issues;
+  }
+
+  private isPageContentNonblank(content: string): boolean {
+    const normalized = content
+      .replace(/data:image\/gif;base64,R0lGODlhAQAB[^"')\s]*/gi, "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return normalized.length > 12;
+  }
+
+  private writeVisualCheckSvg(
+    filePath: string,
+    input: {
+      projectName: string;
+      pageName: string;
+      pageId: string;
+      runtimeType: DemoPageRuntimeType;
+      viewport: string;
+      nonblank: boolean;
+    },
+  ): void {
+    const [widthText, heightText] = input.viewport.split("x");
+    const width = Number(widthText) || 375;
+    const height = Number(heightText) || 812;
+    const escape = (value: string) => value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+    const fill = input.nonblank ? "#f8fafc" : "#fff1f2";
+    const status = input.nonblank ? "nonblank" : "blank-or-placeholder";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="100%" height="100%" fill="${fill}"/>
+  <rect x="24" y="28" width="${Math.max(width - 48, 1)}" height="120" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="40" y="66" font-family="Arial, sans-serif" font-size="18" fill="#0f172a">${escape(input.projectName)}</text>
+  <text x="40" y="96" font-family="Arial, sans-serif" font-size="14" fill="#334155">${escape(input.pageName)} / ${escape(input.pageId)}</text>
+  <text x="40" y="124" font-family="Arial, sans-serif" font-size="12" fill="#64748b">${escape(input.runtimeType)} / ${status}</text>
+</svg>
+`;
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, svg, "utf-8");
   }
 
   private getScreenshotServiceUrl(): string {

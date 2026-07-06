@@ -58,6 +58,11 @@ export class ToolHookManager {
     }
   }
 
+  private isNoopSketchPatchToolResult(event: any): boolean {
+    const patch = getToolResultDetails(event)?.patch;
+    return patch && typeof patch === 'object' && patch.changed === false;
+  }
+
   getFileChangesForTool(toolName: string, input: any, isError: boolean, event: any): FileChange[] {
     if (isError) return [];
 
@@ -74,6 +79,15 @@ export class ToolHookManager {
       if (!input?.path) return [];
       return [{
         path: input.path,
+        action: 'modified',
+      }];
+    }
+
+    if (toolName === 'patchSketchScene' || toolName === 'createSketchNodes' || toolName === 'bindSketchConfig') {
+      if (!input?.pageId || input?.dryRun) return [];
+      if (this.isNoopSketchPatchToolResult(event)) return [];
+      return [{
+        path: `demos/${input.pageId}/sketch.scene.json`,
         action: 'modified',
       }];
     }
@@ -145,6 +159,17 @@ export class ToolHookManager {
         method: 'fs/edit_text_file',
         path: input.path,
         content: this.readWorkspaceFileContent(input.path),
+      }];
+    }
+
+    if (toolName === 'patchSketchScene' || toolName === 'createSketchNodes' || toolName === 'bindSketchConfig') {
+      if (!input?.pageId || input?.dryRun) return [];
+      if (this.isNoopSketchPatchToolResult(event)) return [];
+      const filePath = `demos/${input.pageId}/sketch.scene.json`;
+      return [{
+        method: 'fs/edit_text_file',
+        path: filePath,
+        content: this.readWorkspaceFileContent(filePath),
       }];
     }
 

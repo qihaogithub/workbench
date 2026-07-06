@@ -1,7 +1,11 @@
-import type { DemoFolderMeta } from "@opencode-workbench/shared";
-import type { CanvasState } from "@opencode-workbench/demo-ui";
+import type { SketchSceneDocument } from "@workbench/sketch-core";
+import { normalizeAiError, type ImageAttachment, type DemoFolderMeta } from "@workbench/shared";
+import type { CanvasState } from "@workbench/demo-ui";
 
-export type PublishedPageRuntimeType = "prototype-html-css" | "high-fidelity-react";
+export type PublishedPageRuntimeType =
+  | "prototype-html-css"
+  | "high-fidelity-react"
+  | "sketch-scene";
 
 export interface PreviewSize {
   width?: string | number;
@@ -27,6 +31,10 @@ export interface PublishedDemoPage {
   prototypeHtmlPath?: string;
   prototypeCssPath?: string;
   prototypeMetaPath?: string;
+  sketchScene?: SketchSceneDocument;
+  sketchMeta?: Record<string, unknown>;
+  sketchScenePath?: string;
+  sketchMetaPath?: string;
 }
 
 export interface PublishedProject {
@@ -121,9 +129,11 @@ export interface ViewerAiChatRequest {
   projectId: string;
   sessionId?: string;
   message: string;
+  model?: string;
   activePageId?: string;
   activeConfig?: Record<string, unknown>;
   history?: ViewerAiHistoryMessage[];
+  images?: ImageAttachment[];
 }
 
 export interface ViewerAiChatResponse {
@@ -135,11 +145,16 @@ export interface ViewerAiChatResponse {
 export async function askViewerAi(
   request: ViewerAiChatRequest,
 ): Promise<ViewerAiChatResponse> {
-  const res = await fetch(`${AGENT_SERVICE_BASE}/api/viewer-ai/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${AGENT_SERVICE_BASE}/api/viewer-ai/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+  } catch (error) {
+    throw new Error(normalizeAiError(error).userMessage);
+  }
   const payload = await res.json().catch(() => null) as
     | { success: true; data: ViewerAiChatResponse }
     | { success: false; error?: { message?: string } }
@@ -148,10 +163,49 @@ export async function askViewerAi(
   if (!res.ok || !payload || !payload.success) {
     throw new Error(
       payload && "error" in payload && payload.error?.message
-        ? payload.error.message
+        ? normalizeAiError(payload.error).userMessage
         : `AI 问答失败: ${res.status} ${res.statusText}`,
     );
   }
 
   return payload.data;
+}
+
+export interface ViewerAiModel {
+  id: string;
+  label: string;
+  group?: string;
+  provider?: string;
+}
+
+export async function getViewerAiModels(): Promise<{
+  models: ViewerAiModel[];
+  currentModelId: string | null;
+  canSwitch: boolean;
+}> {
+  try {
+    const res = await fetch(`${AGENT_SERVICE_BASE}/models`, { cache: "no-store" });
+    const payload = await res.json().catch(() => null) as
+      | {
+          success: true;
+          data: {
+            models: ViewerAiModel[];
+            currentModelId: string | null;
+            canSwitch: boolean;
+          };
+        }
+      | { success: false; error?: { message?: string } }
+      | null;
+
+    if (!res.ok || !payload || !payload.success) {
+      throw new Error(
+        payload && "error" in payload && payload.error?.message
+          ? payload.error.message
+          : `模型列表加载失败: ${res.status} ${res.statusText}`,
+      );
+    }
+    return payload.data;
+  } catch (error) {
+    throw new Error(normalizeAiError(error).userMessage);
+  }
 }

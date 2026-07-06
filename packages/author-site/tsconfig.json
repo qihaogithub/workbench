@@ -21,14 +21,16 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@opencode-workbench/project-core": ["../project-core/src"],
-      "@opencode-workbench/preview-contract": ["../preview-contract/src"],
-      "@opencode-workbench/preview-contract/*": ["../preview-contract/src/*"],
-      "@opencode-workbench/shared": ["../shared/src"],
-      "@opencode-workbench/demo-ui": ["../demo-ui/src/index.ts"],
-      "@opencode-workbench/demo-ui/*": ["../demo-ui/src/*"],
-      "@opencode-workbench/shared/agent-prompts": ["../shared/src/agent-prompts/index.ts"],
-      "@opencode-workbench/agent-client": ["../agent-client/src"]
+      "@workbench/project-core": ["../project-core/src"],
+      "@workbench/preview-contract": ["../preview-contract/src"],
+      "@workbench/preview-contract/*": ["../preview-contract/src/*"],
+      "@workbench/shared": ["../shared/src"],
+      "@workbench/sketch-core": ["../sketch-core/src"],
+      "@workbench/sketch-react": ["../sketch-react/src/index.tsx"],
+      "@workbench/demo-ui": ["../demo-ui/src/index.ts"],
+      "@workbench/demo-ui/*": ["../demo-ui/src/*"],
+      "@workbench/shared/agent-prompts": ["../shared/src/agent-prompts/index.ts"],
+      "@workbench/agent-client": ["../agent-client/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

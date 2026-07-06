@@ -5,7 +5,7 @@ import type {
   DemoPageMeta,
   DemoFolderMeta,
   DemoPageRuntimeType,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
 import {
   DndContext,
   PointerSensor,
@@ -40,6 +40,7 @@ import {
   isDescendantLocal,
 } from "./demo-page-tree-utils";
 import { projectApiClient } from "@/lib/project-api";
+import { SKETCH_SCENE_AUTHORING_ENABLED } from "@/lib/authoring-feature-flags";
 
 interface RuntimeConversionRequestOptions {
   skipStaticization?: boolean;
@@ -377,7 +378,7 @@ export function DemoPageTree({
     ],
   );
 
-  const handleAddPage = useCallback(async () => {
+  const handleAddPage = useCallback(async (runtimeType?: DemoPageRuntimeType) => {
     if (!sessionId) {
       toast({ title: "未创建 Session", variant: "destructive" });
       return;
@@ -385,16 +386,19 @@ export function DemoPageTree({
     try {
       const res = await projectApiClient.createDemoPage(
         projectId,
-        "新建页面",
+        runtimeType === "sketch-scene" ? "新建手绘页面" : "新建页面",
         sessionId,
+        null,
+        runtimeType,
       );
       onPagesChange([...pages, res].sort((a, b) => a.order - b.order));
+      onPageSelect(res.id);
       onWorkspaceChange?.();
-      toast({ title: "页面创建成功" });
+      toast({ title: runtimeType === "sketch-scene" ? "手绘页面创建成功" : "页面创建成功" });
     } catch {
       toast({ title: "创建失败", variant: "destructive" });
     }
-  }, [sessionId, projectId, pages, onPagesChange, onWorkspaceChange, toast]);
+  }, [sessionId, projectId, pages, onPagesChange, onPageSelect, onWorkspaceChange, toast]);
 
   const handleImportFigmaCreated = useCallback(
     (page: DemoPageMeta) => {
@@ -460,6 +464,18 @@ export function DemoPageTree({
                 <FileText className="h-4 w-4" />
                 添加页面
               </button>
+              {SKETCH_SCENE_AUTHORING_ENABLED && (
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    setPopoverOpen(false);
+                    handleAddPage("sketch-scene");
+                  }}
+                >
+                  <FileText className="h-4 w-4" />
+                  添加手绘页面
+                </button>
+              )}
               <button
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {

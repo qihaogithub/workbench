@@ -81,14 +81,57 @@ try {
   await runCommand("admin capabilities", ["admin", "capabilities"]);
   const commandsPayload = await runCommand("commands", ["commands"]);
   const registeredCommands = dataOf<Array<{ name: string }>>(commandsPayload).map((command) => command.name);
+  await runCommand("help input", ["help", "input"]);
+  await runCommand("recipe list", ["recipe", "list"]);
+  await runCommand("recipe show", ["recipe", "show", "local-project-package-dev"]);
 
-  const created = await runCommand("project create", ["project", "create", "--name", "CLI 全功能项目", "--description", "全命令测试"]);
+  const created = await runCommand("project create", [
+    "project",
+    "create",
+    "--name",
+    "CLI 全功能项目",
+    "--category",
+    "CLI 初始分类",
+    "--description",
+    "全命令测试",
+  ]);
   const projectId = dataOf<{ id: string }>(created).id;
   assert.match(projectId, /^proj_/);
 
   await runCommand("project list", ["project", "list"]);
-  await runCommand("project get", ["project", "get", projectId]);
-  await runCommand("project update", ["project", "update", projectId, "--name", "CLI 全功能项目更新", "--description", "更新描述"]);
+  const fetched = await runCommand("project get", ["project", "get", projectId]);
+  assert.equal(
+    dataOf<{ project: { category?: string } }>(fetched).project.category,
+    "CLI 初始分类",
+  );
+  const updated = await runCommand("project update", [
+    "project",
+    "update",
+    projectId,
+    "--name",
+    "CLI 全功能项目更新",
+    "--category",
+    "CLI 更新分类",
+    "--description",
+    "更新描述",
+    "--sketch-editor-engine",
+    "openpencil",
+  ]);
+  const updatedProject = dataOf<{
+    category?: string;
+    authoringPreferences?: { sketchEditorEngine?: string };
+  }>(updated);
+  assert.equal(updatedProject.category, "CLI 更新分类");
+  assert.equal(updatedProject.authoringPreferences?.sketchEditorEngine, "openpencil");
+  const refetched = await runCommand("project get", ["project", "get", projectId]);
+  const refetchedProject = dataOf<{
+    project: {
+      category?: string;
+      authoringPreferences?: { sketchEditorEngine?: string };
+    };
+  }>(refetched);
+  assert.equal(refetchedProject.project.category, "CLI 更新分类");
+  assert.equal(refetchedProject.project.authoringPreferences?.sketchEditorEngine, "openpencil");
   await runCommand("project set-cover", ["project", "set-cover", projectId, "/covers/demo.png"]);
   await runCommand("project delete-cover", ["project", "delete-cover", projectId]);
 
@@ -116,6 +159,8 @@ try {
   ]);
   const pageId = dataOf<{ meta: { id: string } }>(page).meta.id;
   await runCommand("page list", ["page", "list", editId]);
+  const pageListSummary = await runCommand("page list summary", ["page", "list", editId, "--summary"]);
+  assert.equal(typeof dataOf<{ summary: { pages: number } }>(pageListSummary).summary.pages, "number");
   await runCommand("page get", ["page", "get", editId, pageId]);
   await runCommand("page validate-runtime", ["page", "validate-runtime", editId, pageId]);
 
@@ -144,6 +189,49 @@ try {
     "--prototype-css",
     "main { padding: 32px; }",
   ]);
+  const prototypeCssFile = path.join(tempDir, "prototype-file.css");
+  fs.writeFileSync(prototypeCssFile, "main { color: #065f46; }", "utf-8");
+  await runCommand("page update-prototype file-ref", [
+    "page",
+    "update-prototype",
+    editId,
+    prototypePageId,
+    "--prototype-css",
+    `@${prototypeCssFile}`,
+  ]);
+  await runCommand("page update-prototype at-rule", [
+    "page",
+    "update-prototype",
+    editId,
+    prototypePageId,
+    "--input-json",
+    writeInput({
+      prototypeCss: "@media (min-width: 1px) { main { color: #166534; } }",
+    }),
+  ]);
+  const batchPrototypeManifest = path.join(tempDir, "prototype-pages.json");
+  writeJson(batchPrototypeManifest, {
+    pages: [
+      {
+        pageId: prototypePageId,
+        prototypeHtml: "<main><h1>批量更新原型页</h1></main>",
+        prototypeCss: "@media (min-width: 1px) { main { padding: 20px; } }",
+      },
+      {
+        pageId: "batch_proto",
+        name: "批量原型页",
+        prototypeHtml: "<main><h1>批量新建原型页</h1></main>",
+        prototypeCss: "main { color: #1f2937; }",
+      },
+    ],
+  });
+  await runCommand("page update-prototypes", [
+    "page",
+    "update-prototypes",
+    editId,
+    "--manifest",
+    `@${batchPrototypeManifest}`,
+  ]);
   await runCommand("page switch-runtime", [
     "page",
     "switch-runtime",
@@ -154,6 +242,44 @@ try {
     "export default function Demo(){ return <main>切换后的高保真页</main>; }",
     "--reason",
     "CLI 冒烟切换",
+  ]);
+
+  const sketchScene = JSON.stringify({
+    version: 1,
+    pageSize: { width: 390, height: 844 },
+    nodes: [
+      {
+        id: "title",
+        type: "text",
+        x: 32,
+        y: 48,
+        width: 240,
+        height: 48,
+        text: "草图页",
+      },
+    ],
+    assets: [],
+  });
+  const sketchPage = await runCommand("page create sketch", [
+    "page",
+    "create",
+    "--edit-id",
+    editId,
+    "--name",
+    "草图页",
+    "--runtime-type",
+    "sketch-scene",
+    "--sketch-scene",
+    sketchScene,
+  ]);
+  const sketchPageId = dataOf<{ meta: { id: string } }>(sketchPage).meta.id;
+  await runCommand("page update-sketch", [
+    "page",
+    "update-sketch",
+    editId,
+    sketchPageId,
+    "--sketch-scene",
+    sketchScene.replace("草图页", "更新草图页"),
   ]);
 
   const duplicatedPage = await runCommand("page duplicate", ["page", "duplicate", editId, pageId, "首页副本"]);
@@ -220,7 +346,31 @@ try {
   fs.writeFileSync(replacementFile, Buffer.from("asset-two"));
   const uploadedAsset = await runCommand("asset upload", ["asset", "upload", editId, "--file", assetFile]);
   const uploadedAssetPath = dataOf<{ path: string }>(uploadedAsset).path;
+  const assetDir = path.join(tempDir, "asset-dir");
+  fs.mkdirSync(assetDir, { recursive: true });
+  fs.writeFileSync(path.join(assetDir, "batch.png"), Buffer.from("batch-asset"));
+  await runCommand("asset upload-dir", [
+    "asset",
+    "upload-dir",
+    editId,
+    "--from",
+    assetDir,
+    "--to",
+    "assets/batch",
+  ]);
+  const targetedAsset = await runCommand("asset upload targetPath", [
+    "asset",
+    "upload",
+    editId,
+    "--file",
+    assetFile,
+    "--target-path",
+    "assets/fixture/asset.png",
+  ]);
+  assert.equal(dataOf<{ path: string }>(targetedAsset).path, "assets/fixture/asset.png");
   await runCommand("asset list", ["asset", "list", editId]);
+  const assetSummary = await runCommand("asset list summary", ["asset", "list", editId, "--summary"]);
+  assert.equal(typeof dataOf<{ summary: { count: number } }>(assetSummary).summary.count, "number");
   const replacedAsset = await runCommand("asset replace", ["asset", "replace", editId, uploadedAssetPath, "--file", replacementFile]);
   assert.ok(dataOf<{ newAsset: { path: string } }>(replacedAsset).newAsset.path);
   const assetDeletePlan = await runCommand("asset delete-preview", ["asset", "delete-preview", editId, uploadedAssetPath]);
@@ -246,8 +396,12 @@ try {
   ]);
   await runCommand("config delete-project-schema", ["config", "delete-project-schema", editId]);
   await runCommand("edit diff", ["edit", "diff", editId]);
+  await runCommand("edit diff summary", ["edit", "diff", editId, "--summary"]);
   await runCommand("edit validate", ["edit", "validate", editId]);
-  await runCommand("edit commit", ["edit", "commit", editId, "CLI 全功能提交"]);
+  await runCommand("edit verify", ["edit", "verify", editId]);
+  const committedEdit = await runCommand("edit commit", ["edit", "commit", editId, "CLI 全功能提交"]);
+  const committedVersionId = dataOf<{ version: { versionId: string } }>(committedEdit).version.versionId;
+  const committedAuditId = String(committedEdit.auditId ?? "");
 
   const createdResourceVersion = await runCommand("resource version-create", [
     "resource",
@@ -262,6 +416,25 @@ try {
   await runCommand("resource version-list", ["resource", "version-list", projectId, "page", pageId]);
   await runCommand("resource version-get", ["resource", "version-get", projectId, "page", pageId, resourceVersionId]);
   await runCommand("project validate-runtime", ["project", "validate-runtime", projectId]);
+  await runCommand("project validate-runtime summary", ["project", "validate-runtime", projectId, "--summary"]);
+  await runCommand("project verify", ["project", "verify", projectId]);
+  const visualDir = path.join(tempDir, "visual-check");
+  const visualCheck = await runCommand("project visual-check", ["project", "visual-check", projectId, "--output", visualDir]);
+  assert.ok(fs.existsSync(dataOf<{ reportPath: string }>(visualCheck).reportPath));
+  await runCommand("report agent-run", [
+    "report",
+    "agent-run",
+    "--project-id",
+    projectId,
+    "--edit-id",
+    editId,
+    "--version-id",
+    committedVersionId,
+    "--audit-id",
+    committedAuditId,
+    "--visual-report-path",
+    dataOf<{ reportPath: string }>(visualCheck).reportPath,
+  ]);
   await runCommand("project commit-list", ["project", "commit-list", projectId]);
   await runCommand("project materialize", ["project", "materialize", projectId, "--check"]);
   await runCommand("project content-gc", ["project", "content-gc", projectId, "--dry-run"]);
@@ -281,7 +454,8 @@ try {
   await runCommand("project pull", ["project", "pull", projectId, localDir]);
   await runCommand("validate", ["validate", localDir]);
   await runCommand("diff", ["diff", localDir]);
-  const localManifestPath = path.join(localDir, "opencode.project.json");
+  await runCommand("diff summary", ["diff", localDir, "--summary"]);
+  const localManifestPath = path.join(localDir, "workbench.project.json");
   const localManifest = JSON.parse(fs.readFileSync(localManifestPath, "utf-8")) as { scaffoldVersion: string; pages: Array<{ entry: string }> };
   localManifest.scaffoldVersion = "0.0.1";
   writeJson(localManifestPath, localManifest);
@@ -395,6 +569,52 @@ try {
 
   await runCommand("admin lock-project", ["admin", "lock-project", projectId]);
   await runCommand("admin unlock-project", ["admin", "unlock-project", projectId]);
+
+  const importSourceDir = path.join(tempDir, "import-source");
+  fs.mkdirSync(path.join(importSourceDir, "assets"), { recursive: true });
+  fs.writeFileSync(path.join(importSourceDir, "assets", "hero.png"), Buffer.from("hero"));
+  const importManifest = path.join(importSourceDir, "prototype-pages.json");
+  writeJson(importManifest, {
+    pages: [
+      {
+        pageId: "import_home",
+        name: "导入首页",
+        prototypeHtml: "<main><h1>导入首页</h1><img src=\"assets/import/hero.png\" /></main>",
+        prototypeCss: "main { padding: 16px; }",
+        prototypeMeta: {
+          previewSize: { width: 375, height: 812 },
+          source: "fixture",
+          generatedBy: "cli-all-commands.test",
+        },
+      },
+    ],
+  });
+  await runCommand("project import-prototype dry-run", [
+    "project",
+    "import-prototype",
+    "--name",
+    "导入原型 dry-run",
+    "--source",
+    importSourceDir,
+    "--pages",
+    `@${importManifest}`,
+    "--assets",
+    "assets:assets/import",
+    "--dry-run",
+  ]);
+  await runCommand("project import-prototype", [
+    "project",
+    "import-prototype",
+    "--name",
+    "导入原型项目",
+    "--source",
+    importSourceDir,
+    "--pages",
+    `@${importManifest}`,
+    "--assets",
+    "assets:assets/import",
+    "--commit",
+  ]);
 
   const missing = registeredCommands.filter((command) => !executed.has(command));
   assert.deepEqual(missing, [], `Untested CLI commands: ${missing.join(", ")}`);

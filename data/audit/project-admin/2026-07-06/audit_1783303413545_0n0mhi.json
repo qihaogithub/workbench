@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1783303413545_0n0mhi",
+  "at": 1783303413545,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1783303375909_0a2f7z",
+  "resourceId": "proj_1783303375909_0a2f7z",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1783303375909_0a2f7z"
+    ]
+  }
+}

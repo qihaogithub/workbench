@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -29,10 +30,13 @@ COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/project-scaffold/package.json ./packages/project-scaffold/
+COPY packages/sketch-core/package.json ./packages/sketch-core/
+COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/author-site/package.json ./packages/author-site/
 
-RUN pnpm install --no-frozen-lockfile
+RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
+    pnpm install --store-dir /pnpm/store --no-frozen-lockfile
 
 COPY packages/agent-client/ ./packages/agent-client/
 COPY packages/demo-ui/ ./packages/demo-ui/
@@ -41,11 +45,13 @@ COPY packages/knowledge-service/ ./packages/knowledge-service/
 COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
 COPY packages/project-scaffold/ ./packages/project-scaffold/
+COPY packages/sketch-core/ ./packages/sketch-core/
+COPY packages/sketch-react/ ./packages/sketch-react/
 COPY packages/shared/ ./packages/shared/
 COPY packages/author-site/ ./packages/author-site/
 COPY scripts/ ./scripts/
 
-RUN pnpm --filter @opencode-workbench/author-site build
+RUN pnpm --filter @workbench/author-site build
 
 FROM node:20-bookworm-slim
 

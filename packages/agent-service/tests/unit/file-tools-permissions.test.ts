@@ -278,6 +278,8 @@ describe('createWorkbenchTools - permissions 透传', () => {
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);
     expect(tools.some(t => t.name === 'requestUserChoice')).toBe(true);
+    expect(tools.some(t => t.name === 'readSketchScene')).toBe(false);
+    expect(tools.some(t => t.name === 'patchSketchScene')).toBe(false);
     // 通过读取工具验证：custom/path.ts 应被允许
     const readTool = tools.find(t => t.name === 'readFile')!;
     const ok = await readTool.execute('id', { path: 'custom/path.ts' } as any);

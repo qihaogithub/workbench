@@ -679,9 +679,6 @@ function FieldGroupSection({
               )}
             </span>
             <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
-            <Badge variant="secondary" className="text-xs h-5 font-normal px-1.5 min-w-[20px] justify-center">
-              {group.fields.length}
-            </Badge>
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>

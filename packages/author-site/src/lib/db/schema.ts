@@ -31,6 +31,15 @@ export function initializeDatabase(): void {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS user_authoring_preferences (
+      user_id TEXT PRIMARY KEY,
+      preferences_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS user_external_auth_configs (
       user_id TEXT NOT NULL,
       provider TEXT NOT NULL,

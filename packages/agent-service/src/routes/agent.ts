@@ -11,7 +11,7 @@ import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
 import { AgentConfig } from '../core/types';
 import { logger } from '../utils/logger';
-import type { WorkspaceInfo } from '@opencode-workbench/shared/contracts';
+import type { WorkspaceInfo } from '@workbench/shared/contracts';
 import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
 
 interface SessionParams {
@@ -20,6 +20,7 @@ interface SessionParams {
 
 interface SendMessageBody {
   content: string;
+  projectId?: string;
   demoId?: string;
   workingDir?: string;
   customWorkspace?: boolean;
@@ -99,7 +100,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, demoId, workingDir, customWorkspace, systemPrompt, options } = request.body;
+      const { content, projectId, demoId, workingDir, customWorkspace, systemPrompt, options } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -132,6 +133,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
         const config: AgentConfig = {
           sessionId,
+          projectId,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: requestedModelId || currentModelId,

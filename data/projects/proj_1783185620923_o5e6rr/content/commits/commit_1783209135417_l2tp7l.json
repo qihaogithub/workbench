@@ -1,0 +1,26 @@
+{
+  "id": "commit_1783209135417_l2tp7l",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录站外浏览器引导页",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_25_outside_browser_guide",
+      "versionId": "prv_1783209135415_h0pvs8"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_25_outside_browser_guide",
+      "toVersionId": "prv_1783209135415_h0pvs8"
+    }
+  ],
+  "createdAt": 1783209135417,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

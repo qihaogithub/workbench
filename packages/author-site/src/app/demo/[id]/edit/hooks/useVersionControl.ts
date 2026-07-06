@@ -12,7 +12,8 @@ import type {
   PageVersionInfo,
   VersionHistoryResponse,
   VersionInfo,
-} from "@opencode-workbench/shared";
+} from "@workbench/shared";
+import type { SketchPatchVersionSummary } from "@workbench/project-core";
 import type { ValidationResult } from "../../../../../../lib/validator";
 
 const IDLE_AUTO_CHECKPOINT_MS = 5 * 60 * 1000;
@@ -62,6 +63,9 @@ export interface UseVersionControlParams {
   >;
   setHasUnsavedChanges: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
+  getSketchPatchSummary?: (
+    pageId: string,
+  ) => SketchPatchVersionSummary | undefined;
 }
 
 export function useVersionControl(params: UseVersionControlParams) {
@@ -89,6 +93,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     setPageCodes,
     setHasUnsavedChanges,
     setIsSaving,
+    getSketchPatchSummary,
   } = params;
   const { toast } = useToast();
 
@@ -361,7 +366,7 @@ export function useVersionControl(params: UseVersionControlParams) {
         demoId,
         version.demoId,
         version.versionId,
-        { sessionId },
+        { sessionId, workspaceId },
       );
 
       if (activeDemoId !== version.demoId) {
@@ -462,6 +467,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       await projectApiClient.createPageVersion(demoId, activeDemoId, {
         sessionId,
         note: activePage ? `修改了${activePage.name}` : "修改了页面",
+        sketchPatchSummary: getSketchPatchSummary?.(activeDemoId),
       });
 
       const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
@@ -548,6 +554,9 @@ export function useVersionControl(params: UseVersionControlParams) {
             {
               sessionId,
               note: checkpointNote,
+              sketchPatchSummary: getSketchPatchSummary?.(
+                latestSnapshotRef.current.activeDemoId,
+              ),
             },
           );
         }
@@ -584,6 +593,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       autoCheckpointSignature,
       demoId,
       flushCanvasState,
+      getSketchPatchSummary,
       demoPages,
       loadVersionHistory,
       loadPageVersionHistories,

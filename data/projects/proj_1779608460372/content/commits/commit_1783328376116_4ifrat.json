@@ -1,0 +1,26 @@
+{
+  "id": "commit_1783328376116_4ifrat",
+  "projectId": "proj_1779608460372",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1783328376107_sponhj"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "toVersionId": "prv_1783328376107_sponhj"
+    }
+  ],
+  "createdAt": 1783328376116,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

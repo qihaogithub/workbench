@@ -3,7 +3,7 @@
   "name": "App通用广告弹窗",
   "category": "APP资源位",
   "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
-  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/projects/proj_1782718596686_wmv9yu/workspace",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1782718596686_wmv9yu/workspace",
   "demoPages": [
     {
       "id": "pad-popup_a3f2",
@@ -28,7 +28,7 @@
       "savedAt": 1783067074261,
       "savedBy": "qihao",
       "sessionId": "session-1783066273533-l0jugcfzs",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v1",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v1",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -38,7 +38,7 @@
       "savedAt": 1783067747708,
       "savedBy": "qihao",
       "sessionId": "session-1783066273533-l0jugcfzs",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v2",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v2",
       "fileCount": 14,
       "note": "停止编辑后自动保存记录"
     },
@@ -48,7 +48,7 @@
       "savedAt": 1783068480671,
       "savedBy": "qh2",
       "sessionId": "edit_1783068271536_wz386f",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v3",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v3",
       "fileCount": 9,
       "note": "支持通用弹窗图片与SVGA二选一"
     },
@@ -58,7 +58,7 @@
       "savedAt": 1783070274539,
       "savedBy": "qh2",
       "sessionId": "edit_1783070214662_jmyvri",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v4",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v4",
       "fileCount": 9,
       "note": "改用内置SVGA运行时"
     },
@@ -68,7 +68,7 @@
       "savedAt": 1783070749392,
       "savedBy": "qh2",
       "sessionId": "edit_1783070702078_o9h0jh",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v5",
       "fileCount": 9,
       "note": "修复SVGA预览运行时解析"
     },
@@ -78,7 +78,7 @@
       "savedAt": 1783071204952,
       "savedBy": "qihao",
       "sessionId": "session-1783066273533-l0jugcfzs",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v6",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
     },
@@ -88,7 +88,7 @@
       "savedAt": 1783072855945,
       "savedBy": "qh2",
       "sessionId": "edit_1783072694983_lcsmr8",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v7",
       "fileCount": 9,
       "note": "配置面板支持媒体字段条件显示"
     },
@@ -98,7 +98,7 @@
       "savedAt": 1783073055650,
       "savedBy": "qh2",
       "sessionId": "edit_1783072988263_z8ev6d",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v8",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v8",
       "fileCount": 9,
       "note": "优化弹窗素材配置分组"
     },
@@ -108,7 +108,7 @@
       "savedAt": 1783073125243,
       "savedBy": "system",
       "sessionId": "publish-1783073125240",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v9",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v9",
       "fileCount": 9,
       "note": "发布快照"
     },
@@ -118,7 +118,7 @@
       "savedAt": 1783123336298,
       "savedBy": "system",
       "sessionId": "publish-1783123336294",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/snapshots/proj_1782718596686_wmv9yu/v10",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v10",
       "fileCount": 9,
       "note": "发布快照"
     }

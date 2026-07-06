@@ -1,4 +1,4 @@
-import type { ExternalAuthSessionConfig } from "@opencode-workbench/shared/contracts";
+import type { ExternalAuthSessionConfig } from "@workbench/shared/contracts";
 
 class SessionExternalAuthConfigs {
   private configs = new Map<string, ExternalAuthSessionConfig>();

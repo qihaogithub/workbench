@@ -10,7 +10,7 @@ import {
   type KnowledgeIndexJob,
   type KnowledgeItem,
   type KnowledgeReadingMap,
-} from "@opencode-workbench/knowledge-core";
+} from "@workbench/knowledge-core";
 
 interface WorkspaceTreeFile {
   pages?: Array<{

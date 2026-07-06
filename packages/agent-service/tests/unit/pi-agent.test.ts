@@ -1062,6 +1062,11 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('knowledgeReport');
       expect(toolNames).toContain('readPreinstalledSkill');
       expect(toolNames).toContain('arrangeCanvasPages');
+      expect(toolNames).not.toContain('readSketchScene');
+      expect(toolNames).not.toContain('patchSketchScene');
+      expect(toolNames).not.toContain('createSketchNodes');
+      expect(toolNames).not.toContain('bindSketchConfig');
+      expect(toolNames).not.toContain('convertSketchPage');
       expect(toolNames).toContain('webRead');
       expect(toolNames).toContain('figmaMcp');
       expect(toolNames).toContain('dingtalk');
@@ -1154,6 +1159,8 @@ describe('PiAgent 工具', () => {
       expect(capabilities.toolNames).toContain('knowledgeReport');
       expect(capabilities.toolNames).toContain('readPreinstalledSkill');
       expect(capabilities.toolNames).toContain('webRead');
+      expect(capabilities.toolNames).not.toContain('readSketchScene');
+      expect(capabilities.toolNames).not.toContain('patchSketchScene');
       expect(capabilities.toolNames).not.toContain('delegateTask');
     });
 

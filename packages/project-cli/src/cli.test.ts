@@ -36,11 +36,50 @@ try {
   assert.equal(doctor.result.status, 0);
   assert.equal(doctor.payload.ok, true);
 
-  const created = runCli(["project", "create", "--name", "CLI 项目"], tempDir);
+  const created = runCli(["project", "create", "--name", "CLI 项目", "--category", "CLI 分类"], tempDir);
   assert.equal(created.result.status, 0);
   assert.equal(created.payload.ok, true);
-  const createdData = created.payload.data as { id: string };
+  const createdData = created.payload.data as { id: string; category?: string };
   assert.match(createdData.id, /^proj_/);
+  assert.equal(createdData.category, "CLI 分类");
+
+  const updatedProject = runCli(
+    [
+      "project",
+      "update",
+      createdData.id,
+      "--category",
+      "CLI 分类更新",
+      "--input-json",
+      JSON.stringify({ authoringPreferences: { sketchEditorEngine: "openpencil" } }),
+    ],
+    tempDir,
+  );
+  assert.equal(updatedProject.result.status, 0);
+  assert.equal(updatedProject.payload.ok, true);
+  const updatedProjectData = updatedProject.payload.data as {
+    category?: string;
+    authoringPreferences?: { sketchEditorEngine?: string };
+  };
+  assert.equal(updatedProjectData.category, "CLI 分类更新");
+  assert.equal(updatedProjectData.authoringPreferences?.sketchEditorEngine, "openpencil");
+
+  const clearedPreferences = runCli(
+    ["project", "update", createdData.id, "--clear-authoring-preferences"],
+    tempDir,
+  );
+  assert.equal(clearedPreferences.result.status, 0);
+  assert.equal(clearedPreferences.payload.ok, true);
+  const clearedProject = runCli(["project", "get", createdData.id], tempDir);
+  assert.equal(clearedProject.result.status, 0);
+  const clearedProjectData = clearedProject.payload.data as {
+    project: {
+      category?: string;
+      authoringPreferences?: { sketchEditorEngine?: string };
+    };
+  };
+  assert.equal(clearedProjectData.project.category, "CLI 分类更新");
+  assert.equal(clearedProjectData.project.authoringPreferences?.sketchEditorEngine, undefined);
 
   const edit = runCli(["edit", "begin", createdData.id], tempDir);
   assert.equal(edit.result.status, 0);
@@ -79,7 +118,7 @@ try {
   const pulled = runCli(["project", "pull", createdData.id, localDir], tempDir);
   assert.equal(pulled.result.status, 0);
   assert.equal(pulled.payload.ok, true);
-  assert.equal(fs.existsSync(path.join(localDir, "opencode.project.json")), true);
+  assert.equal(fs.existsSync(path.join(localDir, "workbench.project.json")), true);
 
   const localValidation = runCli(["validate", localDir], tempDir);
   assert.equal(localValidation.result.status, 0);
@@ -92,7 +131,7 @@ try {
   const cleanSummary = cleanDiff.payload.diffSummary as { updated: string[] };
   assert.deepEqual(cleanSummary.updated, []);
 
-  const manifestPath = path.join(localDir, "opencode.project.json");
+  const manifestPath = path.join(localDir, "workbench.project.json");
   const staleManifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as { scaffoldVersion: string };
   staleManifest.scaffoldVersion = "0.0.1";
   fs.writeFileSync(manifestPath, `${JSON.stringify(staleManifest, null, 2)}\n`, "utf-8");
@@ -109,7 +148,7 @@ try {
   const cleanSummaryAfterUpgrade = cleanDiffAfterUpgrade.payload.diffSummary as { updated: string[] };
   assert.deepEqual(cleanSummaryAfterUpgrade.updated, []);
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(localDir, "opencode.project.json"), "utf-8")) as {
+  const manifest = JSON.parse(fs.readFileSync(path.join(localDir, "workbench.project.json"), "utf-8")) as {
     pages: Array<{ entry: string }>;
   };
   fs.appendFileSync(path.join(localDir, manifest.pages[0]?.entry ?? ""), "\n// local edit\n", "utf-8");

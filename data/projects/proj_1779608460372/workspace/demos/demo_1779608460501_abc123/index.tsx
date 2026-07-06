@@ -7,7 +7,7 @@ interface DemoProps {
 }
 
 export default function PhoneBottomPopup({
-  popupImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png',
+  popupImage = '/api/images/7ff9e09eafad-popup-image.png',
   mainButtonText = '去看看',
   secondaryButtonText = '下次再说',
 }: DemoProps) {

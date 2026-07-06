@@ -9,20 +9,29 @@ import type {
   ValidationIssue,
 } from "../../project-core/src/types.js";
 import { ProjectAdminService } from "../../project-core/src/service.js";
+import { LOCAL_PREVIEW_DEV_SERVER_SCRIPT } from "./local-preview-dev-server.js";
 
 const SCAFFOLD_VERSION = "0.1.0";
-const PROJECT_FILE = "opencode.project.json";
-const SYNC_STATE_FILE = path.join(".opencode", "sync-state.json");
-const REMOTE_FILE = path.join(".opencode", "remote.json");
+const PROJECT_FILE = "workbench.project.json";
+const SYNC_STATE_FILE = path.join(".workbench", "sync-state.json");
+const REMOTE_FILE = path.join(".workbench", "remote.json");
 const WORKSPACE_KNOWLEDGE_DIR = "knowledge";
 const DEFAULT_LOCAL_KNOWLEDGE_DIR = "src/knowledge";
+
+type LocalPageRuntimeType = "high-fidelity-react" | "prototype-html-css" | "sketch-scene";
 
 interface LocalProjectPage {
   id: string;
   name: string;
   routeKey?: string;
+  runtimeType?: LocalPageRuntimeType;
   entry: string;
   schema: string;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: string;
+  sketchScene?: string;
+  sketchMeta?: string;
   parentId: string | null;
   order: number;
 }
@@ -124,6 +133,27 @@ function readJson<T>(filePath: string): T | null {
   }
 }
 
+function readText(projectDir: string, relativePath: string): string {
+  return fs.readFileSync(path.join(projectDir, relativePath), "utf-8");
+}
+
+function readOptionalText(projectDir: string, relativePath: string | undefined): string | undefined {
+  if (!relativePath) return undefined;
+  const filePath = path.join(projectDir, relativePath);
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : undefined;
+}
+
+function readOptionalJson<T>(projectDir: string, relativePath: string | undefined): T | undefined {
+  if (!relativePath) return undefined;
+  return readJson<T>(path.join(projectDir, relativePath)) ?? undefined;
+}
+
+function pageRuntimeType(page: Pick<LocalProjectPage, "runtimeType">): LocalPageRuntimeType {
+  if (page.runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (page.runtimeType === "sketch-scene") return "sketch-scene";
+  return "high-fidelity-react";
+}
+
 function hashFile(filePath: string): SyncFileState {
   const buffer = fs.readFileSync(filePath);
   return {
@@ -161,7 +191,15 @@ function relativeTo(projectDir: string, filePath: string): string {
 function managedFiles(projectDir: string, manifest: LocalProjectManifest): string[] {
   const files = [
     PROJECT_FILE,
-    ...manifest.pages.flatMap((page) => [page.entry, page.schema]),
+    ...manifest.pages.flatMap((page) => [
+      page.entry,
+      page.schema,
+      page.prototypeHtml,
+      page.prototypeCss,
+      page.prototypeMeta,
+      page.sketchScene,
+      page.sketchMeta,
+    ].filter((file): file is string => Boolean(file))),
     ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...walkFiles(path.join(projectDir, manifest.assetsDir)).map((file) => relativeTo(projectDir, file)),
@@ -190,7 +228,15 @@ function computeSyncStateFromEntries(entries: ProjectScaffoldEntry[], manifest: 
   const entryMap = new Map(entries.map((entry) => [entry.path, entry.data]));
   const managedPaths = [
     PROJECT_FILE,
-    ...manifest.pages.flatMap((page) => [page.entry, page.schema]),
+    ...manifest.pages.flatMap((page) => [
+      page.entry,
+      page.schema,
+      page.prototypeHtml,
+      page.prototypeCss,
+      page.prototypeMeta,
+      page.sketchScene,
+      page.sketchMeta,
+    ].filter((entryPath): entryPath is string => Boolean(entryPath))),
     ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...entries
@@ -233,7 +279,7 @@ function validateManifestShape(manifest: LocalProjectManifest | null): Validatio
   if (!manifest) {
     issues.push({
       code: "PROJECT_PACKAGE_MISSING",
-      message: "opencode.project.json 不存在或不是合法 JSON",
+      message: "workbench.project.json 不存在或不是合法 JSON",
       severity: "blocking",
     });
     return issues;
@@ -343,6 +389,18 @@ function validateSchemaFile(projectDir: string, relativePath: string, resourceId
   }
 }
 
+function validateRequiredFile(projectDir: string, relativePath: string | undefined, resourceId: string, code: string, label: string): ValidationIssue[] {
+  if (!relativePath || !fs.existsSync(path.join(projectDir, relativePath))) {
+    return [{
+      code,
+      message: `${label} 文件不存在: ${relativePath ?? "(未配置)"}`,
+      resourceId,
+      severity: "blocking",
+    }];
+  }
+  return [];
+}
+
 function validateKnowledgeManifest(projectDir: string, knowledgeDir: string): ValidationIssue[] {
   const manifestPath = path.join(projectDir, knowledgeDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) return [];
@@ -368,12 +426,17 @@ function buildProjectScaffoldPackageJson(manifest: LocalProjectManifest): Record
     private: true,
     name: manifest.projectId,
     packageManager: "pnpm@8.15.0",
+    devDependencies: {
+      playwright: "^1.42.0",
+    },
     scripts: {
       dev: "node scripts/dev-server.mjs",
       validate: "ow validate --json",
       diff: "ow diff --json",
       submit: "ow submit --json",
       build: "node scripts/dev-server.mjs --check",
+      "preview:check": "node scripts/dev-server.mjs --preview-check",
+      "preview:screenshot": "node scripts/dev-server.mjs --screenshot",
     },
   };
 }
@@ -386,13 +449,16 @@ function buildScaffoldManagedEntries(manifest: LocalProjectManifest): ProjectSca
 }
 
 function buildDevServerScript(): string {
+  return LOCAL_PREVIEW_DEV_SERVER_SCRIPT;
+  /* Legacy script body below is intentionally unreachable and kept only until
+     the scaffold template is fully split from this module. */
   return `import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 
 const root = process.cwd();
-const manifestPath = path.join(root, "opencode.project.json");
+const manifestPath = path.join(root, "workbench.project.json");
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -465,7 +531,7 @@ function renderHtml(project) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>\${htmlEscape(project.manifest.name)} - OpenCode Local Preview</title>
+    <title>\${htmlEscape(project.manifest.name)} - workbench Local Preview</title>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       body { margin: 0; color: #17202a; background: #f5f7fb; }
@@ -548,9 +614,38 @@ if (process.argv.includes("--check")) {
   process.exit(0);
 }
 
+if (process.argv.includes("--preview-check") || process.argv.includes("--screenshot")) {
+  const project = checkProject();
+  const outputDir = path.join(root, "test-results", "local-preview");
+  fs.mkdirSync(outputDir, { recursive: true });
+  const pages = project.pages.map((page) => {
+    const content = [page.code, page.schema].join("\\n").replace(/<[^>]*>/g, " ").trim();
+    const nonblank = content.length > 12;
+    const screenshotPath = path.join(outputDir, page.id + ".svg");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="375" height="812"><rect width="100%" height="100%" fill="' + (nonblank ? "#f8fafc" : "#fff1f2") + '"/><text x="24" y="48" font-family="Arial" font-size="18">' + htmlEscape(page.name || page.id) + '</text><text x="24" y="78" font-family="Arial" font-size="12">' + (nonblank ? "nonblank" : "blank") + '</text></svg>';
+    fs.writeFileSync(screenshotPath, svg, "utf-8");
+    return { pageId: page.id, nonblank, screenshotPath };
+  });
+  const report = {
+    ok: pages.every((page) => page.nonblank),
+    projectId: project.manifest.projectId,
+    outputDir,
+    pages,
+    summary: {
+      total: pages.length,
+      passed: pages.filter((page) => page.nonblank).length,
+      failed: pages.filter((page) => !page.nonblank).length,
+    },
+  };
+  const reportPath = path.join(outputDir, "preview-check-report.json");
+  fs.writeFileSync(reportPath, JSON.stringify({ ...report, reportPath }, null, 2) + "\\n", "utf-8");
+  console.log(JSON.stringify({ ...report, reportPath }, null, 2));
+  process.exit(report.ok ? 0 : 1);
+}
+
 if (process.env.OW_DEV_ONCE === "1") {
   const project = checkProject();
-  console.log("OpenCode local preview check: " + project.manifest.projectId + " (" + project.pages.length + " pages)");
+  console.log("workbench local preview check: " + project.manifest.projectId + " (" + project.pages.length + " pages)");
   process.exit(0);
 }
 
@@ -573,7 +668,7 @@ const server = http.createServer((request, response) => {
 });
 
 server.listen(port, () => {
-  console.log("OpenCode local preview: http://localhost:" + port);
+  console.log("workbench local preview: http://localhost:" + port);
 });
 `;
 }
@@ -666,15 +761,32 @@ export function exportProjectScaffoldEntries(
     projectId: projectPackage.data.project.id,
     baseVersion: projectPackage.data.baseVersion,
     name: projectPackage.data.project.name,
-    pages: projectPackage.data.pages.map((page) => ({
-      id: page.meta.id,
-      name: page.meta.name,
-      routeKey: page.meta.routeKey,
-      parentId: page.meta.parentId,
-      order: page.meta.order,
-      entry: `src/pages/${page.meta.id}/index.tsx`,
-      schema: `src/pages/${page.meta.id}/config.schema.json`,
-    })),
+    pages: projectPackage.data.pages.map((page) => {
+      const runtimeType = page.meta.runtimeType ?? "high-fidelity-react";
+      return {
+        id: page.meta.id,
+        name: page.meta.name,
+        routeKey: page.meta.routeKey,
+        runtimeType,
+        parentId: page.meta.parentId,
+        order: page.meta.order,
+        entry: `src/pages/${page.meta.id}/index.tsx`,
+        schema: `src/pages/${page.meta.id}/config.schema.json`,
+        ...(runtimeType === "prototype-html-css"
+          ? {
+              prototypeHtml: `src/pages/${page.meta.id}/prototype.html`,
+              prototypeCss: `src/pages/${page.meta.id}/prototype.css`,
+              prototypeMeta: `src/pages/${page.meta.id}/prototype.meta.json`,
+            }
+          : {}),
+        ...(runtimeType === "sketch-scene"
+          ? {
+              sketchScene: `src/pages/${page.meta.id}/sketch.scene.json`,
+              sketchMeta: `src/pages/${page.meta.id}/sketch.meta.json`,
+            }
+          : {}),
+      };
+    }),
     folders: projectPackage.data.folders.map((folder) => ({
       id: folder.id,
       name: folder.name,
@@ -708,6 +820,25 @@ export function exportProjectScaffoldEntries(
       { path: localPage.entry, data: Buffer.from(page.files.code, "utf-8") },
       { path: localPage.schema, data: Buffer.from(page.files.schema, "utf-8") },
     );
+    if (localPage.runtimeType === "prototype-html-css") {
+      if (localPage.prototypeHtml) {
+        entries.push({ path: localPage.prototypeHtml, data: Buffer.from(page.files.prototypeHtml ?? "", "utf-8") });
+      }
+      if (localPage.prototypeCss) {
+        entries.push({ path: localPage.prototypeCss, data: Buffer.from(page.files.prototypeCss ?? "", "utf-8") });
+      }
+      if (localPage.prototypeMeta) {
+        entries.push({ path: localPage.prototypeMeta, data: jsonBuffer(page.files.prototypeMeta ?? {}) });
+      }
+    }
+    if (localPage.runtimeType === "sketch-scene") {
+      if (localPage.sketchScene) {
+        entries.push({ path: localPage.sketchScene, data: Buffer.from(page.files.sketchScene ?? "", "utf-8") });
+      }
+      if (localPage.sketchMeta) {
+        entries.push({ path: localPage.sketchMeta, data: jsonBuffer(page.files.sketchMeta ?? {}) });
+      }
+    }
   }
   if (manifest.projectConfig && projectPackage.data.projectConfigSchema) {
     entries.push({
@@ -787,7 +918,19 @@ export function pullProjectScaffold(
       pages: exported.data.pages,
       assets: exported.data.assets,
     },
-    { nextActions: [`cd ${projectDir}`, "pnpm install", "pnpm dev", "ow validate --json", "ow diff --json"] },
+    {
+      nextActions: [
+        `cd ${projectDir}`,
+        "pnpm install",
+        "pnpm dev",
+        "pnpm build",
+        "pnpm preview:check",
+        "pnpm preview:screenshot",
+        "ow validate --json",
+        "ow diff --summary --json",
+        "ow submit --json",
+      ],
+    },
   );
 }
 
@@ -811,6 +954,15 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
         issues.push({ code: "PAGE_ENTRY_MISSING", message: `页面入口不存在: ${page.entry}`, resourceId: page.id, severity: "blocking" });
       }
       issues.push(...validateSchemaFile(resolvedDir, page.schema, page.id));
+      if (pageRuntimeType(page) === "prototype-html-css") {
+        issues.push(...validateRequiredFile(resolvedDir, page.prototypeHtml, page.id, "PROTOTYPE_HTML_FILE_MISSING", "原型 HTML"));
+        if (page.prototypeCss) {
+          issues.push(...validateRequiredFile(resolvedDir, page.prototypeCss, page.id, "PROTOTYPE_CSS_FILE_MISSING", "原型 CSS"));
+        }
+      }
+      if (pageRuntimeType(page) === "sketch-scene") {
+        issues.push(...validateRequiredFile(resolvedDir, page.sketchScene, page.id, "SKETCH_SCENE_FILE_MISSING", "草图 Scene"));
+      }
     }
     if (manifest.projectConfig) {
       issues.push(...validateSchemaFile(resolvedDir, manifest.projectConfig, "project"));
@@ -819,7 +971,7 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
       issues.push(...validateKnowledgeManifest(resolvedDir, manifest.knowledgeDir));
     }
     if (!readSyncState(resolvedDir)) {
-      issues.push({ code: "SYNC_STATE_MISSING", message: ".opencode/sync-state.json 不存在或不是合法 JSON", severity: "warning" });
+      issues.push({ code: "SYNC_STATE_MISSING", message: ".workbench/sync-state.json 不存在或不是合法 JSON", severity: "warning" });
     }
   }
 
@@ -829,7 +981,9 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
   };
   return ok({ projectDir: resolvedDir }, {
     validation,
-    nextActions: validation.ok ? ["ow diff --json"] : ["修复 validation.issues 后重试"],
+    nextActions: validation.ok
+      ? ["pnpm preview:check", "ow diff --summary --json", "提交前运行服务侧 edit validate/project verify"]
+      : ["修复 validation.issues 后重试"],
   });
 }
 
@@ -927,7 +1081,7 @@ export function diffProjectScaffold(projectDir: string): ProjectAdminResult<{
   }
   const syncState = readSyncState(resolvedDir);
   if (!syncState) {
-    return fail("SYNC_STATE_MISSING", ".opencode/sync-state.json 不存在或不是合法 JSON", {
+    return fail("SYNC_STATE_MISSING", ".workbench/sync-state.json 不存在或不是合法 JSON", {
       nextActions: ["ow project pull <projectId> <dir> --json"],
     });
   }
@@ -969,7 +1123,7 @@ export function submitProjectScaffold(
   }
   const manifest = readManifest(resolvedDir);
   if (!manifest) {
-    return fail("PROJECT_PACKAGE_INVALID", "opencode.project.json 不存在或不是合法 JSON");
+    return fail("PROJECT_PACKAGE_INVALID", "workbench.project.json 不存在或不是合法 JSON");
   }
 
   const remote = service.getProject(manifest.projectId, actor);
@@ -1036,7 +1190,7 @@ export function submitProjectScaffold(
     const index = pendingFolders.findIndex((folder) => !folder.parentId || availableFolderIds.has(folder.parentId));
     if (index === -1) {
       return discardAndFail(service, editId, "FOLDER_TREE_INVALID", "本地文件夹层级无法按父子顺序创建", {
-        nextActions: ["修复 opencode.project.json 中的 folders 顺序或父级引用后重试"],
+        nextActions: ["修复 workbench.project.json 中的 folders 顺序或父级引用后重试"],
       });
     }
     const [folder] = pendingFolders.splice(index, 1);

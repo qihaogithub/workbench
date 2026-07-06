@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783341723457_qytk25",
+  "at": 1783341723457,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783341723455_iaxzre",
+  "inputSummary": {
+    "name": "E2E:20260706T124132026Z-0dpmq6:OpenPencil 多窗口协同压力回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783341723455_iaxzre"
+    ]
+  }
+}

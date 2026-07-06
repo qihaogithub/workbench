@@ -91,7 +91,7 @@ staticChecks.push({
 
 const testRun = run('pnpm', [
   '--filter',
-  '@opencode-workbench/agent-service',
+  '@workbench/agent-service',
   'test',
   '--',
   'tests/unit/pi-agent.test.ts',

@@ -38,8 +38,8 @@ corepack pnpm check:agent
 如果 agent-service 正在运行，可用 OPS CLI：
 
 ```bash
-corepack pnpm --filter @opencode-workbench/cli-tools dev -- health
-corepack pnpm --filter @opencode-workbench/cli-tools dev -- system
+corepack pnpm --filter @workbench/cli-tools dev -- health
+corepack pnpm --filter @workbench/cli-tools dev -- system
 ```
 
 ## 可用诊断工具

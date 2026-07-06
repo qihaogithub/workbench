@@ -11,7 +11,7 @@ covers:
 
 # CLI 自动维护运行手册
 
-> 更新日期：2026-07-04
+> 更新日期：2026-07-06
 
 ## 读者
 
@@ -29,7 +29,7 @@ covers:
 
 如果改动涉及项目、模板、页面、配置、资产、发布、AI 会话或审计，还要读取对应模块的项目文档，确认业务语义。
 
-如果页面能力涉及 `runtimeType: "prototype-html-css"`、`prototypeHtml` / `prototypeCss` / `prototypeMeta` 或 `page update-prototype`，还要确认 `project-core` 已承载原型页文件读写、版本快照和静态安全校验；CLI 不得直接复用 author-site 画布或组件逻辑。
+如果页面能力涉及 `runtimeType: "prototype-html-css"`、`runtimeType: "sketch-scene"`、`prototypeHtml` / `prototypeCss` / `prototypeMeta`、`sketchScene` / `sketchMeta`、`page update-prototype` 或 `page update-sketch`，还要确认 `project-core` 已承载原型页文件读写、草图 scene 文件读写、版本快照和对应校验；CLI 不得直接复用 author-site 画布、demo-ui 草图编辑器或组件逻辑。
 
 如果页面历史、知识文档历史或内容图能力发生变化，还要确认 author-site 已通过 `/api/projects/[projectId]/resources/*`、`/commits/*` 或 `/materialize` 入口复用 `project-core`；CLI 不得恢复旧 `page version-*` 路由，也不能绕过内容图 commit / blob / materialization 状态。
 
@@ -102,10 +102,13 @@ covers:
 - Web 是否有新增业务入口。
 - 领域服务是否有新增业务方法。
 - CLI 命令是否登记对应能力。
+- CLI 已有命令的参数面是否仍覆盖共享层与 Web 已暴露的业务字段。
 - CLI 测试是否覆盖所有登记命令。
 - 文档是否说明新增或变化的能力。
 
-页面历史相关入口优先检查 `/resources/[kind]/[resourceId]/versions` 是否已替代旧 `/demos/[demoId]/versions`；项目内容图相关入口优先检查 `/commits` 与 `/materialize` 是否已经复用 `project-core`，避免把共享层迁移误判成 CLI 缺口。
+页面历史相关入口优先检查 `/resources/[kind]/[resourceId]/versions` 是否已替代旧 `/demos/[demoId]/versions`；项目内容图相关入口优先检查 `/commits` 与 `/materialize` 是否已经复用 `project-core`，避免把共享层迁移误判成 CLI 缺口。草图页相关入口优先检查 `page create --runtime-type sketch-scene`、`page update-sketch` 与 `page switch-runtime --target-runtime-type sketch-scene` 是否只是转发到 `project-core` 与 `@workbench/sketch-core`，不要把 author-site 编辑器或 viewer 展示层误记成 CLI 共享能力。
+
+对于已经存在同名命令的能力，不要只检查“命令是否注册”。还要继续核对参数面对齐情况，例如 `project create` / `project update` 是否继续覆盖 Web 与共享层中的 `category`、`authoringPreferences` 等项目元数据字段。
 
 ### 3. 选择处理等级
 

@@ -12,14 +12,15 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { normalizeCanvasStateLayers } from "@opencode-workbench/demo-ui";
+import { normalizeCanvasStateLayers } from "@workbench/demo-ui";
 import type {
   CanvasDocumentEntry,
   CanvasFreeNode,
   CanvasLayersState,
   CanvasPageLayout,
+  CanvasPageGroup,
   CanvasState,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 interface StoredCanvasLayout {
   version: 1;
@@ -178,6 +179,73 @@ function parseCanvasDocumentEntries(value: unknown): CanvasDocumentEntry[] {
   return entries;
 }
 
+function parseCanvasPageGroupEntries(
+  value: unknown,
+): CanvasPageGroup["pages"] {
+  if (!Array.isArray(value)) return [];
+  const entries: CanvasPageGroup["pages"] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return [];
+    const id = readString(item, "id");
+    const pageId = readString(item, "pageId");
+    const title = readString(item, "title");
+    if (!id || !pageId || !title) return [];
+    entries.push({ id, pageId, title });
+  }
+  return entries;
+}
+
+function parseCanvasPageGroups(
+  value: unknown,
+): Record<string, CanvasPageGroup> | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+
+  const groups: Record<string, CanvasPageGroup> = {};
+  for (const [groupId, groupValue] of Object.entries(value)) {
+    if (!isRecord(groupValue)) return null;
+    const id = readString(groupValue, "id");
+    const kind = readString(groupValue, "kind");
+    const title = readString(groupValue, "title");
+    const activePageId = readString(groupValue, "activePageId");
+    const layout = parseLayout(groupValue.layout);
+    const createdAt = readNumber(groupValue, "createdAt");
+    const updatedAt = readNumber(groupValue, "updatedAt");
+    const directoryCollapsed =
+      typeof groupValue.directoryCollapsed === "boolean"
+        ? groupValue.directoryCollapsed
+        : undefined;
+    const groupPages = parseCanvasPageGroupEntries(groupValue.pages);
+
+    if (
+      !id ||
+      id !== groupId ||
+      kind !== "page-group" ||
+      !title ||
+      !activePageId ||
+      !layout ||
+      createdAt === null ||
+      updatedAt === null ||
+      groupPages.length === 0
+    ) {
+      return null;
+    }
+
+    groups[groupId] = {
+      id,
+      kind,
+      title,
+      pages: groupPages,
+      activePageId,
+      layout,
+      ...(directoryCollapsed === undefined ? {} : { directoryCollapsed }),
+      createdAt,
+      updatedAt,
+    };
+  }
+  return groups;
+}
+
 function parseCanvasLayers(value: unknown): CanvasLayersState | undefined | null {
   if (value === undefined) return undefined;
   if (!isRecord(value)) return null;
@@ -259,6 +327,9 @@ function parseCanvasState(value: unknown): CanvasState | null {
 
   const hiddenKnowledgeDocumentIds =
     readStringArray(value, "hiddenKnowledgeDocumentIds") ?? undefined;
+  const hiddenPageIds = readStringArray(value, "hiddenPageIds") ?? undefined;
+  const pageGroups = parseCanvasPageGroups(value.pageGroups);
+  if (pageGroups === null) return null;
 
   return normalizeCanvasStateLayers({
     viewport: {
@@ -267,6 +338,8 @@ function parseCanvasState(value: unknown): CanvasState | null {
       zoom,
     },
     pages,
+    ...(pageGroups ? { pageGroups } : {}),
+    ...(hiddenPageIds ? { hiddenPageIds } : {}),
     ...(nodes ? { nodes } : {}),
     ...(layers ? { layers } : {}),
     ...(hiddenKnowledgeDocumentIds ? { hiddenKnowledgeDocumentIds } : {}),

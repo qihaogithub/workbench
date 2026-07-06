@@ -1,7 +1,7 @@
 import {
   getPreviewSize,
   type PreviewSize,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 export type { PreviewSize };
 

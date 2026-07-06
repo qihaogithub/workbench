@@ -1,4 +1,4 @@
-import type { BackendProvidersConfig } from "@opencode-workbench/shared/contracts";
+import type { BackendProvidersConfig } from "@workbench/shared/contracts";
 
 class SessionModelConfigs {
   private configs = new Map<string, BackendProvidersConfig>();

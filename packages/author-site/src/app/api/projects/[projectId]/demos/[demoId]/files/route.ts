@@ -172,9 +172,22 @@ export async function PUT(
       }
     }
 
+    const bodyWithSketch = body as {
+      sketchScene?: string;
+      sketchMeta?: unknown;
+    };
+    if (bodyWithSketch.sketchScene !== undefined && typeof bodyWithSketch.sketchScene !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sketchScene 必须为字符串"),
+        { status: 400 },
+      );
+    }
+
     const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
       code,
       schema,
+      sketchScene: bodyWithSketch.sketchScene,
+      sketchMeta: bodyWithSketch.sketchMeta as Record<string, unknown> | undefined,
     });
     if (!success) {
       return NextResponse.json(

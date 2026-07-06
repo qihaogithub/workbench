@@ -1,14 +1,14 @@
 {
   "id": "proj_1783042627508_t1czw2",
   "name": "伴读广告页面",
-  "publishedVersion": "v12",
-  "publishedAt": 1783050200018,
+  "publishedVersion": "v16",
+  "publishedAt": 1783325642737,
   "demoPages": [
     {
       "id": "page_lib0",
-      "name": "手机 - HTML",
+      "name": "手机",
       "routeKey": "page",
-      "order": 2,
+      "order": 0,
       "parentId": null,
       "runtimeType": "prototype-html-css",
       "schemaPath": "demos/page_lib0/schema.json",
@@ -16,39 +16,41 @@
         "width": 375,
         "height": 812
       },
-      "prototypeHtml": "<div class=\"phone-container\">\n  <!-- 顶部吸顶内容 -->\n  <img class=\"top-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/底部吸顶内容.png\" alt=\"顶部吸顶内容\" />\n\n  <!-- 可滚动内容区域 -->\n  <div class=\"scroll-area\">\n    <div class=\"content-wrapper\">\n      <!-- 重磅更新标题 -->\n      <img class=\"section-title\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/重磅更新标题.png\" alt=\"重磅更新\" />\n\n      <!-- 手机广告图（可配置） -->\n      <img class=\"ad-image\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png\" alt=\"手机广告图\" />\n\n      <!-- 叫叫活动标题 -->\n      <img class=\"section-title\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/叫叫活动标题.png\" alt=\"叫叫活动\" />\n\n      <!-- 轮播广告图容器 -->\n      <div class=\"carousel-container\">\n        <img class=\"carousel-image\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png\" alt=\"轮播广告图\" />\n      </div>\n\n      <!-- 底部内容 -->\n      <img class=\"bottom-content\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/下.png\" alt=\"底部内容\" />\n    </div>\n  </div>\n\n  <!-- 底部标签栏 -->\n  <img class=\"bottom-tab-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/吸底标签栏.png\" alt=\"底部标签栏\" />\n</div>",
+      "prototypeHtml": "<div class=\"phone-container\">\n  <!-- 顶部吸顶内容 -->\n  <img class=\"top-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/底部吸顶内容.png\" alt=\"顶部吸顶内容\" />\n\n  <!-- 可滚动内容区域 -->\n  <div class=\"scroll-area\">\n    <div class=\"content-wrapper\">\n      <!-- 重磅更新标题 -->\n      <img class=\"section-title\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/重磅更新标题.png\" alt=\"重磅更新\" />\n\n      <!-- 手机广告图（可配置） -->\n      <img class=\"ad-image\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png\" alt=\"手机广告图\" data-bind-src=\"field\" />\n\n      <!-- 叫叫活动标题 -->\n      <img class=\"section-title\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/叫叫活动标题.png\" alt=\"叫叫活动\" />\n\n      <!-- 轮播广告图容器 -->\n      <div class=\"carousel-container\">\n        <img class=\"carousel-image\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png\" alt=\"轮播广告图\" />\n      </div>\n\n      <!-- 底部内容 -->\n      <img class=\"bottom-content\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/下.png\" alt=\"底部内容\" />\n    </div>\n  </div>\n\n  <!-- 底部标签栏 -->\n  <img class=\"bottom-tab-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/吸底标签栏.png\" alt=\"底部标签栏\" />\n</div>",
       "prototypeCss": "/* 手机 - 副本 原型样式 */\n/* 与 React 版保持一致的视觉层级和布局 */\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  min-height: 100vh;\n  background: #f0f0f0;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\n}\n\n/* 手机容器 */\n.phone-container {\n  position: relative;\n  width: 375px;\n  max-width: 100%;\n  height: 100vh;\n  min-height: 812px;\n  overflow: hidden;\n  background-color: #ffffff;\n  margin: 0 auto;\n}\n\n/* 顶部吸顶内容 */\n.top-bar {\n  position: absolute;\n  left: 0;\n  top: 0;\n  z-index: 20;\n  width: 375px;\n  display: block;\n}\n\n/* 可滚动内容区域 */\n.scroll-area {\n  position: absolute;\n  left: 0;\n  top: 141px;\n  width: 375px;\n  height: 585px;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  overflow-x: hidden;\n  overflow-y: auto;\n  background-color: #ffffff;\n}\n\n/* 隐藏滚动条 - 兼容各浏览器 */\n.scroll-area::-webkit-scrollbar {\n  display: none;\n}\n.scroll-area {\n  -ms-overflow-style: none;\n  scrollbar-width: none;\n}\n\n/* 内容包装器 */\n.content-wrapper {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n\n/* 章节标题图片 */\n.section-title {\n  width: 344px;\n  display: block;\n}\n\n/* 手机广告图 */\n.ad-image {\n  width: 344px;\n  height: 180px;\n  object-fit: cover;\n  display: block;\n}\n\n/* 轮播广告图容器 */\n.carousel-container {\n  width: 344px;\n  height: 180px;\n  flex-shrink: 0;\n  overflow: hidden;\n  border-radius: 10px;\n  background-color: #d9d9d9;\n}\n\n/* 轮播广告图 */\n.carousel-image {\n  width: 100%;\n  height: 100%;\n  object-fit: cover;\n  display: block;\n}\n\n/* 底部内容图片 */\n.bottom-content {\n  width: 375px;\n  flex-shrink: 0;\n  display: block;\n}\n\n/* 底部标签栏 */\n.bottom-tab-bar {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  z-index: 20;\n  width: 375px;\n  height: 86px;\n  display: block;\n}",
       "prototypeHtmlPath": "demos/page_lib0/prototype.html",
       "prototypeCssPath": "demos/page_lib0/prototype.css"
     },
     {
       "id": "pad-react_3gok",
-      "name": "pad-HTML",
+      "name": "pad",
       "routeKey": "pad-react",
-      "order": 3,
+      "order": 1,
       "parentId": null,
-      "compiledJsPath": "demos/pad-react_3gok/compiled.js",
+      "runtimeType": "prototype-html-css",
       "schemaPath": "demos/pad-react_3gok/schema.json",
       "previewSize": {
         "width": 1133,
         "height": 749
       },
-      "iframeHtmlPath": "demos/pad-react_3gok/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1783042627508_t1czw2/demos/pad-react_3gok/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "prototypeHtml": "<div class=\"pad-container\">\n  <!-- 顶部吸顶内容 -->\n  <img class=\"top-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/底部吸顶内容.png\" alt=\"顶部吸顶内容\" />\n\n  <!-- 可滚动内容区域 -->\n  <div class=\"scroll-area\">\n    <!-- 顶部区域 -->\n    <img class=\"hero-image\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/1.png\" alt=\"顶部区域\" />\n\n    <!-- 平板广告图（可配置） -->\n    <div class=\"ad-wrapper\">\n      <img\n        class=\"ad-image\"\n        src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png\"\n        alt=\"平板广告图\"\n        data-bind-src=\"field\"\n      />\n    </div>\n\n    <!-- 活动标题 -->\n    <img class=\"activity-title\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/配图-1.png\" alt=\"活动标题\" />\n\n    <!-- 轮播广告行 -->\n    <div class=\"carousel-row\">\n      <img\n        class=\"carousel-main\"\n        src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/广告图.png\"\n        alt=\"轮播广告图\"\n      />\n      <img class=\"carousel-side\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/配图-3.png\" alt=\"\" />\n      <img class=\"carousel-side\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/配图-4.png\" alt=\"\" />\n      <img class=\"carousel-side\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/配图-5.png\" alt=\"\" />\n      <img class=\"carousel-side\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/配图-6.png\" alt=\"\" />\n    </div>\n  </div>\n\n  <!-- 底部标签栏 -->\n  <img class=\"bottom-tab-bar\" src=\"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/吸底标签栏.png\" alt=\"底部标签栏\" />\n</div>\n",
+      "prototypeCss": "/* pad-HTML 原型样式 */\n/* 与 React 版保持一致的视觉层级和布局 */\n\n* {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\nbody {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  min-height: 100vh;\n  background: #f0f0f0;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\n}\n\n/* 平板容器 */\n.pad-container {\n  position: relative;\n  width: 1133px;\n  max-width: 100%;\n  height: 100vh;\n  min-height: 749px;\n  overflow: hidden;\n  background-color: #ffffff;\n  margin: 0 auto;\n}\n\n/* 顶部吸顶内容 */\n.top-bar {\n  position: absolute;\n  left: 1px;\n  top: 0;\n  z-index: 20;\n  width: 1132px;\n  height: 90px;\n  display: block;\n}\n\n/* 可滚动内容区域 */\n.scroll-area {\n  position: absolute;\n  left: 0;\n  top: 90px;\n  width: 1133px;\n  height: 592px;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  overflow-x: hidden;\n  overflow-y: auto;\n  background-color: #ffffff;\n}\n\n/* 隐藏滚动条 */\n.scroll-area::-webkit-scrollbar {\n  display: none;\n}\n.scroll-area {\n  -ms-overflow-style: none;\n  scrollbar-width: none;\n}\n\n/* 顶部 hero 图片 */\n.hero-image {\n  width: 1133px;\n  height: 188px;\n  flex-shrink: 0;\n  object-fit: cover;\n  display: block;\n}\n\n/* 广告图包装容器 */\n.ad-wrapper {\n  width: 1005px;\n  flex-shrink: 0;\n  overflow: hidden;\n  border-radius: 12px;\n  background-color: #ffffff;\n}\n\n/* 平板广告图 */\n.ad-image {\n  width: 1005px;\n  height: 180px;\n  object-fit: cover;\n  display: block;\n}\n\n/* 活动标题 */\n.activity-title {\n  width: 1133px;\n  height: 61px;\n  flex-shrink: 0;\n  display: block;\n}\n\n/* 轮播广告行 */\n.carousel-row {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  width: 100%;\n  height: 100px;\n  flex-shrink: 0;\n  padding: 0 64px;\n}\n\n/* 轮播主广告图 */\n.carousel-main {\n  width: 210px;\n  height: 100%;\n  border-radius: 9px;\n  object-fit: cover;\n  background-color: #d9d9d9;\n  flex-shrink: 0;\n}\n\n/* 轮播侧边图 */\n.carousel-side {\n  height: 100px;\n  border-radius: 9px;\n  flex-shrink: 0;\n}\n\n/* 底部标签栏 */\n.bottom-tab-bar {\n  position: absolute;\n  bottom: 0;\n  left: 1px;\n  z-index: 20;\n  width: 1132px;\n  height: 62px;\n  display: block;\n}\n",
+      "prototypeHtmlPath": "demos/pad-react_3gok/prototype.html",
+      "prototypeCssPath": "demos/pad-react_3gok/prototype.css"
     }
   ],
   "demoFolders": [],
   "appGraph": {
     "version": 1,
-    "entry": "page",
+    "entry": "pad-react",
     "pages": {
       "page": {
         "pageId": "page_lib0",
-        "title": "手机 - HTML"
+        "title": "手机"
       },
       "pad-react": {
         "pageId": "pad-react_3gok",
-        "title": "pad-HTML"
+        "title": "pad"
       }
     },
     "actions": [],
@@ -57,22 +59,22 @@
   "projectConfigSchema": "\n",
   "canvasState": {
     "viewport": {
-      "x": -307.7641073531587,
-      "y": 131.429430527425,
-      "zoom": 0.43543543250353806
+      "x": 496.18286665355936,
+      "y": 153.10430162740354,
+      "zoom": 0.4893350366815548
     },
     "pages": {
       "demo_1779608460373_h7i8j9": {
-        "x": 408.5089023433909,
-        "y": 0,
+        "x": 1.4958394576164409,
+        "y": 930.0232253466418,
         "width": 1214.0470588923813,
         "height": 802.5783293119097,
         "sizeMode": "custom",
         "previewSizeKey": "1133x749"
       },
       "demo_1779608460372_f5g6h7": {
-        "x": 0.5649811226809205,
-        "y": 0,
+        "x": -397.4989995457845,
+        "y": 930.0232253466418,
         "width": 375,
         "height": 812,
         "zIndex": 0,
@@ -80,16 +82,16 @@
         "previewSizeKey": "375x812"
       },
       "page_lib0": {
-        "x": 790.9648173850902,
-        "y": 1.8732458034932395,
-        "width": 345.0400650538055,
-        "height": 747.1267541965068,
+        "x": -354.57717426039113,
+        "y": -4.122780054689898,
+        "width": 347.8091656656511,
+        "height": 753.1227800546899,
         "sizeMode": "custom",
         "previewSizeKey": "375x812"
       },
       "pad-react_3gok": {
-        "x": 1157.2829740321042,
-        "y": 1.8732458034932398,
+        "x": 13.235040169139895,
+        "y": 0,
         "width": 1133,
         "height": 749,
         "zIndex": 1,

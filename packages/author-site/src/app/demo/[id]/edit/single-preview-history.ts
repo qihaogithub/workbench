@@ -1,6 +1,6 @@
-import { getActiveCanvasDocumentEntry } from "@opencode-workbench/demo-ui/canvas-kernel";
-import type { CanvasDocumentNode } from "@opencode-workbench/demo-ui/types";
-import type { DemoPageMeta, ProjectResourceKind } from "@opencode-workbench/shared";
+import { getActiveCanvasDocumentEntry } from "@workbench/demo-ui/canvas-kernel";
+import type { CanvasDocumentNode } from "@workbench/demo-ui/types";
+import type { DemoPageMeta, ProjectResourceKind } from "@workbench/shared";
 
 export type SinglePreviewTarget =
   | { kind: "page"; pageId: string }

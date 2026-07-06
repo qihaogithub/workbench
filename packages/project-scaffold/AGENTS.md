@@ -4,7 +4,7 @@
 
 ## 边界
 
-- 可以读取本地 `opencode.project.json`、`.opencode/sync-state.json` 和脚手架源码文件。
+- 可以读取本地 `workbench.project.json`、`.workbench/sync-state.json` 和脚手架源码文件。
 - 可以通过 `ProjectAdminService` 读取或提交线上项目数据。
 - 不负责解析 CLI 参数、打印终端文本、启动 dev server、安装依赖或管理 Web 路由。
 - 不直接操作 `data/projects/*/workspace` 的内部文件；线上读写必须经过 `project-core`。

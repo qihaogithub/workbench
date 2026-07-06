@@ -1,5 +1,5 @@
-import type { PrototypePageMeta } from "@opencode-workbench/shared";
-import type { PreviewSize } from "@opencode-workbench/demo-ui";
+import type { PrototypePageMeta } from "@workbench/shared";
+import type { PreviewSize } from "@workbench/demo-ui";
 
 function readDimension(value: unknown): string | number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {

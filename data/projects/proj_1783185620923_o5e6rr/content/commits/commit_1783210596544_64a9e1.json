@@ -1,0 +1,28 @@
+{
+  "id": "commit_1783210596544_64a9e1",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "parentCommitId": "commit_1783209135417_l2tp7l",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "持续编辑自动记录站外浏览器引导页",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_25_outside_browser_guide",
+      "versionId": "prv_1783210596542_9c9fme"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "worldcup_25_outside_browser_guide",
+      "fromVersionId": "prv_1783209135415_h0pvs8",
+      "toVersionId": "prv_1783210596542_9c9fme"
+    }
+  ],
+  "createdAt": 1783210596544,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

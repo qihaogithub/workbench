@@ -160,6 +160,7 @@ export function PageConfigPanel({
     string | null
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
+  const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
@@ -206,6 +207,23 @@ export function PageConfigPanel({
   const selectedPageConfig =
     scopedPages.find((item) => item.page.id === effectiveDetailPageId) ?? null;
   const selectedPage = selectedPageConfig?.page ?? null;
+  const sharedAffectedPages = useMemo(
+    () =>
+      scopedPages
+        .filter(
+          ({ projectConfigSchema: scopedProjectConfigSchema }) =>
+            getSchemaFieldCountByCategory(
+              scopedProjectConfigSchema,
+              configCategoryFilter,
+            ) > 0,
+        )
+        .map(({ page }) => page),
+    [configCategoryFilter, scopedPages],
+  );
+
+  useEffect(() => {
+    setShowSharedAffectedPages(false);
+  }, [effectiveDetailPageId, configCategoryFilter]);
 
   const openPageDetail = (pageId: string) => {
     onPageSelect?.(pageId);
@@ -232,7 +250,15 @@ export function PageConfigPanel({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {filteredPages.length > 0 ? (
+          {sortedPages.length === 0 ? (
+            <div className="flex h-full min-h-[160px] flex-col items-center justify-center px-4 text-center">
+              <FileText className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">暂无页面</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
+                添加页面后即可配置页面内容
+              </p>
+            </div>
+          ) : filteredPages.length > 0 ? (
             <div className="space-y-1">
               {filteredPages.map(({ page, projectConfigSchema: scopedProjectConfigSchema }) => {
                 const sharedCount = getSchemaFieldCountByCategory(
@@ -343,10 +369,32 @@ export function PageConfigPanel({
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">共享配置</span>
                 </div>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  影响多个页面
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowSharedAffectedPages((current) => !current)}
+                  className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-expanded={showSharedAffectedPages}
+                >
+                  影响 {sharedAffectedPages.length} 个页面
+                </button>
               </div>
+              {showSharedAffectedPages && (
+                <div className="mb-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <div className="mb-1 text-xs text-muted-foreground">
+                    受影响页面
+                  </div>
+                  <ul className="space-y-1">
+                    {sharedAffectedPages.map((page) => (
+                      <li
+                        key={page.id}
+                        className="truncate text-xs text-foreground/80"
+                      >
+                        {page.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <ConfigScopeWrapper scope="project" hideHeader>
                 <ConfigForm
                   key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
@@ -369,9 +417,6 @@ export function PageConfigPanel({
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">本页配置</span>
                 </div>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  仅当前页面
-                </span>
               </div>
               <ConfigScopeWrapper scope="page" hideHeader>
                 <ConfigForm

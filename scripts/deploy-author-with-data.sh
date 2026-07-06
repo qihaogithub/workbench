@@ -6,12 +6,12 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_IP="${SERVER_IP:-10.130.33.131}"
 SERVER_PORT="${SERVER_PORT:-22}"
 SERVER_USER="${SERVER_USER:-root}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/opencode-workbench}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/workbench}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
-REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/opt/opencode-workbench-data-backups}"
-REMOTE_STAGING_ROOT="${REMOTE_STAGING_ROOT:-/opt/opencode-workbench-data-staging}"
-LEGACY_DATA_VOLUME="${LEGACY_DATA_VOLUME:-opencode-workbench_app-data}"
+REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/opt/workbench-data-backups}"
+REMOTE_STAGING_ROOT="${REMOTE_STAGING_ROOT:-/opt/workbench-data-staging}"
+LEGACY_DATA_VOLUME="${LEGACY_DATA_VOLUME:-workbench_app-data}"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -130,7 +130,7 @@ fi
 
 cd "$remote_dir"
 
-app_data_dir="/opt/opencode-workbench/data"
+app_data_dir="/opt/workbench/data"
 if [ -f .env.docker ]; then
     configured="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' .env.docker)"
     if [ -n "$configured" ]; then
@@ -159,10 +159,10 @@ fi
 
 echo "MOUNTS"
 for c in \
-    opencode-workbench-agent-service-1 \
-    opencode-workbench-author-site-1 \
-    opencode-workbench-screenshot-service-1 \
-    opencode-workbench-viewer-site-1
+    workbench-agent-service-1 \
+    workbench-author-site-1 \
+    workbench-screenshot-service-1 \
+    workbench-viewer-site-1
 do
     docker inspect -f '{{.Name}} {{range .Mounts}}{{.Type}}|{{.Name}}|{{.Source}}|{{.Destination}} {{end}}' "$c" 2>/dev/null || true
 done
@@ -186,7 +186,7 @@ stamp="$4"
 cd "$remote_dir"
 mkdir -p "$backup_dir"
 
-app_data_dir="/opt/opencode-workbench/data"
+app_data_dir="/opt/workbench/data"
 if [ -f .env.docker ]; then
     configured="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' .env.docker)"
     if [ -n "$configured" ]; then
@@ -279,7 +279,7 @@ legacy_volume="$3"
 cd "$remote_dir"
 test -d "$staging"
 
-app_data_dir="/opt/opencode-workbench/data"
+app_data_dir="/opt/workbench/data"
 if [ -f .env.docker ]; then
     configured="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' .env.docker)"
     if [ -n "$configured" ]; then
@@ -333,10 +333,10 @@ remote_dir="$1"
 cd "$remote_dir"
 
 for i in $(seq 1 90); do
-    agent="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' opencode-workbench-agent-service-1 2>/dev/null || echo missing)"
-    author="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' opencode-workbench-author-site-1 2>/dev/null || echo missing)"
-    screenshot="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' opencode-workbench-screenshot-service-1 2>/dev/null || echo missing)"
-    viewer="$(docker inspect -f '{{.State.Status}}' opencode-workbench-viewer-site-1 2>/dev/null || echo missing)"
+    agent="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' workbench-agent-service-1 2>/dev/null || echo missing)"
+    author="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' workbench-author-site-1 2>/dev/null || echo missing)"
+    screenshot="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' workbench-screenshot-service-1 2>/dev/null || echo missing)"
+    viewer="$(docker inspect -f '{{.State.Status}}' workbench-viewer-site-1 2>/dev/null || echo missing)"
     printf 'attempt=%s agent=%s author=%s screenshot=%s viewer=%s\n' "$i" "$agent" "$author" "$screenshot" "$viewer"
     if [ "$agent" = healthy ] && [ "$author" = healthy ] && [ "$screenshot" = healthy ] && [ "$viewer" = running ]; then
         break
@@ -360,17 +360,17 @@ check_health() {
     fi
 }
 
-check_health opencode-workbench-agent-service-1 healthy
-check_health opencode-workbench-author-site-1 healthy
-check_health opencode-workbench-screenshot-service-1 healthy
-check_health opencode-workbench-viewer-site-1 running
+check_health workbench-agent-service-1 healthy
+check_health workbench-author-site-1 healthy
+check_health workbench-screenshot-service-1 healthy
+check_health workbench-viewer-site-1 running
 
 echo "MOUNTS"
 for c in \
-    opencode-workbench-agent-service-1 \
-    opencode-workbench-author-site-1 \
-    opencode-workbench-screenshot-service-1 \
-    opencode-workbench-viewer-site-1
+    workbench-agent-service-1 \
+    workbench-author-site-1 \
+    workbench-screenshot-service-1 \
+    workbench-viewer-site-1
 do
     docker inspect -f '{{.Name}} {{range .Mounts}}{{.Type}}|{{.Name}}|{{.Source}}|{{.Destination}} {{end}}' "$c"
 done

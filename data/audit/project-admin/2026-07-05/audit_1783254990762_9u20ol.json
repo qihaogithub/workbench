@@ -1,0 +1,15 @@
+{
+  "auditId": "audit_1783254990762_9u20ol",
+  "at": 1783254990762,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "edit_begin",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "edit_1783254990658_minol3",
+  "ok": true
+}

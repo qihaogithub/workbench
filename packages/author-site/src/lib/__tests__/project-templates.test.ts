@@ -133,7 +133,7 @@ describe("项目模板", () => {
     const sourceRuntimePath = path.join(
       fsUtils.getProjectPath(project.id),
       "workspace",
-      ".opencode",
+      ".workbench",
     );
     fs.mkdirSync(sourceRuntimePath, { recursive: true });
     fs.writeFileSync(path.join(sourceRuntimePath, ".gitignore"), "*", "utf-8");
@@ -146,7 +146,7 @@ describe("项目模板", () => {
 
     expect(
       fs.existsSync(
-        path.join(fsUtils.getTemplatePath(template.id), "workspace", ".opencode"),
+        path.join(fsUtils.getTemplatePath(template.id), "workspace", ".workbench"),
       ),
     ).toBe(false);
   });

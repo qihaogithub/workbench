@@ -6,7 +6,7 @@ import {
   PreviewCanvas,
   type CanvasKnowledgeDocument,
   type CanvasState,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 const initialState: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -317,8 +317,10 @@ function TestCanvasWithParentVisibleState({
 
 function TestEditorCanvasWithConfigCallback({
   onPageConfigEdit,
+  onRequestDeletePages,
 }: {
   onPageConfigEdit: (pageId: string) => void;
+  onRequestDeletePages?: (pageIds: string[]) => void;
 }) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -343,11 +345,16 @@ function TestEditorCanvasWithConfigCallback({
       canvasState={state}
       onCanvasStateChange={setState}
       onPageConfigEdit={onPageConfigEdit}
+      onRequestDeletePages={onRequestDeletePages}
     />
   );
 }
 
-function TestMultiPageEditorCanvas() {
+function TestMultiPageEditorCanvas({
+  onRequestDeletePages,
+}: {
+  onRequestDeletePages?: (pageIds: string[]) => void;
+} = {}) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 0, y: 0, zoom: 1 },
     pages: {
@@ -387,6 +394,7 @@ function TestMultiPageEditorCanvas() {
         ]}
         canvasState={state}
         onCanvasStateChange={setState}
+        onRequestDeletePages={onRequestDeletePages}
       />
       <output data-testid="canvas-state">{JSON.stringify(state)}</output>
     </>
@@ -723,6 +731,372 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       ).toBeInTheDocument();
     });
     expect(onPageConfigEdit).toHaveBeenCalledWith("page_1");
+  });
+
+  it("editor 模式选中页面后按 Delete 请求删除页面", async () => {
+    const onRequestDeletePages = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        onRequestDeletePages={onRequestDeletePages}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 260,
+      pointerId: 22,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 220,
+      clientY: 260,
+      pointerId: 22,
+    });
+
+    await waitFor(() => {
+      expect(
+        container.querySelector("[data-page-id='page_1'] [data-canvas-selection-box='true']"),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "Delete" });
+
+    expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
+  });
+
+  it("editor 模式页面右键菜单可以请求删除页面", async () => {
+    const onRequestDeletePages = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        onRequestDeletePages={onRequestDeletePages}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    fireEvent.contextMenu(page, { clientX: 240, clientY: 260 });
+    fireEvent.click(screen.getByText("删除页面"));
+
+    expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
+  });
+
+  it("editor 模式单选页面后显示删除按钮", async () => {
+    const onRequestDeletePages = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        onRequestDeletePages={onRequestDeletePages}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 260,
+      pointerId: 23,
+    });
+    fireEvent.pointerUp(page, {
+      clientX: 220,
+      clientY: 260,
+      pointerId: 23,
+    });
+
+    const deleteButton = await screen.findByTitle("删除页面");
+    fireEvent.click(deleteButton);
+
+    expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
+  });
+
+  it("支持 Shift 多选页面并合并为带目录的页面组", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const pageA = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    const pageB = container.querySelector("[data-page-id='page_2']") as HTMLElement;
+    Object.defineProperty(pageA, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 200,
+        bottom: 200,
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(pageB, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 300,
+        top: 130,
+        right: 400,
+        bottom: 230,
+        width: 100,
+        height: 100,
+        x: 300,
+        y: 130,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(pageA, {
+      button: 0,
+      clientX: 120,
+      clientY: 120,
+      pointerId: 41,
+    });
+    fireEvent.pointerUp(pageA, {
+      clientX: 120,
+      clientY: 120,
+      pointerId: 41,
+    });
+    await waitFor(() => {
+      expect(
+        container.querySelector(
+          "[data-page-id='page_1'] [data-canvas-selection-box='true']",
+        ),
+      ).toBeInTheDocument();
+    });
+    fireEvent.pointerDown(pageB, {
+      button: 0,
+      clientX: 320,
+      clientY: 150,
+      pointerId: 42,
+      shiftKey: true,
+    });
+    fireEvent.pointerUp(pageB, {
+      clientX: 320,
+      clientY: 150,
+      pointerId: 42,
+      shiftKey: true,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const groups = Object.values(state.pageGroups ?? {});
+      expect(groups).toHaveLength(1);
+      expect(groups[0]).toMatchObject({
+        kind: "page-group",
+        activePageId: "page_1",
+        layout: {
+          x: 100,
+          y: 100,
+          width: 100,
+          height: 100,
+        },
+      });
+      expect(groups[0].pages.map((entry) => entry.pageId)).toEqual([
+        "page_1",
+        "page_2",
+      ]);
+      expect(state.hiddenPageIds).toEqual(["page_1", "page_2"]);
+      expect(state.pages.page_1).toEqual({ x: 100, y: 100, width: 100, height: 100 });
+      expect(state.pages.page_2).toEqual({ x: 300, y: 130, width: 100, height: 100 });
+    });
+
+    const groupElement = container.querySelector("[data-page-group-id]") as HTMLElement;
+    expect(groupElement).toHaveStyle({
+      left: "100px",
+      top: "100px",
+      width: "100px",
+      height: "100px",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠页面目录" }));
+
+    await waitFor(() => {
+      const group = Object.values(getCanvasState().pageGroups ?? {})[0];
+      expect(group.directoryCollapsed).toBe(true);
+    });
+    expect(
+      screen.getByRole("button", { name: /展开页面目录/ }),
+    ).toHaveTextContent("2");
+  });
+
+  it("页面组目录切换和拖拽缩放只更新页面组布局", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const pageA = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    const pageB = container.querySelector("[data-page-id='page_2']") as HTMLElement;
+    Object.defineProperty(pageA, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 200,
+        bottom: 200,
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(pageB, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 300,
+        top: 130,
+        right: 400,
+        bottom: 230,
+        width: 100,
+        height: 100,
+        x: 300,
+        y: 130,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(pageA, {
+      button: 0,
+      clientX: 120,
+      clientY: 120,
+      pointerId: 43,
+    });
+    fireEvent.pointerUp(pageA, {
+      clientX: 120,
+      clientY: 120,
+      pointerId: 43,
+    });
+    await waitFor(() => {
+      expect(
+        container.querySelector(
+          "[data-page-id='page_1'] [data-canvas-selection-box='true']",
+        ),
+      ).toBeInTheDocument();
+    });
+    fireEvent.pointerDown(pageB, {
+      button: 0,
+      clientX: 320,
+      clientY: 150,
+      pointerId: 44,
+      shiftKey: true,
+    });
+    fireEvent.pointerUp(pageB, {
+      clientX: 320,
+      clientY: 150,
+      pointerId: 44,
+      shiftKey: true,
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "页面二" }));
+
+    await waitFor(() => {
+      const group = Object.values(getCanvasState().pageGroups ?? {})[0];
+      expect(group.activePageId).toBe("page_2");
+    });
+
+    const groupElement = await waitFor(() => {
+      const element = container.querySelector("[data-page-group-id]") as HTMLElement | null;
+      expect(element).toBeTruthy();
+      return element as HTMLElement;
+    });
+
+    Object.defineProperty(groupElement, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 200,
+        bottom: 200,
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(groupElement, {
+      button: 0,
+      clientX: 200,
+      clientY: 180,
+      pointerId: 45,
+    });
+    fireEvent.pointerMove(groupElement, {
+      clientX: 230,
+      clientY: 205,
+      pointerId: 45,
+    });
+    fireEvent.pointerUp(groupElement, {
+      clientX: 230,
+      clientY: 205,
+      pointerId: 45,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const group = Object.values(state.pageGroups ?? {})[0];
+      expect(group.layout).toMatchObject({ x: 130, y: 125, width: 100, height: 100 });
+      expect(state.pages.page_1).toEqual({ x: 100, y: 100, width: 100, height: 100 });
+      expect(state.pages.page_2).toEqual({ x: 300, y: 130, width: 100, height: 100 });
+    });
+
+    fireEvent.pointerMove(groupElement, {
+      clientX: 198,
+      clientY: 150,
+      pointerId: 46,
+    });
+    fireEvent.pointerDown(groupElement, {
+      button: 0,
+      clientX: 198,
+      clientY: 150,
+      pointerId: 46,
+    });
+    fireEvent.pointerMove(groupElement, {
+      clientX: 238,
+      clientY: 150,
+      pointerId: 46,
+    });
+    fireEvent.pointerUp(groupElement, {
+      clientX: 238,
+      clientY: 150,
+      pointerId: 46,
+    });
+
+    await waitFor(() => {
+      const state = getCanvasState();
+      const group = Object.values(state.pageGroups ?? {})[0];
+      expect(group.layout.width).toBe(140);
+      expect(state.pages.page_1).toEqual({ x: 100, y: 100, width: 100, height: 100 });
+      expect(state.pages.page_2).toEqual({ x: 300, y: 130, width: 100, height: 100 });
+    });
   });
 
   it("文字工具在画布目标位置点击后创建文字节点", async () => {

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783317849706_f0h4be",
+  "at": 1783317849706,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783317849705_b97aid",
+  "inputSummary": {
+    "name": "E2E:20260706T060354057Z-6ghsod:手绘页面回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783317849705_b97aid"
+    ]
+  }
+}

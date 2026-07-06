@@ -1,0 +1,18 @@
+{
+  "projectId": "proj_1783334663364_30hsrv",
+  "commitId": "commit_1783336915137_25p5da",
+  "materializerVersion": "project-core-content-graph-v1",
+  "resources": [
+    {
+      "kind": "page",
+      "resourceId": "product-showcase_a3f2",
+      "versionId": "prv_1783336915041_ertlmw",
+      "contentHash": "23df8d4cb39ac76af94532f1336c9cca82740ef13a3f8c9a53e7bbbe687a6135",
+      "blobRefs": [
+        "9f47f96cc3deba73d1eac624c16a2dcd5cb3d8b0a7bef7fcca3d3d427b6cb845",
+        "02ab4fd1f5f0a37fd724880f63ec383f23ec93f8a49f60799d3538aa3a4e540a"
+      ]
+    }
+  ],
+  "updatedAt": 1783336915147
+}

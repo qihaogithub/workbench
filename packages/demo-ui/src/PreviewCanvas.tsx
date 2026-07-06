@@ -11,10 +11,12 @@ import {
   BetweenHorizontalStart,
   BetweenVerticalStart,
   Combine,
+  Trash2,
 } from "lucide-react";
 import { CanvasViewport } from "./CanvasViewport";
-import { CanvasPageItem } from "./CanvasPageItem";
+import { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
+import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { DocumentEditor } from "./DocumentEditor";
 import { useCanvasDocumentMarkdown } from "./useCanvasDocumentMarkdown";
@@ -54,6 +56,12 @@ import type {
   CanvasToolMode,
   CanvasFreeNode,
   CanvasDocumentNode,
+  CanvasPageData,
+  CanvasPageGroup,
+  CanvasPageRenderMode,
+  ConsoleLogPayload,
+  PositionableSizeItem,
+  ScreenshotRenderBox,
 } from "./types";
 
 type CanvasImportFileKind = "document" | "image";
@@ -89,6 +97,11 @@ const MARKDOWN_FILE_EXTENSIONS = [".md", ".markdown", ".mdown"];
 const MARKDOWN_MIME_TYPES = new Set(["text/markdown", "text/x-markdown"]);
 const DOCUMENT_NODE_DEFAULT_HEIGHT = 360;
 const DOCUMENT_NODE_COLLAPSED_HEIGHT = 48;
+const PAGE_GROUP_DIRECTORY_WIDTH = 160;
+const PAGE_GROUP_DIRECTORY_GAP = 8;
+const PAGE_GROUP_MIN_WIDTH = 100;
+const PAGE_GROUP_MIN_HEIGHT = 100;
+const PAGE_GROUP_EDGE_HIT_SIZE = 8;
 
 function getLowerFileName(file: File): string {
   return file.name.toLowerCase();
@@ -184,6 +197,24 @@ function sortDocumentNodesByLayout(
     const yDiff = a.layout.y - b.layout.y;
     if (Math.abs(yDiff) > 1) return yDiff;
     return a.layout.x - b.layout.x;
+  });
+}
+
+function sortPageIdsByLayout(
+  pageIds: string[],
+  layouts: Record<string, CanvasPageLayout>,
+): string[] {
+  return [...pageIds].sort((a, b) => {
+    const layoutA = layouts[a];
+    const layoutB = layouts[b];
+    if (!layoutA && !layoutB) return a.localeCompare(b);
+    if (!layoutA) return 1;
+    if (!layoutB) return -1;
+    const yDiff = layoutA.y - layoutB.y;
+    if (Math.abs(yDiff) > 1) return yDiff;
+    const xDiff = layoutA.x - layoutB.x;
+    if (Math.abs(xDiff) > 1) return xDiff;
+    return a.localeCompare(b);
   });
 }
 
@@ -343,6 +374,363 @@ function computeAlignment(
   return { layout: result, guides };
 }
 
+interface CanvasPageGroupItemProps {
+  group: CanvasPageGroup;
+  pagesById: Map<string, CanvasPageData>;
+  editable: boolean;
+  selected: boolean;
+  zoom: number;
+  sessionId?: string;
+  pageRenderModes: Record<string, CanvasPageRenderMode>;
+  screenshotUrls?: Record<string, string>;
+  screenshotRenderBoxes?: Record<string, ScreenshotRenderBox>;
+  onSelect: (
+    groupId: string,
+    activePageId: string,
+    event?: React.PointerEvent | React.MouseEvent,
+  ) => void;
+  onLayoutChange: (groupId: string, layout: CanvasPageLayout) => void;
+  onActivePageChange: (groupId: string, pageId: string) => void;
+  onDirectoryCollapsedChange: (groupId: string, collapsed: boolean) => void;
+  onDragStart?: (groupId: string) => void;
+  onDragMove?: (groupId: string, layout: CanvasPageLayout, edge?: string) => void;
+  onDragEnd?: () => void;
+  onConsoleEntry?: (entry: ConsoleLogPayload) => void;
+  onError?: (error: Error) => void;
+  onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+}
+
+function detectPageGroupResizeEdge(
+  localX: number,
+  localY: number,
+  width: number,
+  height: number,
+): string | null {
+  const nearLeft = localX <= PAGE_GROUP_EDGE_HIT_SIZE;
+  const nearRight = localX >= width - PAGE_GROUP_EDGE_HIT_SIZE;
+  const nearTop = localY <= PAGE_GROUP_EDGE_HIT_SIZE;
+  const nearBottom = localY >= height - PAGE_GROUP_EDGE_HIT_SIZE;
+
+  if (nearTop && nearLeft) return "nw";
+  if (nearTop && nearRight) return "ne";
+  if (nearBottom && nearLeft) return "sw";
+  if (nearBottom && nearRight) return "se";
+  if (nearTop) return "n";
+  if (nearBottom) return "s";
+  if (nearLeft) return "w";
+  if (nearRight) return "e";
+  return null;
+}
+
+function resizePageGroupLayout(
+  start: CanvasPageLayout,
+  edge: string,
+  dx: number,
+  dy: number,
+): CanvasPageLayout {
+  let x = start.x;
+  let y = start.y;
+  let width = start.width;
+  let height = start.height;
+
+  if (edge.includes("e")) width = Math.max(PAGE_GROUP_MIN_WIDTH, start.width + dx);
+  if (edge.includes("s")) height = Math.max(PAGE_GROUP_MIN_HEIGHT, start.height + dy);
+  if (edge.includes("w")) {
+    width = Math.max(PAGE_GROUP_MIN_WIDTH, start.width - dx);
+    x = start.x + (start.width - width);
+  }
+  if (edge.includes("n")) {
+    height = Math.max(PAGE_GROUP_MIN_HEIGHT, start.height - dy);
+    y = start.y + (start.height - height);
+  }
+
+  return { ...start, x, y, width, height };
+}
+
+function CanvasPageGroupItem({
+  group,
+  pagesById,
+  editable,
+  selected,
+  zoom,
+  sessionId,
+  pageRenderModes,
+  screenshotUrls,
+  screenshotRenderBoxes,
+  onSelect,
+  onLayoutChange,
+  onActivePageChange,
+  onDirectoryCollapsedChange,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onConsoleEntry,
+  onError,
+  onPositionableSizes,
+}: CanvasPageGroupItemProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [resizeEdge, setResizeEdge] = useState<string | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  const startPointerRef = useRef({ x: 0, y: 0 });
+  const startLayoutRef = useRef(group.layout);
+  const groupRef = useRef<HTMLDivElement>(null);
+  const activeEntry =
+    group.pages.find((entry) => entry.pageId === group.activePageId) ??
+    group.pages[0];
+  const activePageId = activeEntry?.pageId ?? group.activePageId;
+  const activePage = activePageId ? pagesById.get(activePageId) : undefined;
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const labelFontSize = Math.min(12 / safeZoom, 24);
+  const labelTopOffset = Math.min(20 / safeZoom, 40);
+  const previewLayout: CanvasPageLayout = {
+    x: 0,
+    y: 0,
+    width: Math.max(group.layout.width, 1),
+    height: group.layout.height,
+  };
+
+  const updateHoveredEdge = useCallback(
+    (event: React.PointerEvent | React.MouseEvent) => {
+      if (!editable || isDragging || resizeEdge) {
+        setHoveredEdge(null);
+        return;
+      }
+      const rect = groupRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setHoveredEdge(
+        detectPageGroupResizeEdge(
+          event.clientX - rect.left,
+          event.clientY - rect.top,
+          rect.width,
+          rect.height,
+        ),
+      );
+    },
+    [editable, isDragging, resizeEdge],
+  );
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!editable || event.button !== 0) return;
+      const target = event.target as HTMLElement;
+      if (target.closest("button,input,textarea,select,a")) return;
+
+      event.stopPropagation();
+      startPointerRef.current = { x: event.clientX, y: event.clientY };
+      startLayoutRef.current = group.layout;
+      if (hoveredEdge) {
+        setResizeEdge(hoveredEdge);
+      } else {
+        setIsDragging(true);
+      }
+      onDragStart?.(group.id);
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [editable, group.id, group.layout, hoveredEdge, onDragStart],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDragging && !resizeEdge) {
+        updateHoveredEdge(event);
+        return;
+      }
+
+      event.stopPropagation();
+      const dx = (event.clientX - startPointerRef.current.x) / safeZoom;
+      const dy = (event.clientY - startPointerRef.current.y) / safeZoom;
+      const nextLayout = resizeEdge
+        ? resizePageGroupLayout(startLayoutRef.current, resizeEdge, dx, dy)
+        : {
+            ...startLayoutRef.current,
+            x: startLayoutRef.current.x + dx,
+            y: startLayoutRef.current.y + dy,
+          };
+      onLayoutChange(group.id, nextLayout);
+      onDragMove?.(group.id, nextLayout, resizeEdge ?? undefined);
+    },
+    [
+      group.id,
+      isDragging,
+      onDragMove,
+      onLayoutChange,
+      resizeEdge,
+      safeZoom,
+      updateHoveredEdge,
+    ],
+  );
+
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDragging && !resizeEdge) return;
+
+      event.stopPropagation();
+      const dx = event.clientX - startPointerRef.current.x;
+      const dy = event.clientY - startPointerRef.current.y;
+      const wasClick = Math.abs(dx) < 3 && Math.abs(dy) < 3 && !resizeEdge;
+      setIsDragging(false);
+      setResizeEdge(null);
+      setHoveredEdge(null);
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      onDragEnd?.();
+      if (wasClick) onSelect(group.id, activePageId, event);
+    },
+    [activePageId, group.id, isDragging, onDragEnd, onSelect, resizeEdge],
+  );
+
+  const cursor =
+    resizeEdge || hoveredEdge
+      ? "nwse-resize"
+      : editable
+        ? "move"
+        : undefined;
+
+  return (
+    <div
+      ref={groupRef}
+      data-page-group-id={group.id}
+      className="absolute select-none"
+      style={{
+        left: group.layout.x,
+        top: group.layout.y,
+        width: group.layout.width,
+        height: group.layout.height,
+        zIndex: group.layout.zIndex ?? 0,
+        cursor,
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onLostPointerCapture={() => {
+        setIsDragging(false);
+        setResizeEdge(null);
+        setHoveredEdge(null);
+        onDragEnd?.();
+      }}
+      onMouseEnter={updateHoveredEdge}
+      onMouseLeave={() => {
+        if (!isDragging && !resizeEdge) setHoveredEdge(null);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(group.id, activePageId, event);
+      }}
+    >
+      <div
+        className="absolute left-0 max-w-full truncate font-medium text-muted-foreground pointer-events-none"
+        title={group.title}
+        style={{
+          top: -labelTopOffset,
+          fontSize: labelFontSize,
+          lineHeight: 1.2,
+        }}
+      >
+        {group.title}
+      </div>
+
+      {group.directoryCollapsed ? (
+        <button
+          type="button"
+          className="absolute top-0 z-20 flex h-9 min-w-9 items-center justify-center rounded-md border bg-background px-2 text-xs font-medium text-foreground shadow-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{
+            right: `calc(100% + ${PAGE_GROUP_DIRECTORY_GAP}px)`,
+          }}
+          aria-label={`展开页面目录，${group.pages.length} 个页面`}
+          title="展开页面目录"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDirectoryCollapsedChange(group.id, false);
+            onSelect(group.id, activePageId);
+          }}
+        >
+          {group.pages.length}
+        </button>
+      ) : (
+        <div
+          className="absolute top-0 z-20 overflow-hidden rounded-md border bg-background shadow-lg"
+          style={{
+            right: `calc(100% + ${PAGE_GROUP_DIRECTORY_GAP}px)`,
+            width: PAGE_GROUP_DIRECTORY_WIDTH,
+            maxHeight: Math.max(group.layout.height, 120),
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-2 py-1.5">
+            <span className="truncate text-xs font-medium text-muted-foreground">
+              目录
+            </span>
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="折叠页面目录"
+              title="折叠页面目录"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDirectoryCollapsedChange(group.id, true);
+                onSelect(group.id, activePageId);
+              }}
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+          </div>
+          <div className="scrollbar-thin max-h-[inherit] overflow-auto py-1">
+            {group.pages.map((entry) => {
+              const active = entry.pageId === activePageId;
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={cn(
+                    "block w-full truncate px-3 py-2 text-left text-xs transition-colors hover:bg-background/80",
+                    active
+                      ? "bg-background font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                  title={entry.title}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onActivePageChange(group.id, entry.pageId);
+                    onSelect(group.id, entry.pageId, event);
+                  }}
+                >
+                  {entry.title}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="relative h-full w-full overflow-hidden rounded-lg bg-white shadow-md">
+        {activePage ? (
+          <CanvasPagePreviewContent
+            page={activePage}
+            layout={previewLayout}
+            sessionId={sessionId}
+            screenshotUrl={screenshotUrls?.[activePage.id]}
+            screenshotRenderBox={screenshotRenderBoxes?.[activePage.id]}
+            renderMode={pageRenderModes[activePage.id] ?? "loading"}
+            onConsoleEntry={onConsoleEntry}
+            onError={onError}
+            onPositionableSizes={onPositionableSizes}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-muted/35 text-sm text-muted-foreground">
+            页面不存在
+          </div>
+        )}
+      </div>
+
+      <CanvasSelectionBox
+        visible={selected || isDragging || Boolean(resizeEdge)}
+        handles={editable}
+      />
+    </div>
+  );
+}
+
 export function PreviewCanvas({
   editable = false,
   interactionMode,
@@ -351,6 +739,7 @@ export function PreviewCanvas({
   pages,
   canvasState: externalState,
   onCanvasStateChange,
+  onRequestDeletePages,
   onPageConfigEdit,
   onRuntimeConversionRequest,
   onCanvasClick,
@@ -376,6 +765,8 @@ export function PreviewCanvas({
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: computeInitialCanvasLayout(pages),
+    pageGroups: {},
+    hiddenPageIds: [],
     nodes: {},
     layers: {
       annotations: { nodes: {} },
@@ -395,6 +786,7 @@ export function PreviewCanvas({
   const [draggingFileOver, setDraggingFileOver] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedDocumentNodeIds, setSelectedDocumentNodeIds] = useState<string[]>([]);
+  const [selectedPageGroupIds, setSelectedPageGroupIds] = useState<string[]>([]);
   const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(null);
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
   const pendingImageFilesRef = useRef<File[]>([]);
@@ -430,6 +822,63 @@ export function PreviewCanvas({
   }, [canvasState.pages, pages]);
 
   const pageIds = useMemo(() => new Set(pages.map((page) => page.id)), [pages]);
+  const pagesById = useMemo(
+    () => new Map(pages.map((page) => [page.id, page])),
+    [pages],
+  );
+  const hiddenPageIdSet = useMemo(
+    () => new Set(canvasState.hiddenPageIds ?? []),
+    [canvasState.hiddenPageIds],
+  );
+  const effectivePageGroups = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(canvasState.pageGroups ?? {})
+        .map(([groupId, group]) => {
+          const entries = group.pages.filter((entry) => pageIds.has(entry.pageId));
+          if (entries.length === 0) return null;
+          const activePageId = entries.some((entry) => entry.pageId === group.activePageId)
+            ? group.activePageId
+            : entries[0].pageId;
+          return [
+            groupId,
+            {
+              ...group,
+              pages: entries,
+              activePageId,
+            },
+          ] as const;
+        })
+        .filter(
+          (entry): entry is readonly [string, CanvasPageGroup] => entry !== null,
+        ),
+    );
+  }, [canvasState.pageGroups, pageIds]);
+  const pageGroupIds = useMemo(
+    () => new Set(Object.keys(effectivePageGroups)),
+    [effectivePageGroups],
+  );
+
+  const standalonePageLayouts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(effectivePages).filter(([pageId]) => !hiddenPageIdSet.has(pageId)),
+      ),
+    [effectivePages, hiddenPageIdSet],
+  );
+  const activePageGroupLayouts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.values(effectivePageGroups).map((group) => [
+          group.activePageId,
+          group.layout,
+        ]),
+      ),
+    [effectivePageGroups],
+  );
+  const renderablePageLayouts = useMemo(
+    () => ({ ...standalonePageLayouts, ...activePageGroupLayouts }),
+    [activePageGroupLayouts, standalonePageLayouts],
+  );
 
   const effectiveNodes = getAnnotationsFromCanvasState(canvasState);
   const documentNodes = useMemo(
@@ -529,8 +978,11 @@ export function PreviewCanvas({
     const nodeLayouts = Object.fromEntries(
       Object.entries(effectiveNodes).map(([id, node]) => [id, node.layout]),
     );
-    return { ...effectivePages, ...nodeLayouts };
-  }, [effectiveNodes, effectivePages]);
+    const pageGroupLayouts = Object.fromEntries(
+      Object.entries(effectivePageGroups).map(([id, group]) => [id, group.layout]),
+    );
+    return { ...standalonePageLayouts, ...pageGroupLayouts, ...nodeLayouts };
+  }, [effectiveNodes, effectivePageGroups, standalonePageLayouts]);
 
   const allItemLayoutSignature = useMemo(
     () => getCanvasLayoutSignature(allItemLayouts),
@@ -558,6 +1010,7 @@ export function PreviewCanvas({
   const handleCanvasClick = useCallback(() => {
     setSelectedNodeId(null);
     setSelectedDocumentNodeIds([]);
+    setSelectedPageGroupIds([]);
     setEditingTextNodeId(null);
     setSelectedPageIds([]);
     onCanvasClick?.();
@@ -565,9 +1018,15 @@ export function PreviewCanvas({
 
   useEffect(() => {
     setSelectedPageIds((current) =>
-      current.filter((pageId) => pageIds.has(pageId)),
+      current.filter((pageId) => pageIds.has(pageId) && !hiddenPageIdSet.has(pageId)),
     );
-  }, [pageIds]);
+  }, [hiddenPageIdSet, pageIds]);
+
+  useEffect(() => {
+    setSelectedPageGroupIds((current) =>
+      current.filter((groupId) => effectivePageGroups[groupId]),
+    );
+  }, [effectivePageGroups]);
 
   useEffect(() => {
     setSelectedDocumentNodeIds((current) =>
@@ -592,17 +1051,23 @@ export function PreviewCanvas({
         setSelectedPageIds([]);
         setSelectedNodeId(null);
         setSelectedDocumentNodeIds([]);
+        setSelectedPageGroupIds([]);
         setEditingTextNodeId(null);
         return;
       }
 
       const nextSelectedPageIds = pages
         .filter((page) => {
-          const layout = effectivePages[page.id];
+          const layout = standalonePageLayouts[page.id];
           if (!layout) return false;
           return rectsIntersect(rect, layout);
         })
         .map((page) => page.id);
+      const nextSelectedPageGroupIds = Object.values(effectivePageGroups)
+        .filter((group) => rectsIntersect(rect, group.layout))
+        .map((group) => group.id);
+      const hasSelectedPageLikeItems =
+        nextSelectedPageIds.length > 0 || nextSelectedPageGroupIds.length > 0;
 
       const nextSelectedDocumentNodes = Object.values(effectiveNodes).filter(
         (node): node is CanvasDocumentNode =>
@@ -616,13 +1081,14 @@ export function PreviewCanvas({
       );
 
       const nextSelectedDocumentNodeIds =
-        nextSelectedPageIds.length === 0
+        !hasSelectedPageLikeItems
           ? nextSelectedDocumentNodes.map((node) => node.id)
           : [];
 
       setSelectedDocumentNodeIds(nextSelectedDocumentNodeIds);
+      setSelectedPageGroupIds(nextSelectedPageGroupIds);
       setSelectedNodeId(
-        nextSelectedPageIds.length === 0
+        !hasSelectedPageLikeItems
           ? nextSelectedDocumentNodeIds.length === 1
             ? nextSelectedDocumentNodeIds[0]
             : nextSelectedDocumentNodeIds.length === 0 && nextSelectedTextNode
@@ -633,15 +1099,33 @@ export function PreviewCanvas({
       setEditingTextNodeId(null);
       setSelectedPageIds(nextSelectedPageIds);
     },
-    [effectiveNodes, effectivePages, effectiveToolMode, isEditorMode, pages],
+    [
+      effectiveNodes,
+      effectivePageGroups,
+      effectiveToolMode,
+      isEditorMode,
+      pages,
+      standalonePageLayouts,
+    ],
   );
 
   const handlePageSelect = useCallback(
-    (pageId: string) => {
+    (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
       if (isEditorMode && effectiveToolMode === "select") {
+        const isAdditive =
+          Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
         setSelectedNodeId(null);
         setSelectedDocumentNodeIds([]);
         setEditingTextNodeId(null);
+        if (isAdditive) {
+          setSelectedPageIds((current) =>
+            current.includes(pageId)
+              ? current.filter((selectedId) => selectedId !== pageId)
+              : [...current, pageId],
+          );
+          return;
+        }
+        setSelectedPageGroupIds([]);
         setSelectedPageIds([pageId]);
         onPageConfigEdit?.(pageId);
         return;
@@ -660,6 +1144,7 @@ export function PreviewCanvas({
         Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
 
       setSelectedPageIds([]);
+      setSelectedPageGroupIds([]);
       setEditingTextNodeId(null);
 
       if (node?.kind === "document" && isAdditive) {
@@ -775,6 +1260,93 @@ export function PreviewCanvas({
           ...(prev.nodes ?? {}),
           [nodeId]: { ...node, layout, updatedAt: Date.now() },
         });
+      });
+    },
+    [updateState],
+  );
+
+  const handlePageGroupLayoutChange = useCallback(
+    (groupId: string, layout: CanvasPageLayout) => {
+      updateState((prev) => {
+        const group = prev.pageGroups?.[groupId];
+        if (!group) return prev;
+        return {
+          ...prev,
+          pageGroups: {
+            ...(prev.pageGroups ?? {}),
+            [groupId]: { ...group, layout, updatedAt: Date.now() },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handlePageGroupSelect = useCallback(
+    (
+      groupId: string,
+      activePageId: string,
+      event?: React.PointerEvent | React.MouseEvent,
+    ) => {
+      const isAdditive =
+        Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
+      setSelectedDocumentNodeIds([]);
+      setSelectedNodeId(null);
+      setEditingTextNodeId(null);
+      if (isAdditive) {
+        setSelectedPageGroupIds((current) =>
+          current.includes(groupId)
+            ? current.filter((selectedId) => selectedId !== groupId)
+            : [...current, groupId],
+        );
+        return;
+      }
+      setSelectedPageIds([]);
+      setSelectedPageGroupIds([groupId]);
+      onPageConfigEdit?.(activePageId);
+    },
+    [onPageConfigEdit],
+  );
+
+  const handlePageGroupActivePageChange = useCallback(
+    (groupId: string, pageId: string) => {
+      updateState((prev) => {
+        const group = prev.pageGroups?.[groupId];
+        if (!group || !group.pages.some((entry) => entry.pageId === pageId)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          pageGroups: {
+            ...(prev.pageGroups ?? {}),
+            [groupId]: {
+              ...group,
+              activePageId: pageId,
+              updatedAt: Date.now(),
+            },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handlePageGroupDirectoryCollapsedChange = useCallback(
+    (groupId: string, collapsed: boolean) => {
+      updateState((prev) => {
+        const group = prev.pageGroups?.[groupId];
+        if (!group) return prev;
+        return {
+          ...prev,
+          pageGroups: {
+            ...(prev.pageGroups ?? {}),
+            [groupId]: {
+              ...group,
+              directoryCollapsed: collapsed,
+              updatedAt: Date.now(),
+            },
+          },
+        };
       });
     },
     [updateState],
@@ -993,7 +1565,9 @@ export function PreviewCanvas({
   useEffect(() => {
     if (
       !isEditorMode ||
-      (!selectedNodeId && selectedDocumentNodeIds.length === 0) ||
+      (!selectedNodeId &&
+        selectedDocumentNodeIds.length === 0 &&
+        selectedPageIds.length === 0) ||
       documentDraft
     ) {
       return;
@@ -1002,15 +1576,20 @@ export function PreviewCanvas({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
 
-      const target = event.target as HTMLElement | null;
+      const target =
+        event.target instanceof HTMLElement ? event.target : null;
       if (
-        target?.closest("input,textarea") ||
+        target?.closest("input,textarea,select,[contenteditable='true']") ||
         target?.isContentEditable
       ) {
         return;
       }
 
       event.preventDefault();
+      if (selectedPageIds.length > 0) {
+        void onRequestDeletePages?.(selectedPageIds);
+        return;
+      }
       if (selectedDocumentNodeIds.length > 1) {
         selectedDocumentNodeIds.forEach((nodeId) => deleteNode(nodeId));
         return;
@@ -1026,8 +1605,10 @@ export function PreviewCanvas({
     deleteNode,
     documentDraft,
     isEditorMode,
+    onRequestDeletePages,
     selectedDocumentNodeIds,
     selectedNodeId,
+    selectedPageIds,
   ]);
 
   // 开始拖拽/缩放时，清空辅助线
@@ -1064,6 +1645,7 @@ export function PreviewCanvas({
       const activeDragItemIdValue = activeDragItemIdRef.current ?? activeDragItemId;
       if (!activeDragItemIdValue || activeDragItemIdValue !== itemId) return;
       const isPageItem = pageIds.has(itemId);
+      const isPageGroupItem = pageGroupIds.has(itemId);
 
       if (isPageItem && !edge && multiDragStartLayoutsRef.current?.[itemId]) {
         const startLayout = multiDragStartLayoutsRef.current[itemId];
@@ -1109,6 +1691,17 @@ export function PreviewCanvas({
         pages: isPageItem
           ? { ...prev.pages, [itemId]: alignedLayout }
           : prev.pages,
+        pageGroups:
+          isPageGroupItem && prev.pageGroups?.[itemId]
+            ? {
+                ...prev.pageGroups,
+                [itemId]: {
+                  ...prev.pageGroups[itemId],
+                  layout: alignedLayout,
+                  updatedAt: Date.now(),
+                },
+              }
+            : prev.pageGroups,
         nodes: prev.nodes?.[itemId]
           ? {
               ...prev.nodes,
@@ -1121,7 +1714,7 @@ export function PreviewCanvas({
           : prev.nodes,
       }));
     },
-    [activeDragItemId, allItemLayouts, pageIds, updateState],
+    [activeDragItemId, allItemLayouts, pageGroupIds, pageIds, updateState],
   );
 
   // 结束拖拽/缩放时，清空辅助线
@@ -1152,12 +1745,12 @@ export function PreviewCanvas({
   const visiblePageIds = useMemo(
     () =>
       getVisiblePageIds(
-        effectivePages,
+        renderablePageLayouts,
         canvasState.viewport,
         containerSize.width,
         containerSize.height,
       ),
-    [effectivePages, canvasState.viewport, containerSize],
+    [renderablePageLayouts, canvasState.viewport, containerSize],
   );
   const visiblePageIdList = useMemo(
     () => Array.from(visiblePageIds).sort(),
@@ -1183,7 +1776,7 @@ export function PreviewCanvas({
     () =>
       computePreviewRuntimePoolPlan({
         pages,
-        layouts: effectivePages,
+        layouts: renderablePageLayouts,
         visiblePageIds,
         viewport: canvasState.viewport,
         containerWidth: containerSize.width,
@@ -1199,7 +1792,7 @@ export function PreviewCanvas({
       containerSize.height,
       containerSize.width,
       editingPageId,
-      effectivePages,
+      renderablePageLayouts,
       pages,
       screenshotUrls,
       visiblePageIds,
@@ -1256,7 +1849,7 @@ export function PreviewCanvas({
 
   useEffect(() => {
     if (!focusPageId) return;
-    const pageLayout = effectivePages[focusPageId];
+    const pageLayout = renderablePageLayouts[focusPageId];
     if (!pageLayout) return;
     const cw = containerSize.width;
     const ch = containerSize.height;
@@ -1373,6 +1966,69 @@ export function PreviewCanvas({
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }, []);
 
+  const handleMergeSelectedPages = useCallback(() => {
+    if (selectedPageIds.length < 2) return;
+    const sortedPageIds = sortPageIdsByLayout(selectedPageIds, effectivePages)
+      .filter((pageId) => pagesById.has(pageId));
+    const uniquePageIds = Array.from(new Set(sortedPageIds));
+    if (uniquePageIds.length < 2) return;
+
+    const firstPage = pagesById.get(uniquePageIds[0]);
+    const firstLayout = effectivePages[uniquePageIds[0]];
+    if (!firstPage || !firstLayout) return;
+    const now = Date.now();
+    const id = createNodeId("page-group");
+    const maxZ = Math.max(
+      0,
+      ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
+    );
+    const title = `${firstPage.name} 等 ${uniquePageIds.length} 个页面`;
+    const entries = uniquePageIds.map((pageId) => {
+      const page = pagesById.get(pageId);
+      return {
+        id: pageId,
+        pageId,
+        title: page?.name ?? pageId,
+      };
+    });
+
+    updateState((prev) => ({
+      ...prev,
+      pageGroups: {
+        ...(prev.pageGroups ?? {}),
+        [id]: {
+          id,
+          kind: "page-group",
+          title,
+          pages: entries,
+          activePageId: uniquePageIds[0],
+          layout: {
+            ...firstLayout,
+            zIndex: maxZ + 1,
+          },
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      hiddenPageIds: Array.from(
+        new Set([...(prev.hiddenPageIds ?? []), ...uniquePageIds]),
+      ),
+    }));
+
+    setSelectedPageIds([]);
+    setSelectedDocumentNodeIds([]);
+    setSelectedNodeId(null);
+    setEditingTextNodeId(null);
+    setSelectedPageGroupId(id);
+  }, [
+    allItemLayouts,
+    createNodeId,
+    effectivePages,
+    pagesById,
+    selectedPageIds,
+    updateState,
+  ]);
+
   const getDocumentTitleFromMarkdown = useCallback(
     (markdown: string, fallback = "文档") => {
       const firstLine = markdown
@@ -1450,6 +2106,7 @@ export function PreviewCanvas({
 
     setSelectedDocumentNodeIds([]);
     setSelectedPageIds([]);
+    setSelectedPageGroupId(null);
     setEditingTextNodeId(null);
     setSelectedNodeId(id);
   }, [
@@ -1644,6 +2301,7 @@ export function PreviewCanvas({
       });
       setSelectedPageIds([]);
       setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupId(null);
       setSelectedNodeId(id);
       setEditingTextNodeId(null);
       return id;
@@ -1739,6 +2397,7 @@ export function PreviewCanvas({
       if (pendingImageFilesRef.current.length > 0) {
         setSelectedPageIds([]);
         setSelectedDocumentNodeIds([]);
+        setSelectedPageGroupId(null);
         setSelectedNodeId(null);
         setEditingTextNodeId(null);
         setToolMode("image");
@@ -1821,15 +2480,16 @@ export function PreviewCanvas({
     [],
   );
 
-  const handleAddTextNode = useCallback((canvasPoint?: CanvasPoint) => {
-    if (!canvasPoint) {
-      pendingImageFilesRef.current = [];
-      setSelectedPageIds([]);
-      setSelectedDocumentNodeIds([]);
-      setSelectedNodeId(null);
-      setEditingTextNodeId(null);
-      setToolMode("text");
-      return;
+    const handleAddTextNode = useCallback((canvasPoint?: CanvasPoint) => {
+      if (!canvasPoint) {
+        pendingImageFilesRef.current = [];
+        setSelectedPageIds([]);
+        setSelectedDocumentNodeIds([]);
+        setSelectedPageGroupId(null);
+        setSelectedNodeId(null);
+        setEditingTextNodeId(null);
+        setToolMode("text");
+        return;
     }
     const now = Date.now();
     const id = createNodeId("text");
@@ -1852,6 +2512,7 @@ export function PreviewCanvas({
     });
     setSelectedPageIds([]);
     setSelectedDocumentNodeIds([]);
+    setSelectedPageGroupId(null);
     setSelectedNodeId(id);
     setEditingTextNodeId(id);
     setToolMode("select");
@@ -1915,7 +2576,7 @@ export function PreviewCanvas({
   );
 
   const selectionToolbarStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (!selectedPageBounds || selectedPageIds.length < 2) return undefined;
+    if (!selectedPageBounds || selectedPageIds.length < 1) return undefined;
     const zoom = canvasState.viewport.zoom || 1;
     return {
       left:
@@ -2092,53 +2753,90 @@ export function PreviewCanvas({
       {isEditorMode && selectionToolbarStyle && (
         <div
           role="toolbar"
-          aria-label="多选对齐工具栏"
+          aria-label={
+            selectedPageIds.length > 1 ? "多选对齐工具栏" : "单选页面工具栏"
+          }
           className="absolute z-30 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
           style={selectionToolbarStyle}
         >
-          {renderAlignmentButton(
-            "left",
-            "左对齐",
-            <AlignStartVertical className="h-4 w-4" />,
+          {selectedPageIds.length === 1 && (
+            <span className="px-2 text-xs font-medium text-muted-foreground">
+              已选中 1 个页面
+            </span>
           )}
-          {renderAlignmentButton(
-            "center-x",
-            "水平居中对齐",
-            <AlignCenterVertical className="h-4 w-4" />,
+          {selectedPageIds.length >= 2 && (
+            <>
+              {renderAlignmentButton(
+                "left",
+                "左对齐",
+                <AlignStartVertical className="h-4 w-4" />,
+              )}
+              {renderAlignmentButton(
+                "center-x",
+                "水平居中对齐",
+                <AlignCenterVertical className="h-4 w-4" />,
+              )}
+              {renderAlignmentButton(
+                "right",
+                "右对齐",
+                <AlignEndVertical className="h-4 w-4" />,
+              )}
+              <div className="mx-1 h-5 w-px bg-border" />
+              {renderAlignmentButton(
+                "top",
+                "顶部对齐",
+                <AlignStartHorizontal className="h-4 w-4" />,
+              )}
+              {renderAlignmentButton(
+                "center-y",
+                "垂直居中对齐",
+                <AlignCenterHorizontal className="h-4 w-4" />,
+              )}
+              {renderAlignmentButton(
+                "bottom",
+                "底部对齐",
+                <AlignEndHorizontal className="h-4 w-4" />,
+              )}
+              <div className="mx-1 h-5 w-px bg-border" />
+              {renderAlignmentButton(
+                "distribute-x",
+                "水平均分",
+                <BetweenVerticalStart className="h-4 w-4" />,
+                selectedPageIds.length < 3,
+              )}
+              {renderAlignmentButton(
+                "distribute-y",
+                "垂直均分",
+                <BetweenHorizontalStart className="h-4 w-4" />,
+                selectedPageIds.length < 3,
+              )}
+            </>
           )}
-          {renderAlignmentButton(
-            "right",
-            "右对齐",
-            <AlignEndVertical className="h-4 w-4" />,
+          {selectedPageIds.length >= 2 && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={handleMergeSelectedPages}
+              >
+                <Combine className="h-4 w-4" />
+                合并页面
+              </button>
+            </>
           )}
-          <div className="mx-1 h-5 w-px bg-border" />
-          {renderAlignmentButton(
-            "top",
-            "顶部对齐",
-            <AlignStartHorizontal className="h-4 w-4" />,
-          )}
-          {renderAlignmentButton(
-            "center-y",
-            "垂直居中对齐",
-            <AlignCenterHorizontal className="h-4 w-4" />,
-          )}
-          {renderAlignmentButton(
-            "bottom",
-            "底部对齐",
-            <AlignEndHorizontal className="h-4 w-4" />,
-          )}
-          <div className="mx-1 h-5 w-px bg-border" />
-          {renderAlignmentButton(
-            "distribute-x",
-            "水平均分",
-            <BetweenVerticalStart className="h-4 w-4" />,
-            selectedPageIds.length < 3,
-          )}
-          {renderAlignmentButton(
-            "distribute-y",
-            "垂直均分",
-            <BetweenHorizontalStart className="h-4 w-4" />,
-            selectedPageIds.length < 3,
+          {onRequestDeletePages && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="删除页面"
+                onClick={() => void onRequestDeletePages(selectedPageIds)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
           )}
         </div>
       )}
@@ -2189,14 +2887,14 @@ export function PreviewCanvas({
         }
         onCanvasPointClick={handleCanvasPointCreate}
       >
-        {pages.map((page) => {
+        {pages.filter((page) => !hiddenPageIdSet.has(page.id)).map((page) => {
           const renderMode = pageRenderModes[page.id] ?? "loading";
           return (
             <CanvasPageItem
               key={page.id}
               page={page}
               layout={
-                effectivePages[page.id] ||
+                standalonePageLayouts[page.id] ||
                 (() => {
                   const size = resolveCanvasPageSize(page.previewSize);
                   return { x: 0, y: 0, width: size.width, height: size.height };
@@ -2222,6 +2920,11 @@ export function PreviewCanvas({
               renderMode={renderMode}
               onLayoutChange={handleLayoutChange}
               onConfigEdit={handlePageSelect}
+              onRequestDelete={
+                onRequestDeletePages
+                  ? (pageId) => void onRequestDeletePages([pageId])
+                  : undefined
+              }
               onRuntimeConversionRequest={onRuntimeConversionRequest}
               onConsoleEntry={onConsoleEntry}
               onError={onError}
@@ -2234,6 +2937,32 @@ export function PreviewCanvas({
             />
           );
         })}
+        {Object.values(effectivePageGroups).map((group) => (
+          <CanvasPageGroupItem
+            key={group.id}
+            group={group}
+            pagesById={pagesById}
+            editable={isEditorMode}
+            selected={selectedPageGroupId === group.id}
+            zoom={canvasState.viewport.zoom}
+            sessionId={sessionId}
+            pageRenderModes={pageRenderModes}
+            screenshotUrls={shouldUseScreenshotLayer ? screenshotUrls : undefined}
+            screenshotRenderBoxes={
+              shouldUseScreenshotLayer ? screenshotRenderBoxes : undefined
+            }
+            onSelect={handlePageGroupSelect}
+            onLayoutChange={handlePageGroupLayoutChange}
+            onActivePageChange={handlePageGroupActivePageChange}
+            onDirectoryCollapsedChange={handlePageGroupDirectoryCollapsedChange}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onConsoleEntry={onConsoleEntry}
+            onError={onError}
+            onPositionableSizes={onPositionableSizes}
+          />
+        ))}
         {Object.values(effectiveNodes).map((node) => {
           const renderedNode = (() => {
             if (node.kind !== "document") return node;
@@ -2293,6 +3022,7 @@ export function PreviewCanvas({
             onTextEditStart={(nodeId) => {
               setSelectedPageIds([]);
               setSelectedDocumentNodeIds([]);
+              setSelectedPageGroupId(null);
               setSelectedNodeId(nodeId);
               setEditingTextNodeId(nodeId);
             }}

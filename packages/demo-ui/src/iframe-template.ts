@@ -59,7 +59,7 @@ const consoleInterceptScript = `
 
 const visualEditScript = `
 (function() {
-  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, annotations: [], propertyChanges: [] };
+  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, hiddenNodeIds: [], annotations: [], propertyChanges: [] };
   var hoverBox = null;
   var selectedBox = null;
   var label = null;
@@ -78,6 +78,7 @@ const visualEditScript = `
   var textDraftValue = null;
   var suppressStyleRestoreOnHide = false;
   var editingAnnotationId = null;
+  var hiddenNodeOriginalDisplays = {};
   var lastHoverId = null;
   var appliedPropertyOriginals = {};
 
@@ -349,6 +350,38 @@ const visualEditScript = `
       }
     });
     appliedPropertyOriginals = {};
+  }
+
+  function restoreHiddenNodes() {
+    Object.keys(hiddenNodeOriginalDisplays).forEach(function(key) {
+      var original = hiddenNodeOriginalDisplays[key];
+      if (!original || !original.element) return;
+      original.element.style.display = original.display || '';
+      original.element.removeAttribute('data-visual-hidden');
+    });
+    hiddenNodeOriginalDisplays = {};
+  }
+
+  function applyHiddenNodes() {
+    restoreHiddenNodes();
+    (state.hiddenNodeIds || []).forEach(function(nodeId) {
+      if (!nodeId) return;
+      var el = getElementByPath(nodeId);
+      if (!el) {
+        try {
+          el = document.querySelector('[data-visual-node-id="' + String(nodeId).replace(/"/g, '\\\\"') + '"]');
+        } catch (_err) {
+          el = null;
+        }
+      }
+      if (!el) return;
+      hiddenNodeOriginalDisplays[nodeId] = {
+        element: el,
+        display: el.style.display || ''
+      };
+      el.setAttribute('data-visual-hidden', 'true');
+      el.style.setProperty('display', 'none', 'important');
+    });
   }
 
   function applyPropertyChanges() {
@@ -966,6 +999,7 @@ const visualEditScript = `
       annotationMode: !!next.annotationMode,
       hoverNodeId: next.hoverNodeId || null,
       selectedNodeId: next.selectedNodeId || null,
+      hiddenNodeIds: Array.isArray(next.hiddenNodeIds) ? next.hiddenNodeIds : [],
       propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
@@ -976,6 +1010,7 @@ const visualEditScript = `
       if (selectedBox) selectedBox.style.display = 'none';
     }
     applyPropertyChanges();
+    applyHiddenNodes();
     redrawSelection();
     redrawHoverFromState();
     renderAnnotations();

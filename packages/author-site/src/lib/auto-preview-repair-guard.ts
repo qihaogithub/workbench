@@ -1,5 +1,5 @@
 export const AUTO_PREVIEW_REPAIR_HISTORY_KEY =
-  "opencode-workbench:auto-preview-repair-history:v1";
+  "workbench:auto-preview-repair-history:v1";
 
 const AUTO_PREVIEW_REPAIR_HISTORY_VERSION = 1;
 const AUTO_PREVIEW_REPAIR_HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;

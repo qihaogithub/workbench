@@ -427,7 +427,7 @@ if [[ "$REPLY_FOUND" == "true" ]] && [[ -n "$AI_REPLY" ]]; then
         log "" "WARN"
         log "WARN" "排查建议:"
         log "WARN" "  - 检查 agent-service 是否启动: curl http://localhost:3201/health"
-        log "WARN" "  - 检查 ACP CLI 是否可用: opencode acp"
+        log "WARN" "  - 检查 ACP CLI 是否可用: workbench acp"
         log "WARN" "  - 查看 agent-service 控制台日志"
         log "WARN" "  - 使用浏览器开发者工具查看 WebSocket 消息"
         exit 1

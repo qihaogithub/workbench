@@ -8,12 +8,12 @@
 
 ## 文档概览
 
-本系列文档用于指导 `@opencode-workbench/agent-service`、`@opencode-workbench/agent-client` 与 `@opencode-workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件，并通过 session 级配置接收当前用户的外部工具授权。
+本系列文档用于指导 `@workbench/agent-service`、`@workbench/agent-client` 与 `@workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件，并通过 session 级配置接收当前用户的外部工具授权。
 
 核心原则：
 
-- 只注册 `pi-agent` 后端，不恢复 OpenCode、Claude、Codex、Gemini 等历史多后端适配器。
-- 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖外部 OpenCode Server 或 CLI 子进程。
+- 只注册 `pi-agent` 后端，不恢复 workbench、Claude、Codex、Gemini 等历史多后端适配器。
+- 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖外部 workbench Server 或 CLI 子进程。
 - 前端消费层只处理 UI 和状态呈现，Agent 服务层负责会话生命周期、文件变更、工具权限和事件流。
 - 截图能力由独立 `screenshot-service` 提供，供创作端预览快照和 Pi Agent 截图工具复用。
 
@@ -26,7 +26,7 @@
 | [01-架构设计.md](./01-架构设计.md) | Fastify 服务、Pi Agent 单后端、工具权限、工作空间与截图服务协作 | 1 | 已更新 |
 | [02-接口规范.md](./02-接口规范.md) | REST API、WebSocket 消息、使用端只读 AI、内部配置同步、校验与模型接口 | 2 | 已更新 |
 | [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools、预装 Skills 等模块职责 | 3 | 已更新 |
-| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | 历史 OpenCode SSE drain 问题记录，当前仅作迁移背景参考 | 4 | 历史参考 |
+| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | 历史 workbench SSE drain 问题记录，当前仅作迁移背景参考 | 4 | 历史参考 |
 | [05-快照服务.md](./05-快照服务.md) | Git/snapshot 双模式、变更比较、丢弃回滚、Session 生命周期 | 5 | 已完成 |
 | [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界 | 6 | 已完成 |
 
@@ -70,11 +70,11 @@
 
 | 包 | 路径 | 职责 |
 | :--- | :--- | :--- |
-| `@opencode-workbench/agent-service` | `packages/agent-service/` | Fastify Agent 服务、项目管理 API、Pi Agent 后端、WebSocket 事件流 |
-| `@opencode-workbench/agent-client` | `packages/agent-client/` | 浏览器端 AgentClient/AgentStream SDK |
-| `@opencode-workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer 截图服务，支持同步单页和异步批量截图 |
-| `@opencode-workbench/shared` | `packages/shared/` | 共享契约类型、校验器和预览 iframe 模板 |
-| `@opencode-workbench/demo-ui` | `packages/demo-ui/` | 创作端与使用端复用的 React 预览、配置和画布组件 |
+| `@workbench/agent-service` | `packages/agent-service/` | Fastify Agent 服务、项目管理 API、Pi Agent 后端、WebSocket 事件流 |
+| `@workbench/agent-client` | `packages/agent-client/` | 浏览器端 AgentClient/AgentStream SDK |
+| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer 截图服务，支持同步单页和异步批量截图 |
+| `@workbench/shared` | `packages/shared/` | 共享契约类型、校验器和预览 iframe 模板 |
+| `@workbench/demo-ui` | `packages/demo-ui/` | 创作端与使用端复用的 React 预览、配置和画布组件 |
 
 关键源码入口：
 
@@ -111,7 +111,7 @@
 | 日期 | 版本 | 更新内容 |
 | :--- | :--- | :--- |
 | 2026-04-05 | v1.0 | 初始版本，完成独立服务层文档 |
-| 2026-04-05 | v1.1 | 添加早期 AionUi/OpenCode 参考 |
+| 2026-04-05 | v1.1 | 添加早期 AionUi/workbench 参考 |
 | 2026-05-29 | v2.0 | 根据当时实现更新服务层文档 |
 | 2026-06-04 | v2.1 | 新增快照服务文档 |
 | 2026-06-21 | v2.2 | 新增 Pi Agent 子 Agent 实现文档 |

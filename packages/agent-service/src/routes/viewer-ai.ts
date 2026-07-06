@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { normalizeAiError } from "@workbench/shared";
 import { BackendAgent } from "../core/backend-agent";
 import { getAgentManager } from "../core/agent-manager";
-import type { AgentConfig } from "../core/types";
+import type { AgentConfig, ImageAttachment } from "../core/types";
 import { getSessionModelConfigs } from "../config/session-model-configs";
 import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
 import { projectWorkspaceManager } from "../workspace/project-workspace-manager";
@@ -17,9 +18,11 @@ interface ViewerAiChatBody {
   projectId?: string;
   sessionId?: string;
   message?: string;
+  model?: string;
   activePageId?: string;
   activeConfig?: Record<string, unknown>;
   history?: ViewerAiHistoryMessage[];
+  images?: ImageAttachment[];
 }
 
 function createSessionId(projectId: string): string {
@@ -104,20 +107,40 @@ export async function registerViewerAiRoutes(fastify: FastifyInstance): Promise<
         }
 
         if (agent instanceof BackendAgent) {
+          if (body.model?.trim()) {
+            await agent.setModel(body.model.trim());
+          }
           await agent.updateSystemPrompt(buildViewerAiSystemPrompt());
         }
 
         const result = await agent.sendMessage(
           `${context}\n\n## 当前使用者问题\n${message}`,
-          { stream: false },
+          {
+            stream: false,
+            images: Array.isArray(body.images) ? body.images : undefined,
+          },
         );
 
         if (!result.success) {
+          const normalized = normalizeAiError(result.error, {
+            fallbackCode: result.error?.code || "MESSAGE_SEND_ERROR",
+            fallbackMessage: "AI 问答失败，请稍后重试。",
+          });
+          logger.warn(
+            {
+              projectId,
+              sessionId,
+              code: normalized.code,
+              category: normalized.category,
+              technicalMessage: normalized.technicalMessage,
+            },
+            "使用端 AI 问答返回失败",
+          );
           return reply.code(500).send({
             success: false,
             error: {
-              code: result.error?.code || "MESSAGE_SEND_ERROR",
-              message: result.error?.message || "AI 问答失败",
+              code: normalized.code,
+              message: normalized.userMessage,
             },
           });
         }
@@ -138,12 +161,25 @@ export async function registerViewerAiRoutes(fastify: FastifyInstance): Promise<
           });
         }
 
-        logger.error({ error, projectId }, "使用端 AI 问答失败");
+        const normalized = normalizeAiError(error, {
+          fallbackCode: "VIEWER_AI_ERROR",
+          fallbackMessage: "使用端 AI 问答失败，请稍后重试。",
+        });
+        logger.error(
+          {
+            error,
+            projectId,
+            code: normalized.code,
+            category: normalized.category,
+            technicalMessage: normalized.technicalMessage,
+          },
+          "使用端 AI 问答失败",
+        );
         return reply.code(500).send({
           success: false,
           error: {
-            code: "VIEWER_AI_ERROR",
-            message: error instanceof Error ? error.message : "使用端 AI 问答失败",
+            code: normalized.code,
+            message: normalized.userMessage,
           },
         });
       }

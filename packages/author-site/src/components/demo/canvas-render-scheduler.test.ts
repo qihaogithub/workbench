@@ -3,7 +3,7 @@ import {
   computePreviewRuntimePoolPlan,
   type CanvasPageData,
   type CanvasPageLayout,
-} from "@opencode-workbench/demo-ui";
+} from "@workbench/demo-ui";
 
 function makePage(id: string): CanvasPageData {
   return { id, name: id, order: 0 };

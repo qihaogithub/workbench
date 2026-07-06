@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783244851154_nv9a04",
+  "at": 1783244851154,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_19_preview_gold",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_19_preview_gold:prototypeHtml",
+      "page:worldcup_19_preview_gold:prototypeCss",
+      "page:worldcup_19_preview_gold:prototypeMeta"
+    ]
+  }
+}

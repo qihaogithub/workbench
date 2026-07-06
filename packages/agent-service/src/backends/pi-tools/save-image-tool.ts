@@ -27,7 +27,7 @@ const SaveImageParams = Type.Object({
   }),
   directory: Type.Optional(
     Type.String({
-      description: '已废弃：图片统一保存到图床，忽略此参数',
+      description: '已废弃：图片统一保存到当前项目工作区 assets/images/ 下，忽略此参数',
     }),
   ),
 });
@@ -46,7 +46,6 @@ function findProjectRoot(cwd: string): string {
 }
 
 let _dataDir: string | null = null;
-let _imagesDir: string | null = null;
 let _projectsDir: string | null = null;
 
 function getDataDir(): string {
@@ -58,18 +57,23 @@ function getDataDir(): string {
   return _dataDir;
 }
 
-function getImagesDir(): string {
-  if (!_imagesDir) {
-    _imagesDir = path.join(getDataDir(), 'images');
-  }
-  return _imagesDir;
-}
-
 function getProjectsDir(): string {
   if (!_projectsDir) {
     _projectsDir = path.join(getDataDir(), 'projects');
   }
   return _projectsDir;
+}
+
+function getWorkspaceAssetsDir(workingDir: string): string {
+  return path.join(path.resolve(workingDir), 'assets', 'images');
+}
+
+function getWorkspaceAssetPath(storedFilename: string): string {
+  return `assets/images/${storedFilename}`;
+}
+
+function getDemoRelativeAssetPath(storedFilename: string): string {
+  return `../../assets/images/${storedFilename}`;
 }
 
 function downloadImageFromUrl(urlString: string): Promise<{
@@ -255,7 +259,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
     name: 'saveImage',
     label: 'Save Image',
     description:
-      'Save an image to the image server from Base64 data or a remote URL. The image is stored globally and can be accessed via an absolute URL like /api/images/{hash}-{filename}.png from anywhere in the app, including iframe previews. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+      'Save an image to the current project workspace from Base64 data or a remote URL. The image is stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
       const { source, data, filename } = args;
@@ -324,41 +328,62 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       const sha256 = computeSha256(buffer);
       const hashPrefix = sha256.slice(0, 12);
       const storedFilename = `${hashPrefix}-${filename}`;
-      const storedPath = path.join(getImagesDir(), storedFilename);
-      const publicUrl = `/api/images/${storedFilename}`;
+      const workspaceDir = config.workingDir ? path.resolve(config.workingDir) : '';
 
-      ensureDir(getImagesDir());
+      if (!workspaceDir) {
+        return {
+          content: [{ type: 'text', text: 'Error: saveImage requires a bound project workspace.' }],
+          details: { error: 'missing_working_dir' },
+          isError: true,
+        };
+      }
+
+      const assetsDir = getWorkspaceAssetsDir(workspaceDir);
+      const storedPath = path.join(assetsDir, storedFilename);
+      const workspacePath = getWorkspaceAssetPath(storedFilename);
+      const relativePathFromPage = getDemoRelativeAssetPath(storedFilename);
+
+      ensureDir(assetsDir);
 
       try {
         if (fs.existsSync(storedPath)) {
           logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
         } else {
           await fs.promises.writeFile(storedPath, buffer);
-          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix }, 'Image saved to image server');
+          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to project workspace');
         }
 
-        if (config.demoId) {
+        const manifestProjectId = config.projectId || config.demoId;
+        if (manifestProjectId) {
           const entry: ProjectImageEntry = {
             id: hashPrefix,
             filename,
-            url: publicUrl,
+            url: workspacePath,
             size: buffer.length,
             format: ext,
             createdAt: Date.now(),
             createdBy: 'ai',
           };
           try {
-            addToProjectManifest(config.demoId, entry);
+            addToProjectManifest(manifestProjectId, entry);
           } catch (manifestError) {
-            logger.warn({ demoId: config.demoId, error: manifestError }, 'saveImage: failed to update project image manifest');
+            logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
           }
         }
 
         return {
-          content: [{ type: 'text', text: `Image saved: ${publicUrl}` }],
+          content: [
+            {
+              type: 'text',
+              text: `Image saved locally: ${workspacePath}. From page files use ${relativePathFromPage}`,
+            },
+          ],
           details: {
-            url: publicUrl,
-            path: storedFilename,
+            url: workspacePath,
+            path: workspacePath,
+            filename: storedFilename,
+            relativePathFromPage,
+            absolutePath: storedPath,
             size: buffer.length,
             format: ext,
             source,

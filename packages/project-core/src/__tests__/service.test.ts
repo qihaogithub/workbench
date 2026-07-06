@@ -50,6 +50,26 @@ describe("ProjectAdminService", () => {
     expect(list.data?.find((item) => item.id === projectId)?.category).toBe("未分类");
   });
 
+  it("保存并返回项目级手绘编辑引擎偏好", () => {
+    const created = service.createProject({ name: "手绘偏好项目" });
+    const projectId = created.data?.id ?? "";
+
+    const updated = service.updateProject({
+      projectId,
+      authoringPreferences: { sketchEditorEngine: "native" },
+    });
+
+    expect(updated.ok).toBe(true);
+    expect(updated.data?.authoringPreferences?.sketchEditorEngine).toBe("native");
+    expect(service.getProject(projectId).data?.project.authoringPreferences).toEqual({
+      sketchEditorEngine: "native",
+    });
+    expect(service.listProjects().data?.find((item) => item.id === projectId))
+      .toMatchObject({
+        authoringPreferences: { sketchEditorEngine: "native" },
+      });
+  });
+
   it("在编辑事务中创建页面并提交版本", () => {
     const created = service.createProject({ name: "页面项目" });
     const edit = service.beginEdit(created.data?.id ?? "");

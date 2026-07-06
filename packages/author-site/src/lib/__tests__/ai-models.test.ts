@@ -6,17 +6,18 @@ import {
   buildFullModelId,
   buildModelConfigs,
   MODEL_CONFIGS,
+  applyModelConfigsWithFullData,
 } from "@/lib/ai-models";
 
 describe("matchesId", () => {
   it("字符串 matcher 走前缀匹配", () => {
-    expect(matchesId("opencode/", "opencode/nemotron-3-super")).toBe(true);
-    expect(matchesId("opencode/", "sensenova/nemotron-3-super")).toBe(false);
+    expect(matchesId("workbench/", "workbench/nemotron-3-super")).toBe(true);
+    expect(matchesId("workbench/", "sensenova/nemotron-3-super")).toBe(false);
   });
 
   it("正则 matcher 走 .test()", () => {
     expect(matchesId(/.*/, "any-model")).toBe(true);
-    expect(matchesId(/nemotron/i, "opencode/Nemotron-3-Super")).toBe(true);
+    expect(matchesId(/nemotron/i, "workbench/Nemotron-3-Super")).toBe(true);
   });
 });
 
@@ -24,7 +25,7 @@ describe("buildModelConfigs", () => {
   it("无环境变量时只包含内置分组和 catch-all", () => {
     const configs = buildModelConfigs();
     const matchers = configs.map((c) => c.matcher);
-    expect(matchers).toContain("opencode/");
+    expect(matchers).toContain("workbench/");
     expect(matchers).toContain("jojo/");
     // 最后一条是 catch-all
     expect(configs[configs.length - 1].enabled).toBe(false);
@@ -32,11 +33,11 @@ describe("buildModelConfigs", () => {
 });
 
 describe("resolveModelConfig", () => {
-  it("opencode 分组下的模型应启用", () => {
+  it("workbench 分组下的模型应启用", () => {
     for (const id of [
-      "opencode/nemotron-3-super",
-      "opencode/deepseek-v4-flash",
-      "opencode/any-model",
+      "workbench/nemotron-3-super",
+      "workbench/deepseek-v4-flash",
+      "workbench/any-model",
     ]) {
       const r = resolveModelConfig(id);
       expect(r.enabled).toBe(true);
@@ -85,20 +86,20 @@ describe("resolveModelConfig", () => {
 describe("applyModelConfigs", () => {
   it("仅保留白名单分组内的模型", () => {
     const result = applyModelConfigs([
-      { id: "opencode/nemotron-3-super", label: "opencode/Nemotron 3 Super" },
+      { id: "workbench/nemotron-3-super", label: "workbench/Nemotron 3 Super" },
       { id: "jojo/some-model", label: "jojo/Some Model" },
       { id: "sensenova/deepseek-v4-flash", label: "sensenova/DeepSeek V4 Flash" },
       { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
     ]);
     expect(result.map((m) => m.id)).toEqual([
-      "opencode/nemotron-3-super",
+      "workbench/nemotron-3-super",
       "jojo/some-model",
     ]);
   });
 
   it("去掉前缀后使用后端 label", () => {
     const result = applyModelConfigs([
-      { id: "opencode/deepseek-v4-flash", label: "opencode/DeepSeek V4 Flash" },
+      { id: "workbench/deepseek-v4-flash", label: "workbench/DeepSeek V4 Flash" },
     ]);
     expect(result[0].label).toBe("DeepSeek V4 Flash");
   });
@@ -109,7 +110,7 @@ describe("applyModelConfigs", () => {
     MODEL_CONFIGS.unshift({ matcher: /some-model/i });
     try {
       const result = applyModelConfigs([
-        { id: "opencode/some-model", label: "Some Model" },
+        { id: "workbench/some-model", label: "Some Model" },
       ]);
       expect(result[0].label).toBe("Some Model");
     } finally {
@@ -119,10 +120,10 @@ describe("applyModelConfigs", () => {
 
   it("从 id 前缀提取 group", () => {
     const result = applyModelConfigs([
-      { id: "opencode/deepseek-v4-flash", label: "opencode/DeepSeek V4 Flash" },
+      { id: "workbench/deepseek-v4-flash", label: "workbench/DeepSeek V4 Flash" },
       { id: "jojo/some-model", label: "jojo/Some Model" },
     ]);
-    expect(result[0].group).toBe("opencode");
+    expect(result[0].group).toBe("workbench");
     expect(result[1].group).toBe("jojo");
   });
 
@@ -135,18 +136,18 @@ describe("applyModelConfigs", () => {
     });
     try {
       const result = applyModelConfigs([
-        { id: "opencode/nemotron-3-super-high", label: "opencode/Nemotron 3 Super High" },
-        { id: "opencode/nemotron-3-super-low", label: "opencode/Nemotron 3 Super Low" },
-        { id: "opencode/nemotron-3-super-medium", label: "opencode/Nemotron 3 Super Medium" },
+        { id: "workbench/nemotron-3-super-high", label: "workbench/Nemotron 3 Super High" },
+        { id: "workbench/nemotron-3-super-low", label: "workbench/Nemotron 3 Super Low" },
+        { id: "workbench/nemotron-3-super-medium", label: "workbench/Nemotron 3 Super Medium" },
       ]);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("opencode/nemotron-3-super");
+      expect(result[0].id).toBe("workbench/nemotron-3-super");
       expect(result[0].supportsThinkingDepth).toBe(true);
       expect(result[0].availableDepths).toEqual(["low", "medium", "high"]);
       expect(result[0].depthVariantIds).toEqual({
-        low: "opencode/nemotron-3-super-low",
-        medium: "opencode/nemotron-3-super-medium",
-        high: "opencode/nemotron-3-super-high",
+        low: "workbench/nemotron-3-super-low",
+        medium: "workbench/nemotron-3-super-medium",
+        high: "workbench/nemotron-3-super-high",
       });
     } finally {
       MODEL_CONFIGS.splice(0, MODEL_CONFIGS.length, ...original);
@@ -155,7 +156,7 @@ describe("applyModelConfigs", () => {
 
   it("白名单模型默认 supportsImages 为 false", () => {
     const result = applyModelConfigs([
-      { id: "opencode/model-a", label: "opencode/Model A" },
+      { id: "workbench/model-a", label: "workbench/Model A" },
       { id: "jojo/model-b", label: "jojo/Model B" },
     ]);
     for (const m of result) {
@@ -168,15 +169,70 @@ describe("applyModelConfigs", () => {
   });
 });
 
+describe("applyModelConfigsWithFullData", () => {
+  const rawModels = [
+    { id: "deepseek/deepseek-v4-flash", label: "deepseek/DeepSeek V4 Flash" },
+    { id: "deepseek/deepseek-v4-pro", label: "deepseek/DeepSeek V4 Pro" },
+    { id: "jojo/deepseek-v4-flash", label: "jojo/DeepSeek V4 Flash" },
+    { id: "jojo/kimi-k2.6", label: "jojo/Kimi K2.6" },
+  ];
+
+  const data = {
+    configs: [
+      { matcher: "deepseek/" },
+      { matcher: "jojo/" },
+      { matcher: /.*/, enabled: false },
+    ],
+    blacklist: new Set<string>(),
+    nameFilters: [],
+    autoEnableRules: [{ type: "prefix" as const, value: "jojo/" }],
+  };
+
+  it("存在 enabledModels 时严格只展示管理员启用的模型", () => {
+    const result = applyModelConfigsWithFullData(rawModels, {
+      ...data,
+      enabledModels: [
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-pro",
+      ],
+    });
+
+    expect(result.map((model) => model.id)).toEqual([
+      "deepseek/deepseek-v4-flash",
+      "deepseek/deepseek-v4-pro",
+    ]);
+  });
+
+  it("enabledModels 为空数组时不回退展示全量或自动启用模型", () => {
+    const result = applyModelConfigsWithFullData(rawModels, {
+      ...data,
+      enabledModels: [],
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("没有 enabledModels 时保留旧前缀模式兼容", () => {
+    const result = applyModelConfigsWithFullData(rawModels, data);
+
+    expect(result.map((model) => model.id)).toEqual([
+      "deepseek/deepseek-v4-flash",
+      "deepseek/deepseek-v4-pro",
+      "jojo/deepseek-v4-flash",
+      "jojo/kimi-k2.6",
+    ]);
+  });
+});
+
 describe("resolveCurrentModel", () => {
   const models = applyModelConfigs([
-    { id: "opencode/deepseek-v4-flash", label: "opencode/DeepSeek V4 Flash" },
-    { id: "opencode/minimax-m2-5", label: "opencode/MiniMax M2.5" },
+    { id: "workbench/deepseek-v4-flash", label: "workbench/DeepSeek V4 Flash" },
+    { id: "workbench/minimax-m2-5", label: "workbench/MiniMax M2.5" },
   ]);
 
   it("无思考深度的模型直接匹配", () => {
-    const result = resolveCurrentModel("opencode/deepseek-v4-flash", models);
-    expect(result).toEqual({ baseModelId: "opencode/deepseek-v4-flash" });
+    const result = resolveCurrentModel("workbench/deepseek-v4-flash", models);
+    expect(result).toEqual({ baseModelId: "workbench/deepseek-v4-flash" });
   });
 
   it("未匹配的模型返回 null", () => {
@@ -187,12 +243,12 @@ describe("resolveCurrentModel", () => {
 
 describe("buildFullModelId", () => {
   const models = applyModelConfigs([
-    { id: "opencode/deepseek-v4-flash", label: "opencode/DeepSeek V4 Flash" },
+    { id: "workbench/deepseek-v4-flash", label: "workbench/DeepSeek V4 Flash" },
   ]);
 
   it("无深度时返回基础 id", () => {
-    expect(buildFullModelId("opencode/deepseek-v4-flash", undefined, models)).toBe(
-      "opencode/deepseek-v4-flash",
+    expect(buildFullModelId("workbench/deepseek-v4-flash", undefined, models)).toBe(
+      "workbench/deepseek-v4-flash",
     );
   });
 

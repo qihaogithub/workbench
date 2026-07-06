@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ProjectAdminService, type ProjectResourceKind } from "@opencode-workbench/project-core";
+import { ProjectAdminService, type ProjectResourceKind } from "@workbench/project-core";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -7,6 +7,7 @@ import {
   createApiSuccess,
   getDataDir,
   getSessionMeta,
+  getWorkspaceMeta,
   isSessionExpired,
   markWorkspaceBasedOnVersion,
   sessionExists,
@@ -98,6 +99,7 @@ export async function POST(
   const service = projectService();
   if (kind === "page") {
     const meta = body.sessionId ? getSessionMeta(body.sessionId) : null;
+    const restoreWorkspaceId = body.workspaceId || meta?.workspaceId;
     if (body.sessionId) {
       if (!sessionExists(body.sessionId) || !meta || meta.demoId !== params.projectId) {
         return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
@@ -111,7 +113,7 @@ export async function POST(
       try {
         await flushAndSyncProjectWorkspace({
           projectId: params.projectId,
-          workspaceId: meta.workspaceId,
+          workspaceId: restoreWorkspaceId,
           sessionId: body.sessionId,
         });
       } catch (error) {
@@ -119,6 +121,15 @@ export async function POST(
         return NextResponse.json(
           createApiError(flushError.code, flushError.message),
           { status: flushError.status },
+        );
+      }
+    }
+    if (restoreWorkspaceId) {
+      const workspaceMeta = getWorkspaceMeta(restoreWorkspaceId);
+      if (!workspaceMeta || workspaceMeta.projectId !== params.projectId || workspaceMeta.status === "archived") {
+        return NextResponse.json(
+          createApiError("WORKSPACE_STALE", "当前工作区已过期，请刷新项目后重试"),
+          { status: 409 },
         );
       }
     }
@@ -130,19 +141,19 @@ export async function POST(
         { status: 500 },
       );
     }
-    if (meta?.workspaceId) {
+    if (restoreWorkspaceId) {
       const workspaceUpdated = updateWorkspaceDemoFiles(
-        meta.workspaceId,
+        restoreWorkspaceId,
         params.resourceId,
         pageResult.data.files,
       );
       if (!workspaceUpdated) {
         return NextResponse.json(createApiError("FILE_WRITE_ERROR", "同步 Session Workspace 失败"), { status: 500 });
       }
-      if (!markWorkspaceBasedOnVersion(meta.workspaceId, pageResult.data.newVersionId)) {
+      if (!markWorkspaceBasedOnVersion(restoreWorkspaceId, pageResult.data.newVersionId)) {
         return NextResponse.json(createApiError("FILE_WRITE_ERROR", "更新 Workspace 版本基线失败"), { status: 500 });
       }
-      const synced = syncActiveWorkspaceToCanonical(params.projectId, meta.workspaceId);
+      const synced = syncActiveWorkspaceToCanonical(params.projectId, restoreWorkspaceId);
       if (!synced.success) {
         const code = synced.code === "WORKSPACE_STALE" ? "WORKSPACE_STALE" : "FILE_WRITE_ERROR";
         return NextResponse.json(

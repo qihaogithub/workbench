@@ -22,10 +22,10 @@ import type {
   DemoPageMeta,
   DemoFolderMeta,
   AppGraph,
-} from "@opencode-workbench/shared";
-import { ProjectAdminService } from "@opencode-workbench/project-core";
-import type { CanvasState } from "@opencode-workbench/demo-ui";
-import { generateIframeHtml } from "@opencode-workbench/demo-ui/iframe-template";
+} from "@workbench/shared";
+import { ProjectAdminService } from "@workbench/project-core";
+import type { CanvasState } from "@workbench/demo-ui";
+import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
 import {
   PREVIEW_RUNTIME_MANIFEST_VERSION,
@@ -36,6 +36,26 @@ import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
+
+function resolvePublishThumbnailSource(thumbnail: string): string | undefined {
+  const candidates: string[] = [];
+  const normalized = thumbnail.replace(/^\/+/, "");
+
+  if (path.isAbsolute(thumbnail)) {
+    candidates.push(thumbnail);
+  }
+
+  candidates.push(path.join(process.cwd(), "public", normalized));
+
+  if (normalized.startsWith("data/")) {
+    candidates.push(path.join(process.cwd(), normalized));
+    candidates.push(path.join(getDataDir(), normalized.slice("data/".length)));
+  } else {
+    candidates.push(path.join(getDataDir(), normalized));
+  }
+
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
 
 export interface PublishedDemoPage {
   id: string;
@@ -55,6 +75,10 @@ export interface PublishedDemoPage {
   prototypeHtmlPath?: string;
   prototypeCssPath?: string;
   prototypeMetaPath?: string;
+  sketchScene?: Record<string, unknown>;
+  sketchMeta?: Record<string, unknown>;
+  sketchScenePath?: string;
+  sketchMetaPath?: string;
 }
 
 export interface PublishedProject {
@@ -160,33 +184,31 @@ export async function publishProject(
   );
 
   let urlMap = new Map<string, string>();
-  try {
-    onProgress?.(0, "正在处理图片资源...");
-    const publishContext: PublishContext = {
-      projectId,
-      workspacePath,
-      publishDir: publishedProjectDir,
-      onProgress: (percent, _total, message) => {
-        onProgress?.(percent, message);
-      },
-    };
-    const imageResult = await processImagesForPublish(publishContext);
-    urlMap = imageResult.urlMap;
-    if (imageResult.errors.length > 0) {
-      console.warn(
-        `[publish] ${imageResult.errors.length} 张图片上传失败:`,
-        imageResult.errors.map((e) => e.localPath).join(', '),
-      );
-    }
-  } catch (error) {
-    console.warn('[publish] 图片处理失败，继续发布:', error instanceof Error ? error.message : error);
-    urlMap = new Map();
-  }
-  onProgress?.(10, "正在编译页面...");
 
   fs.rmSync(publishedProjectDir, { recursive: true, force: true });
   fs.mkdirSync(publishedProjectDir, { recursive: true });
   fs.mkdirSync(path.join(publishedProjectDir, "demos"), { recursive: true });
+
+  onProgress?.(0, "正在处理图片资源...");
+  const publishContext: PublishContext = {
+    projectId,
+    workspacePath,
+    publishDir: publishedProjectDir,
+    onProgress: (percent, _total, message) => {
+      onProgress?.(percent, message);
+    },
+  };
+  const imageResult = await processImagesForPublish(publishContext);
+  urlMap = imageResult.urlMap;
+  if (!imageResult.success) {
+    console.warn(
+      `[publish] ${imageResult.errors.length} 张图片本地化失败:`,
+      imageResult.errors.map((e) => `${e.localPath}:${e.error || "UNKNOWN"}`).join(", "),
+    );
+    throw new Error("IMAGE_LOCALIZATION_FAILED");
+  }
+
+  onProgress?.(10, "正在编译页面...");
 
   const publishedDemoPages: PublishedDemoPage[] = [];
 
@@ -216,9 +238,14 @@ export async function publishProject(
     const prototypeHtmlPath = path.join(demoDir, "prototype.html");
     const prototypeCssPath = path.join(demoDir, "prototype.css");
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
-    const runtimeType = page.runtimeType === "prototype-html-css"
-      ? "prototype-html-css"
-      : "high-fidelity-react";
+    const sketchScenePath = path.join(demoDir, "sketch.scene.json");
+    const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+    const runtimeType =
+      page.runtimeType === "prototype-html-css"
+        ? "prototype-html-css"
+        : page.runtimeType === "sketch-scene"
+          ? "sketch-scene"
+          : "high-fidelity-react";
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
@@ -276,6 +303,47 @@ export async function publishProject(
 
       const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
       onProgress?.(pagePercent, `发布原型页 ${i + 1}/${totalPages}...`);
+      continue;
+    }
+
+    if (runtimeType === "sketch-scene") {
+      if (!fs.existsSync(sketchScenePath)) continue;
+      const sceneContent = fs.readFileSync(sketchScenePath, "utf-8");
+      fs.writeFileSync(path.join(demoPublishDir, "sketch.scene.json"), sceneContent, "utf-8");
+      let sketchScene: Record<string, unknown> | undefined;
+      let sketchMeta: Record<string, unknown> | undefined;
+      try {
+        sketchScene = JSON.parse(sceneContent) as Record<string, unknown>;
+      } catch {
+        sketchScene = undefined;
+      }
+      if (fs.existsSync(sketchMetaPath)) {
+        const metaContent = fs.readFileSync(sketchMetaPath, "utf-8");
+        fs.writeFileSync(path.join(demoPublishDir, "sketch.meta.json"), metaContent, "utf-8");
+        try {
+          sketchMeta = JSON.parse(metaContent) as Record<string, unknown>;
+        } catch {
+          sketchMeta = undefined;
+        }
+      }
+
+      publishedDemoPages.push({
+        id: page.id,
+        name: page.name,
+        routeKey: page.routeKey,
+        order: page.order,
+        parentId: page.parentId,
+        runtimeType,
+        schemaPath: schemaPublishPath,
+        previewSize,
+        sketchScene,
+        sketchMeta,
+        sketchScenePath: `demos/${page.id}/sketch.scene.json`,
+        sketchMetaPath: sketchMeta ? `demos/${page.id}/sketch.meta.json` : undefined,
+      });
+
+      const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+      onProgress?.(pagePercent, `发布手绘页面 ${i + 1}/${totalPages}...`);
       continue;
     }
 
@@ -352,9 +420,9 @@ export async function publishProject(
   let thumbnailCopied = false;
   let thumbnailExt = "";
   if (project.thumbnail) {
-    const thumbnailSrc = path.join(process.cwd(), "public", project.thumbnail);
-    if (fs.existsSync(thumbnailSrc)) {
-      thumbnailExt = path.extname(project.thumbnail);
+    const thumbnailSrc = resolvePublishThumbnailSource(project.thumbnail);
+    if (thumbnailSrc && fs.existsSync(thumbnailSrc)) {
+      thumbnailExt = path.extname(thumbnailSrc) || path.extname(project.thumbnail);
       fs.copyFileSync(
         thumbnailSrc,
         path.join(publishedProjectDir, `thumbnail${thumbnailExt}`),
@@ -545,7 +613,7 @@ export async function syncToCloudflare(): Promise<CloudflareSyncResult> {
         env: {
           ...process.env,
           CLOUDFLARE_PROJECT_NAME:
-            process.env.CLOUDFLARE_PROJECT_NAME || "opencode-viewer",
+            process.env.CLOUDFLARE_PROJECT_NAME || "workbench-viewer",
         },
       },
       (error, stdout, stderr) => {

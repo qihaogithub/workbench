@@ -52,7 +52,7 @@ describe("resource versions route", () => {
         source: "user",
       },
     });
-    jest.doMock("@opencode-workbench/project-core", () => ({
+    jest.doMock("@workbench/project-core", () => ({
       ProjectAdminService: jest.fn(() => ({
         resourceVersionCreate,
         resourceVersionList: jest.fn(),
@@ -96,7 +96,7 @@ describe("resource versions route", () => {
   });
 
   afterEach(() => {
-    jest.dontMock("@opencode-workbench/project-core");
+    jest.dontMock("@workbench/project-core");
     jest.dontMock("@/lib/auth/jwt");
     jest.dontMock("@/lib/fs-utils");
     jest.dontMock("@/lib/workspace-flush");
@@ -109,7 +109,16 @@ describe("resource versions route", () => {
     const workspaceFlush = await import("@/lib/workspace-flush");
 
     const response = await POST(
-      jsonRequest({ sessionId: "session-1", note: "命名版本" }),
+      jsonRequest({
+        sessionId: "session-1",
+        note: "命名版本",
+        sketchPatchSummary: {
+          operationCount: 3,
+          hasBaseSceneKey: true,
+          currentNodeCount: 4,
+          targetNodeCount: 5,
+        },
+      }),
       { params: { projectId: "project-1", kind: "page", resourceId: "page-1" } },
     );
     const body = await response.json();
@@ -127,11 +136,43 @@ describe("resource versions route", () => {
         resourceId: "page-1",
         sourceWorkspacePath: "/tmp/workspace-1",
         note: "命名版本",
+        sketchPatchSummary: {
+          operationCount: 3,
+          hasBaseSceneKey: true,
+          currentNodeCount: 4,
+          targetNodeCount: 5,
+        },
       }),
       expect.objectContaining({
         id: "user-1",
         role: "creator",
       }),
     );
+  });
+
+  it("拒绝非法 sketchPatchSummary", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      jsonRequest({
+        sessionId: "session-1",
+        sketchPatchSummary: {
+          operationCount: "3",
+          hasBaseSceneKey: true,
+        },
+      }),
+      { params: { projectId: "project-1", kind: "page", resourceId: "page-1" } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "sketchPatchSummary 格式不合法",
+      },
+    });
+    expect(resourceVersionCreate).not.toHaveBeenCalled();
   });
 });

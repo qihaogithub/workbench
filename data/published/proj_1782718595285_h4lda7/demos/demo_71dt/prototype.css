@@ -63,10 +63,9 @@
 .section {
   width: 335px;
   margin: 0 auto;
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
 }
 
@@ -111,8 +110,7 @@
 }
 
 .section-more-hidden {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .more-text {
@@ -133,8 +131,8 @@
 /* 卡片行 */
 .card-row {
   width: 100%;
-  display: inline-flex;
-  justify-content: flex-start;
+  display: flex;
+  justify-content: center;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;

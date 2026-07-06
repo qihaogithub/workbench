@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783245065872_mdil6a",
+  "at": 1783245065872,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_20_preview_plush",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_20_preview_plush:prototypeHtml",
+      "page:worldcup_20_preview_plush:prototypeCss",
+      "page:worldcup_20_preview_plush:prototypeMeta"
+    ]
+  }
+}

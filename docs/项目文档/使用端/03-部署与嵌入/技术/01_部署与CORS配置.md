@@ -114,7 +114,7 @@ screenshot-service 也通过 Docker Compose 接收 `CORS_ORIGINS`。author-site 
 
 使用端的 `next.config.js` 需要配置：
 
-- **transpilePackages**：将 `@opencode-workbench/shared` 加入转译列表，确保 workspace 依赖正常工作
+- **transpilePackages**：将 `@workbench/shared` 加入转译列表，确保 workspace 依赖正常工作
 - **preview runtime env**：将 `PREVIEW_RUNTIME_SOURCE`、`PREVIEW_SHELL_MODE` 和 `CDN_BASE_URL` 注入到共享 PreviewPanel，默认使用同源 runtime
 - **静态导出 shell 策略**：开发环境可使用 `/api/preview-runtime/shell` 固定 shell；生产静态导出没有动态 route，因此默认使用 inline shell，并把 runtime base 绑定到当前 viewer origin
 

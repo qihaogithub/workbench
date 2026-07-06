@@ -5,7 +5,7 @@ set -e
 SERVER_IP="10.130.33.131"
 SERVER_PORT="22"
 SERVER_USER="root"
-REMOTE_DIR="/opt/opencode-workbench"
+REMOTE_DIR="/opt/workbench"
 
 # 本地路径
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -152,7 +152,7 @@ rsync -avz --progress --delete \
     --exclude '/.gitignore' \
     --exclude '/.agents/' \
     --exclude '/.codegraph/' \
-    --exclude '/.opencode/' \
+    --exclude '/.workbench/' \
     --exclude '/.env' \
     --exclude '/.env.docker' \
     --exclude '/.tmp/' \
@@ -165,7 +165,7 @@ rsync -avz --progress --delete \
     --exclude '/packages/web/' \
     --exclude '/packages/snapshot-service/' \
     --exclude '/packages/*/.next/' \
-    --exclude '/packages/*/.opencode/' \
+    --exclude '/packages/*/.workbench/' \
     --exclude '/packages/*/data/' \
     --exclude '/packages/*/node_modules/' \
     --exclude '/packages/*/dist/' \
@@ -198,7 +198,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
     # 复制部署环境文件
     cp -f .deploy.env .env.docker
     APP_DATA_DIR=\$(awk -F= '\$1 == \"APP_DATA_DIR\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
-    APP_DATA_DIR=\${APP_DATA_DIR:-/opt/opencode-workbench/data}
+    APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
     mkdir -p \"\${APP_DATA_DIR}\"
 
     export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
@@ -237,10 +237,10 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
 
     container_for_service() {
         case \"\$1\" in
-            agent-service) echo 'opencode-workbench-agent-service-1' ;;
-            author-site) echo 'opencode-workbench-author-site-1' ;;
-            screenshot-service) echo 'opencode-workbench-screenshot-service-1' ;;
-            viewer-site) echo 'opencode-workbench-viewer-site-1' ;;
+            agent-service) echo 'workbench-agent-service-1' ;;
+            author-site) echo 'workbench-author-site-1' ;;
+            screenshot-service) echo 'workbench-screenshot-service-1' ;;
+            viewer-site) echo 'workbench-viewer-site-1' ;;
             *) echo \"\" ;;
         esac
     }
@@ -348,7 +348,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ author-site 健康检查失败: http://127.0.0.1:3200'
-                docker logs --tail=120 opencode-workbench-author-site-1 2>/dev/null || true
+                docker logs --tail=120 workbench-author-site-1 2>/dev/null || true
                 exit 1
             fi
             sleep 1
@@ -363,7 +363,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
-                docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
+                docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
                 exit 1
             fi
             sleep 1
@@ -384,7 +384,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ agent-service 内部模型配置接口鉴权失败，请确认 author-site 与 agent-service 使用同一个 INTERNAL_API_TOKEN'
-                docker logs --tail=120 opencode-workbench-agent-service-1 2>/dev/null || true
+                docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
                 exit 1
             fi
             sleep 1
@@ -399,7 +399,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
-                docker logs --tail=120 opencode-workbench-screenshot-service-1 2>/dev/null || true
+                docker logs --tail=120 workbench-screenshot-service-1 2>/dev/null || true
                 exit 1
             fi
             sleep 1
@@ -414,7 +414,7 @@ ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
             fi
             if [ \"\$i\" -eq 30 ]; then
                 echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
-                docker logs --tail=120 opencode-workbench-viewer-site-1 2>/dev/null || true
+                docker logs --tail=120 workbench-viewer-site-1 2>/dev/null || true
                 exit 1
             fi
             sleep 1

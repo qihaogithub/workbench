@@ -58,7 +58,11 @@ export function computeCanvasRenderModes({
   const modes: Record<string, CanvasPageRenderMode> = {};
   const prototypePageIds = new Set(
     pages
-      .filter((page) => page.runtimeType === "prototype-html-css")
+      .filter(
+        (page) =>
+          page.runtimeType === "prototype-html-css" ||
+          page.runtimeType === "sketch-scene",
+      )
       .map((page) => page.id),
   );
   const runtimePages = pages.filter((page) => !prototypePageIds.has(page.id));

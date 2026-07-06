@@ -8,6 +8,13 @@ export interface PrototypePreviewDocumentInput {
   css?: string;
   configData?: Record<string, unknown>;
   previewSize?: PrototypePreviewSize;
+  assetRewrite?: PrototypeAssetRewriteContext;
+}
+
+export interface PrototypeAssetRewriteContext {
+  sessionId?: string;
+  demoId?: string;
+  origin?: string;
 }
 
 type PrototypeBindingElement = {
@@ -33,6 +40,9 @@ const SCRIPT_TAG_RE = /<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi;
 const INLINE_EVENT_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const JAVASCRIPT_URL_RE = /javascript\s*:/gi;
 const DANGEROUS_CSS_RE = /@import\b|expression\s*\(|behavior\s*:/gi;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga)(\?[^'")\s]*)?$/i;
+const HTML_ASSET_ATTR_RE = /\b(src|href|poster)=("|')([^"']+)(\2)/gi;
+const CSS_URL_RE = /url\((["']?)([^"'`)]+)(\1)\)/gi;
 
 export function sanitizePrototypeHtml(html: string): string {
   return html
@@ -72,6 +82,81 @@ export function normalizePrototypeViewportUnits(
   );
 }
 
+function resolvePrototypeRelativePath(relativePath: string, basePath: string): string {
+  const parts = basePath.split("/").filter((part) => part !== "");
+  const relativeParts = relativePath.split("/");
+
+  for (const part of relativeParts) {
+    if (part === "." || part === "") continue;
+    if (part === "..") {
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+
+  return parts.join("/");
+}
+
+function shouldRewritePrototypeAssetUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (!/^\.\.?\/[^'")\s]*$/u.test(trimmed)) return false;
+  return IMAGE_EXT_RE.test(trimmed);
+}
+
+function rewritePrototypeAssetUrl(
+  value: string,
+  context?: PrototypeAssetRewriteContext,
+): string {
+  if (
+    !context?.sessionId ||
+    !context.demoId ||
+    !shouldRewritePrototypeAssetUrl(value)
+  ) {
+    return value;
+  }
+  const resolved = resolvePrototypeRelativePath(value, `demos/${context.demoId}/`);
+  const encodedPath = resolved
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const apiPath = `/api/sessions/${encodeURIComponent(context.sessionId)}/workspace/${encodedPath}`;
+  return context.origin ? `${context.origin}${apiPath}` : apiPath;
+}
+
+export function rewritePrototypeAssetUrls(
+  content: string,
+  context?: PrototypeAssetRewriteContext,
+): string {
+  if (!context?.sessionId || !context.demoId) return content;
+  return content
+    .replace(
+      HTML_ASSET_ATTR_RE,
+      (
+        match,
+        attr: string,
+        quote: string,
+        value: string,
+        endQuote: string,
+      ) => {
+        const rewritten = rewritePrototypeAssetUrl(value, context);
+        return rewritten === value
+          ? match
+          : `${attr}=${quote}${rewritten}${endQuote}`;
+      },
+    )
+    .replace(
+      CSS_URL_RE,
+      (match, quote: string, value: string, endQuote: string) => {
+        const rewritten = rewritePrototypeAssetUrl(value, context);
+        return rewritten === value
+          ? match
+          : `url(${quote}${rewritten}${endQuote})`;
+      },
+    );
+}
+
 function parseSizeValue(value: string | number | undefined, fallback: number): number {
   if (typeof value === "number") {
     return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -104,6 +189,7 @@ export function applyPrototypeTextBindings(
 export function applyPrototypeBindings(
   root: PrototypeBindingRoot,
   configData: Record<string, unknown>,
+  assetRewrite?: PrototypeAssetRewriteContext,
 ): void {
   const browserGlobal = globalThis as unknown as {
     document?: {
@@ -139,11 +225,21 @@ export function applyPrototypeBindings(
   });
   Array.from(root.querySelectorAll("[data-bind-src]")).forEach((element) => {
     const key = element.getAttribute("data-bind-src");
-    if (key) element.setAttribute("src", getConfigValue(configData, key));
+    if (key) {
+      element.setAttribute(
+        "src",
+        rewritePrototypeAssetUrl(getConfigValue(configData, key), assetRewrite),
+      );
+    }
   });
   Array.from(root.querySelectorAll("[data-bind-href]")).forEach((element) => {
     const key = element.getAttribute("data-bind-href");
-    if (key) element.setAttribute("href", getConfigValue(configData, key));
+    if (key) {
+      element.setAttribute(
+        "href",
+        rewritePrototypeAssetUrl(getConfigValue(configData, key), assetRewrite),
+      );
+    }
   });
   Array.from(root.querySelectorAll("[data-bind-style-color]")).forEach((element) => {
     const key = element.getAttribute("data-bind-style-color");
@@ -164,6 +260,7 @@ export function buildPrototypePreviewHtmlFragment({
   css = "",
   configData = {},
   previewSize,
+  assetRewrite,
 }: PrototypePreviewDocumentInput): string {
   const designWidth = parseSizeValue(previewSize?.width, 375);
   const designHeight = parseSizeValue(previewSize?.height, 812);
@@ -172,10 +269,17 @@ export function buildPrototypePreviewHtmlFragment({
   const rootHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
   const rootMinHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
   const rootOverflow = shouldScaleToPreviewSize ? "hidden" : "visible";
-  const safeHtml = applyPrototypeTextBindings(sanitizePrototypeHtml(html), configData);
+  const safeHtml = applyPrototypeTextBindings(
+    rewritePrototypeAssetUrls(sanitizePrototypeHtml(html), assetRewrite),
+    configData,
+  );
+  const rewrittenCss = rewritePrototypeAssetUrls(
+    sanitizePrototypeCss(css),
+    assetRewrite,
+  );
   const safeCss = shouldScaleToPreviewSize
-    ? normalizePrototypeViewportUnits(sanitizePrototypeCss(css), designWidth, designHeight)
-    : sanitizePrototypeCss(css);
+    ? normalizePrototypeViewportUnits(rewrittenCss, designWidth, designHeight)
+    : rewrittenCss;
 
   return `
     <style>

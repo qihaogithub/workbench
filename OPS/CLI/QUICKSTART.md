@@ -136,7 +136,7 @@ npx tsx src/index.ts diagnose "test-1" -m "测试消息"
 步骤 2/4: 检查会话状态
 ✓ 会话存在
   状态: ready
-  后端: opencode
+  后端: workbench
   消息数: 2
 
 步骤 3/4: 发送测试消息

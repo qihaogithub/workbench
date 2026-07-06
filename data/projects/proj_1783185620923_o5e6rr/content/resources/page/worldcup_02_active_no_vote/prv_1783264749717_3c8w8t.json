@@ -1,0 +1,39 @@
+{
+  "id": "prv_1783264749717_3c8w8t",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "kind": "page",
+  "resourceId": "worldcup_02_active_no_vote",
+  "contentHash": "4bfdb1a19b69c308ec13dad21195400a884cba0f1741536e535f8628dcc5017e",
+  "blobRefs": [
+    "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+    "cb11087f4f1e5e71f85090b25496ac0a850ec6e4716ff0863238b0dd16436f92",
+    "a1b91127e8e4d1cb9f409df93e403d01d5e16f41eb24edf2a7e095deb7e0b436",
+    "c2b022f53f33db42c76e315937b08f00817d258d89b8099a6c419cb3630c7a27"
+  ],
+  "metadata": {
+    "page": {
+      "id": "worldcup_02_active_no_vote",
+      "name": "进行中-未投票首页",
+      "routeKey": "02activenovote",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null
+    },
+    "files": {
+      "schema": "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+      "prototypeHtml": "cb11087f4f1e5e71f85090b25496ac0a850ec6e4716ff0863238b0dd16436f92",
+      "prototypeCss": "a1b91127e8e4d1cb9f409df93e403d01d5e16f41eb24edf2a7e095deb7e0b436",
+      "prototypeMeta": "c2b022f53f33db42c76e315937b08f00817d258d89b8099a6c419cb3630c7a27"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783264749718,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录进行中-未投票首页"
+}

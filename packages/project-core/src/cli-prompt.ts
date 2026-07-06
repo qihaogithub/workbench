@@ -9,10 +9,10 @@ export function createProjectCliUsagePrompt(options: CliPromptOptions = {}): str
   const authorSiteUrl = options.authorSiteUrl ?? "http://localhost:3200";
   const commandName = options.commandName ?? "ow";
   const cliVersion = options.cliVersion ?? "0.1.0";
-  const dataDir = options.dataDirPlaceholder ?? "<absolute-path-to-opencode-workbench-data>";
+  const dataDir = options.dataDirPlaceholder ?? "<absolute-path-to-workbench-data>";
 
   return [
-    "请使用 opencode-workbench 的 Project Admin CLI 管理创作端项目。",
+    "请使用 workbench 的 Project Admin CLI 管理创作端项目。",
     "",
     `项目地址：${authorSiteUrl}`,
     `CLI 版本：${cliVersion}`,
