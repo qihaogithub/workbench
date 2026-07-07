@@ -106,6 +106,20 @@ function visibleSelectionBoundsFromIds(
   return getSketchSelectionBounds(selected);
 }
 
+type ResolvedImageNode = Pick<SketchSceneNode, "id" | "x" | "y" | "width" | "height" | "alt" | "name"> & {
+  src: string;
+};
+
+function getResolvedImageNodes(scene: SketchSceneDocument, configData?: Record<string, unknown>): ResolvedImageNode[] {
+  return scene.nodes.flatMap((node) => {
+    if (node.type !== "image") return [];
+    if (resolveSketchSceneBindingValue(node, "visible", node.visible ?? true, configData) === false) return [];
+    const src = resolveSketchSceneBindingValue(node, "src", node.src ?? "", configData);
+    if (typeof src !== "string" || !src.trim()) return [];
+    return [{ id: node.id, x: node.x, y: node.y, width: node.width, height: node.height, alt: node.alt, name: node.name, src }];
+  });
+}
+
 function getSketchTargetNodeId(target: Element): string | null {
   return (
     target.closest("[data-sketch-node-id]")?.getAttribute("data-sketch-node-id") ??
@@ -163,8 +177,15 @@ export function SketchPagePreview({
     () => renderSketchSceneToSvgMarkup(parsedScene, configData),
     [parsedScene, configData],
   );
+  const imageNodes = useMemo(() => getResolvedImageNodes(parsedScene, configData), [configData, parsedScene]);
+  const imageProbeKey = useMemo(() => imageNodes.map((node) => `${node.id}:${node.src}`).join("|"), [imageNodes]);
+  const [failedImageIds, setFailedImageIds] = React.useState<Set<string>>(() => new Set());
   const activeIds = selectedNodeIds ?? (selectedNodeId ? [selectedNodeId] : []);
   const selectionBounds = useMemo(() => visibleSelectionBoundsFromIds(parsedScene, activeIds, configData), [activeIds, configData, parsedScene]);
+
+  React.useEffect(() => {
+    setFailedImageIds(new Set());
+  }, [imageProbeKey]);
 
   return (
     <div
@@ -186,6 +207,50 @@ export function SketchPagePreview({
         className="h-full w-full"
         dangerouslySetInnerHTML={{ __html: svgMarkup }}
       />
+      <div aria-hidden="true" className="hidden">
+        {imageNodes.map((node) => (
+          <img
+            key={`${node.id}:${node.src}`}
+            alt=""
+            data-sketch-image-probe-id={node.id}
+            src={node.src}
+            onError={() => {
+              setFailedImageIds((current) => {
+                if (current.has(node.id)) return current;
+                const next = new Set(current);
+                next.add(node.id);
+                return next;
+              });
+            }}
+            onLoad={() => {
+              setFailedImageIds((current) => {
+                if (!current.has(node.id)) return current;
+                const next = new Set(current);
+                next.delete(node.id);
+                return next;
+              });
+            }}
+          />
+        ))}
+      </div>
+      {imageNodes.map((node) =>
+        failedImageIds.has(node.id) ? (
+          <div
+            key={`failed-${node.id}`}
+            className="pointer-events-none absolute flex items-center justify-center border border-dashed border-amber-500 bg-amber-50/90 px-2 text-center text-xs font-medium text-amber-800"
+            data-sketch-image-error-id={node.id}
+            role="status"
+            style={{
+              left: node.x * (width / parsedScene.pageSize.width),
+              top: node.y * (height / parsedScene.pageSize.height),
+              width: Math.max(24, Math.abs(node.width) * (width / parsedScene.pageSize.width)),
+              height: Math.max(20, Math.abs(node.height) * (height / parsedScene.pageSize.height)),
+            }}
+          >
+            图片加载失败
+          </div>
+        ) : null,
+      )}
       <SelectionOverlay
         bounds={selectionBounds}
         scaleX={width / parsedScene.pageSize.width}

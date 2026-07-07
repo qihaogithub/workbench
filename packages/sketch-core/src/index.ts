@@ -45,6 +45,9 @@ export interface SketchSceneStyle {
   textAlign?: "left" | "center" | "right";
   color?: string;
   lineDash?: number[];
+  startArrow?: "none" | "arrow";
+  endArrow?: "none" | "arrow";
+  imageFit?: "cover" | "contain" | "fill";
 }
 
 export interface SketchSceneTextStyleOverride {
@@ -94,6 +97,17 @@ const SKETCH_SCENE_TEXT_DECORATION_VALUES = new Set<string>([
   "none",
   "underline",
   "line-through",
+]);
+
+const SKETCH_SCENE_ARROW_HEAD_VALUES = new Set<string>([
+  "none",
+  "arrow",
+]);
+
+const SKETCH_SCENE_IMAGE_FIT_VALUES = new Set<string>([
+  "cover",
+  "contain",
+  "fill",
 ]);
 
 export interface SketchSceneNode {
@@ -182,9 +196,25 @@ export interface SketchSceneValidationResult {
   issues: SketchSceneValidationIssue[];
 }
 
+export interface SketchScenePatchSummary {
+  operationCount: number;
+  changed: boolean;
+  beforeNodeCount: number;
+  afterNodeCount: number;
+  addedNodeIds: string[];
+  deletedNodeIds: string[];
+  updatedNodeIds: string[];
+  updatedFieldsByNodeId: Record<string, string[]>;
+  addedCount: number;
+  deletedCount: number;
+  updatedCount: number;
+  affectedNodeCount: number;
+}
+
 export interface SketchScenePatchResult {
   scene: SketchSceneDocument;
   validation: SketchSceneValidationResult;
+  summary: SketchScenePatchSummary;
 }
 
 export interface SketchSceneBounds {
@@ -387,6 +417,15 @@ function isValidSketchSceneStyle(value: unknown): boolean {
     value.lineDash !== undefined &&
     (!Array.isArray(value.lineDash) || value.lineDash.some((entry) => !isFiniteNonNegative(entry)))
   ) {
+    return false;
+  }
+  if (value.startArrow !== undefined && (typeof value.startArrow !== "string" || !SKETCH_SCENE_ARROW_HEAD_VALUES.has(value.startArrow))) {
+    return false;
+  }
+  if (value.endArrow !== undefined && (typeof value.endArrow !== "string" || !SKETCH_SCENE_ARROW_HEAD_VALUES.has(value.endArrow))) {
+    return false;
+  }
+  if (value.imageFit !== undefined && (typeof value.imageFit !== "string" || !SKETCH_SCENE_IMAGE_FIT_VALUES.has(value.imageFit))) {
     return false;
   }
   return true;
@@ -870,6 +909,55 @@ export function applySketchScenePatchOperations(
   };
 }
 
+function getChangedSketchNodeFields(beforeNode: SketchSceneNode, afterNode: SketchSceneNode): string[] {
+  const fields = new Set([...Object.keys(beforeNode), ...Object.keys(afterNode)]);
+  fields.delete("id");
+  return [...fields]
+    .filter((field) => {
+      const key = field as keyof SketchSceneNode;
+      return JSON.stringify(beforeNode[key]) !== JSON.stringify(afterNode[key]);
+    })
+    .sort();
+}
+
+function buildSketchScenePatchSummary(
+  beforeScene: SketchSceneDocument,
+  afterScene: SketchSceneDocument,
+  operationCount: number,
+): SketchScenePatchSummary {
+  const beforeById = new Map(beforeScene.nodes.map((node) => [node.id, node]));
+  const afterById = new Map(afterScene.nodes.map((node) => [node.id, node]));
+  const addedNodeIds = afterScene.nodes.filter((node) => !beforeById.has(node.id)).map((node) => node.id);
+  const deletedNodeIds = beforeScene.nodes.filter((node) => !afterById.has(node.id)).map((node) => node.id);
+  const updatedNodeIds = afterScene.nodes
+    .filter((node) => {
+      const beforeNode = beforeById.get(node.id);
+      return beforeNode ? JSON.stringify(beforeNode) !== JSON.stringify(node) : false;
+    })
+    .map((node) => node.id);
+  const updatedFieldsByNodeId = Object.fromEntries(
+    updatedNodeIds.map((nodeId) => [
+      nodeId,
+      getChangedSketchNodeFields(beforeById.get(nodeId) as SketchSceneNode, afterById.get(nodeId) as SketchSceneNode),
+    ]),
+  );
+  const affectedNodeIds = new Set([...addedNodeIds, ...deletedNodeIds, ...updatedNodeIds]);
+  return {
+    operationCount,
+    changed: affectedNodeIds.size > 0,
+    beforeNodeCount: beforeScene.nodes.length,
+    afterNodeCount: afterScene.nodes.length,
+    addedNodeIds,
+    deletedNodeIds,
+    updatedNodeIds,
+    updatedFieldsByNodeId,
+    addedCount: addedNodeIds.length,
+    deletedCount: deletedNodeIds.length,
+    updatedCount: updatedNodeIds.length,
+    affectedNodeCount: affectedNodeIds.size,
+  };
+}
+
 export function applySketchScenePatchOperationsWithResult(
   scene: SketchSceneDocument,
   operations: SketchScenePatchOperation[],
@@ -878,6 +966,7 @@ export function applySketchScenePatchOperationsWithResult(
   return {
     scene: nextScene,
     validation: validateSketchSceneDocument(nextScene),
+    summary: buildSketchScenePatchSummary(scene, nextScene, operations.length),
   };
 }
 
@@ -1064,6 +1153,22 @@ function renderTextLinesWithStyleRuns(
     .join("");
 }
 
+function renderCenteredNodeLabel(
+  node: SketchSceneNode,
+  label: string,
+  style: SketchSceneStyle,
+  color: unknown,
+  opacity: number,
+  transform: string,
+  defaultFontSize: number,
+): string {
+  const fontSize = styleNumber(style.fontSize, defaultFontSize);
+  const labelX = node.x + node.width / 2;
+  const labelY = node.y + Math.min(node.height / 2 + fontSize / 3, node.height - 8);
+  const labelCommon = `data-sketch-node-label="${escapeAttr(node.id)}" opacity="${opacity}"${transform}`;
+  return `<text ${labelCommon} x="${labelX}" y="${labelY}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}" text-anchor="middle">${renderTextLinesWithStyleRuns(label, labelX, node.textStyleRuns)}</text>`;
+}
+
 function renderSketchNode(
   node: SketchSceneNode,
   configData?: Record<string, unknown>,
@@ -1084,14 +1189,19 @@ function renderSketchNode(
   const dash = style.lineDash?.length ? ` stroke-dasharray="${style.lineDash.join(" ")}"` : "";
 
   if (node.type === "ellipse") {
-    return `<ellipse ${common} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" rx="${node.width / 2}" ry="${node.height / 2}" fill="${escapeAttr(fill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
+    const ellipse = `<ellipse ${common} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" rx="${node.width / 2}" ry="${node.height / 2}" fill="${escapeAttr(fill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
+    const label = resolveBindingValue(node, "text", node.text ?? node.name ?? "", configData);
+    if (!label) return ellipse;
+    return `${ellipse}${renderCenteredNodeLabel(node, String(label), style, color, opacity, transform, 16)}`;
   }
 
   if (node.type === "line" || node.type === "arrow") {
     const x2 = node.x + node.width;
     const y2 = node.y + node.height;
-    const marker = node.type === "arrow" ? ` marker-end="url(#sketch-arrow)"` : "";
-    return `<line ${common} x1="${node.x}" y1="${node.y}" x2="${x2}" y2="${y2}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}" stroke-linecap="round"${dash}${marker} />`;
+    const startArrow = style.startArrow === "arrow";
+    const endArrow = node.type === "arrow" ? style.endArrow !== "none" : style.endArrow === "arrow";
+    const markers = `${startArrow ? ' marker-start="url(#sketch-arrow)"' : ""}${endArrow ? ' marker-end="url(#sketch-arrow)"' : ""}`;
+    return `<line ${common} x1="${node.x}" y1="${node.y}" x2="${x2}" y2="${y2}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}" stroke-linecap="round"${dash}${markers} />`;
   }
 
   if (node.type === "path") {
@@ -1102,7 +1212,13 @@ function renderSketchNode(
   if (node.type === "image") {
     const src = resolveBindingValue(node, "src", node.src ?? "", configData);
     if (!src) return "";
-    return `<image ${common} href="${escapeAttr(src)}" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" preserveAspectRatio="xMidYMid slice"><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
+    const preserveAspectRatio =
+      style.imageFit === "fill"
+        ? "none"
+        : style.imageFit === "contain"
+          ? "xMidYMid meet"
+          : "xMidYMid slice";
+    return `<image ${common} href="${escapeAttr(src)}" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
   }
 
   if (node.type === "text") {
@@ -1125,13 +1241,8 @@ function renderSketchNode(
           : "#FFFFFF";
   const label = resolveBindingValue(node, "text", node.text ?? node.name ?? "", configData);
   const rect = `<rect ${common} x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="${radius}" ry="${radius}" fill="${escapeAttr(resolvedFill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
-  if (!label || node.type === "rect") return rect;
-
-  const fontSize = styleNumber(style.fontSize, node.type === "sticky" ? 18 : 16);
-  const labelX = node.x + node.width / 2;
-  const labelCommon = `data-sketch-node-label="${escapeAttr(node.id)}" opacity="${opacity}"${transform}`;
-  const text = `<text ${labelCommon} x="${labelX}" y="${node.y + Math.min(node.height / 2 + fontSize / 3, node.height - 8)}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}" text-anchor="middle">${renderTextLinesWithStyleRuns(String(label), labelX, node.textStyleRuns)}</text>`;
-  return `${rect}${text}`;
+  if (!label) return rect;
+  return `${rect}${renderCenteredNodeLabel(node, String(label), style, color, opacity, transform, node.type === "sticky" ? 18 : 16)}`;
 }
 
 export function renderSketchSceneToSvgMarkup(
@@ -1146,7 +1257,7 @@ export function renderSketchSceneToSvgMarkup(
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Sketch scene">`,
     "<defs>",
-    '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">',
+    '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">',
     '<path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />',
     "</marker>",
     "</defs>",
@@ -1270,6 +1381,27 @@ function hitTestLineLikeNode(node: SketchSceneNode, point: { x: number; y: numbe
   ) <= tolerance;
 }
 
+function hitTestPathNode(node: SketchSceneNode, point: { x: number; y: number }): boolean {
+  const points = node.points;
+  if (!points || points.length < 2) {
+    const bounds = getSketchNodeLocalBounds(node);
+    return (
+      point.x >= bounds.x &&
+      point.x <= bounds.x + bounds.width &&
+      point.y >= bounds.y &&
+      point.y <= bounds.y + bounds.height
+    );
+  }
+  const strokeWidth = styleNumber(node.style?.strokeWidth, 1);
+  const tolerance = Math.max(6, strokeWidth / 2 + 3);
+  for (let index = 1; index < points.length; index += 1) {
+    if (getPointToSegmentDistance(point, points[index - 1], points[index]) <= tolerance) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function getNodeLocalPointForHitTest(
   node: SketchSceneNode,
   point: { x: number; y: number },
@@ -1296,6 +1428,9 @@ export function hitTestSketchScene(
     const localPoint = getNodeLocalPointForHitTest(node, point);
     if (node.type === "line" || node.type === "arrow") {
       return hitTestLineLikeNode(node, localPoint);
+    }
+    if (node.type === "path") {
+      return hitTestPathNode(node, localPoint);
     }
     const bounds = getSketchNodeLocalBounds(node);
     return (

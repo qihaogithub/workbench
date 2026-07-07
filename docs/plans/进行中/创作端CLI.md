@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-06。
+CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-07。
 
-主线结论：CLI 对账仍只剩 4 个结构性共享层缺口，但 2026-07-06 额外发现并修复了一个 L4 参数面对齐缺口：Web 与 `project-core` 已支持项目分类和项目级创作偏好，CLI `project create` / `project update` 之前没有完整暴露这些字段。`commands --json` 与 `register(...)` 列表继续保持一致，`cli-all-commands` 末尾仍用反查守卫覆盖所有已注册命令。
+主线结论：2026-07-07 复核未发现新的 L3 / L4 CLI 命令缺口，CLI 对账仍只剩 4 个结构性共享层缺口。最近一个已关闭缺口仍是 2026-07-06 修复的项目元数据参数面对齐问题：Web 与 `project-core` 已支持项目分类和项目级创作偏好，CLI `project create` / `project update` 现已完整暴露这些字段。`commands --json` 与 `register(...)` 列表继续保持一致，`cli-all-commands` 末尾仍用反查守卫覆盖所有已注册命令。
 
 ## 当前缺口
 
@@ -35,6 +35,9 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-06。
 - `corepack pnpm check:project-cli`：通过，确认 `page update-prototype`、`page update-sketch` 与扩展后的 `page create` 仍满足全命令回归。
 - `corepack pnpm check:author`：通过（85 test suites / 577 tests），确认当前工作树里的草图页 runtimeType / scene 负载改动未引入 author-site 本地测试回归。
 - 未运行 `corepack pnpm check:project-scaffold`：最近一轮未修改 project-scaffold。
+- 2026-07-07 对账：`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `packages/project-cli/src/index.ts` 注册项一致；`packages/project-cli/src/cli-all-commands.test.ts` 仍通过 `registeredCommands.filter((command) => !executed.has(command))` 反查所有已注册命令。
+- 2026-07-07 对账：`packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`knowledge/[docId]/route.ts` 与 `screenshots/generate-batch/route.ts` 仍分别依赖 agent-service / 外部鉴权同步、本地 workspace manager、直接文件与 manifest 读写、以及 screenshot-service 代理；剩余 4 个缺口继续判定为共享层未完成，而不是 CLI 漏实现。
+- 2026-07-07 当前工作树验证：`corepack pnpm check:project-cli` 通过（含 `preview-contract` 20 tests、`project-cli` typecheck 与 CLI 测试），本轮未发现新增命令回归。
 - 2026-07-06 对账：`packages/project-core/src/service.ts` 的 `createProject` / `updateProject` 已支持 `category` 与 `authoringPreferences`，author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 也已暴露相同元数据字段；CLI 侧此前仅透传 `name` / `description`，属于 L4 项目元数据参数面对齐缺口。
 - 2026-07-06 当前工作树验证：`corepack pnpm check:project-cli` 通过，新增的 `project create --category`、`project update --category`、`--sketch-editor-engine` 与 `--clear-authoring-preferences` 已进入稳定入口回归和全命令回归。
 - 2026-07-03 对账：`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出包含 `page switch-runtime`；同时该命令已存在于 `packages/project-cli/src/index.ts`、`packages/project-cli/src/cli-all-commands.test.ts`、`packages/project-core/src/service.ts` 与 `packages/author-site/src/app/api/projects/[projectId]/demos/[demoId]/runtime/route.ts`，本轮只修正文档登记遗漏。

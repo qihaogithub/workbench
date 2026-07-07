@@ -330,7 +330,6 @@ describe("session demo page files route sketch patch", () => {
       { op: "update", nodeId: "title", patch: { text: "服务端回放标题" } },
     ];
     const targetScene = applySketchScenePatchOperations(baseScene, operations);
-    const targetSceneJson = JSON.stringify(targetScene, null, 2);
 
     jest.mocked(fsUtils.getWorkspaceDemoPageFiles).mockReturnValue({
       code: "",
@@ -364,13 +363,26 @@ describe("session demo page files route sketch patch", () => {
         runtimeValidation: { ok: true, issues: [] },
       },
     });
-    expect(fsUtils.updateWorkspaceDemoFiles).toHaveBeenCalledWith(
+    const updateWorkspaceDemoFiles = jest.mocked(fsUtils.updateWorkspaceDemoFiles);
+    expect(updateWorkspaceDemoFiles).toHaveBeenCalledWith(
       "workspace-1",
       "page-sketch",
       expect.objectContaining({
-        sketchScene: targetSceneJson,
+        sketchScene: expect.any(String),
       }),
     );
+    const savedFiles = updateWorkspaceDemoFiles.mock.calls[0]?.[2];
+    const savedScene = JSON.parse(savedFiles?.sketchScene ?? "") as SketchSceneDocument;
+    expect(savedScene).toMatchObject({
+      version: targetScene.version,
+      pageSize: targetScene.pageSize,
+      nodes: targetScene.nodes,
+      assets: targetScene.assets,
+      bindings: targetScene.bindings,
+      metadata: expect.objectContaining({
+        updatedAt: expect.any(Number),
+      }),
+    });
     expect(diagnosticsStore.appendEditorDiagnosticEvents).toHaveBeenCalledWith([
       expect.objectContaining({
         name: "page.sketch_patch_validated",

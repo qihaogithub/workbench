@@ -66,6 +66,39 @@ describe("sketch-core", () => {
     expect(svg).toContain('x1="60" y1="90" x2="60" y2="40"');
   });
 
+  it("validates and renders optional arrow heads", () => {
+    const scene = testScene([
+      { id: "default-arrow", type: "arrow", x: 20, y: 20, width: 80, height: 0 },
+      { id: "double-arrow", type: "arrow", x: 20, y: 50, width: 80, height: 0, style: { startArrow: "arrow", endArrow: "arrow" } },
+      { id: "plain-arrow", type: "arrow", x: 20, y: 80, width: 80, height: 0, style: { endArrow: "none" } },
+    ]);
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    expect(
+      validateSketchSceneDocument(
+        testScene([
+          {
+            id: "bad-arrow",
+            type: "arrow",
+            x: 20,
+            y: 20,
+            width: 80,
+            height: 0,
+            style: { startArrow: "diamond" } as unknown as SketchSceneNode["style"],
+          },
+        ]),
+      ).valid,
+    ).toBe(false);
+
+    const svg = renderSketchSceneToSvgMarkup(scene);
+    expect(svg).toContain('orient="auto-start-reverse"');
+    expect(svg).toContain('data-sketch-node-id="default-arrow" opacity="1" x1="20" y1="20" x2="100" y2="20"');
+    expect(svg).toContain('data-sketch-node-id="default-arrow" opacity="1" x1="20" y1="20" x2="100" y2="20" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-end="url(#sketch-arrow)"');
+    expect(svg).toContain('data-sketch-node-id="double-arrow" opacity="1" x1="20" y1="50" x2="100" y2="50" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-start="url(#sketch-arrow)" marker-end="url(#sketch-arrow)"');
+    expect(svg).toContain('data-sketch-node-id="plain-arrow" opacity="1" x1="20" y1="80" x2="100" y2="80" stroke="#1F2937" stroke-width="1" stroke-linecap="round"');
+    expect(svg).not.toContain('data-sketch-node-id="plain-arrow" opacity="1" x1="20" y1="80" x2="100" y2="80" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-end');
+  });
+
   it("rejects directed line-like vectors whose end point is outside the page origin", () => {
     expect(
       validateSketchSceneDocument(testScene([{ id: "bad", type: "arrow", x: 20, y: 20, width: -40, height: 0 }])).valid,
@@ -117,6 +150,66 @@ describe("sketch-core", () => {
     expect(validateSketchSceneDocument(next).valid).toBe(true);
   });
 
+  it("validates path points and renders path markup with style-compatible fields", () => {
+    const scene = testScene([
+      {
+        id: "path",
+        type: "path",
+        x: 20,
+        y: 20,
+        width: 120,
+        height: 60,
+        path: "M 20 20 L 140 20 L 140 80",
+        points: [
+          { x: 20, y: 20 },
+          { x: 140, y: 20 },
+          { x: 140, y: 80 },
+        ],
+        style: {
+          fill: "transparent",
+          stroke: "#2563EB",
+          strokeWidth: 4,
+          opacity: 0.5,
+          lineDash: [6, 3],
+        },
+      },
+    ]);
+    const invalidPointsScene = testScene([
+      {
+        id: "bad-path",
+        type: "path",
+        x: 20,
+        y: 20,
+        width: 120,
+        height: 60,
+        path: "M 20 20 L 140 20",
+        points: [{ x: 20, y: Number.NaN }],
+      } as unknown as SketchSceneNode,
+    ]);
+
+    const validation = validateSketchSceneDocument(scene);
+    const invalidValidation = validateSketchSceneDocument(invalidPointsScene);
+    const svg = renderSketchSceneToSvgMarkup(scene);
+
+    expect(validation.valid).toBe(true);
+    expect(invalidValidation.valid).toBe(false);
+    expect(invalidValidation.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "INVALID_NODE",
+          message: "Sketch scene node contains invalid optional fields.",
+          nodeId: "bad-path",
+        }),
+      ]),
+    );
+    expect(svg).toContain('data-sketch-node-id="path"');
+    expect(svg).toContain('d="M 20 20 L 140 20 L 140 80"');
+    expect(svg).toContain('stroke="#2563EB"');
+    expect(svg).toContain('stroke-width="4"');
+    expect(svg).toContain('opacity="0.5"');
+    expect(svg).toContain('stroke-dasharray="6 3"');
+  });
+
   it("rejects image nodes without a static src or src binding", () => {
     const scene = testScene([]);
     const invalidImageNode = { id: "image", type: "image", x: 10, y: 20, width: 80, height: 40 } as SketchSceneNode;
@@ -137,6 +230,41 @@ describe("sketch-core", () => {
 
     expect(next.nodes).toEqual([]);
     expect(validateSketchSceneDocument(next).valid).toBe(true);
+  });
+
+  it("validates and renders image fit strategies", () => {
+    const src = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
+    const scene = testScene([
+      { id: "cover", type: "image", x: 10, y: 20, width: 80, height: 40, src },
+      { id: "contain", type: "image", x: 110, y: 20, width: 80, height: 40, src, style: { imageFit: "contain" } },
+      { id: "fill", type: "image", x: 210, y: 20, width: 80, height: 40, src, style: { imageFit: "fill" } },
+    ]);
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    expect(
+      validateSketchSceneDocument(
+        testScene([
+          {
+            id: "bad-fit",
+            type: "image",
+            x: 10,
+            y: 20,
+            width: 80,
+            height: 40,
+            src,
+            style: { imageFit: "crop" } as unknown as SketchSceneNode["style"],
+          },
+        ]),
+      ).valid,
+    ).toBe(false);
+
+    const svg = renderSketchSceneToSvgMarkup(scene);
+    expect(svg).toContain('data-sketch-node-id="cover"');
+    expect(svg).toContain('preserveAspectRatio="xMidYMid slice"');
+    expect(svg).toContain('data-sketch-node-id="contain"');
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
+    expect(svg).toContain('data-sketch-node-id="fill"');
+    expect(svg).toContain('preserveAspectRatio="none"');
   });
 
   it("rejects invalid style and binding payloads", () => {
@@ -337,6 +465,86 @@ describe("sketch-core", () => {
     expect(ungrouped.nodes.find((node) => node.id === "a")).toMatchObject({ id: "a", type: "rect" });
     expect(ungrouped.nodes.find((node) => node.id === "b")).toMatchObject({ id: "b", type: "text", text: "new" });
     expect(applySketchScenePatchOperationsWithResult(next, []).validation.valid).toBe(true);
+  });
+
+  it("summarizes accepted patch effects by changed node ids and counts", () => {
+    const scene = testScene([
+      { id: "a", type: "rect", x: 10, y: 10, width: 80, height: 40 },
+      { id: "b", type: "text", x: 100, y: 10, width: 90, height: 30, text: "old" },
+    ]);
+
+    const result = applySketchScenePatchOperationsWithResult(scene, [
+      { op: "update", nodeId: "b", patch: { text: "new" } },
+      { op: "duplicate", nodeId: "a", newNodeId: "a-copy", offset: { x: 12, y: 8 } },
+      { op: "delete", nodeId: "a" },
+    ]);
+
+    expect(result.validation.valid).toBe(true);
+    expect(result.summary).toMatchObject({
+      operationCount: 3,
+      changed: true,
+      beforeNodeCount: 2,
+      afterNodeCount: 2,
+      addedNodeIds: ["a-copy"],
+      deletedNodeIds: ["a"],
+      updatedNodeIds: ["b"],
+      updatedFieldsByNodeId: { b: ["text"] },
+      addedCount: 1,
+      deletedCount: 1,
+      updatedCount: 1,
+      affectedNodeCount: 3,
+    });
+  });
+
+  it("summarizes batch deletes and batch property edits without counting rejected patches", () => {
+    const scene = testScene([
+      { id: "a", type: "rect", x: 10, y: 10, width: 80, height: 40 },
+      { id: "b", type: "rect", x: 100, y: 10, width: 80, height: 40 },
+      { id: "c", type: "rect", x: 190, y: 10, width: 80, height: 40 },
+    ]);
+
+    const result = applySketchScenePatchOperationsWithResult(scene, [
+      { op: "set-visible", nodeIds: ["a", "b"], visible: false },
+      { op: "set-locked", nodeIds: ["a", "b"], locked: true },
+      { op: "delete", nodeId: "c" },
+      { op: "update", nodeId: "missing", patch: { text: "ignored" } },
+      { op: "add", node: { id: "bad", type: "rect", x: -1, y: 10, width: 40, height: 40 } },
+    ]);
+    const rejected = applySketchScenePatchOperationsWithResult(scene, [
+      { op: "update", nodeId: "missing", patch: { text: "ignored" } },
+      { op: "add", node: { id: "bad", type: "rect", x: -1, y: 10, width: 40, height: 40 } },
+    ]);
+
+    expect(result.validation.valid).toBe(true);
+    expect(result.summary).toMatchObject({
+      operationCount: 5,
+      changed: true,
+      beforeNodeCount: 3,
+      afterNodeCount: 2,
+      addedNodeIds: [],
+      deletedNodeIds: ["c"],
+      updatedNodeIds: ["a", "b"],
+      updatedFieldsByNodeId: {
+        a: ["locked", "visible"],
+        b: ["locked", "visible"],
+      },
+      addedCount: 0,
+      deletedCount: 1,
+      updatedCount: 2,
+      affectedNodeCount: 3,
+    });
+    expect(rejected.scene).toBe(scene);
+    expect(rejected.summary).toMatchObject({
+      operationCount: 2,
+      changed: false,
+      beforeNodeCount: 3,
+      afterNodeCount: 3,
+      addedCount: 0,
+      deletedCount: 0,
+      updatedCount: 0,
+      affectedNodeCount: 0,
+      updatedFieldsByNodeId: {},
+    });
   });
 
   it("persists reorder operations into zIndex so rendering follows layer commands", () => {
@@ -684,6 +892,20 @@ describe("sketch-core", () => {
     expect(svg).not.toContain("fallback");
   });
 
+  it("renders rect and ellipse node text as centered shape labels", () => {
+    const scene = testScene([
+      { id: "rect", type: "rect", x: 20, y: 30, width: 120, height: 60, text: "Rect label" },
+      { id: "ellipse", type: "ellipse", x: 180, y: 30, width: 120, height: 60, text: "Ellipse label" },
+    ]);
+
+    const svg = renderSketchSceneToSvgMarkup(scene);
+
+    expect(svg).toContain('data-sketch-node-label="rect"');
+    expect(svg).toContain("Rect label");
+    expect(svg).toContain('data-sketch-node-label="ellipse"');
+    expect(svg).toContain("Ellipse label");
+  });
+
   it("preserves valid page size when rendering fallback SVG for invalid scenes", () => {
     const invalidScene = {
       version: 1,
@@ -985,6 +1207,37 @@ describe("sketch-core", () => {
     expect(hitTestSketchScene(scene, { x: 80, y: 44 })?.id).toBe("line");
     expect(hitTestSketchScene(scene, { x: 80, y: 112 })?.id).toBe("arrow");
     expect(hitTestSketchScene(scene, { x: 80, y: 58 })).toBeNull();
+  });
+
+  it("hit tests line endpoints and path points without treating the whole path bounds as painted", () => {
+    const scene = testScene([
+      { id: "line", type: "line", x: 20, y: 40, width: 120, height: 0, style: { strokeWidth: 2 } },
+      { id: "arrow", type: "arrow", x: 20, y: 80, width: 120, height: 60, style: { strokeWidth: 3 } },
+      {
+        id: "path",
+        type: "path",
+        x: 20,
+        y: 20,
+        width: 120,
+        height: 60,
+        path: "M 20 20 L 140 20 L 140 80",
+        points: [
+          { x: 20, y: 20 },
+          { x: 140, y: 20 },
+          { x: 140, y: 80 },
+        ],
+        style: { strokeWidth: 4 },
+        zIndex: 2,
+      },
+      { id: "image", type: "image", x: 180, y: 20, width: 80, height: 60, src: "data:image/png;base64,abc" },
+    ]);
+
+    expect(hitTestSketchScene(scene, { x: 20, y: 40 })?.id).toBe("line");
+    expect(hitTestSketchScene(scene, { x: 140, y: 140 })?.id).toBe("arrow");
+    expect(hitTestSketchScene(scene, { x: 80, y: 23 })?.id).toBe("path");
+    expect(hitTestSketchScene(scene, { x: 138, y: 52 })?.id).toBe("path");
+    expect(hitTestSketchScene(scene, { x: 80, y: 60 })).toBeNull();
+    expect(hitTestSketchScene(scene, { x: 220, y: 50 })?.id).toBe("image");
   });
 
   it("does not hit semantic groups even when config bindings resolve them visible", () => {

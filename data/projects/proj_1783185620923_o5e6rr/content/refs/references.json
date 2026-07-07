@@ -8,10 +8,10 @@
       },
       "to": {
         "kind": "page",
-        "resourceId": "worldcup_13_draw_drawing"
+        "resourceId": "worldcup_02_active_no_vote"
       },
       "reason": "canvas_node"
     }
   ],
-  "updatedAt": 1783349665629
+  "updatedAt": 1783355143155
 }
