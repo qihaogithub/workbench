@@ -5,6 +5,7 @@ import {
   applySketchScenePatchOperationsWithResult,
   bindSketchSceneConfigField,
   buildSketchScenePreviewDocumentHtml,
+  computeSketchSnapResult,
   createDefaultSketchScene,
   getSketchNodeBounds,
   getSketchSceneHashSource,
@@ -97,6 +98,44 @@ describe("sketch-core", () => {
     expect(svg).toContain('data-sketch-node-id="double-arrow" opacity="1" x1="20" y1="50" x2="100" y2="50" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-start="url(#sketch-arrow)" marker-end="url(#sketch-arrow)"');
     expect(svg).toContain('data-sketch-node-id="plain-arrow" opacity="1" x1="20" y1="80" x2="100" y2="80" stroke="#1F2937" stroke-width="1" stroke-linecap="round"');
     expect(svg).not.toContain('data-sketch-node-id="plain-arrow" opacity="1" x1="20" y1="80" x2="100" y2="80" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-end');
+  });
+
+  it("validates connector endpoint bindings and clears them when targets are deleted", () => {
+    const scene = testScene([
+      { id: "source", type: "rect", x: 20, y: 20, width: 80, height: 40 },
+      { id: "target", type: "card", x: 180, y: 80, width: 100, height: 60 },
+      {
+        id: "arrow",
+        type: "arrow",
+        x: 100,
+        y: 40,
+        width: 80,
+        height: 70,
+        connections: {
+          start: { nodeId: "source", anchor: "right" },
+          end: { nodeId: "target", anchor: "left" },
+        },
+      },
+    ]);
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    expect(
+      validateSketchSceneDocument(testScene([
+        { id: "target", type: "card", x: 180, y: 80, width: 100, height: 60 },
+        { id: "bad", type: "arrow", x: 20, y: 20, width: 80, height: 0, connections: { end: { nodeId: "missing", anchor: "left" } } },
+      ])).valid,
+    ).toBe(false);
+    expect(
+      validateSketchSceneDocument(testScene([
+        { id: "target", type: "card", x: 180, y: 80, width: 100, height: 60, connections: { end: { nodeId: "target", anchor: "left" } } as SketchSceneNode["connections"] },
+      ])).valid,
+    ).toBe(false);
+
+    const next = applySketchScenePatchOperations(scene, [{ op: "delete", nodeId: "target" }]);
+    expect(next.nodes.find((node) => node.id === "arrow")?.connections).toEqual({
+      start: { nodeId: "source", anchor: "right" },
+    });
+    expect(validateSketchSceneDocument(next).valid).toBe(true);
   });
 
   it("rejects directed line-like vectors whose end point is outside the page origin", () => {
@@ -892,10 +931,13 @@ describe("sketch-core", () => {
     expect(svg).not.toContain("fallback");
   });
 
-  it("renders rect and ellipse node text as centered shape labels", () => {
+  it("renders rect ellipse and diamond node text as centered shape labels", () => {
     const scene = testScene([
       { id: "rect", type: "rect", x: 20, y: 30, width: 120, height: 60, text: "Rect label" },
       { id: "ellipse", type: "ellipse", x: 180, y: 30, width: 120, height: 60, text: "Ellipse label" },
+      { id: "diamond", type: "diamond", x: 20, y: 120, width: 120, height: 80, text: "Diamond label" },
+      { id: "named-rect", type: "rect", x: 20, y: 120, width: 120, height: 60, name: "矩形" },
+      { id: "named-ellipse", type: "ellipse", x: 180, y: 120, width: 120, height: 60, name: "圆形" },
     ]);
 
     const svg = renderSketchSceneToSvgMarkup(scene);
@@ -904,6 +946,45 @@ describe("sketch-core", () => {
     expect(svg).toContain("Rect label");
     expect(svg).toContain('data-sketch-node-label="ellipse"');
     expect(svg).toContain("Ellipse label");
+    expect(svg).toContain('data-sketch-node-label="diamond"');
+    expect(svg).toContain("Diamond label");
+    expect(svg).not.toContain('data-sketch-node-label="named-rect"');
+    expect(svg).not.toContain('data-sketch-node-label="named-ellipse"');
+  });
+
+  it("hit tests diamond nodes by their polygon shape", () => {
+    const scene = testScene([
+      { id: "diamond", type: "diamond", x: 100, y: 60, width: 120, height: 80 },
+    ]);
+
+    expect(hitTestSketchScene(scene, { x: 160, y: 100 })?.id).toBe("diamond");
+    expect(hitTestSketchScene(scene, { x: 102, y: 62 })).toBeNull();
+  });
+
+  it("computes object and grid snap deltas without mutating scene state", () => {
+    const scene = testScene([
+      { id: "target", type: "rect", x: 100, y: 80, width: 80, height: 60 },
+      { id: "moving", type: "rect", x: 17, y: 43, width: 40, height: 40 },
+    ]);
+
+    const objectSnap = computeSketchSnapResult({
+      nodes: scene.nodes,
+      movingNodeIds: ["moving"],
+      movingBounds: { x: 56, y: 43, width: 40, height: 40 },
+      threshold: 5,
+    });
+    expect(objectSnap.delta).toEqual({ x: 4, y: -3 });
+    expect(objectSnap.lines.some((line) => line.orientation === "vertical" && line.targetNodeId === "target")).toBe(true);
+    expect(objectSnap.lines.some((line) => line.orientation === "horizontal" && line.targetNodeId === "target")).toBe(true);
+
+    const gridSnap = computeSketchSnapResult({
+      nodes: [],
+      movingBounds: { x: 29, y: 35, width: 40, height: 40 },
+      includeGrid: true,
+      gridSize: 16,
+      threshold: 4,
+    });
+    expect(gridSnap.delta).toEqual({ x: -1, y: -3 });
   });
 
   it("preserves valid page size when rendering fallback SVG for invalid scenes", () => {

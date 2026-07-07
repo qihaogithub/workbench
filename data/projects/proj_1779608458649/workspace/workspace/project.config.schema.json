@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "项目级共享配置",
+  "properties": {
+    "bannerImage": {
+      "type": "string",
+      "title": "广告图",
+      "description": "手机和平板共用的广告图",
+      "format": "image",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png"
+    }
+  }
+}

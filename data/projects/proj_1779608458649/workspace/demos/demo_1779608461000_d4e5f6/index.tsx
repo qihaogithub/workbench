@@ -1,13 +1,9 @@
 import { ChevronRight } from 'lucide-react';
 
-interface DemoProps {
-  /** 手机和平板共用的广告图（项目级配置） */
-  bannerImage?: string;
-}
+interface DemoProps {}
 
-export default function PadAfterSchool({
-  bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png',
-}: DemoProps) {
+export default function PadAfterSchool(props: DemoProps) {
+  const { bannerImage = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png' } = props as Record<string, unknown>;
   const featureRows = [
     [
       {

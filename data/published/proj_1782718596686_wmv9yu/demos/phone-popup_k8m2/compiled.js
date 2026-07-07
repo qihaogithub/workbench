@@ -32,7 +32,7 @@ export default function PhonePopup(props) {
     _jsxs('div', {
       className: "fixed inset-0 z-50 flex flex-col"    ,
       style: {
-        backgroundImage: 'url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E5%B9%BF%E5%9C%BA%E9%A1%B5phone.png)',
+        backgroundImage: 'url(/data/proj_1782718596686_wmv9yu/assets/images/c64b75dd5d0cc1f967a4ccc6.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',

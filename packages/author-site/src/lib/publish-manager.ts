@@ -234,6 +234,7 @@ export async function publishProject(
 ): Promise<PublishResult> {
   const startTime = Date.now();
   const onProgress = options?.onProgress;
+  const assetCacheBustParam = `v=${encodeURIComponent(String(startTime))}`;
 
   if (!projectExists(projectId)) {
     throw new Error("PROJECT_NOT_FOUND");
@@ -449,20 +450,22 @@ export async function publishProject(
 
     const mergedConfigData = { ...projectConfigData, ...pageConfigData };
 
+    const compiledJsPath = `demos/${page.id}/compiled.js`;
+    const compiledJsUrlPath = `${compiledJsPath}?${assetCacheBustParam}`;
+    const iframeHtmlPath = `demos/${page.id}/iframe.html?${assetCacheBustParam}`;
     const iframeHtml = generateIframeHtml({
-      compiledCode: replacedCode,
+      compiledCodeUrl: `/data/${projectId}/${compiledJsUrlPath}`,
       cssImports: compileResult.cssImports,
       configData: mergedConfigData,
       cdnBaseUrl: getCdnBaseUrl(),
       runtimeBaseUrl: publishedRuntimeBasePath,
       useCdnRuntime,
     });
-    const iframeHtmlPath = `demos/${page.id}/iframe.html`;
     fs.writeFileSync(path.join(demoPublishDir, "iframe.html"), iframeHtml);
 
     const iframeSrc = viewerBaseUrl
-      ? `${viewerBaseUrl}/data/${projectId}/demos/${page.id}/iframe.html`
-      : `/data/${projectId}/demos/${page.id}/iframe.html`;
+      ? `${viewerBaseUrl}/data/${projectId}/${iframeHtmlPath}`
+      : `/data/${projectId}/${iframeHtmlPath}`;
     const embedCode = `<iframe\n  src="${iframeSrc}"\n  sandbox="allow-scripts"\n  style="width: 100%; border: none;"\n/>`;
 
     publishedDemoPages.push({
@@ -472,7 +475,7 @@ export async function publishProject(
       order: page.order,
       parentId: page.parentId,
       runtimeType: page.runtimeType,
-      compiledJsPath: `demos/${page.id}/compiled.js`,
+      compiledJsPath,
       schemaPath: schemaPublishPath,
       previewSize,
       screenshotPath,

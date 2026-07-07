@@ -301,6 +301,7 @@ export function PreviewPanel({
   onContentLoaded,
   activityState = "active",
   effectiveHeight,
+  containerSizeOverride,
   onPositionableSizes,
   visualEditMode = false,
   visualAnnotationMode = false,
@@ -323,6 +324,7 @@ export function PreviewPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
+  const hasContainerSizeOverride = containerSizeOverride != null;
   const [isCompiling, setIsCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -366,10 +368,12 @@ export function PreviewPanel({
   };
 
   const validCode = code ? isValidCode(code) : true;
+  const effectiveContainerWidth = containerSizeOverride?.width ?? containerWidth;
+  const effectiveContainerHeight = containerSizeOverride?.height ?? containerHeight;
   const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
     previewSize,
-    containerWidth,
-    containerHeight,
+    effectiveContainerWidth,
+    effectiveContainerHeight,
     fillContainer,
     effectiveHeight,
   );
@@ -441,6 +445,7 @@ export function PreviewPanel({
   }, []);
 
   const measureContainer = useCallback(() => {
+    if (hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el) return;
     const width = el.clientWidth;
@@ -452,7 +457,7 @@ export function PreviewPanel({
 
     const rect = el.getBoundingClientRect();
     updateContainerSize(rect.width, rect.height);
-  }, [updateContainerSize]);
+  }, [hasContainerSizeOverride, updateContainerSize]);
 
   const sendLifecycleMessage = useCallback((type: "SLEEP" | "WAKE") => {
     const iframe = iframeRef.current;
@@ -1200,10 +1205,12 @@ export function PreviewPanel({
   }, [onStaticPrototypeSnapshot, staticPrototypeRequestKey]);
 
   useEffect(() => {
+    if (hasContainerSizeOverride) return;
     measureContainer();
-  }, [measureContainer]);
+  }, [hasContainerSizeOverride, measureContainer]);
 
   useEffect(() => {
+    if (hasContainerSizeOverride) return;
     if (!shouldUsePassiveMeasureFallback()) return;
     if (skipNextPassiveMeasureRef.current) {
       skipNextPassiveMeasureRef.current = false;
@@ -1213,6 +1220,7 @@ export function PreviewPanel({
   });
 
   useEffect(() => {
+    if (hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -1223,7 +1231,7 @@ export function PreviewPanel({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [updateContainerSize]);
+  }, [hasContainerSizeOverride, updateContainerSize]);
 
   // 页面切换时重置外层滚动容器的 scrollTop，避免 iframe 偏移到底部
   useEffect(() => {

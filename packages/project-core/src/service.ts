@@ -580,19 +580,20 @@ export class ProjectAdminService {
       const projectPath = this.getProjectPath(entry.name);
       const stats = fs.statSync(projectPath);
       const project = this.readProject(entry.name);
+      if (!project) continue;
       projects.push({
         id: entry.name,
-        name: project?.name ?? entry.name,
-        category: normalizeProjectCategory(project?.category),
-        description: project?.description,
-        authoringPreferences: project?.authoringPreferences,
-        createdAt: project?.createdAt ?? stats.birthtimeMs,
-        updatedAt: project?.updatedAt ?? stats.mtimeMs,
-        thumbnail: project?.thumbnail,
-        demoCount: project?.demoPages?.length ?? 0,
-        demoPages: project?.demoPages,
-        publishedVersion: project?.publishedVersion,
-        publishedAt: project?.publishedAt,
+        name: project.name,
+        category: normalizeProjectCategory(project.category),
+        description: project.description,
+        authoringPreferences: project.authoringPreferences,
+        createdAt: project.createdAt ?? stats.birthtimeMs,
+        updatedAt: project.updatedAt ?? stats.mtimeMs,
+        thumbnail: project.thumbnail,
+        demoCount: project.demoPages.length,
+        demoPages: project.demoPages,
+        publishedVersion: project.publishedVersion,
+        publishedAt: project.publishedAt,
         locked: this.isProjectLocked(entry.name),
       });
     }

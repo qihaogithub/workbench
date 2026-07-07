@@ -90,6 +90,24 @@ function ControlledPartsEditor({
   );
 }
 
+function KeyboardNavigationHarness({
+  initialScene,
+  configData = {},
+}: {
+  initialScene: SketchSceneDocument;
+  configData?: Record<string, unknown>;
+}) {
+  const [value, setValue] = React.useState(initialScene);
+  const controller = useSketchEditorState(value, setValue, undefined, configData);
+  return (
+    <>
+      <SketchEditorCanvas scene={value} controller={controller} configData={configData} previewSize={{ width: 400, height: 300 }} />
+      <output data-testid="selection-node-ids">{JSON.stringify(controller.selection.nodeIds)}</output>
+      <output data-testid="scene-json">{JSON.stringify(value)}</output>
+    </>
+  );
+}
+
 function PartsSelectionCallbackHarnessWithConfig({
   initialScene,
   configData,
@@ -255,7 +273,7 @@ function dispatchPointerEvent(
   type: string,
   clientX: number,
   clientY: number,
-  options: { altKey?: boolean; shiftKey?: boolean; pointerId?: number } = {},
+  options: { altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; ctrlKey?: boolean; pointerId?: number } = {},
 ) {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(event, {
@@ -263,6 +281,8 @@ function dispatchPointerEvent(
     clientY: { value: clientY },
     altKey: { value: Boolean(options.altKey) },
     shiftKey: { value: Boolean(options.shiftKey) },
+    metaKey: { value: Boolean(options.metaKey) },
+    ctrlKey: { value: Boolean(options.ctrlKey) },
     pointerId: { value: options.pointerId ?? 1 },
   });
   fireEvent(target, event);
@@ -272,6 +292,21 @@ function getCanvasStage(): HTMLElement {
   const stage = document.querySelector("[data-sketch-stage]") as HTMLElement | null;
   expect(stage).not.toBeNull();
   return stage as HTMLElement;
+}
+
+function setCanvasStageRect(stage: HTMLElement, width = 400, height = 300) {
+  stage.getBoundingClientRect = () =>
+    ({
+      left: 0,
+      top: 0,
+      width,
+      height,
+      right: width,
+      bottom: height,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
 }
 
 function openCanvasContextMenu() {
@@ -299,6 +334,33 @@ function getLayerRow(nodeId: string): HTMLElement {
   const row = screen.getByTestId("sketch-layer-panel").querySelector(`[data-sketch-layer-row][data-sketch-layer-node-id="${nodeId}"]`);
   expect(row).not.toBeNull();
   return row as HTMLElement;
+}
+
+function queryLayerRow(nodeId: string): HTMLElement | null {
+  return screen.getByTestId("sketch-layer-panel").querySelector(`[data-sketch-layer-row][data-sketch-layer-node-id="${nodeId}"]`);
+}
+
+function createDragDataTransfer(): DataTransfer {
+  const values = new Map<string, string>();
+  return {
+    dropEffect: "move",
+    effectAllowed: "move",
+    files: [] as unknown as FileList,
+    items: [] as unknown as DataTransferItemList,
+    types: [],
+    clearData: (format?: string) => {
+      if (format) {
+        values.delete(format);
+      } else {
+        values.clear();
+      }
+    },
+    getData: (format: string) => values.get(format) ?? "",
+    setData: (format: string, data: string) => {
+      values.set(format, data);
+    },
+    setDragImage: () => {},
+  } as DataTransfer;
 }
 
 function openLayerContextMenu(nodeId: string) {
@@ -619,6 +681,282 @@ describe("sketch-react", () => {
     expect(selectionEvents.at(-1)?.nodeIds).toEqual(["card"]);
   });
 
+  it("shows hover highlight and selected center point without changing scene data", async () => {
+    render(<ControlledEditor />);
+
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+    const cardLabel = document.querySelector('[data-sketch-node-label="card"]');
+    const titleNode = document.querySelector('[data-sketch-node-id="title"]');
+    expect(cardLabel).not.toBeNull();
+    expect(titleNode).not.toBeNull();
+
+    fireEvent.pointerMove(cardLabel as Element, { clientX: 80, clientY: 120 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-hover-highlight")).not.toBeNull();
+      expect(screen.queryByTestId("sketch-selection-box")).toBeNull();
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+
+    fireEvent.pointerDown(cardLabel as Element, { clientX: 80, clientY: 120 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-selection-box")).not.toBeNull();
+      expect(screen.getByTestId("sketch-selection-center-point")).not.toBeNull();
+      expect(screen.getByTestId("sketch-rotate-handle")).not.toBeNull();
+      expect(screen.getByTestId("sketch-resize-handle")).not.toBeNull();
+      expect(screen.queryByTestId("sketch-hover-highlight")).toBeNull();
+    });
+
+    fireEvent.pointerMove(titleNode as Element, { clientX: 40, clientY: 44 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-hover-highlight")).not.toBeNull();
+      expect(screen.getByText("1 selected")).not.toBeNull();
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("cycles overlapping object selection with Cmd or Ctrl click without changing scene data", async () => {
+    const overlapScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "bottom", type: "rect", x: 40, y: 40, width: 120, height: 90, text: "Bottom" },
+        { id: "top", type: "rect", x: 60, y: 60, width: 120, height: 90, text: "Top" },
+      ],
+    };
+    const selectionEvents: SketchEditorSelection[] = [];
+    render(<ControlledEditor initialScene={overlapScene} onSelectionChange={(selection) => selectionEvents.push(selection)} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+
+    dispatchPointerEvent(stage, "pointerdown", 80, 80, { metaKey: true });
+
+    await waitFor(() => {
+      expect(selectionEvents.at(-1)?.nodeIds).toEqual(["top"]);
+    });
+
+    dispatchPointerEvent(stage, "pointerdown", 80, 80, { metaKey: true });
+
+    await waitFor(() => {
+      expect(selectionEvents.at(-1)?.nodeIds).toEqual(["bottom"]);
+    });
+
+    dispatchPointerEvent(stage, "pointerdown", 80, 80, { ctrlKey: true });
+
+    await waitFor(() => {
+      expect(selectionEvents.at(-1)?.nodeIds).toEqual(["top"]);
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("navigates visible canvas objects with Tab and Shift Tab without changing scene data", async () => {
+    const navigationScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 320, height: 220 },
+      nodes: [
+        { id: "title", type: "text", x: 20, y: 20, width: 120, height: 32, text: "Title" },
+        { id: "hidden", type: "rect", x: 40, y: 70, width: 80, height: 40, visible: false },
+        { id: "card", type: "card", x: 150, y: 80, width: 120, height: 64, text: "Card" },
+        { id: "missing-image", type: "image", x: 20, y: 150, width: 60, height: 40 },
+      ],
+    };
+    render(<KeyboardNavigationHarness initialScene={navigationScene} />);
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("selection-node-ids").textContent ?? "[]")).toEqual(["title"]));
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("selection-node-ids").textContent ?? "[]")).toEqual(["card"]));
+
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("selection-node-ids").textContent ?? "[]")).toEqual(["title"]));
+
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("selection-node-ids").textContent ?? "[]")).toEqual(["card"]));
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("enters semantic group child selection on double click and returns to the group with Escape", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 60, y: 100, width: 160, height: 90, visible: false, children: ["card"], name: "Card group" },
+        { id: "card", type: "card", x: 60, y: 100, width: 160, height: 90, text: "Card" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={groupedScene} />);
+
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+    clickLayerNode("group");
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("对象文本")).toBeNull();
+      expect(getLayerRow("group").className).toContain("bg-[#2f5d97]");
+    });
+
+    const cardLabel = document.querySelector('[data-sketch-node-label="card"]');
+    expect(cardLabel).not.toBeNull();
+    fireEvent.doubleClick(cardLabel as Element, { clientX: 120, clientY: 140 });
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("对象文本")).not.toBeNull();
+    });
+    expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("对象文本")).toBeNull();
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("shows rectangular marquee feedback on blank-space drag without changing scene data", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledEditor initialScene={emptyScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+
+    dispatchPointerEvent(stage, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 160, 130);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-marquee-box")).toBeTruthy();
+      expect(screen.getByTestId("sketch-marquee-mode-label").textContent).toBe("矩形框选");
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+
+    dispatchPointerEvent(stage, "pointerup", 160, 130);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("sketch-marquee-box")).toBeNull();
+      expect(screen.queryByTestId("sketch-marquee-mode-label")).toBeNull();
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("renames a layer without changing the canvas text", async () => {
+    const namedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "card", type: "card", x: 60, y: 100, width: 160, height: 90, name: "Old layer", text: "Visible card" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={namedScene} />);
+
+    const rowButton = screen.getByTitle("Old layer");
+    fireEvent.doubleClick(rowButton);
+    const renameInput = screen.getByLabelText("重命名图层 Old layer");
+    fireEvent.change(renameInput, { target: { value: "Renamed layer" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByTitle("Renamed layer")).toBeTruthy();
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "card")).toMatchObject({
+        name: "Renamed layer",
+        text: "Visible card",
+      });
+    });
+    expect(document.body.innerHTML).toContain("Visible card");
+  });
+
+  it("reorders layers by dragging rows without changing node content", async () => {
+    const layerScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "back", type: "rect", x: 20, y: 30, width: 80, height: 40, name: "Back", text: "Back text", zIndex: 0 },
+        { id: "middle", type: "rect", x: 40, y: 50, width: 80, height: 40, name: "Middle", text: "Middle text", zIndex: 1 },
+        { id: "front", type: "rect", x: 60, y: 70, width: 80, height: 40, name: "Front", text: "Front text", zIndex: 2 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={layerScene} />);
+
+    const dataTransfer = createDragDataTransfer();
+    fireEvent.dragStart(getLayerRow("back"), { dataTransfer });
+    fireEvent.dragOver(getLayerRow("front"), { dataTransfer });
+    fireEvent.drop(getLayerRow("front"), { dataTransfer });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      const byId = new Map(parsed.nodes.map((node) => [node.id, node]));
+      expect(byId.get("back")).toMatchObject({ zIndex: 2, name: "Back", text: "Back text" });
+      expect(byId.get("front")).toMatchObject({ zIndex: 1, name: "Front", text: "Front text" });
+      expect(byId.get("middle")).toMatchObject({ zIndex: 0, name: "Middle", text: "Middle text" });
+      expect(getLayerRow("back").className).toContain("bg-[#2f5d97]");
+    });
+  });
+
+  it("filters layer rows by search text and node type without changing scene data", async () => {
+    const layerScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "hero-card", type: "card", x: 20, y: 30, width: 80, height: 40, name: "Hero card", text: "Visible hero" },
+        { id: "hero-image", type: "image", x: 40, y: 50, width: 80, height: 40, name: "Hero image", src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" },
+        { id: "baseline", type: "line", x: 10, y: 10, width: 120, height: 0, name: "Baseline" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={layerScene} />);
+
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+    fireEvent.change(screen.getByLabelText("搜索图层"), { target: { value: "hero" } });
+
+    await waitFor(() => {
+      expect(queryLayerRow("hero-card")).not.toBeNull();
+      expect(queryLayerRow("hero-image")).not.toBeNull();
+      expect(queryLayerRow("baseline")).toBeNull();
+    });
+
+    fireEvent.change(screen.getByLabelText("筛选图层类型"), { target: { value: "image" } });
+
+    await waitFor(() => {
+      expect(queryLayerRow("hero-card")).toBeNull();
+      expect(queryLayerRow("hero-image")).not.toBeNull();
+      expect(queryLayerRow("baseline")).toBeNull();
+    });
+
+    fireEvent.change(screen.getByLabelText("搜索图层"), { target: { value: "missing" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("没有匹配的图层。")).toBeTruthy();
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+  });
+
+  it("shows persistent layer status icons for groups locked hidden and bound nodes", () => {
+    const statusScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 20, y: 20, width: 80, height: 60, visible: false, children: ["locked"], name: "Group layer" },
+        { id: "locked", type: "rect", x: 20, y: 20, width: 80, height: 60, locked: true, name: "Locked layer" },
+        { id: "hidden", type: "ellipse", x: 120, y: 20, width: 80, height: 60, visible: false, name: "Hidden layer" },
+        { id: "bound", type: "text", x: 20, y: 120, width: 120, height: 40, text: "Bound", bindings: { text: "headline" }, name: "Bound layer" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={statusScene} configData={{ headline: "Runtime headline" }} />);
+
+    expect(screen.getByLabelText("分组 Group layer")).toBeTruthy();
+    expect(screen.getByLabelText("已锁定 Locked layer")).toBeTruthy();
+    expect(screen.getByLabelText("已隐藏 Hidden layer")).toBeTruthy();
+    expect(screen.getByLabelText("已绑定 Bound layer")).toBeTruthy();
+  });
+
   it("keeps editor preview mode read-only", async () => {
     render(<ControlledEditor mode="preview" />);
 
@@ -703,6 +1041,102 @@ describe("sketch-react", () => {
     });
   });
 
+  it("runs object commands from the command palette and exposes disabled reasons", async () => {
+    render(<ControlledPartsEditorWithToolbar initialScene={scene} />);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    let palette = screen.getByRole("dialog", { name: "草图命令面板" });
+    fireEvent.change(within(palette).getByLabelText("搜索草图命令"), { target: { value: "删除" } });
+    expect(within(palette).getByRole("button", { name: /删除/ }).hasAttribute("disabled")).toBe(true);
+    expect(within(palette).getByText("当前选择不可编辑")).not.toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByTitle("Card"));
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    palette = screen.getByRole("dialog", { name: "草图命令面板" });
+    fireEvent.change(within(palette).getByLabelText("搜索草图命令"), { target: { value: "复制副本" } });
+    fireEvent.click(within(palette).getByRole("button", { name: /复制副本/ }));
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.filter((node) => node.type === "card")).toHaveLength(2);
+      expect(screen.queryByRole("dialog", { name: "草图命令面板" })).toBeNull();
+    });
+  });
+
+  it("renders shortcut help from registered actions", () => {
+    render(<ControlledPartsEditorWithToolbar initialScene={scene} />);
+
+    fireEvent.click(screen.getByLabelText("打开快捷键帮助"));
+
+    const help = screen.getByRole("dialog", { name: "草图快捷键帮助" });
+    expect(within(help).getByText("复制样式")).not.toBeNull();
+    expect(within(help).getByText("Cmd/Ctrl+Alt+C")).not.toBeNull();
+    expect(within(help).getByText("置顶")).not.toBeNull();
+    expect(within(help).getByText("Cmd/Ctrl+Shift+]")).not.toBeNull();
+  });
+
+  it("copies and pastes styles through registered keyboard actions", async () => {
+    const styleScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "source", type: "rect", x: 30, y: 40, width: 80, height: 50, style: { fill: "#ef4444", stroke: "#111827", strokeWidth: 5, opacity: 0.5, radius: 12 } },
+        { id: "target", type: "ellipse", x: 160, y: 40, width: 80, height: 50, style: { fill: "#ffffff", stroke: "#94a3b8", strokeWidth: 1 } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={styleScene} />);
+
+    clickLayerNode("source");
+    fireEvent.keyDown(window, { key: "c", metaKey: true, altKey: true });
+    clickLayerNode("target");
+    fireEvent.keyDown(window, { key: "v", metaKey: true, altKey: true });
+
+    await waitFor(() => {
+      const target = readRenderedScene().nodes.find((node) => node.id === "target");
+      expect(target?.style).toMatchObject({
+        fill: "#ef4444",
+        stroke: "#111827",
+        strokeWidth: 5,
+        opacity: 0.5,
+      });
+      expect(target?.style?.radius).toBeUndefined();
+    });
+  });
+
+  it("draws diamond nodes from the toolbar", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={emptyScene} />);
+    const stage = getCanvasStage();
+    stage.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 300,
+        right: 400,
+        bottom: 300,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    fireEvent.click(screen.getByLabelText("菱形"));
+    dispatchPointerEvent(stage, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 150, 130);
+    dispatchPointerEvent(stage, "pointerup", 150, 130);
+
+    await waitFor(() => {
+      const diamond = readRenderedScene().nodes.find((node) => node.type === "diamond");
+      expect(diamond).toMatchObject({ name: "菱形", x: 40, y: 50, width: 110, height: 80 });
+      expect(document.querySelector(`[data-sketch-node-id="${diamond?.id}"]`)).not.toBeNull();
+    });
+  });
+
   it("zooms and pans the canvas viewport without changing the scene", async () => {
     render(<ControlledEditor />);
 
@@ -767,6 +1201,151 @@ describe("sketch-react", () => {
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.id === "rect")?.text).toBe("Shape label");
+    });
+  });
+
+  it("starts shape text editing from empty shape body hit testing", async () => {
+    const shapeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 40, y: 50, width: 140, height: 70 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={shapeScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    fireEvent.doubleClick(stage, { clientX: 82, clientY: 74 });
+
+    const editor = await screen.findByLabelText("画布文本编辑");
+    expect(editor).toHaveProperty("placeholder", "输入形状文本");
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "rect")).toMatchObject({ type: "rect" });
+      expect(parsed.nodes.find((node) => node.id === "rect")?.text ?? "").toBe("");
+    });
+  });
+
+  it("does not start inline text editing for locked shapes", () => {
+    const lockedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "locked", type: "rect", x: 40, y: 50, width: 140, height: 70, locked: true },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={lockedScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    fireEvent.doubleClick(stage, { clientX: 82, clientY: 74 });
+
+    expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+  });
+
+  it("does not start inline text editing in preview mode", () => {
+    const shapeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 40, y: 50, width: 140, height: 70, text: "Preview" },
+      ],
+    };
+    render(<ControlledEditor initialScene={shapeScene} mode="preview" />);
+
+    const rectNode = document.querySelector('[data-sketch-node-id="rect"]');
+    expect(rectNode).not.toBeNull();
+    fireEvent.doubleClick(rectNode as Element);
+
+    expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+  });
+
+  it("positions inline shape text editing within the text area and keeps rotation", async () => {
+    const rotatedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        {
+          id: "rotated",
+          type: "rect",
+          x: 40,
+          y: 50,
+          width: 140,
+          height: 70,
+          rotation: 30,
+          text: "Rotated",
+          style: { fontSize: 20, fontWeight: 700, color: "#123456", textAlign: "right" },
+        },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={rotatedScene} />);
+
+    const rectNode = document.querySelector('[data-sketch-node-id="rotated"]');
+    expect(rectNode).not.toBeNull();
+    fireEvent.doubleClick(rectNode as Element);
+
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    expect(editor.style.transform).toBe("rotate(30deg)");
+    expect(editor.style.textAlign).toBe("right");
+    expect(editor.style.fontSize).toBe("20px");
+    expect(editor.style.color).toBe("rgb(18, 52, 86)");
+    expect(Number.parseFloat(editor.style.width)).toBeLessThan(140);
+    expect(Number.parseFloat(editor.style.left)).toBeGreaterThan(40);
+    expect(Number.parseFloat(editor.style.top)).toBeGreaterThan(50);
+
+    const initialHeight = Number.parseFloat(editor.style.height);
+    const initialTop = Number.parseFloat(editor.style.top);
+    expect(screen.queryByTestId("sketch-inline-text-overflow")).toBeNull();
+    fireEvent.change(editor, { target: { value: "Line 1\nLine 2\nLine 3" } });
+
+    expect(Number.parseFloat(editor.style.height)).toBeGreaterThan(initialHeight);
+    expect(Number.parseFloat(editor.style.top)).toBeLessThan(initialTop);
+    expect(Number.parseFloat(editor.style.top) + Number.parseFloat(editor.style.height)).toBeLessThanOrEqual(120);
+    expect(editor.style.overflowY).toBe("auto");
+    expect(screen.getByTestId("sketch-inline-text-overflow").textContent).toBe("文本超出");
+  });
+
+  it("applies text style changes only to the selected inline text range", async () => {
+    const partialTextScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        {
+          id: "card",
+          type: "card",
+          x: 60,
+          y: 100,
+          width: 160,
+          height: 90,
+          text: "Hello",
+        },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={partialTextScene} />);
+
+    const cardNode = document.querySelector('[data-sketch-node-id="card"]');
+    expect(cardNode).not.toBeNull();
+    fireEvent.doubleClick(cardNode as Element);
+
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    editor.setSelectionRange(1, 4);
+    fireEvent.select(editor);
+    fireEvent.change(screen.getByLabelText("斜体"), { target: { value: "true" } });
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      const card = parsed.nodes.find((node) => node.id === "card");
+      expect(card?.text).toBe("Hello");
+      expect(card?.textStyleRuns).toEqual([
+        {
+          start: 1,
+          length: 3,
+          style: { italic: true },
+        },
+      ]);
     });
   });
 
@@ -1336,6 +1915,58 @@ describe("sketch-react", () => {
     });
   });
 
+  it("keeps newly drawn shapes unlabeled until double-click text editing", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledEditor initialScene={emptyScene} />);
+
+    const stage = document.querySelector("[data-sketch-stage]") as HTMLElement;
+    expect(stage).not.toBeNull();
+    stage.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 300,
+        right: 400,
+        bottom: 300,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    fireEvent.click(screen.getByLabelText("矩形"));
+    dispatchPointerEvent(stage, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 140, 120);
+    dispatchPointerEvent(stage, "pointerup", 140, 120);
+
+    let rectId = "";
+    await waitFor(() => {
+      const rect = readRenderedScene().nodes.find((node) => node.type === "rect");
+      expect(rect).toMatchObject({ name: "矩形" });
+      expect(rect?.text ?? "").toBe("");
+      rectId = rect?.id ?? "";
+      expect(document.querySelector(`[data-sketch-node-label="${rectId}"]`)).toBeNull();
+    });
+
+    const rectNode = document.querySelector(`[data-sketch-node-id="${rectId}"]`);
+    expect(rectNode).not.toBeNull();
+    fireEvent.doubleClick(rectNode as Element);
+
+    const editor = await screen.findByLabelText("画布文本编辑");
+    fireEvent.change(editor, { target: { value: "Shape label" } });
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => {
+      const rect = readRenderedScene().nodes.find((node) => node.id === rectId);
+      expect(rect?.text).toBe("Shape label");
+      expect(document.querySelector(`[data-sketch-node-label="${rectId}"]`)).not.toBeNull();
+    });
+  });
+
   it("keeps a committed drawing node id stable across move resize and property edits", async () => {
     const emptyScene: SketchSceneDocument = {
       version: 1,
@@ -1467,6 +2098,51 @@ describe("sketch-react", () => {
       expect(parsed.nodes.filter((node) => node.type === "card")).toHaveLength(1);
       expect(parsed.nodes.find((node) => node.id === "card")).toMatchObject({ x: 60, y: 100 });
     });
+  });
+
+  it("shows typed snap guides and modifier hints while dragging without persisting guide state", async () => {
+    const snapScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "moving", type: "rect", x: 20, y: 30, width: 80, height: 40 },
+        { id: "target", type: "rect", x: 140, y: 30, width: 80, height: 40 },
+      ],
+    };
+    render(<ControlledEditor initialScene={snapScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const movingNode = document.querySelector('[data-sketch-node-id="moving"]');
+    expect(movingNode).not.toBeNull();
+
+    dispatchPointerEvent(movingNode as Element, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 80, 50);
+
+    await waitFor(() => {
+      const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
+      expect(kinds).toContain("edge");
+      expect(screen.getByTestId("sketch-drag-modifier-hint").textContent).toContain("Cmd/Ctrl 临时隐藏吸附参考线");
+    });
+
+    dispatchPointerEvent(stage, "pointermove", 60, 50);
+    await waitFor(() => {
+      const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
+      expect(kinds).toContain("grid");
+      expect(kinds).toContain("spacing");
+    });
+
+    dispatchPointerEvent(stage, "pointermove", 180, 50);
+    await waitFor(() => {
+      const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
+      expect(kinds).toContain("center");
+    });
+
+    dispatchPointerEvent(stage, "pointermove", 180, 50, { metaKey: true });
+    await waitFor(() => expect(screen.queryByTestId("sketch-snap-guide")).toBeNull());
+    dispatchPointerEvent(stage, "pointerup", 180, 50);
+    expect(screen.queryByTestId("sketch-drag-modifier-hint")).toBeNull();
+    expect(screen.getByTestId("scene-json").textContent).not.toContain("snap");
   });
 
   it("draws newly created sticky nodes from pointer drag bounds", async () => {
@@ -1644,6 +2320,85 @@ describe("sketch-react", () => {
         alt: "hero.png",
       });
       expect(imageNode?.src).toContain("data:image/png;base64");
+    });
+  });
+
+  it("opens canvas image fit editing on double click", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "image", type: "image", x: 60, y: 50, width: 120, height: 80, src: "data:image/png;base64,abc", style: { radius: 12 } },
+      ],
+    };
+    render(<ControlledEditor initialScene={imageScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const imageNode = document.querySelector('[data-sketch-node-id="image"]');
+    expect(imageNode).not.toBeNull();
+
+    fireEvent.doubleClick(imageNode as Element, { clientX: 80, clientY: 70 });
+    const editor = await screen.findByRole("toolbar", { name: "图片裁剪适配编辑" });
+    fireEvent.click(within(editor).getByRole("button", { name: "图片完整显示" }));
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "image")).toMatchObject({
+        style: { imageFit: "contain", radius: 12 },
+      });
+      expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+    });
+  });
+
+  it("replaces an image by dropping a file over it while preserving geometry style bindings and layer order", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "behind", type: "rect", x: 10, y: 10, width: 40, height: 40 },
+        {
+          id: "image",
+          type: "image",
+          x: 60,
+          y: 50,
+          width: 120,
+          height: 80,
+          src: "data:image/png;base64,old",
+          alt: "Old image",
+          style: { radius: 10, imageFit: "cover" },
+          bindings: { text: "heroLabel" },
+        },
+        { id: "front", type: "rect", x: 220, y: 10, width: 40, height: 40 },
+      ],
+    };
+    render(<ControlledEditor initialScene={imageScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const imageNode = document.querySelector('[data-sketch-node-id="image"]');
+    expect(imageNode).not.toBeNull();
+
+    fireEvent.drop(imageNode as Element, {
+      clientX: 80,
+      clientY: 70,
+      dataTransfer: { files: [new File(["replacement"], "replacement.png", { type: "image/png" })] },
+    });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.map((node) => node.id)).toEqual(["behind", "image", "front"]);
+      const image = parsed.nodes.find((node) => node.id === "image");
+      expect(image).toMatchObject({
+        x: 60,
+        y: 50,
+        width: 120,
+        height: 80,
+        alt: "replacement.png",
+        style: { radius: 10, imageFit: "cover" },
+        bindings: { text: "heroLabel" },
+      });
+      expect(image?.src).toContain("data:image/png;base64");
     });
   });
 
@@ -2942,6 +3697,349 @@ describe("sketch-react", () => {
     expect(screen.getByLabelText("线宽")).toBeTruthy();
   });
 
+  it("runs layout and arrange commands from the property panel", async () => {
+    const arrangeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "a", type: "rect", x: 20, y: 30, width: 20, height: 20 },
+        { id: "b", type: "rect", x: 90, y: 70, width: 20, height: 20 },
+        { id: "c", type: "rect", x: 220, y: 110, width: 20, height: 20 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={arrangeScene} />);
+
+    clickLayerNode("a");
+    clickLayerNode("b", { shiftKey: true });
+    clickLayerNode("c", { shiftKey: true });
+
+    const arrangeSection = screen.getByText("Layout/Arrange").closest("details");
+    expect(arrangeSection).not.toBeNull();
+    const arrangeControls = within(arrangeSection as HTMLElement);
+    fireEvent.click(arrangeControls.getByRole("button", { name: "水平分布" }));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "b")?.x).toBe(120);
+    });
+
+    fireEvent.click(arrangeControls.getByRole("button", { name: "左对齐" }));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "a")?.x).toBe(20);
+      expect(parsed.nodes.find((node) => node.id === "b")?.x).toBe(20);
+      expect(parsed.nodes.find((node) => node.id === "c")?.x).toBe(20);
+    });
+
+    fireEvent.click(arrangeControls.getByRole("button", { name: "成组" }));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      const group = parsed.nodes.find((node) => node.type === "group");
+      expect(group?.children).toEqual(["a", "b", "c"]);
+    });
+  });
+
+  it("shows property sections, color swatches, reset, and export controls", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+
+    expect(screen.getByText("Position")).toBeTruthy();
+    expect(screen.getByText("Appearance")).toBeTruthy();
+    expect(screen.getByText("Text")).toBeTruthy();
+    expect(screen.getByText("Export")).toBeTruthy();
+    expect(screen.getByLabelText("快捷锁定")).toBeTruthy();
+    expect(screen.getByText("导出整页")).toBeTruthy();
+    expect(screen.getByText("选区尺寸：80 x 40")).toBeTruthy();
+    expect(screen.getByText("PNG 输出：400 x 300 px，透明背景")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("导出倍率"), { target: { value: "2" } });
+    fireEvent.click(screen.getByLabelText("导出带背景"));
+    expect(screen.getByText("PNG 输出：800 x 600 px，带白色背景")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "复制 PNG" }).hasAttribute("disabled")).toBe(false);
+    const rotationScrubber = screen.getByLabelText("旋转拖拽调整");
+    expect(rotationScrubber.textContent).toBe("R");
+    expect(rotationScrubber.getAttribute("title")).toContain("旋转");
+
+    fireEvent.click(screen.getByLabelText("填充 #EF4444"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")).toMatchObject({
+        style: { fill: "#ef4444" },
+      });
+    });
+
+    expect(screen.getByLabelText("填充最近颜色")).toBeTruthy();
+    expect(screen.getByLabelText("填充 最近 #EF4444")).toBeTruthy();
+    expect(screen.getByTestId("scene-json").textContent).not.toContain("recentColors");
+
+    fireEvent.click(screen.getByLabelText("填充 #3B82F6"));
+    expect(screen.getByLabelText("填充 最近 #3B82F6")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("填充 最近 #EF4444"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")).toMatchObject({
+        style: { fill: "#ef4444" },
+      });
+      expect(screen.getByTestId("scene-json").textContent).not.toContain("recentColors");
+    });
+
+    fireEvent.click(screen.getByTitle("重置填充"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fill).toBeUndefined();
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.stroke).toBe("#111827");
+    });
+
+    fireEvent.change(screen.getByLabelText("字号"), { target: { value: "24" } });
+    fireEvent.change(screen.getByLabelText("字重"), { target: { value: "700" } });
+    fireEvent.click(screen.getByTitle("重置字号"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fontSize).toBeUndefined();
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fontWeight).toBe(700);
+    });
+
+    fireEvent.click(screen.getByLabelText("重置外观"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.stroke).toBeUndefined();
+    });
+  });
+
+  it("shows a download fallback status when SVG clipboard copy is blocked", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40 },
+      ],
+    };
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    const linkClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("blocked")) },
+    });
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:sketch-export") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+
+    try {
+      render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+      clickLayerNode("rect");
+      const originalSceneJson = screen.getByTestId("scene-json").textContent;
+
+      fireEvent.click(screen.getByRole("button", { name: "复制 SVG" }));
+
+      expect(await screen.findByText("剪贴板不可用，已下载 SVG")).toBeTruthy();
+      expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+      expect(linkClick).toHaveBeenCalledTimes(1);
+    } finally {
+      linkClick.mockRestore();
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, "clipboard");
+      }
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+    }
+  });
+
+  it("merges continuous property panel numeric input into one undo step", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+    const xInput = screen.getByLabelText("X");
+    fireEvent.change(xInput, { target: { value: "30" } });
+    fireEvent.change(xInput, { target: { value: "40" } });
+    fireEvent.blur(xInput);
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.x).toBe(40);
+    });
+
+    fireEvent.click(screen.getByLabelText("撤销"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.x).toBe(20);
+    });
+
+    fireEvent.click(screen.getByLabelText("重做"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.x).toBe(40);
+    });
+  });
+
+  it("supports numeric expressions, keyboard nudging, scrubber drag, and size ratio lock", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+    fireEvent.click(screen.getByLabelText("开启尺寸比例锁定"));
+    fireEvent.change(screen.getByLabelText("W"), { target: { value: "+20" } });
+    fireEvent.keyDown(screen.getByLabelText("W"), { key: "Enter" });
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")).toMatchObject({
+        width: 100,
+        height: 50,
+      });
+    });
+
+    fireEvent.keyDown(screen.getByLabelText("X"), { key: "ArrowUp" });
+    fireEvent.keyDown(screen.getByLabelText("X"), { key: "ArrowUp", shiftKey: true });
+    fireEvent.keyDown(screen.getByLabelText("X"), { key: "ArrowDown", altKey: true });
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.x).toBe(30.9);
+    });
+
+    fireEvent.mouseDown(screen.getByLabelText("Y拖拽调整"), { clientX: 0 });
+    fireEvent.mouseMove(window, { clientX: 16 });
+    fireEvent.mouseUp(window);
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.y).toBe(34);
+    });
+  });
+
+  it("keeps key property controls accessible by aria label and keyboard behavior", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+
+    for (const label of ["名称", "锁定", "可见", "X", "Y", "W", "H", "旋转", "填充", "描边", "导出倍率"]) {
+      expect(screen.getByLabelText(label)).toBeTruthy();
+    }
+
+    const xInput = screen.getByLabelText("X");
+    fireEvent.keyDown(xInput, { key: "ArrowUp" });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "rect")?.x).toBe(21);
+    });
+
+    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "Accessible rect" } });
+    fireEvent.keyDown(screen.getByLabelText("名称"), { key: "Enter" });
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.name).toBe("Accessible rect");
+    });
+  });
+
+  it("shows a single-selection floating toolbar for fill, text, style, and more actions", async () => {
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "rect", type: "rect", x: 20, y: 30, width: 80, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮描边")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮文本")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮复制样式")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#f8fafc");
+    });
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮文本"));
+    expect(await screen.findByLabelText("画布文本编辑")).toBeTruthy();
+  });
+
+  it("shows a multi-selection floating toolbar for arrange, grouping, copy, delete, and more actions", async () => {
+    const arrangeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "a", type: "rect", x: 20, y: 30, width: 20, height: 20 },
+        { id: "b", type: "rect", x: 90, y: 70, width: 20, height: 20 },
+        { id: "c", type: "rect", x: 220, y: 110, width: 20, height: 20 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={arrangeScene} />);
+
+    clickLayerNode("a");
+    clickLayerNode("b", { shiftKey: true });
+    clickLayerNode("c", { shiftKey: true });
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(within(toolbar).getByLabelText("悬浮左对齐")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮水平分布")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮成组")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮复制")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮删除")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮水平分布"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.id === "b")?.x).toBe(120);
+    });
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮成组"));
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(parsed.nodes.find((node) => node.type === "group")?.children).toEqual(["a", "b", "c"]);
+    });
+  });
+
   it("edits common state, shape style, and line endpoints from the property panel", async () => {
     const panelScene: SketchSceneDocument = {
       version: 1,
@@ -3061,9 +4159,11 @@ describe("sketch-react", () => {
     fireEvent.change(screen.getByPlaceholderText("对象文本"), { target: { value: "Ellipse label" } });
 
     clickLayerNode("image");
+    expect(screen.getByText("图片来源：内嵌 data URL")).toBeTruthy();
+    expect(screen.getByText(/资源大小：约/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("图片地址"), { target: { value: nextImageSrc } });
     fireEvent.change(screen.getByLabelText("Alt 文本"), { target: { value: "Hero image" } });
-    fireEvent.change(screen.getByLabelText("适配"), { target: { value: "contain" } });
+    fireEvent.change(screen.getByLabelText("裁剪/适配"), { target: { value: "contain" } });
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
@@ -3238,6 +4338,95 @@ describe("sketch-react", () => {
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.id === "line")).toMatchObject({ x: 40, y: 50, width: 100, height: 20 });
+    });
+  });
+
+  it("shows connector candidate points while dragging arrow endpoints without changing scene data", async () => {
+    const connectorScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "arrow", type: "arrow", x: 40, y: 50, width: 80, height: 0 },
+        { id: "card", type: "card", x: 180, y: 90, width: 100, height: 70, text: "Target" },
+        { id: "hidden", type: "rect", x: 300, y: 90, width: 40, height: 40, visible: false },
+      ],
+    };
+    render(<ControlledEditor initialScene={connectorScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+    const arrowNode = document.querySelector('[data-sketch-node-id="arrow"]');
+    expect(arrowNode).not.toBeNull();
+    dispatchPointerEvent(arrowNode as Element, "pointerdown", 80, 50);
+    dispatchPointerEvent(stage, "pointerup", 80, 50);
+
+    const endHandle = await screen.findByTestId("sketch-resize-handle");
+    dispatchPointerEvent(endHandle, "pointerdown", 120, 50);
+
+    await waitFor(() => {
+      const candidates = screen.getAllByTestId("sketch-connector-candidate-point");
+      expect(candidates).toHaveLength(5);
+      expect(candidates[0].style.left).toBe("230px");
+      expect(candidates[0].style.top).toBe("90px");
+    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+
+    dispatchPointerEvent(stage, "pointerup", 120, 50);
+    await waitFor(() => expect(screen.queryByTestId("sketch-connector-candidate-point")).toBeNull());
+  });
+
+  it("binds arrow endpoints to shape anchors and follows the connected shape while moving", async () => {
+    const connectorScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "arrow", type: "arrow", x: 40, y: 50, width: 80, height: 0 },
+        { id: "card", type: "card", x: 180, y: 90, width: 100, height: 70, text: "Target" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={connectorScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const arrowNode = document.querySelector('[data-sketch-node-id="arrow"]');
+    expect(arrowNode).not.toBeNull();
+    dispatchPointerEvent(arrowNode as Element, "pointerdown", 80, 50);
+    dispatchPointerEvent(stage, "pointerup", 80, 50);
+
+    const endHandle = await screen.findByTestId("sketch-resize-handle");
+    dispatchPointerEvent(endHandle, "pointerdown", 120, 50);
+    dispatchPointerEvent(stage, "pointermove", 180, 125);
+    dispatchPointerEvent(stage, "pointerup", 180, 125);
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "arrow")).toMatchObject({
+        x: 40,
+        y: 50,
+        width: 140,
+        height: 75,
+        connections: { end: { nodeId: "card", anchor: "left" } },
+      });
+    });
+
+    expect(screen.getByText("终点绑定：card / left")).toBeTruthy();
+    const cardNode = document.querySelector('[data-sketch-node-id="card"]');
+    expect(cardNode).not.toBeNull();
+    dispatchPointerEvent(cardNode as Element, "pointerdown", 200, 110);
+    dispatchPointerEvent(stage, "pointermove", 220, 120);
+    dispatchPointerEvent(stage, "pointerup", 220, 120);
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "card")).toMatchObject({ x: 200, y: 100 });
+      expect(parsed.nodes.find((node) => node.id === "arrow")).toMatchObject({
+        x: 40,
+        y: 50,
+        width: 160,
+        height: 85,
+        connections: { end: { nodeId: "card", anchor: "left" } },
+      });
     });
   });
 
@@ -4147,6 +5336,23 @@ describe("sketch-react", () => {
       expect(parsed.nodes.find((node) => node.id === "card")).toMatchObject({ locked: true });
       expect(screen.queryByRole("menu", { name: "草图右键菜单" })).toBeNull();
     });
+  });
+
+  it("shows export and copy actions in the canvas context menu without changing scene data", async () => {
+    render(<ControlledEditor />);
+
+    const cardLabel = document.querySelector('[data-sketch-node-label="card"]');
+    expect(cardLabel).not.toBeNull();
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
+
+    fireEvent.contextMenu(cardLabel as Element, { clientX: 120, clientY: 140 });
+
+    const menu = await screen.findByRole("menu", { name: "草图右键菜单" });
+    expect(within(menu).getByRole("menuitem", { name: "复制 SVG" })).not.toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: "复制 PNG" })).not.toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: "导出选区" })).not.toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: "导出整页" })).not.toBeNull();
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
   });
 
   it("does not open the canvas context menu in preview mode", () => {

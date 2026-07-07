@@ -1,12 +1,12 @@
 {
   "version": 1,
   "projectId": "proj_1783185620923_o5e6rr",
-  "updatedAt": 1783354833514,
+  "updatedAt": 1783415800781,
   "state": {
     "viewport": {
-      "x": 380.72324503903013,
-      "y": 196.40563290747536,
-      "zoom": 0.2655905344723162
+      "x": 313.4768740740882,
+      "y": 75.99897007553881,
+      "zoom": 0.0915138857948408
     },
     "pages": {
       "worldcup_02_active_no_vote": {
@@ -117,8 +117,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_13_draw_drawing": {
-        "x": 86,
-        "y": 2032,
+        "x": 1891.0430325105208,
+        "y": -320.35852754482147,
         "width": 375,
         "height": 812,
         "zIndex": 13,
@@ -126,10 +126,10 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_14_draw_miss": {
-        "x": 508.58140533624027,
-        "y": 2032,
-        "width": 360.9621341222383,
-        "height": 781.60334108602,
+        "x": 1259.3534831590096,
+        "y": -313.09711867784637,
+        "width": 371.64651684099056,
+        "height": 804.7385911330249,
         "sizeMode": "custom",
         "previewSizeKey": "375x812"
       },
@@ -427,7 +427,7 @@
         ],
         "activePageId": "worldcup_08_prize_drawer_empty",
         "layout": {
-          "x": -280.95648691330985,
+          "x": -153.81310592088013,
           "y": -350.75518645880146,
           "width": 375,
           "height": 812,
@@ -436,7 +436,7 @@
           "previewSizeKey": "375x812"
         },
         "createdAt": 1783343969961,
-        "updatedAt": 1783354709875
+        "updatedAt": 1783415151843
       },
       "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c": {
         "id": "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c",
@@ -464,18 +464,18 @@
             "title": "抽奖结果-公仔"
           }
         ],
-        "activePageId": "worldcup_16_draw_plush",
+        "activePageId": "worldcup_15_draw_vip",
         "layout": {
-          "x": 543.3069458553173,
-          "y": -344.49311136919147,
-          "width": 372.1080318243796,
-          "height": 805.73792491039,
+          "x": 542.8746765927415,
+          "y": -350.75518645880146,
+          "width": 352.0415392033991,
+          "height": 762.2872795550935,
           "zIndex": 40,
           "sizeMode": "preview",
           "previewSizeKey": "375x812"
         },
         "createdAt": 1783354591518,
-        "updatedAt": 1783354824602
+        "updatedAt": 1783415422810
       }
     },
     "hiddenPageIds": [

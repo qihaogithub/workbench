@@ -1,46 +1,13 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
-let _projectsDir: string | null = null;
-
-function getProjectsDir(): string {
-  if (!_projectsDir) {
-    const dataDir = path.resolve(
-      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-    );
-    _projectsDir = path.join(dataDir, 'projects');
-  }
-  return _projectsDir;
-}
-
-interface ProjectImageEntry {
-  id: string;
-  filename: string;
-  url: string;
-  size: number;
-  format: string;
-  createdAt: number;
-  createdBy: 'user' | 'ai' | 'figma';
-}
-
-interface ProjectImageManifest {
-  images: ProjectImageEntry[];
-}
+import {
+  getProjectImageManifestPath,
+  readProjectImageManifest,
+  resolveProjectImageManifestProjectId,
+} from './project-image-manifest';
 
 const ListImagesParams = Type.Object({});
 
@@ -54,7 +21,7 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
       'List all images that have been uploaded to the current project. Use this to check what images are already available before creating new ones, to avoid duplicate uploads.',
     parameters: ListImagesParams,
     execute: async (_toolCallId: string) => {
-      const manifestProjectId = config.projectId || config.demoId;
+      const manifestProjectId = resolveProjectImageManifestProjectId(config);
       if (!manifestProjectId) {
         return {
           content: [{ type: 'text', text: 'No project associated with this session. Images are not tracked.' }],
@@ -62,7 +29,7 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
         };
       }
 
-      const manifestPath = path.join(getProjectsDir(), manifestProjectId, 'images.json');
+      const manifestPath = getProjectImageManifestPath(manifestProjectId);
 
       if (!fs.existsSync(manifestPath)) {
         return {
@@ -72,8 +39,7 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
       }
 
       try {
-        const raw = fs.readFileSync(manifestPath, 'utf-8');
-        const manifest: ProjectImageManifest = JSON.parse(raw);
+        const manifest = readProjectImageManifest(manifestProjectId);
 
         if (manifest.images.length === 0) {
           return {

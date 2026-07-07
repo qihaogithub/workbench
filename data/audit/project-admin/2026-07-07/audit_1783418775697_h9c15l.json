@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1783418775697_h9c15l",
+  "at": 1783418775697,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L4",
+  "tool": "publish_project",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "publishedVersion",
+      "publishedAt"
+    ]
+  }
+}

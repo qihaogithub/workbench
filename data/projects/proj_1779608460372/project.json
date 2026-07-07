@@ -211,10 +211,24 @@
       "sessionId": "session-1782796675350-cfs1bhq9f",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460372/v20",
       "fileCount": 9
+    },
+    {
+      "versionId": "v21",
+      "type": "publish_snapshot",
+      "savedAt": 1783415439840,
+      "savedBy": "system",
+      "sessionId": "publish-1783415439831",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460372/v21",
+      "fileCount": 15,
+      "note": "发布快照"
     }
   ],
   "createdAt": 1779608460372,
-  "updatedAt": 1783354259784,
+  "updatedAt": 1783415439840,
   "activeWorkspaceId": "live-1783354259724-qypgj91ne",
-  "activeWorkspaceUpdatedAt": 1783354259784
+  "activeWorkspaceUpdatedAt": 1783354259784,
+  "canonicalSyncedWorkspaceId": "live-1783354259724-qypgj91ne",
+  "canonicalSyncedAt": 1783415439236,
+  "publishedVersion": "v21",
+  "publishedAt": 1783415439851
 }

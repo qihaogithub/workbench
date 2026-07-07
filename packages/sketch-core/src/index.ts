@@ -2,6 +2,7 @@ export const SKETCH_SCENE_PROTOCOL_VERSION = 1;
 
 export type SketchSceneNodeType =
   | "rect"
+  | "diamond"
   | "ellipse"
   | "line"
   | "arrow"
@@ -16,6 +17,7 @@ export type SketchSceneNodeType =
 
 const SKETCH_SCENE_NODE_TYPES = new Set<string>([
   "rect",
+  "diamond",
   "ellipse",
   "line",
   "arrow",
@@ -77,6 +79,18 @@ export interface SketchSceneNodeBindings {
   variant?: string;
 }
 
+export type SketchSceneConnectorAnchor = "top" | "right" | "bottom" | "left" | "center";
+
+export interface SketchSceneConnectorEndpointBinding {
+  nodeId: string;
+  anchor: SketchSceneConnectorAnchor;
+}
+
+export interface SketchSceneConnectorBindings {
+  start?: SketchSceneConnectorEndpointBinding;
+  end?: SketchSceneConnectorEndpointBinding;
+}
+
 const SKETCH_SCENE_BINDING_KEYS = new Set<string>([
   "text",
   "src",
@@ -85,6 +99,14 @@ const SKETCH_SCENE_BINDING_KEYS = new Set<string>([
   "color",
   "visible",
   "variant",
+]);
+
+const SKETCH_SCENE_CONNECTOR_ANCHORS = new Set<string>([
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "center",
 ]);
 
 const SKETCH_SCENE_TEXT_ALIGN_VALUES = new Set<string>([
@@ -129,6 +151,7 @@ export interface SketchSceneNode {
   points?: Array<{ x: number; y: number }>;
   style?: SketchSceneStyle;
   bindings?: SketchSceneNodeBindings;
+  connections?: SketchSceneConnectorBindings;
   children?: string[];
   name?: string;
   metadata?: Record<string, unknown>;
@@ -150,6 +173,28 @@ export interface SketchSceneDocument {
   assets?: SketchSceneAsset[];
   bindings?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+}
+
+export interface SketchSnapLine {
+  orientation: "vertical" | "horizontal";
+  position: number;
+  from: number;
+  to: number;
+  targetNodeId?: string;
+}
+
+export interface SketchSnapResult {
+  delta: { x: number; y: number };
+  lines: SketchSnapLine[];
+}
+
+export interface ComputeSketchSnapOptions {
+  movingBounds: SketchSceneBounds;
+  nodes: SketchSceneNode[];
+  movingNodeIds?: string[];
+  threshold?: number;
+  gridSize?: number;
+  includeGrid?: boolean;
 }
 
 export type SketchScenePatchOperation =
@@ -438,6 +483,26 @@ function isValidSketchSceneBindings(value: unknown): boolean {
   );
 }
 
+function isValidSketchSceneConnectorEndpoint(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    typeof value.nodeId === "string" &&
+    value.nodeId.trim().length > 0 &&
+    typeof value.anchor === "string" &&
+    SKETCH_SCENE_CONNECTOR_ANCHORS.has(value.anchor)
+  );
+}
+
+function isValidSketchSceneConnectorBindings(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isObject(value)) return false;
+  return (
+    Object.entries(value).every(([key]) => key === "start" || key === "end") &&
+    (value.start === undefined || isValidSketchSceneConnectorEndpoint(value.start)) &&
+    (value.end === undefined || isValidSketchSceneConnectorEndpoint(value.end))
+  );
+}
+
 export function parseSketchSceneDocument(
   value: unknown,
 ): SketchSceneDocument | null {
@@ -454,6 +519,20 @@ export function parseSketchSceneDocument(
 
 export function cloneSketchSceneDocument(scene: SketchSceneDocument): SketchSceneDocument {
   return JSON.parse(JSON.stringify(scene)) as SketchSceneDocument;
+}
+
+export function getSketchConnectorAnchorPoint(
+  node: SketchSceneNode,
+  anchor: SketchSceneConnectorAnchor,
+): { x: number; y: number } {
+  const bounds = getSketchNodeBounds(node);
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+  if (anchor === "top") return { x: centerX, y: bounds.y };
+  if (anchor === "right") return { x: bounds.x + bounds.width, y: centerY };
+  if (anchor === "bottom") return { x: centerX, y: bounds.y + bounds.height };
+  if (anchor === "left") return { x: bounds.x, y: centerY };
+  return { x: centerX, y: centerY };
 }
 
 export function normalizeSketchSceneDocument(
@@ -548,6 +627,7 @@ export function validateSketchSceneDocument(
     const ids = new Set<string>();
     const nodesById = new Map<string, SketchSceneNode>();
     const childRefs: Array<{ nodeId?: string; childId: string }> = [];
+    const connectorRefs: Array<{ nodeId?: string; endpoint: "start" | "end"; targetNodeId: string }> = [];
     for (const node of scene.nodes) {
       if (!isObject(node)) {
         issues.push({
@@ -686,6 +766,19 @@ export function validateSketchSceneDocument(
           severity: "error",
         });
       }
+      if (node.connections !== undefined) {
+        if (!lineLikeType || !isValidSketchSceneConnectorBindings(node.connections)) {
+          issues.push({
+            code: "INVALID_NODE",
+            message: "Sketch scene connector connections are only supported on line and arrow nodes.",
+            nodeId,
+            severity: "error",
+          });
+        } else {
+          if (node.connections.start) connectorRefs.push({ nodeId, endpoint: "start", targetNodeId: node.connections.start.nodeId });
+          if (node.connections.end) connectorRefs.push({ nodeId, endpoint: "end", targetNodeId: node.connections.end.nodeId });
+        }
+      }
     }
     const visiting = new Set<string>();
     const visited = new Set<string>();
@@ -715,6 +808,24 @@ export function validateSketchSceneDocument(
         issues.push({
           code: "INVALID_NODE",
           message: "Sketch scene node children must reference existing nodes.",
+          nodeId: ref.nodeId,
+          severity: "error",
+        });
+      }
+    }
+    for (const ref of connectorRefs) {
+      const target = nodesById.get(ref.targetNodeId);
+      if (
+        !target ||
+        target.id === ref.nodeId ||
+        target.type === "group" ||
+        target.type === "line" ||
+        target.type === "arrow" ||
+        target.type === "path"
+      ) {
+        issues.push({
+          code: "INVALID_NODE",
+          message: "Sketch scene connector endpoints must reference an existing connectable node.",
           nodeId: ref.nodeId,
           severity: "error",
         });
@@ -767,10 +878,23 @@ export function applySketchScenePatchOperations(
     return nodes
       .filter((node) => !removedIds.has(node.id))
       .map((node) => {
-        if (!node.children?.some((childId) => removedIds.has(childId))) return node;
+        const nextChildren = node.children?.some((childId) => removedIds.has(childId))
+          ? node.children.filter((childId) => !removedIds.has(childId))
+          : node.children;
+        const nextConnections =
+          node.connections && (removedIds.has(node.connections.start?.nodeId ?? "") || removedIds.has(node.connections.end?.nodeId ?? ""))
+            ? {
+                ...node.connections,
+                start: node.connections.start && !removedIds.has(node.connections.start.nodeId) ? node.connections.start : undefined,
+                end: node.connections.end && !removedIds.has(node.connections.end.nodeId) ? node.connections.end : undefined,
+              }
+            : node.connections;
+        const compactConnections = nextConnections && (nextConnections.start || nextConnections.end) ? nextConnections : undefined;
+        if (nextChildren === node.children && compactConnections === node.connections) return node;
         return {
           ...node,
-          children: node.children.filter((childId) => !removedIds.has(childId)),
+          children: nextChildren,
+          connections: compactConnections,
         };
       });
   };
@@ -1190,9 +1314,22 @@ function renderSketchNode(
 
   if (node.type === "ellipse") {
     const ellipse = `<ellipse ${common} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" rx="${node.width / 2}" ry="${node.height / 2}" fill="${escapeAttr(fill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
-    const label = resolveBindingValue(node, "text", node.text ?? node.name ?? "", configData);
+    const label = resolveBindingValue(node, "text", node.text ?? "", configData);
     if (!label) return ellipse;
     return `${ellipse}${renderCenteredNodeLabel(node, String(label), style, color, opacity, transform, 16)}`;
+  }
+
+  if (node.type === "diamond") {
+    const points = [
+      `${node.x + node.width / 2},${node.y}`,
+      `${node.x + node.width},${node.y + node.height / 2}`,
+      `${node.x + node.width / 2},${node.y + node.height}`,
+      `${node.x},${node.y + node.height / 2}`,
+    ].join(" ");
+    const diamond = `<polygon ${common} points="${points}" fill="${escapeAttr(fill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
+    const label = resolveBindingValue(node, "text", node.text ?? "", configData);
+    if (!label) return diamond;
+    return `${diamond}${renderCenteredNodeLabel(node, String(label), style, color, opacity, transform, 16)}`;
   }
 
   if (node.type === "line" || node.type === "arrow") {
@@ -1239,7 +1376,7 @@ function renderSketchNode(
         : isControl
           ? "#F9FAFB"
           : "#FFFFFF";
-  const label = resolveBindingValue(node, "text", node.text ?? node.name ?? "", configData);
+  const label = resolveBindingValue(node, "text", node.text ?? "", configData);
   const rect = `<rect ${common} x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="${radius}" ry="${radius}" fill="${escapeAttr(resolvedFill)}" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
   if (!label) return rect;
   return `${rect}${renderCenteredNodeLabel(node, String(label), style, color, opacity, transform, node.type === "sticky" ? 18 : 16)}`;
@@ -1354,6 +1491,125 @@ export function getSketchSelectionBounds(nodes: SketchSceneNode[]): SketchSceneB
   };
 }
 
+function getSnapAnchors(bounds: SketchSceneBounds): Array<{ kind: "start" | "center" | "end"; x?: number; y?: number }> {
+  return [
+    { kind: "start", x: bounds.x, y: bounds.y },
+    { kind: "center", x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+    { kind: "end", x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+  ];
+}
+
+function pickBestSnapCandidate(
+  candidates: Array<{ distance: number; delta: number; line: SketchSnapLine }>,
+): { delta: number; lines: SketchSnapLine[] } | null {
+  if (!candidates.length) return null;
+  const bestDistance = Math.min(...candidates.map((candidate) => candidate.distance));
+  const best = candidates.filter((candidate) => candidate.distance === bestDistance);
+  return {
+    delta: best[0].delta,
+    lines: best.map((candidate) => candidate.line),
+  };
+}
+
+export function computeSketchSnapResult(options: ComputeSketchSnapOptions): SketchSnapResult {
+  const threshold = options.threshold ?? 6;
+  const movingNodeIds = new Set(options.movingNodeIds ?? []);
+  const movingAnchors = getSnapAnchors(options.movingBounds);
+  const verticalCandidates: Array<{ distance: number; delta: number; line: SketchSnapLine }> = [];
+  const horizontalCandidates: Array<{ distance: number; delta: number; line: SketchSnapLine }> = [];
+
+  for (const node of options.nodes) {
+    if (movingNodeIds.has(node.id) || node.type === "group" || node.visible === false) continue;
+    const targetBounds = getSketchNodeBounds(node);
+    const targetAnchors = getSnapAnchors(targetBounds);
+    for (const movingAnchor of movingAnchors) {
+      for (const targetAnchor of targetAnchors) {
+        if (movingAnchor.x !== undefined && targetAnchor.x !== undefined) {
+          const delta = targetAnchor.x - movingAnchor.x;
+          const distance = Math.abs(delta);
+          if (distance <= threshold) {
+            verticalCandidates.push({
+              distance,
+              delta,
+              line: {
+                orientation: "vertical",
+                position: targetAnchor.x,
+                from: Math.min(options.movingBounds.y, targetBounds.y),
+                to: Math.max(options.movingBounds.y + options.movingBounds.height, targetBounds.y + targetBounds.height),
+                targetNodeId: node.id,
+              },
+            });
+          }
+        }
+        if (movingAnchor.y !== undefined && targetAnchor.y !== undefined) {
+          const delta = targetAnchor.y - movingAnchor.y;
+          const distance = Math.abs(delta);
+          if (distance <= threshold) {
+            horizontalCandidates.push({
+              distance,
+              delta,
+              line: {
+                orientation: "horizontal",
+                position: targetAnchor.y,
+                from: Math.min(options.movingBounds.x, targetBounds.x),
+                to: Math.max(options.movingBounds.x + options.movingBounds.width, targetBounds.x + targetBounds.width),
+                targetNodeId: node.id,
+              },
+            });
+          }
+        }
+      }
+    }
+  }
+
+  if (options.includeGrid && options.gridSize && options.gridSize > 0) {
+    const gridSize = options.gridSize;
+    for (const movingAnchor of movingAnchors) {
+      if (movingAnchor.x !== undefined) {
+        const position = Math.round(movingAnchor.x / gridSize) * gridSize;
+        const delta = position - movingAnchor.x;
+        const distance = Math.abs(delta);
+        if (distance <= threshold) {
+          verticalCandidates.push({
+            distance,
+            delta,
+            line: {
+              orientation: "vertical",
+              position,
+              from: options.movingBounds.y,
+              to: options.movingBounds.y + options.movingBounds.height,
+            },
+          });
+        }
+      }
+      if (movingAnchor.y !== undefined) {
+        const position = Math.round(movingAnchor.y / gridSize) * gridSize;
+        const delta = position - movingAnchor.y;
+        const distance = Math.abs(delta);
+        if (distance <= threshold) {
+          horizontalCandidates.push({
+            distance,
+            delta,
+            line: {
+              orientation: "horizontal",
+              position,
+              from: options.movingBounds.x,
+              to: options.movingBounds.x + options.movingBounds.width,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  const vertical = pickBestSnapCandidate(verticalCandidates);
+  const horizontal = pickBestSnapCandidate(horizontalCandidates);
+  return {
+    delta: { x: vertical?.delta ?? 0, y: horizontal?.delta ?? 0 },
+    lines: [...(vertical?.lines ?? []), ...(horizontal?.lines ?? [])],
+  };
+}
+
 function getPointToSegmentDistance(
   point: { x: number; y: number },
   start: { x: number; y: number },
@@ -1431,6 +1687,14 @@ export function hitTestSketchScene(
     }
     if (node.type === "path") {
       return hitTestPathNode(node, localPoint);
+    }
+    if (node.type === "diamond") {
+      const bounds = getSketchNodeLocalBounds(node);
+      const centerX = bounds.x + bounds.width / 2;
+      const centerY = bounds.y + bounds.height / 2;
+      const normalizedX = bounds.width === 0 ? 0 : Math.abs(localPoint.x - centerX) / (bounds.width / 2);
+      const normalizedY = bounds.height === 0 ? 0 : Math.abs(localPoint.y - centerY) / (bounds.height / 2);
+      return normalizedX + normalizedY <= 1;
     }
     const bounds = getSketchNodeLocalBounds(node);
     return (

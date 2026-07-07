@@ -39,7 +39,7 @@ export default function PadPopup(props) {
       _jsxs('div', {
         className: "relative flex h-screen w-screen flex-col items-center justify-center"      ,
         style: {
-          backgroundImage: 'url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E9%A6%96%E9%A1%B5-pad.webp)',
+          backgroundImage: 'url(/data/proj_1782718596686_wmv9yu/assets/images/0d1ebc4fadf43c911af54647.webp)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

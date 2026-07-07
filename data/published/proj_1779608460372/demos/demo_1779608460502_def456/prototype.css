@@ -1,0 +1,81 @@
+/* 平板居中广告弹窗 - HTML/CSS 原型 */
+.pad-popup-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  max-width: 1024px;
+  margin: 0 auto;
+  overflow: hidden;
+  background-color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.pad-popup-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/data/proj_1779608460372/assets/images/dbcb7aaf54e8ffe8c57c9daf.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.pad-popup-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pad-popup-card {
+  width: 375px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pad-popup-image {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.pad-popup-actions {
+  background-color: #ffffff;
+  border-radius: 0 0 32px 32px;
+  padding: 8px 16px 20px;
+}
+
+.pad-popup-actions-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.pad-popup-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 280px;
+  height: 44px;
+  border-radius: 30px;
+  background-color: #fcda00;
+  color: #544300;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 150%;
+  font-family: "PingFang SC", sans-serif;
+  cursor: pointer;
+}
+
+.pad-popup-secondary {
+  color: #666666;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 150%;
+  font-family: "PingFang SC", sans-serif;
+  cursor: pointer;
+}

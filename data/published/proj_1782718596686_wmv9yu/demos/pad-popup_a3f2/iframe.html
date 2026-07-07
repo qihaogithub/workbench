@@ -27,7 +27,7 @@
 }
   }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -66,7 +66,7 @@
 
     
 (function() {
-  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, annotations: [], propertyChanges: [] };
+  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, hiddenNodeIds: [], annotations: [], propertyChanges: [] };
   var hoverBox = null;
   var selectedBox = null;
   var label = null;
@@ -85,6 +85,7 @@
   var textDraftValue = null;
   var suppressStyleRestoreOnHide = false;
   var editingAnnotationId = null;
+  var hiddenNodeOriginalDisplays = {};
   var lastHoverId = null;
   var appliedPropertyOriginals = {};
 
@@ -356,6 +357,38 @@
       }
     });
     appliedPropertyOriginals = {};
+  }
+
+  function restoreHiddenNodes() {
+    Object.keys(hiddenNodeOriginalDisplays).forEach(function(key) {
+      var original = hiddenNodeOriginalDisplays[key];
+      if (!original || !original.element) return;
+      original.element.style.display = original.display || '';
+      original.element.removeAttribute('data-visual-hidden');
+    });
+    hiddenNodeOriginalDisplays = {};
+  }
+
+  function applyHiddenNodes() {
+    restoreHiddenNodes();
+    (state.hiddenNodeIds || []).forEach(function(nodeId) {
+      if (!nodeId) return;
+      var el = getElementByPath(nodeId);
+      if (!el) {
+        try {
+          el = document.querySelector('[data-visual-node-id="' + String(nodeId).replace(/"/g, '\\"') + '"]');
+        } catch (_err) {
+          el = null;
+        }
+      }
+      if (!el) return;
+      hiddenNodeOriginalDisplays[nodeId] = {
+        element: el,
+        display: el.style.display || ''
+      };
+      el.setAttribute('data-visual-hidden', 'true');
+      el.style.setProperty('display', 'none', 'important');
+    });
   }
 
   function applyPropertyChanges() {
@@ -973,6 +1006,7 @@
       annotationMode: !!next.annotationMode,
       hoverNodeId: next.hoverNodeId || null,
       selectedNodeId: next.selectedNodeId || null,
+      hiddenNodeIds: Array.isArray(next.hiddenNodeIds) ? next.hiddenNodeIds : [],
       propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
@@ -983,6 +1017,7 @@
       if (selectedBox) selectedBox.style.display = 'none';
     }
     applyPropertyChanges();
+    applyHiddenNodes();
     redrawSelection();
     redrawHoverFromState();
     renderAnnotations();
@@ -1392,6 +1427,35 @@
           reportRuntimeError({ stage: 'dependency_import', error: err.message, stack: err.stack });
         });
     }
+    
+    function loadModuleFromUrl(moduleUrl, thisVersion) {
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeUrl: moduleUrl
+      });
+      import(moduleUrl)
+        .then((module) => {
+          if (thisVersion !== updateVersion) return;
+          currentComponent = module.default || null;
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
+          renderComponent();
+          if (module.default) {
+            window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
+          } else {
+            reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
+          }
+        })
+        .catch((err) => {
+          if (thisVersion !== updateVersion) return;
+          reportRuntimeError({ stage: 'dependency_import', error: err.message, stack: err.stack });
+        });
+    }
     const shellStartedAt = performance.now();
     reportRuntimeTiming('shell_start', {
       cdnBase: 'https://esm.sh',
@@ -1430,19 +1494,7 @@
         const thisVersion = ++updateVersion;
 
         if (isModuleUrl) {
-          fetch(incomingCode)
-            .then(res => {
-              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-              return res.text();
-            })
-            .then(jsCode => {
-              if (thisVersion !== updateVersion) return;
-              loadModuleFromCode(jsCode, thisVersion);
-            })
-            .catch((err) => {
-              if (thisVersion !== updateVersion) return;
-              reportRuntimeError({ stage: 'dependency_import', error: err.message });
-            });
+          loadModuleFromUrl(incomingCode, thisVersion);
         } else {
           loadModuleFromCode(incomingCode, thisVersion);
         }
@@ -1641,8 +1693,8 @@
     reportRuntimeTiming('ready_sent');
     window.parent.postMessage({ type: 'READY' }, '*');
 
-    const initialCode = "import {jsx as _jsx, jsxs as _jsxs} from \"/data/proj_1782718596686_wmv9yu/preview-runtime/vendor/react-jsx-runtime.js\";import { SvgaPlayer } from \"/data/proj_1782718596686_wmv9yu/preview-runtime/vendor/preview-sdk.js\";\n\n\n\n\n\n\n\n\n\n\n\nconst DEFAULT_MODAL_IMAGE = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png';\n\nfunction readString(value, fallback = '') {\n  return typeof value === 'string' && value.trim().length > 0 ? value : fallback;\n}\n\nfunction readMediaType(value) {\n  return value === 'svga' ? 'svga' : 'image';\n}\n\n\nexport default function PadPopup(props) {\n  const config = props ;\n  const modalImage = readString(config.modalImage, DEFAULT_MODAL_IMAGE);\n  const mediaType = readMediaType(config.mediaType);\n  const svgaSrc = readString(config.svgaSrc);\n  const showSvga = mediaType === 'svga' && svgaSrc.length > 0;\n\n  return (\n    _jsx('div', {\n      className: \"fixed inset-0 z-50 flex items-center justify-center\"     ,\n      style: {\n        backgroundColor: 'rgba(0, 0, 0, 0.7)',\n        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n      },\n children: \n      _jsxs('div', {\n        className: \"relative flex h-screen w-screen flex-col items-center justify-center\"      ,\n        style: {\n          backgroundImage: 'url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E9%A6%96%E9%A1%B5-pad.webp)',\n          backgroundSize: 'cover',\n          backgroundPosition: 'center',\n          backgroundRepeat: 'no-repeat',\n        },\n children: [\n        _jsx('div', { className: \"absolute inset-0 bg-black/70\"  ,} )\n\n        , _jsx('div', { className: \"relative z-10 w-full max-w-[26em] px-8\"    , children: \n          _jsxs('div', { className: \"relative\", children: [\n            _jsx('div', { className: \"absolute z-20 cursor-pointer\"  , style: { top: '-46px', right: 0 }, children: \n              _jsxs('svg', { width: \"36\", height: \"36\", viewBox: \"0 0 42 42\"   , fill: \"none\", children: [\n                _jsx('rect', { width: \"42\", height: \"42\", fill: \"black\", fillOpacity: \"0.01\",} )\n                , _jsx('circle', { cx: \"21\", cy: \"21.0002\", r: \"18.0955\", stroke: \"white\", strokeWidth: \"1.26847\", strokeLinecap: \"round\", strokeLinejoin: \"round\",} )\n                , _jsx('path', { fillRule: \"evenodd\", clipRule: \"evenodd\", d: \"M26.6199 17.5782C27.126 16.9651 27.0923 16.0559 26.5186 15.4822C25.9091 14.8727 24.9208 14.8727 24.3113 15.4822L21.0002 18.7933L17.6892 15.4822L17.5778 15.381C16.9647 14.8748 16.0555 14.9086 15.4819 15.4822C14.8723 16.0918 14.8723 17.08 15.4819 17.6896L18.7929 21.0006L15.482 24.3115L15.3808 24.4229C14.8746 25.036 14.9083 25.9452 15.482 26.5188C16.0916 27.1284 17.0798 27.1284 17.6893 26.5188L21.0002 23.2079L24.3111 26.5188L24.4225 26.6201C25.0356 27.1263 25.9448 27.0925 26.5185 26.5188C27.128 25.9093 27.128 24.9211 26.5185 24.3115L23.2076 21.0006L26.5186 17.6896L26.6199 17.5782Z\"                                                     , fill: \"white\",} )\n              ]})\n            })\n\n            , showSvga ? (\n              _jsx(SvgaPlayer, {\n                src: svgaSrc,\n                className: \"block w-full\" ,\n                style: { aspectRatio: '670 / 780' },}\n              )\n            ) : (\n              _jsx('img', { src: modalImage, alt: \"popup\", className: \"block h-auto w-full\"  ,} )\n            )\n          ]})\n        })\n      ]})\n    })\n  );\n}\n";
-    const initialCodeUrl = null;
+    const initialCode = null;
+    const initialCodeUrl = "/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/compiled.js?v=1783419130270";
     if (initialCode) {
       window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
@@ -1672,17 +1724,7 @@
         });
     } else if (initialCodeUrl) {
       window.__DEMO_PROPS__ = currentConfig;
-      fetch(initialCodeUrl)
-        .then(function(res) {
-          if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-          return res.text();
-        })
-        .then(function(jsCode) {
-          loadModuleFromCode(jsCode, updateVersion);
-        })
-        .catch((err) => {
-          reportRuntimeError({ stage: 'dependency_import', error: err.message });
-        });
+      loadModuleFromUrl(initialCodeUrl, updateVersion);
     }
   </script>
 </body>

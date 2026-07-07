@@ -27,6 +27,7 @@
 | [创作端CLI-ProjectAdmin使用体验优化方案](./创作端CLI-ProjectAdmin使用体验优化方案.md) | Project Admin CLI | 记录摘要输出、批量原型导入、聚合验证、页面效果检查、证据包和本地项目包体验优化的最终结论 |
 | [创作端手绘删除OpenPencil方案目标任务](./创作端手绘删除OpenPencil方案目标任务.md) | 创作端手绘路线收敛 | 记录创作端手绘从 OpenPencil 方案删除并收敛到自研草图 SDK 的最终结论、验证和剩余 E2E 环境风险 |
 | [创作端草图绘图SDK编辑体验提升归档](./创作端草图绘图SDK编辑体验提升归档.md) | 创作端草图 SDK | 记录自研草图 SDK 绘图状态机、属性面板、协议渲染、Agent 友好性和 playground 验收完成结论 |
+| [创作端草图绘图SDK-Excalidraw源码对比优化归档](./创作端草图绘图SDK-Excalidraw源码对比优化归档.md) | 创作端草图 SDK | 记录 Excalidraw 源码对比后完成 action registry、命令面板、快捷键帮助、样式复制、diamond 和吸附几何服务的最终结论 |
 | [本机OrbStack-Docker回归修复归档](./本机OrbStack-Docker回归修复归档.md) | Docker 回归与 AI/发布链路 | 记录创作端/浏览端 AI、发布资源本地化和本机 OrbStack 构建启动验证的最终结论 |
 | [Docker本机部署体验修复目标归档](./Docker本机部署体验修复目标归档.md) | Docker 体验与创作端/浏览端交互 | 记录浏览端 AI 多会话、单页设备框、配置默认资源、计划审批、模型过滤、图层隐藏和配置面板提示等体验修复结论 |
 ## 相关规范

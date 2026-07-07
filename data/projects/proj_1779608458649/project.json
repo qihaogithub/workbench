@@ -6,17 +6,19 @@
   "demoPages": [
     {
       "id": "demo_1779608460500_a1b2c3",
-      "name": "demo",
+      "name": "手机",
+      "routeKey": "demo",
+      "runtimeType": "prototype-html-css",
       "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
+      "parentId": null
     },
     {
       "id": "demo_1779608461000_d4e5f6",
-      "name": "demo",
+      "name": "平板",
+      "routeKey": "demo-2",
+      "runtimeType": "prototype-html-css",
       "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
+      "parentId": null
     }
   ],
   "demoFolders": [],
@@ -110,15 +112,40 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608458649/v11",
       "fileCount": 9,
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v12",
+      "type": "publish_snapshot",
+      "savedAt": 1783415771902,
+      "savedBy": "system",
+      "sessionId": "publish-1783415771895",
+      "snapshotPath": "/app/data/snapshots/proj_1779608458649/v12",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v13",
+      "type": "publish_snapshot",
+      "savedAt": 1783415939062,
+      "savedBy": "system",
+      "sessionId": "publish-1783415938871",
+      "snapshotPath": "/app/data/snapshots/proj_1779608458649/v13",
+      "fileCount": 13,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v14",
+      "type": "publish_snapshot",
+      "savedAt": 1783418226691,
+      "savedBy": "system",
+      "sessionId": "publish-1783418226665",
+      "snapshotPath": "/app/data/snapshots/proj_1779608458649/v14",
+      "fileCount": 16,
+      "note": "发布快照"
     }
   ],
-  "pageVersions": {},
   "createdAt": 1779608458652,
-  "updatedAt": 1783060643070,
-  "publishedVersion": "v10",
-  "publishedAt": 1780063578252,
-  "activeWorkspaceId": "live-1783060641371-6spy22bem",
-  "activeWorkspaceUpdatedAt": 1783060641376,
-  "canonicalSyncedWorkspaceId": "live-1783060641371-6spy22bem",
-  "canonicalSyncedAt": 1783060643070
+  "updatedAt": 1783418525588,
+  "publishedVersion": "v14",
+  "publishedAt": 1783418226770
 }

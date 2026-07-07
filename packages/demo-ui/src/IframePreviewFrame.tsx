@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { computePreviewScale } from "./preview-scale";
-import type { PreviewSize } from "./types";
+import type { PreviewContainerSize, PreviewSize } from "./types";
 import { cn } from "./utils";
 
 export interface IframePreviewFrameProps {
@@ -11,6 +11,7 @@ export interface IframePreviewFrameProps {
   previewSize?: PreviewSize;
   className?: string;
   fillContainer?: boolean;
+  containerSizeOverride?: PreviewContainerSize;
   sandbox?: string;
   onLoad?: () => void;
 }
@@ -26,12 +27,14 @@ export function IframePreviewFrame({
   previewSize,
   className,
   fillContainer = false,
+  containerSizeOverride,
   sandbox = "allow-scripts",
   onLoad,
 }: IframePreviewFrameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
+  const hasContainerSizeOverride = containerSizeOverride != null;
 
   const updateContainerSize = useCallback((width: number, height: number) => {
     const nextWidth = normalizeMeasuredSize(width);
@@ -42,6 +45,7 @@ export function IframePreviewFrame({
   }, []);
 
   const measureContainer = useCallback(() => {
+    if (hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el) return;
     const width = el.clientWidth;
@@ -52,13 +56,14 @@ export function IframePreviewFrame({
     }
     const rect = el.getBoundingClientRect();
     updateContainerSize(rect.width, rect.height);
-  }, [updateContainerSize]);
+  }, [hasContainerSizeOverride, updateContainerSize]);
 
   useLayoutEffect(() => {
     measureContainer();
   }, [measureContainer]);
 
   useEffect(() => {
+    if (hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
@@ -68,12 +73,15 @@ export function IframePreviewFrame({
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [updateContainerSize]);
+  }, [hasContainerSizeOverride, updateContainerSize]);
+
+  const effectiveContainerWidth = containerSizeOverride?.width ?? containerWidth;
+  const effectiveContainerHeight = containerSizeOverride?.height ?? containerHeight;
 
   const { wrapperStyle, contentStyle } = computePreviewScale(
     previewSize,
-    containerWidth,
-    containerHeight,
+    effectiveContainerWidth,
+    effectiveContainerHeight,
     fillContainer,
   );
 

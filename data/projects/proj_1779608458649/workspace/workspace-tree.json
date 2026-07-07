@@ -3,17 +3,19 @@
   "pages": [
     {
       "id": "demo_1779608460500_a1b2c3",
-      "name": "demo",
+      "name": "手机",
+      "routeKey": "demo",
+      "runtimeType": "prototype-html-css",
       "order": 0,
-      "parentId": null,
-      "routeKey": "demo"
+      "parentId": null
     },
     {
       "id": "demo_1779608461000_d4e5f6",
-      "name": "demo",
+      "name": "平板",
+      "routeKey": "demo-2",
+      "runtimeType": "prototype-html-css",
       "order": 1,
-      "parentId": null,
-      "routeKey": "demo-2"
+      "parentId": null
     }
   ]
 }
