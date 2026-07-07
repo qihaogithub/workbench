@@ -1,12 +1,12 @@
 {
   "version": 1,
   "projectId": "proj_1783185620923_o5e6rr",
-  "updatedAt": 1783349365819,
+  "updatedAt": 1783354833514,
   "state": {
     "viewport": {
-      "x": 396.8192334864417,
-      "y": 210.15070221649387,
-      "zoom": 0.1995420995284126
+      "x": 380.72324503903013,
+      "y": 196.40563290747536,
+      "zoom": 0.2655905344723162
     },
     "pages": {
       "worldcup_02_active_no_vote": {
@@ -134,8 +134,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_12_share_dialog": {
-        "x": -760,
-        "y": 3328,
+        "x": -1410.2097290956162,
+        "y": 3651.012262250618,
         "width": 375,
         "height": 812,
         "zIndex": 12,
@@ -143,8 +143,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_15_draw_vip": {
-        "x": -760,
-        "y": 4264,
+        "x": 1073.4330548503035,
+        "y": 2301.399989484777,
         "width": 375,
         "height": 812,
         "zIndex": 15,
@@ -152,8 +152,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_16_draw_trial": {
-        "x": -272,
-        "y": 4264,
+        "x": 1561.4330548503035,
+        "y": 2301.399989484777,
         "width": 375,
         "height": 812,
         "zIndex": 18,
@@ -161,8 +161,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_15_draw_gold": {
-        "x": 232,
-        "y": 4264,
+        "x": 2065.4330548503035,
+        "y": 2301.399989484777,
         "width": 375,
         "height": 812,
         "zIndex": 16,
@@ -170,8 +170,8 @@
         "previewSizeKey": "375x812"
       },
       "worldcup_16_draw_plush": {
-        "x": 744,
-        "y": 4264,
+        "x": 2577.4330548503035,
+        "y": 2301.399989484777,
         "width": 375,
         "height": 812,
         "zIndex": 17,
@@ -397,7 +397,7 @@
             "title": "预热期首页"
           }
         ],
-        "activePageId": "worldcup_04_active_chance_used",
+        "activePageId": "worldcup_07_ended_lost",
         "layout": {
           "x": -800.6210262515999,
           "y": -350.75518645880146,
@@ -407,7 +407,7 @@
         },
         "directoryCollapsed": false,
         "createdAt": 1783337634754,
-        "updatedAt": 1783347187261
+        "updatedAt": 1783354832673
       },
       "page-group-8a8f7c86-5119-4527-88b4-e48d1787cc4e": {
         "id": "page-group-8a8f7c86-5119-4527-88b4-e48d1787cc4e",
@@ -427,7 +427,7 @@
         ],
         "activePageId": "worldcup_08_prize_drawer_empty",
         "layout": {
-          "x": 607,
+          "x": -280.95648691330985,
           "y": -350.75518645880146,
           "width": 375,
           "height": 812,
@@ -436,7 +436,46 @@
           "previewSizeKey": "375x812"
         },
         "createdAt": 1783343969961,
-        "updatedAt": 1783347193010
+        "updatedAt": 1783354709875
+      },
+      "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c": {
+        "id": "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c",
+        "kind": "page-group",
+        "title": "抽奖结果-VIP 等 4 个页面",
+        "pages": [
+          {
+            "id": "worldcup_15_draw_vip",
+            "pageId": "worldcup_15_draw_vip",
+            "title": "抽奖结果-VIP"
+          },
+          {
+            "id": "worldcup_16_draw_trial",
+            "pageId": "worldcup_16_draw_trial",
+            "title": "抽奖结果-体验课"
+          },
+          {
+            "id": "worldcup_15_draw_gold",
+            "pageId": "worldcup_15_draw_gold",
+            "title": "抽奖结果-金片"
+          },
+          {
+            "id": "worldcup_16_draw_plush",
+            "pageId": "worldcup_16_draw_plush",
+            "title": "抽奖结果-公仔"
+          }
+        ],
+        "activePageId": "worldcup_16_draw_plush",
+        "layout": {
+          "x": 543.3069458553173,
+          "y": -344.49311136919147,
+          "width": 372.1080318243796,
+          "height": 805.73792491039,
+          "zIndex": 40,
+          "sizeMode": "preview",
+          "previewSizeKey": "375x812"
+        },
+        "createdAt": 1783354591518,
+        "updatedAt": 1783354824602
       }
     },
     "hiddenPageIds": [
@@ -449,7 +488,11 @@
       "worldcup_02_active_no_vote",
       "worldcup_01_upcoming_home",
       "worldcup_08_prize_drawer_empty",
-      "worldcup_09_prize_drawer_with_prizes"
+      "worldcup_09_prize_drawer_with_prizes",
+      "worldcup_15_draw_vip",
+      "worldcup_16_draw_trial",
+      "worldcup_15_draw_gold",
+      "worldcup_16_draw_plush"
     ],
     "nodes": {},
     "layers": {

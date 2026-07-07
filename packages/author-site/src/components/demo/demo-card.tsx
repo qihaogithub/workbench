@@ -11,7 +11,6 @@ import {
 import Link from "next/link";
 import {
   Copy,
-  FileText,
   FolderPen,
   Image,
   Lock,
@@ -180,12 +179,7 @@ function PageScreenshotCell({
           onError={handleError}
         />
       ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-muted/60 to-muted">
-          <FileText className="h-4 w-4 text-muted-foreground/50" />
-          <span className="max-w-full truncate px-1 text-center text-[10px] leading-tight text-muted-foreground/60">
-            {page.name}
-          </span>
-        </div>
+        <PagePreviewPlaceholder label={page.name} />
       )}
       {showOverlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/60">
@@ -194,6 +188,39 @@ function PageScreenshotCell({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+function PagePreviewPlaceholder({ label }: { label: string }) {
+  return (
+    <div
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background/30"
+      style={{
+        background:
+          "radial-gradient(circle at 22% 18%, rgba(20, 184, 166, 0.18), transparent 34%), radial-gradient(circle at 82% 8%, rgba(245, 158, 11, 0.14), transparent 30%), linear-gradient(135deg, hsl(var(--muted) / 0.72), hsl(var(--background) / 0.72))",
+      }}
+    >
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.06)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.05)_1px,transparent_1px)] bg-[size:18px_18px] opacity-50" />
+      <div className="relative flex h-[76%] w-[62%] flex-col overflow-hidden rounded border border-foreground/10 bg-background/50 shadow-sm">
+        <div className="flex h-3 shrink-0 items-center gap-0.5 border-b border-foreground/10 px-1.5">
+          <span className="h-1 w-1 rounded-full bg-foreground/25" />
+          <span className="h-1 w-1 rounded-full bg-foreground/10" />
+          <span className="h-1 w-1 rounded-full bg-foreground/10" />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5 p-2">
+          <div className="h-2 w-2/3 rounded-full bg-foreground/25" />
+          <div className="grid flex-1 grid-cols-[1.2fr_0.8fr] gap-1.5">
+            <div className="rounded-sm bg-foreground/10" />
+            <div className="space-y-1">
+              <div className="h-2 rounded-full bg-foreground/10" />
+              <div className="h-2 w-3/4 rounded-full bg-foreground/10" />
+              <div className="mt-2 h-5 rounded-sm bg-primary/20" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <span className="sr-only">{label}</span>
     </div>
   );
 }
@@ -317,20 +344,38 @@ function ScreenshotCover({
 
 function PlaceholderIcon() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background/50">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-6 w-6 text-muted-foreground/60"
-        >
-          <polygon points="5 3 19 12 5 21 5 3" />
-        </svg>
+    <div
+      className="relative h-full w-full overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(circle at 18% 18%, rgba(20, 184, 166, 0.24), transparent 30%), radial-gradient(circle at 82% 22%, rgba(245, 158, 11, 0.18), transparent 28%), linear-gradient(135deg, hsl(var(--muted) / 0.82), hsl(var(--background) / 0.78))",
+      }}
+    >
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.055)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.05)_1px,transparent_1px)] bg-[size:24px_24px] opacity-60" />
+      <div className="absolute left-[12%] top-[18%] h-[62%] w-[36%] rounded-md border border-foreground/10 bg-background/50 shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+        <div className="h-4 border-b border-foreground/10 px-2 py-1">
+          <div className="h-1.5 w-8 rounded-full bg-foreground/25" />
+        </div>
+        <div className="space-y-2 p-2">
+          <div className="h-8 rounded-sm bg-primary/20" />
+          <div className="h-1.5 w-3/4 rounded-full bg-foreground/20" />
+          <div className="h-1.5 w-1/2 rounded-full bg-foreground/10" />
+        </div>
+      </div>
+      <div className="absolute left-[38%] top-[12%] h-[70%] w-[46%] rounded-md border border-foreground/10 bg-background/60 shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
+        <div className="grid h-full grid-rows-[20%_1fr] overflow-hidden rounded-md">
+          <div className="border-b border-foreground/10 bg-foreground/5 px-3 py-2">
+            <div className="h-1.5 w-16 rounded-full bg-foreground/25" />
+          </div>
+          <div className="grid grid-cols-[0.7fr_1fr] gap-2 p-3">
+            <div className="rounded-sm bg-foreground/10" />
+            <div className="space-y-1.5">
+              <div className="h-2 w-full rounded-full bg-foreground/20" />
+              <div className="h-2 w-2/3 rounded-full bg-foreground/10" />
+              <div className="mt-2 h-5 w-16 rounded-sm bg-teal-400/20" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

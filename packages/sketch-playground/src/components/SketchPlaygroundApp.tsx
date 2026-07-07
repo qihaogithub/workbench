@@ -3,10 +3,13 @@
 import React from "react";
 import {
   getSketchSceneHashSource,
+  hitTestSketchScene,
   parseSketchSceneDocument,
   renderSketchSceneToSvgMarkup,
+  translateSketchNodes,
   validateSketchSceneDocument,
   type SketchSceneDocument,
+  type SketchSceneNode,
 } from "@workbench/sketch-core";
 import {
   SketchEditorCanvas,
@@ -17,7 +20,16 @@ import {
 } from "@workbench/sketch-react";
 import { sketchFixtures } from "../fixtures/sketch-fixtures";
 
-type DevPanelTab = "scene" | "config" | "metrics";
+type DevPanelTab = "scene" | "config" | "metrics" | "debug";
+
+type PerformanceRow = {
+  count: number;
+  renderMs: number;
+  hitTestMs: number;
+  translateMs: number;
+  pathRenderMs: number;
+  hashLength: number;
+};
 
 function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
@@ -54,6 +66,65 @@ function createPerformanceScene(count: number): SketchSceneDocument {
   };
 }
 
+function createPerformancePathScene(count: number): SketchSceneDocument {
+  return {
+    version: 1,
+    pageSize: { width: 960, height: 640 },
+    nodes: Array.from({ length: count }, (_, index) => {
+      const x = 24 + (index % 20) * 44;
+      const y = 32 + Math.floor(index / 20) * 24;
+      return {
+        id: `perf-path-${index}`,
+        type: "path",
+        x,
+        y,
+        width: 32,
+        height: 12,
+        path: `M ${x} ${y + 6} L ${x + 8} ${y} L ${x + 16} ${y + 12} L ${x + 24} ${y + 2} L ${x + 32} ${y + 6}`,
+        points: [
+          { x, y: y + 6 },
+          { x: x + 8, y },
+          { x: x + 16, y: y + 12 },
+          { x: x + 24, y: y + 2 },
+          { x: x + 32, y: y + 6 },
+        ],
+        style: {
+          fill: "transparent",
+          stroke: "#0f172a",
+          strokeWidth: 2,
+        },
+      } satisfies SketchSceneNode;
+    }),
+    assets: [],
+    bindings: {},
+  };
+}
+
+function summarizeSceneChange(previous: SketchSceneDocument, next: SketchSceneDocument): string {
+  const previousById = new Map(previous.nodes.map((node) => [node.id, node]));
+  const nextById = new Map(next.nodes.map((node) => [node.id, node]));
+  const added = next.nodes.filter((node) => !previousById.has(node.id)).map((node) => node.id);
+  const deleted = previous.nodes.filter((node) => !nextById.has(node.id)).map((node) => node.id);
+  const updated = next.nodes
+    .filter((node) => {
+      const previousNode = previousById.get(node.id);
+      return previousNode ? JSON.stringify(previousNode) !== JSON.stringify(node) : false;
+    })
+    .map((node) => node.id);
+  const parts = [
+    added.length ? `added ${added.slice(0, 3).join(", ")}` : "",
+    deleted.length ? `deleted ${deleted.slice(0, 3).join(", ")}` : "",
+    updated.length ? `updated ${updated.slice(0, 3).join(", ")}` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "No structural change";
+}
+
+function measureMs(action: () => void): number {
+  const start = performance.now();
+  action();
+  return Number((performance.now() - start).toFixed(2));
+}
+
 export function SketchPlaygroundApp() {
   const [fixtureId, setFixtureId] = React.useState(sketchFixtures[0].id);
   const activeFixture = sketchFixtures.find((fixture) => fixture.id === fixtureId) ?? sketchFixtures[0];
@@ -64,7 +135,8 @@ export function SketchPlaygroundApp() {
   const [message, setMessage] = React.useState("Ready");
   const [devPanelOpen, setDevPanelOpen] = React.useState(false);
   const [devPanelTab, setDevPanelTab] = React.useState<DevPanelTab>("scene");
-  const [perf, setPerf] = React.useState<Array<{ count: number; renderMs: number; hashLength: number }>>([]);
+  const [perf, setPerf] = React.useState<PerformanceRow[]>([]);
+  const [lastSceneSummary, setLastSceneSummary] = React.useState("Ready");
   const initialSelectionAppliedRef = React.useRef(false);
 
   const validation = React.useMemo(() => validateSketchSceneDocument(scene), [scene]);
@@ -74,7 +146,10 @@ export function SketchPlaygroundApp() {
   );
 
   const updateScene = React.useCallback((nextScene: SketchSceneDocument) => {
-    setScene(nextScene);
+    setScene((previousScene) => {
+      setLastSceneSummary(summarizeSceneChange(previousScene, nextScene));
+      return nextScene;
+    });
     setSceneJson(formatJson(nextScene));
   }, []);
 
@@ -96,6 +171,7 @@ export function SketchPlaygroundApp() {
     setConfigJson(formatJson(fixture.configData ?? {}));
     setPerf([]);
     setMessage(`Loaded ${fixture.name}`);
+    setLastSceneSummary(`Loaded ${fixture.name}`);
     const firstNode = fixture.scene.nodes[0];
     controller.setNodeIds(firstNode ? [firstNode.id] : []);
   }, [controller]);
@@ -131,15 +207,26 @@ export function SketchPlaygroundApp() {
   }, [configJson]);
 
   const runPerformance = React.useCallback(() => {
-    const counts = [20, 50, 100];
+    const counts = [100, 500, 1000];
     const rows = counts.map((count) => {
       const perfScene = createPerformanceScene(count);
-      const start = performance.now();
-      renderSketchSceneToSvgMarkup(perfScene, {});
-      const renderMs = performance.now() - start;
+      const pathScene = createPerformancePathScene(count);
       return {
         count,
-        renderMs: Number(renderMs.toFixed(2)),
+        renderMs: measureMs(() => {
+          renderSketchSceneToSvgMarkup(perfScene, {});
+        }),
+        hitTestMs: measureMs(() => {
+          for (let index = 0; index < 120; index += 1) {
+            hitTestSketchScene(perfScene, { x: 24 + (index % 20) * 44, y: 32 + Math.floor(index / 20) * 40 });
+          }
+        }),
+        translateMs: measureMs(() => {
+          translateSketchNodes(perfScene.nodes, { x: 8, y: 4 });
+        }),
+        pathRenderMs: measureMs(() => {
+          renderSketchSceneToSvgMarkup(pathScene, {});
+        }),
         hashLength: getSketchSceneHashSource(perfScene).length,
       };
     });
@@ -232,7 +319,7 @@ export function SketchPlaygroundApp() {
         {devPanelOpen ? (
           <div className="absolute bottom-24 left-8 right-8 z-20 overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
             <div className="flex h-11 items-center gap-2 border-b border-border px-3">
-              {(["scene", "config", "metrics"] as const).map((tab) => (
+              {(["scene", "config", "metrics", "debug"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -241,7 +328,7 @@ export function SketchPlaygroundApp() {
                   }`}
                   onClick={() => setDevPanelTab(tab)}
                 >
-                  {tab === "scene" ? "Scene JSON" : tab === "config" ? "Config Data" : "Metrics"}
+                  {tab === "scene" ? "Scene JSON" : tab === "config" ? "Config Data" : tab === "metrics" ? "Metrics" : "Debug"}
                 </button>
               ))}
               <button
@@ -294,6 +381,9 @@ export function SketchPlaygroundApp() {
                       <tr className="bg-background text-left text-muted-foreground">
                         <th className="border border-border p-2">nodes</th>
                         <th className="border border-border p-2">render ms</th>
+                        <th className="border border-border p-2">hit test ms</th>
+                        <th className="border border-border p-2">translate ms</th>
+                        <th className="border border-border p-2">path render ms</th>
                         <th className="border border-border p-2">hash len</th>
                       </tr>
                     </thead>
@@ -302,6 +392,9 @@ export function SketchPlaygroundApp() {
                         <tr key={row.count}>
                           <td className="border border-border p-2 text-foreground">{row.count}</td>
                           <td className="border border-border p-2 text-foreground">{row.renderMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.hitTestMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.translateMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.pathRenderMs}</td>
                           <td className="border border-border p-2 text-foreground">{row.hashLength}</td>
                         </tr>
                       ))}
@@ -310,6 +403,46 @@ export function SketchPlaygroundApp() {
                 ) : (
                   <div className="rounded-md border border-border bg-background p-3">Run Performance to refresh the baseline.</div>
                 )}
+              </div>
+            ) : null}
+
+            {devPanelTab === "debug" ? (
+              <div className="grid max-h-80 grid-cols-[240px_minmax(0,1fr)] gap-3 overflow-hidden p-3 text-xs text-muted-foreground">
+                <div className="grid content-start gap-3">
+                  <Metric label="tool" value={controller.tool} />
+                  <Metric label="selection" value={controller.selection.nodeIds.length ? controller.selection.nodeIds.join(", ") : "none"} />
+                  <Metric label="draft state" value="idle" />
+                  <Metric label="last change" value={lastSceneSummary} />
+                  <Metric label="node count" value={String(scene.nodes.length)} />
+                </div>
+                <div className="min-h-0 overflow-auto rounded-md border border-border bg-background">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-card text-left text-muted-foreground">
+                        <th className="border-b border-border p-2">id</th>
+                        <th className="border-b border-border p-2">type</th>
+                        <th className="border-b border-border p-2">name/text</th>
+                        <th className="border-b border-border p-2">state</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scene.nodes.slice(0, 60).map((node) => (
+                        <tr key={node.id}>
+                          <td className="border-t border-border p-2 font-mono text-foreground">{node.id}</td>
+                          <td className="border-t border-border p-2 text-foreground">{node.type}</td>
+                          <td className="border-t border-border p-2 text-foreground">{node.name ?? node.text ?? node.alt ?? ""}</td>
+                          <td className="border-t border-border p-2 text-foreground">
+                            {[
+                              node.locked ? "locked" : "",
+                              node.visible === false ? "hidden" : "",
+                              node.bindings ? "bound" : "",
+                            ].filter(Boolean).join(", ") || "editable"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
           </div>

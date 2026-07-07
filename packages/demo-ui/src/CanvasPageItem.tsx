@@ -11,6 +11,7 @@ import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
 import { SketchPagePreview } from "./SketchPagePreview";
+import { IframePreviewFrame } from "./IframePreviewFrame";
 import type {
   CanvasPageLayout,
   CanvasPageData,
@@ -347,17 +348,22 @@ export function CanvasPagePreviewContent({
       )}
 
       {shouldRenderIframe && page.iframeUrl && (
-        <iframe
-          title={page.name}
-          src={page.iframeUrl}
-          className="absolute inset-0 h-full w-full border-0 bg-white shadow-md transition-opacity duration-200 ease-out"
+        <div
+          className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md transition-opacity duration-200 ease-out"
           style={{
             opacity: showIframeContent ? 1 : 0,
             pointerEvents: "none",
           }}
-          sandbox="allow-scripts"
-          onLoad={handleIframeContentLoaded}
-        />
+        >
+          <IframePreviewFrame
+            title={page.name}
+            src={page.iframeUrl}
+            previewSize={page.previewSize}
+            fillContainer
+            sandbox="allow-scripts"
+            onLoad={handleIframeContentLoaded}
+          />
+        </div>
       )}
 
       {shouldRenderIframe && !page.iframeUrl && (

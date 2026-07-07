@@ -168,12 +168,16 @@ function parseSizeValue(value: string | number | undefined, fallback: number): n
   return fallback;
 }
 
-function getConfigValue(configData: Record<string, unknown>, key: string): string {
+function getConfigValue(
+  configData: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(configData, key)) return undefined;
   const value = configData[key];
   if (value == null) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return "";
+  return undefined;
 }
 
 export function applyPrototypeTextBindings(
@@ -182,7 +186,7 @@ export function applyPrototypeTextBindings(
 ): string {
   return html.replace(
     /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g,
-    (_match, key: string) => getConfigValue(configData, key),
+    (match, key: string) => getConfigValue(configData, key) ?? match,
   );
 }
 
@@ -221,37 +225,47 @@ export function applyPrototypeBindings(
 
   Array.from(root.querySelectorAll("[data-bind-text]")).forEach((element) => {
     const key = element.getAttribute("data-bind-text");
-    if (key) element.textContent = getConfigValue(configData, key);
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value !== undefined) element.textContent = value;
   });
   Array.from(root.querySelectorAll("[data-bind-src]")).forEach((element) => {
     const key = element.getAttribute("data-bind-src");
-    if (key) {
-      element.setAttribute(
-        "src",
-        rewritePrototypeAssetUrl(getConfigValue(configData, key), assetRewrite),
-      );
-    }
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value === undefined) return;
+    element.setAttribute(
+      "src",
+      rewritePrototypeAssetUrl(value, assetRewrite),
+    );
   });
   Array.from(root.querySelectorAll("[data-bind-href]")).forEach((element) => {
     const key = element.getAttribute("data-bind-href");
-    if (key) {
-      element.setAttribute(
-        "href",
-        rewritePrototypeAssetUrl(getConfigValue(configData, key), assetRewrite),
-      );
-    }
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value === undefined) return;
+    element.setAttribute(
+      "href",
+      rewritePrototypeAssetUrl(value, assetRewrite),
+    );
   });
   Array.from(root.querySelectorAll("[data-bind-style-color]")).forEach((element) => {
     const key = element.getAttribute("data-bind-style-color");
-    if (key) element.style.color = getConfigValue(configData, key);
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value !== undefined) element.style.color = value;
   });
   Array.from(root.querySelectorAll("[data-bind-style-background-color]")).forEach((element) => {
     const key = element.getAttribute("data-bind-style-background-color");
-    if (key) element.style.backgroundColor = getConfigValue(configData, key);
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value !== undefined) element.style.backgroundColor = value;
   });
   Array.from(root.querySelectorAll("[data-bind-style-border-color]")).forEach((element) => {
     const key = element.getAttribute("data-bind-style-border-color");
-    if (key) element.style.borderColor = getConfigValue(configData, key);
+    if (!key) return;
+    const value = getConfigValue(configData, key);
+    if (value !== undefined) element.style.borderColor = value;
   });
 }
 

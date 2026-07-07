@@ -705,7 +705,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >(undefined);
   const projectConfigSchemaRef = useRef<string | undefined>(projectConfigSchema);
   projectConfigSchemaRef.current = projectConfigSchema;
-  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
+  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<
+    string | null
+  >(null);
+  const [configPanelOverviewRequested, setConfigPanelOverviewRequested] =
+    useState(false);
 
   const {
     previewMode,
@@ -3231,6 +3235,7 @@ ${context.details}
         setPreviewSize(pagePreviewSizeMap[pageId]);
       }
       if (previewMode === "canvas") {
+        setConfigPanelOverviewRequested(false);
         focusCanvasPage(pageId);
         setCanvasEditingPageId(pageId);
       }
@@ -3318,6 +3323,7 @@ ${context.details}
     if (canvasEditingPageId && deleted.has(canvasEditingPageId)) {
       setCanvasEditingPageId(null);
       setConfigPanelDetailPageId(null);
+      setConfigPanelOverviewRequested(false);
       clearCanvasSelection();
     }
   }, [
@@ -6056,6 +6062,7 @@ ${context.details}
                         rememberActivePageSchema();
                         setCanvasEditingPageId(pageId);
                         setConfigPanelDetailPageId(pageId);
+                        setConfigPanelOverviewRequested(false);
                         setActiveDemoId(pageId);
                         activeDemoIdRef.current = pageId;
                         if (sessionId) {
@@ -6094,6 +6101,7 @@ ${context.details}
                         clearCanvasSelection();
                         setCanvasEditingPageId(null);
                         setConfigPanelDetailPageId(null);
+                        setConfigPanelOverviewRequested(true);
                       }}
                     />
                   </div>
@@ -6571,9 +6579,14 @@ ${context.details}
                         : undefined,
                   }))}
                   activePageId={activeDemoId}
-                  detailPageId={configPanelDetailPageId}
+                  detailPageId={
+                    configPanelOverviewRequested
+                      ? configPanelDetailPageId
+                      : configPanelDetailPageId ?? activeDemoId
+                  }
                   onDetailPageIdChange={(pageId) => {
                     setConfigPanelDetailPageId(pageId);
+                    setConfigPanelOverviewRequested(pageId === null);
                     if (pageId === null && previewMode === "canvas") {
                       clearCanvasSelection();
                     }

@@ -1,6 +1,6 @@
 # CLI 维护当前状态
 
-> 更新日期：2026-07-06
+> 更新日期：2026-07-07
 
 ## 当前结论
 
@@ -10,7 +10,7 @@
 - `docs/项目文档/创作端/10-CLI/技术/05_CLI能力自动化清单.md`
 - `docs/项目文档/创作端/10-CLI/技术/06_CLI自动维护运行手册.md`
 
-`commands --json`、`packages/project-cli/src/index.ts` 的 `register(...)` 列表与 `packages/project-cli/src/cli-all-commands.test.ts` 末尾的未覆盖守卫继续保持一致。2026-07-06 对账确认，当前工作树除了已登记的内容图 / 资源历史 / 草图页命令外，还补齐了 `project create --category` 与 `project update --category`、`--authoring-preferences`、`--sketch-editor-engine`、`--clear-authoring-preferences`；它们与 `packages/project-core/src/service.ts` 的项目元数据写入能力、author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 入口保持同名同义，并已进入 `cli-all-commands` 与稳定入口回归。
+`commands --json`、`packages/project-cli/src/index.ts` 的 `register(...)` 列表与 `packages/project-cli/src/cli-all-commands.test.ts` 末尾的未覆盖守卫继续保持一致。2026-07-07 复核未发现新的 L3 只读命令缺口或已注册命令参数漂移：上一轮补齐的 `project create --category` 与 `project update --category`、`--authoring-preferences`、`--sketch-editor-engine`、`--clear-authoring-preferences` 仍与 `packages/project-core/src/service.ts` 的项目元数据写入能力、author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 入口保持同名同义，并继续进入 `cli-all-commands` 与稳定入口回归。
 
 当前工作树新增的 HTML/CSS 原型页能力已进入共享层：`page create` 支持 `runtimeType: "prototype-html-css"` 与 `prototypeHtml`、`prototypeCss`、`prototypeMeta`，`page update-prototype` 与 `page switch-runtime` 已注册并纳入 `cli-all-commands` 覆盖。对应的文件读写、版本快照、运行时切换、恢复与校验由 `project-core` 承载，不属于 CLI 侧复制 Web 逻辑；但这条能力当前只确认创作端编辑事务与本地测试链路，不等同于发布、viewer 或本地项目包协议已经完整支持原型页。
 
@@ -18,7 +18,7 @@
 
 当前页面历史模型已经从旧 `page version-*` 命令切换到通用 `resource version-*` 入口。author-site 的页面版本与知识文档版本入口均已迁到 `/api/projects/[projectId]/resources/[kind]/[resourceId]/versions/*`，知识文档增删改也会通过 `ProjectAdminService.resourceVersionCreate` / `resourceDelete` 写入资源历史；CLI 与共享层对齐本身没有缺命令，缺的是长期文档还保留旧命令名称和旧路由认知。
 
-本轮复核还确认，知识文档“资源历史”与“知识文档 CRUD”仍是两层能力：`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 仍直接维护 `knowledge/manifest.json` 和文档文件，所以 GAP-004 继续保持 L1，只报告不补 CLI。
+本轮复核还确认，知识文档“资源历史”与“知识文档 CRUD”仍是两层能力：`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 仍直接维护 `knowledge/manifest.json` 和文档文件；`packages/author-site/src/app/api/workspaces/route.ts` 仍依赖 author-site 本地 workspace manager；`packages/author-site/src/app/api/screenshots/generate-batch/route.ts` 仍只做代理到 screenshot-service。因此 GAP-003、GAP-004、GAP-005 继续保持 L1，只报告不补 CLI。
 
 本轮处理额外关闭了一个 L4 元数据对齐缺口：此前 CLI `project create` / `project update` 仅暴露名称和描述，未覆盖 Web 已有的项目分类与项目级创作偏好。当前已补齐 CLI 参数层与回归测试，但由于属于创建 / 更新类能力，自动化等级仍按 L4 记录，后续需要人工审核变更语义而非继续自动扩面。
 
@@ -60,3 +60,6 @@
 - 2026-07-05：`corepack pnpm check:project-core` 通过（31 tests passed）；`corepack pnpm check:project-cli` 通过；`corepack pnpm check:author` 通过（85 test suites / 577 tests），确认草图页 runtimeType 与 scene 负载在当前工作树的共享层、CLI 与 author-site 本地测试链路下没有回归。
 - 2026-07-06：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `register(...)` 一致。对账 `packages/project-core/src/service.ts`、`packages/author-site/src/app/api/demos/route.ts` 与 `packages/author-site/src/app/api/demos/[id]/route.ts` 后，确认 CLI 先前遗漏了 `project create/update` 的 `category` 与项目级 `authoringPreferences` 参数面。
 - 2026-07-06：`corepack pnpm check:project-cli` 通过，确认新增的项目元数据参数和稳定入口 / 全命令回归没有引入新失败。
+- 2026-07-07：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `register(...)` 一致，`packages/project-cli/src/cli-all-commands.test.ts` 仍使用 `registeredCommands.filter((command) => !executed.has(command))` 断言无未覆盖命令。
+- 2026-07-07：对账 `packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`knowledge/[docId]/route.ts` 与 `screenshots/generate-batch/route.ts` 后，确认剩余会话 / 工作区 / 知识文档 CRUD / 截图任务仍停留在 author-site 路由或代理层，不满足 CLI 自动补齐前提。
+- 2026-07-07：`corepack pnpm check:project-cli` 通过（含 `preview-contract` 20 tests、`project-cli` typecheck 与 CLI 测试），确认本轮文档更新前后当前命令集没有回归。

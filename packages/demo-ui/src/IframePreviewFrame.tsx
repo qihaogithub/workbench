@@ -12,6 +12,7 @@ export interface IframePreviewFrameProps {
   className?: string;
   fillContainer?: boolean;
   sandbox?: string;
+  onLoad?: () => void;
 }
 
 function normalizeMeasuredSize(value: number): number {
@@ -26,6 +27,7 @@ export function IframePreviewFrame({
   className,
   fillContainer = false,
   sandbox = "allow-scripts",
+  onLoad,
 }: IframePreviewFrameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -90,6 +92,7 @@ export function IframePreviewFrame({
           sandbox={sandbox}
           style={contentStyle}
           className="bg-white"
+          onLoad={onLoad}
         />
       </div>
     </div>
