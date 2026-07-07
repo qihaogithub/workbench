@@ -455,7 +455,7 @@ export function ViewerAiDrawer({
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 96), 140)}px`;
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 80), 140)}px`;
   }, [input]);
 
   return (
@@ -465,11 +465,11 @@ export function ViewerAiDrawer({
       }`}
       aria-hidden={!open}
     >
-      <div className="flex h-[76px] shrink-0 items-center gap-3 border-b border-border px-5">
-        <MessageCircle className="h-6 w-6 text-muted-foreground" />
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-4">
+        <MessageCircle className="h-5 w-5 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-2xl font-medium leading-tight">AI 问答</div>
-          <div className="truncate text-sm text-muted-foreground">
+          <div className="truncate text-xl font-medium leading-tight">AI 问答</div>
+          <div className="truncate text-xs text-muted-foreground">
             {project.name} / {activePageName}
           </div>
         </div>
@@ -477,52 +477,52 @@ export function ViewerAiDrawer({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10"
+          className="h-8 w-8"
           onClick={handleClear}
           disabled={messages.length === 0 || isSending}
           title="清空历史"
         >
-          <Trash2 className="h-5 w-5" />
+          <Trash2 className="h-4 w-4" />
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10"
+          className="h-8 w-8"
           onClick={handleNewChatSession}
           disabled={isSending}
           title="新对话"
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-5 w-5" />
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10"
+          className="h-8 w-8"
           onClick={() => onOpenChange(false)}
           title="收起"
         >
-          <X className="h-6 w-6" />
+          <X className="h-5 w-5" />
         </Button>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="h-full p-5">
-          <div className="flex min-h-full flex-col gap-4">
+        <div className="h-full p-4">
+          <div className="flex min-h-full flex-col gap-3">
             {messages.length === 0 && (
-              <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-                <div className="flex h-28 w-28 items-center justify-center rounded-full bg-muted">
-                  <Bot className="h-14 w-14 text-foreground" />
+              <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                  <Bot className="h-10 w-10 text-foreground" />
                 </div>
-                <div className="mt-8 space-y-4">
-                  <h2 className="text-3xl font-semibold tracking-normal">AI 助手</h2>
-                  <p className="max-w-sm text-xl font-medium leading-8 text-muted-foreground">
+                <div className="mt-5 space-y-2">
+                  <h2 className="text-xl font-semibold tracking-normal">AI 助手</h2>
+                  <p className="max-w-[280px] text-sm font-medium leading-6 text-muted-foreground">
                     输入自然语言问题，AI 将帮您理解当前项目
                   </p>
                 </div>
-                <div className="mt-12 space-y-3 text-left">
-                  <p className="text-sm font-medium text-muted-foreground">示例问题：</p>
+                <div className="mt-8 space-y-2 text-left">
+                  <p className="text-xs font-medium text-muted-foreground">示例问题：</p>
                   <div className="space-y-2">
                     {[
                       "这个页面适合什么场景？",
@@ -532,7 +532,7 @@ export function ViewerAiDrawer({
                       <button
                         key={example}
                         type="button"
-                        className="block rounded-md bg-muted px-4 py-2 text-base font-semibold text-foreground transition-colors hover:bg-muted/80"
+                        className="block rounded-md bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
                         onClick={() => setInput(example)}
                       >
                         &quot;{example}&quot;
@@ -549,7 +549,7 @@ export function ViewerAiDrawer({
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[86%] whitespace-pre-wrap rounded-xl px-4 py-3 text-sm leading-6 ${
+                  className={`max-w-[86%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm leading-5 ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "border border-border bg-card text-card-foreground"
@@ -566,7 +566,7 @@ export function ViewerAiDrawer({
             ))}
 
             {isSending && (
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 正在生成回答...
               </div>
@@ -593,7 +593,7 @@ export function ViewerAiDrawer({
       </ScrollArea>
 
       <form
-        className="shrink-0 border-t border-border bg-card p-4"
+        className="shrink-0 border-t border-border bg-card p-3"
         onSubmit={(event) => {
           event.preventDefault();
           void sendQuestion(input);
@@ -626,11 +626,11 @@ export function ViewerAiDrawer({
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="输入问题，按 Enter 发送..."
-          className="max-h-[140px] min-h-24 resize-none overflow-hidden rounded-2xl px-4 py-4 text-xl leading-7"
+          className="max-h-[140px] min-h-20 resize-none overflow-hidden rounded-xl px-3 py-3 text-sm leading-5"
           disabled={isSending}
           onKeyDown={handleInputKeyDown}
         />
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <input
               ref={fileInputRef}
@@ -644,30 +644,30 @@ export function ViewerAiDrawer({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-8 w-8"
               disabled={isSending}
               onClick={() => fileInputRef.current?.click()}
               title="添加图片"
             >
-              <ImagePlus className="h-6 w-6" />
+              <ImagePlus className="h-4 w-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-8 w-8"
               disabled={isSending}
               onClick={() => setHistoryDialogOpen(true)}
               title="历史对话"
             >
-              <History className="h-6 w-6" />
+              <History className="h-4 w-4" />
             </Button>
             <Select
               value={selectedModel}
               onValueChange={setSelectedModel}
               disabled={isSending || isLoadingModels || models.length === 0}
             >
-              <SelectTrigger className="h-11 w-[180px] rounded-2xl text-base font-semibold">
+              <SelectTrigger className="h-9 w-[160px] rounded-xl text-sm font-medium">
                 <span className="truncate">
                   {isLoadingModels ? "加载模型" : selectedModelLabel || "选择模型"}
                 </span>
@@ -691,14 +691,14 @@ export function ViewerAiDrawer({
           <Button
             type="submit"
             size="icon"
-            className="h-14 w-14 rounded-2xl"
+            className="h-11 w-11 rounded-xl"
             disabled={isSending || (!input.trim() && images.length === 0)}
             title={isSending ? "正在生成" : "发送"}
           >
             {isSending ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Send className="h-6 w-6" />
+              <Send className="h-5 w-5" />
             )}
           </Button>
         </div>

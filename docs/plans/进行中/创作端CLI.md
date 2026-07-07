@@ -38,6 +38,7 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-07。
 - 2026-07-07 对账：`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `packages/project-cli/src/index.ts` 注册项一致；`packages/project-cli/src/cli-all-commands.test.ts` 仍通过 `registeredCommands.filter((command) => !executed.has(command))` 反查所有已注册命令。
 - 2026-07-07 对账：`packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`knowledge/[docId]/route.ts` 与 `screenshots/generate-batch/route.ts` 仍分别依赖 agent-service / 外部鉴权同步、本地 workspace manager、直接文件与 manifest 读写、以及 screenshot-service 代理；剩余 4 个缺口继续判定为共享层未完成，而不是 CLI 漏实现。
 - 2026-07-07 当前工作树验证：`corepack pnpm check:project-cli` 通过（含 `preview-contract` 20 tests、`project-cli` typecheck 与 CLI 测试），本轮未发现新增命令回归。
+- 2026-07-07 正式仓库复核：按自动化提示词切到 `/Users/qh2/Documents/PGM/1·Work/workbench` 重新运行 `corepack pnpm check:automation`、`corepack pnpm ops:automation report --json`、`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 与 `corepack pnpm check:project-cli`，均通过；当前 Codex worktree `/Users/qh2/.codex/worktrees/48ec/workbench` 缺少依赖，因此验证命令应继续在正式仓库路径执行，避免把 `node_modules` 缺失误判成 CLI 回归。
 - 2026-07-06 对账：`packages/project-core/src/service.ts` 的 `createProject` / `updateProject` 已支持 `category` 与 `authoringPreferences`，author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 也已暴露相同元数据字段；CLI 侧此前仅透传 `name` / `description`，属于 L4 项目元数据参数面对齐缺口。
 - 2026-07-06 当前工作树验证：`corepack pnpm check:project-cli` 通过，新增的 `project create --category`、`project update --category`、`--sketch-editor-engine` 与 `--clear-authoring-preferences` 已进入稳定入口回归和全命令回归。
 - 2026-07-03 对账：`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出包含 `page switch-runtime`；同时该命令已存在于 `packages/project-cli/src/index.ts`、`packages/project-cli/src/cli-all-commands.test.ts`、`packages/project-core/src/service.ts` 与 `packages/author-site/src/app/api/projects/[projectId]/demos/[demoId]/runtime/route.ts`，本轮只修正文档登记遗漏。
@@ -61,6 +62,7 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-07。
 - `project materialize`、`project content-gc` 与 `resource restore-version` 虽然都已有 CLI 命令，但它们分别涉及写项目基准工作区、删除 blob 和覆盖资源内容，后续自动任务仍需按 L5 高风险处理；只有 `project commit-list`、`resource version-list`、`resource version-get` 可继续视为低风险只读命令。
 - `project create` / `project update` 的项目元数据参数面对齐虽然已经补齐，但它们仍属于创建 / 更新类能力，自动任务后续只能按 L4 继续维护，不因为参数补齐就下调为 L3。
 - 外部自动化提示词仍使用历史文件名 `CLI与创作端能力对齐长期跟踪.md`；兼容入口继续保留，但正文仍只在本文件维护。
+- 本轮再次确认，自动化提示词指定的正式仓库路径 `/Users/qh2/Documents/PGM/1·Work/workbench` 才是稳定验证来源；如果 Codex worktree 缺少依赖，属于执行环境差异，不应单独上升为 CLI 对齐缺口。
 
 ## 下次检查重点
 

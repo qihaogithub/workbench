@@ -262,5 +262,60 @@ describe('createSaveImageTool', () => {
       const manifestCall = (fs.writeFileSync as any).mock.calls[0];
       expect(String(manifestCall[0]).replace(/\\/g, '/')).toContain('/projects/test-project/images.json');
     });
+
+    it('只有页面 demoId 时不应创建页面级 images.json', async () => {
+      (fs.promises.mkdir as any).mockResolvedValue(undefined);
+      (fs.promises.writeFile as any).mockResolvedValue(undefined);
+      (fs.existsSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        return normalized.endsWith('/assets/images') || normalized.endsWith('/assets/images/9f86d081884c-hero.png');
+      });
+
+      const tool = createTool({
+        ...baseConfig,
+        demoId: 'page-1',
+      });
+      const result = await tool.execute('id', {
+        source: 'base64',
+        data: 'dGVzdA==',
+        filename: 'hero.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('缺少 projectId 时应从工作区元数据解析项目 images.json', async () => {
+      (fs.promises.mkdir as any).mockResolvedValue(undefined);
+      (fs.promises.writeFile as any).mockResolvedValue(undefined);
+      (fs.existsSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        return (
+          normalized.endsWith('/.workspace.json') ||
+          normalized.endsWith('/projects/proj_1/project.json')
+        );
+      });
+      (fs.readFileSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        if (normalized.endsWith('/.workspace.json')) {
+          return JSON.stringify({ projectId: 'proj_1' });
+        }
+        return JSON.stringify({ images: [] });
+      });
+
+      const tool = createTool({
+        ...baseConfig,
+        demoId: 'page-1',
+      });
+      const result = await tool.execute('id', {
+        source: 'base64',
+        data: 'dGVzdA==',
+        filename: 'hero.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      const manifestCall = (fs.writeFileSync as any).mock.calls[0];
+      expect(String(manifestCall[0]).replace(/\\/g, '/')).toContain('/projects/proj_1/images.json');
+    });
   });
 });

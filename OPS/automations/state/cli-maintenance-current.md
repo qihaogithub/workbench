@@ -18,7 +18,7 @@
 
 当前页面历史模型已经从旧 `page version-*` 命令切换到通用 `resource version-*` 入口。author-site 的页面版本与知识文档版本入口均已迁到 `/api/projects/[projectId]/resources/[kind]/[resourceId]/versions/*`，知识文档增删改也会通过 `ProjectAdminService.resourceVersionCreate` / `resourceDelete` 写入资源历史；CLI 与共享层对齐本身没有缺命令，缺的是长期文档还保留旧命令名称和旧路由认知。
 
-本轮复核还确认，知识文档“资源历史”与“知识文档 CRUD”仍是两层能力：`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 仍直接维护 `knowledge/manifest.json` 和文档文件；`packages/author-site/src/app/api/workspaces/route.ts` 仍依赖 author-site 本地 workspace manager；`packages/author-site/src/app/api/screenshots/generate-batch/route.ts` 仍只做代理到 screenshot-service。因此 GAP-003、GAP-004、GAP-005 继续保持 L1，只报告不补 CLI。
+本轮复核还确认，会话管理、工作区管理、知识文档“资源历史”与“知识文档 CRUD”以及截图任务仍是多层能力：`packages/author-site/src/app/api/sessions/route.ts` 继续依赖 agent-service、模型配置和外部鉴权同步；`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 仍直接维护 `knowledge/manifest.json` 和文档文件；`packages/author-site/src/app/api/workspaces/route.ts` 仍依赖 author-site 本地 workspace manager；`packages/author-site/src/app/api/screenshots/generate-batch/route.ts` 仍只做代理到 screenshot-service。因此 GAP-002、GAP-003、GAP-004、GAP-005 继续保持 L1，只报告不补 CLI。
 
 本轮处理额外关闭了一个 L4 元数据对齐缺口：此前 CLI `project create` / `project update` 仅暴露名称和描述，未覆盖 Web 已有的项目分类与项目级创作偏好。当前已补齐 CLI 参数层与回归测试，但由于属于创建 / 更新类能力，自动化等级仍按 L4 记录，后续需要人工审核变更语义而非继续自动扩面。
 
@@ -63,3 +63,4 @@
 - 2026-07-07：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `register(...)` 一致，`packages/project-cli/src/cli-all-commands.test.ts` 仍使用 `registeredCommands.filter((command) => !executed.has(command))` 断言无未覆盖命令。
 - 2026-07-07：对账 `packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`knowledge/[docId]/route.ts` 与 `screenshots/generate-batch/route.ts` 后，确认剩余会话 / 工作区 / 知识文档 CRUD / 截图任务仍停留在 author-site 路由或代理层，不满足 CLI 自动补齐前提。
 - 2026-07-07：`corepack pnpm check:project-cli` 通过（含 `preview-contract` 20 tests、`project-cli` typecheck 与 CLI 测试），确认本轮文档更新前后当前命令集没有回归。
+- 2026-07-07：按自动化提示词切到正式仓库路径 `/Users/qh2/Documents/PGM/1·Work/workbench` 再次运行 `corepack pnpm check:automation`、`corepack pnpm ops:automation report --json`、`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 与 `corepack pnpm check:project-cli`，均通过；当前 Codex worktree `/Users/qh2/.codex/worktrees/48ec/workbench` 缺少依赖，因此后续自动维护仍应以正式仓库路径作为验证来源，避免把 `node_modules` 缺失误判成 CLI 回归。

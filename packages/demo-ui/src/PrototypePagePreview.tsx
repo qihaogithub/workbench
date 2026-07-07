@@ -11,6 +11,7 @@ import { cn } from "./utils";
 import { computePreviewScale } from "./preview-scale";
 import type {
   PreviewSize,
+  PreviewContainerSize,
   VisualNodeInfo,
   VisualNodeTreeItem,
   VisualPropertyChange,
@@ -24,6 +25,7 @@ export interface PrototypePagePreviewProps {
   demoId?: string;
   previewSize?: PreviewSize;
   fillContainer?: boolean;
+  containerSizeOverride?: PreviewContainerSize;
   effectiveHeight?: number;
   className?: string;
   visualEditMode?: boolean;
@@ -249,6 +251,7 @@ export function PrototypePagePreview({
   demoId,
   previewSize,
   fillContainer = false,
+  containerSizeOverride,
   effectiveHeight,
   className,
   visualEditMode = false,
@@ -268,6 +271,7 @@ export function PrototypePagePreview({
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
   const shouldScaleToPreviewSize = previewSize != null;
+  const hasContainerSizeOverride = containerSizeOverride != null;
 
   const updateContainerSize = useCallback((width: number, height: number) => {
     const nextWidth = normalizeMeasuredSize(width);
@@ -278,7 +282,7 @@ export function PrototypePagePreview({
   }, []);
 
   const measureContainer = useCallback(() => {
-    if (!shouldScaleToPreviewSize) return;
+    if (!shouldScaleToPreviewSize || hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el) return;
     const width = el.clientWidth;
@@ -290,7 +294,7 @@ export function PrototypePagePreview({
 
     const rect = el.getBoundingClientRect();
     updateContainerSize(rect.width, rect.height);
-  }, [shouldScaleToPreviewSize, updateContainerSize]);
+  }, [hasContainerSizeOverride, shouldScaleToPreviewSize, updateContainerSize]);
 
   useLayoutEffect(() => {
     if (!shouldScaleToPreviewSize) return;
@@ -298,7 +302,7 @@ export function PrototypePagePreview({
   }, [measureContainer, shouldScaleToPreviewSize]);
 
   useEffect(() => {
-    if (!shouldScaleToPreviewSize) return;
+    if (!shouldScaleToPreviewSize || hasContainerSizeOverride) return;
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
@@ -308,12 +312,15 @@ export function PrototypePagePreview({
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [shouldScaleToPreviewSize, updateContainerSize]);
+  }, [hasContainerSizeOverride, shouldScaleToPreviewSize, updateContainerSize]);
+
+  const effectiveContainerWidth = containerSizeOverride?.width ?? containerWidth;
+  const effectiveContainerHeight = containerSizeOverride?.height ?? containerHeight;
 
   const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
     previewSize,
-    containerWidth,
-    containerHeight,
+    effectiveContainerWidth,
+    effectiveContainerHeight,
     fillContainer,
     effectiveHeight,
   );

@@ -121,15 +121,80 @@
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v10",
       "fileCount": 9,
       "note": "发布快照"
+    },
+    {
+      "versionId": "v11",
+      "type": "publish_snapshot",
+      "savedAt": 1783415693373,
+      "savedBy": "system",
+      "sessionId": "publish-1783415693364",
+      "snapshotPath": "/app/data/snapshots/proj_1782718596686_wmv9yu/v11",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v12",
+      "type": "publish_snapshot",
+      "savedAt": 1783416071624,
+      "savedBy": "system",
+      "sessionId": "publish-1783416071607",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v12",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v13",
+      "type": "publish_snapshot",
+      "savedAt": 1783418775693,
+      "savedBy": "qh2",
+      "sessionId": "publish-1783418775685",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v13",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v14",
+      "type": "publish_snapshot",
+      "savedAt": 1783418847242,
+      "savedBy": "system",
+      "sessionId": "publish-1783418847225",
+      "snapshotPath": "/app/data/snapshots/proj_1782718596686_wmv9yu/v14",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v15",
+      "type": "publish_snapshot",
+      "savedAt": 1783418898491,
+      "savedBy": "system",
+      "sessionId": "publish-1783418898481",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v15",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v16",
+      "type": "publish_snapshot",
+      "savedAt": 1783418995909,
+      "savedBy": "system",
+      "sessionId": "publish-1783418995897",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v16",
+      "fileCount": 9,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v17",
+      "type": "publish_snapshot",
+      "savedAt": 1783419131736,
+      "savedBy": "system",
+      "sessionId": "publish-1783419131697",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v17",
+      "fileCount": 9,
+      "note": "发布快照"
     }
   ],
-  "pageVersions": {},
   "createdAt": 1782718596693,
-  "updatedAt": 1783123336298,
-  "canonicalSyncedAt": 1783123336194,
-  "activeWorkspaceId": "live-1783073094111-rcjasjt26",
-  "activeWorkspaceUpdatedAt": 1783123298171,
-  "canonicalSyncedWorkspaceId": "live-1783073094111-rcjasjt26",
-  "publishedVersion": "v10",
-  "publishedAt": 1783123336302
+  "updatedAt": 1783419131736,
+  "publishedVersion": "v17",
+  "publishedAt": 1783419131754
 }

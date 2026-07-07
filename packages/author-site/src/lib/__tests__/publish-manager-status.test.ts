@@ -231,6 +231,47 @@ describe("getPublishStatus", () => {
     ).toBe(true);
   });
 
+  it("发布 iframe 使用编译产物 URL 而不是内联模块代码", async () => {
+    setupPublishableProject("proj-publish-module-url");
+
+    await publishProject("proj-publish-module-url");
+
+    const iframeHtml = fs.readFileSync(
+      path.join(
+        tempDir,
+        "published",
+        "proj-publish-module-url",
+        "demos",
+        "home",
+        "iframe.html",
+      ),
+      "utf-8",
+    );
+    const publishedProject = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, "published", "proj-publish-module-url", "project.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(iframeHtml).toContain("const initialCode = null;");
+    expect(iframeHtml).toMatch(
+      new RegExp(
+        'const initialCodeUrl = "/data/proj-publish-module-url/demos/home/compiled[.]js[?]v=[0-9]+";',
+      ),
+    );
+    expect(iframeHtml).toContain("loadModuleFromUrl(initialCodeUrl, updateVersion);");
+    expect(iframeHtml).not.toContain(
+      "const initialCode = \"import",
+    );
+    expect(publishedProject.demoPages[0].compiledJsPath).toBe(
+      "demos/home/compiled.js",
+    );
+    expect(publishedProject.demoPages[0].iframeHtmlPath).toMatch(
+      /^demos\/home\/iframe\.html\?v=\d+$/,
+    );
+  });
+
   it("发布快照创建后应推进已同步 live workspace 的版本基线", async () => {
     setupPublishableProject("proj-publish-live-base");
     const projectPath = path.join(tempDir, "projects", "proj-publish-live-base");

@@ -2,8 +2,9 @@
   "id": "proj_1782718596686_wmv9yu",
   "name": "App通用广告弹窗",
   "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
-  "publishedVersion": "v10",
-  "publishedAt": 1783123336299,
+  "publishedVersion": "v17",
+  "commitId": "commit_1783419131743_gikxl1",
+  "publishedAt": 1783419131744,
   "demoPages": [
     {
       "id": "pad-popup_a3f2",
@@ -17,9 +18,9 @@
         "width": 1024,
         "height": 768
       },
-      "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
-      "screenshotPath": "screenshots/pad-popup_a3f2.png"
+      "screenshotPath": "screenshots/pad-popup_a3f2.png",
+      "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html?v=1783419130270",
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html?v=1783419130270\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     },
     {
       "id": "phone-popup_k8m2",
@@ -33,9 +34,9 @@
         "width": 375,
         "height": 812
       },
-      "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>",
-      "screenshotPath": "screenshots/phone-popup_k8m2.png"
+      "screenshotPath": "screenshots/phone-popup_k8m2.png",
+      "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html?v=1783419130270",
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html?v=1783419130270\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     }
   ],
   "demoFolders": [],
@@ -59,8 +60,8 @@
   "canvasState": {
     "viewport": {
       "x": 36.64999999999998,
-      "y": 60.35823611835244,
-      "zoom": 0.4586027111574557
+      "y": 69.33207283948119,
+      "zoom": 0.4410260696323914
     },
     "pages": {
       "phone-popup_k8m2": {
@@ -71,8 +72,8 @@
         "zIndex": 1
       },
       "pad-popup_a3f2": {
-        "x": 414.5,
-        "y": 105.5572312698954,
+        "x": 401.1433632712234,
+        "y": 105.55723126989538,
         "width": 1081.3299416401394,
         "height": 810.9974562301046,
         "sizeMode": "custom",

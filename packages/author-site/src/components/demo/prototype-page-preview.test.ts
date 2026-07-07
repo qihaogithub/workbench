@@ -206,4 +206,34 @@ describe("PrototypePagePreview", () => {
       heightSpy.mockRestore();
     }
   });
+
+  it("画布原型页缺少显式 previewSize 时仍使用 layout 尺寸计算内容缩放", async () => {
+    const { container } = render(
+      React.createElement(CanvasPageItem, {
+        page: {
+          id: "prototype-page-custom",
+          name: "放大原型页",
+          order: 0,
+          runtimeType: "prototype-html-css",
+          prototypeHtml: `<section><div style="width: 320px">固定宽度内容</div></section>`,
+          prototypeCss: "",
+        },
+        layout: { x: 0, y: 0, width: 528.75, height: 1144.2 },
+        editable: false,
+        renderMode: "prototype",
+      }),
+    );
+
+    await waitFor(() => {
+      const host = container.querySelector("[data-prototype-preview]");
+      const scaleContent = host?.parentElement as HTMLElement | null;
+      expect(scaleContent).not.toBeNull();
+      expect(scaleContent?.style.width).toBe("375px");
+      expect(scaleContent?.style.height).toBe("812px");
+      const scale = Number.parseFloat(
+        scaleContent?.style.transform.match(/scale\(([^)]+)\)/)?.[1] ?? "0",
+      );
+      expect(scale).toBeGreaterThan(1.4);
+    });
+  });
 });

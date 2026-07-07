@@ -32,6 +32,52 @@ async function readScene(page: Page): Promise<{ nodes: Array<Record<string, unkn
   return JSON.parse(value) as { nodes: Array<Record<string, unknown>> };
 }
 
+async function attachSketchScreenshot(page: Page, name: string) {
+  await test.info().attach(name, {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+}
+
+function createLargeBenchmarkScene(count: number) {
+  return {
+    version: 1,
+    pageSize: { width: 960, height: 640 },
+    nodes: Array.from({ length: count }, (_, index) => ({
+      id: `perf-${index}`,
+      type: index % 5 === 0 ? "text" : "card",
+      x: 32 + (index % 10) * 88,
+      y: 48 + Math.floor(index / 10) * 70,
+      width: index % 5 === 0 ? 120 : 76,
+      height: index % 5 === 0 ? 32 : 48,
+      text: `N${index + 1}`,
+      style: {
+        fill: index % 2 ? "#f8fafc" : "#ffffff",
+        stroke: "#94a3b8",
+        color: "#0f172a",
+        radius: 8,
+      },
+    })),
+    assets: [],
+    bindings: {},
+  };
+}
+
+async function applySceneJson(page: Page, scene: unknown) {
+  const sceneJson = page.getByLabel("scene-json");
+  const wasOpen = await sceneJson.isVisible().catch(() => false);
+  if (!wasOpen) await page.getByRole("button", { name: "Dev Data" }).click();
+  await page.getByLabel("scene-json").evaluate((element, value) => {
+    const textarea = element as HTMLTextAreaElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+    valueSetter?.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  }, JSON.stringify(scene));
+  await page.getByRole("button", { name: "Apply Scene" }).click();
+  await expect(page.getByText("Scene JSON applied")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+}
+
 test("sketch playground edits and exports scene JSON", async ({ page }) => {
   await page.goto("/");
 
@@ -52,9 +98,76 @@ test("sketch playground edits and exports scene JSON", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "100", exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "500", exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "1000", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "selection ms" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "property panel ms" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "hit test ms" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "drag ms" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "input ms" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "translate ms" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "path render ms" })).toBeVisible();
+});
+
+test("sketch playground records large document interaction performance baselines", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  const rows: Array<{ count: number; selectionMs: number; propertyPanelMs: number; dragMs: number; inputMs: number }> = [];
+
+  for (const count of [100, 500, 1000]) {
+    await applySceneJson(page, createLargeBenchmarkScene(count));
+    const nodeLabel = page.locator('[data-sketch-node-label="perf-1"]');
+    const node = page.locator('[data-sketch-node-id="perf-1"]');
+
+    let start = Date.now();
+    await nodeLabel.click();
+    await expect(page.getByText("1 selected")).toBeVisible();
+    const selectionMs = Date.now() - start;
+
+    start = Date.now();
+    await expect(page.getByRole("spinbutton", { name: "X" })).toBeVisible();
+    await expect(page.getByPlaceholder("对象文本")).toBeVisible();
+    const propertyPanelMs = Date.now() - start;
+
+    const box = await node.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) continue;
+    start = Date.now();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 12, box.y + box.height / 2 + 8);
+    await page.mouse.up();
+    await expect
+      .poll(async () => {
+        const parsed = await readScene(page);
+        const moved = parsed.nodes.find((item) => item.id === "perf-1");
+        return moved ? `${moved.x},${moved.y}` : "";
+      })
+      .toBe("132,56");
+    const dragMs = Date.now() - start;
+
+    start = Date.now();
+    await page.getByPlaceholder("对象文本").fill(`Benchmark ${count}`);
+    await expect
+      .poll(async () => {
+        const parsed = await readScene(page);
+        return parsed.nodes.find((item) => item.id === "perf-1")?.text ?? "";
+      })
+      .toBe(`Benchmark ${count}`);
+    const inputMs = Date.now() - start;
+
+    rows.push({ count, selectionMs, propertyPanelMs, dragMs, inputMs });
+  }
+
+  await test.info().attach("sketch-large-document-performance.json", {
+    body: JSON.stringify(rows, null, 2),
+    contentType: "application/json",
+  });
+
+  for (const row of rows) {
+    expect(row.selectionMs).toBeLessThan(1500);
+    expect(row.propertyPanelMs).toBeLessThan(1500);
+    expect(row.dragMs).toBeLessThan(2500);
+    expect(row.inputMs).toBeLessThan(2500);
+  }
 });
 
 test("sketch playground debug panel shows tool, selection, recent change, and object list", async ({ page }) => {
@@ -77,6 +190,29 @@ test("sketch playground debug panel shows tool, selection, recent change, and ob
   await page.getByRole("button", { name: "Debug" }).click();
   await expect(page.getByText(/added sketch_/)).toBeVisible();
   await expect(page.getByText("rect")).toBeVisible();
+});
+
+test("sketch playground captures editor state walkthrough screenshots", async ({ page }) => {
+  await page.goto("/");
+
+  await attachSketchScreenshot(page, "sketch-empty-selection");
+  await page.locator('[data-sketch-node-label="card"]').click();
+  await expect(page.getByText("1 selected")).toBeVisible();
+  await attachSketchScreenshot(page, "sketch-single-selection-property-panel");
+
+  await page.locator('[data-sketch-node-label="button"]').click({ modifiers: ["Shift"] });
+  await expect(page.getByText("2 selected")).toBeVisible();
+  await attachSketchScreenshot(page, "sketch-multi-selection-layer-panel");
+
+  await page.keyboard.press("Escape");
+  await page.locator('[data-sketch-node-label="card"]').dispatchEvent("dblclick", { bubbles: true, cancelable: true });
+  await expect(page.getByLabel("画布文本编辑")).toBeVisible();
+  await attachSketchScreenshot(page, "sketch-inline-text-editing");
+  await page.keyboard.press("Escape");
+
+  await page.getByLabel("打开命令面板").click();
+  await expect(page.getByLabel("草图命令面板")).toBeVisible();
+  await attachSketchScreenshot(page, "sketch-command-palette");
 });
 
 test("sketch playground can create image nodes from the toolbar", async ({ page }) => {
@@ -121,7 +257,15 @@ test("sketch playground edits shape text inline and from properties", async ({ p
   expect(rectNodeId).toBeTruthy();
   if (!rectNodeId) return;
 
-  await page.locator(`[data-sketch-node-id="${rectNodeId}"]`).dispatchEvent("dblclick", { bubbles: true, cancelable: true });
+  const rectBox = await page.locator(`[data-sketch-node-id="${rectNodeId}"]`).boundingBox();
+  expect(rectBox).not.toBeNull();
+  if (!rectBox) return;
+  await page.locator("[data-sketch-stage]").dispatchEvent("dblclick", {
+    bubbles: true,
+    cancelable: true,
+    clientX: rectBox.x + rectBox.width / 2,
+    clientY: rectBox.y + rectBox.height / 2,
+  });
   await page.getByLabel("画布文本编辑").fill("Inline shape label");
   await page.keyboard.press("Enter");
 
@@ -309,7 +453,7 @@ test("sketch playground runs commands from the canvas context menu", async ({ pa
 
   const menu = page.getByRole("menu", { name: "草图右键菜单" });
   await expect(menu).toBeVisible();
-  await menu.getByRole("menuitem", { name: "复制" }).click();
+  await menu.getByRole("menuitem", { name: "复制", exact: true }).click();
 
   await page.getByRole("button", { name: "Dev Data" }).click();
   const sceneJson = page.getByLabel("scene-json");
@@ -559,6 +703,26 @@ test("sketch playground completes the P0 editing acceptance flow", async ({ page
   const createdNode = page.locator(`[data-sketch-node-id="${createdNodeId}"]`);
   const createdNodeLabel = page.locator(`[data-sketch-node-label="${createdNodeId}"]`);
   const buttonNode = page.locator('[data-sketch-node-label="button"]');
+  await createdNodeLabel.click();
+  await expect(page.getByRole("toolbar", { name: "草图悬浮快捷工具条" })).toBeVisible();
+  await expect(page.getByLabel("悬浮更多")).toBeVisible();
+
+  const createdLayerRow = page.locator(`[data-sketch-layer-node-id="${createdNodeId}"]`);
+  await createdLayerRow.dblclick();
+  const renameInput = page.getByLabel(/重命名图层/);
+  await expect(renameInput).toBeVisible();
+  await renameInput.fill("P0 renamed layer");
+  await renameInput.press("Enter");
+  await expect(createdLayerRow).toContainText("P0 renamed layer");
+
+  await createdNodeLabel.click({ button: "right" });
+  const exportMenu = page.getByRole("menu", { name: "草图右键菜单" });
+  await expect(exportMenu.getByRole("menuitem", { name: "复制 SVG" })).toBeVisible();
+  await expect(exportMenu.getByRole("menuitem", { name: "复制 PNG" })).toBeVisible();
+  await expect(exportMenu.getByRole("menuitem", { name: "导出选区" })).toBeVisible();
+  await exportMenu.getByRole("menuitem", { name: "导出选区" }).click();
+  await expect(exportMenu).toBeHidden();
+
   await createdNodeLabel.click();
   await buttonNode.click({ modifiers: ["Shift"] });
   await expect(page.getByText("2 selected")).toBeVisible();

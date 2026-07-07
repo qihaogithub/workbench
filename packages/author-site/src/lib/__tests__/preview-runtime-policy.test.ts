@@ -95,6 +95,17 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain("type: 'VISUAL_NODE_TREE_RESULT'");
   });
 
+  it("iframe 中 Tailwind CDN 脚本不阻塞页面 body 解析", () => {
+    const html = generateIframeHtml();
+
+    expect(html).toContain(
+      '<script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+    );
+    expect(html).not.toContain(
+      '<script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+    );
+  });
+
   it("支持紧急 CDN 回退", () => {
     const result = compileCode(
       `

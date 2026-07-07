@@ -1081,6 +1081,36 @@ export function generateIframeHtml(
         });
     }`;
 
+  const loadModuleFromUrlFn = `
+    function loadModuleFromUrl(moduleUrl, thisVersion) {
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeUrl: moduleUrl
+      });
+      import(moduleUrl)
+        .then((module) => {
+          if (thisVersion !== updateVersion) return;
+          currentComponent = module.default || null;
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
+          renderComponent();
+          if (module.default) {
+            window.parent.postMessage({ type: 'LOADED' }, '*');
+          } else {
+            reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
+          }
+        })
+        .catch((err) => {
+          if (thisVersion !== updateVersion) return;
+          reportRuntimeError({ stage: 'dependency_import', error: err.message, stack: err.stack });
+        });
+    }`;
+
   const updateCodeHandler = supportUrlMode
     ? `
       if (type === 'UPDATE_CODE' || type === 'UPDATE_MODULE') {
@@ -1095,19 +1125,7 @@ export function generateIframeHtml(
         const thisVersion = ++updateVersion;
 
         if (isModuleUrl) {
-          fetch(incomingCode)
-            .then(res => {
-              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-              return res.text();
-            })
-            .then(jsCode => {
-              if (thisVersion !== updateVersion) return;
-              loadModuleFromCode(jsCode, thisVersion);
-            })
-            .catch((err) => {
-              if (thisVersion !== updateVersion) return;
-              reportRuntimeError({ stage: 'dependency_import', error: err.message });
-            });
+          loadModuleFromUrl(incomingCode, thisVersion);
         } else {
           loadModuleFromCode(incomingCode, thisVersion);
         }
@@ -1175,7 +1193,7 @@ ${cssLinks}
     "imports": ${JSON.stringify(runtimeImports, null, 6)}
   }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -1276,6 +1294,7 @@ ${cssLinks}
     }
 
     ${loadModuleFn}
+    ${loadModuleFromUrlFn}
     const shellStartedAt = performance.now();
     reportRuntimeTiming('shell_start', {
       cdnBase: '${cdnBase}',
@@ -1538,17 +1557,7 @@ ${cssLinks}
         });
     } else if (initialCodeUrl) {
       window.__DEMO_PROPS__ = currentConfig;
-      fetch(initialCodeUrl)
-        .then(function(res) {
-          if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-          return res.text();
-        })
-        .then(function(jsCode) {
-          loadModuleFromCode(jsCode, updateVersion);
-        })
-        .catch((err) => {
-          reportRuntimeError({ stage: 'dependency_import', error: err.message });
-        });
+      loadModuleFromUrl(initialCodeUrl, updateVersion);
     }
   </script>
 </body>

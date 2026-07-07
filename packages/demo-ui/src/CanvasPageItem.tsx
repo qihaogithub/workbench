@@ -264,6 +264,10 @@ export function CanvasPagePreviewContent({
 
   const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
   const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
+  const resolvedPreviewSize = page.previewSize ?? {
+    width: designWidth,
+    height: designHeight,
+  };
   const layoutScale = layout.width / designWidth;
   const layoutDerivedContentHeight =
     Number.isFinite(layoutScale) && layoutScale > 0
@@ -275,6 +279,10 @@ export function CanvasPagePreviewContent({
   );
   const iframeEffectiveHeight =
     effectiveHeight > designHeight + 1 ? effectiveHeight : undefined;
+  const containerSizeOverride = {
+    width: Math.max(layout.width, 1),
+    height: Math.max(layout.height, 1),
+  };
 
   React.useEffect(() => {
     setScreenshotLoaded(false);
@@ -329,8 +337,9 @@ export function CanvasPagePreviewContent({
             configData={page.configData}
             sessionId={sessionId}
             demoId={page.id}
-            previewSize={page.previewSize}
+            previewSize={resolvedPreviewSize}
             fillContainer
+            containerSizeOverride={containerSizeOverride}
             effectiveHeight={iframeEffectiveHeight}
           />
         </div>
@@ -358,8 +367,9 @@ export function CanvasPagePreviewContent({
           <IframePreviewFrame
             title={page.name}
             src={page.iframeUrl}
-            previewSize={page.previewSize}
+            previewSize={resolvedPreviewSize}
             fillContainer
+            containerSizeOverride={containerSizeOverride}
             sandbox="allow-scripts"
             onLoad={handleIframeContentLoaded}
           />
@@ -380,8 +390,9 @@ export function CanvasPagePreviewContent({
             sessionId={sessionId}
             demoId={page.id}
             configData={page.configData}
-            previewSize={page.previewSize}
+            previewSize={resolvedPreviewSize}
             fillContainer
+            containerSizeOverride={containerSizeOverride}
             onConsoleEntry={onConsoleEntry}
             onError={onError}
             onContentHeightChange={handleContentHeightChange}

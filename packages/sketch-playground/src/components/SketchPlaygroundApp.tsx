@@ -3,6 +3,7 @@
 import React from "react";
 import {
   getSketchSceneHashSource,
+  getSketchSelectionBounds,
   hitTestSketchScene,
   parseSketchSceneDocument,
   renderSketchSceneToSvgMarkup,
@@ -25,7 +26,11 @@ type DevPanelTab = "scene" | "config" | "metrics" | "debug";
 type PerformanceRow = {
   count: number;
   renderMs: number;
+  selectionMs: number;
+  propertyPanelMs: number;
   hitTestMs: number;
+  dragMs: number;
+  inputMs: number;
   translateMs: number;
   pathRenderMs: number;
   hashLength: number;
@@ -216,9 +221,41 @@ export function SketchPlaygroundApp() {
         renderMs: measureMs(() => {
           renderSketchSceneToSvgMarkup(perfScene, {});
         }),
+        selectionMs: measureMs(() => {
+          for (let index = 0; index < 120; index += 1) {
+            const node = perfScene.nodes[index % perfScene.nodes.length];
+            if (node) getSketchSelectionBounds([node]);
+          }
+        }),
+        propertyPanelMs: measureMs(() => {
+          for (let index = 0; index < 120; index += 1) {
+            const node = perfScene.nodes[index % perfScene.nodes.length];
+            if (!node) continue;
+            JSON.stringify({
+              id: node.id,
+              type: node.type,
+              x: node.x,
+              y: node.y,
+              width: node.width,
+              height: node.height,
+              style: node.style,
+            });
+          }
+        }),
         hitTestMs: measureMs(() => {
           for (let index = 0; index < 120; index += 1) {
             hitTestSketchScene(perfScene, { x: 24 + (index % 20) * 44, y: 32 + Math.floor(index / 20) * 40 });
+          }
+        }),
+        dragMs: measureMs(() => {
+          for (let index = 0; index < 60; index += 1) {
+            translateSketchNodes([perfScene.nodes[index % perfScene.nodes.length]].filter(Boolean), { x: 8, y: 4 });
+          }
+        }),
+        inputMs: measureMs(() => {
+          for (let index = 0; index < 120; index += 1) {
+            const node = perfScene.nodes[index % perfScene.nodes.length];
+            if (node) ({ ...node, text: `${node.text ?? ""}${index}` });
           }
         }),
         translateMs: measureMs(() => {
@@ -381,7 +418,11 @@ export function SketchPlaygroundApp() {
                       <tr className="bg-background text-left text-muted-foreground">
                         <th className="border border-border p-2">nodes</th>
                         <th className="border border-border p-2">render ms</th>
+                        <th className="border border-border p-2">selection ms</th>
+                        <th className="border border-border p-2">property panel ms</th>
                         <th className="border border-border p-2">hit test ms</th>
+                        <th className="border border-border p-2">drag ms</th>
+                        <th className="border border-border p-2">input ms</th>
                         <th className="border border-border p-2">translate ms</th>
                         <th className="border border-border p-2">path render ms</th>
                         <th className="border border-border p-2">hash len</th>
@@ -392,7 +433,11 @@ export function SketchPlaygroundApp() {
                         <tr key={row.count}>
                           <td className="border border-border p-2 text-foreground">{row.count}</td>
                           <td className="border border-border p-2 text-foreground">{row.renderMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.selectionMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.propertyPanelMs}</td>
                           <td className="border border-border p-2 text-foreground">{row.hitTestMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.dragMs}</td>
+                          <td className="border border-border p-2 text-foreground">{row.inputMs}</td>
                           <td className="border border-border p-2 text-foreground">{row.translateMs}</td>
                           <td className="border border-border p-2 text-foreground">{row.pathRenderMs}</td>
                           <td className="border border-border p-2 text-foreground">{row.hashLength}</td>

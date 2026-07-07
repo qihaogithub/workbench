@@ -50,6 +50,21 @@ describe("ProjectAdminService", () => {
     expect(list.data?.find((item) => item.id === projectId)?.category).toBe("未分类");
   });
 
+  it("项目列表忽略缺少 project.json 的残留目录", () => {
+    const created = service.createProject({ name: "有效项目" });
+    const orphanDir = path.join(tempDir, "projects", "demo_page_only");
+    fs.mkdirSync(orphanDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(orphanDir, "images.json"),
+      JSON.stringify({ images: [] }),
+      "utf-8",
+    );
+
+    const list = service.listProjects();
+
+    expect(list.data?.map((project) => project.id)).toEqual([created.data?.id]);
+  });
+
   it("保存并返回项目级手绘编辑引擎偏好", () => {
     const created = service.createProject({ name: "手绘偏好项目" });
     const projectId = created.data?.id ?? "";

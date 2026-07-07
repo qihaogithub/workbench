@@ -1,0 +1,17 @@
+{
+  "projectId": "proj_1779608458649",
+  "references": [
+    {
+      "from": {
+        "kind": "canvas",
+        "resourceId": "main"
+      },
+      "to": {
+        "kind": "page",
+        "resourceId": "demo_1779608461000_d4e5f6"
+      },
+      "reason": "canvas_node"
+    }
+  ],
+  "updatedAt": 1783418525599
+}

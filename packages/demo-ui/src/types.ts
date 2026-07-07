@@ -35,6 +35,11 @@ export interface PreviewSize {
   scale?: number;
 }
 
+export interface PreviewContainerSize {
+  width: number;
+  height: number;
+}
+
 export interface PreviewDiagnostic {
   source: "post_generation_validation" | "preview_runtime";
   stage?: string;
@@ -96,6 +101,7 @@ export interface PreviewPanelProps {
   placeholderScreenshotUrl?: string;
   cdnBaseUrl?: string;
   fillContainer?: boolean;
+  containerSizeOverride?: PreviewContainerSize;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onAppAction?: (action: AppActionPayload & { pageId?: string }) => void;
   onContentHeightChange?: (contentHeight: number) => void;

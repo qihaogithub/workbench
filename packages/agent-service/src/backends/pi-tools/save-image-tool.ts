@@ -7,6 +7,11 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
+import {
+  addProjectImageManifestEntry,
+  resolveProjectImageManifestProjectId,
+  type ProjectImageEntry,
+} from './project-image-manifest';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 
@@ -33,36 +38,6 @@ const SaveImageParams = Type.Object({
 });
 
 type SaveImageParams = Static<typeof SaveImageParams>;
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
-let _dataDir: string | null = null;
-let _projectsDir: string | null = null;
-
-function getDataDir(): string {
-  if (!_dataDir) {
-    _dataDir = path.resolve(
-      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-    );
-  }
-  return _dataDir;
-}
-
-function getProjectsDir(): string {
-  if (!_projectsDir) {
-    _projectsDir = path.join(getDataDir(), 'projects');
-  }
-  return _projectsDir;
-}
 
 function getWorkspaceAssetsDir(workingDir: string): string {
   return path.join(path.resolve(workingDir), 'assets', 'images');
@@ -210,50 +185,6 @@ function ensureDir(dir: string): void {
   }
 }
 
-interface ProjectImageEntry {
-  id: string;
-  filename: string;
-  url: string;
-  size: number;
-  format: string;
-  createdAt: number;
-  createdBy: 'user' | 'ai' | 'figma';
-}
-
-interface ProjectImageManifest {
-  images: ProjectImageEntry[];
-}
-
-function getProjectManifest(projectId: string): ProjectImageManifest {
-  const manifestPath = path.join(getProjectsDir(), projectId, 'images.json');
-  if (!fs.existsSync(manifestPath)) {
-    return { images: [] };
-  }
-  try {
-    const raw = fs.readFileSync(manifestPath, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    return { images: [] };
-  }
-}
-
-function addToProjectManifest(projectId: string, entry: ProjectImageEntry): void {
-  const manifestPath = path.join(getProjectsDir(), projectId, 'images.json');
-  const dir = path.dirname(manifestPath);
-  ensureDir(dir);
-
-  const manifest = getProjectManifest(projectId);
-
-  const existingIndex = manifest.images.findIndex((img) => img.id === entry.id);
-  if (existingIndex >= 0) {
-    manifest.images[existingIndex] = entry;
-  } else {
-    manifest.images.push(entry);
-  }
-
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
-}
-
 export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
   return {
     name: 'saveImage',
@@ -353,7 +284,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to project workspace');
         }
 
-        const manifestProjectId = config.projectId || config.demoId;
+        const manifestProjectId = resolveProjectImageManifestProjectId(config);
         if (manifestProjectId) {
           const entry: ProjectImageEntry = {
             id: hashPrefix,
@@ -365,7 +296,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
             createdBy: 'ai',
           };
           try {
-            addToProjectManifest(manifestProjectId, entry);
+            addProjectImageManifestEntry(manifestProjectId, entry);
           } catch (manifestError) {
             logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
           }
