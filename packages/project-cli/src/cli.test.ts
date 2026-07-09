@@ -86,7 +86,16 @@ try {
   const editData = edit.payload.data as { editId: string; workspaceId: string };
   assert.match(editData.workspaceId, /^cli_edit_/);
 
-  const page = runCli(["page", "create", "--edit-id", editData.editId, "--name", "首页"], tempDir);
+  const page = runCli([
+    "page",
+    "create",
+    "--edit-id",
+    editData.editId,
+    "--name",
+    "首页",
+    "--runtime-type",
+    "high-fidelity-react",
+  ], tempDir);
   assert.equal(page.result.status, 0);
   assert.equal(page.payload.ok, true);
   const pageData = page.payload.data as { meta: { id: string } };

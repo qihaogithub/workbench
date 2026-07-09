@@ -1,18 +1,18 @@
 {
   "projectId": "proj_1783334663364_30hsrv",
-  "commitId": "commit_1783336915137_25p5da",
+  "commitId": "commit_1783570801012_8qg0t1",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
       "kind": "page",
       "resourceId": "product-showcase_a3f2",
-      "versionId": "prv_1783336915041_ertlmw",
-      "contentHash": "23df8d4cb39ac76af94532f1336c9cca82740ef13a3f8c9a53e7bbbe687a6135",
+      "versionId": "prv_1783570800969_c7l85t",
+      "contentHash": "aa515caff671a38052d7d0a7b5144f78012844eff7d0489cc645f8fb4cb4e8bd",
       "blobRefs": [
-        "9f47f96cc3deba73d1eac624c16a2dcd5cb3d8b0a7bef7fcca3d3d427b6cb845",
+        "2612d31c33f1c17310b1b4ebf34ec0eba092cb5142d2d7f84a5dcebd01da9ac3",
         "02ab4fd1f5f0a37fd724880f63ec383f23ec93f8a49f60799d3538aa3a4e540a"
       ]
     }
   ],
-  "updatedAt": 1783336915147
+  "updatedAt": 1783570801013
 }

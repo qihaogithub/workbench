@@ -2090,7 +2090,7 @@ export function updateWorkspaceDemoFiles(
 }
 
 /**
- * 创建一个新的 Demo 页面，写入默认 `index.tsx`、`config.schema.json` 并注册到 workspace-tree.json。
+ * 创建一个新的 Demo 页面，默认写入 HTML/CSS 原型页文件和 `config.schema.json` 并注册到 workspace-tree.json。
  * `order` 取当前最大 order + 1。
  */
 export function createWorkspaceDemoPage(
@@ -2112,10 +2112,12 @@ export function createWorkspaceDemoPage(
   const demoId = generateDemoPageId(name);
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.mkdirSync(demoDir, { recursive: true });
-  const resolvedRuntimeType =
-    runtimeType === "prototype-html-css" || runtimeType === "sketch-scene"
-      ? runtimeType
-      : undefined;
+  const resolvedRuntimeType: DemoPageMeta["runtimeType"] =
+    runtimeType === "high-fidelity-react"
+      ? "high-fidelity-react"
+      : runtimeType === "sketch-scene"
+        ? "sketch-scene"
+        : "prototype-html-css";
   if (resolvedRuntimeType === "sketch-scene") {
     fs.writeFileSync(
       path.join(demoDir, "sketch.scene.json"),
@@ -2146,7 +2148,7 @@ export function createWorkspaceDemoPage(
       name?.trim() || "新建页面",
       existing.map((page) => page.routeKey).filter(Boolean) as string[],
     ),
-    runtimeType: resolvedRuntimeType,
+    runtimeType: resolvedRuntimeType === "high-fidelity-react" ? undefined : resolvedRuntimeType,
     order: nextOrder,
     parentId: parentId ?? null,
   };

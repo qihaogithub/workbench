@@ -19,10 +19,11 @@ export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefiniti
 export function generatePreviewAuthoringRules(): string {
   const allowedPackages = Object.keys(PREVIEW_DEPENDENCY_POLICY).sort().join(", ");
   return [
-    "## 创作端页面运行契约",
+    "## 创作端高保真 React 页面运行契约",
     "",
     `当前契约版本：${PREVIEW_CONTRACT_VERSION}`,
     "",
+    "- 以下规则仅适用于 `high-fidelity-react` 页面。创作端 AI 默认应优先使用 `prototype-html-css`，只有原型页不支持目标效果或用户明确要求高保真时才切换到 React。",
     "- 页面源码必须是单文件 React 组件，提交源码时保留原始 JSX。",
     "- 页面源码必须提供 export default 组件；裸 JSX 或首字母大写组件可由编译器自动包装。",
     "- 页面源码禁止直接导入 react/jsx-runtime；该导入只允许出现在编译产物中。",

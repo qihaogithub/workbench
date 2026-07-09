@@ -21,9 +21,40 @@ export interface ParsedMarkdownContent {
   error?: string;
 }
 
+export type ParsedFigmaImportContent =
+  | {
+      kind: "react";
+      code: string;
+      schema: string;
+      success: true;
+    }
+  | {
+      kind: "prototype";
+      prototypeHtml: string;
+      prototypeCss: string;
+      success: true;
+    }
+  | {
+      kind: "unknown";
+      code: "";
+      schema: "";
+      prototypeHtml: "";
+      prototypeCss: "";
+      success: false;
+      error: string;
+    };
+
 const MARKDOWN_TITLE = "# Workbench Export";
 const CODE_SECTION = "## Component Code";
 const SCHEMA_SECTION = "## Schema Config";
+
+function looksLikeHtmlDocument(text: string): boolean {
+  const trimmedText = text.trim();
+  if (!trimmedText) return false;
+  if (/^<!doctype\s+html\b/i.test(trimmedText)) return true;
+  if (/<html[\s>]/i.test(trimmedText)) return true;
+  return /<(body|main|section|div|style|svg|img)[\s>]/i.test(trimmedText);
+}
 
 /**
  * 从 Markdown 文本中提取 fenced code block 内容
@@ -206,4 +237,64 @@ export function isFigmaMarkdownFormat(text: string): boolean {
 
   // 区块顺序必须正确
   return codeIndex < schemaIndex;
+}
+
+export function parseFigmaImportContent(text: string): ParsedFigmaImportContent {
+  const trimmedText = text.trim();
+  if (!trimmedText) {
+    return {
+      kind: "unknown",
+      code: "",
+      schema: "",
+      prototypeHtml: "",
+      prototypeCss: "",
+      success: false,
+      error: "导入内容不能为空",
+    };
+  }
+
+  const markdown = parseFigmaMarkdown(trimmedText);
+  if (markdown.success) {
+    return {
+      kind: "react",
+      code: markdown.code,
+      schema: markdown.schema,
+      success: true,
+    };
+  }
+
+  if (
+    trimmedText.includes(MARKDOWN_TITLE) ||
+    trimmedText.includes(CODE_SECTION) ||
+    trimmedText.includes(SCHEMA_SECTION)
+  ) {
+    return {
+      kind: "unknown",
+      code: "",
+      schema: "",
+      prototypeHtml: "",
+      prototypeCss: "",
+      success: false,
+      error: markdown.error || "请确认旧版 Workbench Export Markdown 格式完整",
+    };
+  }
+
+  if (looksLikeHtmlDocument(trimmedText)) {
+    return {
+      kind: "prototype",
+      prototypeHtml: trimmedText,
+      prototypeCss: "",
+      success: true,
+    };
+  }
+
+  return {
+    kind: "unknown",
+    code: "",
+    schema: "",
+    prototypeHtml: "",
+    prototypeCss: "",
+    success: false,
+    error: markdown.error || "请确认内容为 Figma 插件导出的 HTML 或旧版 Markdown 格式",
+  };
 }

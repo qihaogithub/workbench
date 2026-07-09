@@ -1,0 +1,20 @@
+{
+  "projectId": "proj_1783585261167_7h7prw",
+  "commitId": "commit_1783588719644_nmhc8i",
+  "materializerVersion": "project-core-content-graph-v1",
+  "resources": [
+    {
+      "kind": "page",
+      "resourceId": "growth-bean-mall_x8k2",
+      "versionId": "prv_1783588719640_1rdegs",
+      "contentHash": "4f671d12a66b7677ac2484af58d15a4c3625bb70c3731de64a74152532f6b11a",
+      "blobRefs": [
+        "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
+        "c07e868b3b3499c01830c59c60285fe28ac81b3f6e8765ae0f08468ae2312bed",
+        "dcaf3a250d3a526989b3802c948828fad75e577a4e7d01c3f4251c745a8290a6",
+        "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea"
+      ]
+    }
+  ],
+  "updatedAt": 1783588719644
+}

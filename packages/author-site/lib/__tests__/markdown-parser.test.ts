@@ -4,6 +4,7 @@
 
 import {
   parseFigmaMarkdown,
+  parseFigmaImportContent,
   buildFigmaMarkdown,
   isFigmaMarkdownFormat,
 } from '../markdown-parser'
@@ -409,5 +410,69 @@ const x = 1;
     expect(isFigmaMarkdownFormat('hello world')).toBe(false)
     expect(isFigmaMarkdownFormat('')).toBe(false)
     expect(isFigmaMarkdownFormat('```tsx\nconst x = 1;\n```')).toBe(false)
+  })
+})
+
+describe('parseFigmaImportContent', () => {
+  it('应将 Figma 导出的完整 HTML 识别为原型页内容', () => {
+    const input = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Figma Export</title>
+  <style>
+    .figma-export { width: 375px; height: 812px; }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+    <div data-layer="商场首页" style="width: 375px; height: 812px">成长豆商城</div>
+  </div>
+</body>
+</html>`
+
+    const result = parseFigmaImportContent(input)
+
+    expect(result.success).toBe(true)
+    expect(result.kind).toBe('prototype')
+    if (result.success && result.kind === 'prototype') {
+      expect(result.prototypeHtml).toContain('<!DOCTYPE html>')
+      expect(result.prototypeHtml).toContain('成长豆商城')
+      expect(result.prototypeCss).toBe('')
+    }
+  })
+
+  it('应继续兼容旧版 Workbench Export Markdown', () => {
+    const input = buildFigmaMarkdown(
+      `export default function Demo() { return <div>Hello</div>; }`,
+      `{"type":"object"}`,
+    )
+
+    const result = parseFigmaImportContent(input)
+
+    expect(result.success).toBe(true)
+    expect(result.kind).toBe('react')
+    if (result.success && result.kind === 'react') {
+      expect(result.code).toContain('export default function Demo')
+      expect(result.schema).toBe('{"type":"object"}')
+    }
+  })
+
+  it('旧版 Markdown 标记不完整时不应误判为 HTML 原型页', () => {
+    const input = `# Workbench Export
+
+## Component Code
+
+\`\`\`tsx
+export default function Demo() { return <div>Hello</div>; }
+\`\`\``
+
+    const result = parseFigmaImportContent(input)
+
+    expect(result.success).toBe(false)
+    expect(result.kind).toBe('unknown')
+    if (!result.success) {
+      expect(result.error).toContain('Schema Config')
+    }
   })
 })

@@ -8,11 +8,11 @@ interface DemoProps {
 
 export default function ContactSection(props: DemoProps) {
   const {
-    contactEmail,
-    contactPhone,
-    address,
-    workingHours,
-    showFooter,
+    contactEmail = "contact@startech.com",
+    contactPhone = "400-888-9999",
+    address = "北京市朝阳区科技大厦 A 座 18 层",
+    workingHours = "周一至周五 9:00 - 18:00",
+    showFooter = true,
   } = props;
 
   const p = props as Record<string, unknown>;
@@ -182,7 +182,6 @@ export default function ContactSection(props: DemoProps) {
                       type="text"
                       placeholder="您的姓名"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 text-sm"
-                      style={{ focusRing: primaryColor }}
                     />
                   </div>
                   <div>

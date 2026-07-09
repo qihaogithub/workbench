@@ -1,7 +1,7 @@
 # Figma 插件模块索引
 
 > **模块路径**: `figma-plugin/`
-> **模块职责**: 将 Figma 设计稿转化为 DSLP 协议的 React 代码
+> **模块职责**: 将 Figma 设计稿转化为可导入创作端的 HTML 原型页，旧版 React/Markdown 导出保持兼容
 
 ---
 
@@ -17,7 +17,7 @@
 |------|----------|------|
 | [技术/Figma插件架构.md](./技术/Figma插件架构.md) | `apps/plugin/*`, `packages/types/*` | 插件整体架构与通信机制 |
 | [技术/UI组件与交互.md](./技术/UI组件与交互.md) | `packages/plugin-ui/src/*` | 插件界面组件与状态管理 |
-| [技术/代码生成引擎.md](./技术/代码生成引擎.md) | `packages/backend/src/*` | 核心代码生成逻辑，HTML/Tailwind 双引擎 |
+| [技术/代码生成引擎.md](./技术/代码生成引擎.md) | `packages/backend/src/*`, `packages/author-site/lib/markdown-parser.ts`, `packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx` | 核心代码生成与创作端导入逻辑，HTML/Tailwind 双引擎 |
 | [技术/标记系统.md](./技术/标记系统.md) | `packages/plugin-ui/src/components/PreviewToolbar.tsx`, `TaggingPanel.tsx` | DSLP 标记解析与应用 |
 | [技术/资源处理与上传.md](./技术/资源处理与上传.md) | `packages/backend/src/common/images.ts`, `r2-asset-worker/*` | 图片导出、R2 上传、CDN 管理 |
 | [技术/Figma插件-警告说明文档.md](./技术/Figma插件-警告说明文档.md) | - | 设计师版警告说明与优化建议 |
@@ -52,7 +52,7 @@ figma-plugin/
 
 ## 🔗 关联模块
 
-- **[创作端](../创作端/)** - 接收生成的 React 代码进行 AI 处理与预览
+- **[创作端](../创作端/)** - 接收生成的 HTML 原型页或旧版 React 代码进行 AI 处理与预览
 - **[使用端](../使用端/)** - 预览生成的 Demo 效果
 
 ---
@@ -61,6 +61,7 @@ figma-plugin/
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-07-09 | 创作端 Figma 导入入口改为优先接收 HTML 代码并创建原型页，支持粘贴、读取剪贴板和上传 HTML 文件；旧版 Workbench Export Markdown 继续兼容 |
 | 2026-05-11 | 全面更新技术文档：修正文件路径、补充 PreviewToolbar/优化建议/预览锁定/代码格式切换等新功能 |
 | 2026-02-23 | 更新 PRD/标记系统/代码生成引擎文档，补充 Props 自动生成与"未生成 Props"排查说明 |
 | 2026-02-23 | 建立模块索引，拆分技术实现文档 |

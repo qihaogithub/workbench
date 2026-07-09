@@ -101,6 +101,8 @@ describe("ProjectAdminService", () => {
     const page = service.createPage({ editId, name: "首页" });
     expect(page.ok).toBe(true);
     expect((page.data as PageDetail).meta.name).toBe("首页");
+    expect((page.data as PageDetail).meta.runtimeType).toBe("prototype-html-css");
+    expect((page.data as PageDetail).files.prototypeHtml).toContain("<main");
 
     const validation = service.editValidate(editId);
     expect(validation.data?.ok).toBe(true);
@@ -239,6 +241,23 @@ describe("ProjectAdminService", () => {
     expect(service.commitEdit(editId, "不合规页面").ok).toBe(false);
   });
 
+  it("传入 React 代码的新页面仍推断为高保真运行时", () => {
+    const created = service.createProject({ name: "高保真推断项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+
+    const page = service.createPage({
+      editId,
+      name: "高保真页",
+      code: "export default function Demo(){ return <main>React</main>; }",
+    });
+
+    expect(page.ok).toBe(true);
+    expect(page.data?.meta.runtimeType).toBeUndefined();
+    expect(page.data?.files.code).toContain("export default function Demo");
+    expect(page.data?.files.prototypeHtml).toBeUndefined();
+  });
+
   it("识别重复拼接导致的模块解析失败并保留落盘内容", () => {
     const created = service.createProject({ name: "模块预检项目" });
     const edit = service.beginEdit(created.data?.id ?? "");
@@ -323,6 +342,30 @@ describe("ProjectAdminService", () => {
     const workspacePath = (edit.data as EditTransaction).workspacePath;
     expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "prototype.html"))).toBe(true);
     expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "index.tsx"))).toBe(false);
+    expect(service.editValidate(editId).data?.ok).toBe(true);
+  });
+
+  it("允许导入超过旧版 120KB 限制的 Figma HTML 原型页", () => {
+    const created = service.createProject({ name: "大型原型页项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const editId = (edit.data as EditTransaction).editId;
+    const largeFigmaHtml = `<!DOCTYPE html><html><body><div class="figma-export">${
+      '<div data-layer="商品卡片" style="width: 375px; height: 64px">成长豆商城</div>'.repeat(1800)
+    }</div></body></html>`;
+
+    expect(largeFigmaHtml.length).toBeGreaterThan(120_000);
+
+    const page = service.createPage({
+      editId,
+      name: "大型原型首页",
+      runtimeType: "prototype-html-css",
+      prototypeHtml: largeFigmaHtml,
+      prototypeCss: "",
+    });
+
+    expect(page.ok).toBe(true);
+    expect(page.runtimeValidation?.ok).toBe(true);
+    expect(page.data?.files.prototypeHtml).toContain("成长豆商城");
     expect(service.editValidate(editId).data?.ok).toBe(true);
   });
 

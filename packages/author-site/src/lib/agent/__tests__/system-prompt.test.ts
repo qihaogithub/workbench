@@ -125,7 +125,9 @@ describe('buildStaticSystemPrompt', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('如果用户没有明确要求配置项，必须写入空配置 schema');
     expect(prompt).toContain('不能从页面内容中自行抽取配置字段');
-    expect(prompt).toContain('标题、文案、图片、颜色、按钮、布局等内容默认都应直接写在 `index.tsx` 中');
+    expect(prompt).toContain('HTML/CSS 原型页是创作端 AI 的默认实现方式');
+    expect(prompt).toContain('原型页写入 `prototype.html` / `prototype.css`，高保真页写入 `index.tsx`');
+    expect(prompt).toContain('runtimeType: "prototype-html-css"');
     expect(prompt).toContain('"properties": {}');
     expect(prompt).toContain('"required": []');
     expect(prompt).toContain('如果 schema 没有配置字段，Props 必须为空');
@@ -146,7 +148,8 @@ describe('buildStaticSystemPrompt', () => {
 
   it('包含共享 preview contract 生成的页面运行规则', () => {
     const prompt = buildStaticSystemPrompt();
-    expect(prompt).toContain('创作端页面运行契约');
+    expect(prompt).toContain('创作端高保真 React 页面运行契约');
+    expect(prompt).toContain('以下规则仅适用于 `high-fidelity-react` 页面');
     expect(prompt).toContain('当前契约版本：');
     expect(prompt).toContain('react/jsx-runtime');
     expect(prompt).toContain('@preview/sdk');

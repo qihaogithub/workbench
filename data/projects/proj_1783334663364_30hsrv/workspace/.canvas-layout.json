@@ -1,28 +1,28 @@
 {
   "version": 1,
   "projectId": "proj_1783334663364_30hsrv",
-  "updatedAt": 1783337575328,
+  "updatedAt": 1783569254877,
   "state": {
     "viewport": {
-      "x": 289.8053050853957,
-      "y": 33.55000000000001,
-      "zoom": 0.29730232844362736
+      "x": 109.01183242894132,
+      "y": 93.19573966528918,
+      "zoom": 0.5337535961107993
     },
     "pages": {
       "product-showcase_a3f2": {
-        "x": -0.03505832200867143,
+        "x": -0.46684698194335433,
         "y": 0,
         "width": 375,
-        "height": 2031.265625,
+        "height": 2035.5,
         "zIndex": 0,
         "sizeMode": "preview",
         "previewSizeKey": "375x812"
       },
       "contact-section_k8m2": {
-        "x": 420.1495502491426,
+        "x": 420.574020457214,
         "y": 0,
         "width": 375,
-        "height": 1655.484375,
+        "height": 1663,
         "zIndex": 1,
         "sizeMode": "preview",
         "previewSizeKey": "375x812"

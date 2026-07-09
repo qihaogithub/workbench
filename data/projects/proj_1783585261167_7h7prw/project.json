@@ -1,0 +1,45 @@
+{
+  "id": "proj_1783585261167_7h7prw",
+  "name": "成长豆商城",
+  "category": "APP资源位",
+  "workspacePath": "/app/data/projects/proj_1783585261167_7h7prw/workspace",
+  "demoPages": [
+    {
+      "id": "growth-bean-mall_x8k2",
+      "name": "成长豆商城",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "page"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1783588216108,
+      "savedBy": "qihao",
+      "sessionId": "session-1783587872149-zg099w56w",
+      "snapshotPath": "/app/data/snapshots/proj_1783585261167_7h7prw/v1",
+      "fileCount": 8,
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1783588720729,
+      "savedBy": "qihao",
+      "sessionId": "session-1783587872149-zg099w56w",
+      "snapshotPath": "/app/data/snapshots/proj_1783585261167_7h7prw/v2",
+      "fileCount": 9,
+      "note": "停止编辑后自动保存记录"
+    }
+  ],
+  "createdAt": 1783585261168,
+  "updatedAt": 1783588720729,
+  "activeWorkspaceId": "live-1783585261306-sza0dkpm7",
+  "activeWorkspaceUpdatedAt": 1783588719594,
+  "canonicalSyncedWorkspaceId": "live-1783585261306-sza0dkpm7",
+  "canonicalSyncedAt": 1783588719885
+}

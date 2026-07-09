@@ -181,7 +181,7 @@ const DEFAULT_SKETCH_META: Record<string, unknown> = {
   updatedAt: 0,
 };
 
-const MAX_PROTOTYPE_HTML_LENGTH = 120_000;
+const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
 const MAX_PROTOTYPE_CSS_LENGTH = 80_000;
 const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 
@@ -1897,11 +1897,15 @@ export class ProjectAdminService {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
     const runtimeType: DemoPageRuntimeType =
-      input.runtimeType === "prototype-html-css"
+      input.runtimeType === "high-fidelity-react"
+        ? "high-fidelity-react"
+        : input.runtimeType === "prototype-html-css"
         ? "prototype-html-css"
         : input.runtimeType === "sketch-scene"
           ? "sketch-scene"
-          : "high-fidelity-react";
+          : input.code
+            ? "high-fidelity-react"
+            : "prototype-html-css";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -4349,7 +4353,7 @@ export class ProjectAdminService {
     if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
       addIssue({
         code: "PROTOTYPE_HTML_TOO_LARGE",
-        message: "原型页 HTML 超过 MVP 限制",
+        message: "原型页 HTML 超过当前限制",
         instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
       }, "repair_prototype");
     }
