@@ -78,16 +78,24 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const isStreaming = isStreamingControlled
     ? externalIsStreaming
     : internalIsStreaming;
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
   const setIsStreaming = useCallback(
     (value: boolean) => {
       if (isStreamingControlled) {
-        if (externalIsStreaming === value) return;
+        isStreamingRef.current = value;
         onIsStreamingChange?.(value);
         return;
       }
-      setInternalIsStreaming((current) => (current === value ? current : value));
+      setInternalIsStreaming((current) => {
+        if (current === value) return current;
+        isStreamingRef.current = value;
+        return value;
+      });
     },
-    [externalIsStreaming, isStreamingControlled, onIsStreamingChange],
+    [isStreamingControlled, onIsStreamingChange],
   );
 
   // --- streamContent ---
