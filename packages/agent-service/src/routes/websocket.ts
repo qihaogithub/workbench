@@ -23,6 +23,7 @@ import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
 import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
 import type { BaseAgent } from "../core/agent";
+import { loadConfig } from "../utils/config";
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
@@ -77,8 +78,28 @@ const connections = new Map<string, ActiveConnection>();
 
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
-const MESSAGE_TIMEOUT_MS = 300000;
+const DEFAULT_MESSAGE_TIMEOUT_MS = 120000;
+const MIN_MESSAGE_TIMEOUT_MS = 15000;
+const MAX_MESSAGE_TIMEOUT_MS = 600000;
 const MESSAGE_TIMEOUT_CHECK_INTERVAL_MS = 5000;
+
+function normalizeTimeoutMs(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return Math.min(
+    MAX_MESSAGE_TIMEOUT_MS,
+    Math.max(MIN_MESSAGE_TIMEOUT_MS, Math.floor(value)),
+  );
+}
+
+export function resolveMessageTimeoutMs(requestTimeoutMs?: number): number {
+  return (
+    normalizeTimeoutMs(requestTimeoutMs) ??
+    normalizeTimeoutMs(loadConfig().piAgent.timeout) ??
+    DEFAULT_MESSAGE_TIMEOUT_MS
+  );
+}
 
 async function resolveCurrentModelId(agent: BaseAgent | undefined): Promise<string | null> {
   if (!agent || !("getModelInfo" in agent)) return null;
@@ -299,6 +320,9 @@ export async function registerWebSocketRoutes(
               });
 
               const messageId = message.id || generateMessageId();
+              const messageTimeoutMs = resolveMessageTimeoutMs(
+                message.options?.timeout,
+              );
               eventRouter.startMessage(messageId, {
                 contentLength: message.content.length,
                 workingDir: message.workingDir,
@@ -321,9 +345,9 @@ export async function registerWebSocketRoutes(
                 const timeoutPromise = new Promise<AgentResult>((resolve) => {
                   const checkTimeout = () => {
                     const idleMs = Date.now() - lastAgentActivityAt;
-                    if (idleMs >= MESSAGE_TIMEOUT_MS) {
+                    if (idleMs >= messageTimeoutMs) {
                       logger.warn(
-                        { sessionId, timeoutMs: MESSAGE_TIMEOUT_MS, idleMs },
+                        { sessionId, timeoutMs: messageTimeoutMs, idleMs },
                         "Agent sendMessage idle timed out, cancelling",
                       );
                       eventRouter.cancelMessage();
@@ -336,7 +360,7 @@ export async function registerWebSocketRoutes(
                         error: {
                           code: "MESSAGE_TIMEOUT",
                           message: `消息处理超时（连续 ${Math.round(
-                            MESSAGE_TIMEOUT_MS / 1000,
+                            messageTimeoutMs / 1000,
                           )}s 无响应），已自动取消`,
                           retryable: true,
                         },
@@ -348,12 +372,12 @@ export async function registerWebSocketRoutes(
                       checkTimeout,
                       Math.min(
                         MESSAGE_TIMEOUT_CHECK_INTERVAL_MS,
-                        Math.max(1000, MESSAGE_TIMEOUT_MS - idleMs),
+                        Math.max(1000, messageTimeoutMs - idleMs),
                       ),
                     );
                   };
 
-                  timeoutHandle = setTimeout(checkTimeout, MESSAGE_TIMEOUT_MS);
+                  timeoutHandle = setTimeout(checkTimeout, messageTimeoutMs);
                 });
 
                 const result: AgentResult = await Promise.race([
