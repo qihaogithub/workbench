@@ -11,7 +11,7 @@ SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/opt/workbench-data-backups}"
 REMOTE_STAGING_ROOT="${REMOTE_STAGING_ROOT:-/opt/workbench-data-staging}"
-LEGACY_DATA_VOLUME="${LEGACY_DATA_VOLUME:-workbench_app-data}"
+LEGACY_DATA_VOLUME="${LEGACY_DATA_VOLUME:-opencode-workbench_app-data}"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

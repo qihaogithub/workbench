@@ -12,6 +12,9 @@ print_usage() {
   scripts/deploy-fast.sh author viewer
   scripts/deploy-fast.sh shot
 
+默认启用 targeted sync，只同步目标服务构建所需的 workspace 包。
+默认启用本地构建：在本机生成 linux/amd64 镜像，上传到服务器后只执行 docker load + recreate。
+
 短名:
   author      -> author-site
   agent       -> agent-service
@@ -21,8 +24,12 @@ print_usage() {
   core        -> agent-service author-site viewer-site
 
 选项:
-  --dry-run   只打印将要执行的部署范围，不真正部署
-  -h, --help  显示帮助
+  --targeted-sync  只同步目标服务需要的包（默认）
+  --full-sync      使用 deploy.sh 的完整同步模式
+  --local-build    本地构建镜像后上传部署（默认）
+  --remote-build   在服务器上构建镜像（仅作为兜底，带资源预检）
+  --dry-run        只打印将要执行的部署范围，不真正部署
+  -h, --help       显示帮助
 EOF
 }
 
@@ -32,6 +39,8 @@ if [ "$#" -eq 0 ]; then
 fi
 
 dry_run=false
+sync_mode="${DEPLOY_SYNC_MODE:-targeted}"
+build_mode="${DEPLOY_BUILD_MODE:-local}"
 services=()
 
 for target in "$@"; do
@@ -42,6 +51,18 @@ for target in "$@"; do
             ;;
         --dry-run)
             dry_run=true
+            ;;
+        --targeted-sync)
+            sync_mode="targeted"
+            ;;
+        --full-sync)
+            sync_mode="full"
+            ;;
+        --local-build)
+            build_mode="local"
+            ;;
+        --remote-build)
+            build_mode="remote"
             ;;
         author|author-site)
             services+=("author-site")
@@ -67,6 +88,26 @@ for target in "$@"; do
     esac
 done
 
+case "${sync_mode}" in
+    full|targeted)
+        ;;
+    *)
+        echo "不支持的同步模式: ${sync_mode}" >&2
+        echo "允许值: full targeted" >&2
+        exit 1
+        ;;
+esac
+
+case "${build_mode}" in
+    local|remote)
+        ;;
+    *)
+        echo "不支持的构建模式: ${build_mode}" >&2
+        echo "允许值: local remote" >&2
+        exit 1
+        ;;
+esac
+
 if [ "${#services[@]}" -eq 0 ]; then
     echo "请至少指定一个部署目标。" >&2
     echo "" >&2
@@ -91,8 +132,8 @@ done
 deploy_services="${deduped_services[*]}"
 
 if [ "${dry_run}" = true ]; then
-    echo "DEPLOY_SERVICES=\"${deploy_services}\" scripts/deploy.sh"
+    echo "DEPLOY_BUILD_MODE=\"${build_mode}\" DEPLOY_SYNC_MODE=\"${sync_mode}\" DEPLOY_SERVICES=\"${deploy_services}\" scripts/deploy.sh"
     exit 0
 fi
 
-DEPLOY_SERVICES="${deploy_services}" exec "${PROJECT_DIR}/scripts/deploy.sh"
+DEPLOY_BUILD_MODE="${build_mode}" DEPLOY_SYNC_MODE="${sync_mode}" DEPLOY_SERVICES="${deploy_services}" exec "${PROJECT_DIR}/scripts/deploy.sh"

@@ -30,26 +30,37 @@ export default function PadPopup(props) {
 
   return (
     _jsx('div', {
-      className: "fixed inset-0 z-50 flex items-center justify-center"     ,
       style: {
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       },
  children: 
       _jsxs('div', {
-        className: "relative flex h-screen w-screen flex-col items-center justify-center"      ,
         style: {
+          position: 'relative',
+          display: 'flex',
+          height: '100vh',
+          width: '100vw',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           backgroundImage: 'url(/data/proj_1782718596686_wmv9yu/assets/images/0d1ebc4fadf43c911af54647.webp)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
         },
  children: [
-        _jsx('div', { className: "absolute inset-0 bg-black/70"  ,} )
+        _jsx('div', { style: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)' },} )
 
-        , _jsx('div', { className: "relative z-10 w-full max-w-[26em] px-8"    , children: 
-          _jsxs('div', { className: "relative", children: [
-            _jsx('div', { className: "absolute z-20 cursor-pointer"  , style: { top: '-46px', right: 0 }, children: 
+        , _jsx('div', { style: { position: 'relative', zIndex: 10, width: '100%', maxWidth: '26em', paddingLeft: '2rem', paddingRight: '2rem', boxSizing: 'border-box' }, children:
+          _jsxs('div', { style: { position: 'relative' }, children: [
+            _jsx('div', { style: { position: 'absolute', zIndex: 20, cursor: 'pointer', top: '-46px', right: 0 }, children:
               _jsxs('svg', { width: "36", height: "36", viewBox: "0 0 42 42"   , fill: "none", children: [
                 _jsx('rect', { width: "42", height: "42", fill: "black", fillOpacity: "0.01",} )
                 , _jsx('circle', { cx: "21", cy: "21.0002", r: "18.0955", stroke: "white", strokeWidth: "1.26847", strokeLinecap: "round", strokeLinejoin: "round",} )
@@ -60,11 +71,10 @@ export default function PadPopup(props) {
             , showSvga ? (
               _jsx(SvgaPlayer, {
                 src: svgaSrc,
-                className: "block w-full" ,
-                style: { aspectRatio: '670 / 780' },}
+                style: { display: 'block', width: '100%', aspectRatio: '670 / 780' },}
               )
             ) : (
-              _jsx('img', { src: modalImage, alt: "popup", className: "block h-auto w-full"  ,} )
+              _jsx('img', { src: modalImage, alt: "popup", style: { display: 'block', height: 'auto', width: '100%' },} )
             )
           ]})
         })

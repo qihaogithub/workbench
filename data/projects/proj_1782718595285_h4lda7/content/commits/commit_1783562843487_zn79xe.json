@@ -1,0 +1,33 @@
+{
+  "id": "commit_1783562843487_zn79xe",
+  "projectId": "proj_1782718595285_h4lda7",
+  "parentCommitId": "commit_1783561688551_4z3v1q",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "持续编辑自动记录手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_71dt",
+      "versionId": "prv_1783562843485_uwdslb"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_omrf",
+      "versionId": "prv_1783561342911_8tbqtf"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_71dt",
+      "fromVersionId": "prv_1783561688496_pq791d",
+      "toVersionId": "prv_1783562843485_uwdslb"
+    }
+  ],
+  "createdAt": 1783562843487,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

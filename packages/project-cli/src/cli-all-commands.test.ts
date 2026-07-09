@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 
@@ -10,6 +11,28 @@ type JsonObject = Record<string, unknown>;
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-cli-all-"));
 const executed = new Set<string>();
 let inputIndex = 0;
+
+function startImageServer(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "image/png" });
+    res.end(Buffer.from("remote-hero"));
+  });
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      assert.ok(address && typeof address === "object");
+      resolve({
+        url: `http://127.0.0.1:${address.port}/figma/hero.png`,
+        close: () => new Promise((closeResolve, closeReject) => {
+          server.close((error) => {
+            if (error) closeReject(error);
+            else closeResolve();
+          });
+        }),
+      });
+    });
+  });
+}
 
 function writeJson(filePath: string, value: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -573,14 +596,15 @@ try {
   const importSourceDir = path.join(tempDir, "import-source");
   fs.mkdirSync(path.join(importSourceDir, "assets"), { recursive: true });
   fs.writeFileSync(path.join(importSourceDir, "assets", "hero.png"), Buffer.from("hero"));
+  const remoteImage = await startImageServer();
   const importManifest = path.join(importSourceDir, "prototype-pages.json");
   writeJson(importManifest, {
     pages: [
       {
         pageId: "import_home",
         name: "导入首页",
-        prototypeHtml: "<main><h1>导入首页</h1><img src=\"assets/import/hero.png\" /></main>",
-        prototypeCss: "main { padding: 16px; }",
+        prototypeHtml: `<main><h1>导入首页</h1><img src="assets/import/hero.png" /><img src="${remoteImage.url}" /></main>`,
+        prototypeCss: `main { padding: 16px; background-image: url("${remoteImage.url}"); }`,
         prototypeMeta: {
           previewSize: { width: 375, height: 812 },
           source: "fixture",
@@ -589,32 +613,49 @@ try {
       },
     ],
   });
-  await runCommand("project import-prototype dry-run", [
-    "project",
-    "import-prototype",
-    "--name",
-    "导入原型 dry-run",
-    "--source",
-    importSourceDir,
-    "--pages",
-    `@${importManifest}`,
-    "--assets",
-    "assets:assets/import",
-    "--dry-run",
-  ]);
-  await runCommand("project import-prototype", [
-    "project",
-    "import-prototype",
-    "--name",
-    "导入原型项目",
-    "--source",
-    importSourceDir,
-    "--pages",
-    `@${importManifest}`,
-    "--assets",
-    "assets:assets/import",
-    "--commit",
-  ]);
+  try {
+    await runCommand("project import-prototype dry-run", [
+      "project",
+      "import-prototype",
+      "--name",
+      "导入原型 dry-run",
+      "--source",
+      importSourceDir,
+      "--pages",
+      `@${importManifest}`,
+      "--assets",
+      "assets:assets/import",
+      "--dry-run",
+    ]);
+    const imported = await runCommand("project import-prototype", [
+      "project",
+      "import-prototype",
+      "--name",
+      "导入原型项目",
+      "--source",
+      importSourceDir,
+      "--pages",
+      `@${importManifest}`,
+      "--assets",
+      "assets:assets/import",
+      "--commit",
+    ]);
+    const importedProjectId = dataOf<{ projectId: string }>(imported).projectId;
+    const importedHtml = fs.readFileSync(
+      path.join(tempDir, "projects", importedProjectId, "workspace", "demos", "import_home", "prototype.html"),
+      "utf-8",
+    );
+    assert.match(importedHtml, /\.\.\/\.\.\/assets\/images\/[a-f0-9]{12}-hero\.png/);
+    assert.doesNotMatch(importedHtml, /127\.0\.0\.1/);
+    const imageManifest = JSON.parse(
+      fs.readFileSync(path.join(tempDir, "projects", importedProjectId, "images.json"), "utf-8"),
+    ) as { images: Array<{ sourceType?: string; originalUrl?: string }> };
+    assert.ok(imageManifest.images.some((image) =>
+      image.sourceType === "remote_url" && image.originalUrl === remoteImage.url
+    ));
+  } finally {
+    await remoteImage.close();
+  }
 
   const missing = registeredCommands.filter((command) => !executed.has(command));
   assert.deepEqual(missing, [], `Untested CLI commands: ${missing.join(", ")}`);

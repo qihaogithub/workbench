@@ -84,10 +84,41 @@ function parsePath(pathname: string): {
 function mergeConfigDefaults(
   projectSchema?: string,
   pageSchema?: string,
+  projectValues?: Record<string, unknown>,
 ): Record<string, unknown> {
   const projectDefaults = projectSchema ? getDefaultValues(projectSchema) : {};
   const pageDefaults = pageSchema ? getDefaultValues(pageSchema) : {};
-  return { ...projectDefaults, ...pageDefaults };
+  return resolvePublishedConfigAssetUrls({
+    ...projectDefaults,
+    ...pageDefaults,
+    ...projectValues,
+  });
+}
+
+function resolvePublishedConfigAssetUrls(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  function walk(value: unknown): unknown {
+    if (typeof value === "string") {
+      if (value.startsWith("/data/")) {
+        return getDataUrl(value);
+      }
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(walk);
+    }
+    if (value !== null && typeof value === "object") {
+      const next: Record<string, unknown> = {};
+      for (const [key, child] of Object.entries(value)) {
+        next[key] = walk(child);
+      }
+      return next;
+    }
+    return value;
+  }
+
+  return walk(data) as Record<string, unknown>;
 }
 
 function clampScreenshotAspectRatio(ratio: number): number {
@@ -751,16 +782,21 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 const defaults = mergeConfigDefaults(
                   data.projectConfigSchema,
                   schemaStr,
+                  data.projectConfigValues,
                 );
                 initialConfigMap[page.id] = defaults;
               } catch {
                 initialConfigMap[page.id] = mergeConfigDefaults(
                   data.projectConfigSchema,
+                  undefined,
+                  data.projectConfigValues,
                 );
               }
             } else {
               initialConfigMap[page.id] = mergeConfigDefaults(
                 data.projectConfigSchema,
+                undefined,
+                data.projectConfigValues,
               );
             }
           }
@@ -1039,6 +1075,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     src={activeIframeUrl}
                     title={activePage?.name ?? "页面预览"}
                     previewSize={previewSize ?? activePage?.previewSize}
+                    configData={configData}
+                    demoId={activePage?.id}
                   />
                 ) : activePage?.runtimeType === "prototype-html-css" ? (
                   <PrototypePagePreview

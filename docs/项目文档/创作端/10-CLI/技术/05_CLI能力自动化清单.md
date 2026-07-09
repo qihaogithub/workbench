@@ -9,7 +9,7 @@ covers:
 
 # CLI 能力自动化清单
 
-> 更新日期：2026-07-06
+> 更新日期：2026-07-08
 
 ## 用途
 
@@ -48,8 +48,8 @@ covers:
 | scaffold.upgrade | 本地项目包 | `upgrade` | 中 | L4 | 已覆盖 | 更新脚手架托管文件 |
 | scaffold.submit | 本地项目包 | `submit` | 中 | L4 | 已覆盖 | 提交本地项目包变更 |
 | project.list | 项目 | `project list` | 低 | L3 | 已覆盖 | 查询项目列表 |
-| project.get | 项目 | `project get` | 低 | L3 | 已覆盖 | 查询项目详情 |
-| project.pull | 项目 | `project pull` | 低 | L3 | 已覆盖 | 拉取项目为本地项目包 |
+| project.get | 项目 | `project get` | 低 | L3 | 已覆盖 | 查询项目详情；当前会随 `project-core.getProject()` 返回 `projectConfigSchema` 与只读 `projectConfigValues` |
+| project.pull | 项目 | `project pull` | 低 | L3 | 已覆盖 | 拉取项目为本地项目包；当前项目包协议仍只同步 `projectConfigSchema`，不包含 `project.config.values.json` |
 | project.runtime.validate | 项目 | `project validate-runtime` | 低 | L3 | 已覆盖 | 校验项目当前版本页面是否符合创作端预览运行契约 |
 | project.verify | 项目 | `project verify` | 低 | L3 | 已覆盖 | 聚合验证项目当前版本的 runtime、资产引用、原型占位和元数据 |
 | project.visual.check | 项目 | `project visual-check` | 低 | L3 | 已覆盖 | 生成页面效果离线检查报告和截图工件 |
@@ -105,6 +105,7 @@ covers:
 | config.project.get | 配置 | `config get-project-schema` | 低 | L3 | 已覆盖 | 读取项目级配置 |
 | config.project.set | 配置 | `config set-project-schema` | 中 | L4 | 已覆盖 | 设置项目级配置 |
 | config.project.delete | 配置 | `config delete-project-schema` | 高 | L5 | 已覆盖 | 删除项目级配置 |
+| config.project.values | 配置 | `project get`（只读明细） | 中 | L1 | 部分覆盖 | `project-core` 已把 `projectConfigValues` 暴露给项目详情和导出结果；但 author-site `/api/projects/[projectId]/config-values` 的写入仍依赖 session/workspace 路由与 `fs-utils.saveProjectConfigValues`，`project-scaffold` 也未把该文件纳入本地项目包协议，因此 CLI 暂不补独立写命令 |
 | config.page.validate | 配置 | `config validate-page-schema` | 低 | L3 | 已覆盖 | 校验页面 Schema |
 | config.merged.validate | 配置 | `config validate-merged-schema` | 低 | L3 | 已覆盖 | 校验合并配置 |
 | config.generate | 配置 | `config generate-from-code` | 低 | L3 | 已覆盖 | 生成候选配置 |

@@ -8,6 +8,7 @@ import {
   isApiImagePath,
   isExternalImageUrl,
   isLocalPath,
+  isSessionAssetPath,
   scanImageReferences,
 } from './image-scanner';
 
@@ -217,7 +218,8 @@ function isPublishableReference(ref: ImageReference): boolean {
   return (
     isExternalImageUrl(ref.originalPath) ||
     isLocalPath(ref.originalPath) ||
-    isApiImagePath(ref.originalPath)
+    isApiImagePath(ref.originalPath) ||
+    isSessionAssetPath(ref.originalPath)
   );
 }
 
@@ -250,14 +252,20 @@ export async function processImagesForPublish(
     if (result.success) {
       urlMap.set(ref.originalPath, result.ossUrl);
     } else {
-      errors.push({ ...result, localPath: ref.originalPath });
+      if (isExternalImageUrl(ref.originalPath)) {
+        console.warn(
+          `[publish] 外部图片本地化失败，发布产物将保留原 URL: ${ref.originalPath} (${result.error || 'UNKNOWN'})`,
+        );
+      } else {
+        errors.push({ ...result, localPath: ref.originalPath });
+      }
     }
 
     const percent = 10 + Math.floor(((index + 1) / references.length) * 80);
     onProgress?.(percent, 100, `本地化图片 ${index + 1}/${references.length}...`);
   }
 
-  onProgress?.(100, 100, `图片本地化完成（成功: ${urlMap.size}, 失败: ${errors.length}）`);
+  onProgress?.(100, 100, `图片本地化完成（成功: ${urlMap.size}, 阻断失败: ${errors.length}）`);
 
   return {
     success: errors.length === 0,

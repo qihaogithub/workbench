@@ -1,0 +1,15 @@
+{
+  "id": "commit_1783506970288_608hmd",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "parentCommitId": "commit_1783419131743_gikxl1",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v18",
+  "resourcePointers": [],
+  "changedResources": [],
+  "createdAt": 1783506970288,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

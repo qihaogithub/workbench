@@ -1,8 +1,14 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import {
   extractImageReferences,
   isApiImagePath,
   isExternalImageUrl,
   isLocalPath,
+  isSessionAssetPath,
+  scanImageReferences,
 } from '../image-scanner';
 
 describe('isLocalPath', () => {
@@ -60,6 +66,18 @@ describe('isApiImagePath', () => {
 
   it('/api/images/ 路径但无图片扩展名返回 false', () => {
     expect(isApiImagePath('/api/images/data.json')).toBe(false);
+  });
+});
+
+describe('isSessionAssetPath', () => {
+  it('/api/sessions/:id/assets 图片路径返回 true', () => {
+    expect(isSessionAssetPath('/api/sessions/session-1/assets/popup.png')).toBe(true);
+    expect(isSessionAssetPath('/api/sessions/session-1/assets/popup.webp?x=1')).toBe(true);
+  });
+
+  it('非图片会话资源返回 false', () => {
+    expect(isSessionAssetPath('/api/sessions/session-1/assets/popup.json')).toBe(false);
+    expect(isSessionAssetPath('/api/images/popup.png')).toBe(false);
   });
 });
 
@@ -150,6 +168,16 @@ describe('extractImageReferences', () => {
     });
   });
 
+  it('提取配置值字符串中的会话图片 URL', () => {
+    const content = '{"modalImage": "/api/sessions/session-1/assets/popup.png"}';
+    const refs = extractImageReferences(content, '/workspace/project.config.values.json');
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: '/api/sessions/session-1/assets/popup.png',
+      type: 'img-src',
+    });
+  });
+
   it('跳过 data URI 图片', () => {
     const content = '<img src="data:image/png;base64,iVBOR..." />';
     const refs = extractImageReferences(content, sourceFile);
@@ -166,5 +194,73 @@ describe('extractImageReferences', () => {
     `;
     const refs = extractImageReferences(content, sourceFile);
     expect(refs).toHaveLength(5);
+  });
+});
+
+describe('scanImageReferences', () => {
+  it('扫描 workspace 根目录的项目级配置值图片', () => {
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'image-scan-'));
+    try {
+      fs.mkdirSync(path.join(workspacePath, 'demos'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspacePath, 'project.config.values.json'),
+        JSON.stringify({ modalImage: 'https://cdn.example.com/shared-popup.png' }),
+        'utf-8',
+      );
+
+      const refs = scanImageReferences(workspacePath);
+      expect(refs).toContainEqual(expect.objectContaining({
+        originalPath: 'https://cdn.example.com/shared-popup.png',
+        sourceFile: path.join(workspacePath, 'project.config.values.json'),
+      }));
+    } finally {
+      fs.rmSync(workspacePath, { recursive: true, force: true });
+    }
+  });
+
+  it('项目级运行值覆盖 schema default 时不再扫描旧默认图片', () => {
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'image-scan-'));
+    try {
+      fs.mkdirSync(path.join(workspacePath, 'demos'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspacePath, 'project.config.schema.json'),
+        JSON.stringify({
+          type: 'object',
+          properties: {
+            modalImage: {
+              type: 'string',
+              default: 'https://cdn.example.com/old-popup.png',
+            },
+            untouchedImage: {
+              type: 'string',
+              default: 'https://cdn.example.com/kept-default.webp',
+            },
+          },
+        }),
+        'utf-8',
+      );
+      fs.writeFileSync(
+        path.join(workspacePath, 'project.config.values.json'),
+        JSON.stringify({
+          modalImage: '/api/sessions/session-1/assets/new-popup.png',
+        }),
+        'utf-8',
+      );
+
+      const refs = scanImageReferences(workspacePath);
+      expect(refs).toContainEqual(expect.objectContaining({
+        originalPath: '/api/sessions/session-1/assets/new-popup.png',
+        sourceFile: path.join(workspacePath, 'project.config.values.json'),
+      }));
+      expect(refs).toContainEqual(expect.objectContaining({
+        originalPath: 'https://cdn.example.com/kept-default.webp',
+        sourceFile: path.join(workspacePath, 'project.config.schema.json'),
+      }));
+      expect(refs).not.toContainEqual(expect.objectContaining({
+        originalPath: 'https://cdn.example.com/old-popup.png',
+      }));
+    } finally {
+      fs.rmSync(workspacePath, { recursive: true, force: true });
+    }
   });
 });

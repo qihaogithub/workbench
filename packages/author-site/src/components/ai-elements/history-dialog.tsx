@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -144,21 +145,24 @@ export function HistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
             对话历史
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            查看、新建、导出或删除当前项目的 AI 对话历史。
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <Button onClick={handleNewSession} className="w-full">
+        <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+          <Button onClick={handleNewSession} className="w-full min-w-0">
             <Plus className="h-4 w-4 mr-2" />
             新建对话
           </Button>
 
-          <ScrollArea className="h-[300px] pr-4">
+          <ScrollArea className="h-[300px] w-full min-w-0 pr-4">
             {loading ? (
               <div className="flex items-center justify-center py-8 text-muted-foreground">
                 加载中...
@@ -169,12 +173,12 @@ export function HistoryDialog({
                 <p>暂无历史对话</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="w-full min-w-0 space-y-2">
                 {sessions.map((session) => (
                   <div
                     key={session.sessionId}
                     className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border transition-colors',
+                      'flex w-full min-w-0 items-center gap-3 rounded-lg border p-3 transition-colors',
                       session.isExpired
                         ? 'bg-muted/50 opacity-60'
                         : 'hover:bg-muted cursor-pointer',
@@ -186,24 +190,24 @@ export function HistoryDialog({
                       onOpenChange(false)
                     }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate font-medium">
                           {session.title || formatTime(session.createdAt)}
                         </span>
                         {session.isExpired && (
-                          <Badge variant="outline" className="text-orange-500 text-[10px] px-1.5 py-0">
+                          <Badge variant="outline" className="shrink-0 text-orange-500 text-[10px] px-1.5 py-0">
                             <AlertCircle className="h-3 w-3 mr-0.5" />
                             已过期
                           </Badge>
                         )}
                         {session.hasUnsavedChanges && !session.isExpired && (
-                          <Badge variant="outline" className="text-yellow-600 text-[10px] px-1.5 py-0">
+                          <Badge variant="outline" className="shrink-0 text-yellow-600 text-[10px] px-1.5 py-0">
                             未保存
                           </Badge>
                         )}
                         {session.messageCount > 0 && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
                             <MessageSquare className="h-3 w-3 mr-0.5" />
                             {session.messageCount}
                           </Badge>
@@ -216,7 +220,7 @@ export function HistoryDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleExport(session.sessionId, session.createdAt)
@@ -229,7 +233,7 @@ export function HistoryDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDelete(session.sessionId)

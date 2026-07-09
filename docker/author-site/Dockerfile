@@ -1,9 +1,23 @@
-# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+ARG DEBIAN_MIRROR=
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+
+RUN corepack enable \
+    && corepack prepare pnpm@8.15.0 --activate \
+    && pnpm config set registry "$NPM_REGISTRY"
 
 WORKDIR /app
 
@@ -21,6 +35,7 @@ ENV NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS}
 ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 ENV NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
 ENV NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL}
+ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/agent-client/package.json ./packages/agent-client/
@@ -36,7 +51,9 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/author-site/package.json ./packages/author-site/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --no-frozen-lockfile
+    pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
+    && pnpm rebuild --store-dir /pnpm/store esbuild \
+    && pnpm --filter @workbench/author-site rebuild --store-dir /pnpm/store bcrypt better-sqlite3
 
 COPY packages/agent-client/ ./packages/agent-client/
 COPY packages/demo-ui/ ./packages/demo-ui/

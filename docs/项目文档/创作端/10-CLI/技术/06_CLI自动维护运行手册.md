@@ -11,7 +11,7 @@ covers:
 
 # CLI 自动维护运行手册
 
-> 更新日期：2026-07-06
+> 更新日期：2026-07-08
 
 ## 读者
 
@@ -32,6 +32,8 @@ covers:
 如果页面能力涉及 `runtimeType: "prototype-html-css"`、`runtimeType: "sketch-scene"`、`prototypeHtml` / `prototypeCss` / `prototypeMeta`、`sketchScene` / `sketchMeta`、`page update-prototype` 或 `page update-sketch`，还要确认 `project-core` 已承载原型页文件读写、草图 scene 文件读写、版本快照和对应校验；CLI 不得直接复用 author-site 画布、demo-ui 草图编辑器或组件逻辑。
 
 如果页面历史、知识文档历史或内容图能力发生变化，还要确认 author-site 已通过 `/api/projects/[projectId]/resources/*`、`/commits/*` 或 `/materialize` 入口复用 `project-core`；CLI 不得恢复旧 `page version-*` 路由，也不能绕过内容图 commit / blob / materialization 状态。
+
+如果项目级配置运行值 `project.config.values.json`、`projectConfigValues` 或 `/api/projects/[projectId]/config-values` 发生变化，还要确认 `project-core` 是否已经同时提供共享读写能力，以及 `project-scaffold` 是否把该文件纳入本地项目包协议；在共享写入能力进入 `project-core` 之前，CLI 不得直接复用 author-site 的 session/workspace 解析、`saveProjectConfigValues()` 或 `updateWorkspaceTimestamp()` 逻辑。
 
 ## 允许自动处理的改动
 
@@ -103,12 +105,15 @@ covers:
 - 领域服务是否有新增业务方法。
 - CLI 命令是否登记对应能力。
 - CLI 已有命令的参数面是否仍覆盖共享层与 Web 已暴露的业务字段。
+- `project get`、`project pull` 与本地项目包协议是否对齐共享层新增字段，尤其是 `projectConfigValues` 这类已经进入 `project-core` 读取结果、但未必进入 `project-scaffold` manifest 的运行值文件。
 - CLI 测试是否覆盖所有登记命令。
 - 文档是否说明新增或变化的能力。
 
 页面历史相关入口优先检查 `/resources/[kind]/[resourceId]/versions` 是否已替代旧 `/demos/[demoId]/versions`；项目内容图相关入口优先检查 `/commits` 与 `/materialize` 是否已经复用 `project-core`，避免把共享层迁移误判成 CLI 缺口。草图页相关入口优先检查 `page create --runtime-type sketch-scene`、`page update-sketch` 与 `page switch-runtime --target-runtime-type sketch-scene` 是否只是转发到 `project-core` 与 `@workbench/sketch-core`，不要把 author-site 编辑器或 viewer 展示层误记成 CLI 共享能力。
 
 对于已经存在同名命令的能力，不要只检查“命令是否注册”。还要继续核对参数面对齐情况，例如 `project create` / `project update` 是否继续覆盖 Web 与共享层中的 `category`、`authoringPreferences` 等项目元数据字段。
+
+如果共享层只新增了字段透出，而没有新增独立命令，也不能直接判定“CLI 已对齐”。例如 `projectConfigValues` 当前已经进入 `project get` 与 `exportProjectPackage()` 的共享返回值，但 `project pull` 对应的本地项目包协议和写回链路仍未同步，这类情况应登记为共享层 / 脚手架缺口，而不是在 CLI 侧补一条绕过共享层的写命令。
 
 ### 3. 选择处理等级
 

@@ -1,16 +1,23 @@
 # CLI 维护当前状态
 
-> 更新日期：2026-07-07
+> 更新日期：2026-07-09
 
 ## 当前结论
 
 `project-cli` 已有独立自动维护文档和长期跟踪记录。下一轮 CLI 定时任务应优先读取：
 
+- `docs/plans/进行中/CLI与创作端能力对齐长期跟踪.md`
 - `docs/plans/进行中/创作端CLI.md`
 - `docs/项目文档/创作端/10-CLI/技术/05_CLI能力自动化清单.md`
 - `docs/项目文档/创作端/10-CLI/技术/06_CLI自动维护运行手册.md`
 
-`commands --json`、`packages/project-cli/src/index.ts` 的 `register(...)` 列表与 `packages/project-cli/src/cli-all-commands.test.ts` 末尾的未覆盖守卫继续保持一致。2026-07-07 复核未发现新的 L3 只读命令缺口或已注册命令参数漂移：上一轮补齐的 `project create --category` 与 `project update --category`、`--authoring-preferences`、`--sketch-editor-engine`、`--clear-authoring-preferences` 仍与 `packages/project-core/src/service.ts` 的项目元数据写入能力、author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 入口保持同名同义，并继续进入 `cli-all-commands` 与稳定入口回归。
+`commands --json`、`packages/project-cli/src/index.ts` 的 `register(...)` 列表与 `packages/project-cli/src/cli-all-commands.test.ts` 末尾的未覆盖守卫继续保持一致。2026-07-09 复核仍未发现新的 L3 只读命令缺口或已注册命令参数漂移：上一轮补齐的 `project create --category` 与 `project update --category`、`--authoring-preferences`、`--sketch-editor-engine`、`--clear-authoring-preferences` 仍与 `packages/project-core/src/service.ts` 的项目元数据写入能力、author-site `POST /api/demos` 与 `PATCH /api/demos/[id]` 入口保持同名同义，并继续进入 `cli-all-commands` 与稳定入口回归。
+
+2026-07-08 新确认的共享层事实是：`packages/project-core/src/service.ts` 的 `listProjects()` 现在会忽略缺少 `project.json` 的残留目录。`packages/project-cli/src/index.ts` 的 `project list` 一直直接复用该共享层方法；author-site 的 `packages/author-site/src/app/api/demos/route.ts` 与 `packages/author-site/src/app/page.tsx` 当前也都通过 `getProjectAdminService().listProjects()` 读取项目列表，所以这次收敛已经同时进入 CLI 与 Web，不构成新的 CLI 对齐缺口。
+
+2026-07-08 本轮还新确认了一条配置运行值边界：`packages/project-core/src/service.ts` 的 `getProject()` 与 `exportProjectPackage()` 现在都会返回 `projectConfigValues`，因此 CLI `project get` 已经可以跟随共享层读取这份只读数据；但 author-site 新增的 `packages/author-site/src/app/api/projects/[projectId]/config-values/route.ts` 写入链路仍直接依赖 session/workspace 解析、`saveProjectConfigValues()` 与 `updateWorkspaceTimestamp()`，`packages/project-scaffold/src/index.ts` 和 `project-package.schema.json` 也仍只托管 `projectConfigSchema`，没有把 `project.config.values.json` 纳入本地项目包协议。因此当前不能把这条能力记成 CLI 已对齐，只能新增为 GAP-011：共享层只读已到位、CLI 本地项目包同步与共享写能力仍缺失，继续按 L1 report-only 处理。
+
+2026-07-09 本轮进一步确认，`projectConfigValues` 已经不只停留在项目详情只读输出：author-site 的 `packages/author-site/src/app/api/viewer/[projectId]/data/route.ts` 与 viewer 页面会把这份运行值合并进页面默认配置，`packages/author-site/src/app/api/projects/[projectId]/publish/route.ts` 还会在发布前把 live workspace 中非空的运行值补写回 canonical workspace（仅当 canonical 缺失时）。这说明 Web 侧对 `project.config.values.json` 的消费进一步扩大；但写回语义仍停留在 author-site 路由层，`project-core` 没有共享写能力，`project-scaffold` 也仍不能 round-trip 该文件，所以 GAP-011 继续保持 L1，只报告不补 CLI。
 
 当前工作树新增的 HTML/CSS 原型页能力已进入共享层：`page create` 支持 `runtimeType: "prototype-html-css"` 与 `prototypeHtml`、`prototypeCss`、`prototypeMeta`，`page update-prototype` 与 `page switch-runtime` 已注册并纳入 `cli-all-commands` 覆盖。对应的文件读写、版本快照、运行时切换、恢复与校验由 `project-core` 承载，不属于 CLI 侧复制 Web 逻辑；但这条能力当前只确认创作端编辑事务与本地测试链路，不等同于发布、viewer 或本地项目包协议已经完整支持原型页。
 
@@ -37,6 +44,8 @@
 - 检查 `project-core` 是否新增会话、工作区、知识文档或截图任务共享能力。
 - 检查 `project-cli` 是否新增或缺失对应命令。
 - 检查现有命令的参数面是否仍与共享层和 Web 路由一致，尤其是 `project create` / `project update` 的 `category` 与 `authoringPreferences`。
+- 检查 `projectConfigValues` 是否进入 `project-core` 的共享写能力，以及 `project-scaffold` 是否把 `project.config.values.json` 纳入本地项目包协议；在这两条都明确前，不要把 `/api/projects/[projectId]/config-values` 误记成 CLI 已对齐。
+- 检查 viewer `/api/viewer/[projectId]/data`、viewer 页面默认值合并和 publish 路由的 canonical 回填是否继续依赖 author-site 本地逻辑；若后续改为共享层承载，再重新评估 GAP-011。
 - 检查 HTML/CSS 原型页和草图页能力是否继续保持 `project-core` 共享承载，并确认能力清单、运行手册与全命令测试同步。
 - 检查 `resource version-*`、`project commit-list`、`project materialize --check` 与 `project content-gc --dry-run` 输出是否继续与 author-site `/resources`、`/commits`、`/materialize` 路由保持一致。
 - 检查 `page update-sketch`、`page switch-runtime --target-runtime-type sketch-scene` 与 author-site `/demos`、`/runtime` 路由是否继续复用共享层校验，而不是复制 demo-ui 编辑器逻辑。
@@ -64,3 +73,11 @@
 - 2026-07-07：对账 `packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`knowledge/route.ts`、`knowledge/[docId]/route.ts` 与 `screenshots/generate-batch/route.ts` 后，确认剩余会话 / 工作区 / 知识文档 CRUD / 截图任务仍停留在 author-site 路由或代理层，不满足 CLI 自动补齐前提。
 - 2026-07-07：`corepack pnpm check:project-cli` 通过（含 `preview-contract` 20 tests、`project-cli` typecheck 与 CLI 测试），确认本轮文档更新前后当前命令集没有回归。
 - 2026-07-07：按自动化提示词切到正式仓库路径 `/Users/qh2/Documents/PGM/1·Work/workbench` 再次运行 `corepack pnpm check:automation`、`corepack pnpm ops:automation report --json`、`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 与 `corepack pnpm check:project-cli`，均通过；当前 Codex worktree `/Users/qh2/.codex/worktrees/48ec/workbench` 缺少依赖，因此后续自动维护仍应以正式仓库路径作为验证来源，避免把 `node_modules` 缺失误判成 CLI 回归。
+- 2026-07-08：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `packages/project-cli/src/index.ts` 的注册命令一致。
+- 2026-07-08：`corepack pnpm check:project-core` 通过（33 tests passed），确认 `ProjectAdminService.listProjects()` 忽略缺少 `project.json` 的残留目录这一共享层行为已稳定。
+- 2026-07-08：`corepack pnpm check:project-cli` 通过，确认 `project list`、`project get` 与全命令回归在新的项目列表语义和 `projectConfigValues` 只读输出下都没有回归。
+- 2026-07-08：`corepack pnpm check:project-scaffold` 通过，确认当前本地项目包协议仍只托管 `projectConfigSchema`，没有把 `project.config.values.json` 纳入 manifest、校验或同步状态。
+- 2026-07-08：`corepack pnpm check:author` 通过（94 test suites / 641 tests），说明新加的 `/api/projects/[projectId]/config-values` 路由在当前工作树下没有引入 author-site 本地测试回归。
+- 2026-07-09：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与 `packages/project-cli/src/index.ts` 的注册命令一致。
+- 2026-07-09：`corepack pnpm check:project-core` 通过（34 tests passed）；`corepack pnpm check:project-cli` 通过；`corepack pnpm check:project-scaffold` 通过。当前工作树里 `projectConfigValues` 扩展到 publish/viewer 链路后，CLI 与共享层相关检查未出现新增回归。
+- 2026-07-09：`corepack pnpm check:author` 通过（102 test suites / 677 tests）。正式仓库路径下当前 author-site 本地测试链路已恢复全绿，因此这轮不再把先前记录的超时 / `act(...)` 噪声视为 CLI 自动维护阻塞。

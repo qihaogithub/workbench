@@ -71,6 +71,7 @@ export interface SendMessageOptions {
   timeout?: number;
   stream?: boolean;
   images?: ImageAttachment[];
+  files?: FileAttachment[];
   context?: MessageContext;
 }
 
@@ -78,6 +79,17 @@ export interface ImageAttachment {
   data: string;
   mimeType: string;
   name: string;
+}
+
+export interface FileAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  textExtracted: boolean;
+  textPreview?: string;
+  lineCount?: number;
+  truncated?: boolean;
 }
 
 export interface MessageContext {

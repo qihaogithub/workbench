@@ -113,6 +113,110 @@ describe("editor diagnostic sanitizers", () => {
     });
   });
 
+  it("保留 AI 发送前同步失败的阶段化字段", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-ai-before-send",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      sessionId: "session-1",
+      workspaceId: "workspace-1",
+      timestamp: 1,
+      category: "ai",
+      name: "ai.before_send_failed",
+      traceId: "trace-1",
+      level: "error",
+      details: {
+        message: "SESSION_EXPIRED",
+        phase: "collab-flush",
+        errorCode: "SESSION_EXPIRED",
+        httpStatus: 403,
+        prompt: "不要入库",
+        ignored: "not allowed",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      message: "SESSION_EXPIRED",
+      phase: "collab-flush",
+      errorCode: "SESSION_EXPIRED",
+      httpStatus: 403,
+      prompt: { length: 4, redacted: true },
+    });
+  });
+
+  it("保留自动保存 flush 失败的阶段化字段", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-autosave-flush",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      sessionId: "session-1",
+      workspaceId: "workspace-1",
+      timestamp: 1,
+      category: "autosave",
+      name: "autosave.flush_before_ai_send_failed",
+      traceId: "trace-1",
+      level: "error",
+      details: {
+        revision: 3,
+        elapsedMs: 120,
+        message: "当前工作区已过期",
+        phase: "persist-workspace",
+        errorCode: "WORKSPACE_STALE",
+        httpStatus: 409,
+        ignored: "not allowed",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      revision: 3,
+      elapsedMs: 120,
+      message: "当前工作区已过期",
+      phase: "persist-workspace",
+      errorCode: "WORKSPACE_STALE",
+      httpStatus: 409,
+    });
+  });
+
+  it("保留 workspace 同步失败的权威链路摘要", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-workspace-sync",
+      schemaVersion: 1,
+      ts: "2026-07-09T00:00:00.000Z",
+      source: "author-api",
+      level: "error",
+      eventGroup: "workspace",
+      eventType: "workspace.sync_failed",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      payload: {
+        reason: "active_workspace_mismatch",
+        requestedWorkspaceId: "workspace-1",
+        activeWorkspaceId: "workspace-2",
+        canonicalSyncedWorkspaceId: "workspace-2",
+        baseVersion: "v1",
+        latestVersionId: "v2",
+        phase: "persist-workspace",
+        errorCode: "WORKSPACE_STALE",
+        code: "export default function Demo() {}",
+        prompt: "不要入库",
+        ignored: "not allowed",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      reason: "active_workspace_mismatch",
+      requestedWorkspaceId: "workspace-1",
+      activeWorkspaceId: "workspace-2",
+      canonicalSyncedWorkspaceId: "workspace-2",
+      baseVersion: "v1",
+      latestVersionId: "v2",
+      phase: "persist-workspace",
+      errorCode: "WORKSPACE_STALE",
+      code: { length: 33, redacted: true },
+      prompt: { length: 4, redacted: true },
+    });
+  });
+
   it("保留草图 patch 校验摘要但不写入 scene 内容", () => {
     const event = normalizeEditorDiagnosticEvent({
       id: "evt-sketch-patch",

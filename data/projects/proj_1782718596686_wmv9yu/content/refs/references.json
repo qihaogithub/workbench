@@ -1,0 +1,17 @@
+{
+  "projectId": "proj_1782718596686_wmv9yu",
+  "references": [
+    {
+      "from": {
+        "kind": "canvas",
+        "resourceId": "main"
+      },
+      "to": {
+        "kind": "page",
+        "resourceId": "pad-popup_a3f2"
+      },
+      "reason": "canvas_node"
+    }
+  ],
+  "updatedAt": 1783507278422
+}

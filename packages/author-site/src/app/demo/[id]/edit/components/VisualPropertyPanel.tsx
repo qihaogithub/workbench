@@ -16,10 +16,12 @@ import {
   CornerDownRight,
   CornerUpLeft,
   CornerUpRight,
+  Download,
   Grid3X3,
   ImageIcon,
   Link2,
   LinkIcon,
+  Loader2,
   MousePointer2,
   PanelTop,
   Plus,
@@ -58,11 +60,15 @@ import {
   type VisualPropertyChange,
   type VisualPropertyChangeKind,
 } from "@workbench/demo-ui";
+import { localizeSelectedImageAsset } from "../image-localization";
 import type { VisualConfigMark } from "../hooks/useVisualEditState";
 
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
   sessionId?: string;
+  projectId?: string;
+  pageId?: string;
+  runtimeType?: string;
   propertyChanges: VisualPropertyChange[];
   configMarks: VisualConfigMark[];
   aiInstruction: string;
@@ -524,6 +530,8 @@ async function readFileAsDataUrl(file: File) {
 export function VisualPropertyPanel({
   selectedNode,
   sessionId,
+  pageId,
+  runtimeType,
   propertyChanges,
   configMarks,
   aiInstruction,
@@ -537,6 +545,7 @@ export function VisualPropertyPanel({
   onAiInstructionChange,
 }: VisualPropertyPanelProps) {
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
+  const [localizingChangeId, setLocalizingChangeId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
   const [editingConfigChangeId, setEditingConfigChangeId] = useState<string | null>(null);
@@ -614,6 +623,55 @@ export function VisualPropertyPanel({
       }
     } finally {
       setUploadingChangeId(null);
+    }
+  };
+
+  const localizeSelectedImage = async (
+    changeId: string,
+    currentValue: string,
+    applyValue: (value: string, resource: VisualPropertyChange["resource"]) => void,
+  ) => {
+    if (!sessionId) {
+      setUploadError("当前编辑会话未初始化，无法保存到项目资源");
+      return;
+    }
+    if (!selectedNode) {
+      setUploadError("请先选择图片元素");
+      return;
+    }
+
+    const src = selectedNode.attrs?.src ?? "";
+    const currentSrc = selectedNode.attrs?.currentSrc ?? src;
+    if (!src && !currentSrc) {
+      setUploadError("当前元素没有可本地化的图片地址");
+      return;
+    }
+
+    setLocalizingChangeId(changeId);
+    setUploadError(null);
+    try {
+      const localized = await localizeSelectedImageAsset({
+        sessionId,
+        selectedNode,
+        pageId,
+        runtimeType,
+      });
+
+      applyValue(localized.relativePathFromPage, {
+        fileName: localized.workspacePath.split("/").pop(),
+        mimeType: localized.mimeType,
+        size: localized.size,
+        url: localized.editPreviewUrl,
+      });
+      if (localized.relativePathFromPage === currentValue) {
+        setUploadError("当前图片已经是项目本地资源");
+      }
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "无法本地化当前图片，需要上传原图",
+      );
+    } finally {
+      setLocalizingChangeId(null);
     }
   };
 
@@ -1786,29 +1844,58 @@ export function VisualPropertyPanel({
                           renderColorControl(spec, value, currentValue || undefined)
                         ) : spec.input === "file" ? (
                           <div className="space-y-1">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              className="h-8 text-xs"
-                              disabled={uploadingChangeId === changeId}
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                if (!file) return;
-                                void uploadImageReplacement(file, changeId, (nextValue, resource) => {
-                                  onPropertyChange(
-                                    selectedNode,
-                                    spec.property,
-                                    "替换图片",
-                                    nextValue,
-                                    spec.kind,
-                                    currentValue || undefined,
-                                    resource,
-                                  );
-                                });
-                              }}
-                            />
-                            {uploadingChangeId === changeId && (
-                              <p className="text-[11px] text-muted-foreground">正在保存到资源目录...</p>
+                            <div className="grid grid-cols-[minmax(0,1fr)_32px] gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                className="h-8 text-xs"
+                                disabled={uploadingChangeId === changeId || localizingChangeId === changeId}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  if (!file) return;
+                                  void uploadImageReplacement(file, changeId, (nextValue, resource) => {
+                                    onPropertyChange(
+                                      selectedNode,
+                                      spec.property,
+                                      "替换图片",
+                                      nextValue,
+                                      spec.kind,
+                                      currentValue || undefined,
+                                      resource,
+                                    );
+                                  });
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="本地化当前图片"
+                                disabled={uploadingChangeId === changeId || localizingChangeId === changeId}
+                                onClick={() => {
+                                  void localizeSelectedImage(changeId, currentValue, (nextValue, resource) => {
+                                    onPropertyChange(
+                                      selectedNode,
+                                      spec.property,
+                                      "本地图片",
+                                      nextValue,
+                                      spec.kind,
+                                      currentValue || undefined,
+                                      resource,
+                                    );
+                                  });
+                                }}
+                              >
+                                {localizingChangeId === changeId ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Download className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </div>
+                            {(uploadingChangeId === changeId || localizingChangeId === changeId) && (
+                              <p className="text-[11px] text-muted-foreground">正在保存到项目资源...</p>
                             )}
                             {uploadError && (
                               <p className="text-[11px] text-muted-foreground">{uploadError}</p>

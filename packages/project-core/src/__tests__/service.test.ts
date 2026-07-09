@@ -164,6 +164,48 @@ describe("ProjectAdminService", () => {
     expect(fs.existsSync(path.join(committed.data!.version.snapshotPath, ".session.json"))).toBe(false);
   });
 
+  it("创建页面资源版本时保留项目 active workspace 指针", () => {
+    const created = service.createProject({ name: "共享工作区页面版本项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const transaction = edit.data as EditTransaction;
+    const page = service.createPage({ editId: transaction.editId, name: "手机" });
+    const pageId = (page.data as PageDetail).meta.id;
+    expect(service.commitEdit(transaction.editId, "初始化页面").ok).toBe(true);
+
+    const projectPath = path.join(tempDir, "projects", projectId, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    fs.writeFileSync(
+      projectPath,
+      JSON.stringify(
+        {
+          ...project,
+          activeWorkspaceId: "live-current",
+          activeWorkspaceUpdatedAt: 1234,
+          canonicalSyncedWorkspaceId: "live-current",
+          canonicalSyncedAt: 1235,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const version = service.resourceVersionCreate({
+      projectId,
+      kind: "page",
+      resourceId: pageId,
+      note: "停止编辑后自动记录手机",
+    });
+
+    expect(version.ok).toBe(true);
+    const updatedProject = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    expect(updatedProject.activeWorkspaceId).toBe("live-current");
+    expect(updatedProject.activeWorkspaceUpdatedAt).toBe(1234);
+    expect(updatedProject.canonicalSyncedWorkspaceId).toBe("live-current");
+    expect(updatedProject.canonicalSyncedAt).toBe(1235);
+  });
+
   it("阻止本事务新增或修改的不合规运行时页面", () => {
     const created = service.createProject({ name: "运行时契约项目" });
     const edit = service.beginEdit(created.data?.id ?? "");
@@ -662,7 +704,17 @@ describe("ProjectAdminService", () => {
       dataBase64: Buffer.from("fake-image").toString("base64"),
     });
     expect(uploaded.ok).toBe(true);
-    expect(uploaded.data?.path).toMatch(/^assets\/images\/hero_/);
+    expect(uploaded.data?.path).toMatch(/^assets\/images\/[a-f0-9]{12}-hero\.png$/);
+    expect(uploaded.data?.assetId).toMatch(/^asset_[a-f0-9]{12}$/);
+    expect(uploaded.data?.contentHash).toHaveLength(64);
+
+    const imageManifestPath = path.join(tempDir, "projects", created.data?.id ?? "", "images.json");
+    const imageManifest = JSON.parse(fs.readFileSync(imageManifestPath, "utf-8")) as {
+      images: Array<{ url: string; contentHash?: string; sourceType?: string }>;
+    };
+    expect(imageManifest.images[0]?.url).toBe(uploaded.data?.path);
+    expect(imageManifest.images[0]?.contentHash).toBe(uploaded.data?.contentHash);
+    expect(imageManifest.images[0]?.sourceType).toBe("upload");
 
     const withReference = service.updatePage({
       editId,
@@ -670,6 +722,9 @@ describe("ProjectAdminService", () => {
       code: `export default function Demo(){ return <img src="${uploaded.data?.path}" /> }`,
     });
     expect(withReference.ok).toBe(true);
+
+    const listed = service.listAssets(editId);
+    expect(listed.data?.assets.find((asset) => asset.path === uploaded.data?.path)?.references).toContain(`demos/${pageId}/index.tsx`);
 
     const replaced = service.replaceAsset({
       editId,

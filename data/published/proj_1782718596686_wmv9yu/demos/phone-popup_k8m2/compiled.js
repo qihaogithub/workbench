@@ -30,8 +30,12 @@ export default function PhonePopup(props) {
 
   return (
     _jsxs('div', {
-      className: "fixed inset-0 z-50 flex flex-col"    ,
       style: {
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
         backgroundImage: 'url(/data/proj_1782718596686_wmv9yu/assets/images/c64b75dd5d0cc1f967a4ccc6.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -39,11 +43,11 @@ export default function PhonePopup(props) {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       },
  children: [
-      _jsx('div', { className: "absolute inset-0 bg-black/70"  ,} )
+      _jsx('div', { style: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)' },} )
 
-      , _jsx('div', { className: "relative z-10 flex flex-1 items-center justify-center px-4"      , children: 
-        _jsxs('div', { className: "relative inline-block w-full max-w-xs"   , children: [
-          _jsx('div', { className: "absolute z-20 cursor-pointer"  , style: { top: '-46px', right: 0 }, children: 
+      , _jsx('div', { style: { position: 'relative', zIndex: 10, display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', paddingLeft: '1rem', paddingRight: '1rem' }, children:
+        _jsxs('div', { style: { position: 'relative', display: 'inline-block', width: '100%', maxWidth: '20rem' }, children: [
+          _jsx('div', { style: { position: 'absolute', zIndex: 20, cursor: 'pointer', top: '-46px', right: 0 }, children:
             _jsxs('svg', { width: "36", height: "36", viewBox: "0 0 42 42"   , fill: "none", children: [
               _jsx('rect', { width: "42", height: "42", fill: "black", fillOpacity: "0.01",} )
               , _jsx('circle', { cx: "21", cy: "21.0002", r: "18.0955", stroke: "white", strokeWidth: "1.26847", strokeLinecap: "round", strokeLinejoin: "round",} )
@@ -54,12 +58,11 @@ export default function PhonePopup(props) {
           , showSvga ? (
             _jsx(SvgaPlayer, {
               src: svgaSrc,
-              className: "block w-full rounded-lg"  ,
-              style: { aspectRatio: '670 / 780' },}
+                style: { display: 'block', width: '100%', borderRadius: '0.5rem', aspectRatio: '670 / 780' },}
+              )
+            ) : (
+              _jsx('img', { src: modalImage, alt: "popup", style: { display: 'block', height: 'auto', width: '100%', borderRadius: '0.5rem' },} )
             )
-          ) : (
-            _jsx('img', { src: modalImage, alt: "popup", className: "block h-auto w-full rounded-lg"   ,} )
-          )
         ]})
       })
     ]})

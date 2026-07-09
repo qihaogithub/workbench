@@ -1,0 +1,21 @@
+{
+  "id": "commit_1783508379082_1w4vki",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "parentCommitId": "commit_1783507278421_06735t",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v20",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad-popup_a3f2",
+      "versionId": "prv_1783507278420_amk9eh"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1783508379082,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

@@ -10,7 +10,8 @@
 2. [CLI 当前状态](../state/cli-maintenance-current.md)
 3. [CLI 自动维护运行手册](../../../docs/项目文档/创作端/10-CLI/技术/06_CLI自动维护运行手册.md)
 4. [CLI 能力自动化清单](../../../docs/项目文档/创作端/10-CLI/技术/05_CLI能力自动化清单.md)
-5. [CLI 与创作端能力对齐长期跟踪](../../../docs/plans/进行中/创作端CLI.md)
+5. [CLI 与创作端能力对齐长期跟踪（兼容入口）](../../../docs/plans/进行中/CLI与创作端能力对齐长期跟踪.md)
+6. [CLI 与创作端能力对齐主文档](../../../docs/plans/进行中/创作端CLI.md)
 
 ## 扫描对象
 
@@ -57,6 +58,7 @@
 ## 输出位置
 
 - 当前状态：`OPS/automations/state/cli-maintenance-current.md`
-- 长期缺口：`docs/plans/进行中/CLI与创作端能力对齐长期跟踪.md`
+- 长期缺口兼容入口：`docs/plans/进行中/CLI与创作端能力对齐长期跟踪.md`
+- 长期缺口主文档：`docs/plans/进行中/创作端CLI.md`
 - 具体实施：新建或更新 `docs/plans/进行中/CLI自动维护-*.md`
 - 可复用规则：`docs/项目文档/创作端/10-CLI/`

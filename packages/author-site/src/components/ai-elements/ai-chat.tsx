@@ -49,6 +49,8 @@ function QueuedMessagesTray({
       {messages.map((message) => {
         const imageCount =
           message.parts?.filter((part) => part.type === "image").length ?? 0;
+        const fileCount =
+          message.parts?.filter((part) => part.type === "file").length ?? 0;
 
         return (
           <div
@@ -56,11 +58,19 @@ function QueuedMessagesTray({
             className="w-fit max-w-[min(82%,34rem)] rounded-lg border border-border/60 bg-muted px-3 py-2.5 text-sm text-foreground shadow-sm"
           >
             <div className="max-w-full truncate font-medium leading-5">
-              {message.content || (imageCount > 0 ? "处理附件图片" : "待发送消息")}
+              {message.content ||
+                (fileCount > 0
+                  ? "读取附件文件"
+                  : imageCount > 0
+                    ? "处理附件图片"
+                    : "待发送消息")}
             </div>
-            {imageCount > 0 && (
+            {(imageCount > 0 || fileCount > 0) && (
               <div className="mt-1 text-xs text-muted-foreground">
-                已附加 {imageCount} 张图片
+                {[
+                  imageCount > 0 ? `${imageCount} 张图片` : "",
+                  fileCount > 0 ? `${fileCount} 个文件` : "",
+                ].filter(Boolean).join("，")}
               </div>
             )}
             <div className="mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground">
@@ -455,6 +465,7 @@ export function AIChat({
         onSubmit={handleSend}
         onCancel={handleCancelStream}
         isStreaming={isStreaming}
+        agentSessionId={agentSessionId}
         onHistoryClick={handleHistoryClick}
         onModelChange={handleModelChange}
         onDepthChange={handleDepthChange}

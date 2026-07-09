@@ -547,8 +547,10 @@ export function renewEditSession(sessionId: string): boolean {
 
   try {
     const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-    if ((meta.status || "editing") !== "editing") return false;
+    const status = meta.status || "editing";
+    if (status !== "editing" && status !== "expired") return false;
 
+    meta.status = "editing";
     meta.expiresAt = Date.now() + SESSION_EXPIRY_MS;
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     return true;

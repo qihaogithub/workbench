@@ -10,7 +10,11 @@ export interface ProjectImageEntry {
   size: number;
   format: string;
   createdAt: number;
-  createdBy: 'user' | 'ai' | 'figma';
+  createdBy: 'user' | 'ai' | 'figma' | 'system';
+  contentHash?: string;
+  mimeType?: string;
+  originalUrl?: string;
+  sourceType?: 'browser_blob' | 'upload' | 'session_asset' | 'workspace_asset' | 'r2_worker' | 'remote_url';
 }
 
 export interface ProjectImageManifest {
@@ -97,6 +101,10 @@ export function getProjectImageManifestPath(projectId: string): string {
   return path.join(getProjectsDir(), projectId, 'images.json');
 }
 
+export function getProjectImageManifestDataDir(): string {
+  return path.dirname(getProjectsDir());
+}
+
 export function readProjectImageManifest(projectId: string): ProjectImageManifest {
   const manifestPath = getProjectImageManifestPath(projectId);
   if (!fs.existsSync(manifestPath)) {
@@ -129,4 +137,16 @@ export function addProjectImageManifestEntry(
   }
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+}
+
+export function findProjectImageManifestEntry(
+  projectId: string,
+  assetId: string,
+): ProjectImageEntry | undefined {
+  const normalized = assetId.startsWith('asset_') ? assetId.slice('asset_'.length) : assetId;
+  return readProjectImageManifest(projectId).images.find((image) =>
+    image.id === normalized ||
+    image.contentHash === normalized ||
+    image.contentHash?.startsWith(normalized) === true,
+  );
 }

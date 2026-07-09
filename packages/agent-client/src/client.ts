@@ -62,6 +62,7 @@ export class AgentClient {
       model?: string;
       options?: SendMessageOptions;
       images?: import("./types").ImageAttachment[];
+      files?: import("./types").FileAttachment[];
     },
   ): Promise<ApiResponse<AgentResult>> {
     return this.request<AgentResult>(`/api/agent/${sessionId}/message`, {
@@ -74,6 +75,7 @@ export class AgentClient {
         customWorkspace: options?.customWorkspace,
         model: options?.model || options?.options?.model,
         images: options?.images,
+        files: options?.files,
         systemPrompt: options?.options?.systemPrompt,
         options: options?.options,
       }),
@@ -360,6 +362,7 @@ export class AgentStream {
         demoId: options?.demoId,
         model: options?.model,
         images: options?.images,
+        files: options?.files,
         systemPrompt: options?.systemPrompt,
         options,
       }),

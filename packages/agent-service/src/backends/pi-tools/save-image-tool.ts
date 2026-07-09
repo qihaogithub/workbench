@@ -9,6 +9,8 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import {
   addProjectImageManifestEntry,
+  findProjectImageManifestEntry,
+  getProjectImageManifestDataDir,
   resolveProjectImageManifestProjectId,
   type ProjectImageEntry,
 } from './project-image-manifest';
@@ -20,16 +22,27 @@ const URL_DOWNLOAD_TIMEOUT = 10_000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const SaveImageParams = Type.Object({
-  source: Type.Union([Type.Literal('base64'), Type.Literal('url')], {
-    description: '图片来源：base64 为内联数据，url 为远程图片地址',
+  source: Type.Union([
+    Type.Literal('assetId'),
+    Type.Literal('sessionAsset'),
+    Type.Literal('base64'),
+    Type.Literal('url'),
+  ], {
+    description: '图片来源：assetId/sessionAsset 为平台受管资源，base64 为内联数据，url 为远程兜底',
   }),
-  data: Type.String({
+  data: Type.Optional(Type.String({
     description:
-      '图片数据：source=base64 时为 Base64 编码字符串（不含 data:image/xxx;base64, 前缀）；source=url 时为图片 URL',
-  }),
-  filename: Type.String({
+      '图片数据：source=base64 时为 Base64 编码字符串；source=url 时为图片 URL；source=sessionAsset 时可传 session asset URL',
+  })),
+  filename: Type.Optional(Type.String({
     description: '保存的文件名，如 product.png',
-  }),
+  })),
+  assetId: Type.Optional(Type.String({
+    description: 'source=assetId 时的项目资产 ID，如 asset_7007557cac7e',
+  })),
+  url: Type.Optional(Type.String({
+    description: 'source=sessionAsset 时的 /api/sessions/{sessionId}/assets/{filename} URL',
+  })),
   directory: Type.Optional(
     Type.String({
       description: '已废弃：图片统一保存到当前项目工作区 assets/images/ 下，忽略此参数',
@@ -49,6 +62,45 @@ function getWorkspaceAssetPath(storedFilename: string): string {
 
 function getDemoRelativeAssetPath(storedFilename: string): string {
   return `../../assets/images/${storedFilename}`;
+}
+
+function getDemoRelativeAssetPathFromWorkspacePath(workspacePath: string): string {
+  return `../../${workspacePath}`;
+}
+
+function normalizeStoredFilename(filename: string): string {
+  return path.basename(filename).replace(/[^a-zA-Z0-9_.-]/g, '-');
+}
+
+function getFilenameFromUrl(urlString: string): string | null {
+  try {
+    const parsed = new URL(urlString, 'http://local.invalid');
+    const filename = path.basename(parsed.pathname);
+    return filename || null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveSessionAssetPath(dataDir: string, urlString: string): {
+  filePath?: string;
+  filename?: string;
+  error?: string;
+} {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlString, 'http://local.invalid');
+  } catch {
+    return { error: 'Invalid session asset URL' };
+  }
+  const match = parsed.pathname.match(/^\/api\/sessions\/([^/]+)\/assets\/([^/]+)$/);
+  if (!match) return { error: 'Expected /api/sessions/{sessionId}/assets/{filename}' };
+  const sessionId = decodeURIComponent(match[1]);
+  const filename = normalizeStoredFilename(decodeURIComponent(match[2]));
+  if (!sessionId || !filename) return { error: 'Invalid session asset URL' };
+  const filePath = path.join(dataDir, 'sessions', sessionId, 'assets', filename);
+  if (!fs.existsSync(filePath)) return { error: 'Session asset file not found' };
+  return { filePath, filename };
 }
 
 function downloadImageFromUrl(urlString: string): Promise<{
@@ -190,10 +242,82 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
     name: 'saveImage',
     label: 'Save Image',
     description:
-      'Save an image to the current project workspace from Base64 data or a remote URL. The image is stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+      'Save or reuse an image in the current project workspace. Prefer source=assetId or source=sessionAsset when a platform-managed asset already exists; base64 and url are fallbacks. The image is stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams) => {
-      const { source, data, filename } = args;
+      const { source } = args;
+
+      const workspaceDir = config.workingDir ? path.resolve(config.workingDir) : '';
+      if (!workspaceDir) {
+        return {
+          content: [{ type: 'text', text: 'Error: saveImage requires a bound project workspace.' }],
+          details: { error: 'missing_working_dir' },
+          isError: true,
+        };
+      }
+
+      const manifestProjectId = resolveProjectImageManifestProjectId(config);
+
+      if (source === 'assetId') {
+        const assetId = args.assetId?.trim() || args.data?.trim() || '';
+        if (!assetId) {
+          return {
+            content: [{ type: 'text', text: 'Error: source=assetId requires assetId.' }],
+            details: { error: 'missing_asset_id' },
+            isError: true,
+          };
+        }
+        if (!manifestProjectId) {
+          return {
+            content: [{ type: 'text', text: 'Error: No project associated with this session. Cannot resolve assetId.' }],
+            details: { error: 'missing_project' },
+            isError: true,
+          };
+        }
+        const entry = findProjectImageManifestEntry(manifestProjectId, assetId);
+        if (!entry) {
+          return {
+            content: [{ type: 'text', text: `Error: Asset not found: ${assetId}` }],
+            details: { error: 'asset_not_found' },
+            isError: true,
+          };
+        }
+        const workspacePath = entry.url;
+        const absolutePath = path.join(workspaceDir, workspacePath);
+        if (!workspacePath.startsWith('assets/') || !fs.existsSync(absolutePath)) {
+          return {
+            content: [{ type: 'text', text: `Error: Managed asset file is missing: ${workspacePath}` }],
+            details: { error: 'asset_file_missing', path: workspacePath },
+            isError: true,
+          };
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Image already available locally: ${workspacePath}. From page files use ${getDemoRelativeAssetPathFromWorkspacePath(workspacePath)}`,
+            },
+          ],
+          details: {
+            assetId: `asset_${entry.id}`,
+            url: workspacePath,
+            path: workspacePath,
+            filename: path.basename(workspacePath),
+            relativePathFromPage: getDemoRelativeAssetPathFromWorkspacePath(workspacePath),
+            absolutePath,
+            size: entry.size,
+            format: entry.format,
+            source,
+            sha256: entry.contentHash?.slice(0, 12) ?? entry.id,
+            contentHash: entry.contentHash,
+          },
+        };
+      }
+
+      let filename = args.filename?.trim() || '';
+      if (source === 'sessionAsset' && !filename) {
+        filename = getFilenameFromUrl(args.url ?? args.data ?? '') ?? '';
+      }
 
       if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(filename)) {
         logger.warn({ filename }, 'saveImage: invalid filename');
@@ -217,6 +341,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       let buffer: Buffer;
 
       if (source === 'base64') {
+        const data = args.data ?? '';
         try {
           buffer = Buffer.from(data, 'base64');
           if (buffer.length === 0) {
@@ -233,7 +358,19 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
             isError: true,
           };
         }
+      } else if (source === 'sessionAsset') {
+        const sessionAssetUrl = args.url ?? args.data ?? '';
+        const resolved = resolveSessionAssetPath(getProjectImageManifestDataDir(), sessionAssetUrl);
+        if (!resolved.filePath) {
+          return {
+            content: [{ type: 'text', text: `Error: ${resolved.error ?? 'Session asset not found'}` }],
+            details: { error: 'session_asset_not_found' },
+            isError: true,
+          };
+        }
+        buffer = await fs.promises.readFile(resolved.filePath);
       } else {
+        const data = args.data ?? '';
         const urlResult = await downloadImageFromUrl(data);
         if (urlResult.error) {
           logger.warn({ url: data, error: urlResult.error }, 'saveImage: URL download failed');
@@ -259,15 +396,6 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       const sha256 = computeSha256(buffer);
       const hashPrefix = sha256.slice(0, 12);
       const storedFilename = `${hashPrefix}-${filename}`;
-      const workspaceDir = config.workingDir ? path.resolve(config.workingDir) : '';
-
-      if (!workspaceDir) {
-        return {
-          content: [{ type: 'text', text: 'Error: saveImage requires a bound project workspace.' }],
-          details: { error: 'missing_working_dir' },
-          isError: true,
-        };
-      }
 
       const assetsDir = getWorkspaceAssetsDir(workspaceDir);
       const storedPath = path.join(assetsDir, storedFilename);
@@ -284,16 +412,19 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to project workspace');
         }
 
-        const manifestProjectId = resolveProjectImageManifestProjectId(config);
         if (manifestProjectId) {
           const entry: ProjectImageEntry = {
             id: hashPrefix,
-            filename,
+            filename: storedFilename,
             url: workspacePath,
             size: buffer.length,
             format: ext,
             createdAt: Date.now(),
             createdBy: 'ai',
+            contentHash: sha256,
+            mimeType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+            originalUrl: source === 'url' ? args.data : source === 'sessionAsset' ? (args.url ?? args.data) : undefined,
+            sourceType: source === 'sessionAsset' ? 'session_asset' : source === 'url' ? 'remote_url' : 'upload',
           };
           try {
             addProjectImageManifestEntry(manifestProjectId, entry);

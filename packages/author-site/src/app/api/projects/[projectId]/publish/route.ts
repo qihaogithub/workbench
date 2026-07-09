@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import path from "path";
 import { publishProject } from '@/lib/publish-manager';
 import {
   createApiSuccess,
   createApiError,
+  findWorkspacePath,
+  getProjectConfigValues,
+  getProjectPath,
   getWorkspaceMeta,
   readProjectMeta,
+  saveProjectConfigValues,
 } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import {
@@ -23,6 +28,27 @@ interface PublishRequestBody {
 
 function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function hasConfigValues(values: Record<string, unknown> | undefined): values is Record<string, unknown> {
+  return !!values && Object.keys(values).length > 0;
+}
+
+function syncNonEmptyProjectConfigValuesFromWorkspace(
+  projectId: string,
+  workspaceId: string,
+): void {
+  const liveWorkspacePath = findWorkspacePath(workspaceId);
+  if (!liveWorkspacePath) return;
+
+  const liveValues = getProjectConfigValues(liveWorkspacePath);
+  if (!hasConfigValues(liveValues)) return;
+
+  const canonicalWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  const canonicalValues = getProjectConfigValues(canonicalWorkspacePath);
+  if (hasConfigValues(canonicalValues)) return;
+
+  saveProjectConfigValues(canonicalWorkspacePath, liveValues);
 }
 
 export async function POST(
@@ -70,6 +96,10 @@ export async function POST(
           workspaceId: session.workspaceId,
           sessionId,
         });
+        syncNonEmptyProjectConfigValuesFromWorkspace(
+          params.projectId,
+          session.workspaceId,
+        );
       } catch (error) {
         const flushError = getWorkspaceFlushErrorResponse(error);
         return NextResponse.json(

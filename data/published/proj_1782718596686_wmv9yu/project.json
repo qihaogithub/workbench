@@ -2,9 +2,9 @@
   "id": "proj_1782718596686_wmv9yu",
   "name": "App通用广告弹窗",
   "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
-  "publishedVersion": "v17",
-  "commitId": "commit_1783419131743_gikxl1",
-  "publishedAt": 1783419131744,
+  "publishedVersion": "v20",
+  "commitId": "commit_1783508379082_1w4vki",
+  "publishedAt": 1783508379082,
   "demoPages": [
     {
       "id": "pad-popup_a3f2",
@@ -19,8 +19,8 @@
         "height": 768
       },
       "screenshotPath": "screenshots/pad-popup_a3f2.png",
-      "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html?v=1783419130270",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html?v=1783419130270\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "iframeHtmlPath": "demos/pad-popup_a3f2/iframe.html?v=1783508373834",
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/pad-popup_a3f2/iframe.html?v=1783508373834\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     },
     {
       "id": "phone-popup_k8m2",
@@ -35,8 +35,8 @@
         "height": 812
       },
       "screenshotPath": "screenshots/phone-popup_k8m2.png",
-      "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html?v=1783419130270",
-      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html?v=1783419130270\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "iframeHtmlPath": "demos/phone-popup_k8m2/iframe.html?v=1783508373834",
+      "embedCode": "<iframe\n  src=\"/data/proj_1782718596686_wmv9yu/demos/phone-popup_k8m2/iframe.html?v=1783508373834\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
     }
   ],
   "demoFolders": [],
@@ -57,11 +57,14 @@
     "state": {}
   },
   "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"通用弹窗配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"mediaType\": {\n      \"type\": \"string\",\n      \"title\": \"素材类型\",\n      \"description\": \"选择弹窗展示图片或 SVGA 动画。\",\n      \"enum\": [\n        \"image\",\n        \"svga\"\n      ],\n      \"enumNames\": [\n        \"图片\",\n        \"SVGA动画\"\n      ],\n      \"default\": \"image\",\n      \"ui:options\": {\n        \"group\": \"弹窗素材\"\n      }\n    },\n    \"modalImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗图片\",\n      \"description\": \"素材类型选择“图片”时生效。建议宽度670px，高度670-890px。\",\n      \"default\": \"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/通用广告弹窗/默认弹窗.png\",\n      \"ui:options\": {\n        \"group\": \"弹窗素材\",\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 670,\n        \"minHeight\": 670,\n        \"maxWidth\": 670,\n        \"maxHeight\": 890,\n        \"visibleWhen\": {\n          \"field\": \"mediaType\",\n          \"equals\": \"image\"\n        }\n      }\n    },\n    \"svgaSrc\": {\n      \"type\": \"string\",\n      \"title\": \"SVGA 文件\",\n      \"description\": \"素材类型选择“SVGA动画”时生效。可上传 .svga 文件，或填写可跨域访问的 .svga 地址。\",\n      \"default\": \"\",\n      \"ui:widget\": \"file\",\n      \"ui:options\": {\n        \"group\": \"弹窗素材\",\n        \"accept\": \".svga,application/octet-stream\",\n        \"maxSize\": 10485760,\n        \"placeholder\": \"上传或填写 .svga 文件地址\",\n        \"visibleWhen\": {\n          \"field\": \"mediaType\",\n          \"equals\": \"svga\"\n        }\n      }\n    }\n  },\n  \"required\": [\n    \"mediaType\"\n  ]\n}",
+  "projectConfigValues": {
+    "modalImage": "/data/proj_1782718596686_wmv9yu/assets/images/ff252d63a6b874ddc0474dff.png"
+  },
   "canvasState": {
     "viewport": {
-      "x": 36.64999999999998,
-      "y": 69.33207283948119,
-      "zoom": 0.4410260696323914
+      "x": 62.31066614883366,
+      "y": -16.096269485790316,
+      "zoom": 0.4894995394493043
     },
     "pages": {
       "phone-popup_k8m2": {

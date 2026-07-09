@@ -9,7 +9,7 @@ import { snapshotService } from '../session/snapshot-service';
 import { consoleBuffer } from '../session/console-buffer';
 import { workspaceManager } from '../workspace/workspace-manager';
 import { getWorkspaceDisplayName } from '../workspace/utils';
-import { AgentConfig } from '../core/types';
+import { AgentConfig, FileAttachment, ImageAttachment } from '../core/types';
 import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@workbench/shared/contracts';
 import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
@@ -25,6 +25,8 @@ interface SendMessageBody {
   workingDir?: string;
   customWorkspace?: boolean;
   model?: string;
+  images?: ImageAttachment[];
+  files?: FileAttachment[];
   /**
    * v3.2: 静态 system prompt 注入（L2 + L4）
    * author-site 端通过 buildStaticSystemPrompt() 生成
@@ -100,7 +102,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, projectId, demoId, workingDir, customWorkspace, systemPrompt, options } = request.body;
+      const { content, projectId, demoId, workingDir, customWorkspace, systemPrompt, options, images, files } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -180,7 +182,11 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           messageCount: (sessionStore.get(sessionId)?.messageCount || 0) + 1,
         });
 
-        const result = await agent.sendMessage(content, options);
+        const result = await agent.sendMessage(content, {
+          ...options,
+          images,
+          files,
+        });
 
         sessionStore.update(sessionId, {
           status: result.success ? 'ready' : 'error',

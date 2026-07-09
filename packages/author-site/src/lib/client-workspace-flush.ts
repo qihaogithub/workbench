@@ -1,8 +1,21 @@
 interface ClientWorkspaceFlushEnvelope {
   success?: boolean;
   error?: {
+    code?: string;
     message?: string;
   };
+}
+
+export class ClientWorkspaceFlushError extends Error {
+  readonly code?: string;
+  readonly status: number;
+
+  constructor(message: string, options: { code?: string; status: number }) {
+    super(message);
+    this.name = "ClientWorkspaceFlushError";
+    this.code = options.code;
+    this.status = options.status;
+  }
 }
 
 async function readFlushEnvelope(response: Response): Promise<ClientWorkspaceFlushEnvelope> {
@@ -33,6 +46,12 @@ export async function flushWorkspaceCollab(
   const result = await readFlushEnvelope(response);
 
   if (!response.ok || result.success === false) {
-    throw new Error(result.error?.message || "协同草稿同步失败");
+    throw new ClientWorkspaceFlushError(
+      result.error?.message || "协同草稿同步失败",
+      {
+        code: result.error?.code,
+        status: response.status || 0,
+      },
+    );
   }
 }

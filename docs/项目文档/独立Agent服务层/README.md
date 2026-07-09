@@ -1,8 +1,8 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.10
+> 版本：v2.11
 > 创建日期：2026-04-05
-> 更新日期：2026-07-01
+> 更新日期：2026-07-09
 
 ---
 
@@ -25,7 +25,7 @@
 | :--- | :--- | :--- | :--- |
 | [01-架构设计.md](./01-架构设计.md) | Fastify 服务、Pi Agent 单后端、工具权限、工作空间与截图服务协作 | 1 | 已更新 |
 | [02-接口规范.md](./02-接口规范.md) | REST API、WebSocket 消息、使用端只读 AI、内部配置同步、校验与模型接口 | 2 | 已更新 |
-| [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools、预装 Skills 等模块职责 | 3 | 已更新 |
+| [03-核心模块设计.md](./03-核心模块设计.md) | Core、Backend、Routes、Session、Workspace、Pi Tools、图片资源工具边界、预装 Skills 等模块职责 | 3 | 已更新 |
 | [04_SSE_Drain机制.md](./04_SSE_Drain机制.md) | 历史 workbench SSE drain 问题记录，当前仅作迁移背景参考 | 4 | 历史参考 |
 | [05-快照服务.md](./05-快照服务.md) | Git/snapshot 双模式、变更比较、丢弃回滚、Session 生命周期 | 5 | 已完成 |
 | [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界 | 6 | 已完成 |
@@ -123,3 +123,4 @@
 | 2026-06-28 | v2.8 | 补充模型列表 route/service 分层和 shared/demo-ui 包边界 |
 | 2026-06-30 | v2.9 | 新增 `requestUserChoice` 需求确认卡片工具和 `user_choice_request` 事件说明 |
 | 2026-07-01 | v2.10 | 补充全局 backend providers 的运行时副本定位和 author-site 启动恢复机制 |
+| 2026-07-09 | v2.11 | 明确预览区选中图片由 author-site 先资产化，Pi Agent 图片工具消费受管资产路径 |

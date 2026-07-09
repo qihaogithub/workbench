@@ -6,6 +6,7 @@ import {
   createListFilesTool,
 } from "./file-tools";
 import { createReadFileLinesTool } from "./read-file-lines-tool";
+import { createReadUploadedFileTool } from "./read-uploaded-file-tool";
 import { createEditFileTool } from "./edit-file-tool";
 import { createBashTool } from "./bash-tool";
 import { createSchemaValidateTool } from "./schema-tool";
@@ -41,7 +42,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 15;
+export const WORKBENCH_TOOL_VERSION = 16;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -77,6 +78,7 @@ export function createWorkbenchTools(
   const tools: AgentTool[] = [
     createReadFileTool(config),
     createReadFileLinesTool(config),
+    createReadUploadedFileTool(config),
     createEditFileTool(config),
     createWriteFileTool(config),
     createListFilesTool(config),

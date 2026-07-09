@@ -101,7 +101,7 @@ describe("workspace-flush", () => {
       }),
     ).rejects.toMatchObject({
       name: "WorkspaceFlushError",
-      code: "COLLAB_FLUSH_FAILED",
+      code: "SESSION_EXPIRED",
       status: 403,
       message: "SESSION_EXPIRED",
     } satisfies Partial<WorkspaceFlushError>);

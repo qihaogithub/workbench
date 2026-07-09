@@ -48,6 +48,7 @@ export interface PublishedProject {
   demoPages: PublishedDemoPage[];
   demoFolders: DemoFolderMeta[];
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
 }
 
@@ -64,7 +65,9 @@ export interface ProjectsIndex {
   generatedAt: number;
 }
 
-const DATA_BASE = process.env.NEXT_PUBLIC_DATA_BASE || "";
+const DATA_BASE =
+  process.env.NEXT_PUBLIC_DATA_BASE ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "");
 const AGENT_SERVICE_BASE = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
 
 async function fetchJson<T>(path: string): Promise<T> {

@@ -83,6 +83,7 @@ export interface SendMessageOptions {
   projectId?: string;
   demoId?: string;
   images?: ImageAttachment[];
+  files?: FileAttachment[];
   /**
    * v3.2: 静态 system prompt 注入（L2 + L4）
    * author-site 端通过 buildStaticSystemPrompt() 生成
@@ -103,6 +104,26 @@ export interface ImageAttachment {
   mimeType: string;
   /** 原始文件名 */
   name: string;
+}
+
+/** 只读文件附件，内容由服务端按 attachment id 读取 */
+export interface FileAttachment {
+  /** 会话内附件 ID */
+  id: string;
+  /** 原始文件名 */
+  name: string;
+  /** MIME 类型 */
+  mimeType: string;
+  /** 原始文件大小 */
+  size: number;
+  /** 是否已提取出可供 AI 读取的文本 */
+  textExtracted: boolean;
+  /** 提取文本预览 */
+  textPreview?: string;
+  /** 提取文本行数 */
+  lineCount?: number;
+  /** 提取文本是否被截断 */
+  truncated?: boolean;
 }
 
 export interface AgentInfo {

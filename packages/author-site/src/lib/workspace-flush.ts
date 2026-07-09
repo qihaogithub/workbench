@@ -74,6 +74,25 @@ function toApiErrorCode(code: string): ErrorCodeType {
   return "AGENT_SERVICE_ERROR";
 }
 
+function normalizeAgentFlushErrorCode(code?: string, message?: string): string | undefined {
+  if (code !== "COLLAB_FLUSH_FAILED") return code;
+  if (message === "SESSION_NOT_FOUND" || message === "SESSION_EXPIRED") {
+    return message;
+  }
+  if (
+    message === "PROJECT_MISMATCH" ||
+    message === "WORKSPACE_MISMATCH" ||
+    message === "WORKSPACE_PROJECT_MISMATCH"
+  ) {
+    return "INVALID_REQUEST";
+  }
+  if (message === "WORKSPACE_NOT_FOUND" || message === "INVALID_RESOURCE_PATH") {
+    return "FILE_WRITE_ERROR";
+  }
+  if (message === "COLLAB_FORBIDDEN") return "FORBIDDEN";
+  return code;
+}
+
 function parseFlushEnvelope(value: unknown): ApiEnvelope<WorkspaceFlushResult> {
   if (!value || typeof value !== "object") return {};
   return value as ApiEnvelope<WorkspaceFlushResult>;
@@ -104,7 +123,7 @@ export async function flushWorkspaceBeforeCriticalAction(
   const body = parseFlushEnvelope(await response.json().catch(() => ({})));
   if (!response.ok || body.success === false) {
     throw new WorkspaceFlushError(body.error?.message ?? "协同草稿落盘失败", {
-      code: body.error?.code,
+      code: normalizeAgentFlushErrorCode(body.error?.code, body.error?.message),
       status: response.status || 502,
     });
   }

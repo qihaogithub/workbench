@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
-import type { StreamEvent, ImageAttachment } from "@workbench/agent-client";
+import type { StreamEvent, FileAttachment, ImageAttachment } from "@workbench/agent-client";
 import { normalizeAiError } from "@workbench/shared";
 import {
   MissingTransactionalDeleteToolsError,
@@ -198,6 +198,7 @@ interface QueuedChatMessage {
   queueId: string;
   content: string;
   images?: ImageAttachment[];
+  files?: FileAttachment[];
   runOptions?: SendMessageRunOptions;
   createdAt: number;
   displayMessageId: string;
@@ -206,6 +207,53 @@ interface QueuedChatMessage {
 
 function createLocalId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildAttachmentParts(
+  images?: ImageAttachment[],
+  files?: FileAttachment[],
+): NonNullable<ChatMessage["parts"]> {
+  return [
+    ...(images?.map((img) => ({
+      type: "image" as const,
+      url: `data:${img.mimeType};base64,${img.data}`,
+    })) || []),
+    ...(files?.map((file) => ({
+      type: "file" as const,
+      name: file.name,
+      url: "",
+      size: file.size,
+      attachmentId: file.id,
+      mimeType: file.mimeType,
+      textExtracted: file.textExtracted,
+    })) || []),
+  ];
+}
+
+function getErrorDiagnosticDetails(error: unknown, fallbackMessage: string): {
+  message: string;
+  phase?: string;
+  errorCode?: string;
+  httpStatus?: number;
+} {
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  const details: {
+    message: string;
+    phase?: string;
+    errorCode?: string;
+    httpStatus?: number;
+  } = { message };
+  if (error && typeof error === "object") {
+    const candidate = error as {
+      phase?: unknown;
+      code?: unknown;
+      status?: unknown;
+    };
+    if (typeof candidate.phase === "string") details.phase = candidate.phase;
+    if (typeof candidate.code === "string") details.errorCode = candidate.code;
+    if (typeof candidate.status === "number") details.httpStatus = candidate.status;
+  }
+  return details;
 }
 
 function createSystemAutoRepairDedupeKey(title: string, hiddenPrompt: string): string {
@@ -432,6 +480,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     async (
       userMessage: string,
       images?: ImageAttachment[],
+      files?: FileAttachment[],
       runOptions?: SendMessageRunOptions,
       startOptions: StartMessageRunOptions = {},
     ) => {
@@ -473,6 +522,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           demoId,
           messageLength: userMessage.trim().length,
           imageCount: images?.length ?? 0,
+          fileCount: files?.length ?? 0,
           hasActiveViewContext: Boolean(activeViewContext),
           selectedModelId,
         },
@@ -504,10 +554,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 id: displayMessageId,
                 role: "user",
                 content: trimmedMessage,
-                parts: images?.map((img) => ({
-                  type: "image" as const,
-                  url: `data:${img.mimeType};base64,${img.data}`,
-                })) || [],
+                parts: buildAttachmentParts(images, files),
               };
           return [...prev, nextMessage];
         });
@@ -706,149 +753,165 @@ export function useChatStream(options: UseChatStreamOptions) {
               },
             });
             stopSilenceTracking();
-            const currentMsg = currentMessageRef.current;
-            const hasStructuredParts =
-              currentMsg.parts !== undefined && currentMsg.parts.length > 0;
-            const assistantMessage: ChatMessage = {
-              id: currentMsg.id || assistantMessageId,
-              role: "assistant",
-              content:
-                accumulatedContent ||
-                result.content ||
-                (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
-              parts: currentMsg.parts,
-            };
+            try {
+              const currentMsg = currentMessageRef.current;
+              const hasStructuredParts =
+                currentMsg.parts !== undefined && currentMsg.parts.length > 0;
+              const assistantMessage: ChatMessage = {
+                id: currentMsg.id || assistantMessageId,
+                role: "assistant",
+                content:
+                  accumulatedContent ||
+                  result.content ||
+                  (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
+                parts: currentMsg.parts,
+              };
 
-            const messagesWithAutoRepairStatus = updateAutoRepairStatus(
-              messagesRef.current,
-              autoRepairMessageId,
-              "completed",
-            );
-            const updatedMessages = appendMessageBeforeQueued(
-              messagesWithAutoRepairStatus,
-              assistantMessage,
-            );
-            setMessages(updatedMessages);
-            setCurrentMessage({
-              role: "assistant",
-              content: "",
-              parts: [],
-            });
-            setStreamContent("");
-
-            await persistMessages(
-              sessionId,
-              updatedMessages.filter((message) => !message.queueStatus),
-            );
-            if (!isSystemAutoRepair) {
-              await updateSessionTitle(
-                sessionId,
-                userMessage,
-                isFirstUserMessage,
+              const messagesWithAutoRepairStatus = updateAutoRepairStatus(
+                messagesRef.current,
+                autoRepairMessageId,
+                "completed",
               );
-            }
-
-            // ── 1. 清除 pending timer（不调用 processRealtimeFiles，避免路径 A 重复触发） ──
-            if (fileUpdateTimer) {
-              clearTimeout(fileUpdateTimer);
-              fileUpdateTimer = null;
-            }
-
-            // ── 2. 检测实时流已更新的数据类型 ──
-            let realtimeUpdatedCode = false;
-            let realtimeUpdatedSchema = false;
-            for (const [path, info] of realtimeFilesRef.entries()) {
-              const normalizedPath = normalizePath(path);
-              if (isCodeFile(normalizedPath) && info.content) realtimeUpdatedCode = true;
-              if (isSchemaFile(normalizedPath) && info.content) realtimeUpdatedSchema = true;
-            }
-
-            // ── 3. Flush 实时流文件到 UI（保持流式阶段的预览体验） ──
-            const pendingRealtimeFiles = Array.from(realtimeFilesRef.entries()).map(
-              ([path, info]) => ({
-                path,
-                action: info.action as "created" | "modified" | "deleted",
-                content: info.content,
-              }),
-            );
-            if (pendingRealtimeFiles.length > 0) {
-              processFileChanges(pendingRealtimeFiles, {
-                onCodeUpdate,
-                onSchemaUpdate,
-                onFilesChange,
+              const updatedMessages = appendMessageBeforeQueued(
+                messagesWithAutoRepairStatus,
+                assistantMessage,
+              );
+              setMessages(updatedMessages);
+              setCurrentMessage({
+                role: "assistant",
+                content: "",
+                parts: [],
               });
-            }
+              setStreamContent("");
 
-            // ── 4. 构建最终文件列表：realtimeFilesRef 优先，result.files 仅补充缺失文件 ──
-            const realtimeFileMap = new Map<string, FileChangeEntry>();
-            for (const [path, info] of realtimeFilesRef.entries()) {
-              realtimeFileMap.set(path, {
-                path,
-                action: info.action as "created" | "modified" | "deleted",
-                content: info.content,
-              });
-            }
-            if (result.files && result.files.length > 0) {
-              for (const f of result.files) {
-                if (!realtimeFileMap.has(f.path)) {
-                  realtimeFileMap.set(f.path, f);
+              await persistMessages(
+                sessionId,
+                updatedMessages.filter((message) => !message.queueStatus),
+              );
+              if (!isSystemAutoRepair) {
+                await updateSessionTitle(
+                  sessionId,
+                  userMessage,
+                  isFirstUserMessage,
+                );
+              }
+
+              // ── 1. 清除 pending timer（不调用 processRealtimeFiles，避免路径 A 重复触发） ──
+              if (fileUpdateTimer) {
+                clearTimeout(fileUpdateTimer);
+                fileUpdateTimer = null;
+              }
+
+              // ── 2. 检测实时流已更新的数据类型 ──
+              let realtimeUpdatedCode = false;
+              let realtimeUpdatedSchema = false;
+              for (const [path, info] of realtimeFilesRef.entries()) {
+                const normalizedPath = normalizePath(path);
+                if (isCodeFile(normalizedPath) && info.content) realtimeUpdatedCode = true;
+                if (isSchemaFile(normalizedPath) && info.content) realtimeUpdatedSchema = true;
+              }
+
+              // ── 3. Flush 实时流文件到 UI（保持流式阶段的预览体验） ──
+              const pendingRealtimeFiles = Array.from(realtimeFilesRef.entries()).map(
+                ([path, info]) => ({
+                  path,
+                  action: info.action as "created" | "modified" | "deleted",
+                  content: info.content,
+                }),
+              );
+              if (pendingRealtimeFiles.length > 0) {
+                processFileChanges(pendingRealtimeFiles, {
+                  onCodeUpdate,
+                  onSchemaUpdate,
+                  onFilesChange,
+                });
+              }
+
+              // ── 4. 构建最终文件列表：realtimeFilesRef 优先，result.files 仅补充缺失文件 ──
+              const realtimeFileMap = new Map<string, FileChangeEntry>();
+              for (const [path, info] of realtimeFilesRef.entries()) {
+                realtimeFileMap.set(path, {
+                  path,
+                  action: info.action as "created" | "modified" | "deleted",
+                  content: info.content,
+                });
+              }
+              if (result.files && result.files.length > 0) {
+                for (const f of result.files) {
+                  if (!realtimeFileMap.has(f.path)) {
+                    realtimeFileMap.set(f.path, f);
+                  }
                 }
               }
-            }
-            const finalFiles = Array.from(realtimeFileMap.values());
+              const finalFiles = Array.from(realtimeFileMap.values());
 
-            if (finalFiles.length > 0) {
-              for (const f of finalFiles) {
-                if (f.path && f.path.endsWith(".md")) {
-                  memoryFilePathsRef.current.add(f.path);
+              if (finalFiles.length > 0) {
+                for (const f of finalFiles) {
+                  if (f.path && f.path.endsWith(".md")) {
+                    memoryFilePathsRef.current.add(f.path);
+                  }
+                }
+                onFilesChange?.(finalFiles);
+              }
+
+              // ── 5. 从 finalFiles 提取更新，但跳过实时流已更新的数据类型（避免旧值覆盖新值） ──
+              const { codeUpdated, schemaUpdated } =
+                finalFiles.length > 0
+                  ? extractCodeAndSchemaUpdates(finalFiles, {
+                      onCodeUpdate: realtimeUpdatedCode
+                        ? undefined
+                        : (code) => onCodeUpdate?.(code, "ai-finish"),
+                      onSchemaUpdate: realtimeUpdatedSchema
+                        ? undefined
+                        : (schema) => onSchemaUpdate?.(schema, "ai-finish"),
+                    })
+                  : { codeUpdated: false, schemaUpdated: false };
+
+              // ── 6. HTTP 兜底：仅在完全没有数据更新时触发 ──
+              const effectiveCodeUpdated = realtimeUpdatedCode || codeUpdated;
+              const effectiveSchemaUpdated = realtimeUpdatedSchema || schemaUpdated;
+
+              if (!effectiveCodeUpdated && !effectiveSchemaUpdated) {
+                const filesData = await fetchSessionFiles(sessionId, demoId);
+                if (filesData) {
+                  const { code, schema } = filesData;
+                  if (code) onCodeUpdate?.(code, "ai-finish");
+                  if (schema) onSchemaUpdate?.(schema, "ai-finish");
+
+                  const fetchedFiles: FileChangeEntry[] = [];
+                  if (code)
+                    fetchedFiles.push({
+                      path: "index.tsx",
+                      action: "modified",
+                      content: code,
+                    });
+                  if (schema)
+                    fetchedFiles.push({
+                      path: "config.schema.json",
+                      action: "modified",
+                      content: schema,
+                    });
+                  if (fetchedFiles.length > 0) onFilesChange?.(fetchedFiles);
                 }
               }
-              onFilesChange?.(finalFiles);
-            }
-
-            // ── 5. 从 finalFiles 提取更新，但跳过实时流已更新的数据类型（避免旧值覆盖新值） ──
-            const { codeUpdated, schemaUpdated } =
-              finalFiles.length > 0
-                ? extractCodeAndSchemaUpdates(finalFiles, {
-                    onCodeUpdate: realtimeUpdatedCode
-                      ? undefined
-                      : (code) => onCodeUpdate?.(code, "ai-finish"),
-                    onSchemaUpdate: realtimeUpdatedSchema
-                      ? undefined
-                      : (schema) => onSchemaUpdate?.(schema, "ai-finish"),
-                  })
-                : { codeUpdated: false, schemaUpdated: false };
-
-            // ── 6. HTTP 兜底：仅在完全没有数据更新时触发 ──
-            const effectiveCodeUpdated = realtimeUpdatedCode || codeUpdated;
-            const effectiveSchemaUpdated = realtimeUpdatedSchema || schemaUpdated;
-
-            if (!effectiveCodeUpdated && !effectiveSchemaUpdated) {
-              const filesData = await fetchSessionFiles(sessionId, demoId);
-              if (filesData) {
-                const { code, schema } = filesData;
-                if (code) onCodeUpdate?.(code, "ai-finish");
-                if (schema) onSchemaUpdate?.(schema, "ai-finish");
-
-                const fetchedFiles: FileChangeEntry[] = [];
-                if (code)
-                  fetchedFiles.push({
-                    path: "index.tsx",
-                    action: "modified",
-                    content: code,
-                  });
-                if (schema)
-                  fetchedFiles.push({
-                    path: "config.schema.json",
-                    action: "modified",
-                    content: schema,
-                  });
-                if (fetchedFiles.length > 0) onFilesChange?.(fetchedFiles);
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "AI 完成收尾失败";
+              console.warn("[AIChat] stream finish finalization failed:", error);
+              onDiagnosticEvent?.({
+                name: "ai.stream_finish_finalization_failed",
+                traceId,
+                level: "warn",
+                details: { message },
+              });
+            } finally {
+              if (fileUpdateTimer) {
+                clearTimeout(fileUpdateTimer);
+                fileUpdateTimer = null;
               }
+              realtimeFilesRef.clear();
+              completeRunAndDrain();
             }
-
-            realtimeFilesRef.clear();
-            completeRunAndDrain();
           },
 
           onConnectionError: () => {
@@ -921,24 +984,50 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         // 等待 L3 / capabilities 拼装完成再发送，确保能力缺失能被当前流程捕获
         if (projectId) {
-          await streamService.sendMessage(
-            outboundMessage,
-            workingDir,
-            images,
-            demoId,
-            activeViewContext,
-            selectedModelId,
-            projectId,
-          );
+          if (files?.length) {
+            await streamService.sendMessage(
+              outboundMessage,
+              workingDir,
+              images,
+              demoId,
+              activeViewContext,
+              selectedModelId,
+              projectId,
+              files,
+            );
+          } else {
+            await streamService.sendMessage(
+              outboundMessage,
+              workingDir,
+              images,
+              demoId,
+              activeViewContext,
+              selectedModelId,
+              projectId,
+            );
+          }
         } else {
-          await streamService.sendMessage(
-            outboundMessage,
-            workingDir,
-            images,
-            demoId,
-            activeViewContext,
-            selectedModelId,
-          );
+          if (files?.length) {
+            await streamService.sendMessage(
+              outboundMessage,
+              workingDir,
+              images,
+              demoId,
+              activeViewContext,
+              selectedModelId,
+              undefined,
+              files,
+            );
+          } else {
+            await streamService.sendMessage(
+              outboundMessage,
+              workingDir,
+              images,
+              demoId,
+              activeViewContext,
+              selectedModelId,
+            );
+          }
         }
         onDiagnosticEvent?.({
           name: "ai.message_sent",
@@ -952,8 +1041,10 @@ export function useChatStream(options: UseChatStreamOptions) {
         startSilenceTracking();
       } catch (error) {
         if (beforeSendFailed) {
-          const message =
-            error instanceof Error ? error.message : "同步工作区失败";
+          const diagnosticDetails = getErrorDiagnosticDetails(
+            error,
+            "同步工作区失败",
+          );
           const normalized = normalizeAiError(error, {
             fallbackMessage: "发送前同步工作区失败，请保存或刷新后重试。",
           });
@@ -961,7 +1052,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             name: "ai.before_send_failed",
             traceId,
             level: "error",
-            details: { message },
+            details: diagnosticDetails,
           });
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
@@ -1178,6 +1269,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     void startMessageRun(
       nextQueuedMessage.content,
       nextQueuedMessage.images,
+      nextQueuedMessage.files,
       nextQueuedMessage.runOptions,
       {
         appendDisplayMessage: false,
@@ -1195,6 +1287,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       userMessage: string,
       images?: ImageAttachment[],
       runOptions?: SendMessageRunOptions,
+      files?: FileAttachment[],
     ) => {
       const trimmedMessage = userMessage.trim();
       if (!trimmedMessage || !agentSessionId) return;
@@ -1242,6 +1335,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             queueId,
             content: trimmedMessage,
             images,
+            files,
             runOptions,
             createdAt: Date.now(),
             displayMessageId,
@@ -1279,17 +1373,13 @@ export function useChatStream(options: UseChatStreamOptions) {
                 content: trimmedMessage,
                 queueId,
                 queueStatus: "queued",
-                parts:
-                  images?.map((img) => ({
-                    type: "image" as const,
-                    url: `data:${img.mimeType};base64,${img.data}`,
-                  })) || [],
+                parts: buildAttachmentParts(images, files),
               },
         ]);
         return;
       }
 
-      void startMessageRun(trimmedMessage, images, runOptions);
+      void startMessageRun(trimmedMessage, images, files, runOptions);
     },
     [
       agentSessionId,

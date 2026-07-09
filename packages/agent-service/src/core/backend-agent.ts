@@ -79,6 +79,7 @@ export class BackendAgent extends BaseAgent {
       const resultContent = await this.backend.sendMessage(content, {
         stream: options?.stream,
         images: options?.images,
+        files: options?.files,
       });
       this.busy = false;
       this.setStatus("ready");
