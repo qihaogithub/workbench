@@ -276,13 +276,19 @@ export class ProjectApiClient {
     projectId: string,
     demoId: string,
     sessionId: string,
-    files: { code?: string; schema?: string },
+    files: {
+      code?: string;
+      schema?: string;
+      prototypeHtml?: string;
+      prototypeCss?: string;
+    },
   ): Promise<void> {
+    void projectId;
     const response = await this.localRequest<null>(
-      `/api/projects/${projectId}/demos/${demoId}/files`,
+      `/api/sessions/${sessionId}/files/${demoId}`,
       {
         method: 'PUT',
-        body: JSON.stringify({ sessionId, ...files }),
+        body: JSON.stringify(files),
       }
     );
     if (!response.success) {

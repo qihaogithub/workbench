@@ -186,7 +186,8 @@ describe("preview contract", () => {
   it("生成 Agent 创作规则", () => {
     const rules = generatePreviewAuthoringRules();
 
-    expect(rules).toContain("创作端页面运行契约");
+    expect(rules).toContain("创作端高保真 React 页面运行契约");
+    expect(rules).toContain("默认应优先使用 `prototype-html-css`");
     expect(rules).toContain("react/jsx-runtime");
   });
 });

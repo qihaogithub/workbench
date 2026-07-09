@@ -109,22 +109,26 @@ delegateTask({
    - 示例：`demos/product-detail_a3f2/`、`demos/homepage_k8m2/`、`demos/settings-page_x7z1/`
    - 英文小写，单词用 `-` 连接，目录名最长 25 字符
    - 不要用时间戳或纯数字作为目录名
-2. 在目录中创建两个文件：
-   - `index.tsx` — 页面组件代码
+2. 默认创建 HTML/CSS 原型页，除非用户明确要求高保真 React，或用户要求的效果触碰原型页不支持的运行时能力。默认目录中创建三个文件：
+   - `prototype.html` — 页面 HTML 结构
+   - `prototype.css` — 页面 CSS 样式
    - `config.schema.json` — 页面配置定义；如果用户没有明确要求配置项，必须写入空配置 schema，不能从页面内容中自行抽取配置字段
 3. 在工作区根目录的 `workspace-tree.json` 的 `pages` 数组中追加新页面记录：
    ```json
    {
      "id": "{目录名}",
      "name": "中文显示名称",
+     "runtimeType": "prototype-html-css",
      "order": 1,
      "parentId": null
    }
    ```
 4. `order` 取当前所有页面最大 order + 1
 5. `parentId` 默认为 `null`（根级），如需归属文件夹则填写对应 folder id
-6. **配置项约束**：新建页面时，标题、文案、图片、颜色、按钮、布局等内容默认都应直接写在 `index.tsx` 中。只有用户明确说"添加配置项"、"这个要可配置"、"加一个字段"等配置诉求时，才可以在 `config.schema.json` 中添加对应字段。
-7. **默认 schema**：用户没有明确提出配置项时，`config.schema.json` 使用空属性集合：
+6. **运行时选择约束**：HTML/CSS 原型页是创作端 AI 的默认实现方式。只有当用户明确要求 React/高保真实现，或需求必须依赖原型页禁止/不支持的能力（例如任意 JavaScript 执行、复杂第三方 JS 播放器、需要 React 状态组件生态的交互）时，才创建或切换为 `high-fidelity-react`，并在 `workspace-tree.json` 中把该页面 `runtimeType` 设置为 `"high-fidelity-react"`。
+7. **高保真页文件**：当且仅当选择 `high-fidelity-react` 时，目录中创建 `index.tsx` 和 `config.schema.json`；不要同时保留同一轮生成的 `prototype.html/css` 作为有效页面源码。
+8. **配置项约束**：新建页面时，标题、文案、图片、颜色、按钮、布局等内容默认都应直接写在当前运行时源码中：原型页写入 `prototype.html` / `prototype.css`，高保真页写入 `index.tsx`。只有用户明确说"添加配置项"、"这个要可配置"、"加一个字段"等配置诉求时，才可以在 `config.schema.json` 中添加对应字段。
+9. **默认 schema**：用户没有明确提出配置项时，`config.schema.json` 使用空属性集合：
    ```json
    {
      "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -133,7 +137,7 @@ delegateTask({
      "required": []
    }
    ```
-8. **自检**：新建页面的 `config.schema.json` 中不得包含 `project.config.schema.json` 中已有的字段名
+10. **自检**：新建页面的 `config.schema.json` 中不得包含 `project.config.schema.json` 中已有的字段名
 
 ### 重命名 / 改顺序
 
@@ -261,7 +265,20 @@ arrangeCanvasPages({
 - 给原型页添加配置项时，应在 `config.schema.json` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用 `format: "color"`，图片字段使用 `format: "image"`
 - 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页
 
-## 代码质量标准（每个页面内）
+## 代码质量标准（按页面运行时）
+
+### HTML/CSS 原型页（默认）
+
+每个 `prototype-html-css` 页面要求：
+
+- 页面源码位于 `demos/{demoId}/prototype.html` 和 `demos/{demoId}/prototype.css`
+- 默认用语义 HTML + CSS 完成布局、视觉、响应式和 CSS 动效
+- 不写 `<script>`、内联事件处理器、`javascript:` URL 或需要任意 JS 执行的代码
+- 图片、链接和样式引用使用工作区内安全资源路径
+- 用户明确要求配置项时，同步维护 `config.schema.json`，并在 `prototype.html` 使用 `{{fieldKey}}` 或 `data-bind-*` 绑定
+- 原型页校验返回 `repair_prototype` 时，优先保留原型页并修复 HTML/CSS；只有返回或确认 `upgrade_to_high_fidelity` 时才切换高保真页
+
+### 高保真 React 页（仅在需要时）
 
 每个页面的 `index.tsx` 要求：
 
@@ -303,7 +320,7 @@ export default function Demo({
 }
 ```
 
-## React 版本约束
+## React 版本约束（仅适用于高保真 React 页）
 
 预览环境使用 React 18.3.1，所有第三方 React 依赖必须兼容此版本。
 禁止手动 import React（由 React JSX Runtime 自动处理）。
@@ -346,12 +363,12 @@ export default function Demo({
 
 当用户请求修改界面时，按以下规则判断要修改哪个文件：
 
-1. **样式修改**（颜色、大小、布局等）→ 修改 `demos/{demoId}/index.tsx`
-2. **配置项修改**（添加/删除/修改配置字段）→ 修改 `demos/{demoId}/config.schema.json`
-3. **组件结构修改**（添加按钮、卡片等）→ 修改 `demos/{demoId}/index.tsx`
+1. **样式修改**（颜色、大小、布局等）→ 原型页修改 `demos/{demoId}/prototype.css` 或相关 HTML 类名；高保真页修改 `demos/{demoId}/index.tsx`
+2. **配置项修改**（添加/删除/修改配置字段）→ 修改 `demos/{demoId}/config.schema.json`，并同步当前运行时的消费方式：原型页改 `prototype.html` 绑定，高保真页改 `index.tsx` Props 使用
+3. **组件结构修改**（添加按钮、卡片等）→ 原型页修改 `demos/{demoId}/prototype.html` / `prototype.css`；高保真页修改 `demos/{demoId}/index.tsx`
 4. **项目级共享配置**（Logo、品牌色等）→ 修改 `project.config.schema.json`
 5. **页面元数据修改**（名称、顺序等）→ 修改 `workspace-tree.json` 中 `pages` 数组对应页面
-6. **创建新页面** → 在 `demos/` 下创建新目录，含 `index.tsx` + `config.schema.json`，并在 `workspace-tree.json` 中追加页面记录
+6. **创建新页面** → 默认在 `demos/` 下创建 HTML/CSS 原型页目录，含 `prototype.html` + `prototype.css` + `config.schema.json`，并在 `workspace-tree.json` 中追加 `runtimeType: "prototype-html-css"`；只有原型页不支持用户目标或用户明确要求高保真时才创建 `index.tsx`
 
 **不要询问用户要修改哪个文件，直接执行。**
 
