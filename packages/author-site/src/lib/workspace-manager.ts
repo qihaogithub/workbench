@@ -19,6 +19,7 @@ import {
   type WorkspaceMeta,
 } from "./fs-utils";
 import type { MultiDemoFiles } from "@workbench/shared";
+import { appendServerEditorDiagnosticEvent } from "./editor-diagnostics/store";
 
 export interface CreateWorkspaceResult {
   workspaceId: string;
@@ -33,6 +34,55 @@ export interface WorkspaceSyncResult {
   workspacePath?: string;
   code?: string;
   error?: string;
+}
+
+type WorkspaceSyncDiagnosticReason =
+  | "missing_active_workspace"
+  | "active_workspace_mismatch"
+  | "workspace_not_found"
+  | "base_version_stale"
+  | "canonical_write_failed";
+
+interface WorkspaceSyncDiagnosticContext {
+  projectId: string;
+  requestedWorkspaceId?: string | null;
+  activeWorkspaceId?: string | null;
+  canonicalSyncedWorkspaceId?: string | null;
+  baseVersion?: string | null;
+  latestVersionId?: string | null;
+}
+
+function recordWorkspaceSyncDiagnostic(
+  eventType: "workspace.sync_started" | "workspace.sync_succeeded" | "workspace.sync_failed",
+  context: WorkspaceSyncDiagnosticContext,
+  details: {
+    level?: "info" | "warn" | "error";
+    reason?: WorkspaceSyncDiagnosticReason;
+    errorCode?: string;
+    workspacePath?: string;
+  } = {},
+): void {
+  appendServerEditorDiagnosticEvent({
+    level: details.level ?? "info",
+    eventGroup: "workspace",
+    eventType,
+    projectId: context.projectId,
+    workspaceId:
+      context.requestedWorkspaceId ||
+      context.activeWorkspaceId ||
+      undefined,
+    payload: {
+      phase: "persist-workspace",
+      requestedWorkspaceId: context.requestedWorkspaceId ?? null,
+      activeWorkspaceId: context.activeWorkspaceId ?? null,
+      canonicalSyncedWorkspaceId: context.canonicalSyncedWorkspaceId ?? null,
+      baseVersion: context.baseVersion ?? null,
+      latestVersionId: context.latestVersionId ?? null,
+      reason: details.reason,
+      errorCode: details.errorCode,
+      workspacePath: details.workspacePath,
+    },
+  });
 }
 
 function getProjectLiveWorkspaceDir(projectId: string): string {
@@ -274,8 +324,22 @@ export function syncActiveWorkspaceToCanonical(
     };
   }
 
+  const diagnosticContext: WorkspaceSyncDiagnosticContext = {
+    projectId,
+    requestedWorkspaceId: workspaceId ?? null,
+    activeWorkspaceId: project.activeWorkspaceId ?? null,
+    canonicalSyncedWorkspaceId: project.canonicalSyncedWorkspaceId ?? null,
+    latestVersionId: latestVersionId(projectId),
+  };
+  recordWorkspaceSyncDiagnostic("workspace.sync_started", diagnosticContext);
+
   const effectiveWorkspaceId = workspaceId || project.activeWorkspaceId;
   if (!effectiveWorkspaceId) {
+    recordWorkspaceSyncDiagnostic("workspace.sync_failed", diagnosticContext, {
+      level: "error",
+      reason: "missing_active_workspace",
+      errorCode: "WORKSPACE_STALE",
+    });
     return {
       success: false,
       code: "WORKSPACE_STALE",
@@ -284,6 +348,18 @@ export function syncActiveWorkspaceToCanonical(
   }
 
   if (project.activeWorkspaceId !== effectiveWorkspaceId) {
+    recordWorkspaceSyncDiagnostic(
+      "workspace.sync_failed",
+      {
+        ...diagnosticContext,
+        requestedWorkspaceId: effectiveWorkspaceId,
+      },
+      {
+        level: "error",
+        reason: "active_workspace_mismatch",
+        errorCode: "WORKSPACE_STALE",
+      },
+    );
     return {
       success: false,
       code: "WORKSPACE_STALE",
@@ -293,6 +369,18 @@ export function syncActiveWorkspaceToCanonical(
 
   const sourcePath = findWorkspacePath(effectiveWorkspaceId);
   if (!sourcePath || !fs.existsSync(sourcePath)) {
+    recordWorkspaceSyncDiagnostic(
+      "workspace.sync_failed",
+      {
+        ...diagnosticContext,
+        requestedWorkspaceId: effectiveWorkspaceId,
+      },
+      {
+        level: "error",
+        reason: "workspace_not_found",
+        errorCode: "WORKSPACE_NOT_FOUND",
+      },
+    );
     return {
       success: false,
       code: "WORKSPACE_NOT_FOUND",
@@ -301,7 +389,17 @@ export function syncActiveWorkspaceToCanonical(
   }
 
   const sourceMeta = getWorkspaceMetaFromFs(effectiveWorkspaceId);
+  const syncContext: WorkspaceSyncDiagnosticContext = {
+    ...diagnosticContext,
+    requestedWorkspaceId: effectiveWorkspaceId,
+    baseVersion: sourceMeta?.baseVersion ?? null,
+  };
   if (!isWorkspaceBasedOnLatest(projectId, sourceMeta)) {
+    recordWorkspaceSyncDiagnostic("workspace.sync_failed", syncContext, {
+      level: "error",
+      reason: "base_version_stale",
+      errorCode: "WORKSPACE_STALE",
+    });
     return {
       success: false,
       code: "WORKSPACE_STALE",
@@ -339,9 +437,25 @@ export function syncActiveWorkspaceToCanonical(
       canonicalSyncedAt: now,
       updatedAt: now,
     });
+    recordWorkspaceSyncDiagnostic(
+      "workspace.sync_succeeded",
+      {
+        ...syncContext,
+        activeWorkspaceId: effectiveWorkspaceId,
+        canonicalSyncedWorkspaceId: effectiveWorkspaceId,
+      },
+      {
+        workspacePath: projectWorkspacePath,
+      },
+    );
     return { success: true, workspacePath: projectWorkspacePath };
   } catch (error) {
     fs.rmSync(tempPath, { recursive: true, force: true });
+    recordWorkspaceSyncDiagnostic("workspace.sync_failed", syncContext, {
+      level: "error",
+      reason: "canonical_write_failed",
+      errorCode: "FILE_WRITE_ERROR",
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Sync failed",

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
@@ -23,8 +22,18 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+ARG DEBIAN_MIRROR=
+
 # 安装 Chromium
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
     chromium \
     chromium-sandbox \
     && rm -rf /var/lib/apt/lists/*

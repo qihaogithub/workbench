@@ -12,6 +12,12 @@ export async function persistMessages(
       kind: m.kind,
       content: m.content,
       autoRepair: m.autoRepair,
+      parts: m.parts,
+      reasoning: m.reasoning,
+      reasonings: m.reasonings,
+      tools: m.tools,
+      images: m.images,
+      files: m.files,
       timestamp: now - (messages.length - i) * 1000,
     }));
     await fetch(`/api/sessions/${sessionId}/messages`, {

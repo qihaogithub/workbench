@@ -16,6 +16,7 @@ export type EditorDiagnosticEventGroup =
   | "ai"
   | "preview"
   | "project"
+  | "workspace"
   | "publish"
   | "page"
   | "ui"
@@ -107,6 +108,7 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "diagnosticCodes",
   "dirty",
   "durationMs",
+  "elapsedMs",
   "enabled",
   "errorCode",
   "errorMessage",
@@ -114,6 +116,7 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "fileChangeCount",
   "fileCount",
   "hash",
+  "httpStatus",
   "kind",
   "latestVersionId",
   "line",
@@ -125,8 +128,10 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "normalizedPaths",
   "pageId",
   "path",
+  "phase",
   "previewMode",
   "publishTarget",
+  "reason",
   "resourcePath",
   "revision",
   "runId",
@@ -141,10 +146,13 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "versionId",
   "versionType",
   "workspacePath",
+  "requestedWorkspaceId",
+  "canonicalSyncedWorkspaceId",
 ]);
 
 const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
   "ai.message_submitted": ["messageId", "contentLength", "model"],
+  "ai.before_send_failed": ["message", "phase", "errorCode", "httpStatus"],
   "ai.run_started": ["messageId", "runId", "contentLength", "model", "workingDir", "demoId", "logPath"],
   "ai.tool_call_started": ["messageId", "runId", "toolCallId", "toolName", "kind", "status"],
   "ai.tool_call_finished": [
@@ -171,6 +179,68 @@ const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
     "fileCount",
   ],
   "ai.run_failed": ["messageId", "runId", "errorCode", "errorMessage"],
+  "autosave.flush_before_ai_send_started": ["revision", "workspaceId"],
+  "autosave.flush_before_ai_send_succeeded": ["revision", "elapsedMs"],
+  "autosave.flush_before_ai_send_failed": [
+    "revision",
+    "elapsedMs",
+    "message",
+    "phase",
+    "errorCode",
+    "httpStatus",
+  ],
+  "autosave.flush_debounced": ["revision", "delayMs"],
+  "autosave.flush_started": ["revision", "workspaceId"],
+  "autosave.flush_succeeded": ["revision", "elapsedMs"],
+  "autosave.flush_failed": [
+    "revision",
+    "elapsedMs",
+    "message",
+    "phase",
+    "errorCode",
+    "httpStatus",
+  ],
+  "autosave.exit_flush_started": [
+    "shouldPersistWorkspace",
+    "hasPendingWorkspaceFlush",
+    "hasUnsavedChanges",
+    "hasUnsavedCanvasChanges",
+  ],
+  "autosave.exit_flush_succeeded": ["elapsedMs"],
+  "autosave.exit_flush_failed": [
+    "elapsedMs",
+    "message",
+    "phase",
+    "errorCode",
+    "httpStatus",
+  ],
+  "workspace.sync_started": [
+    "phase",
+    "requestedWorkspaceId",
+    "activeWorkspaceId",
+    "canonicalSyncedWorkspaceId",
+    "baseVersion",
+    "latestVersionId",
+  ],
+  "workspace.sync_succeeded": [
+    "phase",
+    "requestedWorkspaceId",
+    "activeWorkspaceId",
+    "canonicalSyncedWorkspaceId",
+    "baseVersion",
+    "latestVersionId",
+    "workspacePath",
+  ],
+  "workspace.sync_failed": [
+    "reason",
+    "requestedWorkspaceId",
+    "activeWorkspaceId",
+    "canonicalSyncedWorkspaceId",
+    "baseVersion",
+    "latestVersionId",
+    "phase",
+    "errorCode",
+  ],
   "preview.compile_started": ["compileHash", "pageId", "resourcePath"],
   "preview.compile_succeeded": ["compileHash", "durationMs", "runtimeValidationOk"],
   "preview.compile_failed": ["compileHash", "errorName", "errorMessage", "line", "column"],

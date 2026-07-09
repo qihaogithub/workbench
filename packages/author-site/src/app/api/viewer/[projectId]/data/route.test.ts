@@ -155,8 +155,8 @@ describe("viewer project data route", () => {
     expect(publishedProject.demoPages[0]?.compiledJsPath).toBe(
       `demos/${body.data?.demoPages[0]?.id}/compiled.js`,
     );
-    expect(publishedProject.demoPages[0]?.iframeHtmlPath).toBe(
-      `demos/${body.data?.demoPages[0]?.id}/iframe.html`,
+    expect(publishedProject.demoPages[0]?.iframeHtmlPath).toMatch(
+      new RegExp(`^demos/${body.data?.demoPages[0]?.id}/iframe[.]html[?]v=[0-9]+$`),
     );
   });
 

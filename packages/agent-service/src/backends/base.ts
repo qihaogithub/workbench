@@ -1,11 +1,11 @@
-import { AgentConfig, AgentEvent, ImageAttachment, UserChoiceResponse } from '../core/types';
+import { AgentConfig, AgentEvent, FileAttachment, ImageAttachment, UserChoiceResponse } from '../core/types';
 
 export type BackendStatus = 'idle' | 'initializing' | 'ready' | 'busy' | 'error';
 
 export interface IBackendAdapter {
   readonly name: string;
   initialize(): Promise<void>;
-  sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string>;
+  sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[]; files?: FileAttachment[] }): Promise<string>;
   onStream(callback: (event: AgentEvent) => void): void;
   getStatus(): Promise<BackendStatus>;
   destroy(): Promise<void>;

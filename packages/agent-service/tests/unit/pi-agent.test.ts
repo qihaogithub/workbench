@@ -1045,11 +1045,12 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(26);
+      expect(tools).toHaveLength(27);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
       expect(toolNames).toContain('readFileWithLines');
+      expect(toolNames).toContain('readUploadedFile');
       expect(toolNames).toContain('editFile');
       expect(toolNames).toContain('writeFile');
       expect(toolNames).toContain('listFiles');
@@ -1085,8 +1086,9 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(25);
+      expect(tools).toHaveLength(26);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
+      expect(tools.map(tool => tool.name)).toContain('readUploadedFile');
       expect(tools.map(tool => tool.name)).toContain('requestUserChoice');
     });
 

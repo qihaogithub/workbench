@@ -10,6 +10,7 @@ import {
   listDemoPages,
   getDemoDirPath,
   getProjectConfigSchema,
+  getProjectConfigValues,
   readAppGraph,
   validateAppGraph,
 } from "@/lib/fs-utils";
@@ -101,6 +102,7 @@ export async function GET(
     });
 
     const projectConfigSchema = getProjectConfigSchema(workspacePath) ?? undefined;
+    const projectConfigValues = getProjectConfigValues(workspacePath) ?? undefined;
     const canvasState = readCanvasStateFromWorkspace(workspacePath);
     const appGraph = readAppGraph(workspacePath);
     const appGraphValidation = validateAppGraph(appGraph);
@@ -112,6 +114,7 @@ export async function GET(
           : null,
         demoPages: pages,
         projectConfigSchema,
+        projectConfigValues,
         canvasState,
         appGraph,
         appGraphValidation,

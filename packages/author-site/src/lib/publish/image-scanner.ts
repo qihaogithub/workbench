@@ -5,12 +5,17 @@ import type { ImageReference } from './types';
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 const API_IMAGE_PREFIX = '/api/images/';
+const SESSION_ASSET_RE = /^\/api\/sessions\/([^/]+)\/assets\/([^/?#]+)(?:[?#].*)?$/;
+
+function stripUrlSuffix(p: string): string {
+  return p.split(/[?#]/, 1)[0] ?? p;
+}
 
 function isLocalPath(p: string): boolean {
   if (/^(https?:|data:|\/\/)/i.test(p)) return false;
   if (/placehold\.co|placeholder\.com/i.test(p)) return false;
   if (p.startsWith(API_IMAGE_PREFIX)) return false;
-  return IMAGE_EXTENSIONS.test(p);
+  return IMAGE_EXTENSIONS.test(stripUrlSuffix(p));
 }
 
 function isExternalImageUrl(p: string): boolean {
@@ -20,7 +25,11 @@ function isExternalImageUrl(p: string): boolean {
 }
 
 function isApiImagePath(p: string): boolean {
-  return p.startsWith(API_IMAGE_PREFIX) && IMAGE_EXTENSIONS.test(p);
+  return p.startsWith(API_IMAGE_PREFIX) && IMAGE_EXTENSIONS.test(stripUrlSuffix(p));
+}
+
+function isSessionAssetPath(p: string): boolean {
+  return SESSION_ASSET_RE.test(p) && IMAGE_EXTENSIONS.test(stripUrlSuffix(p));
 }
 
 function getDataDir(): string {
@@ -40,12 +49,36 @@ function getDataDir(): string {
 
 function resolvePath(relativePath: string, sourceFile: string): string {
   const sourceDir = path.dirname(sourceFile);
-  return path.resolve(sourceDir, relativePath);
+  return path.resolve(sourceDir, stripUrlSuffix(relativePath));
 }
 
 function resolveApiImagePath(apiPath: string): string {
-  const filename = apiPath.slice(API_IMAGE_PREFIX.length);
+  const filename = stripUrlSuffix(apiPath).slice(API_IMAGE_PREFIX.length);
   return path.join(getDataDir(), 'images', filename);
+}
+
+function resolveSessionAssetPath(apiPath: string): string {
+  const match = apiPath.match(SESSION_ASSET_RE);
+  if (!match) return apiPath;
+  const [, sessionId, filename] = match;
+  const sessionsDir = path.join(getDataDir(), 'sessions');
+  const candidates: string[] = [];
+
+  function walk(dir: string): void {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (!entry.isDirectory()) continue;
+      if (entry.name === sessionId) {
+        candidates.push(path.join(fullPath, 'assets', 'images', filename));
+      } else {
+        walk(fullPath);
+      }
+    }
+  }
+
+  walk(sessionsDir);
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0] ?? apiPath;
 }
 
 function addReference(
@@ -65,6 +98,13 @@ function addReference(
     references.push({
       originalPath: imgPath,
       absolutePath: resolveApiImagePath(imgPath),
+      sourceFile,
+      type,
+    });
+  } else if (isSessionAssetPath(imgPath)) {
+    references.push({
+      originalPath: imgPath,
+      absolutePath: resolveSessionAssetPath(imgPath),
       sourceFile,
       type,
     });
@@ -105,7 +145,66 @@ function extractImageReferences(
     addReference(references, match[1], sourceFile, 'external-url');
   }
 
+  const quotedImagePathRegex = /["']((?:\/api\/sessions\/[^"']+\/assets\/|\/api\/images\/|(?:\.{1,2}\/|\/)?[^"']*\/)?[^"']+\.(?:png|jpe?g|gif|webp|svg)(?:[?#][^"']*)?)["']/gi;
+  while ((match = quotedImagePathRegex.exec(content)) !== null) {
+    addReference(references, match[1], sourceFile, 'img-src');
+  }
+
   return dedupeReferences(references);
+}
+
+function parseJsonObject(content: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectConfigValueKeys(workspacePath: string): Set<string> {
+  const valuesPath = path.join(workspacePath, 'project.config.values.json');
+  if (!fs.existsSync(valuesPath)) return new Set();
+  const values = parseJsonObject(fs.readFileSync(valuesPath, 'utf-8'));
+  return new Set(Object.keys(values ?? {}));
+}
+
+function removeOverriddenProjectSchemaDefaults(
+  schemaContent: string,
+  overriddenKeys: Set<string>,
+): string {
+  if (overriddenKeys.size === 0) return schemaContent;
+  const schema = parseJsonObject(schemaContent);
+  const properties = schema?.properties;
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    return schemaContent;
+  }
+
+  let changed = false;
+  const nextProperties: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(properties)) {
+    if (
+      overriddenKeys.has(key) &&
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.prototype.hasOwnProperty.call(value, 'default')
+    ) {
+      const { default: _default, ...rest } = value as Record<string, unknown>;
+      nextProperties[key] = rest;
+      changed = true;
+    } else {
+      nextProperties[key] = value;
+    }
+  }
+
+  if (!changed) return schemaContent;
+  return JSON.stringify({
+    ...schema,
+    properties: nextProperties,
+  });
 }
 
 export function scanImageReferences(
@@ -132,11 +231,20 @@ export function scanImageReferences(
 
   walkDir(demosDir);
 
-  const workspaceFiles = ['index.tsx', 'config.schema.json'];
+  const overriddenProjectConfigKeys = collectConfigValueKeys(workspacePath);
+  const workspaceFiles = [
+    'index.tsx',
+    'config.schema.json',
+    'project.config.schema.json',
+    'project.config.values.json',
+  ];
   for (const file of workspaceFiles) {
     const filePath = path.join(workspacePath, file);
     if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const rawContent = fs.readFileSync(filePath, 'utf-8');
+      const content = file === 'project.config.schema.json'
+        ? removeOverriddenProjectSchemaDefaults(rawContent, overriddenProjectConfigKeys)
+        : rawContent;
       const refs = extractImageReferences(content, filePath);
       references.push(...refs);
     }
@@ -155,5 +263,5 @@ function dedupeReferences(refs: ImageReference[]): ImageReference[] {
   });
 }
 
-export { extractImageReferences, isLocalPath, isApiImagePath };
+export { extractImageReferences, isLocalPath, isApiImagePath, isSessionAssetPath };
 export { isExternalImageUrl };

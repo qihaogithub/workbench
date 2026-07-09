@@ -272,6 +272,91 @@ describe("getPublishStatus", () => {
     );
   });
 
+  it("发布共享配置上传图时应写入本地化运行值并覆盖页面默认值", async () => {
+    const projectId = "proj-publish-config-values";
+    setupPublishableProject(projectId);
+    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    const demoDir = path.join(workspacePath, "demos", "home");
+    const sessionAssetUrl = "/api/sessions/session-config/assets/popup.png";
+    const sessionAssetDir = path.join(
+      tempDir,
+      "sessions",
+      "session-config",
+      "assets",
+      "images",
+    );
+
+    fs.mkdirSync(sessionAssetDir, { recursive: true });
+    fs.writeFileSync(path.join(sessionAssetDir, "popup.png"), "uploaded-image");
+    fs.writeFileSync(
+      path.join(workspacePath, "project.config.schema.json"),
+      JSON.stringify({
+        type: "object",
+        properties: {
+          modalImage: {
+            type: "string",
+            format: "image",
+            default: "project-default",
+          },
+        },
+      }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "project.config.values.json"),
+      JSON.stringify({ modalImage: sessionAssetUrl }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(demoDir, "config.schema.json"),
+      JSON.stringify({
+        type: "object",
+        properties: {
+          modalImage: {
+            type: "string",
+            format: "image",
+            default: "page-default",
+          },
+        },
+      }),
+      "utf-8",
+    );
+
+    await publishProject(projectId);
+
+    const publishedProjectDir = path.join(tempDir, "published", projectId);
+    const configValues = JSON.parse(
+      fs.readFileSync(path.join(publishedProjectDir, "config-values.json"), "utf-8"),
+    ) as { modalImage?: string };
+    const publishedProject = JSON.parse(
+      fs.readFileSync(path.join(publishedProjectDir, "project.json"), "utf-8"),
+    ) as { projectConfigValues?: { modalImage?: string } };
+    const iframeHtml = fs.readFileSync(
+      path.join(publishedProjectDir, "demos", "home", "iframe.html"),
+      "utf-8",
+    );
+    const publishedModalImage = configValues.modalImage;
+
+    expect(publishedModalImage).toBeDefined();
+    expect(publishedModalImage).toMatch(
+      /^\/data\/proj-publish-config-values\/assets\/images\/[a-f0-9]{24}\.png$/,
+    );
+    expect(publishedProject.projectConfigValues?.modalImage).toBe(
+      publishedModalImage,
+    );
+    expect(iframeHtml).toContain(`"modalImage":"${publishedModalImage}"`);
+    expect(iframeHtml).not.toContain(sessionAssetUrl);
+    expect(iframeHtml).not.toContain("page-default");
+    expect(
+      fs.existsSync(
+        path.join(
+          publishedProjectDir,
+          publishedModalImage?.replace(`/data/${projectId}/`, "") ?? "",
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("发布快照创建后应推进已同步 live workspace 的版本基线", async () => {
     setupPublishableProject("proj-publish-live-base");
     const projectPath = path.join(tempDir, "projects", "proj-publish-live-base");

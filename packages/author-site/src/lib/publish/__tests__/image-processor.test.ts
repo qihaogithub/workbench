@@ -76,7 +76,7 @@ describe('processImagesForPublish', () => {
     expect(fs.readdirSync(path.join(publishDir, 'assets', 'images'))).toHaveLength(1);
   });
 
-  it('拒绝非图片 content-type', async () => {
+  it('外部图片 content-type 非图片时不阻断发布并保留原 URL', async () => {
     const { workspacePath, publishDir } = createWorkspace();
     fs.writeFileSync(
       path.join(workspacePath, 'demos', 'page_1', 'prototype.css'),
@@ -93,11 +93,12 @@ describe('processImagesForPublish', () => {
       publishDir,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.errors[0]?.error).toBe('INVALID_CONTENT_TYPE');
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.urlMap.has('https://cdn.example.com/not-image')).toBe(false);
   });
 
-  it('阻断解析到私网地址的外部图片', async () => {
+  it('外部图片解析到私网地址时不请求也不阻断发布', async () => {
     const { workspacePath, publishDir } = createWorkspace();
     fs.writeFileSync(
       path.join(workspacePath, 'demos', 'page_1', 'prototype.html'),
@@ -113,8 +114,9 @@ describe('processImagesForPublish', () => {
       publishDir,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.errors[0]?.error).toBe('PRIVATE_NETWORK_BLOCKED');
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.urlMap.has('https://internal.example.com/secret.png')).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

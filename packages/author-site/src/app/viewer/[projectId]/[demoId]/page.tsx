@@ -33,6 +33,7 @@ interface ViewerData {
   project: { id: string; name: string; description?: string } | null;
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   appGraph?: AppGraph;
   appGraphValidation?: AppGraphValidationResult;
 }
@@ -108,14 +109,18 @@ export default function ViewerDemoPage() {
   }
 
   const getSafeMergedDefaults = useCallback(
-    (projectSchema: string | undefined, pageSchema: string) => {
+    (
+      projectSchema: string | undefined,
+      pageSchema: string,
+      projectValues?: Record<string, unknown>,
+    ) => {
       try {
-        if (projectSchema) {
-          return mergeConfigToProps(projectSchema, pageSchema);
-        }
-        return getDefaultValues(pageSchema);
+        const defaults = projectSchema
+          ? mergeConfigToProps(projectSchema, pageSchema)
+          : getDefaultValues(pageSchema);
+        return { ...defaults, ...projectValues };
       } catch {
-        return getDefaultValues(pageSchema);
+        return { ...getDefaultValues(pageSchema), ...projectValues };
       }
     },
     []
@@ -157,7 +162,8 @@ export default function ViewerDemoPage() {
         if (page?.schema) {
           const defaults = getSafeMergedDefaults(
             result.data.projectConfigSchema,
-            page.schema
+            page.schema,
+            result.data.projectConfigValues,
           );
           const urlConfig = urlConfigDataRef.current;
           const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
@@ -246,7 +252,11 @@ export default function ViewerDemoPage() {
     syncBrowserUrl(page);
     postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
     if (page?.schema) {
-      const defaults = getSafeMergedDefaults(data.projectConfigSchema, page.schema);
+      const defaults = getSafeMergedDefaults(
+        data.projectConfigSchema,
+        page.schema,
+        data.projectConfigValues,
+      );
       setConfigData(defaults);
       setPreviewSize(getPreviewSize(page.schema));
     }

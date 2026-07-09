@@ -236,6 +236,11 @@ program
   .option("--limit <n>", "事件数量上限", "200")
   .option("--format <format>", "输出格式: json/text", "json")
   .option("--data-dir <dir>", "覆盖 data 目录")
+  .option("--remote-host <host>", "通过 SSH 查询远程环境诊断数据")
+  .option("--remote-user <user>", "SSH 用户名")
+  .option("--remote-port <port>", "SSH 端口", "22")
+  .option("--remote-data-dir <dir>", "远程 data 目录，未指定时自动探测常见生产路径")
+  .option("--remote-password-env <name>", "读取 SSH 密码的环境变量名", "OPS_CLI_REMOTE_PASSWORD")
   .option("--output <file>", "export 查询写入文件")
   .action(async (kind, options) => {
     await queryDiagnostics(kind, options);

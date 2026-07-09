@@ -59,6 +59,10 @@ interface BatchCommandItemFailure {
   resumeCommand?: string;
 }
 
+interface LocalizedRemoteAsset {
+  replacement: string;
+}
+
 interface RecipeDefinition {
   id: string;
   title: string;
@@ -815,7 +819,141 @@ function mimeTypeForLocalFile(file: string): string | undefined {
   return undefined;
 }
 
-function updatePrototypePages(
+const IMPORT_REMOTE_IMAGE_RE = /https?:\/\/[^\s"'()<>\\]+?\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s"'()<>\\]*)?/gi;
+const IMPORT_REMOTE_IMAGE_TIMEOUT_MS = 10_000;
+const IMPORT_REMOTE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+function imageExtensionFromMime(mimeType: string): string {
+  if (mimeType.includes("jpeg")) return ".jpg";
+  if (mimeType.includes("png")) return ".png";
+  if (mimeType.includes("gif")) return ".gif";
+  if (mimeType.includes("webp")) return ".webp";
+  if (mimeType.includes("svg")) return ".svg";
+  return ".png";
+}
+
+function filenameFromRemoteImageUrl(url: string, mimeType: string): string {
+  try {
+    const parsed = new URL(url);
+    const basename = path.basename(parsed.pathname);
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(basename)) return basename;
+  } catch {
+    // Fall through to a deterministic generic name.
+  }
+  return `remote-image${imageExtensionFromMime(mimeType)}`;
+}
+
+async function downloadImportImage(url: string): Promise<{
+  dataBase64?: string;
+  filename?: string;
+  mimeType?: string;
+  warning?: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), IMPORT_REMOTE_IMAGE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return { warning: `${url} 下载失败: HTTP ${response.status}` };
+    const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+    if (!mimeType.startsWith("image/")) {
+      return { warning: `${url} 不是图片资源: ${mimeType || "unknown content-type"}` };
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > IMPORT_REMOTE_IMAGE_MAX_BYTES) {
+      return { warning: `${url} 超过 10MB，已保留外链` };
+    }
+    const buffer = Buffer.from(arrayBuffer);
+    return {
+      dataBase64: buffer.toString("base64"),
+      filename: filenameFromRemoteImageUrl(url, mimeType),
+      mimeType,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "未知错误";
+    return { warning: `${url} 下载异常: ${message}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function localizeRemoteImageUrl(
+  service: ProjectAdminService,
+  actor: ProjectAdminActor,
+  editId: string,
+  url: string,
+  cache: Map<string, LocalizedRemoteAsset>,
+): Promise<{ replacement?: string; warning?: string }> {
+  const cached = cache.get(url);
+  if (cached) return { replacement: cached.replacement };
+  const downloaded = await downloadImportImage(url);
+  if (!downloaded.dataBase64 || !downloaded.filename || !downloaded.mimeType) {
+    return { warning: downloaded.warning ?? `${url} 无法本地化，已保留外链` };
+  }
+  const sourceType = url.includes("r2-asset-worker") ? "r2_worker" : "remote_url";
+  const uploaded = service.uploadAsset({
+    editId,
+    filename: downloaded.filename,
+    dataBase64: downloaded.dataBase64,
+    mimeType: downloaded.mimeType,
+    originalUrl: url,
+    sourceType,
+    createdBy: sourceType === "r2_worker" ? "figma" : "system",
+  }, actor);
+  if (!uploaded.ok || !uploaded.data) {
+    return { warning: `${url} 写入项目资产失败: ${uploaded.error?.message ?? "未知错误"}` };
+  }
+  const replacement = `../../${uploaded.data.path}`;
+  cache.set(url, { replacement });
+  return { replacement };
+}
+
+async function rewriteRemoteImagesInText(
+  text: string | undefined,
+  input: {
+    service: ProjectAdminService;
+    actor: ProjectAdminActor;
+    editId: string;
+    cache: Map<string, LocalizedRemoteAsset>;
+  },
+): Promise<{ text?: string; warnings: string[] }> {
+  if (!text) return { text, warnings: [] };
+  const urls = [...new Set([...text.matchAll(IMPORT_REMOTE_IMAGE_RE)].map((match) => match[0]))];
+  if (urls.length === 0) return { text, warnings: [] };
+  let next = text;
+  const warnings: string[] = [];
+  for (const url of urls) {
+    const localized = await localizeRemoteImageUrl(input.service, input.actor, input.editId, url, input.cache);
+    if (localized.replacement) {
+      next = next.split(url).join(localized.replacement);
+    } else if (localized.warning) {
+      warnings.push(localized.warning);
+    }
+  }
+  return { text: next, warnings };
+}
+
+async function localizePrototypeManifestPage(
+  service: ProjectAdminService,
+  actor: ProjectAdminActor,
+  editId: string,
+  page: PrototypeManifestPage,
+  cache: Map<string, LocalizedRemoteAsset>,
+): Promise<{ page: PrototypeManifestPage; warnings: string[] }> {
+  const html = await rewriteRemoteImagesInText(page.prototypeHtml, { service, actor, editId, cache });
+  const css = await rewriteRemoteImagesInText(page.prototypeCss, { service, actor, editId, cache });
+  const schema = await rewriteRemoteImagesInText(page.schema, { service, actor, editId, cache });
+  return {
+    page: {
+      ...page,
+      prototypeHtml: html.text,
+      prototypeCss: css.text,
+      schema: schema.text,
+    },
+    warnings: [...html.warnings, ...css.warnings, ...schema.warnings],
+  };
+}
+
+async function updatePrototypePages(
   service: ProjectAdminService,
   actor: ProjectAdminActor,
   input: {
@@ -824,7 +962,7 @@ function updatePrototypePages(
     noConfig?: boolean;
     dryRun?: boolean;
   },
-): ProjectAdminResult<{
+): Promise<ProjectAdminResult<{
   editId: string;
   created: string[];
   updated: string[];
@@ -832,11 +970,18 @@ function updatePrototypePages(
   total: number;
   dryRun: boolean;
   resumeCommand: string;
-}> {
+}>> {
   const created: string[] = [];
   const updated: string[] = [];
   const failed: BatchCommandItemFailure[] = [];
-  for (const page of input.manifest.pages) {
+  const warnings: string[] = [];
+  const remoteAssetCache = new Map<string, LocalizedRemoteAsset>();
+  for (const manifestPage of input.manifest.pages) {
+    const localized = input.dryRun
+      ? { page: manifestPage, warnings: [] }
+      : await localizePrototypeManifestPage(service, actor, input.editId, manifestPage, remoteAssetCache);
+    warnings.push(...localized.warnings);
+    const page = localized.page;
     const pageId = page.pageId;
     const existing = pageId ? service.getPage(input.editId, pageId) : undefined;
     const name = page.name ?? pageId ?? "原型页";
@@ -886,7 +1031,10 @@ function updatePrototypePages(
     resumeCommand,
   }, {
     nextActions: failed.length > 0 ? [resumeCommand] : [`ow edit verify ${input.editId} --checks runtime,prototype-placeholders,metadata --json`],
-    warnings: failed.length > 0 ? [`${failed.length} 个页面写入失败`] : undefined,
+    warnings: [
+      ...warnings,
+      ...(failed.length > 0 ? [`${failed.length} 个页面写入失败`] : []),
+    ],
   });
 }
 
@@ -1111,7 +1259,7 @@ register("project visual-check", "生成项目页面效果离线检查报告和�
   ["project_visual_check"],
 );
 
-register("project import-prototype", "从外部目录导入 HTML/CSS 原型项目工作流", (args, _pos, { service, actor }) => {
+register("project import-prototype", "从外部目录导入 HTML/CSS 原型项目工作流", async (args, _pos, { service, actor }) => {
   const manifestResult = parsePrototypeManifest(args);
   if (!manifestResult.ok || !manifestResult.data) return manifestResult;
   const sourceDir = path.resolve(stringArg(args, "source", process.cwd()));
@@ -1183,13 +1331,17 @@ register("project import-prototype", "从外部目录导入 HTML/CSS 原型项�
     }
   }
 
-  const pages = updatePrototypePages(service, actor, {
+  const pages = await updatePrototypePages(service, actor, {
     editId,
     manifest: manifestResult.data,
     noConfig: booleanArg(args, "noConfig"),
     dryRun: false,
   });
-  stages.push({ name: "page update-prototypes", ok: pages.ok, data: pages.ok ? pages.data : pages.error });
+  stages.push({
+    name: "page update-prototypes",
+    ok: pages.ok,
+    data: pages.ok ? { ...pages.data, warnings: pages.warnings ?? [] } : pages.error,
+  });
   if (!pages.ok || (pages.data && pages.data.failed.length > 0)) {
     return cliFail(pages.error?.code ?? "IMPORT_PAGES_FAILED", pages.error?.message ?? "原型页导入失败", {
       nextActions: [`ow page update-prototypes ${editId} --manifest <manifest> --resume --json`],
@@ -1238,6 +1390,7 @@ register("project import-prototype", "从外部目录导入 HTML/CSS 原型项�
     nextActions: committed?.ok
       ? [`ow report agent-run --project-id ${projectId} --edit-id ${editId} --version-id ${committed.data?.version.versionId} --audit-id ${committed.auditId ?? ""} --json`]
       : [`ow edit diff ${editId} --summary --json`, `ow edit commit ${editId} --json`],
+    warnings: pages.warnings,
   });
 }, ["project_import_prototype"]);
 

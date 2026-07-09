@@ -1,5 +1,8 @@
 ---
 covers:
+  - packages/author-site/src/app/cli/page.tsx
+  - packages/author-site/src/lib/project-cli-url.ts
+  - packages/author-site/src/components/cli/project-cli-page.tsx
   - packages/project-cli/bin/ow.mjs
   - packages/project-cli/scripts/build.mjs
   - packages/project-cli/scripts/run-tests.mjs
@@ -16,7 +19,7 @@ covers:
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-06
+> 更新日期：2026-07-09
 
 ## 技术定位
 
@@ -37,6 +40,8 @@ CLI 包暴露两个命令名：`ow` 和 `workbench-project-admin`。两者指向
 命令注册集中在 `packages/project-cli/src/index.ts`。每个命令都有名称、说明、别名和处理函数。注册时会自动提供下划线别名，例如 `project list` 同时可以通过 `project_list` 调用，便于代理在不方便处理空格命令时使用。
 
 `commands` 命令会返回机器可读的命令清单。代理不确定可用能力时，应先调用这个命令，而不是猜测命令名称。
+
+author-site 提供面向人工复制的 `/cli` 入口，页面中的“复制到 Agent”提示词由 `project-core` 的提示词生成器产出。页面会优先根据当前 HTTP 请求头还原用户正在访问的创作端 origin，并把该地址写入“项目地址”；如果请求缺少 host，再回退到部署环境变量，最后才使用本地开发默认值。这样 Agent 拿到的入口地址与当前部署一致，不需要用户手动把 `localhost` 改成线上或局域网地址。
 
 ## 能力分组
 

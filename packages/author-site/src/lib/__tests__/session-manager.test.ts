@@ -180,6 +180,63 @@ describe("对话历史 Session 数量限制", () => {
   });
 });
 
+describe("编辑 Session 续期", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("允许过期编辑会话在关键同步前恢复为 editing", async () => {
+    const sessionId = "session-expired";
+    const sessionDir = path.join(dataDir, "sessions", "user-1", "project-1", sessionId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionDir, ".session.json"),
+      JSON.stringify(
+        {
+          sessionId,
+          userId: "user-1",
+          demoId: "project-1",
+          workspaceId: "workspace-1",
+          status: "expired",
+          createdAt: Date.now() - 10_000,
+          expiresAt: Date.now() - 1_000,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const { renewEditSession } = await importSessionManager(dataDir);
+
+    expect(renewEditSession(sessionId)).toBe(true);
+
+    const renewed = JSON.parse(
+      fs.readFileSync(path.join(sessionDir, ".session.json"), "utf-8"),
+    );
+    expect(renewed.status).toBe("editing");
+    expect(renewed.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it("不会恢复已归档会话", async () => {
+    const sessionId = "session-archived";
+    writeSession(dataDir, "user-1", "project-1", sessionId, Date.now() - 10_000);
+
+    const { renewEditSession } = await importSessionManager(dataDir);
+
+    expect(renewEditSession(sessionId)).toBe(false);
+  });
+});
+
 describe("活跃 Session 复用", () => {
   const originalEnv = { ...process.env };
   let dataDir: string;

@@ -44,8 +44,10 @@ import type {
   AiSendMessageInput,
   AiSendMessageResult,
   AiSessionSummary,
+  AssetCreatedBy,
   AssetReplaceInput,
   AssetSummary,
+  AssetSourceType,
   AssetUploadInput,
   AgentRunReport,
   AgentRunReportInput,
@@ -186,6 +188,8 @@ const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 const APP_GRAPH_FILENAME = "app.graph.json";
 const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
+const PROJECT_CONFIG_VALUES_FILENAME = "project.config.values.json";
+const PROJECT_IMAGE_MANIFEST_FILENAME = "images.json";
 const EDIT_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_VERSIONS_KEEP = 50;
 const MAX_ASSET_SIZE = 10 * 1024 * 1024;
@@ -210,6 +214,24 @@ interface ResourceBlobMap {
   sketchScene?: string;
   sketchMeta?: string;
   markdown?: string;
+}
+
+interface ProjectImageManifestEntry {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  format: string;
+  createdAt: number;
+  createdBy: AssetCreatedBy;
+  contentHash?: string;
+  mimeType?: string;
+  originalUrl?: string;
+  sourceType?: AssetSourceType;
+}
+
+interface ProjectImageManifest {
+  images: ProjectImageManifestEntry[];
 }
 
 interface PageResourceMetadata extends Record<string, unknown> {
@@ -617,6 +639,7 @@ export class ProjectAdminService {
       folders: tree.folders,
       versions: [...project.versions].reverse(),
       projectConfigSchema: this.readProjectConfig(workspacePath) ?? undefined,
+      projectConfigValues: this.readProjectConfigValues(workspacePath) ?? undefined,
       locked: this.isProjectLocked(projectId),
     });
   }
@@ -680,6 +703,7 @@ export class ProjectAdminService {
       folders: detail.data.folders,
       versions: detail.data.versions,
       projectConfigSchema: detail.data.projectConfigSchema,
+      projectConfigValues: detail.data.projectConfigValues,
       appGraph: this.readAppGraph(workspacePath),
       assets,
       knowledgeFiles,
@@ -2728,7 +2752,7 @@ export class ProjectAdminService {
   listAssets(editId: string): ProjectAdminResult<{ assets: AssetSummary[] }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    return ok({ assets: this.collectAssetSummaries(transaction.workspacePath) });
+    return ok({ assets: this.collectAssetSummaries(transaction.workspacePath, transaction.projectId) });
   }
 
   uploadAsset(input: AssetUploadInput, actor = this.defaultActor()): ProjectAdminResult<AssetSummary> {
@@ -2737,10 +2761,14 @@ export class ProjectAdminService {
     const validation = this.validateAssetInput(input);
     if (!validation.ok) return fail("VALIDATION_BLOCKED", "资产校验失败", { validation });
     const buffer = Buffer.from(input.dataBase64, "base64");
-    const filename = this.generateAssetFilename(input.filename);
+    const contentHash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const existingAsset = input.targetPath
+      ? undefined
+      : this.findRegisteredAssetByHash(transaction.data.projectId, transaction.data.workspacePath, contentHash);
+    const filename = this.generateAssetFilename(input.filename, contentHash);
     const relativePath = input.targetPath
       ? this.safeRelativeAssetPath(input.targetPath)
-      : `assets/images/${filename}`;
+      : existingAsset?.url ?? `assets/images/${filename}`;
     if (input.targetPath && relativePath.split("/")[0] !== "assets") {
       return fail("INVALID_ASSET_PATH", "targetPath 必须位于 assets/ 目录下");
     }
@@ -2750,12 +2778,34 @@ export class ProjectAdminService {
       path: relativePath,
       size: buffer.length,
       references: [],
+      assetId: `asset_${contentHash.slice(0, 12)}`,
+      contentHash,
+      mimeType: input.mimeType,
+      originalUrl: input.originalUrl,
+      sourceType: input.sourceType ?? "upload",
+      createdBy: input.createdBy ?? "user",
+      createdAt: existingAsset?.createdAt ?? Date.now(),
     };
     if (input.dryRun) {
       return ok(summary, { diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] }, validation });
     }
     ensureDir(path.dirname(targetPath));
-    fs.writeFileSync(targetPath, buffer);
+    if (!existed) {
+      fs.writeFileSync(targetPath, buffer);
+    }
+    this.upsertProjectImageRegistry(transaction.data.projectId, {
+      id: contentHash.slice(0, 12),
+      filename: path.basename(relativePath),
+      url: relativePath,
+      size: buffer.length,
+      format: path.extname(relativePath).slice(1).toLowerCase(),
+      createdAt: summary.createdAt ?? Date.now(),
+      createdBy: summary.createdBy ?? "user",
+      contentHash,
+      mimeType: input.mimeType,
+      originalUrl: input.originalUrl,
+      sourceType: input.sourceType ?? "upload",
+    });
     const auditId = this.audit("asset_upload", actor, "L2", true, {
       projectId: transaction.data.projectId,
       resourceId: relativePath,
@@ -2797,6 +2847,7 @@ export class ProjectAdminService {
     const assetPath = typeof plan.extra?.assetPath === "string" ? plan.extra.assetPath : "";
     const relativePath = this.safeRelativeAssetPath(assetPath);
     fs.rmSync(path.join(transaction.data.workspacePath, relativePath), { force: true });
+    this.removeProjectImageRegistryEntry(transaction.data.projectId, relativePath);
     const auditId = this.audit("asset_delete_execute", actor, "L3", true, {
       projectId: transaction.data.projectId,
       resourceId: relativePath,
@@ -3827,6 +3878,22 @@ export class ProjectAdminService {
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
+      activeWorkspaceId:
+        typeof parsed.activeWorkspaceId === "string"
+          ? parsed.activeWorkspaceId
+          : undefined,
+      activeWorkspaceUpdatedAt:
+        typeof parsed.activeWorkspaceUpdatedAt === "number"
+          ? parsed.activeWorkspaceUpdatedAt
+          : undefined,
+      canonicalSyncedWorkspaceId:
+        typeof parsed.canonicalSyncedWorkspaceId === "string"
+          ? parsed.canonicalSyncedWorkspaceId
+          : undefined,
+      canonicalSyncedAt:
+        typeof parsed.canonicalSyncedAt === "number"
+          ? parsed.canonicalSyncedAt
+          : undefined,
       lockedDependencies: parsed.lockedDependencies,
       authoringPreferences: normalizeProjectAuthoringPreferences(parsed.authoringPreferences),
       thumbnail: parsed.thumbnail,
@@ -4004,6 +4071,19 @@ export class ProjectAdminService {
   private readProjectConfig(workspacePath: string): string | null {
     const configPath = path.join(workspacePath, PROJECT_CONFIG_FILENAME);
     return fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : null;
+  }
+
+  private readProjectConfigValues(workspacePath: string): Record<string, unknown> | null {
+    const valuesPath = path.join(workspacePath, PROJECT_CONFIG_VALUES_FILENAME);
+    if (!fs.existsSync(valuesPath)) return null;
+    try {
+      const parsed = readJsonFile<unknown>(valuesPath);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   private readAppGraph(workspacePath: string): AppGraph {
@@ -4729,7 +4809,55 @@ export class ProjectAdminService {
     return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
   }
 
-  private generateAssetFilename(filename: string): string {
+  private readProjectImageRegistry(projectId: string): ProjectImageManifest {
+    return readJsonFile<ProjectImageManifest>(
+      path.join(this.getProjectPath(projectId), PROJECT_IMAGE_MANIFEST_FILENAME),
+    ) ?? { images: [] };
+  }
+
+  private writeProjectImageRegistry(projectId: string, manifest: ProjectImageManifest): void {
+    writeJsonFile(path.join(this.getProjectPath(projectId), PROJECT_IMAGE_MANIFEST_FILENAME), manifest);
+  }
+
+  private findRegisteredAssetByHash(
+    projectId: string,
+    workspacePath: string,
+    contentHash: string,
+  ): ProjectImageManifestEntry | undefined {
+    return this.readProjectImageRegistry(projectId).images.find((image) =>
+      image.contentHash === contentHash &&
+      image.url.startsWith("assets/") &&
+      fs.existsSync(path.join(workspacePath, image.url))
+    );
+  }
+
+  private upsertProjectImageRegistry(projectId: string, entry: ProjectImageManifestEntry): void {
+    const manifest = this.readProjectImageRegistry(projectId);
+    const existingIndex = manifest.images.findIndex((image) =>
+      image.id === entry.id || image.contentHash === entry.contentHash || image.url === entry.url
+    );
+    if (existingIndex >= 0) {
+      const previous = manifest.images[existingIndex];
+      manifest.images[existingIndex] = {
+        ...previous,
+        ...entry,
+        createdAt: previous.createdAt ?? entry.createdAt,
+      };
+    } else {
+      manifest.images.push(entry);
+    }
+    this.writeProjectImageRegistry(projectId, manifest);
+  }
+
+  private removeProjectImageRegistryEntry(projectId: string, assetPath: string): void {
+    const manifest = this.readProjectImageRegistry(projectId);
+    const nextImages = manifest.images.filter((image) => image.url !== assetPath);
+    if (nextImages.length !== manifest.images.length) {
+      this.writeProjectImageRegistry(projectId, { images: nextImages });
+    }
+  }
+
+  private generateAssetFilename(filename: string, contentHash?: string): string {
     const ext = path.extname(filename).toLowerCase() || ".bin";
     const stem = path
       .basename(filename, ext)
@@ -4738,6 +4866,7 @@ export class ProjectAdminService {
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 32) || "image";
+    if (contentHash) return `${contentHash.slice(0, 12)}-${stem}${ext}`;
     return `${stem}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
   }
 
@@ -4764,10 +4893,10 @@ export class ProjectAdminService {
     return updated;
   }
 
-  private verifyWorkspace(_projectId: string, workspacePath: string, checks: string[]): VerifySummary {
+  private verifyWorkspace(projectId: string, workspacePath: string, checks: string[]): VerifySummary {
     const tree = this.readWorkspaceTree(workspacePath);
     const runtimeTypes: Record<string, number> = {};
-    const assets = this.collectAssetSummaries(workspacePath);
+    const assets = this.collectAssetSummaries(workspacePath, projectId);
     const runtimeValidation = checks.length === 0 || checks.includes("runtime")
       ? this.validateWorkspaceRuntime(workspacePath)
       : { ok: true, issues: [], pageIds: tree.pages.map((page) => page.id) };
@@ -4812,15 +4941,25 @@ export class ProjectAdminService {
     };
   }
 
-  private collectAssetSummaries(workspacePath: string): AssetSummary[] {
+  private collectAssetSummaries(workspacePath: string, projectId?: string): AssetSummary[] {
+    const registry = projectId ? this.readProjectImageRegistry(projectId).images : [];
+    const registryByPath = new Map(registry.map((image) => [image.url, image]));
     const assets: AssetSummary[] = [];
     for (const file of this.walkFiles(workspacePath)) {
       if (/\.(png|jpe?g|gif|webp|svg|svga)$/i.test(file)) {
         const relative = path.relative(workspacePath, file).split(path.sep).join("/");
+        const entry = registryByPath.get(relative);
         assets.push({
           path: relative,
           size: fs.statSync(file).size,
           references: this.findReferences(workspacePath, relative),
+          assetId: entry ? `asset_${entry.id}` : undefined,
+          contentHash: entry?.contentHash,
+          mimeType: entry?.mimeType,
+          originalUrl: entry?.originalUrl,
+          sourceType: entry?.sourceType,
+          createdBy: entry?.createdBy,
+          createdAt: entry?.createdAt,
         });
       }
     }

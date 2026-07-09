@@ -1,5 +1,7 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
+import { spawn } from "child_process";
 
 import Database from "better-sqlite3";
 
@@ -19,6 +21,7 @@ type EditorDiagnosticEventGroup =
   | "ai"
   | "preview"
   | "project"
+  | "workspace"
   | "publish"
   | "page"
   | "ui"
@@ -79,6 +82,17 @@ interface DiagnosticsOptions {
   format?: "json" | "text";
   dataDir?: string;
   output?: string;
+  remoteHost?: string;
+  remoteUser?: string;
+  remotePort?: string;
+  remoteDataDir?: string;
+  remotePasswordEnv?: string;
+}
+
+interface RemoteSnapshot {
+  localDataDir: string;
+  remoteDataDir: string;
+  cleanup: () => void;
 }
 
 interface EditorEventRow {
@@ -118,6 +132,145 @@ function getDataDir(options: DiagnosticsOptions): string {
       process.env.DATA_DIR ||
       path.join(findProjectRoot(process.cwd()), "data"),
   );
+}
+
+function getRemoteHost(options: DiagnosticsOptions): string | undefined {
+  return options.remoteHost || process.env.OPS_CLI_REMOTE_HOST;
+}
+
+function getRemoteUser(options: DiagnosticsOptions): string | undefined {
+  return options.remoteUser || process.env.OPS_CLI_REMOTE_USER;
+}
+
+function getRemotePort(options: DiagnosticsOptions): string {
+  return options.remotePort || process.env.OPS_CLI_REMOTE_PORT || "22";
+}
+
+function getRemotePassword(options: DiagnosticsOptions): string | undefined {
+  const envName = options.remotePasswordEnv || "OPS_CLI_REMOTE_PASSWORD";
+  return process.env[envName] || process.env.SSHPASS;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function remoteTarget(options: DiagnosticsOptions): string {
+  const host = getRemoteHost(options);
+  if (!host) throw new Error("remote host is required");
+  const user = getRemoteUser(options);
+  return user ? `${user}@${host}` : host;
+}
+
+function buildSshArgs(options: DiagnosticsOptions, remoteCommand: string): string[] {
+  return [
+    "-p",
+    getRemotePort(options),
+    "-o",
+    "BatchMode=no",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    remoteTarget(options),
+    `sh -lc ${shellQuote(remoteCommand)}`,
+  ];
+}
+
+function runRemoteCommand(options: DiagnosticsOptions, remoteCommand: string): Promise<Buffer> {
+  const password = getRemotePassword(options);
+  const sshArgs = buildSshArgs(options, remoteCommand);
+  const command = password ? "sshpass" : "ssh";
+  const args = password ? ["-e", "ssh", ...sshArgs] : sshArgs;
+  const env = password ? { ...process.env, SSHPASS: password } : process.env;
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdout));
+        return;
+      }
+      reject(new Error(Buffer.concat(stderr).toString("utf8").trim() || `ssh exited with code ${code}`));
+    });
+  });
+}
+
+async function detectRemoteDataDir(options: DiagnosticsOptions): Promise<string> {
+  const explicit = options.remoteDataDir || process.env.OPS_CLI_REMOTE_DATA_DIR;
+  if (explicit) return explicit;
+
+  const command = [
+    "for d in",
+    "\"$DATA_DIR\"",
+    "/opt/opencode-workbench/data",
+    "/opt/workbench/data",
+    "/app/data",
+    "/data",
+    "; do",
+    "[ -n \"$d\" ] && [ -d \"$d\" ] && printf '%s\\n' \"$d\" && exit 0;",
+    "done;",
+    "printf '%s\\n' 'No diagnostics data dir found' >&2;",
+    "exit 2",
+  ].join(" ");
+  const output = await runRemoteCommand(options, command);
+  const dataDir = output.toString("utf8").trim().split("\n").filter(Boolean).at(-1);
+  if (!dataDir) throw new Error("remote data dir detection returned empty output");
+  return dataDir;
+}
+
+async function createRemoteDiagnosticsSnapshot(options: DiagnosticsOptions): Promise<RemoteSnapshot> {
+  const remoteDataDir = await detectRemoteDataDir(options);
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "workbench-diagnostics-remote-"));
+  const archivePath = path.join(tempRoot, "diagnostics.tgz");
+  const localDataDir = path.join(tempRoot, "data");
+  try {
+    fs.mkdirSync(localDataDir, { recursive: true });
+
+    const remoteCommand = [
+      "set -eu;",
+      `DATA_DIR=${shellQuote(remoteDataDir)};`,
+      "[ -d \"$DATA_DIR\" ] || { printf 'Data dir not found: %s\\n' \"$DATA_DIR\" >&2; exit 2; };",
+      "cd \"$DATA_DIR\";",
+      "tmp_list=$(mktemp);",
+      "for p in diagnostics/editor-events.db diagnostics/editor-events.db-wal diagnostics/editor-events.db-shm editor-diagnostics agent-run-logs; do",
+      "[ -e \"$p\" ] && printf '%s\\n' \"$p\" >> \"$tmp_list\";",
+      "done;",
+      "[ -s \"$tmp_list\" ] || { rm -f \"$tmp_list\"; printf 'No diagnostics files found under %s\\n' \"$DATA_DIR\" >&2; exit 3; };",
+      "tar -czf - -T \"$tmp_list\";",
+      "rm -f \"$tmp_list\";",
+    ].join(" ");
+
+    const archive = await runRemoteCommand(options, remoteCommand);
+    fs.writeFileSync(archivePath, archive);
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("tar", ["-xzf", archivePath, "-C", localDataDir], {
+        stdio: ["ignore", "ignore", "pipe"],
+      });
+      const stderr: Buffer[] = [];
+      child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(Buffer.concat(stderr).toString("utf8").trim() || `tar exited with code ${code}`));
+      });
+    });
+
+    return {
+      localDataDir,
+      remoteDataDir,
+      cleanup: () => fs.rmSync(tempRoot, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function parseSince(value: string | undefined, fallbackHours?: number): string | undefined {
@@ -189,7 +342,7 @@ function normalizeEditorDiagnosticEvent(
   };
 }
 
-function readSqliteEvents(dataDir: string, filters: Record<string, string | undefined>, limit: number): {
+export function readSqliteEvents(dataDir: string, filters: Record<string, string | undefined>, limit: number): {
   events: EditorDiagnosticEvent[];
   warning?: string;
   dbMissing: boolean;
@@ -213,6 +366,7 @@ function readSqliteEvents(dataDir: string, filters: Record<string, string | unde
         ["trace", "trace_id", "trace"],
         ["operation", "operation_id", "operation"],
         ["eventType", "event_type", "eventType"],
+        ["group", "event_group", "group"],
       ];
       for (const [key, column, param] of mapping) {
         const value = filters[key];
@@ -277,7 +431,7 @@ function readJsonlEvents(dataDir: string): EditorDiagnosticEvent[] {
   return events;
 }
 
-function applyFilters(
+export function applyFilters(
   events: EditorDiagnosticEvent[],
   filters: Record<string, string | undefined>,
   limit: number,
@@ -357,6 +511,31 @@ function buildResult(kind: string, options: DiagnosticsOptions, filters: Record<
   };
 }
 
+function isDiagnosticFailure(event: EditorDiagnosticEvent): boolean {
+  return event.level === "error" || event.eventType.endsWith("_failed");
+}
+
+export function formatDiagnosticFailureDetails(event: EditorDiagnosticEvent): string {
+  if (!isDiagnosticFailure(event)) return "";
+
+  const details: string[] = [
+    `workspace=${event.workspaceId || "-"}`,
+    `page=${event.pageId || "-"}`,
+  ];
+  const phase = event.payload.phase;
+  const errorCode = event.payload.errorCode;
+  const httpStatus = event.payload.httpStatus;
+  if (typeof phase === "string" && phase) details.push(`phase=${phase}`);
+  if (typeof errorCode === "string" && errorCode) details.push(`code=${errorCode}`);
+  if (
+    typeof httpStatus === "number" ||
+    typeof httpStatus === "string"
+  ) {
+    details.push(`status=${httpStatus}`);
+  }
+  return details.length > 0 ? ` ${details.join(" ")}` : "";
+}
+
 function printTextTimeline(events: EditorDiagnosticEvent[], diagnostics: EditorDiagnosticQueryDiagnostics): void {
   for (const warning of diagnostics.warnings) showWarning(warning);
   if (events.length === 0) {
@@ -365,7 +544,7 @@ function printTextTimeline(events: EditorDiagnosticEvent[], diagnostics: EditorD
   }
   for (const event of events) {
     console.log(
-      `${event.ts} [${event.level}] ${event.eventType} project=${event.projectId || "-"} session=${event.sessionId || "-"} trace=${event.traceId || "-"}`,
+      `${event.ts} [${event.level}] ${event.eventType} project=${event.projectId || "-"} session=${event.sessionId || "-"} trace=${event.traceId || "-"}${formatDiagnosticFailureDetails(event)}`,
     );
   }
 }
@@ -389,17 +568,40 @@ export async function queryDiagnostics(kind: string, options: DiagnosticsOptions
   if (kind === "operation") filters.operation = options.operation;
   if (kind === "session") filters.editorSession = options.editorSession;
 
-  const result = buildResult(kind, options, filters);
+  const remoteHost = getRemoteHost(options);
+  const snapshot = remoteHost ? await createRemoteDiagnosticsSnapshot(options) : null;
 
-  if (kind === "export" && options.output) {
-    fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
-    fs.writeFileSync(path.resolve(options.output), `${JSON.stringify(result, null, 2)}\n`, "utf8");
+  try {
+    const effectiveOptions = snapshot
+      ? { ...options, dataDir: snapshot.localDataDir }
+      : options;
+    const result = buildResult(kind, effectiveOptions, filters);
+    if (snapshot) {
+      const query = result.query as Record<string, unknown>;
+      query.dataDir = snapshot.remoteDataDir;
+      query.source = "remote";
+      query.remote = {
+        host: remoteHost,
+        user: getRemoteUser(options),
+        port: getRemotePort(options),
+      };
+      result.diagnostics.warnings.push(
+        `已从远程 ${remoteTarget(options)}:${snapshot.remoteDataDir} 拉取只读诊断快照`,
+      );
+    }
+
+    if (kind === "export" && options.output) {
+      fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
+      fs.writeFileSync(path.resolve(options.output), `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    }
+
+    if (options.format === "text") {
+      printTextTimeline(result.events, result.diagnostics);
+      return;
+    }
+
+    outputJson(result);
+  } finally {
+    snapshot?.cleanup();
   }
-
-  if (options.format === "text") {
-    printTextTimeline(result.events, result.diagnostics);
-    return;
-  }
-
-  outputJson(result);
 }

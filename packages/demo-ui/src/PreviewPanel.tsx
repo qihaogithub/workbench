@@ -12,10 +12,9 @@ import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
 import { computePreviewScale } from "./preview-scale";
+import { resolvePreviewConfigAssetUrls } from "./preview-config-utils";
 const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
 const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
-
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
 
 interface VisualContextMenuState {
   x: number;
@@ -33,58 +32,6 @@ function buildVisualTreeFromStack(nodes: VisualNodeInfo[]): VisualNodeTreeItem[]
     };
   }
   return child ? [child] : [];
-}
-
-function resolveRelativePath(relativePath: string, basePath: string): string {
-  const parts = basePath.split('/').filter(p => p !== '');
-  const relativeParts = relativePath.split('/');
-
-  for (const part of relativeParts) {
-    if (part === '.' || part === '') continue;
-    if (part === '..') {
-      parts.pop();
-    } else {
-      parts.push(part);
-    }
-  }
-
-  return parts.join('/');
-}
-
-function resolveImageUrls(
-  data: Record<string, unknown>,
-  sessionId?: string,
-  demoId?: string,
-): Record<string, unknown> {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  if (!origin) return data;
-
-  const basePath = demoId ? `demos/${demoId}/` : '';
-
-  function walk(value: unknown): unknown {
-    if (typeof value === "string") {
-      if (value.startsWith("/api/sessions/")) {
-        return origin + value;
-      }
-      if (sessionId && basePath && /^\.\.?\/[^'")\s]*$/.test(value) && IMAGE_EXT_RE.test(value)) {
-        const resolved = resolveRelativePath(value, basePath);
-        return `${origin}/api/sessions/${sessionId}/workspace/${resolved}`;
-      }
-    }
-    if (Array.isArray(value)) {
-      return value.map(walk);
-    }
-    if (value !== null && typeof value === "object") {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value)) {
-        result[k] = walk(v);
-      }
-      return result;
-    }
-    return value;
-  }
-
-  return walk(data) as Record<string, unknown>;
 }
 
 function isValidCode(code: string): boolean {
@@ -481,7 +428,10 @@ export function PreviewPanel({
         return;
       }
 
-      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+      const resolvedConfig = resolvePreviewConfigAssetUrls(config, {
+        sessionId,
+        demoId,
+      });
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_url_sent", {
@@ -532,7 +482,10 @@ export function PreviewPanel({
         return;
       }
 
-      const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+      const resolvedConfig = resolvePreviewConfigAssetUrls(config, {
+        sessionId,
+        demoId,
+      });
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_sent", {
@@ -565,7 +518,10 @@ export function PreviewPanel({
       return;
     }
 
-    const resolvedConfig = resolveImageUrls(config, sessionId, demoId);
+    const resolvedConfig = resolvePreviewConfigAssetUrls(config, {
+      sessionId,
+      demoId,
+    });
     const requestId = activePreviewRequestIdRef.current;
 
     iframe.contentWindow.postMessage(

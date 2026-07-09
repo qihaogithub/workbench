@@ -63,6 +63,7 @@ export interface UseVersionControlParams {
   >;
   setHasUnsavedChanges: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
+  beforePublish?: () => Promise<void>;
   getSketchPatchSummary?: (
     pageId: string,
   ) => SketchPatchVersionSummary | undefined;
@@ -93,6 +94,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     setPageCodes,
     setHasUnsavedChanges,
     setIsSaving,
+    beforePublish,
     getSketchPatchSummary,
   } = params;
   const { toast } = useToast();
@@ -218,6 +220,7 @@ export function useVersionControl(params: UseVersionControlParams) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
+      await beforePublish?.();
       const publishResult = await projectApiClient.publishProject(demoId, {
         sessionId,
         workspaceId,

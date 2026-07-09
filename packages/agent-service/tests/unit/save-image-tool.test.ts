@@ -10,6 +10,7 @@ vi.mock('fs', () => ({
   promises: {
     mkdir: vi.fn(),
     writeFile: vi.fn(),
+    readFile: vi.fn(),
   },
   existsSync: vi.fn().mockReturnValue(false),
   mkdirSync: vi.fn(),
@@ -316,6 +317,73 @@ describe('createSaveImageTool', () => {
       expect(result.isError).toBeFalsy();
       const manifestCall = (fs.writeFileSync as any).mock.calls[0];
       expect(String(manifestCall[0]).replace(/\\/g, '/')).toContain('/projects/proj_1/images.json');
+    });
+  });
+
+  describe('受管资产来源', () => {
+    it('source=assetId 时应直接复用项目 images.json 中的资产', async () => {
+      (fs.existsSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        return (
+          normalized.endsWith('/projects/test-project/images.json') ||
+          normalized.endsWith('/workspace/project-1/assets/images/abc123def456-hero.png')
+        );
+      });
+      (fs.readFileSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        if (normalized.endsWith('/projects/test-project/images.json')) {
+          return JSON.stringify({
+            images: [
+              {
+                id: 'abc123def456',
+                filename: 'abc123def456-hero.png',
+                url: 'assets/images/abc123def456-hero.png',
+                size: 16,
+                format: 'png',
+                createdAt: 1,
+                createdBy: 'user',
+                contentHash: 'abc123def4567890',
+              },
+            ],
+          });
+        }
+        return JSON.stringify({ images: [] });
+      });
+
+      const tool = createTool({ ...baseConfig, projectId: 'test-project' });
+      const result = await tool.execute('id', {
+        source: 'assetId',
+        assetId: 'asset_abc123def456',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(result.details.path).toBe('assets/images/abc123def456-hero.png');
+      expect(result.details.relativePathFromPage).toBe('../../assets/images/abc123def456-hero.png');
+      expect(fs.promises.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('source=sessionAsset 时应从本地 session asset 复制到项目资产', async () => {
+      (fs.promises.readFile as any).mockResolvedValue(Buffer.from('session-image'));
+      (fs.promises.writeFile as any).mockResolvedValue(undefined);
+      (fs.existsSync as any).mockImplementation((target: string) => {
+        const normalized = String(target).replace(/\\/g, '/');
+        return (
+          normalized.endsWith('/sessions/session-1/assets/upload.png') ||
+          normalized.endsWith('/projects/test-project/project.json')
+        );
+      });
+
+      const tool = createTool({ ...baseConfig, projectId: 'test-project' });
+      const result = await tool.execute('id', {
+        source: 'sessionAsset',
+        url: '/api/sessions/session-1/assets/upload.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(result.details.source).toBe('sessionAsset');
+      expect(result.details.path).toMatch(/^assets\/images\/[a-f0-9]{12}-upload\.png$/);
+      expect(fs.promises.readFile).toHaveBeenCalled();
+      expect(fs.promises.writeFile).toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,10 @@
-# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+
+RUN corepack enable \
+    && corepack prepare pnpm@8.15.0 --activate \
+    && pnpm config set registry "$NPM_REGISTRY"
 
 WORKDIR /app
 
@@ -10,6 +13,7 @@ ARG NEXT_PUBLIC_DATA_BASE=
 
 ENV NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
 ENV NEXT_PUBLIC_DATA_BASE=${NEXT_PUBLIC_DATA_BASE}
+ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/demo-ui/package.json ./packages/demo-ui/
@@ -19,7 +23,8 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/viewer-site/package.json ./packages/viewer-site/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --no-frozen-lockfile
+    pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
+    && pnpm rebuild --store-dir /pnpm/store esbuild
 
 COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/sketch-core/ ./packages/sketch-core/

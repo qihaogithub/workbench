@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { computePreviewScale } from "./preview-scale";
+import { resolvePreviewConfigAssetUrls } from "./preview-config-utils";
 import type { PreviewContainerSize, PreviewSize } from "./types";
 import { cn } from "./utils";
 
@@ -13,7 +14,19 @@ export interface IframePreviewFrameProps {
   fillContainer?: boolean;
   containerSizeOverride?: PreviewContainerSize;
   sandbox?: string;
+  configData?: Record<string, unknown>;
+  sessionId?: string;
+  demoId?: string;
   onLoad?: () => void;
+}
+
+function getIframeOrigin(src: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    return new URL(src, window.location.href).origin;
+  } catch {
+    return window.location.origin;
+  }
 }
 
 function normalizeMeasuredSize(value: number): number {
@@ -29,9 +42,13 @@ export function IframePreviewFrame({
   fillContainer = false,
   containerSizeOverride,
   sandbox = "allow-scripts",
+  configData,
+  sessionId,
+  demoId,
   onLoad,
 }: IframePreviewFrameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
   const hasContainerSizeOverride = containerSizeOverride != null;
@@ -85,6 +102,28 @@ export function IframePreviewFrame({
     fillContainer,
   );
 
+  const syncIframeConfig = useCallback(() => {
+    if (!configData) return;
+    const resolvedConfig = resolvePreviewConfigAssetUrls(configData, {
+      sessionId,
+      demoId,
+      origin: getIframeOrigin(src),
+    });
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "UPDATE_CONFIG", configData: resolvedConfig },
+      "*",
+    );
+  }, [configData, demoId, sessionId, src]);
+
+  useEffect(() => {
+    syncIframeConfig();
+  }, [syncIframeConfig]);
+
+  const handleLoad = useCallback(() => {
+    onLoad?.();
+    syncIframeConfig();
+  }, [onLoad, syncIframeConfig]);
+
   return (
     <div
       ref={containerRef}
@@ -95,12 +134,13 @@ export function IframePreviewFrame({
         className={fillContainer ? "relative" : "relative rounded-lg border border-border"}
       >
         <iframe
+          ref={iframeRef}
           title={title}
           src={src}
           sandbox={sandbox}
           style={contentStyle}
           className="bg-white"
-          onLoad={onLoad}
+          onLoad={handleLoad}
         />
       </div>
     </div>

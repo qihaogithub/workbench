@@ -5,6 +5,7 @@ import { BackendAgent } from "../core/backend-agent";
 import {
   AgentConfig,
   AgentResult,
+  FileAttachment,
   ImageAttachment,
   UserChoiceResponse,
 } from "../core/types";
@@ -46,6 +47,7 @@ interface ClientMessage {
   projectId?: string;
   demoId?: string;
   images?: ImageAttachment[];
+  files?: FileAttachment[];
   /** v3.2: 静态 system prompt 注入（L2 + L4） */
   systemPrompt?: string;
   entries?: Array<{ level: 'log' | 'warn' | 'error' | 'info' | 'debug'; args: string; timestamp: number }>;
@@ -313,6 +315,7 @@ export async function registerWebSocketRoutes(
                   {
                     ...message.options,
                     images: message.images,
+                    files: message.files,
                   },
                 );
                 const timeoutPromise = new Promise<AgentResult>((resolve) => {

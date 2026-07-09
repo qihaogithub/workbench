@@ -1,5 +1,5 @@
 import { IBackendAdapter, BackendStatus } from './base';
-import { AgentConfig, AgentEvent, FileChange, ImageAttachment, UserChoiceResponse } from '../core/types';
+import { AgentConfig, AgentEvent, FileAttachment, FileChange, ImageAttachment, UserChoiceResponse } from '../core/types';
 import { createWorkbenchTools, type SubagentRunResult } from './pi-tools';
 import type { PreinstalledSkill } from './preinstalled-skills';
 import {
@@ -45,6 +45,36 @@ function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; descrip
     '以下列表由运行时 activeTools 自动注入，代表你本轮真正可以调用的工具；如果这里列出了 `delegateTask`，你就可以使用子 Agent。',
     '',
     ...lines,
+  ].join('\n');
+}
+
+function formatUploadedFilesForPrompt(files?: FileAttachment[]): string {
+  if (!files || files.length === 0) return '';
+
+  const lines = files.map((file, index) => {
+    const status = file.textExtracted ? '可读取' : '未提取到文本';
+    const preview = file.textPreview
+      ? `\n  预览：${file.textPreview.replace(/\s+/g, ' ').slice(0, 240)}`
+      : '';
+    return [
+      `${index + 1}. ${file.name}`,
+      `  attachmentId: ${file.id}`,
+      `  MIME: ${file.mimeType || 'unknown'}`,
+      `  大小: ${file.size} bytes`,
+      `  文本状态: ${status}`,
+      file.lineCount ? `  行数: ${file.lineCount}` : '',
+      file.truncated ? '  注意：提取文本已截断' : '',
+      preview,
+    ].filter(Boolean).join('\n');
+  });
+
+  return [
+    '【上传文件】',
+    '用户本轮上传了以下只读文件附件。需要查看文件内容时，调用 `readUploadedFile`，传入对应 attachmentId；不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。',
+    '',
+    ...lines,
+    '',
+    '【用户问题】',
   ].join('\n');
 }
 
@@ -516,7 +546,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
     }
   }
 
-  async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[] }): Promise<string> {
+  async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[]; files?: FileAttachment[] }): Promise<string> {
     if (!this.harness) throw new Error("Agent not initialized");
     this.status = "busy";
     this.toolHookManager.resetForNewMessage();
@@ -525,7 +555,8 @@ Keep the final response concise: summarize what you changed, what you verified, 
     const model = this.modelManager.getModel();
     const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
 
-    let promptContent = content;
+    const uploadedFilesPrefix = formatUploadedFilesForPrompt(options?.files);
+    let promptContent = uploadedFilesPrefix ? `${uploadedFilesPrefix}${content}` : content;
     let imageContent: any[] | undefined;
 
     if (images && images.length > 0) {
@@ -555,12 +586,19 @@ Keep the final response concise: summarize what you changed, what you verified, 
         );
 
         const imageDescription = await this.imageDescriber.describe(images);
-        promptContent = `【图片内容】${imageDescription}\n\n【用户问题】${content}`;
+        promptContent = uploadedFilesPrefix
+          ? `【图片内容】${imageDescription}\n\n${uploadedFilesPrefix}${content}`
+          : `【图片内容】${imageDescription}\n\n【用户问题】${content}`;
       }
     }
 
     logger.info(
-      { contentLength: promptContent.length, imageCount: images?.length || 0, modelSupportsImages },
+      {
+        contentLength: promptContent.length,
+        imageCount: images?.length || 0,
+        fileCount: options?.files?.length || 0,
+        modelSupportsImages,
+      },
       "Pi Agent sending message",
     );
 

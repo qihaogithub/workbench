@@ -22,6 +22,13 @@ import type {
   PrototypeVisualConfigResult,
 } from "@/lib/prototype-visual-editor";
 import { invalidateCompileCache } from "../../../../../../components/demo";
+import {
+  getSelectedImageSource,
+  isProjectLocalImageReference,
+  localizeSelectedImageAsset,
+  type LocalizedImageAsset,
+  type SelectedImageSource,
+} from "../image-localization";
 
 function createVisualId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -95,6 +102,17 @@ export interface VisualPropertySubmission {
   error: string | null;
 }
 
+interface PrototypePropertyApplyStatus {
+  ok: boolean;
+  error?: string;
+}
+
+export interface VisualDraftActionState {
+  count: number;
+  kind: "save" | "send";
+  label: "保存" | "发送给AI";
+}
+
 const EMPTY_VISUAL_PROPERTY_SUBMISSION: VisualPropertySubmission = {
   status: "idle",
   submittedAt: null,
@@ -154,6 +172,111 @@ function formatChangeValue(change: VisualPropertyChange): string {
     return "临时 data URL 预览，正式落地时请保存到项目资源目录";
   }
   return change.value;
+}
+
+const LOCALIZE_IMAGE_INSTRUCTION_PATTERN =
+  /(本地化|本地图片|下载到本地|保存到本地|改为本地|转成本地|不要用远程|不用远程|不要远程|远程\s*URL|remote\s*url|local\s+image)/i;
+
+function shouldLocalizeSelectedImageForInstruction(instruction: string): boolean {
+  return LOCALIZE_IMAGE_INSTRUCTION_PATTERN.test(instruction);
+}
+
+function createLocalizedImageChange(
+  node: VisualNodeInfo,
+  source: SelectedImageSource,
+  asset: LocalizedImageAsset,
+): VisualPropertyChange {
+  return {
+    id: getChangeId(node, "src", "attribute"),
+    nodeId: node.nodeId,
+    domPath: node.domPath,
+    kind: "attribute",
+    property: "src",
+    label: "替换图片",
+    value: asset.relativePathFromPage,
+    previousValue: source.src || source.currentSrc || source.url,
+    resource: {
+      fileName: asset.workspacePath.split("/").pop(),
+      mimeType: asset.mimeType,
+      size: asset.size,
+      url: asset.editPreviewUrl,
+    },
+  };
+}
+
+function upsertVisualPropertyChange(
+  changes: VisualPropertyChange[],
+  change: VisualPropertyChange,
+): VisualPropertyChange[] {
+  const index = changes.findIndex((item) => item.id === change.id);
+  if (index === -1) return [...changes, change];
+  const next = [...changes];
+  next[index] = change;
+  return next;
+}
+
+function formatLocalizedImagePromptContext(
+  source: SelectedImageSource,
+  asset: LocalizedImageAsset,
+): string {
+  return [
+    "【已本地化资源】",
+    "选中图片已在当前编辑会话中保存为项目本地资源：",
+    `- 原始地址：${asset.originalUrl || source.url}`,
+    `- 工作区路径：${asset.workspacePath}`,
+    `- 页面引用路径：${asset.relativePathFromPage}`,
+    `- 预览地址：${asset.editPreviewUrl}`,
+    "请直接把最终选中元素的 src 改为上述页面引用路径；不要再调用 saveImage 下载这个远程 URL。",
+  ].join("\n");
+}
+
+function formatVisualConfigMarkForPrompt(
+  mark: VisualConfigMark,
+  index: number,
+  fallbackReason?: string,
+): string {
+  const reason = fallbackReason ? `，直接写回结果：${fallbackReason}` : "";
+  return `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}${reason}`;
+}
+
+function canDirectApplyPrototypeConfigMark(
+  mark: VisualConfigMark,
+  applyPrototypeVisualConfig: UseVisualEditStateParams["applyPrototypeVisualConfig"],
+): boolean {
+  return mark.scope === "page" && !!createPrototypeConfigTargetFromMark(mark) && !!applyPrototypeVisualConfig;
+}
+
+function resolveVisualDraftActionState(params: {
+  isPrototypePage: boolean;
+  pendingPropertyChanges: VisualPropertyChange[];
+  pendingConfigMarks: VisualConfigMark[];
+  hasPendingInstruction: boolean;
+  canRetrySubmission: boolean;
+  prototypePropertyApplyStatus: Record<string, PrototypePropertyApplyStatus>;
+  applyPrototypeVisualConfig: UseVisualEditStateParams["applyPrototypeVisualConfig"];
+}): VisualDraftActionState | null {
+  const count =
+    params.pendingPropertyChanges.length +
+    params.pendingConfigMarks.length +
+    (params.hasPendingInstruction ? 1 : 0);
+  if (count === 0 && !params.canRetrySubmission) return null;
+
+  const needsAi =
+    params.canRetrySubmission ||
+    params.hasPendingInstruction ||
+    !params.isPrototypePage ||
+    params.pendingPropertyChanges.some(
+      (change) => params.prototypePropertyApplyStatus[change.id]?.ok !== true,
+    ) ||
+    params.pendingConfigMarks.some(
+      (mark) => !canDirectApplyPrototypeConfigMark(mark, params.applyPrototypeVisualConfig),
+    );
+
+  return {
+    count: params.canRetrySubmission && count === 0 ? 1 : count,
+    kind: needsAi ? "send" : "save",
+    label: needsAi ? "发送给AI" : "保存",
+  };
 }
 
 function getChangeSignature(change: VisualPropertyChange): string {
@@ -292,6 +415,7 @@ export interface UseVisualEditStateParams {
   activeDemoIdRef: MutableRefObject<string>;
   sessionId: string;
   activeDemoId: string;
+  runtimeType?: string;
   applyDemoSnapshot: ApplyDemoSnapshotFn;
   markWorkspaceChanged: () => void;
   setConfigDataMap: React.Dispatch<
@@ -320,6 +444,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     activeDemoIdRef,
     sessionId,
     activeDemoId,
+    runtimeType,
     applyDemoSnapshot,
     markWorkspaceChanged,
     setConfigDataMap,
@@ -343,6 +468,10 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     VisualPropertyChange[]
   >([]);
   const [visualConfigMarks, setVisualConfigMarks] = useState<VisualConfigMark[]>([]);
+  const [
+    prototypePropertyApplyStatus,
+    setPrototypePropertyApplyStatus,
+  ] = useState<Record<string, PrototypePropertyApplyStatus>>({});
   const [visualAiInstruction, setVisualAiInstruction] = useState("");
   const [visualPropertySubmission, setVisualPropertySubmission] =
     useState<VisualPropertySubmission>(EMPTY_VISUAL_PROPERTY_SUBMISSION);
@@ -389,6 +518,30 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     [visualConfigMarks, visualPropertySubmission],
   );
   const hasPendingVisualAiInstruction = visualAiInstruction.trim().length > 0;
+  const canRetryVisualPropertySubmission =
+    visualPropertySubmission.status === "failed" &&
+    visualPropertySubmission.prompt.trim().length > 0;
+  const visualDraftAction = useMemo(
+    () =>
+      resolveVisualDraftActionState({
+        isPrototypePage: isPrototypeVisualPage?.() ?? false,
+        pendingPropertyChanges: visualPendingPropertyChanges,
+        pendingConfigMarks: visualPendingConfigMarks,
+        hasPendingInstruction: hasPendingVisualAiInstruction,
+        canRetrySubmission: canRetryVisualPropertySubmission,
+        prototypePropertyApplyStatus,
+        applyPrototypeVisualConfig,
+      }),
+    [
+      applyPrototypeVisualConfig,
+      canRetryVisualPropertySubmission,
+      hasPendingVisualAiInstruction,
+      isPrototypeVisualPage,
+      prototypePropertyApplyStatus,
+      visualPendingConfigMarks,
+      visualPendingPropertyChanges,
+    ],
+  );
 
   const initializeVisualConfigDialog = useCallback(
     (node: VisualNodeInfo, preferredCandidate?: VisualConfigCandidate) => {
@@ -487,7 +640,20 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         return next;
       });
       if (isPrototypeVisualPage?.()) {
-        applyPrototypeVisualPropertyChange?.(node, property, value, kind);
+        const applied = applyPrototypeVisualPropertyChange?.(node, property, value, kind) ?? false;
+        setPrototypePropertyApplyStatus((prev) => ({
+          ...prev,
+          [id]: applied
+            ? { ok: true }
+            : { ok: false, error: "原型页属性无法直接写回，已准备交给 AI 处理" },
+        }));
+      } else {
+        setPrototypePropertyApplyStatus((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
       }
     },
     [applyPrototypeVisualPropertyChange, isPrototypeVisualPage],
@@ -496,6 +662,12 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   const handleRestoreVisualProperty = useCallback((changeId: string) => {
     setVisualPropertyChanges((prev) => prev.filter((item) => item.id !== changeId));
     setVisualConfigMarks((prev) => prev.filter((item) => item.changeId !== changeId));
+    setPrototypePropertyApplyStatus((prev) => {
+      if (!(changeId in prev)) return prev;
+      const next = { ...prev };
+      delete next[changeId];
+      return next;
+    });
   }, []);
 
   const handleClearVisualProperties = useCallback(() => {
@@ -512,6 +684,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
 
     setVisualPropertyChanges([]);
     setVisualConfigMarks([]);
+    setPrototypePropertyApplyStatus({});
     setVisualAiInstruction("");
     setVisualPropertySubmission(EMPTY_VISUAL_PROPERTY_SUBMISSION);
   }, [visualPropertySubmission]);
@@ -581,7 +754,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   }, []);
 
   const handleSendVisualPropertiesToAI = useCallback(
-    (singleChange?: VisualPropertyChange) => {
+    async (singleChange?: VisualPropertyChange) => {
       const retryingFailedSubmission =
         !singleChange &&
         visualPropertySubmission.status === "failed" &&
@@ -609,76 +782,212 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         return;
       }
 
-      if (isPrototypeVisualPage?.()) {
-        if (instructionForPrompt && configMarks.length === 0) {
+      const isPrototypePage = isPrototypeVisualPage?.() ?? false;
+      let effectiveInstructionForPrompt = instructionForPrompt;
+      let changesForSubmission = changes;
+      let localizedImagePromptContext = "";
+      const wantsImageLocalization =
+        !retryingFailedSubmission &&
+        !singleChange &&
+        shouldLocalizeSelectedImageForInstruction(instructionForPrompt);
+
+      if (wantsImageLocalization) {
+        const imageSource = getSelectedImageSource(selectedVisualNode);
+        if (!selectedVisualNode || !imageSource) {
           toast({
-            title: "原型页属性已直接写回",
-            description: "补充说明仍需要切换到 AI 对话处理。",
+            title: "当前选中元素没有图片地址",
+            description: "请先选中预览区中的图片元素，再发送本地化指令。",
+            variant: "destructive",
           });
           return;
         }
 
-        for (const mark of configMarks) {
-          if (mark.scope !== "page") {
-            toast({
-              title: "原型页暂只支持页面级配置项",
-              description: "请把配置项范围切换为页面级后再应用。",
-              variant: "destructive",
+        if (isProjectLocalImageReference(imageSource.url)) {
+          localizedImagePromptContext = [
+            "【已本地化资源】",
+            `当前选中图片已经引用本地资源：${imageSource.url}`,
+            "请不要再下载远程 URL；如果源码仍有远程地址，只把选中元素的 src 改为这个本地路径。",
+          ].join("\n");
+          effectiveInstructionForPrompt = "";
+          if (changes.length === 0 && configMarks.length === 0) {
+            setVisualPropertySubmission({
+              status: "sent",
+              submittedAt: Date.now(),
+              changes: visualPropertyChanges,
+              configMarks: visualConfigMarks,
+              instruction: "",
+              prompt: "",
+              error: null,
             });
+            setVisualAiInstruction("");
+            toast({ title: "当前图片已经是本地资源" });
             return;
           }
-          const target = createPrototypeConfigTargetFromMark(mark);
-          if (!target) {
-            toast({
-              title: "该属性暂不能直接配置化",
-              description: "原型页 MVP 先支持文本、图片和颜色配置项。",
-              variant: "destructive",
+        } else {
+          setVisualPropertySending(true);
+          try {
+            const localized = await localizeSelectedImageAsset({
+              sessionId,
+              selectedNode: selectedVisualNode,
+              pageId: activeDemoIdRef.current,
+              runtimeType,
             });
-            return;
-          }
-          if (!applyPrototypeVisualConfig) {
-            toast({
-              title: "原型页配置写回入口不可用",
-              variant: "destructive",
+            const localizedChange = createLocalizedImageChange(
+              selectedVisualNode,
+              imageSource,
+              localized,
+            );
+            localizedImagePromptContext = formatLocalizedImagePromptContext(
+              imageSource,
+              localized,
+            );
+
+            if (
+              isPrototypePage &&
+              applyPrototypeVisualPropertyChange?.(
+                selectedVisualNode,
+                "src",
+                localized.relativePathFromPage,
+                "attribute",
+              )
+            ) {
+              changesForSubmission = upsertVisualPropertyChange(
+                changesForSubmission,
+                localizedChange,
+              );
+              setPrototypePropertyApplyStatus((prev) => ({
+                ...prev,
+                [localizedChange.id]: { ok: true },
+              }));
+              setVisualPropertyChanges((prev) =>
+                upsertVisualPropertyChange(prev, localizedChange),
+              );
+              effectiveInstructionForPrompt = "";
+              setVisualPropertySending(false);
+              toast({ title: "图片已保存为本地资源" });
+            } else {
+              changesForSubmission = upsertVisualPropertyChange(
+                changesForSubmission,
+                localizedChange,
+              );
+              effectiveInstructionForPrompt =
+                "把选中图片 src 改为已本地化资源的页面引用路径。";
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "无法本地化当前图片，需要上传原图";
+            setVisualPropertySubmission({
+              status: "failed",
+              submittedAt: Date.now(),
+              changes: visualPropertyChanges,
+              configMarks: visualConfigMarks,
+              instruction: instructionForPrompt,
+              prompt: "",
+              error: message,
             });
-            return;
-          }
-          const result = applyPrototypeVisualConfig({
-            node: {
-              nodeId: mark.nodeId,
-              domPath: mark.domPath,
-              tagName: "div",
-              rect: { x: 0, y: 0, width: 0, height: 0 },
-              editCapabilities: [],
-            },
-            target,
-          });
-          if (!result.ok) {
+            setVisualPropertySending(false);
             toast({
-              title: "配置项写回失败",
-              description: result.error,
+              title: "图片本地化失败",
+              description: message,
               variant: "destructive",
             });
             return;
           }
         }
+      }
 
-        setVisualPropertySubmission({
-          status: "sent",
-          submittedAt: Date.now(),
-          changes: singleChange
-            ? mergeSubmittedChanges(visualPropertySubmission.changes, changes)
-            : visualPropertyChanges,
-          configMarks: visualConfigMarks,
-          instruction: "",
-          prompt: "",
-          error: null,
+      const fallbackReasonsByChangeId = new Map<string, string>();
+      const fallbackReasonsByMarkId = new Map<string, string>();
+      let changesForAi = changesForSubmission;
+      let configMarksForAi = configMarks;
+      const directAppliedChangeLines: string[] = [];
+      const directAppliedConfigLines: string[] = [];
+      const directConfigPatch: Record<string, unknown> = {};
+
+      if (isPrototypePage) {
+        changesForAi = changesForSubmission.filter((change) => {
+          const status = prototypePropertyApplyStatus[change.id];
+          if (status?.ok) {
+            directAppliedChangeLines.push(
+              `${directAppliedChangeLines.length + 1}. ${change.label}（${change.kind}:${change.property}）已直接写回原型 HTML，值：${formatChangeValue(change)}`,
+            );
+            return false;
+          }
+          fallbackReasonsByChangeId.set(
+            change.id,
+            status?.error || "原型页属性没有可确认的直接写回结果",
+          );
+          return true;
         });
-        setVisualAiInstruction("");
-        toast({
-          title: configMarks.length > 0 ? "配置项已应用到原型页" : "属性已应用到原型页",
-        });
-        return;
+
+        const fallbackMarks: VisualConfigMark[] = [];
+        for (const mark of configMarks) {
+          const target = createPrototypeConfigTargetFromMark(mark);
+          let fallbackReason: string | null = null;
+          if (mark.scope !== "page") {
+            fallbackReason = "原型页直接写回暂不支持项目级配置项";
+          } else if (!target) {
+            fallbackReason = "原型页直接写回只支持文本、图片和颜色配置项";
+          } else if (!applyPrototypeVisualConfig) {
+            fallbackReason = "原型页配置写回入口不可用";
+          } else {
+            const result = applyPrototypeVisualConfig({
+              node: {
+                nodeId: mark.nodeId,
+                domPath: mark.domPath,
+                tagName: "div",
+                rect: { x: 0, y: 0, width: 0, height: 0 },
+                editCapabilities: [],
+              },
+              target,
+            });
+            if (result.ok) {
+              Object.assign(directConfigPatch, result.configPatch);
+              directAppliedConfigLines.push(
+                `${directAppliedConfigLines.length + 1}. ${mark.label} -> 页面级配置项 ${mark.fieldKey} 已直接写入 prototype.html 与 config.schema.json`,
+              );
+              continue;
+            }
+            fallbackReason = result.error;
+          }
+
+          fallbackMarks.push(mark);
+          fallbackReasonsByMarkId.set(mark.id, fallbackReason);
+        }
+        configMarksForAi = fallbackMarks;
+
+        if (Object.keys(directConfigPatch).length > 0) {
+          setConfigDataMap((prev) => {
+            const pageId = activeDemoIdRef.current;
+            return {
+              ...prev,
+              [pageId]: {
+                ...(prev[pageId] ?? {}),
+                ...directConfigPatch,
+              },
+            };
+          });
+        }
+
+        if (
+          changesForAi.length === 0 &&
+          configMarksForAi.length === 0 &&
+          !effectiveInstructionForPrompt
+        ) {
+          setVisualPropertySubmission({
+            status: "sent",
+            submittedAt: Date.now(),
+            changes: singleChange
+              ? mergeSubmittedChanges(visualPropertySubmission.changes, changesForSubmission)
+              : changesForSubmission,
+            configMarks: visualConfigMarks,
+            instruction: "",
+            prompt: "",
+            error: null,
+          });
+          setVisualAiInstruction("");
+          return;
+        }
       }
 
       setVisualPropertySending(true);
@@ -688,26 +997,53 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
           ? getNodeSummary(selectedVisualNode)
           : "无";
       const changeContext =
-        changes.length > 0
-          ? changes
+        changesForAi.length > 0
+          ? changesForAi
               .map(
                 (change, index) =>
-                  `${index + 1}. ${change.label}（${change.kind}:${change.property}）：${change.previousValue ?? "未设置"} -> ${formatChangeValue(change)}`,
+                  `${index + 1}. ${change.label}（${change.kind}:${change.property}）：${change.previousValue ?? "未设置"} -> ${formatChangeValue(change)}${fallbackReasonsByChangeId.has(change.id) ? `；直接写回结果：${fallbackReasonsByChangeId.get(change.id)}` : ""}`,
               )
               .join("\n")
-          : "无明确属性变更";
+        : "无明确属性变更";
       const configContext =
-        configMarks.length > 0
-          ? configMarks
-              .map(
-                (mark, index) =>
-                  `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}`,
+        configMarksForAi.length > 0
+          ? configMarksForAi
+              .map((mark, index) =>
+                formatVisualConfigMarkForPrompt(
+                  mark,
+                  index,
+                  fallbackReasonsByMarkId.get(mark.id),
+                ),
               )
               .join("\n")
           : "无";
+      const directApplyContext =
+        isPrototypePage &&
+        (directAppliedChangeLines.length > 0 || directAppliedConfigLines.length > 0)
+          ? [
+              "【已直接写回的原型页变更】",
+              directAppliedChangeLines.length > 0
+                ? ["属性变更：", ...directAppliedChangeLines].join("\n")
+                : "",
+              directAppliedConfigLines.length > 0
+                ? ["配置项：", ...directAppliedConfigLines].join("\n")
+                : "",
+              "请不要重复改写上述已落盘内容，只处理下面仍需 AI 处理的部分。",
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+          : "";
+      const pageFileHint = isPrototypePage
+        ? `页面运行时：HTML/CSS 原型页
+主要文件：demos/${activeDemoIdRef.current}/prototype.html、prototype.css、config.schema.json`
+        : `页面文件：demos/${activeDemoIdRef.current}/index.tsx`;
       const prompt = `请根据右侧属性面板中的结构化变更修改当前页面。
 
-页面文件：demos/${activeDemoIdRef.current}/index.tsx
+${pageFileHint}
+
+${directApplyContext}
+
+${localizedImagePromptContext}
 
 【点击位置图层】
 ${stackContext}
@@ -722,7 +1058,7 @@ ${changeContext}
 ${configContext}
 
 【补充说明】
-${instructionForPrompt || "无"}
+${effectiveInstructionForPrompt || "无"}
 
 请优先只修改当前页面相关代码。临时预览已经在 iframe 中验证，但不要把它视为已写回源码；如果新增配置项，请同步处理页面 Schema、默认值和预览数据。`;
 
@@ -734,14 +1070,14 @@ ${instructionForPrompt || "无"}
         changes: retryingFailedSubmission
           ? previous.changes
           : singleChange
-            ? mergeSubmittedChanges(previous.changes, changes)
-            : visualPropertyChanges,
+            ? mergeSubmittedChanges(previous.changes, changesForSubmission)
+            : changesForSubmission,
         configMarks: retryingFailedSubmission
           ? previous.configMarks
           : singleChange
             ? mergeSubmittedConfigMarks(previous.configMarks, configMarks)
             : visualConfigMarks,
-        instruction: instructionForPrompt,
+        instruction: effectiveInstructionForPrompt,
         prompt,
         error: null,
       }));
@@ -751,8 +1087,13 @@ ${instructionForPrompt || "无"}
     [
       activeDemoIdRef,
       applyPrototypeVisualConfig,
+      applyPrototypeVisualPropertyChange,
       isPrototypeVisualPage,
+      prototypePropertyApplyStatus,
+      runtimeType,
       selectedVisualNode,
+      sessionId,
+      setConfigDataMap,
       setTabValue,
       setTriggerAutoSend,
       toast,
@@ -834,18 +1175,19 @@ ${instructionForPrompt || "无"}
 
     setVisualConfigApplying(true);
     setVisualConfigError(null);
+    const target = {
+      kind: selectedVisualConfigCandidate.kind,
+      fieldKey: visualConfigFieldKey.trim(),
+      title: visualConfigTitle.trim(),
+      defaultValue: visualConfigDefaultValue,
+      category: visualConfigCategory.trim(),
+      colorProperty: selectedVisualConfigCandidate.colorProperty,
+    };
     try {
       if (isPrototypeVisualPage?.() && applyPrototypeVisualConfig) {
         const data = applyPrototypeVisualConfig({
           node: visualConfigNode,
-          target: {
-            kind: selectedVisualConfigCandidate.kind,
-            fieldKey: visualConfigFieldKey.trim(),
-            title: visualConfigTitle.trim(),
-            defaultValue: visualConfigDefaultValue,
-            category: visualConfigCategory.trim(),
-            colorProperty: selectedVisualConfigCandidate.colorProperty,
-          },
+          target,
         });
         if (!data.ok) {
           throw new Error(data.error);
@@ -876,14 +1218,7 @@ ${instructionForPrompt || "无"}
           projectConfigSchema,
           demoId: activeDemoIdRef.current,
           node: visualConfigNode,
-          target: {
-            kind: selectedVisualConfigCandidate.kind,
-            fieldKey: visualConfigFieldKey.trim(),
-            title: visualConfigTitle.trim(),
-            defaultValue: visualConfigDefaultValue,
-            category: visualConfigCategory.trim(),
-            colorProperty: selectedVisualConfigCandidate.colorProperty,
-          },
+          target,
         }),
       });
       const data = (await response.json()) as
@@ -921,12 +1256,34 @@ ${instructionForPrompt || "无"}
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "添加配置项失败";
-      setVisualConfigError(message);
-      toast({
-        title: "无法添加配置项",
-        description: message,
-        variant: "destructive",
-      });
+      const runtimeHint = isPrototypeVisualPage?.()
+        ? `页面运行时：HTML/CSS 原型页
+主要文件：demos/${activeDemoIdRef.current}/prototype.html、prototype.css、config.schema.json`
+        : `页面文件：demos/${activeDemoIdRef.current}/index.tsx`;
+      const prompt = `请为当前选中元素添加配置项。直接写回已尝试但未成功，请根据失败原因改写当前页面。
+
+${runtimeHint}
+
+【选中元素】
+${getNodeSummary(visualConfigNode)}
+
+【配置项】
+- 类型：${target.kind}
+- 字段标题：${target.title}
+- 字段 key：${target.fieldKey}
+- 默认值：${target.defaultValue}
+- 分类：${target.category || "未设置"}
+${target.colorProperty ? `- 颜色属性：${target.colorProperty}` : ""}
+
+【直接写回失败原因】
+${message}
+
+请同步处理页面源码、页面 Schema 和默认配置数据；如果字段应改为项目级共享配置，请明确维护项目级 Schema 与当前页面消费方式。`;
+      setTabValue("ai");
+      setTriggerAutoSend(prompt);
+      setVisualConfigError(`已交给 AI 处理：${message}`);
+      setVisualConfigNode(null);
+      setSelectedVisualNode(null);
     } finally {
       setVisualConfigApplying(false);
     }
@@ -939,6 +1296,8 @@ ${instructionForPrompt || "无"}
     markWorkspaceChanged,
     projectConfigSchema,
     selectedVisualConfigCandidate,
+    setTabValue,
+    setTriggerAutoSend,
     toast,
     visualConfigCategory,
     visualConfigDefaultValue,
@@ -1196,6 +1555,8 @@ ${context}
     visualPendingPropertyChanges,
     visualPendingConfigMarks,
     hasPendingVisualAiInstruction,
+    canRetryVisualPropertySubmission,
+    visualDraftAction,
     visualPropertySending,
     setVisualPropertySending,
     visualAnnotations,

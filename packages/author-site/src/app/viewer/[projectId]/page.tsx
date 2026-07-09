@@ -34,6 +34,7 @@ interface ViewerData {
   project: { id: string; name: string; description?: string } | null;
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
 }
 
@@ -124,14 +125,18 @@ export default function ViewerProjectPage() {
   }
 
   const getSafeMergedDefaults = useCallback(
-    (projectSchema: string | undefined, pageSchema: string) => {
+    (
+      projectSchema: string | undefined,
+      pageSchema: string,
+      projectValues?: Record<string, unknown>,
+    ) => {
       try {
-        if (projectSchema) {
-          return mergeConfigToProps(projectSchema, pageSchema);
-        }
-        return getDefaultValues(pageSchema);
+        const defaults = projectSchema
+          ? mergeConfigToProps(projectSchema, pageSchema)
+          : getDefaultValues(pageSchema);
+        return { ...defaults, ...projectValues };
       } catch {
-        return getDefaultValues(pageSchema);
+        return { ...getDefaultValues(pageSchema), ...projectValues };
       }
     },
     []
@@ -179,7 +184,8 @@ export default function ViewerProjectPage() {
             if (p.schema) {
               initialConfigDataMap[p.id] = getSafeMergedDefaults(
                 result.data.projectConfigSchema,
-                p.schema
+                p.schema,
+                result.data.projectConfigValues,
               );
             }
           }
@@ -303,7 +309,11 @@ export default function ViewerProjectPage() {
       postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
       const page = data.demoPages.find((p) => p.id === pageId);
       if (page?.schema) {
-        const defaults = getSafeMergedDefaults(data.projectConfigSchema, page.schema);
+        const defaults = getSafeMergedDefaults(
+          data.projectConfigSchema,
+          page.schema,
+          data.projectConfigValues,
+        );
         setConfigData(defaults);
         setConfigDataMap((prev) => {
           if (prev[pageId]) return prev;

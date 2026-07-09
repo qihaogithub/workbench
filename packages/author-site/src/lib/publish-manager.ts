@@ -9,6 +9,7 @@ import {
   listDemoPages,
   getDemoDirPath,
   getProjectConfigSchema,
+  getProjectConfigValues,
   getProjectPath,
   projectExists,
   getDataDir,
@@ -103,6 +104,7 @@ export interface PublishedProject {
   demoFolders: DemoFolderMeta[];
   appGraph?: AppGraph;
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
   previewRuntime?: {
     version: string;
@@ -159,6 +161,35 @@ function copyPreviewRuntimeForPublish(projectId: string, publishDir: string): st
     force: true,
   });
   return runtimeBasePath;
+}
+
+function replaceConfigValueAssetUrls(
+  value: unknown,
+  urlMap: Map<string, string>,
+): unknown {
+  if (typeof value === "string") {
+    return urlMap.get(value) ?? value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceConfigValueAssetUrls(item, urlMap));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        replaceConfigValueAssetUrls(item, urlMap),
+      ]),
+    );
+  }
+  return value;
+}
+
+function normalizePublishedConfigValues(
+  values: Record<string, unknown> | undefined,
+  urlMap: Map<string, string>,
+): Record<string, unknown> {
+  if (!values) return {};
+  return replaceConfigValueAssetUrls(values, urlMap) as Record<string, unknown>;
 }
 
 function normalizeScreenshotHash(hash?: string | null): string | null {
@@ -289,9 +320,13 @@ export async function publishProject(
   const publishedDemoPages: PublishedDemoPage[] = [];
 
   const projectConfigSchema = getProjectConfigSchema(workspacePath);
-  const projectConfigData = projectConfigSchema
+  const projectConfigDefaults = projectConfigSchema
     ? extractSchemaDefaults(projectConfigSchema)
     : {};
+  const projectConfigValues = normalizePublishedConfigValues(
+    getProjectConfigValues(workspacePath),
+    urlMap,
+  );
   const canvasState = readCanvasStateFromWorkspace(workspacePath);
   const appGraph = readAppGraph(workspacePath);
 
@@ -448,7 +483,11 @@ export async function publishProject(
       replacedCode,
     );
 
-    const mergedConfigData = { ...projectConfigData, ...pageConfigData };
+    const mergedConfigData = {
+      ...projectConfigDefaults,
+      ...pageConfigData,
+      ...projectConfigValues,
+    };
 
     const compiledJsPath = `demos/${page.id}/compiled.js`;
     const compiledJsUrlPath = `${compiledJsPath}?${assetCacheBustParam}`;
@@ -495,6 +534,12 @@ export async function publishProject(
     fs.writeFileSync(
       path.join(publishedProjectDir, "config-schema.json"),
       projectConfigSchema,
+    );
+  }
+  if (Object.keys(projectConfigValues).length > 0) {
+    fs.writeFileSync(
+      path.join(publishedProjectDir, "config-values.json"),
+      JSON.stringify(projectConfigValues, null, 2),
     );
   }
 
@@ -561,6 +606,10 @@ export async function publishProject(
     demoFolders: project.demoFolders,
     appGraph,
     projectConfigSchema: projectConfigSchema ?? undefined,
+    projectConfigValues:
+      Object.keys(projectConfigValues).length > 0
+        ? projectConfigValues
+        : undefined,
     canvasState,
     previewRuntime: {
       version: PREVIEW_RUNTIME_MANIFEST_VERSION,

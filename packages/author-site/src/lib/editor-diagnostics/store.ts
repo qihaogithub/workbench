@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 
 import Database from "better-sqlite3";
 
@@ -9,6 +10,7 @@ import {
   type EditorDiagnosticEvent,
   type EditorDiagnosticExport,
   type NormalizedEditorDiagnosticEvent,
+  createEditorDiagnosticEvent,
   isValidEditorSessionId,
   normalizeEditorDiagnosticEvent,
   sanitizeDiagnosticEvent,
@@ -92,6 +94,7 @@ function ensureDiagnosticsDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_editor_events_operation ON editor_events(operation_id, ts);
     CREATE INDEX IF NOT EXISTS idx_editor_events_workspace ON editor_events(workspace_id, ts);
     CREATE INDEX IF NOT EXISTS idx_editor_events_type_ts ON editor_events(event_type, ts);
+    CREATE INDEX IF NOT EXISTS idx_editor_events_group_ts ON editor_events(event_group, ts);
   `);
   return db;
 }
@@ -275,6 +278,53 @@ export async function appendEditorDiagnosticEvents(
       warnings,
     },
   };
+}
+
+export function appendServerEditorDiagnosticEvent(
+  input: Omit<NormalizedEditorDiagnosticEvent, "id" | "schemaVersion" | "ts" | "source" | "payload"> & {
+    id?: string;
+    ts?: string;
+    payload?: Record<string, unknown>;
+  },
+): {
+  sqliteWritten: number;
+  diagnostics: EditorDiagnosticExport["diagnostics"];
+} {
+  const event = createEditorDiagnosticEvent({
+    ...input,
+    id: input.id ?? `evt-${randomUUID()}`,
+    source: "author-api",
+  });
+  const warnings: string[] = [];
+  try {
+    const sqliteWritten = insertSqliteEvents([event]);
+    return {
+      sqliteWritten,
+      diagnostics: {
+        sqliteUsed: true,
+        jsonlFallbackUsed: false,
+        dbUnavailable: false,
+        eventGapDetected: false,
+        warnings,
+      },
+    };
+  } catch (error) {
+    warnings.push(
+      `SQLite 事件库写入失败: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return {
+      sqliteWritten: 0,
+      diagnostics: {
+        sqliteUsed: false,
+        jsonlFallbackUsed: false,
+        dbUnavailable: true,
+        eventGapDetected: true,
+        warnings,
+      },
+    };
+  }
 }
 
 export async function readEditorDiagnosticEvents(

@@ -129,11 +129,13 @@ export type PageSnapshotInput =
  *
  * - demos: demoId -> 单页 { code, schema } 对
  * - projectConfigSchema: workspace/project.config.schema.json 内容（不存在时为 undefined）
+ * - projectConfigValues: workspace/project.config.values.json 内容（不存在时为 undefined）
  *   是否存在项目级配置由该字段是否为 undefined 判定，不引入额外标记字段。
  */
 export interface MultiDemoFiles {
   demos: Record<string, DemoFiles>;
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
 }
 
 /**

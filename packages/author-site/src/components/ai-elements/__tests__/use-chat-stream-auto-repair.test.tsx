@@ -24,7 +24,14 @@ jest.mock("../chat/services/stream-service", () => {
 
   class StreamService {
     private handlers: {
-      onFinish?: (result: { content: string; files?: [] }) => Promise<void>;
+      onFinish?: (result: {
+        content: string;
+        files?: Array<{
+          path: string;
+          action: "created" | "modified" | "deleted";
+          content?: string;
+        }>;
+      }) => Promise<void>;
     } = {};
 
     connect = jest.fn().mockResolvedValue({});
@@ -36,7 +43,16 @@ jest.mock("../chat/services/stream-service", () => {
       this.handlers = handlers;
     });
     sendMessage = mockSendMessage.mockImplementation(async (message: string) => {
-      await this.handlers.onFinish?.({ content: `已处理: ${message}`, files: [] });
+      const files = message.includes("触发文件回调异常")
+        ? [
+            {
+              path: "demos/demo_omrf/prototype.html",
+              action: "modified" as const,
+              content: "<main>updated</main>",
+            },
+          ]
+        : [];
+      await this.handlers.onFinish?.({ content: `已处理: ${message}`, files });
     });
   }
 
@@ -648,6 +664,102 @@ describe("useChatStream 自动修复发送", () => {
     await waitFor(() => {
       expect(setIsStreaming).toHaveBeenCalledWith(false);
     });
+  });
+
+  it("流式回复完成后的持久化失败不会卡住发送状态", async () => {
+    (persistMessages as jest.Mock).mockRejectedValueOnce(new Error("写入失败"));
+    const messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setIsStreaming = jest.fn();
+    const onDiagnosticEvent = jest.fn();
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming,
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+        onDiagnosticEvent,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("测试完成收尾失败状态");
+    });
+
+    await waitFor(() => {
+      expect(setIsStreaming).toHaveBeenCalledWith(false);
+    });
+    expect(onDiagnosticEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "ai.stream_finish_finalization_failed",
+        level: "warn",
+      }),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it("流式回复完成后的文件回调失败不会卡住发送状态", async () => {
+    const messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setIsStreaming = jest.fn();
+    const onDiagnosticEvent = jest.fn();
+    const onFilesChange = jest.fn(() => {
+      throw new Error("文件回调失败");
+    });
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        workingDir: "/tmp/workspace",
+        messagesRef,
+        setMessages: jest.fn(),
+        setIsStreaming,
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+        onFilesChange,
+        onDiagnosticEvent,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("触发文件回调异常");
+    });
+
+    await waitFor(() => {
+      expect(setIsStreaming).toHaveBeenCalledWith(false);
+    });
+    expect(onFilesChange).toHaveBeenCalledWith([
+      {
+        path: "demos/demo_omrf/prototype.html",
+        action: "modified",
+        content: "<main>updated</main>",
+      },
+    ]);
+    expect(onDiagnosticEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "ai.stream_finish_finalization_failed",
+        level: "warn",
+      }),
+    );
+
+    warnSpy.mockRestore();
   });
 
   it("取消当前回复时清空正在展示的计划", () => {

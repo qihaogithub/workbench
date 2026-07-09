@@ -137,6 +137,7 @@ export interface ProjectDetail {
   folders: DemoFolderMeta[];
   versions: VersionInfo[];
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   locked?: boolean;
 }
 
@@ -261,6 +262,7 @@ export interface ProjectPackageExport {
   folders: DemoFolderMeta[];
   versions: VersionInfo[];
   projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
   appGraph?: AppGraph;
   assets: ExportedAsset[];
   knowledgeFiles: ExportedKnowledgeFile[];
@@ -322,10 +324,27 @@ export interface PublishStatus {
   };
 }
 
+export type AssetSourceType =
+  | "browser_blob"
+  | "upload"
+  | "session_asset"
+  | "workspace_asset"
+  | "r2_worker"
+  | "remote_url";
+
+export type AssetCreatedBy = "user" | "ai" | "figma" | "system";
+
 export interface AssetSummary {
   path: string;
   size: number;
   references: string[];
+  assetId?: string;
+  contentHash?: string;
+  mimeType?: string;
+  originalUrl?: string;
+  sourceType?: AssetSourceType;
+  createdBy?: AssetCreatedBy;
+  createdAt?: number;
 }
 
 export interface AssetUploadInput {
@@ -334,6 +353,9 @@ export interface AssetUploadInput {
   dataBase64: string;
   mimeType?: string;
   targetPath?: string;
+  originalUrl?: string;
+  sourceType?: AssetSourceType;
+  createdBy?: AssetCreatedBy;
   dryRun?: boolean;
 }
 

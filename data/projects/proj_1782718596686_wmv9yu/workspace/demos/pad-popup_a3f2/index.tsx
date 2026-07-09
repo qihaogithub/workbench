@@ -30,26 +30,37 @@ export default function PadPopup(props: DemoProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
       style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       <div
-        className="relative flex h-screen w-screen flex-col items-center justify-center"
         style={{
+          position: 'relative',
+          display: 'flex',
+          height: '100vh',
+          width: '100vw',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           backgroundImage: 'url(https://uiweb.oss-cn-chengdu.aliyuncs.com/img/%E9%80%9A%E7%94%A8%E5%B9%BF%E5%91%8A%E5%BC%B9%E7%AA%97/%E9%A6%96%E9%A1%B5-pad.webp)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
         }}
       >
-        <div className="absolute inset-0 bg-black/70" />
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)' }} />
 
-        <div className="relative z-10 w-full max-w-[26em] px-8">
-          <div className="relative">
-            <div className="absolute z-20 cursor-pointer" style={{ top: '-46px', right: 0 }}>
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '26em', paddingLeft: '2rem', paddingRight: '2rem', boxSizing: 'border-box' }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', zIndex: 20, cursor: 'pointer', top: '-46px', right: 0 }}>
               <svg width="36" height="36" viewBox="0 0 42 42" fill="none">
                 <rect width="42" height="42" fill="black" fillOpacity="0.01" />
                 <circle cx="21" cy="21.0002" r="18.0955" stroke="white" strokeWidth="1.26847" strokeLinecap="round" strokeLinejoin="round" />
@@ -60,11 +71,10 @@ export default function PadPopup(props: DemoProps) {
             {showSvga ? (
               <SvgaPlayer
                 src={svgaSrc}
-                className="block w-full"
-                style={{ aspectRatio: '670 / 780' }}
+                style={{ display: 'block', width: '100%', aspectRatio: '670 / 780' }}
               />
             ) : (
-              <img src={modalImage} alt="popup" className="block h-auto w-full" />
+              <img src={modalImage} alt="popup" style={{ display: 'block', height: 'auto', width: '100%' }} />
             )}
           </div>
         </div>

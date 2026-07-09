@@ -1,4 +1,4 @@
-import {jsxs as _jsxs, jsx as _jsx} from "http://0.0.0.0:3200/preview-runtime/vendor/react-jsx-runtime.js";
+import {jsxs as _jsxs, jsx as _jsx} from "http://localhost:3200/preview-runtime/vendor/react-jsx-runtime.js";
 
 
 

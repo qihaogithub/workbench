@@ -18,6 +18,7 @@ import {
   X,
   MessageSquareText,
   Wrench,
+  FileText,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,13 @@ import { Streamdown } from "streamdown";
 import { Tool } from "./tool";
 import { Reasoning } from "./reasoning";
 import { AssistantMessage } from "./assistant-message";
+
+function formatFileSize(bytes?: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /**
  * MessagePart 类型定义
@@ -92,6 +100,9 @@ export type MessagePart =
       name: string;
       url: string;
       size?: number;
+      attachmentId?: string;
+      mimeType?: string;
+      textExtracted?: boolean;
     };
 
 export interface ChatMessage {
@@ -296,6 +307,10 @@ export function Message({
       (p): p is Extract<MessagePart, { type: "image" }> =>
         p.type === "image",
     );
+    const userFileParts = (message.parts || []).filter(
+      (p): p is Extract<MessagePart, { type: "file" }> =>
+        p.type === "file",
+    );
 
     return (
       <div className={cn("flex flex-col gap-2 group items-end min-w-0", className)}>
@@ -308,6 +323,26 @@ export function Message({
                 alt={part.alt || "用户上传图片"}
                 className="max-w-[200px] max-h-[200px] rounded-lg object-cover border border-border/50"
               />
+            ))}
+          </div>
+        )}
+        {userFileParts.length > 0 && (
+          <div className="flex max-w-[80%] flex-col gap-2">
+            {userFileParts.map((part, i) => (
+              <div
+                key={`user-file-${i}`}
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted px-3 py-2 text-sm text-foreground"
+              >
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{part.name}</p>
+                  {part.size && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(part.size)}
+                    </p>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}

@@ -17,6 +17,9 @@ jest.mock("@/lib/fs-utils", () => ({
     success: true,
     data,
   })),
+  findWorkspacePath: jest.fn(() => "/tmp/live-workspace"),
+  getProjectConfigValues: jest.fn(() => undefined),
+  getProjectPath: jest.fn(() => "/tmp/project"),
   getWorkspaceMeta: jest.fn(() => ({
     workspaceId: "workspace-1",
     demoId: "project-1",
@@ -32,6 +35,7 @@ jest.mock("@/lib/fs-utils", () => ({
     canonicalSyncedWorkspaceId: undefined,
     canonicalSyncedAt: undefined,
   })),
+  saveProjectConfigValues: jest.fn(),
 }));
 
 jest.mock("@/lib/session-manager", () => ({
@@ -184,5 +188,32 @@ describe("project publish route", () => {
     expect(sessionManager.createEditSession).not.toHaveBeenCalled();
     expect(workspaceFlush.flushAndSyncProjectWorkspace).not.toHaveBeenCalled();
     expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
+  });
+
+  it("发布前应将 live workspace 的非空共享配置运行值补写到 canonical workspace", async () => {
+    const fsUtils = await import("@/lib/fs-utils");
+    const liveValues = {
+      modalImage: "/api/sessions/session-1/assets/popup.png",
+    };
+    (
+      fsUtils.getProjectConfigValues as jest.MockedFunction<
+        typeof fsUtils.getProjectConfigValues
+      >
+    ).mockImplementation((workspacePath: string) =>
+      workspacePath === "/tmp/live-workspace" ? liveValues : undefined,
+    );
+
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      jsonRequest({ sessionId: "session-missing", workspaceId: "workspace-1" }),
+      { params: { projectId: "project-1" } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fsUtils.saveProjectConfigValues).toHaveBeenCalledWith(
+      "/tmp/project/workspace",
+      liveValues,
+    );
   });
 });

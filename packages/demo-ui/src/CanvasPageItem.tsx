@@ -371,6 +371,9 @@ export function CanvasPagePreviewContent({
             fillContainer
             containerSizeOverride={containerSizeOverride}
             sandbox="allow-scripts"
+            configData={page.configData}
+            sessionId={sessionId}
+            demoId={page.id}
             onLoad={handleIframeContentLoaded}
           />
         </div>

@@ -249,6 +249,13 @@ corepack pnpm diagnostics:preview -- --project "project-1"
 
 # 导出 JSON 复现包
 corepack pnpm diagnostics:export -- --project "project-1" --since 24h --output diagnostics-export.json
+
+# 查询正式环境（密码只通过环境变量传入，不写入命令或仓库）
+OPS_CLI_REMOTE_PASSWORD="***" corepack pnpm diagnostics:autosave -- \
+  --remote-host 10.130.33.131 \
+  --remote-user qihao \
+  --project "project-1" \
+  --since 24h
 ```
 
 根目录提供稳定别名：
@@ -259,9 +266,19 @@ corepack pnpm diagnostics:trace -- --trace "trace-1"
 corepack pnpm diagnostics:export -- --project "project-1" --since 24h
 ```
 
-默认输出 JSON；人工查看可加 `--format text` 输出简短时间线。
+远程查询参数：
+
+- `--remote-host <host>`：通过 SSH 拉取远程诊断数据快照后在本地解析。
+- `--remote-user <user>` / `--remote-port <port>`：SSH 用户和端口。
+- `--remote-data-dir <dir>`：远程 `data` 目录；未指定时依次探测 `$DATA_DIR`、`/opt/opencode-workbench/data`、`/opt/workbench/data`、`/app/data` 和 `/data`。
+- `--remote-password-env <name>`：读取 SSH 密码的环境变量名，默认 `OPS_CLI_REMOTE_PASSWORD`。如果没有密码环境变量，会尝试普通 SSH key 登录。
+
+远程模式只读取 `diagnostics/editor-events.db*`、`editor-diagnostics/` 和 `agent-run-logs/`，不会修改生产数据。
+
+默认输出 JSON；人工查看可加 `--format text` 输出简短时间线。失败事件会额外显示 `workspace`、`page`、`phase`、`code` 和 `status`，便于直接判断同步失败边界。
 
 SQLite 是诊断主账本。JSONL 只在 SQLite 不可用、无匹配主事件或导出 fallback/spool 片段时读取；输出中的 `jsonlFallbackUsed` 会明确标记该情况。
+`diagnostics:autosave`、`diagnostics:collab` 和 `diagnostics:preview` 在 SQLite 与 JSONL 兜底路径都会按事件组过滤，避免高频协同状态快照淹没专项时间线。
 
 **输出示例:**
 ```

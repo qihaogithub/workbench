@@ -1973,7 +1973,8 @@ export function getWorkspaceMultiDemoFiles(
   }
 
   const projectConfigSchema = getProjectConfigSchema(wsPath);
-  return { demos, projectConfigSchema };
+  const projectConfigValues = getProjectConfigValues(wsPath);
+  return { demos, projectConfigSchema, projectConfigValues };
 }
 
 /**
@@ -2358,9 +2359,14 @@ export function listWorkspaceDemoPages(workspaceId: string): DemoPageMeta[] {
 // ============================================================
 
 const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
+const PROJECT_CONFIG_VALUES_FILENAME = "project.config.values.json";
 
 export function getProjectConfigPath(workspacePath: string): string {
   return path.join(workspacePath, PROJECT_CONFIG_FILENAME);
+}
+
+export function getProjectConfigValuesPath(workspacePath: string): string {
+  return path.join(workspacePath, PROJECT_CONFIG_VALUES_FILENAME);
 }
 
 /**
@@ -2385,6 +2391,37 @@ export function saveProjectConfigSchema(
     fs.mkdirSync(workspacePath, { recursive: true });
   }
   fs.writeFileSync(getProjectConfigPath(workspacePath), schema, "utf-8");
+}
+
+function isPlainConfigObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function getProjectConfigValues(
+  workspacePath: string,
+): Record<string, unknown> | undefined {
+  const filePath = getProjectConfigValuesPath(workspacePath);
+  if (!fs.existsSync(filePath)) return undefined;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
+    return isPlainConfigObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveProjectConfigValues(
+  workspacePath: string,
+  values: Record<string, unknown>,
+): void {
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
+  }
+  fs.writeFileSync(
+    getProjectConfigValuesPath(workspacePath),
+    JSON.stringify(values, null, 2),
+    "utf-8",
+  );
 }
 
 /**

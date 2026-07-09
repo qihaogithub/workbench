@@ -1,5 +1,6 @@
 import {
   AgentStream,
+  type FileAttachment,
   type StreamEvent,
   type ImageAttachment,
 } from "@workbench/agent-client";
@@ -172,9 +173,13 @@ export class StreamService {
   private currentSessionId: string = "";
   private handlers: StreamEventHandlers = {};
   private connectionEstablished = false;
+  private finishDelivered = false;
+  private messageInFlight = false;
+  private readyFallbackTimer: NodeJS.Timeout | null = null;
   private keepaliveTimer: NodeJS.Timeout | null = null;
   private hasInjectedMemory = false;
   private static readonly KEEPALIVE_INTERVAL_MS = 25000; // 每25秒发送一次ping
+  private static readonly READY_FINISH_FALLBACK_DELAY_MS = 1000;
 
   get isActive(): boolean {
     return this.stream !== null;
@@ -190,6 +195,9 @@ export class StreamService {
   ): Promise<AgentStream> {
     this.currentSessionId = sessionId;
     this.connectionEstablished = false;
+    this.finishDelivered = false;
+    this.messageInFlight = false;
+    this.clearReadyFallbackTimer();
 
     const { getAgentClient } = await import("@/lib/agent-client");
     const agentClient = getAgentClient();
@@ -239,6 +247,7 @@ export class StreamService {
     activeViewContext?: ActiveViewContext,
     modelId?: string,
     projectId?: string,
+    files?: FileAttachment[],
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -282,6 +291,7 @@ export class StreamService {
       }
     }
 
+    this.messageInFlight = true;
     this.stream.send(finalContent, `msg-${Date.now()}`, {
       stream: true,
       workingDir,
@@ -289,6 +299,7 @@ export class StreamService {
       demoId,
       model: modelId,
       images,
+      files,
       systemPrompt,
     } as any);
   }
@@ -348,6 +359,9 @@ export class StreamService {
       this.stream = null;
       this.currentSessionId = "";
       this.connectionEstablished = false;
+      this.finishDelivered = false;
+      this.messageInFlight = false;
+      this.clearReadyFallbackTimer();
       this.hasInjectedMemory = false;
     }
   }
@@ -372,6 +386,38 @@ export class StreamService {
     return this.connectionEstablished;
   }
 
+  private deliverFinish(result: StreamResult): void {
+    if (this.finishDelivered) return;
+    this.finishDelivered = true;
+    this.messageInFlight = false;
+    this.clearReadyFallbackTimer();
+    this.handlers.onFinish?.(result);
+  }
+
+  private clearReadyFallbackTimer(): void {
+    if (!this.readyFallbackTimer) return;
+    clearTimeout(this.readyFallbackTimer);
+    this.readyFallbackTimer = null;
+  }
+
+  private scheduleReadyFinishFallback(streamId: string): void {
+    if (this.finishDelivered || !this.messageInFlight || this.readyFallbackTimer) {
+      return;
+    }
+    this.readyFallbackTimer = setTimeout(() => {
+      this.readyFallbackTimer = null;
+      if (
+        this.currentSessionId !== streamId ||
+        this.finishDelivered ||
+        !this.messageInFlight
+      ) {
+        return;
+      }
+      this.deliverFinish({ content: "" });
+      this.close();
+    }, StreamService.READY_FINISH_FALLBACK_DELAY_MS);
+  }
+
   private setupEventHandlers(): void {
     if (!this.stream) return;
 
@@ -382,6 +428,26 @@ export class StreamService {
       this.connectionEstablished = true;
       if (event.content) {
         this.handlers.onStream?.(event.content);
+      }
+      if (event.done) {
+        this.deliverFinish({
+          content: event.content,
+          files: event.files,
+        });
+        this.close();
+      }
+    });
+
+    this.stream.on("status", (event: StreamEvent) => {
+      if (this.currentSessionId !== streamId) return;
+      if (event.status === "processing") {
+        this.connectionEstablished = true;
+        this.messageInFlight = true;
+        this.clearReadyFallbackTimer();
+        return;
+      }
+      if (event.status === "ready") {
+        this.scheduleReadyFinishFallback(streamId);
       }
     });
 
@@ -459,7 +525,7 @@ export class StreamService {
         content: event.content,
         files: event.files,
       };
-      this.handlers.onFinish?.(result);
+      this.deliverFinish(result);
       this.close();
     });
 
