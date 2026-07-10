@@ -17,6 +17,16 @@ import type { DemoPageMeta } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { Clipboard, Loader2, Upload } from "lucide-react";
 
+const EMPTY_FIGMA_CONFIG_SCHEMA = JSON.stringify({
+  type: "object",
+  properties: {},
+});
+
+function getImportedPageName(filename: string): string {
+  const name = filename.replace(/\.html?$/i, "").trim();
+  return name || "从Figma导入的页面";
+}
+
 interface ImportFromFigmaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +43,7 @@ export function ImportFromFigmaDialog({
   onPageCreated,
 }: ImportFromFigmaDialogProps) {
   const [content, setContent] = useState("");
+  const [uploadedPageName, setUploadedPageName] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isReadingClipboard, setIsReadingClipboard] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -56,6 +67,7 @@ export function ImportFromFigmaDialog({
         return;
       }
       setContent(text);
+      setUploadedPageName(null);
       toast({ title: "已读取剪贴板", description: "内容已填入导入框。" });
     } catch (err) {
       toast({
@@ -91,6 +103,7 @@ export function ImportFromFigmaDialog({
         return;
       }
       setContent(text);
+      setUploadedPageName(getImportedPageName(file.name));
       toast({ title: "HTML 文件已读取", description: `已载入 ${file.name}` });
     } catch (err) {
       toast({
@@ -126,7 +139,7 @@ export function ImportFromFigmaDialog({
     try {
       const page = await projectApiClient.createDemoPage(
         projectId,
-        "从Figma导入的页面",
+        uploadedPageName ?? "从Figma导入的页面",
         sessionId,
         undefined,
         parsed.kind === "prototype" ? "prototype-html-css" : undefined,
@@ -135,6 +148,8 @@ export function ImportFromFigmaDialog({
         await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
           prototypeHtml: parsed.prototypeHtml,
           prototypeCss: parsed.prototypeCss,
+          prototypeMeta: parsed.prototypeMeta,
+          schema: EMPTY_FIGMA_CONFIG_SCHEMA,
         });
       } else {
         await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
@@ -145,6 +160,7 @@ export function ImportFromFigmaDialog({
       onPageCreated(page);
       toast({ title: "导入成功", description: `已创建页面「${page.name}」` });
       setContent("");
+      setUploadedPageName(null);
       onOpenChange(false);
     } catch (err) {
       toast({
@@ -218,7 +234,10 @@ export function ImportFromFigmaDialog({
 
 <!-- 也兼容旧版 # Workbench Export Markdown -->`}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            setUploadedPageName(null);
+          }}
           className="min-h-[200px] font-mono text-sm"
         />
         <DialogFooter>

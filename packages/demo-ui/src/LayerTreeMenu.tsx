@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 import type { VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
@@ -94,8 +95,25 @@ export function LayerTreeMenu({
   onToggleNodeHidden,
   onHoverNodeIdChange,
 }: LayerTreeMenuProps) {
-  const items = flattenLayerTree(nodes);
+  const itemRefs = useRef(new Map<string, HTMLDivElement>());
+  const items = useMemo(() => flattenLayerTree(nodes), [nodes]);
   const hiddenNodeIdSet = new Set(hiddenNodeIds);
+  const selectedItemKey = useMemo(
+    () =>
+      items.find(
+        ({ node }) =>
+          node.domPath === selectedNodeId || node.nodeId === selectedNodeId,
+      )?.node.domPath ?? null,
+    [items, selectedNodeId],
+  );
+
+  useEffect(() => {
+    if (!selectedItemKey) return;
+    itemRefs.current.get(selectedItemKey)?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [selectedItemKey]);
 
   return (
     <div
@@ -132,6 +150,13 @@ export function LayerTreeMenu({
             return (
               <div
                 key={node.domPath}
+                ref={(element) => {
+                  if (element) {
+                    itemRefs.current.set(node.domPath, element);
+                  } else {
+                    itemRefs.current.delete(node.domPath);
+                  }
+                }}
                 role="menuitem"
                 className={[
                   "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-2 text-left text-xs transition-colors",

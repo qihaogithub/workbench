@@ -185,8 +185,9 @@ function isBulkPageDeletionRequest(message: string): boolean {
 }
 
 interface SendMessageRunOptions {
-  source?: "user" | "system_auto_repair";
+  source?: "user" | "system_auto_repair" | "visual_property";
   displayMessage?: NonNullable<ChatMessage["autoRepair"]>;
+  visualPropertyDisplayMessage?: NonNullable<ChatMessage["visualProperty"]>;
 }
 
 interface StartMessageRunOptions {
@@ -491,6 +492,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       const trimmedMessage = userMessage.trim();
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
+      const isVisualProperty = source === "visual_property";
       const conversationHistoryPrefix = buildConversationHistoryPrefix(
         messagesRef.current,
       );
@@ -550,7 +552,18 @@ export function useChatStream(options: UseChatStreamOptions) {
                   hiddenPrompt: trimmedMessage,
                 },
               }
-            : {
+            : isVisualProperty
+              ? {
+                  id: displayMessageId,
+                  role: "user",
+                  content: trimmedMessage,
+                  visualProperty: runOptions?.visualPropertyDisplayMessage ?? {
+                    title: "可视化修改已发送给 AI",
+                    summary: "AI 将根据当前选区和属性变更修改页面。",
+                    hiddenPrompt: trimmedMessage,
+                  },
+                }
+              : {
                 id: displayMessageId,
                 role: "user",
                 content: trimmedMessage,
@@ -963,11 +976,26 @@ export function useChatStream(options: UseChatStreamOptions) {
               });
             }
 
-            const errorMessage: ChatMessage = {
-              id: `error-${Date.now()}`,
-              role: "assistant",
-              content: normalizeAiError(error).userMessage,
-            };
+            const normalizedMessage = normalizeAiError(error).userMessage;
+            const currentMsg = currentMessageRef.current;
+            const errorMessage: ChatMessage = hasVisibleAssistantContent(currentMsg)
+              ? {
+                  id: currentMsg.id || `assistant-${Date.now()}`,
+                  role: "assistant",
+                  content: currentMsg.content || accumulatedContent || normalizedMessage,
+                  parts: [
+                    ...(currentMsg.parts || []),
+                    {
+                      type: "text",
+                      content: `\n\n${normalizedMessage}`,
+                    },
+                  ],
+                }
+              : {
+                  id: `error-${Date.now()}`,
+                  role: "assistant",
+                  content: normalizedMessage,
+                };
             setMessages((prev) => [
               ...appendMessageBeforeQueued(
                 updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
@@ -975,6 +1003,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               ),
             ]);
             setStreamContent("");
+            setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
             stopSilenceTracking();
             completeRunAndDrain();
           },
@@ -1294,6 +1323,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const source = runOptions?.source ?? "user";
       const isSystemAutoRepair = source === "system_auto_repair";
+      const isVisualProperty = source === "visual_property";
       const dedupeKey = isSystemAutoRepair
         ? createSystemAutoRepairDedupeKey(
             runOptions?.displayMessage?.title || DEFAULT_AUTO_REPAIR_TITLE,
@@ -1367,7 +1397,20 @@ export function useChatStream(options: UseChatStreamOptions) {
                   hiddenPrompt: trimmedMessage,
                 },
               }
-            : {
+            : isVisualProperty
+              ? {
+                  id: displayMessageId,
+                  role: "user",
+                  content: trimmedMessage,
+                  queueId,
+                  queueStatus: "queued",
+                  visualProperty: runOptions?.visualPropertyDisplayMessage ?? {
+                    title: "可视化修改已发送给 AI",
+                    summary: "AI 将根据当前选区和属性变更修改页面。",
+                    hiddenPrompt: trimmedMessage,
+                  },
+                }
+              : {
                 id: displayMessageId,
                 role: "user",
                 content: trimmedMessage,

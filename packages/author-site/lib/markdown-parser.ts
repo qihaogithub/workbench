@@ -32,6 +32,7 @@ export type ParsedFigmaImportContent =
       kind: "prototype";
       prototypeHtml: string;
       prototypeCss: string;
+      prototypeMeta?: { width: number; height: number; generatedBy: string };
       success: true;
     }
   | {
@@ -54,6 +55,31 @@ function looksLikeHtmlDocument(text: string): boolean {
   if (/^<!doctype\s+html\b/i.test(trimmedText)) return true;
   if (/<html[\s>]/i.test(trimmedText)) return true;
   return /<(body|main|section|div|style|svg|img)[\s>]/i.test(trimmedText);
+}
+
+function parsePositivePixels(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Figma HTML exports put the design frame on `.figma-export`; older exports
+ * sometimes only keep the same width/height on the first data-layer node.
+ */
+function extractFigmaPrototypeMeta(html: string):
+  | { width: number; height: number; generatedBy: string }
+  | undefined {
+  const figmaExportRule = html.match(
+    /\.figma-export\s*\{[^}]*?width\s*:\s*([\d.]+)px\s*;?[^}]*?height\s*:\s*([\d.]+)px\s*;?[^}]*?\}/i,
+  );
+  const frameStyle = html.match(
+    /<[^>]+(?:data-layer|class=["'][^"']*figma-export)[^>]*style=["'][^"']*?width\s*:\s*([\d.]+)px\s*;?[^"']*?height\s*:\s*([\d.]+)px/i,
+  );
+  const match = figmaExportRule ?? frameStyle;
+  const width = parsePositivePixels(match?.[1]);
+  const height = parsePositivePixels(match?.[2]);
+  return width && height ? { width, height, generatedBy: "figma-import" } : undefined;
 }
 
 /**
@@ -284,6 +310,7 @@ export function parseFigmaImportContent(text: string): ParsedFigmaImportContent 
       kind: "prototype",
       prototypeHtml: trimmedText,
       prototypeCss: "",
+      prototypeMeta: extractFigmaPrototypeMeta(trimmedText),
       success: true,
     };
   }

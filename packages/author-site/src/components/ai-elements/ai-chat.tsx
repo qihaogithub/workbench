@@ -30,7 +30,14 @@ export interface AutoRepairTrigger {
   debugDetail?: string;
 }
 
-type TriggerAutoSend = string | AutoRepairTrigger;
+export interface VisualPropertyAutoSend {
+  kind: "visual_property";
+  visibleTitle: string;
+  visibleSummary: string;
+  hiddenPrompt: string;
+}
+
+export type TriggerAutoSend = string | AutoRepairTrigger | VisualPropertyAutoSend;
 
 function QueuedMessagesTray({
   messages,
@@ -360,16 +367,29 @@ export function AIChat({
       if (typeof triggerAutoSend === "string") {
         handleSendRef.current(triggerAutoSend);
       } else {
-        handleSendRef.current(triggerAutoSend.hiddenPrompt, undefined, {
-          source: "system_auto_repair",
-          displayMessage: {
-            status: "running",
-            title: triggerAutoSend.visibleTitle,
-            summary: triggerAutoSend.visibleSummary,
-            debugDetail: triggerAutoSend.debugDetail,
-            hiddenPrompt: triggerAutoSend.hiddenPrompt,
-          },
-        });
+        handleSendRef.current(
+          triggerAutoSend.hiddenPrompt,
+          undefined,
+          triggerAutoSend.kind === "auto_repair"
+            ? {
+                source: "system_auto_repair",
+                displayMessage: {
+                  status: "running",
+                  title: triggerAutoSend.visibleTitle,
+                  summary: triggerAutoSend.visibleSummary,
+                  debugDetail: triggerAutoSend.debugDetail,
+                  hiddenPrompt: triggerAutoSend.hiddenPrompt,
+                },
+              }
+            : {
+                source: "visual_property",
+                visualPropertyDisplayMessage: {
+                  title: triggerAutoSend.visibleTitle,
+                  summary: triggerAutoSend.visibleSummary,
+                  hiddenPrompt: triggerAutoSend.hiddenPrompt,
+                },
+              },
+        );
       }
       onTriggerAutoSendHandledRef.current?.();
     }

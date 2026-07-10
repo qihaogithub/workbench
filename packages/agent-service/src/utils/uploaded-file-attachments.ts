@@ -13,7 +13,7 @@ export interface StoredUploadedFileAttachment extends FileAttachment {
 function findProjectRoot(startDir: string): string {
   let dir = startDir;
   while (dir !== path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, "package.json"))) {
+    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
       return dir;
     }
     dir = path.dirname(dir);
@@ -32,15 +32,56 @@ function sanitizePathSegment(value: string, label: string): string {
   return value;
 }
 
-function resolveAttachmentDir(sessionId: string, attachmentId: string): string {
+function resolveSessionAttachmentsDir(sessionId: string): string {
   const safeSessionId = sanitizePathSegment(sessionId, "sessionId");
+  return path.resolve(getDataDir(), "ai-attachments", safeSessionId);
+}
+
+function resolveAttachmentDir(sessionId: string, attachmentId: string): string {
   const safeAttachmentId = sanitizePathSegment(attachmentId, "attachmentId");
-  const sessionDir = path.resolve(getDataDir(), "ai-attachments", safeSessionId);
+  const sessionDir = resolveSessionAttachmentsDir(sessionId);
   const attachmentDir = path.resolve(sessionDir, safeAttachmentId);
   if (!attachmentDir.startsWith(sessionDir + path.sep)) {
     throw new Error("attachment path escaped session directory");
   }
   return attachmentDir;
+}
+
+export async function listUploadedFileAttachments(
+  sessionId: string,
+): Promise<StoredUploadedFileAttachment[]> {
+  const sessionDir = resolveSessionAttachmentsDir(sessionId);
+  let entries: fs.Dirent[];
+  try {
+    entries = await fs.promises.readdir(sessionDir, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const attachments = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry): Promise<StoredUploadedFileAttachment | null> => {
+        const attachmentDir = resolveAttachmentDir(sessionId, entry.name);
+        try {
+          const manifestRaw = await fs.promises.readFile(
+            path.join(attachmentDir, "manifest.json"),
+            "utf-8",
+          );
+          const metadata = JSON.parse(manifestRaw) as StoredUploadedFileAttachment;
+          return metadata.id === entry.name ? metadata : null;
+        } catch {
+          return null;
+        }
+      }),
+  );
+
+  return attachments
+    .filter((attachment): attachment is StoredUploadedFileAttachment => Boolean(attachment))
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
 }
 
 export async function readUploadedFileAttachment(

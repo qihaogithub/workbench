@@ -78,27 +78,21 @@ describe('EventMapper', () => {
     expect((events[0] as any).status).toBe('in_progress');
   });
 
-  it('tool_execution_end 应映射为 tool_call_update 并触发文件变更捕获', () => {
+  it('真实形状的 tool_execution_end 不应承担文件变更捕获', () => {
     mapper.register(harness);
     harness.emit({
       type: 'tool_execution_end',
       toolCallId: 'tc_2',
-      toolName: 'writeFile',
-      input: { path: 'b.ts', content: 'b' },
-      isError: false,
       result: { content: 'done' },
-      details: { durationMs: 100 },
     });
-    expect(events[0].type).toBe('tool_call_update');
-    expect((events[0] as any).status).toBe('completed');
-    expect((events[0] as any).durationMs).toBe(100);
-    expect(toolHookManager.getFiles()).toHaveLength(1);
+    expect(events).toHaveLength(0);
+    expect(toolHookManager.getFiles()).toHaveLength(0);
   });
 
-  it('tool_execution_end 工具出错时应映射为 failed 状态', () => {
+  it('tool_result 工具出错时应映射为 failed 状态', () => {
     mapper.register(harness);
     harness.emit({
-      type: 'tool_execution_end',
+      type: 'tool_result',
       toolCallId: 'tc_3',
       toolName: 'writeFile',
       input: { path: 'c.ts' },

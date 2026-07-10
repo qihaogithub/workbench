@@ -9,7 +9,6 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  ChevronRight,
   AlertTriangle,
   RotateCcw,
   ThumbsUp,
@@ -22,14 +21,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { ChatCard, ChatCardDetailDialog } from "./chat-card";
 import { Streamdown } from "streamdown";
 import { Tool } from "./tool";
 import { Reasoning } from "./reasoning";
@@ -120,6 +112,12 @@ export interface ChatMessage {
     debugDetail?: string;
     hiddenPrompt?: string;
   };
+  /** 可视化属性面板发起的结构化页面修改请求，仅影响对话中的展示方式。 */
+  visualProperty?: {
+    title: string;
+    summary: string;
+    hiddenPrompt: string;
+  };
   /** 有序的内容块数组（推荐） */
   parts?: MessagePart[];
   /** @deprecated 使用 parts 中的 reasoning 类型替代 */
@@ -170,6 +168,9 @@ interface MessageProps {
     options?: {
       source: "system_auto_repair";
       displayMessage: NonNullable<ChatMessage["autoRepair"]>;
+    } | {
+      source: "visual_property";
+      visualPropertyDisplayMessage: NonNullable<ChatMessage["visualProperty"]>;
     },
   ) => void;
   onCancelQueuedMessage?: (queueId: string) => void;
@@ -228,6 +229,10 @@ export function Message({
         onRetry={handleSend}
       />
     );
+  }
+
+  if (isUser && message.visualProperty) {
+    return <VisualPropertyMessage message={message} className={className} />;
   }
 
   // 用户消息使用气泡样式
@@ -419,6 +424,43 @@ export function Message({
   );
 }
 
+function VisualPropertyMessage({
+  message,
+  className,
+}: {
+  message: ChatMessage;
+  className?: string;
+}) {
+  const visualProperty = message.visualProperty;
+  if (!visualProperty) return null;
+
+  return (
+    <div className={cn("flex flex-col items-end gap-2 min-w-0", className)}>
+      <ChatCard className="max-w-[80%] rounded-2xl rounded-tr-sm border-blue-500/25 bg-blue-500/10 px-4 py-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-blue-500/20 p-1.5 text-blue-400">
+            <MessageSquareText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="font-medium">{visualProperty.title}</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {visualProperty.summary}
+            </p>
+          </div>
+          <ChatCardDetailDialog
+            title={visualProperty.title}
+            description={visualProperty.summary}
+          >
+            <pre className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-background p-3 text-xs leading-5 text-foreground">
+              {visualProperty.hiddenPrompt}
+            </pre>
+          </ChatCardDetailDialog>
+        </div>
+      </ChatCard>
+    </div>
+  );
+}
+
 function AutoRepairMessage({
   message,
   className,
@@ -453,7 +495,7 @@ function AutoRepairMessage({
 
   return (
     <div className={cn("flex justify-center px-3 py-2", className)}>
-      <div className="w-full max-w-[540px] rounded-lg border border-border/70 bg-card/80 px-3.5 py-3 text-sm text-foreground shadow-sm">
+      <ChatCard className="max-w-[540px] px-3.5 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
             <Wrench className="h-3.5 w-3.5" />
@@ -479,43 +521,20 @@ function AutoRepairMessage({
               </p>
               <div className="flex shrink-0 items-center gap-1.5">
                 {autoRepair.debugDetail && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        查看详情
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="flex max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
-                      <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
-                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <DialogTitle className="text-base leading-6">
-                            自动修复详情
-                          </DialogTitle>
-                          <span
-                            className={cn(
-                              "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-medium",
-                              statusConfig.className,
-                            )}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                            {statusConfig.label}
-                          </span>
-                        </div>
-                        <DialogDescription className="text-sm leading-5">
-                          {autoRepair.summary}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="min-h-0 flex-1 overflow-auto bg-muted/30 p-4">
-                        <pre className="whitespace-pre-wrap break-words rounded-md border border-border/70 bg-background p-3 text-xs leading-relaxed text-muted-foreground">
-                          {autoRepair.debugDetail}
-                        </pre>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <ChatCardDetailDialog
+                    title="自动修复详情"
+                    description={autoRepair.summary}
+                    badge={
+                      <span className={cn("inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-medium", statusConfig.className)}>
+                        <StatusIcon className="h-3 w-3" />
+                        {statusConfig.label}
+                      </span>
+                    }
+                  >
+                    <pre className="whitespace-pre-wrap break-words rounded-md border border-border/70 bg-background p-3 text-xs leading-relaxed text-muted-foreground">
+                      {autoRepair.debugDetail}
+                    </pre>
+                  </ChatCardDetailDialog>
                 )}
                 {canRetry && (
                   <button
@@ -539,7 +558,7 @@ function AutoRepairMessage({
             </div>
           </div>
         </div>
-      </div>
+      </ChatCard>
     </div>
   );
 }

@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783654166170_5bstzh",
+  "at": 1783654166170,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783585261167_7h7prw",
+  "resourceId": "assets/images/kingkong-wish.png",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/images/kingkong-wish.png"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

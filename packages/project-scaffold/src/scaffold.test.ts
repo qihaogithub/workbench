@@ -22,7 +22,6 @@ import {
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-scaffold-"));
 const service = new ProjectAdminService({ dataDir: tempDir });
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = path.resolve(packageRoot, "../..");
 const actor: ProjectAdminActor = {
   id: "test-agent",
   name: "Test Agent",
@@ -50,6 +49,40 @@ function runLocalNode(projectDir: string, args: string[], options: { env?: NodeJ
     encoding: "utf-8",
     env: options.env,
   });
+}
+
+function createFakePlaywrightModule(targetDir: string): string {
+  const modulePath = path.join(targetDir, "fake-playwright.mjs");
+  fs.writeFileSync(modulePath, `import fs from "node:fs";
+
+const png = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
+export const chromium = {
+  async launch() {
+    return {
+      async newPage() {
+        return {
+          on() {},
+          async goto() {},
+          async waitForTimeout() {},
+          async evaluate() {
+            return { textLength: 20, loadedImages: 0, visibleElements: 4 };
+          },
+          async screenshot(options) {
+            fs.writeFileSync(options.path, png);
+          },
+          async close() {},
+        };
+      },
+      async close() {},
+    };
+  },
+};
+`, "utf-8");
+  return modulePath;
 }
 
 try {
@@ -107,10 +140,11 @@ try {
   });
   assert.equal(localDev.status, 0, localDev.stderr || localDev.stdout);
   assert.match(localDev.stdout, /workbench local preview/);
+  const fakePlaywrightModule = createFakePlaywrightModule(tempDir);
   const localPreviewScreenshot = runLocalNode(projectDir, ["scripts/dev-server.mjs", "--screenshot"], {
     env: {
       ...process.env,
-      OW_PLAYWRIGHT_IMPORT_PATH: path.join(repoRoot, "node_modules/playwright/index.mjs"),
+      OW_PLAYWRIGHT_IMPORT_PATH: fakePlaywrightModule,
     },
   });
   assert.equal(localPreviewScreenshot.status, 0, localPreviewScreenshot.stderr || localPreviewScreenshot.stdout);

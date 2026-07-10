@@ -176,6 +176,8 @@ export class WorkspaceFilePersistence {
 
   private isAllowedResource(resourcePath: string, kind: CollabResourceKind): boolean {
     if (kind === "page-code") return /^demos\/[^/]+\/index\.tsx$/.test(resourcePath);
+    if (kind === "page-prototype-html") return /^demos\/[^/]+\/prototype\.html$/.test(resourcePath);
+    if (kind === "page-prototype-css") return /^demos\/[^/]+\/prototype\.css$/.test(resourcePath);
     if (kind === "page-schema") return /^demos\/[^/]+\/config\.schema\.json$/.test(resourcePath);
     if (kind === "page-sketch-scene") return /^demos\/[^/]+\/sketch\.scene\.json$/.test(resourcePath);
     if (kind === "project-schema") return resourcePath === "project.config.schema.json";

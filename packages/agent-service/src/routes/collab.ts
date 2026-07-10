@@ -18,6 +18,8 @@ interface CollabQuery {
 
 const RESOURCE_KINDS: CollabResourceKind[] = [
   "page-code",
+  "page-prototype-html",
+  "page-prototype-css",
   "page-schema",
   "page-sketch-scene",
   "project-schema",

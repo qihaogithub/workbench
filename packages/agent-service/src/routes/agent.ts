@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { getAgentManager } from '../core/agent-manager';
+import { createAgentBusyResult, getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
 import { getSessionModelConfigs } from '../config/session-model-configs';
 import { getSessionExternalAuthConfigs } from '../config/session-external-auth';
@@ -162,6 +162,20 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
               },
             });
           }
+        }
+
+        if (agent instanceof BackendAgent && agent.isBusy()) {
+          const result = createAgentBusyResult();
+          sessionStore.update(sessionId, { status: 'processing' });
+          return reply.code(409).send({
+            success: false,
+            error: result.error,
+            data: {
+              sessionId,
+              files: result.files,
+              metadata: result.metadata,
+            },
+          });
         }
 
         if (

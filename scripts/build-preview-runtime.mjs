@@ -9,6 +9,7 @@ const outDir = path.join(repoRoot, "packages/author-site/public/preview-runtime"
 const viewerOutDir = path.join(repoRoot, "packages/viewer-site/public/preview-runtime");
 const vendorDir = path.join(outDir, "vendor");
 const tmpDir = path.join(repoRoot, "tmp/preview-runtime-build");
+const manifestPath = path.join(outDir, "manifest.json");
 
 const entries = {
   react: {
@@ -58,6 +59,23 @@ export default SVGA;`,
 
 function digest(content) {
   return createHash("sha256").update(content).digest("hex").slice(0, 16);
+}
+
+async function resolveGeneratedAt(nextManifestContent) {
+  try {
+    const currentManifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    const { generatedAt, ...currentManifestContent } = currentManifest;
+    if (
+      typeof generatedAt === "string" &&
+      JSON.stringify(currentManifestContent) === JSON.stringify(nextManifestContent)
+    ) {
+      return generatedAt;
+    }
+  } catch {
+    // 首次构建或旧 manifest 不可读时生成新时间。
+  }
+
+  return new Date().toISOString();
 }
 
 async function readPackageVersion(packageName) {
@@ -316,9 +334,8 @@ export function Carousel(props) {
     bytes: Buffer.byteLength(sdkContent),
   };
 
-  const manifest = {
+  const manifestContent = {
     version: "2026-06-preview-runtime-v4",
-    generatedAt: new Date().toISOString(),
     imports,
     files,
     packages: {
@@ -329,8 +346,15 @@ export function Carousel(props) {
       "svgaplayerweb": await readPackageVersion("svgaplayerweb"),
     },
   };
+  const manifest = {
+    version: manifestContent.version,
+    generatedAt: await resolveGeneratedAt(manifestContent),
+    imports: manifestContent.imports,
+    files: manifestContent.files,
+    packages: manifestContent.packages,
+  };
 
-  await writeFile(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await rm(viewerOutDir, { recursive: true, force: true });
   await mkdir(path.dirname(viewerOutDir), { recursive: true });
   await cp(outDir, viewerOutDir, { recursive: true });

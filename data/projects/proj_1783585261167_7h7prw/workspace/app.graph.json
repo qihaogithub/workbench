@@ -1,7 +1,16 @@
 {
   "version": 1,
-  "entry": "",
-  "pages": {},
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "growth-bean-mall_x8k2",
+      "title": "成长豆商城"
+    },
+    "figma": {
+      "pageId": "figma_7zwt",
+      "title": "从Figma导入的页面"
+    }
+  },
   "actions": [],
   "state": {}
 }

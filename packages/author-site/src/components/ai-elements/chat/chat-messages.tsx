@@ -59,6 +59,9 @@ interface ChatMessagesProps {
     options?: {
       source: "system_auto_repair";
       displayMessage: NonNullable<ChatMessage["autoRepair"]>;
+    } | {
+      source: "visual_property";
+      visualPropertyDisplayMessage: NonNullable<ChatMessage["visualProperty"]>;
     },
   ) => void;
   onUserChoiceResponse: (requestId: string, choice: UserChoiceResponse) => void;

@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783657288213_vfsffe",
+  "at": 1783657288213,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783585261167_7h7prw",
+  "resourceId": "growth-bean-mall_x8k2",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:growth-bean-mall_x8k2:prv_1783657288210_hnlhk5"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

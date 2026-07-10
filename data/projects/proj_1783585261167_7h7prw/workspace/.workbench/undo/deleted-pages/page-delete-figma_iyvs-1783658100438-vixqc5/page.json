@@ -1,0 +1,8 @@
+{
+  "id": "figma_iyvs",
+  "name": "从Figma导入的页面",
+  "routeKey": "figma",
+  "runtimeType": "prototype-html-css",
+  "order": 2,
+  "parentId": null
+}

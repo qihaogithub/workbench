@@ -1,0 +1,40 @@
+{
+  "id": "prv_1783658401559_hedhng",
+  "projectId": "proj_1783585261167_7h7prw",
+  "kind": "page",
+  "resourceId": "growth-bean-mall_x8k2",
+  "previousVersionId": "prv_1783657288210_hnlhk5",
+  "contentHash": "4886da9592b1d0df057fdcc9bedd2b6a0feda0aab2a69cc66985beba890e4869",
+  "blobRefs": [
+    "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
+    "eaf7cf7ace2e3c97da7d678d717c762596222c69994fc0f8be759eabfc781fc1",
+    "d233cc3fd24d4ba443f80d6c7dc5affe5d0474dcf2b924e6c5dc337a14535cf1",
+    "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea"
+  ],
+  "metadata": {
+    "page": {
+      "id": "growth-bean-mall_x8k2",
+      "name": "成长豆商城",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
+      "prototypeHtml": "eaf7cf7ace2e3c97da7d678d717c762596222c69994fc0f8be759eabfc781fc1",
+      "prototypeCss": "d233cc3fd24d4ba443f80d6c7dc5affe5d0474dcf2b924e6c5dc337a14535cf1",
+      "prototypeMeta": "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783658401561,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录成长豆商城"
+}

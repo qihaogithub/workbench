@@ -195,11 +195,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | `@workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
 | `@workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
 
-历史或非 workspace 目录：
-
-- `packages/web/` 存在于文件系统，但没有 `package.json`，不要引入或修改，除非用户明确要求。
-- `packages/snapshot-service/` 当前没有 `package.json`。根脚本只保留 `dev:snapshot:legacy` 作为历史排查入口，不参与默认 `pnpm dev`。
-- `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
+`.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
 `packages/shared/src/index.ts` 是共享类型入口。`@workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
 
@@ -241,7 +237,7 @@ pnpm test:e2e:ui
 pnpm test:e2e:headed
 ```
 
-注意：`pnpm dev` 会并行启动 author、agent、viewer、screenshot。`snapshot-service` 是历史包，默认不启动；如果需要调查旧截图方案，只使用 `pnpm dev:snapshot:legacy` 核实历史引用。
+注意：`pnpm dev` 会并行启动 author、agent、viewer、screenshot。当前正式截图服务是 `packages/screenshot-service/`。
 
 包级验证：
 

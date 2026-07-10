@@ -6,8 +6,6 @@ import {
   useEffect,
   useRef,
   useMemo,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -87,7 +85,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { AIChat, type AutoRepairTrigger } from "@/components/ai-elements/ai-chat";
+import { AIChat, type AutoRepairTrigger, type VisualPropertyAutoSend } from "@/components/ai-elements/ai-chat";
 import { type ChatMessage } from "@/components/ai-elements";
 import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
 import { getAgentClient } from "@/lib/agent-client";
@@ -1489,7 +1487,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [visualPropertyDrawerOpen, setVisualPropertyDrawerOpen] = useState(false);
   const [visualPropertyDrawerMounted, setVisualPropertyDrawerMounted] = useState(false);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
-  const [triggerAutoSend, setTriggerAutoSend] = useState<string | AutoRepairTrigger | null>(null);
+  const [triggerAutoSend, setTriggerAutoSend] = useState<string | AutoRepairTrigger | VisualPropertyAutoSend | null>(null);
   // visualEditMode and related state moved to useVisualEditState hook
 
   // Console buffer for forwarding iframe console logs to agent-service
@@ -1510,13 +1508,47 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     (page) => page.id === activeDemoId,
   )?.runtimeType;
   const activeCodeCollab = useCollabDocument(
-    sessionId && workspaceId && activeDemoId
+    sessionId &&
+      workspaceId &&
+      activeDemoId &&
+      activeDemoRuntimeTypeForCollab !== "prototype-html-css" &&
+      activeDemoRuntimeTypeForCollab !== "sketch-scene"
       ? {
           projectId: demoId,
           workspaceId,
           sessionId,
           resourcePath: `demos/${activeDemoId}/index.tsx`,
           kind: "page-code",
+        }
+      : null,
+    collabUser,
+  );
+  const activePrototypeHtmlCollab = useCollabDocument(
+    sessionId &&
+      workspaceId &&
+      activeDemoId &&
+      activeDemoRuntimeTypeForCollab === "prototype-html-css"
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: `demos/${activeDemoId}/prototype.html`,
+          kind: "page-prototype-html",
+        }
+      : null,
+    collabUser,
+  );
+  const activePrototypeCssCollab = useCollabDocument(
+    sessionId &&
+      workspaceId &&
+      activeDemoId &&
+      activeDemoRuntimeTypeForCollab === "prototype-html-css"
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: `demos/${activeDemoId}/prototype.css`,
+          kind: "page-prototype-css",
         }
       : null,
     collabUser,
@@ -1584,6 +1616,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       : null,
     collabUser,
   );
+  const activePageCollabStatuses =
+    activeDemoRuntimeTypeForCollab === "prototype-html-css"
+      ? [activePrototypeHtmlCollab.status, activePrototypeCssCollab.status]
+      : activeDemoRuntimeTypeForCollab === "sketch-scene"
+        ? [activeSketchSceneCollab.status]
+        : [activeCodeCollab.status];
   const [previewRuntimeError, setPreviewRuntimeError] =
     useState<PreviewRuntimeErrorContext | null>(null);
 
@@ -1639,6 +1677,24 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         resourcePath: activeDemoId ? `demos/${activeDemoId}/index.tsx` : undefined,
         kind: "page-code",
       },
+      activePrototypeHtml: {
+        status: activePrototypeHtmlCollab.status,
+        error: activePrototypeHtmlCollab.error,
+        awarenessCount: activePrototypeHtmlCollab.awareness.length,
+        resourcePath: activeDemoId
+          ? `demos/${activeDemoId}/prototype.html`
+          : undefined,
+        kind: "page-prototype-html",
+      },
+      activePrototypeCss: {
+        status: activePrototypeCssCollab.status,
+        error: activePrototypeCssCollab.error,
+        awarenessCount: activePrototypeCssCollab.awareness.length,
+        resourcePath: activeDemoId
+          ? `demos/${activeDemoId}/prototype.css`
+          : undefined,
+        kind: "page-prototype-css",
+      },
       activeSchema: {
         status: activeSchemaCollab.status,
         error: activeSchemaCollab.error,
@@ -1683,6 +1739,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       activeCodeCollab.awareness.length,
       activeCodeCollab.error,
       activeCodeCollab.status,
+      activePrototypeCssCollab.awareness.length,
+      activePrototypeCssCollab.error,
+      activePrototypeCssCollab.status,
+      activePrototypeHtmlCollab.awareness.length,
+      activePrototypeHtmlCollab.error,
+      activePrototypeHtmlCollab.status,
       activeDemoId,
       activeDemoRuntimeTypeForCollab,
       activeSchemaCollab.awareness.length,
@@ -2054,16 +2116,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ],
   );
 
-  const setStringTriggerAutoSend: Dispatch<SetStateAction<string | null>> =
-    useCallback((nextValue) => {
-      setTriggerAutoSend((prev) => {
-        const stringPrev = typeof prev === "string" ? prev : null;
-        return typeof nextValue === "function"
-          ? nextValue(stringPrev)
-          : nextValue;
-      });
-    }, []);
-
   const isActivePrototypeVisualPage = useCallback(() => {
     const pageId = activeDemoIdRef.current;
     return demoPages.some(
@@ -2198,7 +2250,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     markWorkspaceChanged,
     setConfigDataMap,
     setTabValue,
-    setTriggerAutoSend: setStringTriggerAutoSend,
+    setTriggerAutoSend,
     isPrototypeVisualPage: isActivePrototypeVisualPage,
     applyPrototypeVisualPropertyChange: applyActivePrototypeVisualPropertyChange,
     applyPrototypeVisualConfig: applyActivePrototypeVisualConfig,
@@ -2518,6 +2570,70 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     activeSchemaCollab.value,
     activeSchemaCollab.ytext,
     applyDemoSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (activePrototypeHtmlCollab.status !== "synced") return;
+    const currentPageId = activeDemoIdRef.current;
+    if (!currentPageId) return;
+    const currentHtml = pagePrototypeMapRef.current[currentPageId]?.html ?? "";
+    if (activePrototypeHtmlCollab.value === currentHtml) return;
+    if (activePrototypeHtmlCollab.value === "" && currentHtml.trim()) {
+      replaceCollabText(activePrototypeHtmlCollab.ytext, currentHtml);
+      return;
+    }
+    pagePrototypeMapRef.current = {
+      ...pagePrototypeMapRef.current,
+      [currentPageId]: {
+        ...(pagePrototypeMapRef.current[currentPageId] ?? {}),
+        html: activePrototypeHtmlCollab.value,
+      },
+    };
+    setPagePrototypeMap((current) => ({
+      ...current,
+      [currentPageId]: {
+        ...(current[currentPageId] ?? {}),
+        html: activePrototypeHtmlCollab.value,
+      },
+    }));
+    invalidatePageScreenshot(currentPageId);
+  }, [
+    activePrototypeHtmlCollab.status,
+    activePrototypeHtmlCollab.value,
+    activePrototypeHtmlCollab.ytext,
+    invalidatePageScreenshot,
+  ]);
+
+  useEffect(() => {
+    if (activePrototypeCssCollab.status !== "synced") return;
+    const currentPageId = activeDemoIdRef.current;
+    if (!currentPageId) return;
+    const currentCss = pagePrototypeMapRef.current[currentPageId]?.css ?? "";
+    if (activePrototypeCssCollab.value === currentCss) return;
+    if (activePrototypeCssCollab.value === "" && currentCss.trim()) {
+      replaceCollabText(activePrototypeCssCollab.ytext, currentCss);
+      return;
+    }
+    pagePrototypeMapRef.current = {
+      ...pagePrototypeMapRef.current,
+      [currentPageId]: {
+        ...(pagePrototypeMapRef.current[currentPageId] ?? {}),
+        css: activePrototypeCssCollab.value,
+      },
+    };
+    setPagePrototypeMap((current) => ({
+      ...current,
+      [currentPageId]: {
+        ...(current[currentPageId] ?? {}),
+        css: activePrototypeCssCollab.value,
+      },
+    }));
+    invalidatePageScreenshot(currentPageId);
+  }, [
+    activePrototypeCssCollab.status,
+    activePrototypeCssCollab.value,
+    activePrototypeCssCollab.ytext,
+    invalidatePageScreenshot,
   ]);
 
   useEffect(() => {
@@ -3435,10 +3551,24 @@ ${context.details}
         const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
         const data = await res.json();
         if (data.success) {
+          const prototypeMeta = data.data.prototypeMeta as PrototypePageMeta | undefined;
           setPageCodes((prev) => ({
             ...prev,
             [pageId]: data.data.code,
           }));
+          if (
+            data.data.prototypeHtml !== undefined ||
+            data.data.prototypeCss !== undefined
+          ) {
+            setPagePrototypeMap((prev) => ({
+              ...prev,
+              [pageId]: {
+                html: data.data.prototypeHtml,
+                css: data.data.prototypeCss,
+                meta: prototypeMeta,
+              },
+            }));
+          }
           setCode(data.data.code);
           setSchema(data.data.schema);
           updatePageSchemaMapFromLoad(pageId, data.data.schema);
@@ -3448,7 +3578,15 @@ ${context.details}
             const defaults = getSafeMergedDefaults(data.data.schema);
             return { ...prev, [pageId]: defaults };
           });
-          const size = getPreviewSize(data.data.schema);
+          const size =
+            getPreviewSize(data.data.schema) ??
+            getPrototypePreviewSize(prototypeMeta);
+          if (size) {
+            setPagePreviewSizeMap((prev) => ({
+              ...prev,
+              [pageId]: size,
+            }));
+          }
           setPreviewSize(size);
         }
       } catch (err) {
@@ -4394,7 +4532,7 @@ ${context.details}
   ]);
 
   const exitSyncStatuses = [
-    activeCodeCollab.status,
+    ...activePageCollabStatuses,
     activeSchemaCollab.status,
     projectSchemaCollab.status,
     workspaceTreeCollab.status,
@@ -5301,7 +5439,7 @@ ${context.details}
   // hasPublishableChanges, publishButtonDisabled,
   // publishButtonText, publishingButtonText moved to useVersionControl hook
   const collabStatuses = [
-    activeCodeCollab.status,
+    ...activePageCollabStatuses,
     activeSchemaCollab.status,
     projectSchemaCollab.status,
     workspaceTreeCollab.status,
@@ -5876,10 +6014,24 @@ ${context.details}
                         );
                         const data = await res.json();
                         if (data.success) {
+                          const prototypeMeta = data.data.prototypeMeta as PrototypePageMeta | undefined;
                           setPageCodes((prev) => ({
                             ...prev,
                             [pageId]: data.data.code,
                           }));
+                          if (
+                            data.data.prototypeHtml !== undefined ||
+                            data.data.prototypeCss !== undefined
+                          ) {
+                            setPagePrototypeMap((prev) => ({
+                              ...prev,
+                              [pageId]: {
+                                html: data.data.prototypeHtml,
+                                css: data.data.prototypeCss,
+                                meta: prototypeMeta,
+                              },
+                            }));
+                          }
                           setCode(data.data.code);
                           setSchema(data.data.schema);
                           setPageSchemaMap((prev) => ({
@@ -5896,7 +6048,15 @@ ${context.details}
                             );
                             return { ...prev, [pageId]: defaults };
                           });
-                          const size = getPreviewSize(data.data.schema);
+                          const size =
+                            getPreviewSize(data.data.schema) ??
+                            getPrototypePreviewSize(prototypeMeta);
+                          if (size) {
+                            setPagePreviewSizeMap((prev) => ({
+                              ...prev,
+                              [pageId]: size,
+                            }));
+                          }
                           setPreviewSize(size);
                         }
                       } catch (err) {
@@ -6263,10 +6423,24 @@ ${context.details}
                             .then((res) => res.json())
                             .then((data) => {
                               if (data.success) {
+                                const prototypeMeta = data.data.prototypeMeta as PrototypePageMeta | undefined;
                                 setPageCodes((prev) => ({
                                   ...prev,
                                   [pageId]: data.data.code,
                                 }));
+                                if (
+                                  data.data.prototypeHtml !== undefined ||
+                                  data.data.prototypeCss !== undefined
+                                ) {
+                                  setPagePrototypeMap((prev) => ({
+                                    ...prev,
+                                    [pageId]: {
+                                      html: data.data.prototypeHtml,
+                                      css: data.data.prototypeCss,
+                                      meta: prototypeMeta,
+                                    },
+                                  }));
+                                }
                                 setCode(data.data.code);
                                 setSchema(data.data.schema);
                                 updatePageSchemaMapFromLoad(
@@ -6283,7 +6457,15 @@ ${context.details}
                                   );
                                   return { ...prev, [pageId]: defaults };
                                 });
-                                const size = getPreviewSize(data.data.schema);
+                                const size =
+                                  getPreviewSize(data.data.schema) ??
+                                  getPrototypePreviewSize(prototypeMeta);
+                                if (size) {
+                                  setPagePreviewSizeMap((prev) => ({
+                                    ...prev,
+                                    [pageId]: size,
+                                  }));
+                                }
                                 setPreviewSize(size);
                               }
                             })

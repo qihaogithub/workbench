@@ -168,7 +168,7 @@ export function readUserBackendProvidersConfig(
     )
     .get(userId) as UserModelConfigRow | undefined;
 
-  if (!row) return null;
+  if (!row) return fallbackConfig || null;
 
   const stored = parseStoredConfig(row);
   const encryptedApiKey = stored.provider.encryptedApiKey;
