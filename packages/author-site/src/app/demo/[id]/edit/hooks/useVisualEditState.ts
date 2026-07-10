@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, type MutableRefObject, type RefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
+import type { AutoRepairTrigger, VisualPropertyAutoSend } from "@/components/ai-elements/ai-chat";
 import type {
   VisualAnnotation,
   VisualEditPatch,
@@ -422,7 +423,7 @@ export interface UseVisualEditStateParams {
     React.SetStateAction<Record<string, Record<string, unknown>>>
   >;
   setTabValue: React.Dispatch<React.SetStateAction<string>>;
-  setTriggerAutoSend: React.Dispatch<React.SetStateAction<string | null>>;
+  setTriggerAutoSend: React.Dispatch<React.SetStateAction<string | AutoRepairTrigger | VisualPropertyAutoSend | null>>;
   isPrototypeVisualPage?: () => boolean;
   applyPrototypeVisualPropertyChange?: (
     node: VisualNodeInfo,
@@ -1063,7 +1064,16 @@ ${effectiveInstructionForPrompt || "无"}
 请优先只修改当前页面相关代码。临时预览已经在 iframe 中验证，但不要把它视为已写回源码；如果新增配置项，请同步处理页面 Schema、默认值和预览数据。`;
 
       setTabValue("ai");
-      setTriggerAutoSend(prompt);
+      const pendingCount = changesForAi.length + configMarksForAi.length;
+      const selectedNodeLabel = selectedVisualNode
+        ? `<${selectedVisualNode.tagName}> ${selectedVisualNode.textContent || selectedVisualNode.domPath}`
+        : "当前页面";
+      setTriggerAutoSend({
+        kind: "visual_property",
+        visibleTitle: "可视化修改已发送给 AI",
+        visibleSummary: `${selectedNodeLabel} · ${pendingCount > 0 ? `${pendingCount} 项结构化变更` : "补充修改说明"}`,
+        hiddenPrompt: prompt,
+      });
       setVisualPropertySubmission((previous) => ({
         status: "queued",
         submittedAt: Date.now(),

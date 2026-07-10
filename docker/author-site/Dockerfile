@@ -14,6 +14,8 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
     && rm -rf /var/lib/apt/lists/*
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+ENV npm_config_disturl=https://npmmirror.com/mirrors/node
 
 RUN corepack enable \
     && corepack prepare pnpm@8.15.0 --activate \

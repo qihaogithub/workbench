@@ -19,7 +19,7 @@ covers:
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-09
+> 更新日期：2026-07-10
 
 ## 技术定位
 
@@ -99,7 +99,9 @@ ow project validate-runtime <projectId> --json
 
 runtime issue 的 JSON 字段包括 `pageId`、`severity`、`stage`、`code`、`message` 和 `instruction`。`severity: "error"` 表示显式 runtime 校验失败；映射到 `edit validate` 时，本次变更页变成 `blocking`，未改历史页变成 `warning`。
 
-HTML/CSS 原型页通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "prototype-html-css"`，并接收 `prototypeHtml`、`prototypeCss` 和 `prototypeMeta`；`page update-prototype` 用于更新原型页内容，不复用 `page update-code`。原型页校验由 `project-core` 执行，只检查静态 HTML/CSS 安全边界，不进入 React 编译和 iframe runtime contract。CLI JSON 会保留 `prototypeGate`，让代理能区分继续修复原型页还是升级为高保真页。
+HTML/CSS 原型页通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "prototype-html-css"`，并接收 `prototypeHtml`、`prototypeCss` 和 `prototypeMeta`；`page update-prototype` 用于更新原型页内容，不复用 `page update-code`。当前共享层默认行为也已切到“未显式传 `runtimeType` 且未传 React `code` 时默认创建原型页”，因此需要稳定创建高保真 React 页时，应显式传 `--runtime-type high-fidelity-react` 或直接提供页面代码。原型页校验由 `project-core` 执行，只检查静态 HTML/CSS 安全边界，不进入 React 编译和 iframe runtime contract。CLI JSON 会保留 `prototypeGate`，让代理能区分继续修复原型页还是升级为高保真页。
+
+原型页 HTML 当前允许最高 2MB 输入，主要用于承接大型 Figma HTML 导出。只要仍满足静态安全边界，`page create`、`page update-prototype`、`page update-prototypes` 与 `project import-prototype` 都应继续复用这条共享链路，而不是因为旧 120KB 假设被迫拆页或误判成 CLI 能力缺失。
 
 草图页也通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "sketch-scene"`，并接收 `sketchScene` 和 `sketchMeta`；`page update-sketch` 用于更新草图 scene，不复用代码或原型页更新命令。草图页校验由 `project-core` 调用 `@workbench/sketch-core` 的 `SketchSceneDocument` 校验入口执行，失败时返回结构化 runtime issue。
 

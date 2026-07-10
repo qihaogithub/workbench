@@ -48,6 +48,21 @@ describe("sessions route external auth reuse", () => {
       configDir: "/tmp/dws-user-config",
     },
   };
+  const globalBackendProvidersConfig = {
+    providers: [
+      {
+        id: "admin",
+        name: "Admin",
+        baseURL: "https://admin.example.com/v1",
+        apiKey: "sk-admin",
+        models: ["admin-model"],
+        defaultModel: "admin-model",
+        enabled: true,
+      },
+    ],
+    activeProviderId: "admin",
+    activeModelId: "admin/admin-model",
+  };
 
   beforeEach(() => {
     jest.resetModules();
@@ -121,10 +136,13 @@ describe("sessions route external auth reuse", () => {
       ),
     }));
     jest.doMock("@/lib/model-config", () => ({
-      getModelConfig: jest.fn(async () => ({ backendProviders: [] })),
+      getModelConfig: jest.fn(async () => ({
+        backendProviders: globalBackendProvidersConfig,
+        multimodalModels: ["admin/vision-model"],
+      })),
     }));
     jest.doMock("@/lib/user-model-config", () => ({
-      readUserBackendProvidersConfig: jest.fn(() => null),
+      readUserBackendProvidersConfig: jest.fn((_userId, fallback) => fallback),
     }));
     jest.doMock("@/lib/agent-client", () => ({
       getAgentClient: jest.fn(() => ({
@@ -163,6 +181,27 @@ describe("sessions route external auth reuse", () => {
     );
   });
 
+  it("新建会话时推送全局模型配置给 agent-service session", async () => {
+    const { POST } = await import("./route");
+    const agentProviders = await import("@/lib/agent-providers");
+    const userModelConfig = await import("@/lib/user-model-config");
+
+    const response = await POST(createJsonRequest({ demoId: "project-1" }) as never);
+
+    expect(response.status).toBe(201);
+    expect(userModelConfig.readUserBackendProvidersConfig).toHaveBeenCalledWith(
+      "user-1",
+      globalBackendProvidersConfig,
+    );
+    expect(agentProviders.pushSessionModelConfigToAgent).toHaveBeenCalledWith(
+      "session-new",
+      {
+        ...globalBackendProvidersConfig,
+        multimodalModels: ["admin/vision-model"],
+      },
+    );
+  });
+
   it("复用活跃会话时也重新推送已保存授权配置", async () => {
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
@@ -180,6 +219,29 @@ describe("sessions route external auth reuse", () => {
     expect(agentProviders.pushSessionExternalAuthToAgent).toHaveBeenCalledWith(
       "session-existing",
       externalAuthConfig,
+    );
+  });
+
+  it("复用活跃会话时也重新推送全局模型配置", async () => {
+    jest.doMock("@/lib/session-manager", () => ({
+      archiveActiveSession: jest.fn(),
+      createEditSession: jest.fn(),
+      enforceSessionLimit: jest.fn(),
+      ensureSessionUsesProjectActiveWorkspace: jest.fn(),
+      findActiveSession: jest.fn(() => "session-existing"),
+    }));
+    const { POST } = await import("./route");
+    const agentProviders = await import("@/lib/agent-providers");
+
+    const response = await POST(createJsonRequest({ demoId: "project-1" }) as never);
+
+    expect(response.status).toBe(200);
+    expect(agentProviders.pushSessionModelConfigToAgent).toHaveBeenCalledWith(
+      "session-existing",
+      {
+        ...globalBackendProvidersConfig,
+        multimodalModels: ["admin/vision-model"],
+      },
     );
   });
 

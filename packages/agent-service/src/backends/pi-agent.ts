@@ -24,6 +24,7 @@ import {
 } from './managers/assistant-text-utils';
 import { normalizeImageAttachments } from '../utils/image-attachments';
 import { serializeErrorForLog } from '../utils/error-utils';
+import { listUploadedFileAttachments } from '../utils/uploaded-file-attachments';
 
 function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; description?: string }>): string {
   if (!activeTools.length) return '';
@@ -48,17 +49,19 @@ function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; descrip
   ].join('\n');
 }
 
-function formatUploadedFilesForPrompt(files?: FileAttachment[]): string {
+function formatUploadedFilesForPrompt(files?: FileAttachment[], currentFileIds = new Set<string>()): string {
   if (!files || files.length === 0) return '';
 
   const lines = files.map((file, index) => {
     const status = file.textExtracted ? '可读取' : '未提取到文本';
+    const source = currentFileIds.has(file.id) ? '本轮上传' : '当前会话历史附件';
     const preview = file.textPreview
       ? `\n  预览：${file.textPreview.replace(/\s+/g, ' ').slice(0, 240)}`
       : '';
     return [
       `${index + 1}. ${file.name}`,
       `  attachmentId: ${file.id}`,
+      `  来源: ${source}`,
       `  MIME: ${file.mimeType || 'unknown'}`,
       `  大小: ${file.size} bytes`,
       `  文本状态: ${status}`,
@@ -70,7 +73,7 @@ function formatUploadedFilesForPrompt(files?: FileAttachment[]): string {
 
   return [
     '【上传文件】',
-    '用户本轮上传了以下只读文件附件。需要查看文件内容时，调用 `readUploadedFile`，传入对应 attachmentId；不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。',
+    '当前会话已有以下只读文件附件（包含本轮和之前消息上传的文件）。需要查看文件内容时，必须调用 `readUploadedFile`，传入对应 attachmentId；不要使用文件名猜 attachmentId，也不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。',
     '',
     ...lines,
     '',
@@ -336,6 +339,9 @@ export class PiAgentBackend implements IBackendAdapter {
         isError,
         event,
         sessionId,
+        {
+          emitFileOperations: true,
+        },
       );
       return undefined;
     });
@@ -555,7 +561,24 @@ Keep the final response concise: summarize what you changed, what you verified, 
     const model = this.modelManager.getModel();
     const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
 
-    const uploadedFilesPrefix = formatUploadedFilesForPrompt(options?.files);
+    const currentFiles = options?.files || [];
+    const currentFileIds = new Set(currentFiles.map((file) => file.id));
+    let sessionFiles: FileAttachment[] = [];
+    if (this.config.sessionId) {
+      try {
+        sessionFiles = await listUploadedFileAttachments(this.config.sessionId);
+      } catch (error) {
+        logger.warn(
+          { error: serializeErrorForLog(error), sessionId: this.config.sessionId },
+          'Failed to list uploaded file attachments for prompt context',
+        );
+      }
+    }
+    const uploadedFiles = [
+      ...currentFiles,
+      ...sessionFiles.filter((file) => !currentFileIds.has(file.id)),
+    ];
+    const uploadedFilesPrefix = formatUploadedFilesForPrompt(uploadedFiles, currentFileIds);
     let promptContent = uploadedFilesPrefix ? `${uploadedFilesPrefix}${content}` : content;
     let imageContent: any[] | undefined;
 
@@ -596,7 +619,8 @@ Keep the final response concise: summarize what you changed, what you verified, 
       {
         contentLength: promptContent.length,
         imageCount: images?.length || 0,
-        fileCount: options?.files?.length || 0,
+        fileCount: currentFiles.length,
+        sessionFileCount: uploadedFiles.length,
         modelSupportsImages,
       },
       "Pi Agent sending message",

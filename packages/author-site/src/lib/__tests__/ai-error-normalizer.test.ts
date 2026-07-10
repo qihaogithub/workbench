@@ -25,4 +25,10 @@ describe('normalizeAiError', () => {
     expect(result.category).toBe('quota');
     expect(result.userMessage).toBe('AI 服务额度或频率受限，请稍后重试。');
   });
+
+  it('将上一轮仍在运行映射为明确提示', () => {
+    const result = normalizeAiError({ code: 'AGENT_BUSY', message: 'Agent is currently processing a previous message' });
+    expect(result.category).toBe('busy');
+    expect(result.userMessage).toBe('上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。');
+  });
 });

@@ -6,6 +6,7 @@
 
 ## 当前结论
 
+- 2026-07-10 同步主文档结论：`page create` 默认运行时已切到 `prototype-html-css`，author-site 页面创建入口也同步默认写入原型页文件；CLI 若要稳定创建高保真 React 页，应显式传 `--runtime-type high-fidelity-react` 或提供页面代码。大型 Figma HTML 原型页上限也已放宽到 2MB，这两项都属于共享层当前事实，不新增 CLI 命令缺口。
 - 2026-07-09 同步主文档结论：`projectConfigValues` 已进一步进入 viewer 默认值与发布前 canonical workspace 回填链路，但写回语义仍停留在 author-site 路由层，`project-core` / `project-scaffold` 仍未形成共享闭环，因此 GAP-011 继续按 L1 report-only 处理，不新增 CLI 命令。
 - 2026-07-02 确认外部 CLI 自动维护提示词仍引用本文件名。
 - 2026-07-03 同步主文档结论：`page switch-runtime` 属于已实现但此前未登记的能力清单漂移，已在主文档与项目文档中补齐。
@@ -24,6 +25,8 @@
 ## 验证状态
 
 - `corepack pnpm check:automation`：通过。
+- `corepack pnpm check:project-core`：2026-07-10 通过。
+- `corepack pnpm check:project-cli`：2026-07-10 通过。
 - `corepack pnpm check:project-core`：2026-07-09 通过（34 tests passed）。
 - `corepack pnpm check:project-cli`：2026-07-09 通过（含命令集与全命令回归复核）。
 - `corepack pnpm check:project-scaffold`：2026-07-09 通过。

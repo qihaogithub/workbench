@@ -110,6 +110,48 @@ describe("ai attachments", () => {
     );
   });
 
+  it("未设置 DATA_DIR 时从 package 子目录定位到 monorepo 根数据目录", async () => {
+    jest.resetModules();
+    delete process.env.DATA_DIR;
+    const originalCwd = process.cwd();
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "ow-monorepo-"));
+    const packageDir = path.join(repoDir, "packages", "author-site");
+    fs.mkdirSync(packageDir, { recursive: true });
+    fs.writeFileSync(path.join(repoDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+    fs.writeFileSync(path.join(packageDir, "package.json"), "{}\n");
+
+    try {
+      process.chdir(packageDir);
+      const { saveAiAttachment } = await import("@/lib/ai-attachments");
+      const file = createMockFile(
+        "brief.txt",
+        "text/plain",
+        Buffer.from("Root data directory attachment", "utf-8"),
+      );
+
+      const attachment = await saveAiAttachment("agent-session-1", file);
+
+      expect(
+        fs.existsSync(
+          path.join(
+            repoDir,
+            "data",
+            "ai-attachments",
+            "agent-session-1",
+            attachment.id,
+            "text.txt",
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(packageDir, "data", "ai-attachments")),
+      ).toBe(false);
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
   it("提取 PDF 文本", async () => {
     const { saveAiAttachment } = await import("@/lib/ai-attachments");
     const pdf = `%PDF-1.4

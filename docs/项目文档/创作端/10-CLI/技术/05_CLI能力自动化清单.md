@@ -84,7 +84,7 @@ covers:
 | page.list | 页面 | `page list` | 低 | L3 | 已覆盖 | 查询页面树 |
 | page.get | 页面 | `page get` | 低 | L3 | 已覆盖 | 查询页面代码和配置 |
 | page.runtime.validate | 页面 | `page validate-runtime` | 低 | L3 | 已覆盖 | React 页面走预览运行契约校验，HTML/CSS 原型页走静态安全边界校验 |
-| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建高保真 React 页面、HTML/CSS 原型页或草图页 |
+| page.create | 页面 | `page create` | 中 | L4 | 已覆盖 | 新建高保真 React 页面、HTML/CSS 原型页或草图页；未显式指定 `runtimeType` 且未提供 React `code` 时默认创建原型页 |
 | page.duplicate | 页面 | `page duplicate` | 中 | L4 | 已覆盖 | 复制页面 |
 | page.update.code | 页面 | `page update-code` | 中 | L4 | 已覆盖 | 更新 React 页面代码 |
 | page.update.prototype | 页面 | `page update-prototype` | 中 | L4 | 已覆盖 | 更新 HTML/CSS 原型页内容和元信息 |

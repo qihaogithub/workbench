@@ -8,6 +8,16 @@ const NEXT_CACHE_DIRS = [
   resolve("packages/author-site/.next"),
   resolve("packages/viewer-site/.next"),
 ];
+const clearCache = process.argv.slice(2).includes("--clear-cache");
+
+const unknownArgs = process.argv
+  .slice(2)
+  .filter((arg) => arg !== "--clear-cache");
+
+if (unknownArgs.length > 0) {
+  console.error(`[dev-restart] Unknown option(s): ${unknownArgs.join(", ")}`);
+  process.exit(1);
+}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -128,7 +138,11 @@ function startDevServices() {
 
 try {
   await cleanPorts();
-  cleanNextCaches();
+  if (clearCache) {
+    cleanNextCaches();
+  } else {
+    console.log("[dev-restart] Preserving Next.js caches. Use pnpm dev:repair to clear them.");
+  }
   startDevServices();
 } catch (error) {
   console.error(`[dev-restart] ${error instanceof Error ? error.message : String(error)}`);

@@ -104,6 +104,14 @@ describe('PiAgentBackend', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    fsMocks.existsSync.mockReset();
+    fsMocks.existsSync.mockReturnValue(true);
+    fsMocks.readFileSync.mockReset();
+    fsMocks.readFileSync.mockReturnValue('edited file content');
+    fsMocks.promises.readFile.mockReset();
+    fsMocks.promises.writeFile.mockReset();
+    fsMocks.promises.mkdir.mockReset();
+    fsMocks.promises.readdir.mockReset();
     piAgentMocks.harnesses.length = 0;
     piAgentMocks.envs.length = 0;
   });
@@ -256,6 +264,38 @@ describe('PiAgentBackend', () => {
       await expect(backend.sendMessage('hello')).rejects.toThrow(
         '模型返回了空内容',
       );
+    });
+
+    it('后续消息应注入当前会话已上传文件清单', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      fsMocks.promises.readdir.mockResolvedValue([
+        { name: 'att-history', isDirectory: () => true },
+      ] as any);
+      fsMocks.promises.readFile.mockResolvedValue(JSON.stringify({
+        id: 'att-history',
+        name: '商城首页.html',
+        mimeType: 'text/html',
+        size: 1024,
+        textExtracted: true,
+        textPreview: '<main>mall</main>',
+        lineCount: 12,
+      }));
+
+      await backend.start();
+      const prompt = vi.fn().mockResolvedValue({
+        content: 'ok',
+      });
+      piAgentMocks.harnesses[0].prompt = prompt;
+
+      await expect(
+        backend.sendMessage('按照我上传的文件修改当前页面'),
+      ).resolves.toBe('ok');
+
+      const promptContent = prompt.mock.calls[0][0] as string;
+      expect(promptContent).toContain('当前会话已有以下只读文件附件');
+      expect(promptContent).toContain('attachmentId: att-history');
+      expect(promptContent).toContain('来源: 当前会话历史附件');
+      expect(promptContent).toContain('商城首页.html');
     });
 
     it('底层发送失败日志应保留 Error 的可诊断字段', async () => {
@@ -521,7 +561,7 @@ describe('PiAgentBackend', () => {
       });
     });
 
-    it('应从底层 writeFile tool_execution_end 捕获文件变更并发出文件事件', async () => {
+    it('应从带完整参数的 tool_result 钩子捕获 writeFile 并发出文件事件', async () => {
       const backend = new PiAgentBackend(mockConfig);
       const events: any[] = [];
 
@@ -529,35 +569,24 @@ describe('PiAgentBackend', () => {
       await backend.start();
 
       const harness = piAgentMocks.harnesses[0];
-      harness.subscriber?.({
-        type: 'tool_execution_start',
+      harness.handlers.get('tool_result')?.({
+        type: 'tool_result',
         toolCallId: 'write-1',
         toolName: 'writeFile',
-        args: {
-          path: 'demos/new-page_a1b2/index.tsx',
-          content: 'export default function Demo() { return <div />; }',
-        },
-      });
-      harness.subscriber?.({
-        type: 'tool_execution_end',
-        toolCallId: 'write-1',
-        toolName: 'writeFile',
-        args: {
+        input: {
           path: 'demos/new-page_a1b2/index.tsx',
           content: 'export default function Demo() { return <div />; }',
         },
         isError: false,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: 'Successfully wrote to demos/new-page_a1b2/index.tsx',
-            },
-          ],
-          details: {
-            path: 'demos/new-page_a1b2/index.tsx',
-            size: 48,
+        content: [
+          {
+            type: 'text',
+            text: 'Successfully wrote to demos/new-page_a1b2/index.tsx',
           },
+        ],
+        details: {
+          path: 'demos/new-page_a1b2/index.tsx',
+          size: 48,
         },
       });
 
@@ -580,7 +609,7 @@ describe('PiAgentBackend', () => {
       );
     });
 
-    it('应从底层 editFile tool_execution_end 立即发出文件事件', async () => {
+    it('应从带完整参数的 tool_result 钩子捕获 editFile 并立即发出文件事件', async () => {
       const backend = new PiAgentBackend(mockConfig);
       const events: any[] = [];
 
@@ -588,27 +617,25 @@ describe('PiAgentBackend', () => {
       await backend.start();
 
       const harness = piAgentMocks.harnesses[0];
-      harness.subscriber?.({
-        type: 'tool_execution_end',
+      harness.handlers.get('tool_result')?.({
+        type: 'tool_result',
         toolCallId: 'edit-1',
         toolName: 'editFile',
-        args: {
+        input: {
           path: 'demos/new-page_a1b2/index.tsx',
           old_string: 'before',
           new_string: 'after',
         },
         isError: false,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: 'Successfully edited demos/new-page_a1b2/index.tsx',
-            },
-          ],
-          details: {
-            path: 'demos/new-page_a1b2/index.tsx',
-            lineNumber: 1,
+        content: [
+          {
+            type: 'text',
+            text: 'Successfully edited demos/new-page_a1b2/index.tsx',
           },
+        ],
+        details: {
+          path: 'demos/new-page_a1b2/index.tsx',
+          lineNumber: 1,
         },
       });
 

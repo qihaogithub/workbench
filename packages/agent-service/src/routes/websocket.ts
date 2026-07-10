@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket, { WebSocketServer } from "ws";
-import { getAgentManager } from "../core/agent-manager";
+import { createAgentBusyResult, getAgentManager } from "../core/agent-manager";
 import { BackendAgent } from "../core/backend-agent";
 import {
   AgentConfig,
@@ -23,7 +23,6 @@ import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
 import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
 import type { BaseAgent } from "../core/agent";
-import { loadConfig } from "../utils/config";
 
 function resolveDefaultModelId(): string {
   const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
@@ -78,10 +77,9 @@ const connections = new Map<string, ActiveConnection>();
 
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
-const DEFAULT_MESSAGE_TIMEOUT_MS = 120000;
 const MIN_MESSAGE_TIMEOUT_MS = 15000;
 const MAX_MESSAGE_TIMEOUT_MS = 600000;
-const MESSAGE_TIMEOUT_CHECK_INTERVAL_MS = 5000;
+const MESSAGE_PROGRESS_HEARTBEAT_INTERVAL_MS = 25000;
 
 function normalizeTimeoutMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -93,12 +91,8 @@ function normalizeTimeoutMs(value: unknown): number | null {
   );
 }
 
-export function resolveMessageTimeoutMs(requestTimeoutMs?: number): number {
-  return (
-    normalizeTimeoutMs(requestTimeoutMs) ??
-    normalizeTimeoutMs(loadConfig().piAgent.timeout) ??
-    DEFAULT_MESSAGE_TIMEOUT_MS
-  );
+export function resolveExplicitMessageTimeoutMs(requestTimeoutMs?: number): number | null {
+  return normalizeTimeoutMs(requestTimeoutMs);
 }
 
 async function resolveCurrentModelId(agent: BaseAgent | undefined): Promise<string | null> {
@@ -288,6 +282,36 @@ export async function registerWebSocketRoutes(
                 }
               }
 
+              const messageId = message.id || generateMessageId();
+              if (agent instanceof BackendAgent && agent.isBusy()) {
+                const result = createAgentBusyResult();
+                if (!eventRouter.isActive()) {
+                  eventRouter.startMessage(messageId, {
+                    contentLength: message.content.length,
+                    workingDir: message.workingDir,
+                    demoId: message.demoId,
+                    model: requestedModelId || (await resolveCurrentModelId(agent)) || config.model,
+                  });
+                  eventRouter.recordFinish(result);
+                  eventRouter.finishMessage();
+                }
+                sendMessage({
+                  type: "error",
+                  id: messageId,
+                  sessionId,
+                  error: result.error,
+                });
+                sendMessage({
+                  type: "status",
+                  sessionId,
+                  status: "processing",
+                });
+                getSessionStore().update(sessionId, {
+                  status: "processing",
+                });
+                break;
+              }
+
               if (
                 requestedModelId &&
                 agent instanceof BackendAgent &&
@@ -319,8 +343,7 @@ export async function registerWebSocketRoutes(
                 messageCount: (sessionStore.get(sessionId)?.messageCount || 0) + 1,
               });
 
-              const messageId = message.id || generateMessageId();
-              const messageTimeoutMs = resolveMessageTimeoutMs(
+              const explicitMessageTimeoutMs = resolveExplicitMessageTimeoutMs(
                 message.options?.timeout,
               );
               eventRouter.startMessage(messageId, {
@@ -331,9 +354,22 @@ export async function registerWebSocketRoutes(
               });
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+              let progressHeartbeatHandle: ReturnType<typeof setInterval> | undefined;
 
               try {
                 lastAgentActivityAt = Date.now();
+                progressHeartbeatHandle = setInterval(() => {
+                  if (eventRouter.isCancelled()) return;
+                  sendMessage({
+                    type: "status",
+                    id: messageId,
+                    sessionId,
+                    status: "processing",
+                    timestamp: Date.now(),
+                  });
+                }, MESSAGE_PROGRESS_HEARTBEAT_INTERVAL_MS);
+                progressHeartbeatHandle.unref?.();
+
                 const sendPromise = agent.sendMessage(
                   message.content,
                   {
@@ -342,48 +378,43 @@ export async function registerWebSocketRoutes(
                     files: message.files,
                   },
                 );
-                const timeoutPromise = new Promise<AgentResult>((resolve) => {
-                  const checkTimeout = () => {
-                    const idleMs = Date.now() - lastAgentActivityAt;
-                    if (idleMs >= messageTimeoutMs) {
-                      logger.warn(
-                        { sessionId, timeoutMs: messageTimeoutMs, idleMs },
-                        "Agent sendMessage idle timed out, cancelling",
-                      );
-                      eventRouter.cancelMessage();
-                      agent.cancel();
-                      const partialFiles =
-                        agent instanceof BackendAgent ? agent.getFiles() : [];
-                      resolve({
-                        success: false,
-                        files: partialFiles.length > 0 ? partialFiles : undefined,
-                        error: {
-                          code: "MESSAGE_TIMEOUT",
-                          message: `消息处理超时（连续 ${Math.round(
-                            messageTimeoutMs / 1000,
-                          )}s 无响应），已自动取消`,
-                          retryable: true,
-                        },
-                      });
-                      return;
-                    }
 
-                    timeoutHandle = setTimeout(
-                      checkTimeout,
-                      Math.min(
-                        MESSAGE_TIMEOUT_CHECK_INTERVAL_MS,
-                        Math.max(1000, messageTimeoutMs - idleMs),
-                      ),
-                    );
-                  };
+                const result: AgentResult = explicitMessageTimeoutMs
+                  ? await Promise.race([
+                      sendPromise,
+                      new Promise<AgentResult>((resolve) => {
+                        timeoutHandle = setTimeout(() => {
+                          const elapsedMs = Date.now() - lastAgentActivityAt;
+                          const partialFiles =
+                            agent instanceof BackendAgent ? agent.getFiles() : [];
+                          eventRouter.cancelMessage();
+                          agent.cancel();
 
-                  timeoutHandle = setTimeout(checkTimeout, messageTimeoutMs);
-                });
+                          logger.warn(
+                            {
+                              sessionId,
+                              timeoutMs: explicitMessageTimeoutMs,
+                              elapsedMs,
+                            },
+                            "Agent sendMessage reached explicit timeout, cancelling",
+                          );
 
-                const result: AgentResult = await Promise.race([
-                  sendPromise,
-                  timeoutPromise,
-                ]);
+                          resolve({
+                            success: false,
+                            files: partialFiles.length > 0 ? partialFiles : undefined,
+                            error: {
+                              code: "MESSAGE_TIMEOUT",
+                              message: `消息处理超时（已达到显式上限 ${Math.round(
+                                explicitMessageTimeoutMs / 1000,
+                              )}s），已自动取消`,
+                              retryable: true,
+                            },
+                          });
+                        }, explicitMessageTimeoutMs);
+                        timeoutHandle.unref?.();
+                      }),
+                    ])
+                  : await sendPromise;
 
                 if (!result.success && result.error?.code === "MESSAGE_TIMEOUT") {
                   eventRouter.cancelMessage();
@@ -432,6 +463,7 @@ export async function registerWebSocketRoutes(
                 throw error;
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
+                if (progressHeartbeatHandle) clearInterval(progressHeartbeatHandle);
                 eventRouter.finishMessage();
               }
             } catch (error) {

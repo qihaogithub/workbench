@@ -46,6 +46,7 @@ import { Reasoning, ReasoningTrigger, ReasoningContent } from "./reasoning";
 import { SplitContentRenderer } from "./split-content-renderer";
 import { type MessagePart } from "./message";
 import { UserChoiceCard } from "./user-choice-card";
+import { ChatCard } from "./chat-card";
 import type { UserChoiceResponse } from "./chat/services/stream-service";
 import {
   Dialog,
@@ -1268,9 +1269,9 @@ function ExternalAuthCard({
   };
 
   return (
-    <div
+    <ChatCard
       className={cn(
-        "rounded-lg border border-border/50 bg-muted/20 p-3 text-sm",
+        "border-border/50 bg-muted/20 p-3",
         compact && "my-1",
       )}
     >
@@ -1368,7 +1369,7 @@ function ExternalAuthCard({
           </div>
         </div>
       </div>
-    </div>
+    </ChatCard>
   );
 }
 

@@ -4,13 +4,26 @@ import { useChatModels } from "../chat/hooks/use-chat-models";
 
 type StreamHandler = (event: Record<string, unknown>) => void | Promise<void>;
 
-class MockAgentStream {
-  readonly ws = {
-    readyState: 1,
-    send: jest.fn(),
-  };
+const OPEN_READY_STATE = 1;
+const CONNECTING_READY_STATE = 0;
+const initialReadyStates = new Map<string, number>();
 
+class MockAgentStream {
+  readonly ws: { readyState: number; send: jest.Mock };
+
+  readonly ping = jest.fn();
   readonly close = jest.fn();
+
+  constructor(readyState = OPEN_READY_STATE) {
+    this.ws = {
+      readyState,
+      send: jest.fn(),
+    };
+  }
+
+  open() {
+    this.ws.readyState = OPEN_READY_STATE;
+  }
 
   private readonly handlers = new Map<string, Set<StreamHandler>>();
 
@@ -35,7 +48,9 @@ class MockAgentStream {
 
 const mockStreams = new Map<string, MockAgentStream>();
 const mockStream = jest.fn((sessionId: string) => {
-  const stream = new MockAgentStream();
+  const stream = new MockAgentStream(
+    initialReadyStates.get(sessionId) ?? OPEN_READY_STATE,
+  );
   mockStreams.set(sessionId, stream);
   return stream;
 });
@@ -49,8 +64,10 @@ jest.mock("@/lib/agent-client", () => ({
 describe("useChatModels", () => {
   beforeEach(() => {
     mockStreams.clear();
+    initialReadyStates.clear();
     mockStream.mockClear();
     window.localStorage.clear();
+    jest.useRealTimers();
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -69,7 +86,7 @@ describe("useChatModels", () => {
     if (!global.WebSocket) {
       Object.defineProperty(global, "WebSocket", {
         configurable: true,
-        value: { OPEN: 1 },
+        value: { OPEN: OPEN_READY_STATE },
       });
     }
   });
@@ -190,5 +207,76 @@ describe("useChatModels", () => {
       JSON.stringify({ type: "set_model", modelId: "custom/preferred" }),
     );
     second.unmount();
+  });
+
+  it("连接状态事件已发出也会兜底请求模型列表", async () => {
+    const { unmount } = renderHook(() =>
+      useChatModels({ agentSessionId: "session-ready-fallback", workingDir: "/tmp/workspace" }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("session-ready-fallback")).toBeDefined());
+    const stream = mockStreams.get("session-ready-fallback")!;
+
+    await waitFor(() =>
+      expect(stream.ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+      ),
+    );
+
+    unmount();
+  });
+
+  it("兜底请求早于 WebSocket OPEN 时不会吞掉 connected 后的模型请求", async () => {
+    jest.useFakeTimers();
+    initialReadyStates.set("session-delayed-open", CONNECTING_READY_STATE);
+
+    const { unmount } = renderHook(() =>
+      useChatModels({
+        agentSessionId: "session-delayed-open",
+        workingDir: "/tmp/workspace",
+      }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("session-delayed-open")).toBeDefined());
+    const stream = mockStreams.get("session-delayed-open")!;
+
+    act(() => {
+      jest.advanceTimersByTime(50);
+    });
+    expect(stream.ws.send).not.toHaveBeenCalledWith(
+      JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+    );
+
+    stream.open();
+    await act(async () => {
+      await stream.emit("status", { status: "connected" });
+    });
+
+    expect(stream.ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+    );
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  it("模型列表专用连接保持心跳，避免空闲后被服务端关闭", async () => {
+    jest.useFakeTimers();
+
+    const { unmount } = renderHook(() =>
+      useChatModels({ agentSessionId: "session-model-keepalive" }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("session-model-keepalive")).toBeDefined());
+    const stream = mockStreams.get("session-model-keepalive")!;
+
+    act(() => {
+      jest.advanceTimersByTime(25_000);
+    });
+
+    expect(stream.ping).toHaveBeenCalledTimes(1);
+
+    unmount();
+    jest.useRealTimers();
   });
 });

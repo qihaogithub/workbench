@@ -8,6 +8,14 @@
       "parentId": null,
       "runtimeType": "prototype-html-css",
       "routeKey": "page"
+    },
+    {
+      "id": "figma_7zwt",
+      "name": "从Figma导入的页面",
+      "routeKey": "figma",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
     }
   ]
 }

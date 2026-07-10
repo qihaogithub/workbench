@@ -18,6 +18,8 @@ beforeEach(() => {
   fs.mkdirSync(path.join(workspacePath, "demos", "page-1"), { recursive: true });
   fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "index.tsx"), "old", "utf-8");
+  fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "prototype.html"), "<main>old</main>", "utf-8");
+  fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "prototype.css"), "main { color: black; }", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "config.schema.json"), "{}", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "knowledge", "产品规则.md"), "# 产品规则", "utf-8");
   writeJson(path.join(workspacePath, ".workspace.json"), {
@@ -112,6 +114,29 @@ describe("WorkspaceFilePersistence", () => {
 
     expect(result.ok).toBe(true);
     expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
+  });
+
+  it("允许 HTML/CSS 原型页源码进入独立协同房间", () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+
+    expect(
+      persistence.validateSession({
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        resourcePath: "demos/page-1/prototype.html",
+        kind: "page-prototype-html",
+      }).ok,
+    ).toBe(true);
+    expect(
+      persistence.validateSession({
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        resourcePath: "demos/page-1/prototype.css",
+        kind: "page-prototype-css",
+      }).ok,
+    ).toBe(true);
   });
 
   it("允许不同用户通过各自 session 协作同一个 workspace", () => {

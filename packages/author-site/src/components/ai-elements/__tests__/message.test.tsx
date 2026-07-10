@@ -19,6 +19,36 @@ jest.mock("@streamdown/math", () => ({ math: {} }), { virtual: true });
 jest.mock("@streamdown/cjk", () => ({ cjk: {} }), { virtual: true });
 
 describe("Message 用户消息展示", () => {
+  it("可视化属性消息以卡片展示，并可在弹窗中查看完整上下文", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Message
+        message={{
+          id: "visual-property-1",
+          role: "user",
+          content: "完整的结构化属性修改提示",
+          visualProperty: {
+            title: "可视化修改已发送给 AI",
+            summary: "<div> 商品列表 · 2 项结构化变更",
+            hiddenPrompt: "【点击位置图层】\n1. 商品列表\n\n【属性变更】\n标题：旧值 -> 新值",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("可视化修改已发送给 AI")).toBeInTheDocument();
+    expect(screen.getByText(/商品列表 · 2 项结构化变更/)).toBeInTheDocument();
+    expect(screen.queryByText("完整的结构化属性修改提示")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "查看详情" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("【点击位置图层】");
+    expect(dialog).toHaveTextContent("标题：旧值 -> 新值");
+  });
+
   it("普通 Markdown 用户消息使用 Markdown 渲染器展示", () => {
     const content = [
       "设计以下页面：",

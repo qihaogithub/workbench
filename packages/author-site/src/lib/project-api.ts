@@ -281,6 +281,7 @@ export class ProjectApiClient {
       schema?: string;
       prototypeHtml?: string;
       prototypeCss?: string;
+      prototypeMeta?: PrototypePageMeta;
     },
   ): Promise<void> {
     void projectId;

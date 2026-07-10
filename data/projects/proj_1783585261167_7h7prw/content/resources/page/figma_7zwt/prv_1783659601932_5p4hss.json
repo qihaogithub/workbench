@@ -1,0 +1,39 @@
+{
+  "id": "prv_1783659601932_5p4hss",
+  "projectId": "proj_1783585261167_7h7prw",
+  "kind": "page",
+  "resourceId": "figma_7zwt",
+  "contentHash": "8b8ad8287bb73a1e290407332caa8c6dd9c94ed19dc6d5b4bbc80465482de589",
+  "blobRefs": [
+    "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+    "077038f1e784165724283e5c0afcd60736d7f8febb59efcec91d71ae5db2fc57",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "figma_7zwt",
+      "name": "从Figma导入的页面",
+      "routeKey": "figma",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    },
+    "files": {
+      "schema": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "prototypeHtml": "077038f1e784165724283e5c0afcd60736d7f8febb59efcec91d71ae5db2fc57",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783659601936,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录从Figma导入的页面"
+}

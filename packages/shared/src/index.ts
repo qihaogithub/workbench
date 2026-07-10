@@ -161,6 +161,8 @@ export interface SessionMeta {
 
 export type CollabResourceKind =
   | "page-code"
+  | "page-prototype-html"
+  | "page-prototype-css"
   | "page-schema"
   | "page-sketch-scene"
   | "project-schema"

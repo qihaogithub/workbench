@@ -65,7 +65,7 @@ interface StoredAiAttachmentManifest extends FileAttachment {
 function findProjectRoot(startDir: string): string {
   let dir = startDir;
   while (dir !== path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, "package.json"))) {
+    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
       return dir;
     }
     dir = path.dirname(dir);

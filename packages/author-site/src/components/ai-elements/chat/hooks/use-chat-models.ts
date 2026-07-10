@@ -44,6 +44,23 @@ interface PersistedModelPreference {
 }
 
 const MODEL_PREFERENCE_STORAGE_PREFIX = "workbench:ai-model:";
+const MODEL_STREAM_KEEPALIVE_INTERVAL_MS = 25_000;
+const MODEL_STREAM_READY_REQUEST_DELAY_MS = 50;
+
+interface TimerWithUnref {
+  unref: () => void;
+}
+
+function unrefTimer(timer: unknown): void {
+  if (
+    typeof timer === "object" &&
+    timer !== null &&
+    "unref" in timer &&
+    typeof (timer as TimerWithUnref).unref === "function"
+  ) {
+    (timer as TimerWithUnref).unref();
+  }
+}
 
 function readPersistedPreference(
   persistenceKey?: string,
@@ -98,6 +115,8 @@ export function useChatModels(options: UseChatModelsOptions) {
   const modelStreamRef = useRef<AgentStream | null>(null);
   const modelRetryCountRef = useRef(0);
   const modelRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modelKeepaliveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const modelReadyRequestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferredModelRef = useRef<{
     fullModelId: string;
     baseModelId: string;
@@ -153,28 +172,49 @@ export function useChatModels(options: UseChatModelsOptions) {
 
   useEffect(() => {
     if (!agentSessionId) return;
+    let disposed = false;
 
     const setupModelStream = async () => {
       const { getAgentClient } = await import("@/lib/agent-client");
+      if (disposed) return;
+
       const agentClient = getAgentClient();
       const stream = agentClient.stream(agentSessionId);
       modelStreamRef.current = stream;
       modelRetryCountRef.current = 0;
+      let initialRequestSent = false;
 
-      const requestModels = () => {
+      const requestModels = (): boolean => {
         const ws = (stream as any).ws;
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "get_models", workingDir }));
+          return true;
         }
+        return false;
+      };
+
+      const requestInitialModels = () => {
+        if (initialRequestSent) return;
+        initialRequestSent = requestModels();
       };
 
       let connected = false;
       stream.on("status", (event: StreamEvent) => {
         if (event.status === "connected" && !connected) {
           connected = true;
-          requestModels();
+          requestInitialModels();
         }
       });
+
+      modelReadyRequestTimerRef.current = setTimeout(
+        requestInitialModels,
+        MODEL_STREAM_READY_REQUEST_DELAY_MS,
+      );
+      unrefTimer(modelReadyRequestTimerRef.current);
+      modelKeepaliveTimerRef.current = setInterval(() => {
+        stream.ping();
+      }, MODEL_STREAM_KEEPALIVE_INTERVAL_MS);
+      unrefTimer(modelKeepaliveTimerRef.current);
 
       stream.on("models", async (event: StreamEvent) => {
         const models = event.models
@@ -230,6 +270,15 @@ export function useChatModels(options: UseChatModelsOptions) {
     setupModelStream();
 
     return () => {
+      disposed = true;
+      if (modelReadyRequestTimerRef.current) {
+        clearTimeout(modelReadyRequestTimerRef.current);
+        modelReadyRequestTimerRef.current = null;
+      }
+      if (modelKeepaliveTimerRef.current) {
+        clearInterval(modelKeepaliveTimerRef.current);
+        modelKeepaliveTimerRef.current = null;
+      }
       if (modelRetryTimerRef.current) {
         clearTimeout(modelRetryTimerRef.current);
         modelRetryTimerRef.current = null;

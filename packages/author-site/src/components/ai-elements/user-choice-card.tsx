@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { MessagePart } from "./message";
 import type { UserChoiceResponse } from "./chat/services/stream-service";
+import { ChatCard } from "./chat-card";
 
 type UserChoicePart = Extract<MessagePart, { type: "user_choice" }>;
 
@@ -58,9 +59,9 @@ export function UserChoiceCard({
   })();
 
   return (
-    <div
+    <ChatCard
       className={cn(
-        "w-full rounded-lg border bg-background shadow-sm",
+        "bg-background",
         compact ? "p-3" : "p-4",
       )}
     >
@@ -200,6 +201,6 @@ export function UserChoiceCard({
             </div>
           )}
       </div>
-    </div>
+    </ChatCard>
   );
 }

@@ -3,6 +3,7 @@ export type AiErrorCategory =
   | "timeout"
   | "auth"
   | "quota"
+  | "busy"
   | "cancelled"
   | "server"
   | "unknown";
@@ -44,6 +45,14 @@ function extractCode(error: unknown): string | undefined {
 
 function classifyAiError(code: string | undefined, message: string): AiErrorCategory {
   const haystack = `${code || ""} ${message}`.toLowerCase();
+  if (
+    haystack.includes("agent_busy") ||
+    haystack.includes("currently processing") ||
+    haystack.includes("仍在运行") ||
+    haystack.includes("上一轮")
+  ) {
+    return "busy";
+  }
   if (
     haystack.includes("abort") ||
     haystack.includes("cancel") ||
@@ -117,6 +126,8 @@ function userMessageForCategory(
       return "AI 服务鉴权失败，请联系管理员检查模型 API 配置。";
     case "quota":
       return "AI 服务额度或频率受限，请稍后重试。";
+    case "busy":
+      return "上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。";
     case "cancelled":
       return "本次 AI 请求已取消，可以重新发送。";
     case "server":

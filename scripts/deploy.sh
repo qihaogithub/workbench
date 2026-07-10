@@ -249,8 +249,6 @@ rsync_excludes=(
     --exclude '/node_modules/'
     --exclude '/OPS/CLI/dist/'
     --exclude '/OPS/CLI/node_modules/'
-    --exclude '/packages/web/'
-    --exclude '/packages/snapshot-service/'
     --exclude '/packages/*/.next/'
     --exclude '/packages/*/.workbench/'
     --exclude '/packages/*/data/'

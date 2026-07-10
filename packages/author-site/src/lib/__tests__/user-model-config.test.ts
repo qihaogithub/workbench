@@ -115,6 +115,29 @@ describe("user model config", () => {
     expect(backend?.activeModelId).toBe("custom/user-model");
   });
 
+  it("returns admin providers when user has no personal config", async () => {
+    const { readUserBackendProvidersConfig } =
+      await import("@/lib/user-model-config");
+
+    const fallback = {
+      providers: [
+        {
+          id: "admin",
+          name: "Admin",
+          baseURL: "https://admin.example.com/v1",
+          apiKey: "sk-admin",
+          models: ["admin-model"],
+          defaultModel: "admin-model",
+          enabled: true,
+        },
+      ],
+      activeProviderId: "admin",
+      activeModelId: "admin/admin-model",
+    };
+
+    expect(readUserBackendProvidersConfig("u1", fallback)).toBe(fallback);
+  });
+
   it("clears config", async () => {
     const {
       upsertUserModelConfig,

@@ -270,6 +270,8 @@ function replaceCollabText(
 function getCollabResourceKind(filePath: string): CollabResourceKind | null {
   const normalized = filePath.replace(/^\/+/, "");
   if (/^demos\/[^/]+\/index\.tsx$/.test(normalized)) return "page-code";
+  if (/^demos\/[^/]+\/prototype\.html$/.test(normalized)) return "page-prototype-html";
+  if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return "page-prototype-css";
   if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
   if (normalized === "project.config.schema.json") return "project-schema";
   if (normalized === "workspace-tree.json") return "workspace-tree";

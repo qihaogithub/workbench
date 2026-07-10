@@ -3,7 +3,6 @@ import {
   getToolResultContent,
   getToolResultDetails,
   getToolResultPayload,
-  getToolInput,
 } from './assistant-text-utils';
 import type { ToolHookManager } from './tool-hook-manager';
 
@@ -86,12 +85,14 @@ export class EventMapper {
           break;
 
         case 'tool_execution_end': {
-          const input = getToolInput(event);
           const details = getToolResultDetails(event);
-          this.toolHookManager.recordToolFileChange(event.toolName, input, event.isError, event);
-          this.toolHookManager.emitFileOperationsForTool(event.toolName, input, event.isError, event, sessionId);
-          this.toolHookManager.updatePlanFromToolResult(event.toolName, event.isError, event, sessionId);
-          this.emitToolCallUpdate(event.toolCallId, event.toolName, event.isError, event, details);
+          // pi-agent-core 的底层 tool_execution_end 只保证 toolCallId + result，
+          // 不保证携带 toolName / input。文件变更必须由随后带完整参数的
+          // AgentHarness tool_result 钩子处理，否则 editFile 虽写入成功，
+          // 前端却收不到 file_operation，旧的内存快照会再次覆盖磁盘文件。
+          if (typeof event.toolName === 'string') {
+            this.emitToolCallUpdate(event.toolCallId, event.toolName, event.isError, event, details);
+          }
           break;
         }
 

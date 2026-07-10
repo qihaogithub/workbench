@@ -439,6 +439,11 @@ describe('parseFigmaImportContent', () => {
       expect(result.prototypeHtml).toContain('<!DOCTYPE html>')
       expect(result.prototypeHtml).toContain('成长豆商城')
       expect(result.prototypeCss).toBe('')
+      expect(result.prototypeMeta).toMatchObject({
+        width: 375,
+        height: 812,
+        generatedBy: 'figma-import',
+      })
     }
   })
 

@@ -64,6 +64,36 @@ function normalizeSlash(value) {
   return value.replace(/\\/g, "/");
 }
 
+function collectWorkspacePackageDirectories() {
+  const packageJsonFiles = [
+    ...walkFiles(path.join(root, "packages"), (file) => path.basename(file) === "package.json"),
+    ...walkFiles(path.join(root, "OPS"), (file) => path.basename(file) === "package.json"),
+  ];
+  const directories = new Map();
+
+  for (const packageJsonFile of packageJsonFiles) {
+    try {
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonFile, "utf8"));
+      if (typeof packageJson.name === "string" && packageJson.name) {
+        directories.set(packageJson.name, path.dirname(packageJsonFile));
+      }
+    } catch {
+      // Invalid package manifests are reported by their package-level checks.
+    }
+  }
+
+  return directories;
+}
+
+function resolveScriptWorkingDirectory(script, commandIndex, workspacePackageDirectories) {
+  const commandPrefix = script.slice(0, commandIndex);
+  const filterExecMatch = commandPrefix.match(
+    /(?:corepack\s+)?pnpm\s+--filter(?:=|\s+)(?:"([^"]+)"|'([^']+)'|([^\s"'&|]+))\s+exec\s*$/,
+  );
+  const packageSelector = filterExecMatch?.[1] ?? filterExecMatch?.[2] ?? filterExecMatch?.[3];
+  return (packageSelector && workspacePackageDirectories.get(packageSelector)) || root;
+}
+
 function checkRequiredFiles() {
   for (const file of [
     "AGENTS.md",
@@ -161,6 +191,7 @@ function checkMarkdownLinks() {
 function checkScriptPaths() {
   const packageJson = JSON.parse(readText("package.json"));
   const scripts = packageJson.scripts ?? {};
+  const workspacePackageDirectories = collectWorkspacePackageDirectories();
   const pathPattern = /(?:node|tsx|playwright\s+test)\s+(?:--config\s+)?("[^"]+"|'[^']+'|[^\s&|]+)/g;
   for (const [name, script] of Object.entries(scripts)) {
     let match;
@@ -168,7 +199,12 @@ function checkScriptPaths() {
       let candidate = match[1]?.replace(/^['"]|['"]$/g, "");
       if (!candidate || candidate.startsWith("--")) continue;
       if (!/\.(mjs|js|ts|tsx)$/.test(candidate)) continue;
-      if (!exists(candidate)) {
+      const workingDirectory = resolveScriptWorkingDirectory(
+        script,
+        match.index,
+        workspacePackageDirectories,
+      );
+      if (!fs.existsSync(path.resolve(workingDirectory, candidate))) {
         addError(`package.json 脚本 ${name} 指向不存在的路径: ${candidate}`);
       }
     }

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Shield, AlertTriangle, FileText, Check, X } from 'lucide-react'
 import { DocumentEditor } from '@workbench/demo-ui'
+import { ChatCard } from './chat-card'
 
 interface PermissionRequestData {
   sessionId: string
@@ -60,7 +61,7 @@ export function PermissionDialog({
     return (
       <>
         <div className={cn(isInline ? 'px-4 py-2' : '', className)}>
-          <div className="w-full rounded-lg border bg-background shadow-sm">
+          <ChatCard className="bg-background">
             <div className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="p-2 rounded-full bg-blue-500/10">
                 <FileText className="h-5 w-5 text-blue-600" />
@@ -81,7 +82,7 @@ export function PermissionDialog({
                 </Button>
               </div>
             </div>
-          </div>
+          </ChatCard>
         </div>
 
         {isPlanOpen && (
@@ -147,8 +148,8 @@ export function PermissionDialog({
         : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm',
       className
     )}>
-      <div className={cn(
-        'bg-background rounded-lg border',
+      <ChatCard className={cn(
+        'bg-background',
         isInline ? 'w-full shadow-sm' : 'shadow-xl max-w-md w-full mx-4',
       )}>
         {/* 头部 */}
@@ -220,7 +221,7 @@ export function PermissionDialog({
             取消请求
           </Button>
         </div>
-      </div>
+      </ChatCard>
     </div>
   )
 }

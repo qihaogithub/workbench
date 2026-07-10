@@ -1,0 +1,21 @@
+{
+  "auditId": "audit_1783654191974_kd1g3y",
+  "at": 1783654191974,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783585261167_7h7prw",
+  "resourceId": "growth-bean-mall_x8k2",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:growth-bean-mall_x8k2:prototypeHtml",
+      "page:growth-bean-mall_x8k2:prototypeCss"
+    ]
+  }
+}

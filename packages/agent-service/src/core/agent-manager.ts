@@ -29,6 +29,17 @@ export interface AgentInfo {
   busy?: boolean;
 }
 
+export function createAgentBusyResult(): AgentResult {
+  return {
+    success: false,
+    error: {
+      code: 'AGENT_BUSY',
+      message: '上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。',
+      retryable: true,
+    },
+  };
+}
+
 export class AgentManager implements IAgentManager {
   private agents: Map<string, BaseAgent> = new Map();
   private factory: AgentFactory;
@@ -161,14 +172,7 @@ export class AgentManager implements IAgentManager {
     }
 
     if (agent instanceof BackendAgent && agent.isBusy()) {
-      return {
-        success: false,
-        error: {
-          code: 'AGENT_NOT_INITIALIZED',
-          message: 'Agent is currently processing a previous message',
-          retryable: true,
-        },
-      };
+      return createAgentBusyResult();
     }
 
     if (agent.status === 'initializing') {
