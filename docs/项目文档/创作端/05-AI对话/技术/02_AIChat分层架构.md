@@ -121,7 +121,7 @@ WebSocket 通信的核心封装，职责包括：
 
 消息持久化和会话元数据管理，提供三个纯异步函数：
 
-- `persistMessages`：将消息列表持久化到服务端
+- `persistMessages`：将消息列表持久化到服务端。调用时机：①用户发送消息后立即持久化（fire-and-forget）、②流式回复过程中节流持久化（每 5 秒最多一次）、③`onFinish` 时最终持久化、④页面 visibilitychange 到 hidden 时兜底持久化
 - `updateSessionTitle`：首条消息时更新会话标题
 - `fetchSessionFiles`：从 HTTP API 获取代码/schema 文件内容（作为 WebSocket 事件的兜底）
 
@@ -185,8 +185,14 @@ UI 子组件只负责渲染，不包含业务逻辑。
         → 统一调用 onCodeUpdate / onSchemaUpdate
         → 触发 onSnapshotReady 回调（通知编辑页快照已就绪）
         → setMessages（保存助手消息）
-        → MessageService.persistMessages
+        → MessageService.persistMessages（最终持久化）
         → MessageService.updateSessionTitle
+    → 流式回复过程中：
+        → 节流调用 persistMessages（每 5 秒最多一次，fire-and-forget）
+    → 用户发送消息时：
+        → 立即调用 persistMessages（fire-and-forget，确保用户消息不丢失）
+    → 页面 visibilitychange 到 hidden：
+        → 立即调用 persistMessages（兜底，比 beforeunload 更可靠）
     → error 事件：
         → 降级到 HTTP 非流式模式
 ```

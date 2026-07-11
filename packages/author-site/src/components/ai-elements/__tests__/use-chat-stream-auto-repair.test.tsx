@@ -667,7 +667,8 @@ describe("useChatStream 自动修复发送", () => {
   });
 
   it("流式回复完成后的持久化失败不会卡住发送状态", async () => {
-    (persistMessages as jest.Mock).mockRejectedValueOnce(new Error("写入失败"));
+    // 所有 persistMessages 调用都失败，包括发送时立即持久化、流式中间持久化和 onFinish 持久化
+    (persistMessages as jest.Mock).mockRejectedValue(new Error("写入失败"));
     const messages: ChatMessage[] = [];
     const messagesRef = { current: messages };
     const currentMessageRef = {
@@ -707,6 +708,8 @@ describe("useChatStream 自动修复发送", () => {
     );
 
     warnSpy.mockRestore();
+    // 恢复默认 mock 实现，避免影响后续测试
+    (persistMessages as jest.Mock).mockResolvedValue(undefined);
   });
 
   it("流式回复完成后的文件回调失败不会卡住发送状态", async () => {
