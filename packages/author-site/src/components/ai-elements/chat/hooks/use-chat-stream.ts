@@ -21,9 +21,6 @@ import {
 import {
   processFileChanges,
   extractCodeAndSchemaUpdates,
-  isCodeFile,
-  isSchemaFile,
-  normalizePath,
   type FileChangeEntry,
 } from "../utils/chat-file-utils";
 import {
@@ -372,6 +369,26 @@ export function useChatStream(options: UseChatStreamOptions) {
     externalStreamServiceRef,
   } = options;
 
+  // 页面隐藏时兜底持久化（比 beforeunload 更可靠）
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        if (throttlePersistTimerRef.current) {
+          clearTimeout(throttlePersistTimerRef.current);
+          throttlePersistTimerRef.current = null;
+        }
+        void persistMessages(
+          sessionId,
+          messagesRef.current.filter((m) => !m.queueStatus),
+        ).catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [sessionId, messagesRef]);
+
   const [plan, setPlan] = useState<PlanState>(EMPTY_PLAN);
   const [pendingPermissionRequest, setPendingPermissionRequest] =
     useState<PermissionRequest | null>(null);
@@ -387,6 +404,31 @@ export function useChatStream(options: UseChatStreamOptions) {
   const activeRunDedupeKeyRef = useRef<string | null>(null);
   const drainQueueRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef(sessionId);
+  const lastPersistAtRef = useRef<number>(0);
+  const throttlePersistTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const throttledPersistRef = useRef<() => void>(() => {});
+  throttledPersistRef.current = () => {
+    const now = Date.now();
+    if (now - lastPersistAtRef.current < 5000) {
+      if (!throttlePersistTimerRef.current) {
+        throttlePersistTimerRef.current = setTimeout(() => {
+          throttlePersistTimerRef.current = null;
+          lastPersistAtRef.current = Date.now();
+          void persistMessages(
+            sessionId,
+            messagesRef.current.filter((m) => !m.queueStatus),
+          ).catch(() => {});
+        }, 5000);
+      }
+      return;
+    }
+    lastPersistAtRef.current = now;
+    void persistMessages(
+      sessionId,
+      messagesRef.current.filter((m) => !m.queueStatus),
+    ).catch(() => {});
+  };
 
   const SILENCE_THRESHOLD_MS = 30000;
   const SILENCE_TICK_MS = 1000;
@@ -421,7 +463,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     }
   }, []);
 
-  // 清理流
+  // 清理流 + 组件卸载时持久化
   useEffect(() => {
     return () => {
       activeRunRef.current = false;
@@ -429,12 +471,34 @@ export function useChatStream(options: UseChatStreamOptions) {
       queuedMessagesRef.current = [];
       streamServiceRef.current?.close();
       stopSilenceTracking();
+      if (throttlePersistTimerRef.current) {
+        clearTimeout(throttlePersistTimerRef.current);
+        throttlePersistTimerRef.current = null;
+      }
+      // 组件卸载时持久化当前消息，确保切换页面后对话可恢复
+      void persistMessages(
+        sessionId,
+        messagesRef.current.filter((m) => !m.queueStatus),
+      ).catch(() => {});
     };
-  }, [stopSilenceTracking]);
+  }, [sessionId, messagesRef, stopSilenceTracking]);
 
   // 会话切换时关闭旧流
   useEffect(() => {
     if (previousSessionIdRef.current !== sessionId) {
+      // 切换前对旧 session 的消息做一次持久化
+      const oldSessionId = previousSessionIdRef.current;
+      if (oldSessionId) {
+        void persistMessages(
+          oldSessionId,
+          messagesRef.current.filter((m) => !m.queueStatus),
+        ).catch(() => {});
+      }
+      // 清理旧 session 的节流定时器
+      if (throttlePersistTimerRef.current) {
+        clearTimeout(throttlePersistTimerRef.current);
+        throttlePersistTimerRef.current = null;
+      }
       previousSessionIdRef.current = sessionId;
       queuedMessagesRef.current = [];
       activeRunRef.current = false;
@@ -581,6 +645,12 @@ export function useChatStream(options: UseChatStreamOptions) {
         );
       }
 
+      // 用户消息加入 state 后立即持久化（fire-and-forget）
+      void persistMessages(
+        sessionId,
+        messagesRef.current.filter((m) => !m.queueStatus),
+      ).catch(() => {});
+
       let beforeSendFailed = false;
 
       try {
@@ -622,30 +692,6 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         let accumulatedContent = "";
 
-        const realtimeFilesRef = new Map<
-          string,
-          { action: string; content?: string }
-        >();
-        let fileUpdateTimer: NodeJS.Timeout | null = null;
-
-        const processRealtimeFiles = () => {
-          const files = Array.from(realtimeFilesRef.entries()).map(
-            ([path, info]) => ({
-              path,
-              action: info.action as "created" | "modified" | "deleted",
-              content: info.content,
-            }),
-          );
-
-          if (files.length > 0) {
-            processFileChanges(files, {
-              onCodeUpdate,
-              onSchemaUpdate,
-              onFilesChange,
-            });
-          }
-        };
-
         streamService.setHandlers({
           onStream: (content) => {
             markActivity();
@@ -660,6 +706,8 @@ export function useChatStream(options: UseChatStreamOptions) {
                 accumulatedContent,
               ),
             }));
+            // 流式回复过程中节流持久化中间状态
+            throttledPersistRef.current();
           },
 
           onThought: (content) => {
@@ -732,29 +780,6 @@ export function useChatStream(options: UseChatStreamOptions) {
             }));
           },
 
-          onFileOperation: (operation) => {
-            markActivity();
-            if (operation.path) {
-              realtimeFilesRef.set(operation.path, {
-                action: operation.method.includes("delete") ? "deleted" : "modified",
-                content: operation.content,
-              });
-
-              if (operation.path.endsWith(".md")) {
-                memoryFilePathsRef.current.add(operation.path);
-              }
-
-              if (fileUpdateTimer) {
-                clearTimeout(fileUpdateTimer);
-              }
-
-              fileUpdateTimer = setTimeout(() => {
-                processRealtimeFiles();
-                fileUpdateTimer = null;
-              }, 300);
-            }
-          },
-
           onFinish: async (result) => {
             streamService.stopKeepalive();
             onDiagnosticEvent?.({
@@ -797,6 +822,11 @@ export function useChatStream(options: UseChatStreamOptions) {
               });
               setStreamContent("");
 
+              // 先清理节流定时器，避免冗余并发写入
+              if (throttlePersistTimerRef.current) {
+                clearTimeout(throttlePersistTimerRef.current);
+                throttlePersistTimerRef.current = null;
+              }
               await persistMessages(
                 sessionId,
                 updatedMessages.filter((message) => !message.queueStatus),
@@ -809,54 +839,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 );
               }
 
-              // ── 1. 清除 pending timer（不调用 processRealtimeFiles，避免路径 A 重复触发） ──
-              if (fileUpdateTimer) {
-                clearTimeout(fileUpdateTimer);
-                fileUpdateTimer = null;
-              }
-
-              // ── 2. 检测实时流已更新的数据类型 ──
-              let realtimeUpdatedCode = false;
-              let realtimeUpdatedSchema = false;
-              for (const [path, info] of realtimeFilesRef.entries()) {
-                const normalizedPath = normalizePath(path);
-                if (isCodeFile(normalizedPath) && info.content) realtimeUpdatedCode = true;
-                if (isSchemaFile(normalizedPath) && info.content) realtimeUpdatedSchema = true;
-              }
-
-              // ── 3. Flush 实时流文件到 UI（保持流式阶段的预览体验） ──
-              const pendingRealtimeFiles = Array.from(realtimeFilesRef.entries()).map(
-                ([path, info]) => ({
-                  path,
-                  action: info.action as "created" | "modified" | "deleted",
-                  content: info.content,
-                }),
-              );
-              if (pendingRealtimeFiles.length > 0) {
-                processFileChanges(pendingRealtimeFiles, {
-                  onCodeUpdate,
-                  onSchemaUpdate,
-                  onFilesChange,
-                });
-              }
-
-              // ── 4. 构建最终文件列表：realtimeFilesRef 优先，result.files 仅补充缺失文件 ──
-              const realtimeFileMap = new Map<string, FileChangeEntry>();
-              for (const [path, info] of realtimeFilesRef.entries()) {
-                realtimeFileMap.set(path, {
-                  path,
-                  action: info.action as "created" | "modified" | "deleted",
-                  content: info.content,
-                });
-              }
-              if (result.files && result.files.length > 0) {
-                for (const f of result.files) {
-                  if (!realtimeFileMap.has(f.path)) {
-                    realtimeFileMap.set(f.path, f);
-                  }
-                }
-              }
-              const finalFiles = Array.from(realtimeFileMap.values());
+              const finalFiles = result.files ?? [];
 
               if (finalFiles.length > 0) {
                 for (const f of finalFiles) {
@@ -867,24 +850,16 @@ export function useChatStream(options: UseChatStreamOptions) {
                 onFilesChange?.(finalFiles);
               }
 
-              // ── 5. 从 finalFiles 提取更新，但跳过实时流已更新的数据类型（避免旧值覆盖新值） ──
+              // finish.files 是前端唯一的流式文件刷新来源；legacy 文件事件不再作为写入/刷新依据。
               const { codeUpdated, schemaUpdated } =
                 finalFiles.length > 0
                   ? extractCodeAndSchemaUpdates(finalFiles, {
-                      onCodeUpdate: realtimeUpdatedCode
-                        ? undefined
-                        : (code) => onCodeUpdate?.(code, "ai-finish"),
-                      onSchemaUpdate: realtimeUpdatedSchema
-                        ? undefined
-                        : (schema) => onSchemaUpdate?.(schema, "ai-finish"),
+                      onCodeUpdate: (code) => onCodeUpdate?.(code, "ai-finish"),
+                      onSchemaUpdate: (schema) => onSchemaUpdate?.(schema, "ai-finish"),
                     })
                   : { codeUpdated: false, schemaUpdated: false };
 
-              // ── 6. HTTP 兜底：仅在完全没有数据更新时触发 ──
-              const effectiveCodeUpdated = realtimeUpdatedCode || codeUpdated;
-              const effectiveSchemaUpdated = realtimeUpdatedSchema || schemaUpdated;
-
-              if (!effectiveCodeUpdated && !effectiveSchemaUpdated) {
+              if (!codeUpdated && !schemaUpdated) {
                 const filesData = await fetchSessionFiles(sessionId, demoId);
                 if (filesData) {
                   const { code, schema } = filesData;
@@ -918,11 +893,6 @@ export function useChatStream(options: UseChatStreamOptions) {
                 details: { message },
               });
             } finally {
-              if (fileUpdateTimer) {
-                clearTimeout(fileUpdateTimer);
-                fileUpdateTimer = null;
-              }
-              realtimeFilesRef.clear();
               completeRunAndDrain();
             }
           },
@@ -1574,7 +1544,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const truncated = msgs.slice(0, targetIndex);
       setMessages(truncated);
-      persistMessages(sessionId, truncated);
+      void persistMessages(sessionId, truncated.filter((m) => !m.queueStatus)).catch(() => {});
 
       const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
       const images: ImageAttachment[] | undefined = imageParts.length > 0
@@ -1636,7 +1606,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const truncated = msgs.slice(0, msgIndex);
       setMessages(truncated);
-      persistMessages(sessionId, truncated);
+      void persistMessages(sessionId, truncated.filter((m) => !m.queueStatus)).catch(() => {});
 
       const msg = msgs[msgIndex];
       const imageParts = msg.parts?.filter((p) => p.type === "image") || [];
