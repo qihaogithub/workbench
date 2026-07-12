@@ -1946,7 +1946,6 @@ export function PreviewCanvas({
         y: ch / 2 - cy * zoom,
       },
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPageId]);
 
   const fitCanvasToScreen = useCallback(() => {
