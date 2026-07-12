@@ -14,7 +14,8 @@
     "build": "node scripts/build.mjs",
     "start": "node bin/ow.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "esbuild": "^0.20.2",

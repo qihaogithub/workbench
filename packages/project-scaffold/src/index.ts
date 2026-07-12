@@ -133,21 +133,6 @@ function readJson<T>(filePath: string): T | null {
   }
 }
 
-function readText(projectDir: string, relativePath: string): string {
-  return fs.readFileSync(path.join(projectDir, relativePath), "utf-8");
-}
-
-function readOptionalText(projectDir: string, relativePath: string | undefined): string | undefined {
-  if (!relativePath) return undefined;
-  const filePath = path.join(projectDir, relativePath);
-  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : undefined;
-}
-
-function readOptionalJson<T>(projectDir: string, relativePath: string | undefined): T | undefined {
-  if (!relativePath) return undefined;
-  return readJson<T>(path.join(projectDir, relativePath)) ?? undefined;
-}
-
 function pageRuntimeType(page: Pick<LocalProjectPage, "runtimeType">): LocalPageRuntimeType {
   if (page.runtimeType === "prototype-html-css") return "prototype-html-css";
   if (page.runtimeType === "sketch-scene") return "sketch-scene";
@@ -1152,11 +1137,6 @@ export function submitProjectScaffold(
       nextActions: diff.nextActions,
     });
   }
-  const changedFiles = [
-    ...(diff.diffSummary?.created ?? []),
-    ...(diff.diffSummary?.updated ?? []),
-    ...(diff.diffSummary?.deleted ?? []),
-  ];
   const assetPrefix = `${manifest.assetsDir.replace(/\/$/, "")}/`;
   const createdAssets = (diff.diffSummary?.created ?? []).filter((file) => file.startsWith(assetPrefix));
   const updatedAssets = (diff.diffSummary?.updated ?? []).filter((file) => file.startsWith(assetPrefix));

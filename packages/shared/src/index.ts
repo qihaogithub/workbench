@@ -1,7 +1,6 @@
 import type {
   DemoPageRuntimeType,
   ProjectAuthoringPreferences,
-  UserAuthoringPreferences,
 } from "./workspace";
 
 export type { DemoPageRuntimeType } from "./workspace";

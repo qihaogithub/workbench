@@ -20,7 +20,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts,.tsx"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
