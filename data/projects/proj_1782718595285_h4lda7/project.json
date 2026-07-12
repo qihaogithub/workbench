@@ -163,12 +163,24 @@
       "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v14",
       "fileCount": 16,
       "note": "发布快照"
+    },
+    {
+      "versionId": "v15",
+      "type": "auto_checkpoint",
+      "savedAt": 1783829156520,
+      "savedBy": "qihao",
+      "sessionId": "session-1783827695397-vy9hncajg",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782718595285_h4lda7\\v15",
+      "fileCount": 16,
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1782718595290,
-  "updatedAt": 1783565881467,
+  "updatedAt": 1783829156520,
+  "activeWorkspaceId": "live-1783827695356-tae34ri4s",
+  "activeWorkspaceUpdatedAt": 1783829152831,
   "publishedVersion": "v14",
   "publishedAt": 1783563813634,
-  "activeWorkspaceId": "live-1783565881454-sp7zjou4e",
-  "activeWorkspaceUpdatedAt": 1783565881467
+  "canonicalSyncedWorkspaceId": "live-1783827695356-tae34ri4s",
+  "canonicalSyncedAt": 1783829156474
 }
