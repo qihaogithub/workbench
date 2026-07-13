@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: viewer_site
+title: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+scope:
+    - packages/viewer-site/
+source_files: []
+depends_on: []
+related_to:
+    - path: demo_ui
+    - path: knowledge_service

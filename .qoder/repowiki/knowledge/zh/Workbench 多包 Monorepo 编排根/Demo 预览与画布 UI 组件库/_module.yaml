@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: demo_ui
+title: Demo 预览与画布 UI 组件库
+scope:
+    - packages/demo-ui/
+source_files: []
+depends_on: []
+related_to:
+    - path: preview_contract
+    - path: sketch_system/sketch_react
+    - path: viewer_site

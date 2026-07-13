@@ -1,0 +1,16 @@
+schema_version: 1
+module_path: author_site/client_libs/admin_auth
+title: 作者站认证与会话管理
+scope:
+    - packages/author-site/src/lib/auth/
+    - packages/author-site/src/lib/admin-auth.ts
+    - packages/author-site/src/lib/dingtalk-login.ts
+    - packages/author-site/src/lib/external-auth.ts
+    - packages/author-site/src/lib/session-manager.ts
+    - packages/author-site/src/lib/user.ts
+    - packages/author-site/src/lib/project-admin-service.ts
+    - packages/author-site/src/lib/workspace-authority-browser-client.ts
+    - packages/author-site/src/lib/workspace-authority-client.ts
+source_files: []
+depends_on: []
+related_to: []

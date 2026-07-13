@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: author_site/api_sessions_canvas/session_core
+title: 编辑会话生命周期 API（创建/保存/放弃）
+scope:
+    - packages/author-site/src/app/api/sessions/route.ts
+    - packages/author-site/src/app/api/sessions/[sessionId]/discard/
+    - packages/author-site/src/app/api/sessions/[sessionId]/save/
+source_files: []
+depends_on: []
+related_to: []

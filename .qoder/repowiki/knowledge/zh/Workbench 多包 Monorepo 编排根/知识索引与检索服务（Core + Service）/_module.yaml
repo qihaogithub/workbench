@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: knowledge_service
+title: 知识索引与检索服务（Core + Service）
+scope:
+    - packages/knowledge-service/
+    - packages/knowledge-core/
+source_files: []
+depends_on: []
+related_to:
+    - path: author_site/api_ai_chat_knowledge
+    - path: viewer_site

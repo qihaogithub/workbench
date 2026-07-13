@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: agent_service/agent_client_sdk
+title: Agent Service HTTP/WS 客户端 SDK
+scope:
+    - packages/agent-client/
+source_files: []
+depends_on: []
+related_to:
+    - path: author_site/api_ai_chat_knowledge
+    - path: author_site/client_libs/agent_ai_chat
+    - path: ops_cli/http_interactive
+    - path: ops_cli/session_commands
+    - path: ops_cli/system_models
