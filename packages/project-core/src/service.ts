@@ -12,9 +12,7 @@ import {
 } from "@workbench/preview-contract/runtime";
 import { compilePreviewPageSource } from "@workbench/preview-contract/compiler";
 import {
-  createDefaultSketchScene,
   validateSketchSceneDocument,
-  type SketchSceneDocument,
 } from "@workbench/sketch-core";
 import type {
   DemoFiles,
@@ -44,10 +42,8 @@ import type {
   AiSendMessageInput,
   AiSendMessageResult,
   AiSessionSummary,
-  AssetCreatedBy,
   AssetReplaceInput,
   AssetSummary,
-  AssetSourceType,
   AssetUploadInput,
   AgentRunReport,
   AgentRunReportInput,
@@ -109,340 +105,59 @@ import {
   getViewerBaseUrl,
 } from "./config.js";
 
-const DEFAULT_DEMO_CODE = `import React from 'react';
-
-interface DemoProps {
-  title: string;
-  description: string;
-}
-
-export default function Demo({ title, description }: DemoProps) {
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="text-gray-600">{description}</p>
-    </div>
-  );
-}
-`;
-
-const DEFAULT_DEMO_SCHEMA = JSON.stringify(
-  {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    title: "Demo 配置",
-    type: "object",
-    properties: {
-      title: { type: "string", title: "标题", default: "Hello World" },
-      description: {
-        type: "string",
-        title: "描述",
-        default: "This is a demo",
-      },
-    },
-    required: ["title"],
-  },
-  null,
-  2,
-);
-
-const DEFAULT_PROTOTYPE_HTML = `<main class="prototype-page">
-  <section class="prototype-hero">
-    <p class="eyebrow">Prototype</p>
-    <h1>HTML/CSS 原型页</h1>
-    <p>用于快速表达页面结构和信息层级。</p>
-  </section>
-</main>`;
-
-const DEFAULT_PROTOTYPE_CSS = `.prototype-page {
-  min-height: 100%;
-  padding: 32px;
-  background: #f8fafc;
-  color: #111827;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-.prototype-hero {
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  padding: 28px;
-}
-.eyebrow {
-  color: #2563eb;
-  font-size: 12px;
-  text-transform: uppercase;
-}`;
-
-const DEFAULT_PROTOTYPE_META: PrototypePageMeta = {
-  width: 390,
-  height: 844,
-  generatedBy: "project-core",
-};
-const DEFAULT_SKETCH_META: Record<string, unknown> = {
-  generatedBy: "project-core",
-  updatedAt: 0,
-};
-
-const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
-const MAX_PROTOTYPE_CSS_LENGTH = 80_000;
-const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
-
-const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
-const APP_GRAPH_FILENAME = "app.graph.json";
-const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
-const PROJECT_CONFIG_VALUES_FILENAME = "project.config.values.json";
-const PROJECT_IMAGE_MANIFEST_FILENAME = "images.json";
-const EDIT_TTL_MS = 2 * 60 * 60 * 1000;
-const MAX_VERSIONS_KEEP = 50;
-const MAX_ASSET_SIZE = 10 * 1024 * 1024;
-const ALLOWED_ASSET_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/svg+xml",
-]);
-
-const DEFAULT_PROJECT_CATEGORY = "未分类";
-const CONTENT_GRAPH_SCHEMA_VERSION = 1;
-const MATERIALIZER_VERSION = "project-core-content-graph-v1";
-
-interface ResourceBlobMap {
-  code?: string;
-  schema?: string;
-  prototypeHtml?: string;
-  prototypeCss?: string;
-  prototypeMeta?: string;
-  sketchScene?: string;
-  sketchMeta?: string;
-  markdown?: string;
-}
-
-interface ProjectImageManifestEntry {
-  id: string;
-  filename: string;
-  url: string;
-  size: number;
-  format: string;
-  createdAt: number;
-  createdBy: AssetCreatedBy;
-  contentHash?: string;
-  mimeType?: string;
-  originalUrl?: string;
-  sourceType?: AssetSourceType;
-}
-
-interface ProjectImageManifest {
-  images: ProjectImageManifestEntry[];
-}
-
-interface PageResourceMetadata extends Record<string, unknown> {
-  page: DemoPageMeta;
-  files: ResourceBlobMap;
-  sketchPatchSummary?: SketchPatchVersionSummary;
-}
-
-interface KnowledgeItemMeta {
-  id: string;
-  title: string;
-  source: "system" | "user";
-  description: string;
-  fileName: string;
-  addedAt: string;
-  updatedAt: string;
-  sizeBytes?: number;
-  category?: string;
-  tags?: string[];
-  aiSummary?: string;
-  aiKeywords?: string[];
-  summaryStatus?: "ready" | "stale" | "failed";
-  readonly?: boolean;
-}
-
-interface KnowledgeManifest {
-  version: number;
-  items: KnowledgeItemMeta[];
-}
-
-interface KnowledgeResourceMetadata extends Record<string, unknown> {
-  item: KnowledgeItemMeta;
-  files: ResourceBlobMap;
-}
-
-function normalizeProjectCategory(category?: string): string {
-  const normalized = category?.trim();
-  return normalized || DEFAULT_PROJECT_CATEGORY;
-}
-
-function normalizeProjectAuthoringPreferences(
-  preferences?: Project["authoringPreferences"],
-): Project["authoringPreferences"] | undefined {
-  const sketchEditorEngine = preferences?.sketchEditorEngine;
-  if (sketchEditorEngine === "native") {
-    return { sketchEditorEngine };
-  }
-  return undefined;
-}
-
-function nowId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function safeId(id: string, label: string): string {
-  if (!/^[a-zA-Z0-9_.-]+$/.test(id)) {
-    throw new Error(`INVALID_${label.toUpperCase()}_ID`);
-  }
-  return id;
-}
-
-function ensureDir(dir: string): void {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function resolvePageRuntimeType(page?: Pick<DemoPageMeta, "runtimeType"> | null): DemoPageRuntimeType {
-  if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
-  if (page?.runtimeType === "sketch-scene") return "sketch-scene";
-  return "high-fidelity-react";
-}
-
-function createDefaultSketchSceneText(): string {
-  return JSON.stringify(createDefaultSketchScene(), null, 2);
-}
-
-function parseSketchSceneText(text: string): SketchSceneDocument | null {
-  try {
-    return JSON.parse(text) as SketchSceneDocument;
-  } catch {
-    return null;
-  }
-}
-
-function readJsonFile<T>(filePath: string): T | null {
-  if (!fs.existsSync(filePath)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-function writeJsonFile(filePath: string, value: unknown): void {
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf-8");
-}
-
-function copyWorkspace(source: string, target: string): void {
-  fs.cpSync(source, target, {
-    recursive: true,
-    filter: (sourcePath) => {
-      const relative = path.relative(source, sourcePath);
-      if (!relative) return true;
-      const segments = relative.split(path.sep);
-      return !segments.some((segment) =>
-        ["node_modules", ".next", ".workbench", ".git"].includes(segment),
-      );
-    },
-  });
-}
-
-function isWorkspaceMetadataPath(filePath: string): boolean {
-  return [".workspace.json", ".session.json"].includes(path.basename(filePath));
-}
-
-function copyWorkspaceWithoutRuntimeMetadata(source: string, target: string): void {
-  fs.cpSync(source, target, {
-    recursive: true,
-    filter: (sourcePath) => {
-      const relative = path.relative(source, sourcePath);
-      if (!relative) return true;
-      const segments = relative.split(path.sep);
-      if (segments.some((segment) =>
-        ["node_modules", ".next", ".workbench", ".git"].includes(segment),
-      )) {
-        return false;
-      }
-      return !isWorkspaceMetadataPath(relative);
-    },
-  });
-}
-
-function countFiles(dir: string): number {
-  if (!fs.existsSync(dir)) return 0;
-  let count = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith(".")) continue;
-    const entryPath = path.join(dir, entry.name);
-    count += entry.isDirectory() ? countFiles(entryPath) : 1;
-  }
-  return count;
-}
-
-function generatePageSlug(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 20)
-    .replace(/-$/, "");
-  return slug || "page";
-}
-
-function isValidRouteKey(routeKey: string): boolean {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(routeKey);
-}
-
-function makeUniqueRouteKey(base: string, used: Set<string>): string {
-  const normalizedBase = isValidRouteKey(base) ? base : generatePageSlug(base);
-  let candidate = normalizedBase || "page";
-  let suffix = 2;
-  while (used.has(candidate)) {
-    candidate = `${normalizedBase || "page"}-${suffix}`;
-    suffix += 1;
-  }
-  used.add(candidate);
-  return candidate;
-}
-
-function normalizePagesRouteKeys(pages: DemoPageMeta[]): DemoPageMeta[] {
-  const used = new Set<string>();
-  return pages.map((page) => {
-    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
-    if (current && isValidRouteKey(current) && !used.has(current)) {
-      used.add(current);
-      return page;
-    }
-    return {
-      ...page,
-      routeKey: makeUniqueRouteKey(current || page.name || page.id, used),
-    };
-  });
-}
-
-function sortPages(pages: DemoPageMeta[]): DemoPageMeta[] {
-  return [...pages].sort((a, b) => {
-    if (a.order !== b.order) return a.order - b.order;
-    return a.id.localeCompare(b.id);
-  });
-}
-
-function ok<T>(
-  data: T,
-  extras: Omit<ProjectAdminResult<T>, "ok" | "data"> = {},
-): ProjectAdminResult<T> {
-  return { ok: true, data, ...extras };
-}
-
-function fail<T>(
-  code: string,
-  message: string,
-  extras: Omit<ProjectAdminResult<T>, "ok" | "error"> = {},
-): ProjectAdminResult<T> {
-  return {
-    ok: false,
-    error: { code, message, recoverable: true },
-    ...extras,
-  };
-}
+import {
+  DEFAULT_DEMO_CODE,
+  DEFAULT_DEMO_SCHEMA,
+  DEFAULT_PROTOTYPE_HTML,
+  DEFAULT_PROTOTYPE_CSS,
+  DEFAULT_PROTOTYPE_META,
+  DEFAULT_SKETCH_META,
+  MAX_PROTOTYPE_HTML_LENGTH,
+  MAX_PROTOTYPE_CSS_LENGTH,
+  PROTOTYPE_GLOBAL_SELECTOR_RE,
+  WORKSPACE_TREE_FILENAME,
+  APP_GRAPH_FILENAME,
+  PROJECT_CONFIG_FILENAME,
+  PROJECT_CONFIG_VALUES_FILENAME,
+  PROJECT_IMAGE_MANIFEST_FILENAME,
+  EDIT_TTL_MS,
+  MAX_VERSIONS_KEEP,
+  MAX_ASSET_SIZE,
+  ALLOWED_ASSET_MIME_TYPES,
+  CONTENT_GRAPH_SCHEMA_VERSION,
+  MATERIALIZER_VERSION,
+} from "./constants.js";
+import type {
+  ResourceBlobMap,
+  ProjectImageManifestEntry,
+  ProjectImageManifest,
+  PageResourceMetadata,
+  KnowledgeItemMeta,
+  KnowledgeManifest,
+  KnowledgeResourceMetadata,
+} from "./internal-types.js";
+import {
+  normalizeProjectCategory,
+  normalizeProjectAuthoringPreferences,
+  nowId,
+  safeId,
+  ensureDir,
+  resolvePageRuntimeType,
+  createDefaultSketchSceneText,
+  parseSketchSceneText,
+  readJsonFile,
+  writeJsonFile,
+  copyWorkspace,
+  isWorkspaceMetadataPath,
+  copyWorkspaceWithoutRuntimeMetadata,
+  countFiles,
+  generatePageSlug,
+  makeUniqueRouteKey,
+  normalizePagesRouteKeys,
+  sortPages,
+  ok,
+  fail,
+} from "./utils.js";
 
 export class ProjectAdminService {
   readonly dataDir: string;
@@ -1897,15 +1612,11 @@ export class ProjectAdminService {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
     const runtimeType: DemoPageRuntimeType =
-      input.runtimeType === "high-fidelity-react"
-        ? "high-fidelity-react"
-        : input.runtimeType === "prototype-html-css"
+      input.runtimeType === "prototype-html-css"
         ? "prototype-html-css"
         : input.runtimeType === "sketch-scene"
           ? "sketch-scene"
-          : input.code
-            ? "high-fidelity-react"
-            : "prototype-html-css";
+          : "high-fidelity-react";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -4353,7 +4064,7 @@ export class ProjectAdminService {
     if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
       addIssue({
         code: "PROTOTYPE_HTML_TOO_LARGE",
-        message: "原型页 HTML 超过当前限制",
+        message: "原型页 HTML 超过 MVP 限制",
         instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
       }, "repair_prototype");
     }

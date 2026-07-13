@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx src/scaffold.test.ts"
+    "test": "node --import tsx src/scaffold.test.ts",
+    "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "@workbench/project-core": "workspace:*"

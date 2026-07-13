@@ -3,13 +3,11 @@ import type {
   AgentInfo,
   SessionListResponse,
   FileChange,
-  FileChangeInfo,
   FilesResponse,
   WorkspaceInfo,
   UpdateWorkspaceOptions,
   SendMessageOptions,
   ApiResponse,
-  AgentType,
 } from "./types";
 
 export interface AgentClientConfig {

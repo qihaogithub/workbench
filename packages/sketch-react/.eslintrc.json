@@ -1,0 +1,7 @@
+{
+  "extends": "../../.eslintrc.base.json",
+  "env": { "browser": true, "es2022": true },
+  "parserOptions": {
+    "ecmaFeatures": { "jsx": true }
+  }
+}

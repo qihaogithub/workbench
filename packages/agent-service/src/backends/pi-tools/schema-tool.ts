@@ -8,7 +8,7 @@ const SchemaValidateParams = Type.Object({
 });
 type SchemaValidateParams = Static<typeof SchemaValidateParams>;
 
-export function createSchemaValidateTool(config: AgentConfig): AgentTool<typeof SchemaValidateParams> {
+export function createSchemaValidateTool(_config: AgentConfig): AgentTool<typeof SchemaValidateParams> {
   return {
     name: 'schemaValidate',
     label: 'Schema Validate',

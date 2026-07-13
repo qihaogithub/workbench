@@ -4,8 +4,6 @@ import { execSync } from 'child_process';
 import type { SnapshotInfo, CompareResult, FileChangeInfo } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
-const SNAPSHOT_DIR = '.workbench-snapshot';
-
 interface SnapshotData {
   files: Map<string, { content: string; mtime: number }>;
   createdAt: number;
