@@ -68,7 +68,14 @@ export interface DemoMeta {
   thumbnail?: string;
   authoringPreferences?: ProjectAuthoringPreferences;
   demoCount?: number;
-  demoPages?: Array<{ id: string; name: string; routeKey?: string; runtimeType?: DemoPageRuntimeType; order: number; parentId: string | null }>;
+  demoPages?: Array<{
+    id: string;
+    name: string;
+    routeKey?: string;
+    runtimeType?: DemoPageRuntimeType;
+    order: number;
+    parentId: string | null;
+  }>;
   locked?: boolean;
 }
 
@@ -85,7 +92,14 @@ export interface ProjectTemplateMeta {
   scope?: "personal" | "team" | "official";
   official?: boolean;
   demoCount: number;
-  demoPages?: Array<{ id: string; name: string; routeKey?: string; runtimeType?: DemoPageRuntimeType; order: number; parentId: string | null }>;
+  demoPages?: Array<{
+    id: string;
+    name: string;
+    routeKey?: string;
+    runtimeType?: DemoPageRuntimeType;
+    order: number;
+    parentId: string | null;
+  }>;
   createdAt: number;
   updatedAt: number;
 }
