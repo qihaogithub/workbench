@@ -42,6 +42,10 @@ function readKnowledgeManifest(knowledgeDir: string): WorkspaceKnowledgeManifest
   }
 }
 
+export function readWorkspaceKnowledgeManifest(workspacePath: string): WorkspaceKnowledgeManifest {
+  return readKnowledgeManifest(path.join(workspacePath, "knowledge"));
+}
+
 function writeKnowledgeManifest(knowledgeDir: string, manifest: WorkspaceKnowledgeManifest): void {
   fs.writeFileSync(
     path.join(knowledgeDir, "manifest.json"),

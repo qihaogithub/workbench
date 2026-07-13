@@ -42,18 +42,23 @@ jest.mock("../chat/services/stream-service", () => {
     setHandlers = jest.fn((handlers) => {
       this.handlers = handlers;
     });
-    sendMessage = mockSendMessage.mockImplementation(async (message: string) => {
-      const files = message.includes("触发文件回调异常")
-        ? [
-            {
-              path: "demos/demo_omrf/prototype.html",
-              action: "modified" as const,
-              content: "<main>updated</main>",
-            },
-          ]
-        : [];
-      await this.handlers.onFinish?.({ content: `已处理: ${message}`, files });
-    });
+    sendMessage = mockSendMessage.mockImplementation(
+      async (message: string) => {
+        const files = message.includes("触发文件回调异常")
+          ? [
+              {
+                path: "demos/demo_omrf/prototype.html",
+                action: "modified" as const,
+                content: "<main>updated</main>",
+              },
+            ]
+          : [];
+        await this.handlers.onFinish?.({
+          content: `已处理: ${message}`,
+          files,
+        });
+      },
+    );
   }
 
   return {
@@ -77,8 +82,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
@@ -98,7 +102,7 @@ describe("useChatStream 自动修复发送", () => {
       beforeSendCallCount += 1;
       if (beforeSendCallCount > 1) return Promise.resolve();
       return new Promise<void>((resolve) => {
-          resolveBeforeSend = resolve;
+        resolveBeforeSend = resolve;
       });
     });
 
@@ -151,8 +155,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
@@ -230,8 +233,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
@@ -314,8 +316,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
@@ -411,8 +412,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
@@ -468,8 +468,7 @@ describe("useChatStream 自动修复发送", () => {
     expect(
       messages.filter(
         (message) =>
-          message.role === "system" &&
-          message.kind === "auto_repair",
+          message.role === "system" && message.kind === "auto_repair",
       ),
     ).toHaveLength(1);
     expect(messages.some((message) => message.queueStatus)).toBe(false);
@@ -486,8 +485,7 @@ describe("useChatStream 自动修复发送", () => {
     const setMessages = (
       updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
     ) => {
-      messages =
-        typeof updater === "function" ? updater(messages) : updater;
+      messages = typeof updater === "function" ? updater(messages) : updater;
       messagesRef.current = messages;
     };
     const currentMessageRef = {
