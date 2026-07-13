@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: author_site/client_libs
+title: Author Site 前端共享能力库
+scope:
+    - packages/author-site/src/lib/
+    - packages/author-site/src/hooks/
+source_files: []
+depends_on: []
+related_to: []

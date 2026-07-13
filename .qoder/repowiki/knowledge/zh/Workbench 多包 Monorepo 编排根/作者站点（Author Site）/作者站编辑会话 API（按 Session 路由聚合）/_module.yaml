@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: author_site/api_sessions_canvas
+title: 作者站编辑会话 API（按 Session 路由聚合）
+scope:
+    - packages/author-site/src/app/api/sessions/
+source_files: []
+depends_on: []
+related_to: []

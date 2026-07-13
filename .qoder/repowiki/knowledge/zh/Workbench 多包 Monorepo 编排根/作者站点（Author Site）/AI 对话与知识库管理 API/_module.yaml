@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: author_site/api_ai_chat_knowledge
+title: AI 对话与知识库管理 API
+scope:
+    - packages/author-site/src/app/api/ai/
+    - packages/author-site/src/app/api/knowledge/
+source_files: []
+depends_on: []
+related_to:
+    - path: agent_service/agent_client_sdk
+    - path: knowledge_service

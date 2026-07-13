@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: agent_service/agent_service_server/workspace_session
+title: 工作空间生命周期、会话持久化与 Yjs 协作层
+scope:
+    - packages/agent-service/src/workspace/
+    - packages/agent-service/src/session/
+    - packages/agent-service/src/collab/
+source_files: []
+depends_on: []
+related_to: []

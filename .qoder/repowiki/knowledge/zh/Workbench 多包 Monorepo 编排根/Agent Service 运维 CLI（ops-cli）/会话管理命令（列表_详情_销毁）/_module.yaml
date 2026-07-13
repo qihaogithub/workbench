@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: ops_cli/session_commands
+title: 会话管理命令（列表/详情/销毁）
+scope:
+    - OPS/CLI/src/commands/destroy-session.ts
+    - OPS/CLI/src/commands/list-sessions.ts
+    - OPS/CLI/src/commands/session-info.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: agent_service/agent_client_sdk

@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: data_artifacts
+title: 运行时数据与问题跟踪持久化层
+scope:
+    - data/
+    - issues/
+    - tmp/
+source_files: []
+depends_on: []
+related_to: []
