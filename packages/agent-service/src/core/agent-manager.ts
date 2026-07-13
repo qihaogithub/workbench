@@ -3,6 +3,7 @@ import { BaseAgent } from './agent';
 import { BackendAgent } from './backend-agent';
 import { AgentFactory, getAgentFactory } from './agent-factory';
 import { logger } from '../utils/logger';
+import { PROCESSING_MAX_TIMEOUT_MS } from './timeouts';
 
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -214,6 +215,21 @@ export class AgentManager implements IAgentManager {
           this.agents.delete(sessionId);
         });
         cleaned++;
+      }
+
+      // processing 状态兜底：超过阈值强制 kill
+      if (agent.status === 'processing') {
+        const processingDuration = now - agent.lastActivityAtPub.getTime();
+        if (processingDuration > PROCESSING_MAX_TIMEOUT_MS) {
+          logger.warn(
+            { sessionId, processingDurationMs: processingDuration },
+            'Agent stuck in processing state, force killing',
+          );
+          void agent.kill().then(() => {
+            this.agents.delete(sessionId);
+          });
+          cleaned++;
+        }
       }
     }
 

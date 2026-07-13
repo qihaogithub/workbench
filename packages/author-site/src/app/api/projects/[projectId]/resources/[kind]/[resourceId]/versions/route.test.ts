@@ -87,11 +87,20 @@ describe("resource versions route", () => {
       sessionExists: jest.fn(() => true),
     }));
     jest.doMock("@/lib/workspace-flush", () => ({
-      flushWorkspaceBeforeCriticalAction: jest.fn(async () => ({
+      flushAndSyncProjectWorkspace: jest.fn(async () => ({
         status: "flushed",
         flushedRooms: 1,
+        canonicalRevision: 9,
+        canonicalRootHash: "root-hash-9",
       })),
-      getWorkspaceFlushErrorResponse: jest.fn(),
+      getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
+        code: "WORKSPACE_STALE",
+        message: error instanceof Error ? error.message : "当前工作区已过期，请刷新项目后重试",
+        status: 409,
+      })),
+    }));
+    jest.doMock("@/lib/live-workspace-route-context", () => ({
+      isLiveWorkspacePath: jest.fn(() => true),
     }));
   });
 
@@ -100,11 +109,12 @@ describe("resource versions route", () => {
     jest.dontMock("@/lib/auth/jwt");
     jest.dontMock("@/lib/fs-utils");
     jest.dontMock("@/lib/workspace-flush");
+    jest.dontMock("@/lib/live-workspace-route-context");
     global.Response = originalResponse;
     jest.resetModules();
   });
 
-  it("创建页面资源版本时复用已保存的 Session Workspace，不重复 flush", async () => {
+  it("创建 live 页面资源版本时先同步 canonical proof 并写入版本", async () => {
     const { POST } = await import("./route");
     const workspaceFlush = await import("@/lib/workspace-flush");
 
@@ -128,13 +138,20 @@ describe("resource versions route", () => {
       success: true,
       data: expect.objectContaining({ id: "prv_1" }),
     });
-    expect(workspaceFlush.flushWorkspaceBeforeCriticalAction).not.toHaveBeenCalled();
+    expect(workspaceFlush.flushAndSyncProjectWorkspace).toHaveBeenCalledWith({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+    });
     expect(resourceVersionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project-1",
         kind: "page",
         resourceId: "page-1",
         sourceWorkspacePath: "/tmp/workspace-1",
+        workspaceId: "workspace-1",
+        workspaceRevision: 9,
+        workspaceRootHash: "root-hash-9",
         note: "命名版本",
         sketchPatchSummary: {
           operationCount: 3,

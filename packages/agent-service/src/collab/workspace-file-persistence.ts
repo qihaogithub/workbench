@@ -3,6 +3,14 @@ import crypto from "crypto";
 import path from "path";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
+import type {
+  WorkspaceMutationCommittedEvent,
+  WorkspaceMutationReceipt,
+  WorkspaceMutationRequest,
+  WorkspaceProjectionAck,
+  WorkspaceProjectionAcknowledgedEvent,
+} from "@workbench/shared/contracts";
+import { WorkspaceMutationAuthority } from "../workspace/workspace-mutation-authority";
 
 export interface SessionValidation {
   ok: boolean;
@@ -18,6 +26,11 @@ export interface ResourceFileState {
   exists: boolean;
   mtimeMs: number;
   size: number;
+}
+
+export interface ResourceMutationResult {
+  state: ResourceFileState;
+  receipt: WorkspaceMutationReceipt;
 }
 
 interface SessionMetaFile {
@@ -50,15 +63,20 @@ function findProjectRoot(cwd: string): string {
   return cwd;
 }
 
-function getDefaultDataDir(): string {
+export function getDefaultDataDir(): string {
   return process.env.DATA_DIR ?? path.join(findProjectRoot(process.cwd()), "data");
 }
 
 export class WorkspaceFilePersistence {
   readonly dataDir: string;
+  private readonly authority: WorkspaceMutationAuthority;
 
   constructor(dataDir = getDefaultDataDir()) {
     this.dataDir = dataDir;
+    this.authority = new WorkspaceMutationAuthority({
+      dataDir,
+      resolveWorkspacePath: (workspaceId) => this.findWorkspacePath(workspaceId),
+    });
   }
 
   validateSession(input: {
@@ -143,16 +161,121 @@ export class WorkspaceFilePersistence {
     };
   }
 
-  writeResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind, content: string): ResourceFileState {
-    const filePath = this.resolveResourcePath(workspacePath, resourcePath, kind);
-    if (!filePath) throw new Error("INVALID_RESOURCE_PATH");
+  async commitResource(input: {
+    projectId: string;
+    workspaceId: string;
+    resourcePath: string;
+    kind: CollabResourceKind;
+    content: string;
+    expectedHash: string;
+    baseRevision?: number;
+    sessionId?: string;
+  }): Promise<ResourceMutationResult> {
+    const workspacePath = this.findWorkspacePath(input.workspaceId);
+    if (!workspacePath || !this.resolveResourcePath(workspacePath, input.resourcePath, input.kind)) {
+      throw new Error("INVALID_RESOURCE_PATH");
+    }
+    const receipt = await this.authority.mutate({
+      mutationId: crypto.randomUUID(),
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      baseRevision: input.baseRevision ?? 0,
+      actor: "collab",
+      reason: "collab_autosave",
+      operations: [{
+        type: "put_text",
+        path: input.resourcePath,
+        content: input.content,
+        expectedHash: input.expectedHash,
+      }],
+    });
+    return { state: this.readResourceState(workspacePath, input.resourcePath, input.kind), receipt };
+  }
 
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    fs.writeFileSync(tmpPath, content, "utf-8");
-    fs.renameSync(tmpPath, filePath);
-    this.touchWorkspace(workspacePath);
-    return this.readResourceState(workspacePath, resourcePath, kind);
+  async getAuthorityState(input: { projectId: string; workspaceId: string; sessionId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.getState(input.projectId, input.workspaceId);
+  }
+
+  async getAuthoritySnapshot(input: { projectId: string; workspaceId: string; sessionId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.getSnapshot(input.projectId, input.workspaceId);
+  }
+
+  async getAuthorityResource(input: { projectId: string; workspaceId: string; sessionId: string; resourcePath: string }) {
+    const snapshot = await this.getAuthoritySnapshot(input);
+    const normalized = input.resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!normalized || normalized.includes("\0") || normalized.split("/").includes("..")) {
+      throw new Error("INVALID_REQUEST");
+    }
+    const content = snapshot.resources[normalized];
+    const hash = snapshot.state.resourceHashes[normalized];
+    if (content === undefined || !hash) throw new Error("WORKSPACE_RESOURCE_NOT_FOUND");
+    return { path: normalized, content, hash, revision: snapshot.state.revision };
+  }
+
+  async getAuthorityEvents(input: { projectId: string; workspaceId: string; sessionId: string; afterRevision: number }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "WORKSPACE_MUTATION_FAILED");
+    return this.authority.getCommittedEventsSince(input.projectId, input.workspaceId, input.afterRevision);
+  }
+
+  async getAuthorityProjectionAcks(input: { projectId: string; workspaceId: string; sessionId: string; afterRevision?: number }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "WORKSPACE_MUTATION_FAILED");
+    return this.authority.getProjectionAcks(input.projectId, input.workspaceId, input.afterRevision);
+  }
+
+  getAuthorityHealth(input: { projectId: string; workspaceId: string; sessionId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.getHealth(input.projectId, input.workspaceId);
+  }
+
+  async reconcileAuthorityAdopt(input: { projectId: string; workspaceId: string; sessionId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.reconcileAdopt(input.projectId, input.workspaceId);
+  }
+
+  async reconcileAuthorityRestore(input: { projectId: string; workspaceId: string; sessionId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.reconcileRestore(input.projectId, input.workspaceId);
+  }
+
+  async recordProjectionAck(ack: WorkspaceProjectionAck & { sessionId: string }) {
+    const validation = this.validateWorkspaceSession(ack);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    await this.authority.recordProjectionAck(ack);
+  }
+
+  async commitMutation(request: WorkspaceMutationRequest): Promise<WorkspaceMutationReceipt> {
+    if (!request.sessionId) throw new Error("SESSION_NOT_FOUND");
+    const validation = this.validateWorkspaceSession({
+      projectId: request.projectId,
+      workspaceId: request.workspaceId,
+      sessionId: request.sessionId,
+    });
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.mutate(request);
+  }
+
+  async stageBinary(input: { projectId: string; workspaceId: string; sessionId: string; content: Buffer }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.stageBinary(input.projectId, input.workspaceId, input.content);
+  }
+
+  onMutationCommitted(listener: (event: WorkspaceMutationCommittedEvent) => void): () => void {
+    return this.authority.onCommitted(listener);
+  }
+
+  onProjectionAck(listener: (event: WorkspaceProjectionAcknowledgedEvent) => void): () => void {
+    return this.authority.onProjectionAck(listener);
   }
 
   resolveResourcePath(
@@ -232,18 +355,6 @@ export class WorkspaceFilePersistence {
       return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMetaFile;
     } catch {
       return null;
-    }
-  }
-
-  private touchWorkspace(workspacePath: string): void {
-    const metaPath = path.join(workspacePath, ".workspace.json");
-    if (!fs.existsSync(metaPath)) return;
-    try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMetaFile & { updatedAt?: number };
-      meta.updatedAt = Date.now();
-      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-    } catch {
-      /* Ignore malformed workspace metadata; the file content was already saved. */
     }
   }
 

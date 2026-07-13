@@ -17,7 +17,6 @@ const AGENT_EVENT_TYPES = [
   "status",
   "permission_request",
   "user_choice_request",
-  "file_operation",
 ] as const;
 
 export interface ServerMessage {
@@ -33,8 +32,7 @@ export interface ServerMessage {
     | "pong"
     | "permission_request"
     | "user_choice_request"
-    | "models"
-    | "file_operation";
+    | "models";
   id?: string;
   sessionId?: string;
   content?: string;
@@ -103,11 +101,6 @@ export interface ServerMessage {
   }>;
   currentModelId?: string;
   canSwitch?: boolean;
-  fileOperation?: {
-    method: string;
-    path: string;
-    content?: string;
-  };
 }
 
 export type SendMessageFn = (message: ServerMessage) => void;
@@ -324,22 +317,6 @@ export class WebSocketEventRouter {
         });
         break;
 
-      case "file_operation":
-        logger.info(
-          {
-            event: "file_operation",
-            path: event.fileOperation?.path,
-            contentLength: event.fileOperation?.content?.length,
-          },
-          "[WebSocket] Forwarding file_operation event to client",
-        );
-        this.sendMessage({
-          type: "file_operation",
-          id: messageId,
-          sessionId: this.sessionId,
-          fileOperation: event.fileOperation,
-        });
-        break;
     }
   }
 }

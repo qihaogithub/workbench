@@ -35,6 +35,7 @@ import type { KnowledgeItem, KnowledgeDocDialogMode } from "./KnowledgeDocDialog
 interface KnowledgePanelProps {
   workingDir?: string;
   projectId?: string;
+  sessionId?: string;
   onDocSelect?: (item: KnowledgeItem, mode: KnowledgeDocDialogMode) => void;
   onDocAdd?: () => void;
   onDocCreated?: (item: KnowledgeItem) => void;
@@ -46,6 +47,7 @@ interface KnowledgePanelProps {
 export function KnowledgePanel({
   workingDir,
   projectId,
+  sessionId,
   onDocSelect,
   onDocAdd,
   onDocCreated,
@@ -68,6 +70,7 @@ export function KnowledgePanel({
     try {
       const params = new URLSearchParams({ workingDir });
       if (projectId) params.set("projectId", projectId);
+      if (sessionId) params.set("sessionId", sessionId);
       const res = await fetch(
         `/api/knowledge?${params.toString()}`
       );
@@ -81,7 +84,7 @@ export function KnowledgePanel({
     } finally {
       setLoading(false);
     }
-  }, [workingDir, projectId, onItemsChange]);
+  }, [workingDir, projectId, sessionId, onItemsChange]);
 
   useEffect(() => {
     fetchItems();
@@ -94,6 +97,7 @@ export function KnowledgePanel({
       try {
         const params = new URLSearchParams({ workingDir });
         if (projectId) params.set("projectId", projectId);
+        if (sessionId) params.set("sessionId", sessionId);
         const res = await fetch(
           `/api/knowledge/${item.id}?${params.toString()}`,
           { method: "DELETE" }
@@ -113,7 +117,7 @@ export function KnowledgePanel({
         toast({ title: "删除失败", variant: "destructive" });
       }
     },
-    [workingDir, projectId, toast, fetchItems]
+    [workingDir, projectId, sessionId, toast, fetchItems]
   );
 
   // 上传文件处理
@@ -135,6 +139,7 @@ export function KnowledgePanel({
         const title = file.name.replace(/\.md$/, "");
         const params = new URLSearchParams({ workingDir });
         if (projectId) params.set("projectId", projectId);
+        if (sessionId) params.set("sessionId", sessionId);
         const res = await fetch(
           `/api/knowledge?${params.toString()}`,
           {
@@ -167,7 +172,7 @@ export function KnowledgePanel({
       e.target.value = "";
       setAddMenuOpen(false);
     },
-    [workingDir, projectId, toast, fetchItems, onDocCreated]
+    [workingDir, projectId, sessionId, toast, fetchItems, onDocCreated]
   );
 
   // 监听 knowledge-updated 事件

@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+const commitWorkspaceMutation = jest.fn();
+
 jest.mock("@/lib/auth/jwt", () => ({
   getAuthCookie: jest.fn(() => "token"),
   verifyToken: jest.fn(async () => ({
@@ -37,6 +39,41 @@ jest.mock("@/lib/workspace-manager", () => ({
   updateWorkspaceTimestamp: jest.fn(),
 }));
 
+jest.mock("@/lib/live-workspace-route-context", () => ({
+  isLiveWorkspacePath: jest.fn(() => true),
+}));
+
+jest.mock("@/lib/workspace-authority-client", () => {
+  class WorkspaceAuthorityClientError extends Error {
+    constructor(
+      readonly code: string,
+      message: string,
+      readonly status: number,
+    ) {
+      super(message);
+    }
+  }
+  return {
+    commitWorkspaceMutation,
+    createTextWorkspaceMutation: jest.fn((input) => ({
+      mutationId: "mutation-1",
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      baseRevision: 0,
+      actor: "author-site",
+      reason: input.reason,
+      operations: [{
+        type: "put_text",
+        path: input.path,
+        content: input.content,
+        expectedAbsent: input.previousContent === null,
+      }],
+    })),
+    WorkspaceAuthorityClientError,
+  };
+});
+
 class TestResponse {
   status: number;
   headers: Headers;
@@ -69,6 +106,14 @@ describe("project config values route", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    commitWorkspaceMutation.mockResolvedValue({
+      mutationId: "mutation-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      revision: 2,
+      resources: [],
+      committedAt: 1,
+    });
     global.Response = TestResponse as unknown as typeof Response;
   });
 
@@ -76,7 +121,7 @@ describe("project config values route", () => {
     global.Response = originalResponse;
   });
 
-  it("写入共享配置运行值后推进 workspace 更新时间", async () => {
+  it("live Workspace 写入共享配置运行值时通过 Authority 提交", async () => {
     const { PUT } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
     const workspaceManager = await import("@/lib/workspace-manager");
@@ -95,12 +140,18 @@ describe("project config values route", () => {
       success: true,
       data: { values, exists: true },
     });
-    expect(fsUtils.saveProjectConfigValues).toHaveBeenCalledWith(
-      "/tmp/workspace",
-      values,
-    );
-    expect(workspaceManager.updateWorkspaceTimestamp).toHaveBeenCalledWith(
-      "workspace-1",
-    );
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+      reason: "update_project_config_values",
+      operations: [expect.objectContaining({
+        type: "put_text",
+        path: "project.config.values.json",
+        content: JSON.stringify(values, null, 2),
+      })],
+    }));
+    expect(fsUtils.saveProjectConfigValues).not.toHaveBeenCalled();
+    expect(workspaceManager.updateWorkspaceTimestamp).not.toHaveBeenCalled();
   });
 });

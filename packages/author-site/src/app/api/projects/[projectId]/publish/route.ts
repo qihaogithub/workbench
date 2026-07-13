@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from "path";
 import { publishProject } from '@/lib/publish-manager';
 import {
   createApiSuccess,
   createApiError,
-  findWorkspacePath,
-  getProjectConfigValues,
-  getProjectPath,
   getWorkspaceMeta,
   readProjectMeta,
-  saveProjectConfigValues,
 } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import {
@@ -30,25 +25,22 @@ function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-function hasConfigValues(values: Record<string, unknown> | undefined): values is Record<string, unknown> {
-  return !!values && Object.keys(values).length > 0;
+interface PublishWorkspaceProof {
+  workspaceId: string;
+  workspaceRevision: number;
+  workspaceRootHash: string;
 }
 
-function syncNonEmptyProjectConfigValuesFromWorkspace(
-  projectId: string,
-  workspaceId: string,
-): void {
-  const liveWorkspacePath = findWorkspacePath(workspaceId);
-  if (!liveWorkspacePath) return;
-
-  const liveValues = getProjectConfigValues(liveWorkspacePath);
-  if (!hasConfigValues(liveValues)) return;
-
-  const canonicalWorkspacePath = path.join(getProjectPath(projectId), "workspace");
-  const canonicalValues = getProjectConfigValues(canonicalWorkspacePath);
-  if (hasConfigValues(canonicalValues)) return;
-
-  saveProjectConfigValues(canonicalWorkspacePath, liveValues);
+function hasCanonicalRevisionMetadata(project: {
+  canonicalSyncedRevision?: number;
+  canonicalSyncedRootHash?: string;
+}): boolean {
+  return (
+    typeof project.canonicalSyncedRevision === "number" &&
+    Number.isFinite(project.canonicalSyncedRevision) &&
+    typeof project.canonicalSyncedRootHash === "string" &&
+    project.canonicalSyncedRootHash.length > 0
+  );
 }
 
 export async function POST(
@@ -69,6 +61,7 @@ export async function POST(
     const body = (await request.json().catch(() => ({}))) as PublishRequestBody;
     let sessionId = readNonEmptyString(body.sessionId);
     const workspaceId = readNonEmptyString(body.workspaceId);
+    let workspaceProof: PublishWorkspaceProof | undefined;
     if (workspaceId) {
       let session = sessionId ? getEditSession(sessionId) : null;
       if (!session) {
@@ -91,15 +84,25 @@ export async function POST(
         return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Session'), { status: 403 });
       }
       try {
-        await flushAndSyncProjectWorkspace({
+        const synced = await flushAndSyncProjectWorkspace({
           projectId: params.projectId,
           workspaceId: session.workspaceId,
           sessionId,
         });
-        syncNonEmptyProjectConfigValuesFromWorkspace(
-          params.projectId,
-          session.workspaceId,
-        );
+        if (
+          synced.canonicalRevision === undefined ||
+          !synced.canonicalRootHash
+        ) {
+          return NextResponse.json(
+            createApiError('WORKSPACE_STALE', '项目基准工作区尚未绑定 committed revision'),
+            { status: 409 },
+          );
+        }
+        workspaceProof = {
+          workspaceId: session.workspaceId,
+          workspaceRevision: synced.canonicalRevision,
+          workspaceRootHash: synced.canonicalRootHash,
+        };
       } catch (error) {
         const flushError = getWorkspaceFlushErrorResponse(error);
         return NextResponse.json(
@@ -117,6 +120,7 @@ export async function POST(
       if (
         project?.activeWorkspaceId &&
         (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId ||
+          !hasCanonicalRevisionMetadata(project) ||
           activeUpdatedAt > (project.canonicalSyncedAt ?? 0))
       ) {
         return NextResponse.json(
@@ -127,7 +131,9 @@ export async function POST(
       sessionId = undefined;
     }
 
-    const result = await publishProject(params.projectId);
+    const result = workspaceProof
+      ? await publishProject(params.projectId, workspaceProof)
+      : await publishProject(params.projectId);
     return NextResponse.json(createApiSuccess(result));
   } catch (error) {
     if (error instanceof Error) {

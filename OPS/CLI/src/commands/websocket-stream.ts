@@ -152,15 +152,6 @@ export async function testWebSocketStream(
             }
             break;
 
-          case "file_operation":
-            if (event.fileOperation) {
-              console.log(
-                chalk.blue(`\n[文件操作] ${event.fileOperation.method}`),
-              );
-              console.log(chalk.blue(`  路径: ${event.fileOperation.path}`));
-            }
-            break;
-
           case "finish":
             isComplete = true;
             const duration = Date.now() - startTime;

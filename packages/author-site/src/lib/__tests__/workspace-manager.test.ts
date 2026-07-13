@@ -124,16 +124,16 @@ describe("workspace manager diagnostics", () => {
     });
     const queried = await diagnosticsStore.queryEditorDiagnosticEvents({
       projectId,
-      eventType: "workspace.sync_failed",
+      eventType: "workspace.canonical_materialization_failed",
     });
     expect(queried.events).toEqual([
       expect.objectContaining({
         eventGroup: "workspace",
-        eventType: "workspace.sync_failed",
+        eventType: "workspace.canonical_materialization_failed",
         payload: expect.objectContaining({
           reason: "missing_active_workspace",
           errorCode: "WORKSPACE_STALE",
-          phase: "persist-workspace",
+          phase: "canonical-materialization",
           latestVersionId: "v2",
         }),
       }),
@@ -156,7 +156,7 @@ describe("workspace manager diagnostics", () => {
     });
     const queried = await diagnosticsStore.queryEditorDiagnosticEvents({
       projectId,
-      eventType: "workspace.sync_failed",
+      eventType: "workspace.canonical_materialization_failed",
     });
     expect(queried.events[0]).toEqual(
       expect.objectContaining({
@@ -190,7 +190,7 @@ describe("workspace manager diagnostics", () => {
     });
     const queried = await diagnosticsStore.queryEditorDiagnosticEvents({
       projectId,
-      eventType: "workspace.sync_failed",
+      eventType: "workspace.canonical_materialization_failed",
     });
     expect(queried.events[0]).toEqual(
       expect.objectContaining({
@@ -205,5 +205,162 @@ describe("workspace manager diagnostics", () => {
         }),
       }),
     );
+  });
+
+  it("active workspace 过期后创建新 live workspace 时清理旧 canonical sync 指针", async () => {
+    const projectId = "project-new-live-clears-stale-canonical";
+    const staleWorkspaceId = "live-stale";
+    writeProject(dataDir, projectId, {
+      activeWorkspaceId: staleWorkspaceId,
+      activeWorkspaceUpdatedAt: 10,
+      canonicalSyncedWorkspaceId: staleWorkspaceId,
+      canonicalSyncedRevision: 7,
+      canonicalSyncedRootHash: "stale-root-hash",
+      canonicalSyncedAt: 20,
+    });
+    writeWorkspace(dataDir, projectId, staleWorkspaceId, "v1");
+    const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
+
+    const result = workspaceManager.getOrCreateProjectActiveWorkspace(projectId);
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(dataDir, "projects", projectId, "project.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(result.workspaceId).not.toBe(staleWorkspaceId);
+    expect(project.activeWorkspaceId).toBe(result.workspaceId);
+    expect(project.canonicalSyncedWorkspaceId).toBeUndefined();
+    expect(project.canonicalSyncedRevision).toBeUndefined();
+    expect(project.canonicalSyncedRootHash).toBeUndefined();
+    expect(project.canonicalSyncedAt).toBeUndefined();
+  });
+
+  it("canonical 同步成功时记录 Authority revision 和 root hash", async () => {
+    const projectId = "project-canonical-sync-revision";
+    const workspaceId = "live-sync-revision";
+    writeProject(dataDir, projectId, {
+      activeWorkspaceId: workspaceId,
+      activeWorkspaceUpdatedAt: 1,
+    });
+    writeWorkspace(dataDir, projectId, workspaceId, "v2");
+    fs.writeFileSync(
+      path.join(
+        dataDir,
+        "workspaces",
+        "projects",
+        projectId,
+        workspaceId,
+        "prototype.html",
+      ),
+      "<div>new</div>",
+      "utf-8",
+    );
+    const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
+
+    const result = workspaceManager.syncActiveWorkspaceToCanonical(projectId, workspaceId, {
+      revision: 12,
+      rootHash: "root-hash-12",
+    });
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(dataDir, "projects", projectId, "project.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      workspacePath: path.join(dataDir, "projects", projectId, "workspace"),
+    });
+    expect(project.canonicalSyncedWorkspaceId).toBe(workspaceId);
+    expect(project.canonicalSyncedRevision).toBe(12);
+    expect(project.canonicalSyncedRootHash).toBe("root-hash-12");
+    expect(project.canonicalSyncedAt).toEqual(expect.any(Number));
+    const diagnostics = await diagnosticsStore.queryEditorDiagnosticEvents({
+      projectId,
+    });
+    expect(diagnostics.events.map((event) => event.eventType)).toEqual([
+      "workspace.canonical_materialization_started",
+      "workspace.canonical_materialization_succeeded",
+    ]);
+    for (const event of diagnostics.events) {
+      expect(event.operationId).toBe(`canonical:${projectId}:${workspaceId}:12`);
+      expect(event.traceId).toBe(event.operationId);
+      expect(event.payload).toEqual(expect.objectContaining({
+        phase: "canonical-materialization",
+        revision: 12,
+        rootHash: "root-hash-12",
+        durationMs: expect.any(Number),
+      }));
+    }
+  });
+
+  it("post-materialize 失败时按匹配 revision/rootHash 清理 stale canonical proof", async () => {
+    const projectId = "project-clear-stale-canonical-proof";
+    const workspaceId = "live-clear-proof";
+    writeProject(dataDir, projectId, {
+      activeWorkspaceId: workspaceId,
+      activeWorkspaceUpdatedAt: 1,
+      canonicalSyncedWorkspaceId: workspaceId,
+      canonicalSyncedRevision: 12,
+      canonicalSyncedRootHash: "root-hash-12",
+      canonicalSyncedAt: 20,
+    });
+    const { workspaceManager } = await importModules(dataDir);
+
+    const cleared = workspaceManager.clearCanonicalSyncProofIfMatches(
+      projectId,
+      workspaceId,
+      { revision: 12, rootHash: "root-hash-12" },
+    );
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(dataDir, "projects", projectId, "project.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(cleared).toBe(true);
+    expect(project.activeWorkspaceId).toBe(workspaceId);
+    expect(project.activeWorkspaceUpdatedAt).toBe(1);
+    expect(project.canonicalSyncedWorkspaceId).toBeUndefined();
+    expect(project.canonicalSyncedRevision).toBeUndefined();
+    expect(project.canonicalSyncedRootHash).toBeUndefined();
+    expect(project.canonicalSyncedAt).toBeUndefined();
+    expect(project.updatedAt).toEqual(expect.any(Number));
+  });
+
+  it("post-materialize 失败时不清理已被并发更新的 canonical proof", async () => {
+    const projectId = "project-keep-newer-canonical-proof";
+    const workspaceId = "live-keep-proof";
+    writeProject(dataDir, projectId, {
+      activeWorkspaceId: workspaceId,
+      activeWorkspaceUpdatedAt: 1,
+      canonicalSyncedWorkspaceId: workspaceId,
+      canonicalSyncedRevision: 13,
+      canonicalSyncedRootHash: "root-hash-13",
+      canonicalSyncedAt: 30,
+    });
+    const { workspaceManager } = await importModules(dataDir);
+
+    const cleared = workspaceManager.clearCanonicalSyncProofIfMatches(
+      projectId,
+      workspaceId,
+      { revision: 12, rootHash: "root-hash-12" },
+    );
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(dataDir, "projects", projectId, "project.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(cleared).toBe(false);
+    expect(project.canonicalSyncedWorkspaceId).toBe(workspaceId);
+    expect(project.canonicalSyncedRevision).toBe(13);
+    expect(project.canonicalSyncedRootHash).toBe("root-hash-13");
+    expect(project.canonicalSyncedAt).toBe(30);
   });
 });

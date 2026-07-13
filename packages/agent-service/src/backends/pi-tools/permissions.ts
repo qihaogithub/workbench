@@ -94,6 +94,26 @@ export function isCommandAllowed(
   return true;
 }
 
+export function isLiveWorkspaceReadOnlyCommandAllowed(
+  command: string,
+  config: PermissionConfig,
+): boolean {
+  if (!isCommandAllowed(command, config)) return false;
+  const trimmed = command.trim();
+  const baseCmd = trimmed.split(/\s+/)[0] || "";
+  if (baseCmd === "node" || baseCmd === "npm" || baseCmd === "npx") {
+    return false;
+  }
+  if (hasShellWriteOrCompositionSyntax(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+function hasShellWriteOrCompositionSyntax(command: string): boolean {
+  return /(?:^|[^\\])(?:>>?|<<|[|;&]|\$\(|`|\n)/.test(command) || /\b(?:tee|xargs)\b/.test(command);
+}
+
 function matchGlob(filePath: string, pattern: string): boolean {
   if (pattern.startsWith("**/") && matchGlob(filePath, pattern.slice(3))) {
     return true;

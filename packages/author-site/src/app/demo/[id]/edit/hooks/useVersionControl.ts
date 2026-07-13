@@ -243,98 +243,6 @@ export function useVersionControl(params: UseVersionControlParams) {
     }
   };
 
-  const handleRestoreVersion = async (version: VersionInfo) => {
-    if (
-      !confirm(
-        `确定要恢复到 ${version.versionId} 吗？当前状态将被保存为新版本。`,
-      )
-    ) {
-      return;
-    }
-
-    setRestoring(version.versionId);
-    try {
-      const result = await projectApiClient.restoreVersion(demoId, {
-        versionId: version.versionId,
-        username: currentUsername || "未知用户",
-      });
-
-      const syncRes = await fetch(
-        `/api/sessions/${sessionId}/sync-project`,
-        {
-          method: "POST",
-        },
-      );
-      if (!syncRes.ok) {
-        throw new Error("同步会话工作区失败");
-      }
-
-      const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
-      const filesData = await filesRes.json();
-      if (filesData.success) {
-        const multi = filesData.data;
-        const pageIds = (multi.demoPages || []).map(
-          (p: { id: string }) => p.id,
-        );
-        const newActiveId = pageIds.includes(activeDemoId)
-          ? activeDemoId
-          : pageIds[0];
-        const targetDemo = multi.demos?.[newActiveId];
-
-        if (newActiveId && newActiveId !== activeDemoId) {
-          setActiveDemoId(newActiveId);
-          activeDemoIdRef.current = newActiveId;
-        }
-
-        if (targetDemo) {
-          applyDemoSnapshot({
-            code: targetDemo.code ?? "",
-            schema: targetDemo.schema ?? "",
-            source: "manual-load",
-          });
-        } else {
-          setActiveDemoId("");
-          activeDemoIdRef.current = "";
-          applyDemoSnapshot({
-            code: "",
-            schema: "",
-            source: "manual-load",
-          });
-        }
-
-        setDemoPages(
-          pageIds.map((id: string) => ({
-            id,
-            name:
-              multi.demoPages.find((p: { id: string }) => p.id === id)?.name ||
-              id,
-            order: 0,
-            parentId: null,
-          })),
-        );
-        setDemoFolders(multi.demoFolders || []);
-        setProjectConfigSchema(multi.projectConfigSchema);
-      }
-
-      toast({
-        title: "恢复成功",
-        description: `已恢复到新版本 ${result.newVersionId}`,
-      });
-      await loadVersionHistory();
-      const statusResult = await projectApiClient.getPublishStatus(demoId);
-      setPublishStatus(statusResult.status);
-      setPublishedVersion(statusResult.publishedVersion);
-    } catch (err) {
-      toast({
-        title: "恢复失败",
-        description: err instanceof Error ? err.message : "恢复版本失败",
-        variant: "destructive",
-      });
-    } finally {
-      setRestoring(null);
-    }
-  };
-
   const handlePreviewPageVersion = async (version: PageVersionInfo) => {
     try {
       const files = await projectApiClient.getPageVersionFiles(
@@ -678,7 +586,6 @@ export function useVersionControl(params: UseVersionControlParams) {
     loadVersionHistory,
     loadPageVersionHistories,
     handlePublish,
-    handleRestoreVersion,
     handlePreviewPageVersion,
     handleRestorePageVersion,
     handleCreateVersion,

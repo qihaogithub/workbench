@@ -57,6 +57,8 @@ export async function POST(
           sessionId: params.sessionId,
           projectId: session.demoId,
           workspacePath: synced.workspacePath,
+          canonicalRevision: synced.canonicalRevision,
+          canonicalRootHash: synced.canonicalRootHash,
           persistedAt: Date.now(),
         }),
       );

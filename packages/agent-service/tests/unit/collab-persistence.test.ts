@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import crypto from "crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { WorkspaceFilePersistence } from "../../src/collab/workspace-file-persistence";
@@ -229,27 +230,28 @@ describe("WorkspaceFilePersistence", () => {
     ).toBe(false);
   });
 
-  it("写入资源时更新文件内容并刷新 workspace 元数据时间", () => {
+  it("协同资源只能通过 Authority durable receipt 写入", async () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
     const workspacePath = path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1");
 
-    persistence.writeResource(
-      workspacePath,
-      "demos/page-1/index.tsx",
-      "page-code",
-      "new content",
-    );
+    const result = await persistence.commitResource({
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      resourcePath: "demos/page-1/index.tsx",
+      kind: "page-code",
+      content: "new content",
+      expectedHash: crypto.createHash("sha256").update("old").digest("hex"),
+      sessionId: "session-1",
+    });
 
     expect(fs.readFileSync(path.join(workspacePath, "demos", "page-1", "index.tsx"), "utf-8")).toBe(
       "new content",
     );
-    const meta = JSON.parse(fs.readFileSync(path.join(workspacePath, ".workspace.json"), "utf-8")) as {
-      updatedAt: number;
-    };
-    expect(meta.updatedAt).toBeGreaterThan(1);
+    expect(result.receipt.committed).toBe(true);
+    expect(result.receipt.revision).toBe(2);
   });
 
-  it("允许知识文档协同并拒绝知识目录嵌套资源", () => {
+  it("允许知识文档协同并拒绝知识目录嵌套资源", async () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
     const workspacePath = path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1");
 
@@ -263,12 +265,15 @@ describe("WorkspaceFilePersistence", () => {
 
     expect(valid.ok).toBe(true);
 
-    persistence.writeResource(
-      workspacePath,
-      "knowledge/产品规则.md",
-      "knowledge-document",
-      "# 新规则",
-    );
+    await persistence.commitResource({
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      resourcePath: "knowledge/产品规则.md",
+      kind: "knowledge-document",
+      content: "# 新规则",
+      expectedHash: crypto.createHash("sha256").update("# 产品规则").digest("hex"),
+      sessionId: "session-1",
+    });
     expect(fs.readFileSync(path.join(workspacePath, "knowledge", "产品规则.md"), "utf-8")).toBe(
       "# 新规则",
     );

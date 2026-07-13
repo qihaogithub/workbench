@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
+import { isLiveWorkspacePath } from '@/lib/live-workspace-route-context';
 
 /**
  * 读取知识库文件内容
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    syncBuiltinKnowledge(workingDir);
+    if (!isLiveWorkspacePath(workingDir)) syncBuiltinKnowledge(workingDir);
     const filePath = path.join(workingDir, 'knowledge', sanitizedFileName);
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(

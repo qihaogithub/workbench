@@ -7,7 +7,6 @@ import type {
   CreateProjectRequest,
   OpenProjectEditResponse,
   SaveProjectChangesResponse,
-  RestoreVersionResponse,
   VersionHistoryResponse,
   ProjectListResponse,
   ProjectDetailResponse,
@@ -458,75 +457,6 @@ export class ProjectWorkspaceManager {
       currentVersion,
       versions,
       totalVersions: project.versions.length,
-    };
-  }
-
-  /**
-   * 恢复指定版本
-   */
-  async restoreVersion(projectId: string, versionId: string, username: string): Promise<RestoreVersionResponse> {
-    const project = await readProjectMeta(projectId);
-
-    // 查找指定版本
-    const version = project.versions.find(v => v.versionId === versionId);
-
-    if (!version) {
-      throw new Error('VERSION_NOT_FOUND');
-    }
-
-    // 生成新版本号
-    const newVersionId = generateVersionId(project);
-
-    // 备份当前状态
-    const backupPath = path.join(SNAPSHOTS_DIR, projectId, `${newVersionId}_backup`);
-    await copyDirectory(project.workspacePath, backupPath);
-
-    // 从快照恢复
-    await copyDirectory(version.snapshotPath, project.workspacePath);
-
-    // 创建恢复后状态的新快照
-    const restoreSnapshotPath = path.join(SNAPSHOTS_DIR, projectId, newVersionId);
-    await copyDirectory(project.workspacePath, restoreSnapshotPath);
-
-    // 统计文件数量
-    const fileCount = await countFiles(project.workspacePath);
-
-    // 记录版本信息
-    const newVersion: VersionInfo = {
-      versionId: newVersionId,
-      type: 'restore_snapshot',
-      savedAt: Date.now(),
-      savedBy: username,
-      sessionId: 'restore',
-      snapshotPath: restoreSnapshotPath,
-      fileCount,
-      note: `从 ${versionId} 恢复`,
-    };
-
-    project.versions.push(newVersion);
-    project.updatedAt = Date.now();
-
-    // 清理旧版本
-    if (project.versions.length > MAX_VERSIONS_KEEP) {
-      const toRemove = project.versions.slice(0, project.versions.length - MAX_VERSIONS_KEEP);
-
-      for (const ver of toRemove) {
-        if (fs.existsSync(ver.snapshotPath)) {
-          await fs.promises.rm(ver.snapshotPath, { recursive: true, force: true });
-        }
-      }
-
-      project.versions = project.versions.slice(-MAX_VERSIONS_KEEP);
-    }
-
-    await writeProjectMeta(projectId, project);
-
-    logger.info({ projectId, versionId, newVersionId, username }, '版本已恢复');
-
-    return {
-      success: true,
-      newVersionId,
-      restoredAt: newVersion.savedAt,
     };
   }
 

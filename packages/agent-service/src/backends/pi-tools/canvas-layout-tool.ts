@@ -1,9 +1,11 @@
 import * as fs from 'fs';
+import crypto from 'crypto';
 import * as path from 'path';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const WORKSPACE_TREE_FILENAME = 'workspace-tree.json';
 const CANVAS_LAYOUT_FILENAME = '.canvas-layout.json';
@@ -720,7 +722,22 @@ export function createArrangeCanvasPagesTool(
           state,
         };
         const layoutPath = getCanvasLayoutPath(workingDir);
-        fs.writeFileSync(layoutPath, JSON.stringify(storedLayout, null, 2), 'utf-8');
+        const content = JSON.stringify(storedLayout, null, 2);
+        const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
+        const receipt = liveWorkspace
+          ? await (async () => {
+          const previous = fs.readFileSync(layoutPath, 'utf-8');
+          const authorityState = await liveWorkspace.authority.getState(liveWorkspace.projectId, liveWorkspace.workspaceId);
+          return liveWorkspace.authority.mutate({
+            mutationId: crypto.randomUUID(), projectId: liveWorkspace.projectId, workspaceId: liveWorkspace.workspaceId,
+            sessionId: config.sessionId, baseRevision: authorityState.revision, actor: 'ai', reason: 'agent_canvas_arrange',
+            operations: [{ type: 'put_text', path: CANVAS_LAYOUT_FILENAME, content, expectedHash: crypto.createHash('sha256').update(previous).digest('hex') }],
+          });
+          })()
+          : null;
+        if (!liveWorkspace) {
+          fs.writeFileSync(layoutPath, content, 'utf-8');
+        }
 
         return {
           content: [{
@@ -735,6 +752,7 @@ export function createArrangeCanvasPagesTool(
           details: {
             arranged: true,
             layoutPath: CANVAS_LAYOUT_FILENAME,
+            receipt,
             mode,
             orderBy,
             sizeMode,

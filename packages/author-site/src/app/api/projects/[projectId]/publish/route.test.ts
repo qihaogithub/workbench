@@ -67,7 +67,14 @@ jest.mock("@/lib/session-manager", () => ({
 }));
 
 jest.mock("@/lib/workspace-flush", () => ({
-  flushAndSyncProjectWorkspace: jest.fn(async () => undefined),
+  flushAndSyncProjectWorkspace: jest.fn(async () => ({
+    status: "no_active_room",
+    flushedRooms: 0,
+    revision: 6,
+    workspacePath: "/tmp/project-1/workspace",
+    canonicalRevision: 6,
+    canonicalRootHash: "root-hash-6",
+  })),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
     code: "AGENT_SERVICE_ERROR",
     message: error instanceof Error ? error.message : "协同草稿同步失败",
@@ -157,7 +164,41 @@ describe("project publish route", () => {
       workspaceId: "workspace-1",
       sessionId: "session-resumed",
     });
-    expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
+    expect(publishManager.publishProject).toHaveBeenCalledWith("project-1", {
+      workspaceId: "workspace-1",
+      workspaceRevision: 6,
+      workspaceRootHash: "root-hash-6",
+    });
+  });
+
+  it("发布前 canonical revision/rootHash 缺失时不会创建发布快照", async () => {
+    const { POST } = await import("./route");
+    const workspaceFlush = await import("@/lib/workspace-flush");
+    const publishManager = await import("@/lib/publish-manager");
+    jest
+      .mocked(workspaceFlush.flushAndSyncProjectWorkspace)
+      .mockResolvedValueOnce({
+        status: "no_active_room",
+        flushedRooms: 0,
+        revision: 6,
+        workspacePath: "/tmp/project-1/workspace",
+      });
+
+    const response = await POST(
+      jsonRequest({ sessionId: "session-missing", workspaceId: "workspace-1" }),
+      { params: { projectId: "project-1" } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({
+      success: false,
+      error: {
+        code: "WORKSPACE_STALE",
+        message: "项目基准工作区尚未绑定 committed revision",
+      },
+    });
+    expect(publishManager.publishProject).not.toHaveBeenCalled();
   });
 
   it("仅携带失效 Session 且没有 Workspace 时发布已有项目工作区", async () => {
@@ -190,7 +231,7 @@ describe("project publish route", () => {
     expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
   });
 
-  it("发布前应将 live workspace 的非空共享配置运行值补写到 canonical workspace", async () => {
+  it("发布前不再绕过同步边界补写共享配置运行值到 canonical workspace", async () => {
     const fsUtils = await import("@/lib/fs-utils");
     const liveValues = {
       modalImage: "/api/sessions/session-1/assets/popup.png",
@@ -211,9 +252,38 @@ describe("project publish route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(fsUtils.saveProjectConfigValues).toHaveBeenCalledWith(
-      "/tmp/project/workspace",
-      liveValues,
+    expect(fsUtils.saveProjectConfigValues).not.toHaveBeenCalled();
+  });
+
+  it("无 Session 发布项目工作区时必须已有 canonical revision 和 root hash", async () => {
+    const fsUtils = await import("@/lib/fs-utils");
+    (
+      fsUtils.readProjectMeta as jest.MockedFunction<typeof fsUtils.readProjectMeta>
+    ).mockReturnValueOnce({
+      id: "project-1",
+      name: "测试项目",
+      activeWorkspaceId: "workspace-1",
+      activeWorkspaceUpdatedAt: 2,
+      canonicalSyncedWorkspaceId: "workspace-1",
+      canonicalSyncedAt: 3,
+    } as ReturnType<typeof fsUtils.readProjectMeta>);
+    const { POST } = await import("./route");
+    const publishManager = await import("@/lib/publish-manager");
+
+    const response = await POST(
+      jsonRequest({}),
+      { params: { projectId: "project-1" } },
     );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "发布前需要同步当前共享工作区",
+      },
+    });
+    expect(publishManager.publishProject).not.toHaveBeenCalled();
   });
 });

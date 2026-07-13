@@ -4,7 +4,12 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { isCommandAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
+import {
+  isCommandAllowed,
+  isLiveWorkspaceReadOnlyCommandAllowed,
+  DEFAULT_WORKSPACE_PERMISSIONS,
+} from './permissions';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const execAsync = promisify(exec);
 
@@ -29,6 +34,24 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
         return {
           content: [{ type: 'text', text: `Error: command "${baseCommand}" is not allowed. Allowed: ${permissions.allowedCommands.join(', ')}. Denied: ${permissions.deniedCommands.join(', ')}` }],
           details: { command, error: 'permission denied' },
+          isError: true,
+        };
+      }
+
+      const liveWorkspace = config.workingDir
+        ? resolveLiveWorkspaceMutationContext(config.workingDir)
+        : null;
+      if (liveWorkspace && !isLiveWorkspaceReadOnlyCommandAllowed(command, permissions)) {
+        const baseCommand = command.split(/\s+/)[0] || '';
+        logger.warn({ command: baseCommand, workspaceId: liveWorkspace.workspaceId }, 'Live Workspace bash command blocked by Authority guard');
+        return {
+          content: [{ type: 'text', text: 'Error: live Workspace bash is read-only. File writes must go through Workspace Mutation Authority.' }],
+          details: {
+            command,
+            error: 'WORKSPACE_AUTHORITY_REQUIRED',
+            workspaceId: liveWorkspace.workspaceId,
+            projectId: liveWorkspace.projectId,
+          },
           isError: true,
         };
       }

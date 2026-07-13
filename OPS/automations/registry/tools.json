@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-30",
+  "updatedAt": "2026-07-10",
   "description": "Long-lived engineering tools that Codex automation can discover and maintain.",
   "items": [
     {
@@ -17,9 +17,10 @@
       "writes": [],
       "docs": [
         "OPS/CLI/README.md",
-        "OPS/CLI/QUICKSTART.md"
+        "OPS/CLI/QUICKSTART.md",
+        "OPS/automations/diagnostics/editor-diagnostics.md"
       ],
-      "notes": "Used for Agent Service health, session, log, model, workspace and file-change diagnostics."
+      "notes": "Used for Agent Service health, session, log, model and Workspace diagnostics, including cross-store mutation-to-projection-to-canonical flows and performance percentiles."
     },
     {
       "id": "automation-registry-checker",
@@ -54,6 +55,42 @@
         "OPS/automations/runbooks/weekly-cleanup.md"
       ],
       "notes": "Reports stale, completed-in-progress, duplicate-title and broken-link candidates under docs/plans/进行中 without modifying files."
+    },
+    {
+      "id": "workspace-authority-deploy-preflight",
+      "kind": "root-check",
+      "title": "Workspace Authority deployment preflight",
+      "path": "scripts/check-workspace-deploy-preflight.mjs",
+      "command": "corepack pnpm check:workspace-deploy-preflight",
+      "ownerArea": "workspace-authority",
+      "status": "active",
+      "automationLevel": "auto-run",
+      "requiresServices": [],
+      "writes": [],
+      "docs": [
+        "OPS/CLI/README.md",
+        "docs/项目文档/创作端/06-基础设施/技术/03_Docker部署方案.md"
+      ],
+      "notes": "Read-only scan for unregistered live Workspaces, drift, leases, prepared transactions, committed backup gaps and shared Compose DATA_DIR mismatches."
+    },
+    {
+      "id": "workspace-authority-migration",
+      "kind": "operator-cli",
+      "title": "Workspace Authority idempotent migration",
+      "path": "packages/agent-service/src/scripts/workspace-authority-migrate.ts",
+      "command": "corepack pnpm workspace-authority:migrate",
+      "ownerArea": "workspace-authority",
+      "status": "active",
+      "automationLevel": "manual-or-weekly",
+      "requiresServices": [],
+      "writes": [
+        "data/workspace-authority/"
+      ],
+      "docs": [
+        "OPS/CLI/README.md",
+        "docs/项目文档/创作端/11-诊断与日志/技术/02_Codex查询CLI与导出包.md"
+      ],
+      "notes": "Dry-run by default; --apply bootstraps Authority state and committed backups for one workspace, one project or all live Workspaces without changing business files."
     }
   ]
 }

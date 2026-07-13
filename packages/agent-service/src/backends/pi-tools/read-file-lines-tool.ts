@@ -6,6 +6,7 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 import { resolveVirtualKnowledgeFile } from './virtual-knowledge';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const ReadFileLinesParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -36,9 +37,24 @@ export function createReadFileLinesTool(config: AgentConfig): AgentTool<typeof R
 
       try {
         const virtualFile = resolveVirtualKnowledgeFile(args.path, config.workingDir || '');
+        const liveWorkspace = !virtualFile && config.workingDir
+          ? resolveLiveWorkspaceMutationContext(config.workingDir)
+          : null;
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(liveWorkspace.projectId, liveWorkspace.workspaceId)
+          : null;
         const content = virtualFile
           ? virtualFile.content
-          : await fs.promises.readFile(filePath, 'utf-8');
+          : snapshot
+            ? snapshot.resources[args.path]
+            : await fs.promises.readFile(filePath, 'utf-8');
+        if (content === undefined) {
+          return {
+            content: [{ type: 'text', text: `Error reading file: ${args.path} is not a committed text resource` }],
+            details: { path: args.path, error: 'WORKSPACE_RESOURCE_NOT_FOUND' },
+            isError: true,
+          };
+        }
         const lines = content.split('\n');
         const totalLines = lines.length;
 
@@ -67,7 +83,14 @@ export function createReadFileLinesTool(config: AgentConfig): AgentTool<typeof R
         logger.debug({ path: displayPath, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) }, 'File read with lines successfully');
         return {
           content: [{ type: 'text', text: `${header}\n${numberedContent}` }],
-          details: { path: displayPath, totalLines, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) },
+          details: {
+            path: displayPath,
+            totalLines,
+            startLine: clampedStart,
+            endLine: clampedEnd,
+            virtual: Boolean(virtualFile),
+            ...(snapshot ? { revision: snapshot.state.revision, hash: snapshot.state.resourceHashes[args.path] } : {}),
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

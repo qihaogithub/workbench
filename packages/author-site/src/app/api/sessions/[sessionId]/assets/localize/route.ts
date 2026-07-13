@@ -17,6 +17,7 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
+import { commitWorkspaceMutation, stageWorkspaceBinary } from "@/lib/workspace-authority-client";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const URL_DOWNLOAD_TIMEOUT_MS = 10_000;
@@ -305,14 +306,6 @@ export async function POST(
       );
     }
 
-    const workspacePath = findWorkspacePath(meta.workspaceId);
-    if (!workspacePath) {
-      return NextResponse.json(
-        createApiError("FILE_READ_ERROR", "工作空间路径不存在"),
-        { status: 500 },
-      );
-    }
-
     const src = typeof body.source.src === "string" ? body.source.src : "";
     const currentSrc = typeof body.source.currentSrc === "string" ? body.source.currentSrc : "";
     const originalUrl = currentSrc || src;
@@ -354,18 +347,40 @@ export async function POST(
       ".png";
     const filename = `${hashPrefix}-${filenameStemFromUrl(originalUrl)}${ext}`;
     const workspaceAssetPath = `assets/images/${filename}`;
+    const workspacePath = findWorkspacePath(meta.workspaceId);
+    if (!workspacePath) {
+      return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间路径不存在"), { status: 500 });
+    }
     const absoluteAssetPath = path.resolve(workspacePath, workspaceAssetPath);
-    const resolvedWorkspacePath = path.resolve(workspacePath);
-    if (!absoluteAssetPath.startsWith(`${resolvedWorkspacePath}${path.sep}`)) {
-      return NextResponse.json(createApiError("FORBIDDEN", "禁止写入工作空间外路径"), {
-        status: 403,
-      });
+    if (!absoluteAssetPath.startsWith(`${path.resolve(workspacePath)}${path.sep}`)) {
+      return NextResponse.json(createApiError("FORBIDDEN", "禁止读取工作空间外路径"), { status: 403 });
     }
-
-    fs.mkdirSync(path.dirname(absoluteAssetPath), { recursive: true });
-    if (!fs.existsSync(absoluteAssetPath)) {
-      fs.writeFileSync(absoluteAssetPath, image.buffer);
-    }
+    const previousHash = fs.existsSync(absoluteAssetPath)
+      ? contentHash(fs.readFileSync(absoluteAssetPath))
+      : null;
+    const staged = await stageWorkspaceBinary({
+      projectId: meta.demoId,
+      workspaceId: meta.workspaceId,
+      sessionId,
+      content: image.buffer,
+    });
+    const receipt = await commitWorkspaceMutation({
+      mutationId: crypto.randomUUID(),
+      projectId: meta.demoId,
+      workspaceId: meta.workspaceId,
+      sessionId,
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "localize_selected_asset",
+      operations: [{
+        type: "put_binary",
+        path: workspaceAssetPath,
+        stagingId: staged.stagingId,
+        hash: staged.hash,
+        size: staged.size,
+        ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
+      }],
+    });
 
     const relativePathFromPage = `../../${workspaceAssetPath}`;
     const assetId = `asset_${hashPrefix}`;
@@ -397,6 +412,7 @@ export async function POST(
         originalUrl: originalUrl || undefined,
         pageId: typeof body.pageId === "string" ? body.pageId : undefined,
         runtimeType: typeof body.runtimeType === "string" ? body.runtimeType : undefined,
+        receipt,
       }),
     );
   } catch (error) {

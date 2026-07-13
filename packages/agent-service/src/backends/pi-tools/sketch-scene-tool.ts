@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import crypto from 'crypto';
 import * as path from 'path';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
@@ -12,8 +13,10 @@ import {
   type SketchScenePatchOperation,
 } from '@workbench/sketch-core';
 import type { AgentConfig } from '../../core/types';
+import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
 import { logger } from '../../utils/logger';
 import { DEFAULT_WORKSPACE_PERMISSIONS, isPathAllowed } from './permissions';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const ReadSketchSceneParams = Type.Object({
   pageId: Type.String({ description: 'Page id under demos/<pageId>' }),
@@ -88,10 +91,23 @@ async function readScene(config: AgentConfig, pageId: string): Promise<SketchSce
   return parseSketchSceneDocument(content);
 }
 
-async function writeScene(config: AgentConfig, pageId: string, scene: SketchSceneDocument): Promise<void> {
+async function writeScene(config: AgentConfig, pageId: string, scene: SketchSceneDocument): Promise<WorkspaceMutationReceipt | null> {
   const filePath = sketchScenePath(config, pageId);
+  const content = JSON.stringify(scene, null, 2);
+  const existing = await fs.promises.readFile(filePath, 'utf-8').catch(() => null);
+  const liveWorkspace = config.workingDir ? resolveLiveWorkspaceMutationContext(config.workingDir) : null;
+  if (liveWorkspace) {
+    const state = await liveWorkspace.authority.getState(liveWorkspace.projectId, liveWorkspace.workspaceId);
+    return liveWorkspace.authority.mutate({
+      mutationId: crypto.randomUUID(), projectId: liveWorkspace.projectId, workspaceId: liveWorkspace.workspaceId,
+      sessionId: config.sessionId, baseRevision: state.revision, actor: 'ai', reason: 'agent_sketch_scene',
+      operations: [{ type: 'put_text', path: sketchSceneRelativePath(pageId), content,
+        ...(existing === null ? { expectedAbsent: true } : { expectedHash: crypto.createHash('sha256').update(existing).digest('hex') }) }],
+    });
+  }
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.promises.writeFile(filePath, JSON.stringify(scene, null, 2), 'utf-8');
+  await fs.promises.writeFile(filePath, content, 'utf-8');
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -231,7 +247,9 @@ export function createPatchSketchSceneTool(config: AgentConfig): AgentTool<typeo
           nextScene,
           operations,
         });
-        if (!args.dryRun && details.patch.changed) await writeScene(config, args.pageId, nextScene);
+        const receipt = !args.dryRun && details.patch.changed
+          ? await writeScene(config, args.pageId, nextScene)
+          : null;
         return {
           content: [{
             type: 'text',
@@ -239,7 +257,7 @@ export function createPatchSketchSceneTool(config: AgentConfig): AgentTool<typeo
               ? `Sketch scene patch validated (${details.patch.operationCount} operations, changed=${details.patch.changed}).`
               : `Sketch scene patch applied (${details.patch.operationCount} operations, changed=${details.patch.changed}).`,
           }],
-          details,
+          details: { ...details, receipt },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -307,7 +325,9 @@ export function createBindSketchConfigTool(config: AgentConfig): AgentTool<typeo
           nextScene,
           operations,
         });
-        if (!args.dryRun && details.patch.changed) await writeScene(config, args.pageId, nextScene);
+        const receipt = !args.dryRun && details.patch.changed
+          ? await writeScene(config, args.pageId, nextScene)
+          : null;
         return {
           content: [{
             type: 'text',
@@ -317,6 +337,7 @@ export function createBindSketchConfigTool(config: AgentConfig): AgentTool<typeo
           }],
           details: {
             ...details,
+            receipt,
             nodeId: args.nodeId,
             property: args.property,
             field: args.field,
