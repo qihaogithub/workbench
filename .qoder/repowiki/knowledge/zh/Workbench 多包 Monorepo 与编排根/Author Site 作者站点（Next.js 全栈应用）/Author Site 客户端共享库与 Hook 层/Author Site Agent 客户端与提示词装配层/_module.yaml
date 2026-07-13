@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: author_site/client_libs/agent_ai_chat
+title: Author Site Agent 客户端与提示词装配层
+scope:
+    - packages/author-site/src/lib/agent/
+    - packages/author-site/src/lib/agent-prompts/
+    - packages/author-site/src/lib/agent-client.ts
+    - packages/author-site/src/lib/agent-providers.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: agent_service

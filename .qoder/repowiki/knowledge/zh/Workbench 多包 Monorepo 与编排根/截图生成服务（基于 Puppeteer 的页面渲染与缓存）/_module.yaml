@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: screenshot_service
+title: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
+scope:
+    - packages/screenshot-service/
+source_files: []
+depends_on: []
+related_to:
+    - path: author_site
+    - path: infra_docker

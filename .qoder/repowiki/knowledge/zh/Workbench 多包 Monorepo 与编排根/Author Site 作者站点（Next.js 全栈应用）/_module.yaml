@@ -1,0 +1,18 @@
+schema_version: 1
+module_path: author_site
+title: Author Site 作者站点（Next.js 全栈应用）
+scope:
+    - packages/author-site/
+source_files: []
+depends_on: []
+related_to:
+    - path: agent_service
+    - path: data_artifacts
+    - path: demo_ui
+    - path: docs
+    - path: infra_docker
+    - path: knowledge_service
+    - path: preview_contract
+    - path: screenshot_service
+    - path: sketch_system
+    - path: tests

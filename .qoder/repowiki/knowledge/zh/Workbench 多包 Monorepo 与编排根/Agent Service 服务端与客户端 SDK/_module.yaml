@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: agent_service
+title: Agent Service 服务端与客户端 SDK
+scope:
+    - packages/agent-service/
+    - packages/agent-client/
+source_files: []
+depends_on: []
+related_to:
+    - path: author_site
+    - path: author_site/client_libs/agent_ai_chat
+    - path: data_artifacts
+    - path: infra_docker
+    - path: ops_cli
+    - path: shared_lib

@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: author_site/api_projects_workspaces/demos_templates
+title: Demo 页面与运行时模板 API
+scope:
+    - packages/author-site/src/app/api/projects/[projectId]/demos/
+    - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: author_site/client_libs/prototype_visual_editor
+title: 原型可视化编辑器与配置注入运行时
+scope:
+    - packages/author-site/src/lib/prototype-visual-editor.ts
+    - packages/author-site/src/lib/prototype-preview-size.ts
+    - packages/author-site/src/lib/visual-configurator.ts
+    - packages/author-site/src/lib/viewer-app-graph-runtime.ts
+    - packages/author-site/src/lib/sketch-editor-engine.ts
+    - packages/author-site/src/lib/screenshot-service.ts
+source_files: []
+depends_on: []
+related_to: []

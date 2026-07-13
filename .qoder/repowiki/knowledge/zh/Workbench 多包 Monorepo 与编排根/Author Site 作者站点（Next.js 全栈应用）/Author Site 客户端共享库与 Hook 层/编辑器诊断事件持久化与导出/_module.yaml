@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: author_site/client_libs/editor_diagnostics
+title: 编辑器诊断事件持久化与导出
+scope:
+    - packages/author-site/src/lib/editor-diagnostics/
+source_files: []
+depends_on: []
+related_to: []

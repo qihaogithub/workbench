@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: ops_cli/system_models
+title: 系统诊断、模型列表与 WebSocket 流式测试命令
+scope:
+    - OPS/CLI/src/commands/system.ts
+    - OPS/CLI/src/commands/models.ts
+    - OPS/CLI/src/commands/websocket-stream.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: ops_cli/http_interactive

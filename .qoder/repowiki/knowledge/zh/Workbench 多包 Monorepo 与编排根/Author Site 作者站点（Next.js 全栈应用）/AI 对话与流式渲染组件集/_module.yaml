@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: author_site/ai_chat_components
+title: AI 对话与流式渲染组件集
+scope:
+    - packages/author-site/src/components/ai-elements/
+source_files: []
+depends_on: []
+related_to: []

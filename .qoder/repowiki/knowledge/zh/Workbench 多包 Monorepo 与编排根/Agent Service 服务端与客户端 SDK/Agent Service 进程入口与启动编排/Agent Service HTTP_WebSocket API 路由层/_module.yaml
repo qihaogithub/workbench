@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: agent_service/agent_service_server/routes_api_layer
+title: Agent Service HTTP/WebSocket API 路由层
+scope:
+    - packages/agent-service/src/routes/
+source_files: []
+depends_on: []
+related_to: []

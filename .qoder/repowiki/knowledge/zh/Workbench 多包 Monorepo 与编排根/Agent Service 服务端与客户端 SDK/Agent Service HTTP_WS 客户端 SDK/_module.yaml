@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: agent_service/agent_client_sdk
+title: Agent Service HTTP/WS 客户端 SDK
+scope:
+    - packages/agent-client/
+source_files: []
+depends_on: []
+related_to: []

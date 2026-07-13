@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: author_site/api_auth_user_admin
+title: 作者站认证与用户管理 API
+scope:
+    - packages/author-site/src/app/api/auth/
+    - packages/author-site/src/app/api/user/
+    - packages/author-site/src/app/api/admin/
+source_files: []
+depends_on: []
+related_to: []

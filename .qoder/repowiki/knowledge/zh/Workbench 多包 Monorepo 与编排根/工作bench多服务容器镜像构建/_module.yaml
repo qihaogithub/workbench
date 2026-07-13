@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: infra_docker
+title: 工作bench多服务容器镜像构建
+scope:
+    - docker/
+source_files: []
+depends_on: []
+related_to:
+    - path: agent_service
+    - path: author_site
+    - path: screenshot_service
+    - path: scripts
+    - path: viewer_site
