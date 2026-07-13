@@ -1,0 +1,11 @@
+{
+  "planId": "plan_1783665013872_pl68e8",
+  "operation": "template_delete",
+  "resourceId": "tmpl_1782660798968_c17sup",
+  "impact": [
+    "删除模板 测试项目",
+    "不会删除已从该模板创建的项目"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1783665013872_d0gnr3"
+}

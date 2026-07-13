@@ -377,7 +377,7 @@ async function readResponseBody(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let bytesRead = 0;
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     if (!value) continue;

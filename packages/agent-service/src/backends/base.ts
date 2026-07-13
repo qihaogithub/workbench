@@ -1,4 +1,4 @@
-import { AgentConfig, AgentEvent, FileAttachment, ImageAttachment, UserChoiceResponse } from '../core/types';
+import { AgentEvent, FileAttachment, ImageAttachment, UserChoiceResponse } from '../core/types';
 
 export type BackendStatus = 'idle' | 'initializing' | 'ready' | 'busy' | 'error';
 

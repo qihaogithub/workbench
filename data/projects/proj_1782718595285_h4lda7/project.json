@@ -166,51 +166,21 @@
     },
     {
       "versionId": "v15",
-      "type": "publish_snapshot",
-      "savedAt": 1783567412593,
-      "savedBy": "system",
-      "sessionId": "publish-1783567412578",
-      "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v15",
-      "fileCount": 24,
-      "note": "发布快照"
-    },
-    {
-      "versionId": "v16",
-      "type": "publish_snapshot",
-      "savedAt": 1783567529141,
-      "savedBy": "system",
-      "sessionId": "publish-1783567529128",
-      "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v16",
-      "fileCount": 24,
-      "note": "发布快照"
-    },
-    {
-      "versionId": "v17",
       "type": "auto_checkpoint",
-      "savedAt": 1783578723438,
+      "savedAt": 1783829156520,
       "savedBy": "qihao",
-      "sessionId": "session-1783560881939-ya2ddwp1n",
-      "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v17",
-      "fileCount": 24,
-      "note": "停止编辑后自动保存记录"
-    },
-    {
-      "versionId": "v18",
-      "type": "auto_checkpoint",
-      "savedAt": 1783583164603,
-      "savedBy": "qihao",
-      "sessionId": "session-1783560881939-ya2ddwp1n",
-      "snapshotPath": "/app/data/snapshots/proj_1782718595285_h4lda7/v18",
-      "fileCount": 29,
+      "sessionId": "session-1783827695397-vy9hncajg",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1782718595285_h4lda7\\v15",
+      "fileCount": 16,
       "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1782718595290,
-  "updatedAt": 1783583164603,
-  "activeWorkspaceId": "live-1783578338255-l1b0zcb5k",
-  "activeWorkspaceUpdatedAt": 1783583164443,
-  "canonicalSyncedWorkspaceId": "live-1783578338255-l1b0zcb5k",
-  "canonicalSyncedAt": 1783583164583,
-  "publishedVersion": "v16",
-  "publishedAt": 1783567529151
+  "updatedAt": 1783829156520,
+  "activeWorkspaceId": "live-1783827695356-tae34ri4s",
+  "activeWorkspaceUpdatedAt": 1783829152831,
+  "publishedVersion": "v14",
+  "publishedAt": 1783563813634,
+  "canonicalSyncedWorkspaceId": "live-1783827695356-tae34ri4s",
+  "canonicalSyncedAt": 1783829156474
 }

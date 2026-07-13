@@ -10,7 +10,6 @@ import {
   PrototypePageMeta,
   ProjectTemplateMeta,
   SessionMeta,
-  ErrorCodeType,
   ERROR_MESSAGES,
   createDefaultSketchScene,
 } from "@workbench/shared";
@@ -29,192 +28,39 @@ import type {
 } from "@workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@workbench/shared";
 import { syncBuiltinKnowledge } from "./knowledge/builtin-documents";
+import {
+  DATA_DIR,
+  PROJECTS_DIR,
+  TEMPLATES_DIR,
+  SESSIONS_DIR,
+  WORKSPACES_DIR,
+  ensureDirsExist,
+  getProjectPath,
+  getTemplatePath,
+  getSnapshotPath,
+  getSessionPath,
+  projectExists,
+  sessionExists,
+} from "./paths";
+import {
+  generatePageSlug,
+  isValidRouteKey,
+  makeUniqueRouteKey,
+  generateRouteKey,
+  generateDemoPageId,
+  getDemoDirPath,
+  normalizeWorkspacePagesRouteKeys,
+} from "./demo-pages";
+import { getProjectConfigSchema, getProjectConfigValues } from "./project-config";
+import {
+  findWorkspacePath,
+  getWorkspaceFiles,
+  updateWorkspaceFiles,
+  getWorkspaceMeta,
+  markWorkspaceBasedOnVersion,
+} from "./workspace-meta";
 
-export function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
-const DATA_DIR =
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
-const PROJECTS_DIR =
-  process.env.PROJECTS_DIR || path.join(DATA_DIR, "projects");
-const TEMPLATES_DIR =
-  process.env.TEMPLATES_DIR || path.join(DATA_DIR, "templates");
-const SESSIONS_DIR =
-  process.env.SESSIONS_DIR || path.join(DATA_DIR, "sessions");
-const WORKSPACES_DIR =
-  process.env.WORKSPACES_DIR || path.join(DATA_DIR, "workspaces");
-const SNAPSHOTS_DIR =
-  process.env.SNAPSHOTS_DIR || path.join(DATA_DIR, "snapshots");
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
-
-export function getDataDir(): string {
-  return DATA_DIR;
-}
-
-export function getProjectsDir(): string {
-  return PROJECTS_DIR;
-}
-
-export function getTemplatesDir(): string {
-  return TEMPLATES_DIR;
-}
-
-export function getSnapshotsDir(): string {
-  return SNAPSHOTS_DIR;
-}
-
-export function getSessionsDir(): string {
-  return SESSIONS_DIR;
-}
-
-export function getWorkspacesDir(): string {
-  return WORKSPACES_DIR;
-}
-
-export function ensureDirsExist(): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(PROJECTS_DIR)) {
-    fs.mkdirSync(PROJECTS_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(TEMPLATES_DIR)) {
-    fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(SESSIONS_DIR)) {
-    fs.mkdirSync(SESSIONS_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(WORKSPACES_DIR)) {
-    fs.mkdirSync(WORKSPACES_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(SNAPSHOTS_DIR)) {
-    fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-  }
-}
-
-export function getProjectPath(projectId: string): string {
-  return path.join(PROJECTS_DIR, projectId);
-}
-
-export function getTemplatePath(templateId: string): string {
-  return path.join(TEMPLATES_DIR, templateId);
-}
-
-export function getSnapshotPath(projectId: string, versionId: string): string {
-  return path.join(SNAPSHOTS_DIR, projectId, versionId);
-}
-
-export function getSessionPath(sessionId: string, projectId?: string): string {
-  if (projectId) {
-    // 先尝试旧结构路径（兼容）
-    const directPath = path.join(SESSIONS_DIR, projectId, sessionId);
-    if (fs.existsSync(directPath)) {
-      return directPath;
-    }
-    // 否则使用 findSessionPath 搜索（支持新结构 sessions/{userId}/{projectId}/{sessionId}/）
-    const foundPath = findSessionPath(sessionId);
-    if (foundPath) return foundPath;
-    // fallback
-    return directPath;
-  }
-  const foundPath = findSessionPath(sessionId);
-  return foundPath || path.join(SESSIONS_DIR, sessionId);
-}
-
-export function findSessionPath(sessionId: string): string | null {
-  console.log(`[findSessionPath] 查找 session: ${sessionId}`);
-
-  if (!fs.existsSync(SESSIONS_DIR)) {
-    console.error(`[findSessionPath] SESSIONS_DIR 不存在: ${SESSIONS_DIR}`);
-    return null;
-  }
-
-  console.log(`[findSessionPath] SESSIONS_DIR: ${SESSIONS_DIR}`);
-
-  // 先尝试新结构: {userId}/{projectId}/{sessionId}/
-  const level1Entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
-  console.log(`[findSessionPath] level1 目录数: ${level1Entries.length}`);
-
-  for (const level1 of level1Entries) {
-    if (!level1.isDirectory()) continue;
-
-    const level1Path = path.join(SESSIONS_DIR, level1.name);
-
-    // 直接检查是否为目标 session（兼容旧结构）
-    const directPath = path.join(level1Path, sessionId);
-    if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
-      console.log(`[findSessionPath] 找到 session (旧结构): ${directPath}`);
-      return directPath;
-    }
-
-    // 检查第二层（新结构: {userId}/{projectId}/{sessionId}/）
-    const level2Entries = fs.readdirSync(level1Path, { withFileTypes: true });
-    for (const level2 of level2Entries) {
-      if (!level2.isDirectory()) continue;
-
-      const level2Path = path.join(level1Path, level2.name);
-
-      // 先检查目录名是否匹配
-      const sessionPathByName = path.join(level2Path, sessionId);
-      if (
-        fs.existsSync(sessionPathByName) &&
-        fs.statSync(sessionPathByName).isDirectory()
-      ) {
-        console.log(
-          `[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`,
-        );
-        return sessionPathByName;
-      }
-
-      // 遍历第三层，检查 .session.json 中的 sessionId 字段
-      const level3Entries = fs.readdirSync(level2Path, { withFileTypes: true });
-      for (const level3 of level3Entries) {
-        if (!level3.isDirectory()) continue;
-
-        const level3Path = path.join(level2Path, level3.name);
-        const metaPath = path.join(level3Path, ".session.json");
-
-        if (fs.existsSync(metaPath)) {
-          try {
-            const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-            if (meta.sessionId === sessionId) {
-              console.log(
-                `[findSessionPath] 找到 session (新结构-meta): ${level3Path}`,
-              );
-              return level3Path;
-            }
-          } catch {
-            // 忽略解析错误的文件
-          }
-        }
-      }
-    }
-  }
-
-  console.error(`[findSessionPath] 未找到 session: ${sessionId}`);
-  return null;
-}
-
-export function projectExists(projectId: string): boolean {
-  const projectPath = getProjectPath(projectId);
-  return fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory();
-}
-
-export function sessionExists(sessionId: string, projectId?: string): boolean {
-  if (projectId) {
-    const sessionPath = getSessionPath(sessionId, projectId);
-    return fs.existsSync(sessionPath) && fs.statSync(sessionPath).isDirectory();
-  }
-  return findSessionPath(sessionId) !== null;
-}
 
 export function listProjects(): DemoMeta[] {
   ensureDirsExist();
@@ -440,106 +286,6 @@ const DEFAULT_DEMO_SCHEMA = JSON.stringify(
 );
 
 // ============================================================
-// Demo 页面 ID 与目录工具函数（多页面架构）
-// ============================================================
-
-/**
- * 将页面名称转为文件系统安全的 slug。
- * - ASCII 字母数字保留，空格/特殊字符 → `-`，全小写
- * - 非 ASCII 字符（中文等）直接丢弃
- * - 合并连续 `-`，去除首尾 `-`
- * - 截断到 20 字符
- * - 空结果回退 `page`
- *
- * @example
- *   generatePageSlug("Landing Page")    // → "landing-page"
- *   generatePageSlug("Product Detail")  // → "product-detail"
- *   generatePageSlug("首页")            // → "page"（中文被丢弃，回退默认）
- *   generatePageSlug("首页 Home")       // → "home"
- *   generatePageSlug("")                // → "page"
- */
-export function generatePageSlug(name: string): string {
-  const slug = name
-    .toLowerCase()
-    // 保留 ASCII 字母数字和空格/连字符，丢弃其他字符（含中文）
-    .replace(/[^a-z0-9\s-]/g, "")
-    // 空格替换为 `-`
-    .replace(/\s+/g, "-")
-    // 合并连续 `-`
-    .replace(/-{2,}/g, "-")
-    // 去除首尾 `-`
-    .replace(/^-|-$/g, "")
-    // 截断到 20 字符
-    .slice(0, 20)
-    // 截断后可能产生尾部 `-`
-    .replace(/-$/, "");
-
-  return slug || "page";
-}
-
-export function isValidRouteKey(routeKey: string): boolean {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(routeKey);
-}
-
-function makeUniqueRouteKey(base: string, used: Set<string>): string {
-  const normalizedBase = isValidRouteKey(base) ? base : generatePageSlug(base);
-  let candidate = normalizedBase || "page";
-  let suffix = 2;
-  while (used.has(candidate)) {
-    candidate = `${normalizedBase || "page"}-${suffix}`;
-    suffix += 1;
-  }
-  used.add(candidate);
-  return candidate;
-}
-
-export function generateRouteKey(
-  name: string,
-  existingRouteKeys: string[] = [],
-): string {
-  return makeUniqueRouteKey(generatePageSlug(name), new Set(existingRouteKeys));
-}
-
-function normalizeWorkspacePagesRouteKeys(
-  pages: DemoPageMeta[],
-): { pages: DemoPageMeta[]; changed: boolean } {
-  const used = new Set<string>();
-  let changed = false;
-  const normalizedPages = pages.map((page) => {
-    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
-    if (current && isValidRouteKey(current) && !used.has(current)) {
-      used.add(current);
-      return page;
-    }
-
-    changed = true;
-    return {
-      ...page,
-      routeKey: makeUniqueRouteKey(current || page.name || page.id, used),
-    };
-  });
-  return { pages: normalizedPages, changed };
-}
-
-/**
- * 生成 Demo 页面 ID。
- * 格式 `{slug}_{4位随机}`，如 `product-detail_a3f2`。
- * slug 由 `generatePageSlug(name)` 生成，保证目录名有语义。
- */
-export function generateDemoPageId(name?: string): string {
-  const slug = generatePageSlug(name || "Default Page");
-  const rand = Math.random().toString(36).slice(2, 6);
-  return `${slug}_${rand}`;
-}
-
-/**
- * 获取页面目录的绝对路径
- */
-export function getDemoDirPath(workspacePath: string, demoId: string): string {
-  return path.join(workspacePath, "demos", demoId);
-}
-
-// ============================================================
 // Workspace 统一清单（workspace-tree.json）— 取代 .demo.json + .folders.json
 // ============================================================
 
@@ -642,7 +388,7 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
  * 读取 Workspace 统一清单（workspace-tree.json）。
  * 文件不存在时自动从旧格式迁移。
  */
-function readWorkspaceTree(workspacePath: string): WorkspaceTree {
+export function readWorkspaceTree(workspacePath: string): WorkspaceTree {
   const treePath = getWorkspaceTreePath(workspacePath);
   if (fs.existsSync(treePath)) {
     try {
@@ -673,7 +419,7 @@ function readWorkspaceTree(workspacePath: string): WorkspaceTree {
  * 将统一清单写回 workspace-tree.json。
  * workspacePath 目录不存在时自动创建。
  */
-function writeWorkspaceTree(workspacePath: string, tree: WorkspaceTree): void {
+export function writeWorkspaceTree(workspacePath: string, tree: WorkspaceTree): void {
   if (!fs.existsSync(workspacePath)) {
     fs.mkdirSync(workspacePath, { recursive: true });
   }
@@ -1294,28 +1040,6 @@ export function isSessionExpired(sessionMeta: SessionMeta): boolean {
   return Date.now() > sessionMeta.expiresAt;
 }
 
-export function createApiError(
-  code: ErrorCodeType,
-  message?: string,
-  details?: unknown,
-) {
-  return {
-    success: false as const,
-    error: {
-      code,
-      message: message || ERROR_MESSAGES[code],
-      details,
-    },
-  };
-}
-
-export function createApiSuccess<T>(data: T) {
-  return {
-    success: true as const,
-    data,
-  };
-}
-
 // ========================================
 // 项目元数据操作
 // ========================================
@@ -1663,229 +1387,6 @@ export function restoreVersion(
   return { success: true, newVersionId: restoreVersionId };
 }
 
-// ========================================
-// Session Assets 工具函数
-// ========================================
-
-export function getSessionAssetsPath(sessionId: string): string | null {
-  const sessionPath = getSessionPath(sessionId);
-  if (!sessionPath) return null;
-  return path.join(sessionPath, "assets", "images");
-}
-
-export function ensureSessionAssetsDir(sessionId: string): string | null {
-  const assetsPath = getSessionAssetsPath(sessionId);
-  if (!assetsPath) return null;
-  if (!fs.existsSync(assetsPath)) {
-    fs.mkdirSync(assetsPath, { recursive: true });
-  }
-  return assetsPath;
-}
-
-export function generateAssetFilename(originalName: string): string {
-  const ext = path.extname(originalName) || ".bin";
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `img_${timestamp}_${random}${ext}`;
-}
-
-export function saveSessionAsset(
-  sessionId: string,
-  filename: string,
-  data: Buffer,
-): { success: boolean; url?: string; error?: string } {
-  try {
-    const assetsPath = ensureSessionAssetsDir(sessionId);
-    if (!assetsPath) {
-      return { success: false, error: "Session 不存在" };
-    }
-
-    const filePath = path.join(assetsPath, filename);
-    fs.writeFileSync(filePath, data);
-
-    const url = `/api/sessions/${sessionId}/assets/${filename}`;
-    return { success: true, url };
-  } catch (error) {
-    return { success: false, error: `保存文件失败: ${error}` };
-  }
-}
-
-export function getSessionAssetPath(
-  sessionId: string,
-  filename: string,
-): string | null {
-  const assetsPath = getSessionAssetsPath(sessionId);
-  if (!assetsPath) return null;
-
-  const filePath = path.join(assetsPath, filename);
-  if (!fs.existsSync(filePath)) return null;
-  return filePath;
-}
-
-export function deleteSessionAsset(
-  sessionId: string,
-  filename: string,
-): boolean {
-  const filePath = getSessionAssetPath(sessionId, filename);
-  if (!filePath) return false;
-
-  try {
-    fs.unlinkSync(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function listSessionAssets(sessionId: string): string[] {
-  const assetsPath = getSessionAssetsPath(sessionId);
-  if (!assetsPath || !fs.existsSync(assetsPath)) return [];
-
-  try {
-    return fs.readdirSync(assetsPath).filter((name) => {
-      const stat = fs.statSync(path.join(assetsPath, name));
-      return stat.isFile();
-    });
-  } catch {
-    return [];
-  }
-}
-
-// ========================================
-// 工作空间路径工具函数
-// ========================================
-
-export function getWorkspacePath(workspaceId: string): string {
-  return path.join(WORKSPACES_DIR, workspaceId);
-}
-
-export function findWorkspacePath(workspaceId: string): string | null {
-  const directPath = path.join(WORKSPACES_DIR, workspaceId);
-  if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
-    return directPath;
-  }
-
-  if (!fs.existsSync(WORKSPACES_DIR)) return null;
-
-  const userDirs = fs.readdirSync(WORKSPACES_DIR, { withFileTypes: true });
-  for (const userDir of userDirs) {
-    if (!userDir.isDirectory()) continue;
-    const projectDirs = fs.readdirSync(
-      path.join(WORKSPACES_DIR, userDir.name),
-      { withFileTypes: true },
-    );
-    for (const projectDir of projectDirs) {
-      if (!projectDir.isDirectory()) continue;
-      const wsPath = path.join(
-        WORKSPACES_DIR,
-        userDir.name,
-        projectDir.name,
-        workspaceId,
-      );
-      if (fs.existsSync(wsPath) && fs.statSync(wsPath).isDirectory()) {
-        return wsPath;
-      }
-    }
-  }
-
-  return null;
-}
-
-export function getWorkspaceDir(userId: string, projectId: string): string {
-  return path.join(WORKSPACES_DIR, userId, projectId);
-}
-
-export function workspaceExists(workspaceId: string): boolean {
-  return findWorkspacePath(workspaceId) !== null;
-}
-
-export interface WorkspaceMeta {
-  workspaceId: string;
-  demoId: string;
-  projectId?: string;
-  userId?: string;
-  ownerUserId?: string;
-  scope?: "live" | "branch" | "snapshot-source" | "legacy";
-  baseVersion?: string;
-  status?: "active" | "archived" | "committed" | "expired";
-  createdAt: number;
-  updatedAt: number;
-}
-
-export function getWorkspaceMeta(workspaceId: string): WorkspaceMeta | null {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return null;
-
-  const metaPath = path.join(wsPath, ".workspace.json");
-  if (!fs.existsSync(metaPath)) return null;
-
-  try {
-    return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMeta;
-  } catch {
-    return null;
-  }
-}
-
-export function writeWorkspaceMeta(
-  workspaceId: string,
-  meta: WorkspaceMeta,
-): void {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return;
-
-  fs.writeFileSync(
-    path.join(wsPath, ".workspace.json"),
-    JSON.stringify(meta, null, 2),
-    "utf-8",
-  );
-}
-
-export function markWorkspaceBasedOnVersion(
-  workspaceId: string,
-  baseVersion: string,
-): boolean {
-  const meta = getWorkspaceMeta(workspaceId);
-  if (!meta) return false;
-
-  writeWorkspaceMeta(workspaceId, {
-    ...meta,
-    baseVersion,
-    updatedAt: Date.now(),
-  });
-  return true;
-}
-
-export function getWorkspaceFiles(workspaceId: string): DemoFiles | null {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return null;
-
-  const codePath = path.join(wsPath, "index.tsx");
-  const schemaPath = path.join(wsPath, "config.schema.json");
-
-  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
-
-  return {
-    code: fs.readFileSync(codePath, "utf-8"),
-    schema: fs.readFileSync(schemaPath, "utf-8"),
-  };
-}
-
-export function updateWorkspaceFiles(
-  workspaceId: string,
-  files: DemoFiles,
-): boolean {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return false;
-
-  fs.writeFileSync(path.join(wsPath, "index.tsx"), files.code, "utf-8");
-  fs.writeFileSync(
-    path.join(wsPath, "config.schema.json"),
-    files.schema,
-    "utf-8",
-  );
-  return true;
-}
-
 export function getSessionWorkspacePath(sessionId: string): string | null {
   const meta = getSessionMeta(sessionId);
   if (!meta || !meta.workspaceId) return null;
@@ -1895,14 +1396,6 @@ export function getSessionWorkspacePath(sessionId: string): string | null {
 // ========================================
 // Demo 相关函数（兼容性别名）
 // ========================================
-
-export function getDemosDir(): string {
-  return PROJECTS_DIR;
-}
-
-export function getDemoPath(demoId: string): string {
-  return getProjectPath(demoId);
-}
 
 export function demoExists(demoId: string): boolean {
   return projectExists(demoId);
@@ -2304,7 +1797,7 @@ export function restoreDeletedWorkspaceDemoPageSnapshot(
   }
 
   if (page.parentId) {
-    const folders = readFoldersMeta(wsPath);
+    const folders = readWorkspaceTree(wsPath).folders;
     if (!folders.some((folder) => folder.id === page.parentId)) {
       return { success: false, reason: "PARENT_FOLDER_NOT_FOUND" };
     }
@@ -2355,122 +1848,6 @@ export function listWorkspaceDemoPages(workspaceId: string): DemoPageMeta[] {
   return listDemoPages(wsPath);
 }
 
-// ============================================================
-// 项目级共享配置（workspace/project.config.schema.json）
-// 是否存在由文件存在性实时判定，不在 project.json 中持久化任何标记字段。
-// ============================================================
-
-const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
-const PROJECT_CONFIG_VALUES_FILENAME = "project.config.values.json";
-
-export function getProjectConfigPath(workspacePath: string): string {
-  return path.join(workspacePath, PROJECT_CONFIG_FILENAME);
-}
-
-export function getProjectConfigValuesPath(workspacePath: string): string {
-  return path.join(workspacePath, PROJECT_CONFIG_VALUES_FILENAME);
-}
-
-/**
- * 读取项目级配置 Schema 内容（不存在时返回 undefined）
- */
-export function getProjectConfigSchema(
-  workspacePath: string,
-): string | undefined {
-  const filePath = getProjectConfigPath(workspacePath);
-  if (!fs.existsSync(filePath)) return undefined;
-  return fs.readFileSync(filePath, "utf-8");
-}
-
-/**
- * 写入项目级配置 Schema（创建或覆盖）
- */
-export function saveProjectConfigSchema(
-  workspacePath: string,
-  schema: string,
-): void {
-  if (!fs.existsSync(workspacePath)) {
-    fs.mkdirSync(workspacePath, { recursive: true });
-  }
-  fs.writeFileSync(getProjectConfigPath(workspacePath), schema, "utf-8");
-}
-
-function isPlainConfigObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function getProjectConfigValues(
-  workspacePath: string,
-): Record<string, unknown> | undefined {
-  const filePath = getProjectConfigValuesPath(workspacePath);
-  if (!fs.existsSync(filePath)) return undefined;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
-    return isPlainConfigObject(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function saveProjectConfigValues(
-  workspacePath: string,
-  values: Record<string, unknown>,
-): void {
-  if (!fs.existsSync(workspacePath)) {
-    fs.mkdirSync(workspacePath, { recursive: true });
-  }
-  fs.writeFileSync(
-    getProjectConfigValuesPath(workspacePath),
-    JSON.stringify(values, null, 2),
-    "utf-8",
-  );
-}
-
-/**
- * 删除项目级配置 Schema 文件（无项目级配置）
- */
-export function deleteProjectConfigSchema(workspacePath: string): boolean {
-  const filePath = getProjectConfigPath(workspacePath);
-  if (!fs.existsSync(filePath)) return false;
-  fs.rmSync(filePath, { force: true });
-  return true;
-}
-
-/**
- * 通过 workspaceId 读取项目级配置 Schema
- */
-export function getWorkspaceProjectConfigSchema(
-  workspaceId: string,
-): string | undefined {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return undefined;
-  return getProjectConfigSchema(wsPath);
-}
-
-/**
- * 通过 workspaceId 写入项目级配置 Schema
- */
-export function saveWorkspaceProjectConfigSchema(
-  workspaceId: string,
-  schema: string,
-): boolean {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return false;
-  saveProjectConfigSchema(wsPath, schema);
-  return true;
-}
-
-/**
- * 通过 workspaceId 删除项目级配置 Schema
- */
-export function deleteWorkspaceProjectConfigSchema(
-  workspaceId: string,
-): boolean {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return false;
-  return deleteProjectConfigSchema(wsPath);
-}
-
 /**
  * 保存流程使用：通过 workspace 当前 demos 目录回写 project.json 的 demoPages 数组。
  * 真值来源是 workspace 文件系统；调用方需要传入持久化路径所属的 workspacePath。
@@ -2493,195 +1870,11 @@ export function syncProjectDemoPagesFromWorkspace(
 // 虚拟文件夹管理（workspace-tree.json 的 folders 数组）
 // ============================================================
 
-/**
- * 读取虚拟文件夹元数据（从 workspace-tree.json 的 folders 数组）。
- * 保留此函数兼容外部调用，内部委托给 readWorkspaceTree。
- */
-export function readFoldersMeta(workspacePath: string): DemoFolderMeta[] {
-  return readWorkspaceTree(workspacePath).folders;
-}
-
-export function generateFolderId(): string {
-  return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function getFolderDepth(
-  folderId: string,
-  folders: DemoFolderMeta[],
-): number {
-  let depth = 0;
-  let current = folders.find((f) => f.id === folderId);
-  while (current?.parentId) {
-    depth++;
-    current = folders.find((f) => f.id === current!.parentId);
-  }
-  return depth;
-}
-
-export function isDescendant(
-  folderId: string,
-  targetParentId: string,
-  folders: DemoFolderMeta[],
-): boolean {
-  let current = folders.find((f) => f.id === targetParentId);
-  while (current) {
-    if (current.id === folderId) return true;
-    current = folders.find((f) => f.id === current!.parentId);
-  }
-  return false;
-}
-
-export function createDemoFolder(
-  workspacePath: string,
-  name: string,
-  parentId?: string | null,
-): DemoFolderMeta | null {
-  const tree = readWorkspaceTree(workspacePath);
-  const folders = tree.folders;
-
-  if (parentId) {
-    const parent = folders.find((f) => f.id === parentId);
-    if (!parent) return null;
-    if (getFolderDepth(parentId, folders) >= 3) return null;
-  }
-
-  const sameParent = folders.filter(
-    (f) => (f.parentId ?? null) === (parentId ?? null),
-  );
-  const nextOrder =
-    sameParent.length > 0 ? Math.max(...sameParent.map((f) => f.order)) + 1 : 0;
-
-  const folder: DemoFolderMeta = {
-    id: generateFolderId(),
-    name: name.trim() || "新建文件夹",
-    parentId: parentId ?? null,
-    order: nextOrder,
-  };
-
-  tree.folders.push(folder);
-  writeWorkspaceTree(workspacePath, tree);
-  return folder;
-}
-
-export function updateDemoFolder(
-  workspacePath: string,
-  folderId: string,
-  patch: { name?: string; parentId?: string | null; order?: number },
-): DemoFolderMeta | null {
-  const tree = readWorkspaceTree(workspacePath);
-  const index = tree.folders.findIndex((f) => f.id === folderId);
-  if (index === -1) return null;
-
-  if (patch.parentId !== undefined && patch.parentId !== null) {
-    const targetParent = tree.folders.find((f) => f.id === patch.parentId);
-    if (!targetParent) return null;
-    if (isDescendant(folderId, patch.parentId, tree.folders)) return null;
-    if (getFolderDepth(folderId, tree.folders) + 1 > 3) return null;
-  }
-
-  const existing = tree.folders[index];
-  tree.folders[index] = {
-    ...existing,
-    ...(patch.name !== undefined && { name: patch.name.trim() }),
-    ...(patch.parentId !== undefined && { parentId: patch.parentId }),
-    ...(patch.order !== undefined && { order: patch.order }),
-  };
-
-  writeWorkspaceTree(workspacePath, tree);
-  return tree.folders[index];
-}
-
-export function deleteDemoFolder(
-  workspacePath: string,
-  folderId: string,
-  deleteContents: boolean = false,
-): { success: boolean; deletedPageIds?: string[] } {
-  const tree = readWorkspaceTree(workspacePath);
-  const index = tree.folders.findIndex((f) => f.id === folderId);
-  if (index === -1) return { success: false };
-
-  const deletedPageIds: string[] = [];
-
-  if (deleteContents) {
-    const descendantFolderIds = new Set<string>();
-    const collectDescendants = (parentId: string) => {
-      for (const f of tree.folders) {
-        if (f.parentId === parentId) {
-          descendantFolderIds.add(f.id);
-          collectDescendants(f.id);
-        }
-      }
-    };
-    collectDescendants(folderId);
-    descendantFolderIds.add(folderId);
-
-    const pages = tree.pages;
-    for (const page of pages) {
-      if (page.parentId && descendantFolderIds.has(page.parentId)) {
-        const wsId = path.basename(workspacePath);
-        deleteWorkspaceDemoPage(wsId, page.id);
-        deletedPageIds.push(page.id);
-      }
-    }
-
-    tree.folders = tree.folders.filter((f) => !descendantFolderIds.has(f.id));
-    tree.pages = tree.pages.filter((p) => !deletedPageIds.includes(p.id));
-    writeWorkspaceTree(workspacePath, tree);
-  } else {
-    tree.folders = tree.folders.filter((f) => f.id !== folderId);
-    for (const f of tree.folders) {
-      if (f.parentId === folderId) {
-        f.parentId =
-          tree.folders.find((fo) => fo.id === folderId)?.parentId ?? null;
-      }
-    }
-
-    let changed = false;
-    for (const p of tree.pages) {
-      if (p.parentId === folderId) {
-        p.parentId =
-          tree.folders.find((fo) => fo.id === folderId)?.parentId ?? null;
-        changed = true;
-      }
-    }
-
-    writeWorkspaceTree(workspacePath, tree);
-  }
-
-  return { success: true, deletedPageIds };
-}
-
-export function reorderDemoPages(
-  workspacePath: string,
-  pageUpdates: Array<{ id: string; order: number; parentId: string | null }>,
-  folderUpdates?: Array<{ id: string; order: number; parentId: string | null }>,
-): boolean {
-  const tree = readWorkspaceTree(workspacePath);
-
-  for (const u of pageUpdates) {
-    const idx = tree.pages.findIndex((p) => p.id === u.id);
-    if (idx !== -1) {
-      tree.pages[idx] = {
-        ...tree.pages[idx],
-        order: u.order,
-        parentId: u.parentId,
-      };
-    }
-  }
-
-  if (folderUpdates && folderUpdates.length > 0) {
-    for (const u of folderUpdates) {
-      const idx = tree.folders.findIndex((f) => f.id === u.id);
-      if (idx !== -1) {
-        tree.folders[idx] = {
-          ...tree.folders[idx],
-          order: u.order,
-          parentId: u.parentId,
-        };
-      }
-    }
-  }
-
-  writeWorkspaceTree(workspacePath, tree);
-  return true;
-}
+// Re-export 路径、API 助手、文件夹管理、Demo 页面、Session Assets、项目配置和工作空间元数据函数，保持向后兼容
+export * from "./paths";
+export * from "./api-helpers";
+export * from "./folders";
+export * from "./demo-pages";
+export * from "./session-assets";
+export * from "./project-config";
+export * from "./workspace-meta";

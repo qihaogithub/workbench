@@ -1,0 +1,35 @@
+{
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "projectId": "proj_1783585261167_7h7prw",
+  "revision": 6,
+  "rootHash": "9f43139bbc34b4526e30b158dec19498c99aaff6a4ac1173fe990d759694d72c",
+  "resourceHashes": {
+    ".canvas-layout.json": "73d5cd98eaa72e9f56a15d8238d42425e8f9006812933a2c6a1148effdf17418",
+    "assets/images/kingkong-earn-beans.png": "e62a8de4095c3b5904004db585c6fea7d91eb7d5cb0b15163c4fcec556e6564f",
+    "assets/images/kingkong-live.png": "df77e874b7470a4de2a63b8621545d074936e1e208a0628a3d3aa17ba636ebd4",
+    "assets/images/kingkong-lucky-draw.png": "6978597803119dd8ca400b696ffb23d8e3a4b0ebafbe06670db9e7e1c919fdd1",
+    "assets/images/kingkong-weekly-share.png": "fc64eb04fefbbbfcb16e1e4418fe8d75aed86ba51f8ac1d2940441c701f45b61",
+    "assets/images/kingkong-welfare.png": "5563fd0feb29fc4d4a1836cb797e9315893da6abd650e129c133c69fb2b0f490",
+    "assets/images/kingkong-wish.png": "50df2982f049d2ea197bb0ec7d5f2f8803c61eea2af6dff3aff51b9e470a12e9",
+    "demos/figma_7zwt/config.schema.json": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+    "demos/figma_7zwt/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/figma_7zwt/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/figma_7zwt/prototype.html": "077038f1e784165724283e5c0afcd60736d7f8febb59efcec91d71ae5db2fc57",
+    "demos/figma_7zwt/prototype.meta.json": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+    "demos/growth-bean-mall_x8k2/config.schema.json": "a772abd3554afd18557e9fb8464e596aa657d3508e74725f63fda1917484a0bc",
+    "demos/growth-bean-mall_x8k2/index.tsx": "0ca257d0c956ccf3de5bed9e89a8b337658b7636d59b3af658a176fe618f80e9",
+    "demos/growth-bean-mall_x8k2/prototype.css": "4058fbe76575c8c0d29a7cab242aaf4986fb4ec5d829f10cd0cc15a3913dfc46",
+    "demos/growth-bean-mall_x8k2/prototype.html": "c91fc381c6772f5abc9c2f15d35579fe256655b205f473fb158526979bb2782b",
+    "demos/growth-bean-mall_x8k2/prototype.meta.json": "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "452672ce4d2269926906bad994192b0a15767d7736b6029589d11004561ebd1e"
+  },
+  "mutationPayloads": {
+    "d36e17ee-aa2b-469a-a446-ff9db198b381": "c5436bcd0fbe454623b86875955fd5d955486c9cc8425dd6b1330041e7ffe73d",
+    "ba581413-1e7c-44a3-8949-a146a742248a": "c7dd38830e9ea10175ffe19e68f3e4c14b084c57b178a635dcdde807359986cd",
+    "873c31af-112e-4290-bb3d-5c5fb7d26523": "41c2a3180d3a3f2898ca1d9c94f9b763bc3111c0989b3d52ae7e41937bb66951",
+    "359c389a-c036-4721-9a3b-1f0d717c1470": "7a88e8220472d13a155bf8e2a74ff183fd28479dc4dccd1a112dd5f61430e6c8",
+    "8b138abb-3eef-4848-9467-e5cffe6d1b6c": "3469026b22c8f895d5f397030822571e8e2c6cb233939a473c1959c2edc820bf"
+  },
+  "updatedAt": 1783762042875
+}

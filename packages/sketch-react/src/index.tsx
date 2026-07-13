@@ -62,92 +62,19 @@ import {
   type SketchSceneTextStyleOverride,
   type SketchSceneTextStyleRun,
 } from "@workbench/sketch-core";
-
-export type PreviewSize = {
-  width?: number | string;
-  height?: number | string;
-};
-
-export type SketchTool =
-  | "select"
-  | "hand"
-  | "rect"
-  | "diamond"
-  | "ellipse"
-  | "line"
-  | "arrow"
-  | "pencil"
-  | "text"
-  | "image"
-  | "sticky"
-  | "eraser";
-
-export type SketchEditorMode = "edit" | "preview";
-
-export interface SketchEditorSelection {
-  nodeIds: string[];
-  bounds: SketchSceneBounds | null;
-}
-
-export interface SketchPagePreviewProps {
-  scene?: string | SketchSceneDocument | null;
-  configData?: Record<string, unknown>;
-  previewSize?: PreviewSize;
-  fillContainer?: boolean;
-  className?: string;
-  selectedNodeId?: string | null;
-  selectedNodeIds?: string[];
-  onNodeSelect?: (node: SketchSceneNode | null) => void;
-  onSelectionChange?: (selection: SketchEditorSelection) => void;
-}
-
-export interface SketchPageEditorProps extends SketchPagePreviewProps {
-  mode?: SketchEditorMode;
-  onSceneChange?: (scene: SketchSceneDocument) => void;
-}
-
-export interface SketchEditorController {
-  keyboardScopeId: string;
-  tool: SketchTool;
-  setTool: (tool: SketchTool) => void;
-  selection: SketchEditorSelection;
-  inlineTextSelection: InlineTextSelectionState | null;
-  setInlineTextSelection: (selection: InlineTextSelectionState | null) => void;
-  setNodeIds: (nextIds: string[]) => void;
-  clearSelection: () => void;
-  applyOperations: (operations: SketchScenePatchOperation[], recordHistory?: boolean) => void;
-  commitScene: (scene: SketchSceneDocument, recordHistory?: boolean) => void;
-  recordHistoryCheckpoint: (scene: SketchSceneDocument) => void;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-export interface SketchEditorPartProps {
-  scene: SketchSceneDocument;
-  controller: SketchEditorController;
-  className?: string;
-}
-
-export interface SketchEditorCanvasProps extends SketchEditorPartProps {
-  configData?: Record<string, unknown>;
-  previewSize?: PreviewSize;
-  fillContainer?: boolean;
-  mode?: SketchEditorMode;
-}
-
-export interface SketchPropertyPanelProps extends SketchEditorPartProps {
-  configData?: Record<string, unknown>;
-}
-
-export interface SketchEditorToolbarProps extends SketchEditorPartProps {
-  configData?: Record<string, unknown>;
-}
-
-export interface SketchLayerPanelProps extends SketchEditorPartProps {
-  configData?: Record<string, unknown>;
-}
+import type {
+  PreviewSize,
+  SketchTool,
+  SketchEditorSelection,
+  SketchPagePreviewProps,
+  SketchPageEditorProps,
+  SketchEditorController,
+  SketchEditorCanvasProps,
+  SketchPropertyPanelProps,
+  SketchEditorToolbarProps,
+  SketchLayerPanelProps,
+  InlineTextSelectionState,
+} from "./types";
 
 type SketchResizeInteractionHandle = SketchSceneResizeHandle | "line-start" | "line-end";
 type SketchSnapGuideKind = "grid" | "center" | "edge" | "spacing";
@@ -233,12 +160,6 @@ interface InlineTextEditState {
   nodeId: string;
   value: string;
   deleteWhenEmpty?: boolean;
-}
-
-export interface InlineTextSelectionState {
-  nodeId: string;
-  start: number;
-  end: number;
 }
 
 interface ContextMenuState {
@@ -3372,7 +3293,7 @@ function SketchShortcutHelp({
   );
 }
 
-export function SketchEditorToolbar({ scene, controller, configData = {}, className }: SketchEditorToolbarProps) {
+export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className }: SketchEditorToolbarProps) {
   const toolButtonClass =
     "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-35";
   const actionButtonClass =
@@ -7284,3 +7205,19 @@ export function SketchPageEditor({
     </div>
   );
 }
+
+export type {
+  PreviewSize,
+  SketchTool,
+  SketchEditorMode,
+  SketchEditorSelection,
+  SketchPagePreviewProps,
+  SketchPageEditorProps,
+  SketchEditorController,
+  SketchEditorPartProps,
+  SketchEditorCanvasProps,
+  SketchPropertyPanelProps,
+  SketchEditorToolbarProps,
+  SketchLayerPanelProps,
+  InlineTextSelectionState,
+} from "./types";

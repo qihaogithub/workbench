@@ -1,4 +1,5 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import { existsSync } from "fs";
 import { config } from "../config";
 import { ScreenshotError, getErrorMessage } from "./errors";
 
@@ -212,7 +213,6 @@ class BrowserPool {
       "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     ];
 
-    const { existsSync } = require("fs") as typeof import("fs");
     if (existsSync(macPath)) return macPath;
     for (const p of linuxPaths) {
       if (existsSync(p)) return p;

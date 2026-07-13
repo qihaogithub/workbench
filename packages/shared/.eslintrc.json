@@ -1,0 +1,4 @@
+{
+  "extends": "../../.eslintrc.base.json",
+  "env": { "node": true, "es2022": true }
+}
