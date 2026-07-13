@@ -1,84 +1,112 @@
-import { IBackendAdapter, BackendStatus } from './base';
-import { AgentConfig, AgentEvent, FileAttachment, FileChange, ImageAttachment, UserChoiceResponse } from '../core/types';
-import { createWorkbenchTools, type SubagentRunResult } from './pi-tools';
-import type { PreinstalledSkill } from './preinstalled-skills';
+import { IBackendAdapter, BackendStatus } from "./base";
+import {
+  AgentConfig,
+  AgentEvent,
+  FileAttachment,
+  FileChange,
+  ImageAttachment,
+  MutationReceiptEntry,
+  ProjectionAckEntry,
+  RunSummary,
+  UserChoiceResponse,
+} from "../core/types";
+import { createWorkbenchTools, type SubagentRunResult } from "./pi-tools";
+import type { PreinstalledSkill } from "./preinstalled-skills";
 import {
   formatPreinstalledSkillsForPrompt,
   getPreinstalledSkills,
-} from './preinstalled-skills';
-import { ImageDescriber, type VisionDescribeRequest } from '../services/image-describer';
-import { logger } from '../utils/logger';
-import { getAgentHarness, getNodeExecutionEnv, getInMemorySessionRepo, loadPiAgentDeps } from './managers/pi-agent-deps';
+} from "./preinstalled-skills";
 import {
-  ModelManager,
-  getServiceConfig,
-} from './managers/model-manager';
-import { PermissionManager } from './managers/permission-manager';
-import { UserInteractionManager } from './managers/user-interaction-manager';
-import { ToolHookManager } from './managers/tool-hook-manager';
-import { EventMapper } from './managers/event-mapper';
+  ImageDescriber,
+  type VisionDescribeRequest,
+} from "../services/image-describer";
+import { logger } from "../utils/logger";
+import {
+  getAgentHarness,
+  getNodeExecutionEnv,
+  getInMemorySessionRepo,
+  loadPiAgentDeps,
+} from "./managers/pi-agent-deps";
+import { ModelManager, getServiceConfig } from "./managers/model-manager";
+import { PermissionManager } from "./managers/permission-manager";
+import { UserInteractionManager } from "./managers/user-interaction-manager";
+import { ToolHookManager } from "./managers/tool-hook-manager";
+import { EventMapper } from "./managers/event-mapper";
 import {
   extractAssistantErrorMessage,
   extractAssistantText,
   summarizeAssistantMessageShape,
-} from './managers/assistant-text-utils';
-import { normalizeImageAttachments } from '../utils/image-attachments';
-import { serializeErrorForLog } from '../utils/error-utils';
-import { listUploadedFileAttachments } from '../utils/uploaded-file-attachments';
+} from "./managers/assistant-text-utils";
+import { normalizeImageAttachments } from "../utils/image-attachments";
+import { serializeErrorForLog } from "../utils/error-utils";
+import { listUploadedFileAttachments } from "../utils/uploaded-file-attachments";
+import { resolveLiveWorkspaceMutationContext } from "../workspace/workspace-mutation-authority";
 
-function formatRuntimeToolsForPrompt(activeTools: Array<{ name?: string; description?: string }>): string {
-  if (!activeTools.length) return '';
+function formatRuntimeToolsForPrompt(
+  activeTools: Array<{ name?: string; description?: string }>,
+): string {
+  if (!activeTools.length) return "";
 
   const lines = activeTools
-    .filter((tool) => typeof tool.name === 'string' && tool.name.trim().length > 0)
+    .filter(
+      (tool) => typeof tool.name === "string" && tool.name.trim().length > 0,
+    )
     .map((tool) => {
-      const description = typeof tool.description === 'string' && tool.description.trim()
-        ? `：${tool.description.trim()}`
-        : '';
+      const description =
+        typeof tool.description === "string" && tool.description.trim()
+          ? `：${tool.description.trim()}`
+          : "";
       return `- \`${tool.name}\`${description}`;
     });
 
-  if (!lines.length) return '';
+  if (!lines.length) return "";
 
   return [
-    '## 当前实际可用工具',
-    '',
-    '以下列表由运行时 activeTools 自动注入，代表你本轮真正可以调用的工具；如果这里列出了 `delegateTask`，你就可以使用子 Agent。',
-    '',
+    "## 当前实际可用工具",
+    "",
+    "以下列表由运行时 activeTools 自动注入，代表你本轮真正可以调用的工具；如果这里列出了 `delegateTask`，你就可以使用子 Agent。",
+    "",
     ...lines,
-  ].join('\n');
+  ].join("\n");
 }
 
-function formatUploadedFilesForPrompt(files?: FileAttachment[], currentFileIds = new Set<string>()): string {
-  if (!files || files.length === 0) return '';
+function formatUploadedFilesForPrompt(
+  files?: FileAttachment[],
+  currentFileIds = new Set<string>(),
+): string {
+  if (!files || files.length === 0) return "";
 
   const lines = files.map((file, index) => {
-    const status = file.textExtracted ? '可读取' : '未提取到文本';
-    const source = currentFileIds.has(file.id) ? '本轮上传' : '当前会话历史附件';
+    const status = file.textExtracted ? "可读取" : "未提取到文本";
+    const source = currentFileIds.has(file.id)
+      ? "本轮上传"
+      : "当前会话历史附件";
     const preview = file.textPreview
-      ? `\n  预览：${file.textPreview.replace(/\s+/g, ' ').slice(0, 240)}`
-      : '';
+      ? `\n  预览：${file.textPreview.replace(/\s+/g, " ").slice(0, 240)}`
+      : "";
     return [
       `${index + 1}. ${file.name}`,
       `  attachmentId: ${file.id}`,
       `  来源: ${source}`,
-      `  MIME: ${file.mimeType || 'unknown'}`,
+      `  MIME: ${file.mimeType || "unknown"}`,
       `  大小: ${file.size} bytes`,
       `  文本状态: ${status}`,
-      file.lineCount ? `  行数: ${file.lineCount}` : '',
-      file.truncated ? '  注意：提取文本已截断' : '',
+      file.lineCount ? `  行数: ${file.lineCount}` : "",
+      file.truncated ? "  注意：提取文本已截断" : "",
       preview,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join("\n");
   });
 
   return [
-    '【上传文件】',
-    '当前会话已有以下只读文件附件（包含本轮和之前消息上传的文件）。需要查看文件内容时，必须调用 `readUploadedFile`，传入对应 attachmentId；不要使用文件名猜 attachmentId，也不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。',
-    '',
+    "【上传文件】",
+    "当前会话已有以下只读文件附件（包含本轮和之前消息上传的文件）。需要查看文件内容时，必须调用 `readUploadedFile`，传入对应 attachmentId；不要使用文件名猜 attachmentId，也不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。",
+    "",
     ...lines,
-    '',
-    '【用户问题】',
-  ].join('\n');
+    "",
+    "【用户问题】",
+  ].join("\n");
 }
 
 export class PiAgentBackend implements IBackendAdapter {
@@ -93,11 +121,12 @@ export class PiAgentBackend implements IBackendAdapter {
   private eventCallback?: (event: AgentEvent) => void;
   private timeout?: number;
   private sessionId: string | null = null;
-  private currentSystemPrompt: string = '';
+  private currentSystemPrompt: string = "";
   private unsubFns: Array<() => void> = [];
   private imageDescriber: ImageDescriber;
   private activeSubagents: Set<any> = new Set();
   private lastResponseDebug: unknown;
+  private lastRunSummary: RunSummary | null = null;
 
   // 管理器
   private modelManager: ModelManager;
@@ -117,9 +146,8 @@ export class PiAgentBackend implements IBackendAdapter {
       undefined,
       this.toolHookManager,
     );
-    this.imageDescriber = new ImageDescriber(
-      {},
-      (request) => this.describeImageWithVisionModel(request),
+    this.imageDescriber = new ImageDescriber({}, (request) =>
+      this.describeImageWithVisionModel(request),
     );
   }
 
@@ -129,7 +157,10 @@ export class PiAgentBackend implements IBackendAdapter {
   }
 
   private getSubagentTimeoutMs(): number {
-    return this.config.piAgent?.subagentTimeout ?? getServiceConfig().piAgent.subagentTimeout;
+    return (
+      this.config.piAgent?.subagentTimeout ??
+      getServiceConfig().piAgent.subagentTimeout
+    );
   }
 
   private syncEventCallback(): void {
@@ -155,7 +186,9 @@ export class PiAgentBackend implements IBackendAdapter {
       const AgentHarnessCtor = getAgentHarness();
 
       // 1. 创建 ExecutionEnv
-      this.env = new NodeExecutionEnvCtor({ cwd: this.config.workingDir ?? process.cwd() });
+      this.env = new NodeExecutionEnvCtor({
+        cwd: this.config.workingDir ?? process.cwd(),
+      });
 
       // 2. 创建 Session
       this.sessionRepo = new InMemorySessionRepoCtor();
@@ -178,7 +211,10 @@ export class PiAgentBackend implements IBackendAdapter {
       const model = this.modelManager.getModel();
       const resources = { skills: getPreinstalledSkills() };
 
-      logger.info({ modelId: model.id, provider: model.provider, baseUrl: model.baseUrl }, "Pi Agent model configured");
+      logger.info(
+        { modelId: model.id, provider: model.provider, baseUrl: model.baseUrl },
+        "Pi Agent model configured",
+      );
 
       // 5. 创建 AgentHarness
       this.harness = new AgentHarnessCtor({
@@ -188,8 +224,9 @@ export class PiAgentBackend implements IBackendAdapter {
         resources,
         model,
         systemPrompt: (context: any) => this.buildSystemPrompt(context),
-        getApiKeyAndHeaders: (model: any) => this.modelManager.getApiKeyAndHeaders(model),
-        thinkingLevel: 'off',
+        getApiKeyAndHeaders: (model: any) =>
+          this.modelManager.getApiKeyAndHeaders(model),
+        thinkingLevel: "off",
       });
 
       // 6. 注册 Hook 事件（工具调用拦截 + 工具结果处理）
@@ -207,50 +244,59 @@ export class PiAgentBackend implements IBackendAdapter {
     }
   }
 
-  private async describeImageWithVisionModel(request: VisionDescribeRequest): Promise<string> {
+  private async describeImageWithVisionModel(
+    request: VisionDescribeRequest,
+  ): Promise<string> {
     await loadPiAgentDeps();
 
     const model = this.modelManager.getVisionModel(request.modelId);
     if (model.baseUrl) {
       const auth = await this.modelManager.getApiKeyAndHeaders(model);
       if (!auth?.apiKey) {
-        throw new Error(`Vision model provider "${model.provider}" missing API key`);
+        throw new Error(
+          `Vision model provider "${model.provider}" missing API key`,
+        );
       }
 
-      const response = await fetch(`${model.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.apiKey}`,
-          ...(auth.headers || {}),
-        },
-        body: JSON.stringify({
-          model: model.id,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: request.prompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${request.image.mimeType};base64,${request.image.data}`,
+      const response = await fetch(
+        `${model.baseUrl.replace(/\/$/, "")}/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.apiKey}`,
+            ...(auth.headers || {}),
+          },
+          body: JSON.stringify({
+            model: model.id,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: request.prompt },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:${request.image.mimeType};base64,${request.image.data}`,
+                    },
                   },
-                },
-              ],
-            },
-          ],
-          max_tokens: 300,
-        }),
-        signal: request.signal,
-      });
+                ],
+              },
+            ],
+            max_tokens: 300,
+          }),
+          signal: request.signal,
+        },
+      );
 
       if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        throw new Error(`Vision model request failed: ${response.status} ${body}`);
+        const body = await response.text().catch(() => "");
+        throw new Error(
+          `Vision model request failed: ${response.status} ${body}`,
+        );
       }
 
-      const payload = await response.json() as {
+      const payload = (await response.json()) as {
         choices?: Array<{
           message?: {
             content?: string | Array<{ type?: string; text?: string }>;
@@ -258,23 +304,25 @@ export class PiAgentBackend implements IBackendAdapter {
         }>;
       };
       const content = payload.choices?.[0]?.message?.content;
-      if (typeof content === 'string') {
+      if (typeof content === "string") {
         return content;
       }
       if (Array.isArray(content)) {
         return content
-          .filter((item) => item.type === 'text' && item.text)
+          .filter((item) => item.type === "text" && item.text)
           .map((item) => item.text)
-          .join('');
+          .join("");
       }
-      return '';
+      return "";
     }
 
     const NodeExecutionEnvCtor = getNodeExecutionEnv();
     const InMemorySessionRepoCtor = getInMemorySessionRepo();
     const AgentHarnessCtor = getAgentHarness();
 
-    const env = new NodeExecutionEnvCtor({ cwd: this.config.workingDir ?? process.cwd() });
+    const env = new NodeExecutionEnvCtor({
+      cwd: this.config.workingDir ?? process.cwd(),
+    });
     const sessionRepo = new InMemorySessionRepoCtor();
     const session = await sessionRepo.create();
     const harness = new AgentHarnessCtor({
@@ -282,23 +330,25 @@ export class PiAgentBackend implements IBackendAdapter {
       session,
       tools: [],
       model,
-      systemPrompt: '你是图片内容描述助手。只输出图片内容描述，不要寒暄，不要添加 Markdown。',
-      getApiKeyAndHeaders: (model: any) => this.modelManager.getApiKeyAndHeaders(model),
-      thinkingLevel: 'off',
+      systemPrompt:
+        "你是图片内容描述助手。只输出图片内容描述，不要寒暄，不要添加 Markdown。",
+      getApiKeyAndHeaders: (model: any) =>
+        this.modelManager.getApiKeyAndHeaders(model),
+      thinkingLevel: "off",
     });
 
     const abort = () => {
       void harness.abort();
     };
-    request.signal.addEventListener('abort', abort, { once: true });
+    request.signal.addEventListener("abort", abort, { once: true });
 
     try {
       const result = await harness.prompt(request.prompt, {
         images: [
           {
-            type: 'image' as const,
+            type: "image" as const,
             source: {
-              type: 'base64' as const,
+              type: "base64" as const,
               media_type: request.image.mimeType,
               data: request.image.data,
             },
@@ -310,12 +360,12 @@ export class PiAgentBackend implements IBackendAdapter {
       if (!text) {
         logger.warn(
           summarizeAssistantMessageShape(result),
-          'Vision model AgentHarness response did not contain extractable text',
+          "Vision model AgentHarness response did not contain extractable text",
         );
       }
       return text;
     } finally {
-      request.signal.removeEventListener('abort', abort);
+      request.signal.removeEventListener("abort", abort);
       await harness.abort().catch(() => undefined);
       await env.cleanup();
     }
@@ -329,7 +379,7 @@ export class PiAgentBackend implements IBackendAdapter {
     });
     this.unsubFns.push(unsubToolCall);
 
-    // tool_result hook：文件变更捕获、文件操作事件、知识库读取追踪
+    // tool_result hook：文件变更摘要捕获、知识库读取追踪
     const unsubToolResult = this.harness.on("tool_result", (event: any) => {
       const { toolName, input, isError } = event;
       const sessionId = this.sessionId ?? this.config.sessionId;
@@ -339,9 +389,6 @@ export class PiAgentBackend implements IBackendAdapter {
         isError,
         event,
         sessionId,
-        {
-          emitFileOperations: true,
-        },
       );
       return undefined;
     });
@@ -362,7 +409,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private buildSubagentSystemPrompt(context?: {
     resources?: { skills?: PreinstalledSkill[] };
   }): string {
-    const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手';
+    const basePrompt = this.currentSystemPrompt || "# Workbench AI 编码助手";
     const preinstalledSkills = formatPreinstalledSkillsForPrompt(
       context?.resources?.skills || [],
     );
@@ -374,7 +421,9 @@ export class PiAgentBackend implements IBackendAdapter {
 You are a short-lived subagent working for the main agent in the same workspace.
 Complete only the delegated task. You may read and edit allowed workspace files, but you must not spawn another subagent.
 Keep the final response concise: summarize what you changed, what you verified, and any remaining risks.`,
-    ].filter(Boolean).join('\n\n');
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   private async runSubagent(
@@ -382,7 +431,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
     signal?: AbortSignal,
   ): Promise<SubagentRunResult> {
     if (!this.areSubagentsEnabled()) {
-      throw new Error('Subagents are disabled');
+      throw new Error("Subagents are disabled");
     }
 
     await loadPiAgentDeps();
@@ -395,7 +444,9 @@ Keep the final response concise: summarize what you changed, what you verified, 
     const timeoutMs = this.getSubagentTimeoutMs();
     const subagentFiles: FileChange[] = [];
     const controller = new AbortController();
-    const env = new NodeExecutionEnvCtor({ cwd: this.config.workingDir ?? process.cwd() });
+    const env = new NodeExecutionEnvCtor({
+      cwd: this.config.workingDir ?? process.cwd(),
+    });
     const sessionRepo = new InMemorySessionRepoCtor();
     const session = await sessionRepo.create();
     const unsubs: Array<() => void> = [];
@@ -414,7 +465,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
     if (signal?.aborted) {
       abortSubagent();
     }
-    signal?.addEventListener('abort', abortSubagent, { once: true });
+    signal?.addEventListener("abort", abortSubagent, { once: true });
 
     const timeoutId = setTimeout(() => {
       timeoutHit = true;
@@ -426,7 +477,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
       const tools = createWorkbenchTools(
         this.config,
         this.permissionManager.requestPermission,
-        { includeDelegateTask: false, includePlanApproval: false, includeUserChoice: false },
+        {
+          includeDelegateTask: false,
+          includePlanApproval: false,
+          includeUserChoice: false,
+        },
       );
       const model = this.modelManager.getModel();
       const resources = { skills: getPreinstalledSkills() };
@@ -437,10 +492,12 @@ Keep the final response concise: summarize what you changed, what you verified, 
         tools,
         resources,
         model,
-        systemPrompt: (context: { resources?: { skills?: PreinstalledSkill[] } }) =>
-          this.buildSubagentSystemPrompt(context),
-        getApiKeyAndHeaders: (model: any) => this.modelManager.getApiKeyAndHeaders(model),
-        thinkingLevel: 'off',
+        systemPrompt: (context: {
+          resources?: { skills?: PreinstalledSkill[] };
+        }) => this.buildSubagentSystemPrompt(context),
+        getApiKeyAndHeaders: (model: any) =>
+          this.modelManager.getApiKeyAndHeaders(model),
+        thinkingLevel: "off",
       });
       this.activeSubagents.add(harness);
 
@@ -461,13 +518,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
           event,
           sessionId,
           {
-            emitFileOperations: true,
             onFileChanges: (changes) => {
               for (const change of changes) {
-                const duplicate = subagentFiles.some((item) =>
-                  item.path === change.path &&
-                  item.action === change.action &&
-                  item.content === change.content
+                const duplicate = subagentFiles.some(
+                  (item) =>
+                    item.path === change.path &&
+                    item.action === change.action &&
+                    item.content === change.content,
                 );
                 if (!duplicate) subagentFiles.push(change);
               }
@@ -480,35 +537,37 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
       if (controller.signal.aborted) {
         await harness.abort().catch(() => undefined);
-        throw new Error(timeoutHit ? 'Subagent timed out' : 'Subagent aborted');
+        throw new Error(timeoutHit ? "Subagent timed out" : "Subagent aborted");
       }
 
       const prompt = [
-        '# Delegated Task',
+        "# Delegated Task",
         params.task,
-        params.context ? `\n# Additional Context\n${params.context}` : '',
-        '\nReturn a concise summary of what you did, including any files changed.',
-      ].filter(Boolean).join('\n\n');
+        params.context ? `\n# Additional Context\n${params.context}` : "",
+        "\nReturn a concise summary of what you did, including any files changed.",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       const abortPromise = new Promise<never>((_, reject) => {
         controller.signal.addEventListener(
-          'abort',
-          () => reject(new Error(timeoutHit ? 'Subagent timed out' : 'Subagent aborted')),
+          "abort",
+          () =>
+            reject(
+              new Error(timeoutHit ? "Subagent timed out" : "Subagent aborted"),
+            ),
           { once: true },
         );
       });
 
-      const result = await Promise.race([
-        harness.prompt(prompt),
-        abortPromise,
-      ]);
+      const result = await Promise.race([harness.prompt(prompt), abortPromise]);
 
       const errorMessage = extractAssistantErrorMessage(result);
       const content = extractAssistantText(result);
       if (errorMessage) {
         logger.warn(
           summarizeAssistantMessageShape(result),
-          'Subagent response contained an error message',
+          "Subagent response contained an error message",
         );
         return {
           success: false,
@@ -520,7 +579,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       if (!content) {
         logger.warn(
           summarizeAssistantMessageShape(result),
-          'Subagent response did not contain extractable text',
+          "Subagent response did not contain extractable text",
         );
       }
 
@@ -531,7 +590,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
         durationMs: Date.now() - startedAt,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : "Unknown error";
       return {
         success: false,
         content: message,
@@ -540,7 +599,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       };
     } finally {
       clearTimeout(timeoutId);
-      signal?.removeEventListener('abort', abortSubagent);
+      signal?.removeEventListener("abort", abortSubagent);
       for (const unsub of unsubs) {
         unsub();
       }
@@ -552,14 +611,22 @@ Keep the final response concise: summarize what you changed, what you verified, 
     }
   }
 
-  async sendMessage(content: string, options?: { stream?: boolean; images?: ImageAttachment[]; files?: FileAttachment[] }): Promise<string> {
+  async sendMessage(
+    content: string,
+    options?: {
+      stream?: boolean;
+      images?: ImageAttachment[];
+      files?: FileAttachment[];
+    },
+  ): Promise<string> {
     if (!this.harness) throw new Error("Agent not initialized");
     this.status = "busy";
     this.toolHookManager.resetForNewMessage();
 
     const images = normalizeImageAttachments(options?.images);
     const model = this.modelManager.getModel();
-    const modelSupportsImages = Array.isArray(model?.input) && model.input.includes('image');
+    const modelSupportsImages =
+      Array.isArray(model?.input) && model.input.includes("image");
 
     const currentFiles = options?.files || [];
     const currentFileIds = new Set(currentFiles.map((file) => file.id));
@@ -569,8 +636,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
         sessionFiles = await listUploadedFileAttachments(this.config.sessionId);
       } catch (error) {
         logger.warn(
-          { error: serializeErrorForLog(error), sessionId: this.config.sessionId },
-          'Failed to list uploaded file attachments for prompt context',
+          {
+            error: serializeErrorForLog(error),
+            sessionId: this.config.sessionId,
+          },
+          "Failed to list uploaded file attachments for prompt context",
         );
       }
     }
@@ -578,8 +648,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
       ...currentFiles,
       ...sessionFiles.filter((file) => !currentFileIds.has(file.id)),
     ];
-    const uploadedFilesPrefix = formatUploadedFilesForPrompt(uploadedFiles, currentFileIds);
-    let promptContent = uploadedFilesPrefix ? `${uploadedFilesPrefix}${content}` : content;
+    const uploadedFilesPrefix = formatUploadedFilesForPrompt(
+      uploadedFiles,
+      currentFileIds,
+    );
+    let promptContent = uploadedFilesPrefix
+      ? `${uploadedFilesPrefix}${content}`
+      : content;
     let imageContent: any[] | undefined;
 
     if (images && images.length > 0) {
@@ -596,16 +671,16 @@ Keep the final response concise: summarize what you changed, what you verified, 
         if (!this.imageDescriber.isAvailable()) {
           logger.warn(
             { modelId: model.id, imageCount: images.length },
-            'Image sent to non-vision model but image description is not configured',
+            "Image sent to non-vision model but image description is not configured",
           );
           throw new Error(
-            '当前模型不支持图片处理。请联系管理员配置识图模型以启用图片理解功能。',
+            "当前模型不支持图片处理。请联系管理员配置识图模型以启用图片理解功能。",
           );
         }
 
         logger.info(
           { imageCount: images.length, modelId: model.id },
-          'Triggering image pre-description for non-vision model',
+          "Triggering image pre-description for non-vision model",
         );
 
         const imageDescription = await this.imageDescriber.describe(images);
@@ -627,15 +702,27 @@ Keep the final response concise: summarize what you changed, what you verified, 
     );
 
     try {
-      const result = await this.harness.prompt(promptContent, { images: imageContent });
+      const result = await this.harness.prompt(promptContent, {
+        images: imageContent,
+      });
       this.status = "ready";
       this.lastResponseDebug = summarizeAssistantMessageShape(result);
+
+      const runSummary = await this.buildRunSummary();
+      this.lastRunSummary = runSummary;
+      if (runSummary && this.eventCallback) {
+        this.eventCallback({
+          type: "run_summary",
+          sessionId: this.sessionId ?? this.config.sessionId,
+          runSummary,
+        });
+      }
 
       const errorMessage = extractAssistantErrorMessage(result);
       if (errorMessage) {
         logger.warn(
           summarizeAssistantMessageShape(result),
-          'Pi Agent response contained an error message',
+          "Pi Agent response contained an error message",
         );
         throw new Error(errorMessage);
       }
@@ -644,13 +731,15 @@ Keep the final response concise: summarize what you changed, what you verified, 
       if (!text) {
         logger.warn(
           summarizeAssistantMessageShape(result),
-          'Pi Agent response did not contain extractable text',
+          "Pi Agent response did not contain extractable text",
         );
         const files = this.toolHookManager.getFiles();
         if (files.length > 0) {
           return `已完成，修改了 ${files.length} 个文件。`;
         }
-        throw new Error('模型返回了空内容，且没有产生工具结果或文件变更。请检查模型配置或后端运行日志。');
+        throw new Error(
+          "模型返回了空内容，且没有产生工具结果或文件变更。请检查模型配置或后端运行日志。",
+        );
       }
 
       logger.info({ resultLength: text.length }, "Pi Agent response extracted");
@@ -675,6 +764,10 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
   getLastResponseDebug(): unknown {
     return this.lastResponseDebug;
+  }
+
+  getLastRunSummary(): RunSummary | null {
+    return this.lastRunSummary;
   }
 
   async getStatus(): Promise<BackendStatus> {
@@ -730,7 +823,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
     logger.info({ modelId }, "Model switched at runtime");
   }
 
-  async getModelInfo(): Promise<{ currentModelId: string | null; availableModels: Array<{ id: string; label: string }>; canSwitch: boolean } | null> {
+  async getModelInfo(): Promise<{
+    currentModelId: string | null;
+    availableModels: Array<{ id: string; label: string }>;
+    canSwitch: boolean;
+  } | null> {
     return this.modelManager.getModelInfo();
   }
 
@@ -738,7 +835,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
     return this.sessionId;
   }
 
-  getFiles(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }> {
+  getFiles(): Array<{
+    path: string;
+    action: "created" | "modified" | "deleted";
+    content?: string;
+  }> {
     return this.toolHookManager.getFiles();
   }
 
@@ -773,8 +874,16 @@ Keep the final response concise: summarize what you changed, what you verified, 
   /**
    * 解除权限等待：前端用户确认或取消后调用
    */
-  resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
-    this.permissionManager.resolvePermission(toolCallId, approved, responseContent);
+  resolvePermission(
+    toolCallId: string,
+    approved: boolean,
+    responseContent?: string,
+  ): void {
+    this.permissionManager.resolvePermission(
+      toolCallId,
+      approved,
+      responseContent,
+    );
   }
 
   resolveUserChoice(requestId: string, choice: UserChoiceResponse): void {
@@ -792,16 +901,60 @@ Keep the final response concise: summarize what you changed, what you verified, 
     activeTools: any[];
     resources: { skills?: PreinstalledSkill[] };
   }): string {
-    const basePrompt = this.currentSystemPrompt || '# Workbench AI 编码助手\n\n等待 system prompt 注入...';
+    const basePrompt =
+      this.currentSystemPrompt ||
+      "# Workbench AI 编码助手\n\n等待 system prompt 注入...";
     const runtimeTools = formatRuntimeToolsForPrompt(context.activeTools || []);
     const preinstalledSkills = formatPreinstalledSkillsForPrompt(
       context.resources?.skills || [],
     );
-    return [basePrompt, runtimeTools, preinstalledSkills].filter(Boolean).join('\n\n');
+    return [basePrompt, runtimeTools, preinstalledSkills]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   async updateSystemPrompt(newPrompt: string): Promise<void> {
     this.currentSystemPrompt = newPrompt;
-    logger.info({ promptLength: newPrompt.length }, 'System prompt updated');
+    logger.info({ promptLength: newPrompt.length }, "System prompt updated");
+  }
+
+  private async buildRunSummary(): Promise<RunSummary | null> {
+    const receipts = this.toolHookManager.getMutationReceipts();
+    if (receipts.length === 0) return null;
+
+    const mutations: MutationReceiptEntry[] = receipts;
+    const projections: ProjectionAckEntry[] = [];
+
+    if (this.config.workingDir) {
+      const liveWorkspace = resolveLiveWorkspaceMutationContext(
+        this.config.workingDir,
+      );
+      if (liveWorkspace) {
+        try {
+          const minRevision = Math.min(
+            ...receipts.map((receipt) => receipt.revision),
+          );
+          const acks = await liveWorkspace.authority.getProjectionAcks(
+            liveWorkspace.projectId,
+            liveWorkspace.workspaceId,
+            minRevision - 1,
+          );
+          for (const ack of acks) {
+            projections.push({
+              revision: ack.revision,
+              surface: ack.surface,
+              status: ack.status === "applied" ? "applied" : "failed",
+            });
+          }
+        } catch (error) {
+          logger.warn(
+            { error },
+            "Failed to query projection acks for run summary",
+          );
+        }
+      }
+    }
+
+    return { mutations, projections };
   }
 }

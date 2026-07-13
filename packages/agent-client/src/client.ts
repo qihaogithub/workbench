@@ -214,7 +214,6 @@ export interface StreamEvent {
     | "status"
     | "permission_request"
     | "user_choice_request"
-    | "file_operation"
     | "models";
   id?: string;
   content?: string;
@@ -261,11 +260,6 @@ export interface StreamEvent {
       description?: string;
     }>;
     allowCustom: boolean;
-  };
-  fileOperation?: {
-    method: string;
-    path: string;
-    content?: string;
   };
   models?: Array<{
     id: string;

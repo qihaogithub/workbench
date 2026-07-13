@@ -17,6 +17,12 @@ import { BackendAgent } from "./core/backend-agent";
 import { registerRoutes } from "./routes";
 import { destroySessionStore } from "./session/session-store";
 import { getBackendProvidersManager } from "./config/backend-providers";
+import { getDefaultDataDir } from "./collab/workspace-file-persistence";
+import {
+  getWorkspaceAuthorityStartupRecoveryStatus,
+  recoverWorkspaceAuthoritiesOnStartup,
+} from "./workspace/workspace-authority-startup-recovery";
+import { assertWorkspaceAuthorityInstancePolicy } from "./workspace/workspace-authority-instance-policy";
 
 const config = loadConfig();
 const logger = getLogger();
@@ -25,6 +31,8 @@ const logger = getLogger();
 getBackendProvidersManager().initialize();
 
 async function start() {
+  const workspaceAuthorityInstancePolicy = assertWorkspaceAuthorityInstancePolicy();
+  logger.info({ workspaceAuthorityInstancePolicy }, "Workspace Authority instance policy accepted");
   const fastify = Fastify({
     logger: {
       level: config.logLevel,
@@ -73,6 +81,9 @@ async function start() {
     );
   }
 
+  const recovery = await recoverWorkspaceAuthoritiesOnStartup(getDefaultDataDir());
+  logger.info({ recovery }, "Workspace Authority startup recovery completed");
+
   await registerRoutes(fastify);
 
   fastify.get("/health", async () => {
@@ -83,6 +94,7 @@ async function start() {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       agents: manager.count(),
+      workspaceAuthorityRecovery: getWorkspaceAuthorityStartupRecoveryStatus(),
     };
   });
 

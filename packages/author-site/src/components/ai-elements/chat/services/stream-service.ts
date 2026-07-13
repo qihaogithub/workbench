@@ -130,12 +130,6 @@ export type UserChoiceResponse =
       type: "cancel";
     };
 
-export interface FileOperation {
-  method: string;
-  path: string;
-  content?: string;
-}
-
 export interface StreamResult {
   content?: string;
   files?: Array<{
@@ -154,7 +148,6 @@ export interface StreamEventHandlers {
   onToolUpdate?: (update: ToolUpdateEvent) => void;
   onPermission?: (request: PermissionRequest) => void;
   onUserChoice?: (request: UserChoiceRequest) => void;
-  onFileOperation?: (operation: FileOperation) => void;
   onFinish?: (result: StreamResult) => void;
   onError?: (error: {
     message: string;
@@ -506,13 +499,6 @@ export class StreamService {
         this.handlers.onUserChoice?.(
           event.userChoiceRequest as UserChoiceRequest,
         );
-      }
-    });
-
-    this.stream.on("file_operation", (event: StreamEvent) => {
-      if (this.currentSessionId !== streamId) return;
-      if (event.fileOperation) {
-        this.handlers.onFileOperation?.(event.fileOperation as FileOperation);
       }
     });
 

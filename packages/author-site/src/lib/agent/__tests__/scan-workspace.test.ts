@@ -288,4 +288,38 @@ describe('scanWorkspaceContext', () => {
     expect(index).not.toContain('配置系统参考');
     expect(index).toContain('不要一次性读取全部知识库');
   });
+
+  it('知识库索引扫描不创建 manifest 或清理旧 system 条目', () => {
+    const knowledgeDir = path.join(tmpDir, 'knowledge');
+    fs.mkdirSync(knowledgeDir, { recursive: true });
+    const systemFile = path.join(knowledgeDir, '系统内置.md');
+    fs.writeFileSync(systemFile, '# 系统内置');
+    fs.writeFileSync(
+      path.join(knowledgeDir, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'kb_system_001',
+            title: '系统内置',
+            source: 'system',
+            description: '旧内置文档',
+            fileName: '系统内置.md',
+            addedAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    const index = scanKnowledgeIndex(tmpDir);
+
+    expect(index).toBeNull();
+    expect(fs.existsSync(systemFile)).toBe(true);
+
+    const missingManifestWorkspace = path.join(tmpDir, 'missing-manifest');
+    fs.mkdirSync(missingManifestWorkspace, { recursive: true });
+    expect(scanKnowledgeIndex(missingManifestWorkspace)).toBeNull();
+    expect(fs.existsSync(path.join(missingManifestWorkspace, 'knowledge'))).toBe(false);
+  });
 });

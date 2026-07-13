@@ -392,7 +392,10 @@ describe("项目级共享 Workspace", () => {
     fs.writeFileSync(path.join(liveWorkspacePath!, "_marker.txt"), "live-change", "utf-8");
 
     expect(
-      workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId),
+      workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId, {
+        revision: 2,
+        rootHash: "root-hash-2",
+      }),
     ).toMatchObject({ success: true });
     const baseBeforeCheckpoint = fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion;
     const checkpoint = fsUtils.createProjectVersionSnapshot(project.id, "tester", {
@@ -420,5 +423,90 @@ describe("项目级共享 Workspace", () => {
       saved.version,
     );
     expect(fs.readFileSync(markerPath, "utf-8")).toBe("live-change");
+  });
+
+  it("缺少 canonical revision/rootHash 时创建版本不推进 live workspace baseVersion", async () => {
+    const { fsUtils, sessionManager, workspaceManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("缺少 canonical revision 的版本项目");
+    const projectWorkspacePath = path.join(dataDir, "projects", project.id, "workspace");
+
+    expect(fsUtils.createProjectVersionSnapshot(project.id, "tester").success).toBe(true);
+    const session = await sessionManager.createEditSession("user-a", project.id);
+    const baseBeforeSync = fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion;
+    expect(
+      workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId),
+    ).toMatchObject({ success: true });
+
+    const checkpoint = fsUtils.createProjectVersionSnapshot(project.id, "tester", {
+      sessionId: session.sessionId,
+      type: "auto_checkpoint",
+    });
+
+    expect(checkpoint.success).toBe(true);
+    expect(fsUtils.getWorkspaceMeta(session.workspaceId)?.baseVersion).toBe(baseBeforeSync);
+    expect(fs.existsSync(projectWorkspacePath)).toBe(true);
+  });
+
+  it("创建项目级版本时记录消费的 workspace revision 和 rootHash", async () => {
+    const { fsUtils } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("版本绑定 workspace revision 项目");
+
+    const result = fsUtils.createProjectVersionSnapshot(project.id, "tester", {
+      sessionId: "session-1",
+      workspaceId: "live-1",
+      workspaceRevision: 9,
+      workspaceRootHash: "root-hash-9",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.version).toMatchObject({
+      workspaceId: "live-1",
+      workspaceRevision: 9,
+      workspaceRootHash: "root-hash-9",
+    });
+    const versions = fsUtils.getVersionHistory(project.id);
+    expect(versions[0]).toMatchObject({
+      workspaceId: "live-1",
+      workspaceRevision: 9,
+      workspaceRootHash: "root-hash-9",
+    });
+  });
+
+  it("保存 Session 时写入外层 canonical sync 的 workspace revision 和 rootHash", async () => {
+    const { fsUtils, sessionManager, workspaceManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("Session 保存绑定 workspace revision 项目");
+    const session = await sessionManager.createEditSession("user-a", project.id);
+    const liveWorkspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+    expect(liveWorkspacePath).toBeTruthy();
+    fs.writeFileSync(path.join(liveWorkspacePath!, "_marker.txt"), "live-change", "utf-8");
+
+    expect(
+      workspaceManager.syncActiveWorkspaceToCanonical(project.id, session.workspaceId, {
+        revision: 14,
+        rootHash: "root-hash-14",
+      }),
+    ).toMatchObject({ success: true });
+
+    const saved = sessionManager.saveEditSession(
+      session.sessionId,
+      "tester",
+      "保存前已完成 canonical sync",
+      "named_version",
+      {
+        syncedWorkspace: {
+          workspaceId: session.workspaceId,
+          revision: 14,
+          rootHash: "root-hash-14",
+        },
+      },
+    );
+
+    expect(saved.success).toBe(true);
+    const versions = fsUtils.getVersionHistory(project.id);
+    expect(versions.find((version) => version.versionId === saved.version)).toMatchObject({
+      workspaceId: session.workspaceId,
+      workspaceRevision: 14,
+      workspaceRootHash: "root-hash-14",
+    });
   });
 });

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import path from "path";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import {
   createApiSuccess,
   createApiError,
@@ -15,7 +17,44 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 import fs from "fs";
+
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function createPutTextOperation(input: {
+  workspacePath: string;
+  resourcePath: string;
+  content: string;
+}): WorkspaceMutationOperation {
+  const absolutePath = path.join(input.workspacePath, input.resourcePath);
+  const previousContent = fs.existsSync(absolutePath)
+    ? fs.readFileSync(absolutePath, "utf-8")
+    : null;
+  return {
+    type: "put_text",
+    path: input.resourcePath,
+    content: input.content,
+    ...(previousContent === null
+      ? { expectedAbsent: true }
+      : { expectedHash: hashText(previousContent) }),
+  };
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
 
 export async function PUT(
   request: NextRequest,
@@ -176,24 +215,74 @@ export async function PUT(
       sketchScene?: string;
       sketchMeta?: unknown;
     };
-    if (bodyWithSketch.sketchScene !== undefined && typeof bodyWithSketch.sketchScene !== "string") {
+    if (
+      bodyWithSketch.sketchScene !== undefined &&
+      typeof bodyWithSketch.sketchScene !== "string"
+    ) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "sketchScene 必须为字符串"),
         { status: 400 },
       );
     }
 
-    const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
-      code,
-      schema,
-      sketchScene: bodyWithSketch.sketchScene,
-      sketchMeta: bodyWithSketch.sketchMeta as Record<string, unknown> | undefined,
-    });
-    if (!success) {
-      return NextResponse.json(
-        createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
-        { status: 500 },
-      );
+    if (isLiveWorkspacePath(wsPath)) {
+      const operations: WorkspaceMutationOperation[] = [];
+      const addTextOperation = (fileName: string, content: string) => {
+        operations.push(
+          createPutTextOperation({
+            workspacePath: wsPath,
+            resourcePath: `demos/${demoId}/${fileName}`,
+            content,
+          }),
+        );
+      };
+
+      if (typeof code === "string") addTextOperation("index.tsx", code);
+      if (typeof schema === "string")
+        addTextOperation("config.schema.json", schema);
+      if (typeof bodyWithSketch.sketchScene === "string") {
+        addTextOperation("sketch.scene.json", bodyWithSketch.sketchScene);
+      }
+      if (bodyWithSketch.sketchMeta !== undefined) {
+        addTextOperation(
+          "sketch.meta.json",
+          JSON.stringify(bodyWithSketch.sketchMeta, null, 2),
+        );
+      }
+
+      try {
+        await commitWorkspaceMutation({
+          mutationId: crypto.randomUUID(),
+          projectId,
+          workspaceId: meta.workspaceId,
+          sessionId,
+          baseRevision: 0,
+          actor: "author-site",
+          reason: "update_demo_page_files",
+          operations,
+        });
+      } catch (error) {
+        if (error instanceof WorkspaceAuthorityClientError)
+          return createMutationErrorResponse(error);
+        throw error;
+      }
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
+        code,
+        schema,
+        sketchScene: bodyWithSketch.sketchScene,
+        sketchMeta: bodyWithSketch.sketchMeta as
+          | Record<string, unknown>
+          | undefined,
+      });
+      if (!success) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json(createApiSuccess(null));

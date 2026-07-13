@@ -43,7 +43,10 @@ jest.mock("@/lib/workspace-flush", () => ({
   flushAndSyncProjectWorkspace: jest.fn(async () => ({
     status: "no_active_room",
     flushedRooms: 0,
+    revision: 6,
     workspacePath: "/tmp/project-1/workspace",
+    canonicalRevision: 6,
+    canonicalRootHash: "root-hash-6",
   })),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
     code: "FILE_WRITE_ERROR",
@@ -127,8 +130,40 @@ describe("session checkpoint route", () => {
         note: "停止编辑后自动保存记录",
         type: "auto_checkpoint",
         advanceWorkspaceId: "workspace-1",
+        workspaceId: "workspace-1",
+        workspaceRevision: 6,
+        workspaceRootHash: "root-hash-6",
       },
     );
+  });
+
+  it("canonical revision/rootHash 缺失时不会创建自动检查点版本", async () => {
+    const { POST } = await import("./route");
+    const fsUtils = await import("@/lib/fs-utils");
+    const workspaceFlush = await import("@/lib/workspace-flush");
+    jest
+      .mocked(workspaceFlush.flushAndSyncProjectWorkspace)
+      .mockResolvedValueOnce({
+        status: "no_active_room",
+        flushedRooms: 0,
+        revision: 6,
+        workspacePath: "/tmp/project-1/workspace",
+      });
+
+    const response = await POST(jsonRequest({}), {
+      params: { sessionId: "session-1" },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({
+      success: false,
+      error: {
+        code: "WORKSPACE_STALE",
+        message: "项目基准工作区尚未绑定 committed revision",
+      },
+    });
+    expect(fsUtils.createProjectVersionSnapshot).not.toHaveBeenCalled();
   });
 
   it("同步项目当前工作区失败时不会创建自动检查点版本", async () => {

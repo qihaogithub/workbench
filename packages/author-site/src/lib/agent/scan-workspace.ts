@@ -4,7 +4,7 @@ import { summarizeCanvasTextNodes } from "@workbench/demo-ui";
 import type { SystemPromptContext } from "./system-prompt";
 import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
 import { listDemoPages } from "../fs-utils";
-import { syncBuiltinKnowledge } from "../knowledge/builtin-documents";
+import { readWorkspaceKnowledgeManifest } from "../knowledge/builtin-documents";
 import { SKETCH_SCENE_AUTHORING_ENABLED } from "../authoring-feature-flags";
 
 const MAX_INLINE_PAGES = 2;
@@ -192,24 +192,9 @@ export function readMemoryContent(workingDir: string): string | null {
  * 容错：manifest.json 不存在或解析失败时返回 null
  */
 export function scanKnowledgeIndex(workingDir: string): string | null {
-  const manifestPath = path.join(workingDir, "knowledge", "manifest.json");
   try {
-    const manifest = syncBuiltinKnowledge(workingDir);
-    const userItems = fs.existsSync(manifestPath)
-      ? (
-          JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
-            items?: Array<{
-              title: string;
-              source?: string;
-              description?: string;
-              fileName: string;
-              category?: string;
-              tags?: string[];
-              updatedAt?: string;
-            }>;
-          }
-        ).items?.filter((item) => item.source !== "system") || []
-      : manifest.items.filter((item) => item.source !== "system");
+    const manifest = readWorkspaceKnowledgeManifest(workingDir);
+    const userItems = manifest.items.filter((item) => item.source !== "system");
     if (userItems.length === 0) return null;
 
     const formatItem = (item: {
@@ -255,50 +240,4 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
   } catch {
     return null;
   }
-}
-
-/**
- * 将旧项目的 references/ 目录迁移到 knowledge/ 目录
- * 仅在 references/ 存在且 knowledge/ 不存在时执行，迁移后删除旧目录
- */
-export function migrateReferencesToKnowledge(workingDir: string): void {
-  const referencesDir = path.join(workingDir, "references");
-  const knowledgeDir = path.join(workingDir, "knowledge");
-
-  // 仅在 references/ 存在且 knowledge/ 不存在时迁移
-  if (!fs.existsSync(referencesDir) || fs.existsSync(knowledgeDir)) return;
-
-  fs.mkdirSync(knowledgeDir, { recursive: true });
-
-  // 读取 references/ 下所有 .md 文件
-  const files = fs.readdirSync(referencesDir).filter(f => f.endsWith(".md"));
-  const items = files.map((file, index) => {
-    const title = file.replace(/\.md$/, "");
-    // 复制文件到 knowledge/
-    fs.copyFileSync(
-      path.join(referencesDir, file),
-      path.join(knowledgeDir, file)
-    );
-    return {
-      id: `kb_user_${String(index + 1).padStart(3, "0")}`,
-      title,
-      source: "user",
-      description: "从旧 references/ 迁移的项目知识文档",
-      fileName: file,
-      addedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  });
-
-  // 写入 manifest.json
-  if (items.length > 0) {
-    fs.writeFileSync(
-      path.join(knowledgeDir, "manifest.json"),
-      JSON.stringify({ version: 1, items }, null, 2),
-      "utf-8"
-    );
-  }
-
-  // 删除旧 references/ 目录
-  fs.rmSync(referencesDir, { recursive: true });
 }

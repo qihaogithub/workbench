@@ -57,6 +57,9 @@ export interface VersionInfo {
   sessionId: string;           // 关联的编辑会话 ID
   snapshotPath: string;        // 备份文件夹路径（绝对路径）
   fileCount: number;           // 文件数量
+  workspaceId?: string;        // 生成该历史记录时消费的 Workspace ID
+  workspaceRevision?: WorkspaceRevision;  // 生成该历史记录时消费的 Workspace Authority revision
+  workspaceRootHash?: string;  // 生成该历史记录时消费的 Workspace Authority root hash
   note?: string;               // 用户备注（可选）
 }
 
@@ -91,6 +94,9 @@ export interface ResourceVersion {
   projectId: string;
   kind: ProjectResourceKind;
   resourceId: string;
+  workspaceId?: string;
+  workspaceRevision?: WorkspaceRevision;
+  workspaceRootHash?: string;
   previousVersionId?: string;
   restoredFromVersionId?: string;
   contentHash: string;
@@ -130,6 +136,8 @@ export interface ProjectCommit {
     actorType: "user" | "ai" | "system" | "cli";
     sessionId?: string;
     workspaceId?: string;
+    workspaceRevision?: WorkspaceRevision;
+    workspaceRootHash?: string;
     bypassedValidation?: boolean;
   };
 }
@@ -259,6 +267,8 @@ export interface Project {
   activeWorkspaceId?: string;  // 项目级共享当前工作空间 ID
   activeWorkspaceUpdatedAt?: number; // 项目级共享当前工作空间更新时间
   canonicalSyncedWorkspaceId?: string; // 最近同步到项目基准工作区的 Workspace ID
+  canonicalSyncedRevision?: CanonicalSyncedRevision; // 仅在 canonical materialize 成功后推进，不代表 Authority 当前 revision
+  canonicalSyncedRootHash?: string; // 最近同步到项目基准工作区的 Authority root hash
   canonicalSyncedAt?: number;  // 最近同步到项目基准工作区的时间
   demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
   demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
@@ -434,23 +444,6 @@ export interface SaveProjectChangesResponse {
 }
 
 /**
- * 恢复版本请求参数
- */
-export interface RestoreVersionRequest {
-  versionId: string;           // 要恢复的版本号
-  username: string;            // 操作用户名
-}
-
-/**
- * 恢复版本响应
- */
-export interface RestoreVersionResponse {
-  success: boolean;
-  newVersionId: string;        // 新创建的版本号
-  restoredAt: number;          // 恢复时间
-}
-
-/**
  * 版本历史响应
  */
 export interface VersionHistoryResponse {
@@ -521,3 +514,12 @@ export interface ProjectDetailResponse {
 
 // 最大版本保留数量
 export const MAX_VERSIONS_KEEP = 50;
+/**
+ * Three version axes that must never be compared or advanced as if they were
+ * interchangeable. The optional semantic tag keeps number/string literals
+ * source-compatible while preventing an already-typed axis from being passed
+ * as another axis accidentally.
+ */
+export type ProjectBaseVersion = string & { readonly __versionAxis?: "project-base-version" };
+export type WorkspaceRevision = number & { readonly __versionAxis?: "workspace-revision" };
+export type CanonicalSyncedRevision = number & { readonly __versionAxis?: "canonical-synced-revision" };

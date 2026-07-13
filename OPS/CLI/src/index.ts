@@ -15,6 +15,13 @@ import { listModels } from "./commands/models.js";
 import { getWorkspace, updateWorkspace } from "./commands/workspace.js";
 import { listFiles } from "./commands/files.js";
 import { queryDiagnostics } from "./commands/diagnostics.js";
+import {
+  workspaceAuthorityBootstrap,
+  workspaceAuthorityPreflight,
+  workspaceAuthorityReconcileAdopt,
+  workspaceAuthorityReconcileRestore,
+  workspaceAuthorityStatus,
+} from "./commands/workspace-authority.js";
 
 const program = new Command();
 
@@ -244,6 +251,99 @@ program
   .option("--output <file>", "export 查询写入文件")
   .action(async (kind, options) => {
     await queryDiagnostics(kind, options);
+  });
+
+// ============================================================
+// Workspace Authority 状态
+// ============================================================
+program
+  .command("workspace-authority-status <projectId> <workspaceId>")
+  .description("只读查询 Workspace Authority 状态: ready/revision/rootHash/queue/lease/prepared/drift")
+  .requiredOption("--session <sessionId>", "用于校验 Workspace 访问权限的编辑 Session ID")
+  .action(async (projectId, workspaceId, options) => {
+    await workspaceAuthorityStatus(
+      program.opts().url,
+      {
+        projectId,
+        workspaceId,
+        sessionId: options.session,
+      },
+      getJsonMode(),
+    );
+  });
+
+program
+  .command("workspace-authority-preflight <projectId> <workspaceId>")
+  .description("只读检查 Workspace Authority 是否满足关键动作前置条件，输出 passed/issues")
+  .requiredOption("--session <sessionId>", "用于校验 Workspace 访问权限的编辑 Session ID")
+  .option("--fail-on-queue", "queueDepth > 0 时也判失败", false)
+  .option("--fail-on-staging", "stagingCount > 0 时也判失败", false)
+  .action(async (projectId, workspaceId, options) => {
+    await workspaceAuthorityPreflight(
+      program.opts().url,
+      {
+        projectId,
+        workspaceId,
+        sessionId: options.session,
+        failOnQueue: options.failOnQueue === true,
+        failOnStaging: options.failOnStaging === true,
+      },
+      getJsonMode(),
+    );
+  });
+
+program
+  .command("workspace-authority-bootstrap <projectId> <workspaceId>")
+  .description("默认 dry-run 检查 Workspace Authority bootstrap；加 --apply 才创建 Authority state")
+  .requiredOption("--session <sessionId>", "用于校验 Workspace 访问权限的编辑 Session ID")
+  .option("--apply", "执行 bootstrap；默认只返回 would_bootstrap", false)
+  .action(async (projectId, workspaceId, options) => {
+    await workspaceAuthorityBootstrap(
+      program.opts().url,
+      {
+        projectId,
+        workspaceId,
+        sessionId: options.session,
+        apply: options.apply === true,
+      },
+      getJsonMode(),
+    );
+  });
+
+program
+  .command("workspace-authority-reconcile-adopt <projectId> <workspaceId>")
+  .description("默认 dry-run 检查 external drift；加 --apply 才 adopt 当前磁盘内容为新 revision")
+  .requiredOption("--session <sessionId>", "用于校验 Workspace 访问权限的编辑 Session ID")
+  .option("--apply", "执行 reconcile adopt；默认只返回 would_adopt", false)
+  .action(async (projectId, workspaceId, options) => {
+    await workspaceAuthorityReconcileAdopt(
+      program.opts().url,
+      {
+        projectId,
+        workspaceId,
+        sessionId: options.session,
+        apply: options.apply === true,
+      },
+      getJsonMode(),
+    );
+  });
+
+program
+  .command("workspace-authority-reconcile-restore <projectId> <workspaceId>")
+  .description("默认 dry-run 检查 external drift；加 --apply 才恢复最后 committed 内容")
+  .requiredOption("--session <sessionId>", "用于校验 Workspace 访问权限的编辑 Session ID")
+  .option("--apply", "执行 reconcile restore；默认只返回 would_restore", false)
+  .action(async (projectId, workspaceId, options) => {
+    await workspaceAuthorityReconcileRestore(
+      program.opts().url,
+      {
+        projectId,
+        workspaceId,
+        sessionId: options.session,
+        apply: options.apply,
+      },
+      getJsonMode(),
+    );
   });
 
 // ============================================================

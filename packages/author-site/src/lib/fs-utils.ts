@@ -116,6 +116,18 @@ function readTemplateMeta(templateId: string): ProjectTemplateMeta | null {
     return {
       id: parsed.id,
       sourceProjectId: parsed.sourceProjectId,
+      sourceWorkspaceId:
+        typeof parsed.sourceWorkspaceId === "string"
+          ? parsed.sourceWorkspaceId
+          : undefined,
+      sourceWorkspaceRevision:
+        typeof parsed.sourceWorkspaceRevision === "number"
+          ? parsed.sourceWorkspaceRevision
+          : undefined,
+      sourceWorkspaceRootHash:
+        typeof parsed.sourceWorkspaceRootHash === "string"
+          ? parsed.sourceWorkspaceRootHash
+          : undefined,
       category: parsed.category,
       name: parsed.name,
       description: parsed.description,
@@ -245,7 +257,7 @@ export function saveProjectAsTemplate(
   return template;
 }
 
-const DEFAULT_DEMO_CODE = `import React from 'react';
+export const DEFAULT_DEMO_CODE = `import React from 'react';
 
 interface DemoProps {
   title: string;
@@ -262,7 +274,7 @@ export default function Demo({ title, description }: DemoProps) {
 }
 `;
 
-const DEFAULT_DEMO_SCHEMA = JSON.stringify(
+export const DEFAULT_DEMO_SCHEMA = JSON.stringify(
   {
     $schema: "https://json-schema.org/draft/2020-12/schema",
     title: "Demo 配置",
@@ -1082,6 +1094,14 @@ export function readProjectMeta(projectId: string): Project | null {
         typeof parsed.canonicalSyncedWorkspaceId === "string"
           ? parsed.canonicalSyncedWorkspaceId
           : undefined,
+      canonicalSyncedRevision:
+        typeof parsed.canonicalSyncedRevision === "number"
+          ? parsed.canonicalSyncedRevision
+          : undefined,
+      canonicalSyncedRootHash:
+        typeof parsed.canonicalSyncedRootHash === "string"
+          ? parsed.canonicalSyncedRootHash
+          : undefined,
       canonicalSyncedAt:
         typeof parsed.canonicalSyncedAt === "number"
           ? parsed.canonicalSyncedAt
@@ -1164,6 +1184,9 @@ export function createProjectVersionSnapshot(
     type?: VersionHistoryEntryType;
     sourceWorkspacePath?: string;
     advanceWorkspaceId?: string | null;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
   },
 ): { success: boolean; version?: VersionInfo; error?: string } {
   const project = readProjectMeta(projectId);
@@ -1179,6 +1202,20 @@ export function createProjectVersionSnapshot(
   const workspaceToAdvance =
     options?.advanceWorkspaceId ??
     inferSyncedActiveWorkspaceForVersion(projectId, project, sourceWorkspacePath);
+  const consumedWorkspaceId =
+    options?.workspaceId ??
+    workspaceToAdvance ??
+    inferCanonicalWorkspaceIdForVersion(projectId, project, sourceWorkspacePath);
+  const consumedWorkspaceRevision =
+    options?.workspaceRevision ??
+    (consumedWorkspaceId === project.canonicalSyncedWorkspaceId
+      ? project.canonicalSyncedRevision
+      : undefined);
+  const consumedWorkspaceRootHash =
+    options?.workspaceRootHash ??
+    (consumedWorkspaceId === project.canonicalSyncedWorkspaceId
+      ? project.canonicalSyncedRootHash
+      : undefined);
   if (workspaceToAdvance && !canAdvanceWorkspaceBase(projectId, workspaceToAdvance)) {
     return { success: false, error: "Workspace 版本基线不可更新" };
   }
@@ -1208,6 +1245,9 @@ export function createProjectVersionSnapshot(
     sessionId: options?.sessionId ?? `snapshot-${versionId}`,
     snapshotPath,
     fileCount: countFiles(sourceWorkspacePath),
+    workspaceId: consumedWorkspaceId,
+    workspaceRevision: consumedWorkspaceRevision,
+    workspaceRootHash: consumedWorkspaceRootHash,
     note: options?.note,
   };
 
@@ -1220,6 +1260,23 @@ export function createProjectVersionSnapshot(
   }
 
   return { success: true, version: versionInfo };
+}
+
+function inferCanonicalWorkspaceIdForVersion(
+  projectId: string,
+  project: Project,
+  sourceWorkspacePath: string,
+): string | undefined {
+  if (!project.activeWorkspaceId) return undefined;
+  if (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId) return undefined;
+  if (typeof project.canonicalSyncedRevision !== "number") return undefined;
+  if (!project.canonicalSyncedRootHash) return undefined;
+
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  if (path.resolve(sourceWorkspacePath) !== path.resolve(projectWorkspacePath)) {
+    return undefined;
+  }
+  return project.activeWorkspaceId;
 }
 
 function canAdvanceWorkspaceBase(projectId: string, workspaceId: string): boolean {
@@ -1240,6 +1297,8 @@ function inferSyncedActiveWorkspaceForVersion(
 ): string | null {
   if (!project.activeWorkspaceId) return null;
   if (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId) return null;
+  if (typeof project.canonicalSyncedRevision !== "number") return null;
+  if (!project.canonicalSyncedRootHash) return null;
 
   const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
   if (path.resolve(sourceWorkspacePath) !== path.resolve(projectWorkspacePath)) {
@@ -1385,6 +1444,229 @@ export function restoreVersion(
   writeProjectMeta(projectId, project);
 
   return { success: true, newVersionId: restoreVersionId };
+}
+
+// ========================================
+// Session Assets 工具函数
+// ========================================
+
+export function getSessionAssetsPath(sessionId: string): string | null {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath) return null;
+  return path.join(sessionPath, "assets", "images");
+}
+
+export function ensureSessionAssetsDir(sessionId: string): string | null {
+  const assetsPath = getSessionAssetsPath(sessionId);
+  if (!assetsPath) return null;
+  if (!fs.existsSync(assetsPath)) {
+    fs.mkdirSync(assetsPath, { recursive: true });
+  }
+  return assetsPath;
+}
+
+export function generateAssetFilename(originalName: string): string {
+  const ext = path.extname(originalName) || ".bin";
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `img_${timestamp}_${random}${ext}`;
+}
+
+export function saveSessionAsset(
+  sessionId: string,
+  filename: string,
+  data: Buffer,
+): { success: boolean; url?: string; error?: string } {
+  try {
+    const assetsPath = ensureSessionAssetsDir(sessionId);
+    if (!assetsPath) {
+      return { success: false, error: "Session 不存在" };
+    }
+
+    const filePath = path.join(assetsPath, filename);
+    fs.writeFileSync(filePath, data);
+
+    const url = `/api/sessions/${sessionId}/assets/${filename}`;
+    return { success: true, url };
+  } catch (error) {
+    return { success: false, error: `保存文件失败: ${error}` };
+  }
+}
+
+export function getSessionAssetPath(
+  sessionId: string,
+  filename: string,
+): string | null {
+  const assetsPath = getSessionAssetsPath(sessionId);
+  if (!assetsPath) return null;
+
+  const filePath = path.join(assetsPath, filename);
+  if (!fs.existsSync(filePath)) return null;
+  return filePath;
+}
+
+export function deleteSessionAsset(
+  sessionId: string,
+  filename: string,
+): boolean {
+  const filePath = getSessionAssetPath(sessionId, filename);
+  if (!filePath) return false;
+
+  try {
+    fs.unlinkSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function listSessionAssets(sessionId: string): string[] {
+  const assetsPath = getSessionAssetsPath(sessionId);
+  if (!assetsPath || !fs.existsSync(assetsPath)) return [];
+
+  try {
+    return fs.readdirSync(assetsPath).filter((name) => {
+      const stat = fs.statSync(path.join(assetsPath, name));
+      return stat.isFile();
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ========================================
+// 工作空间路径工具函数
+// ========================================
+
+export function getWorkspacePath(workspaceId: string): string {
+  return path.join(WORKSPACES_DIR, workspaceId);
+}
+
+export function findWorkspacePath(workspaceId: string): string | null {
+  const directPath = path.join(WORKSPACES_DIR, workspaceId);
+  if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
+    return directPath;
+  }
+
+  if (!fs.existsSync(WORKSPACES_DIR)) return null;
+
+  const userDirs = fs.readdirSync(WORKSPACES_DIR, { withFileTypes: true });
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
+    const projectDirs = fs.readdirSync(
+      path.join(WORKSPACES_DIR, userDir.name),
+      { withFileTypes: true },
+    );
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue;
+      const wsPath = path.join(
+        WORKSPACES_DIR,
+        userDir.name,
+        projectDir.name,
+        workspaceId,
+      );
+      if (fs.existsSync(wsPath) && fs.statSync(wsPath).isDirectory()) {
+        return wsPath;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getWorkspaceDir(userId: string, projectId: string): string {
+  return path.join(WORKSPACES_DIR, userId, projectId);
+}
+
+export function workspaceExists(workspaceId: string): boolean {
+  return findWorkspacePath(workspaceId) !== null;
+}
+
+export interface WorkspaceMeta {
+  workspaceId: string;
+  demoId: string;
+  projectId?: string;
+  userId?: string;
+  ownerUserId?: string;
+  scope?: "live" | "branch" | "snapshot-source" | "legacy";
+  baseVersion?: string;
+  status?: "active" | "archived" | "committed" | "expired";
+  createdAt: number;
+  updatedAt: number;
+}
+
+export function getWorkspaceMeta(workspaceId: string): WorkspaceMeta | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const metaPath = path.join(wsPath, ".workspace.json");
+  if (!fs.existsSync(metaPath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as WorkspaceMeta;
+  } catch {
+    return null;
+  }
+}
+
+export function writeWorkspaceMeta(
+  workspaceId: string,
+  meta: WorkspaceMeta,
+): void {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return;
+
+  fs.writeFileSync(
+    path.join(wsPath, ".workspace.json"),
+    JSON.stringify(meta, null, 2),
+    "utf-8",
+  );
+}
+
+export function markWorkspaceBasedOnVersion(
+  workspaceId: string,
+  baseVersion: string,
+): boolean {
+  const meta = getWorkspaceMeta(workspaceId);
+  if (!meta) return false;
+
+  writeWorkspaceMeta(workspaceId, {
+    ...meta,
+    baseVersion,
+    updatedAt: Date.now(),
+  });
+  return true;
+}
+
+export function getWorkspaceFiles(workspaceId: string): DemoFiles | null {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return null;
+
+  const codePath = path.join(wsPath, "index.tsx");
+  const schemaPath = path.join(wsPath, "config.schema.json");
+
+  if (!fs.existsSync(codePath) || !fs.existsSync(schemaPath)) return null;
+
+  return {
+    code: fs.readFileSync(codePath, "utf-8"),
+    schema: fs.readFileSync(schemaPath, "utf-8"),
+  };
+}
+
+export function updateWorkspaceFiles(
+  workspaceId: string,
+  files: DemoFiles,
+): boolean {
+  const wsPath = findWorkspacePath(workspaceId);
+  if (!wsPath) return false;
+
+  fs.writeFileSync(path.join(wsPath, "index.tsx"), files.code, "utf-8");
+  fs.writeFileSync(
+    path.join(wsPath, "config.schema.json"),
+    files.schema,
+    "utf-8",
+  );
+  return true;
 }
 
 export function getSessionWorkspacePath(sessionId: string): string | null {

@@ -3,7 +3,7 @@ import { getEditSession, saveEditSession } from '@/lib/session-manager';
 import { createApiSuccess, createApiError } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import {
-  flushWorkspaceBeforeCriticalAction,
+  flushAndSyncProjectWorkspace,
   getWorkspaceFlushErrorResponse,
 } from "@/lib/workspace-flush";
 
@@ -41,12 +41,20 @@ export async function POST(
         { status: 403 },
       );
     }
+    let syncedWorkspace:
+      | { workspaceId: string; revision?: number; rootHash?: string }
+      | undefined;
     try {
-      await flushWorkspaceBeforeCriticalAction({
+      const synced = await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
         sessionId,
       });
+      syncedWorkspace = {
+        workspaceId: session.workspaceId,
+        revision: synced.canonicalRevision,
+        rootHash: synced.canonicalRootHash,
+      };
     } catch (error) {
       const flushError = getWorkspaceFlushErrorResponse(error);
       return NextResponse.json(
@@ -55,7 +63,9 @@ export async function POST(
       );
     }
 
-    const result = saveEditSession(sessionId, payload.username, body.note);
+    const result = saveEditSession(sessionId, payload.username, body.note, "named_version", {
+      syncedWorkspace,
+    });
 
     if (!result.success) {
       if (result.error === 'Session not in editing status') {

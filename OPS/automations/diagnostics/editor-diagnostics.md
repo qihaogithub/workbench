@@ -49,12 +49,16 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /
 | 判断 | 依据 |
 |:-----|:-----|
 | 事件源是否可信 | 输出 `diagnostics.sqliteUsed`、`jsonlFallbackUsed`、`dbUnavailable`、`eventGapDetected` 和 `warnings` |
+| revision 链路是否收敛 | 先看 `workspaceFlows` 的 mutation、projection、canonical 阶段和最终 `status` |
+| 延迟是否异常 | 看 `performance.metrics` 各项的 `count/p50/p95/p99/max`；`count=0` 表示本次查询无可用样本 |
 | 打开项目链路 | `project.opened`、`session.created/reused`、`workspace.bound` |
 | 协同是否覆盖 | `collab.snapshot_received`、`snapshot.apply`、外部文件变更命中或遗漏 |
 | 保存是否落盘 | `autosave.flush_*`、`persist-workspace`、退出前保存结果 |
 | 手绘保存 patch 校验 | `page.sketch_patch_validated`、`page.sketch_patch_rejected`；查看 payload 的 `targetSource` 区分 `server_patch` 回放和 `client_scene` 校验 |
 | AI 是否改写 | `ai.run_started`、工具调用摘要、文件变更、`ai.run_finished` |
 | 预览错误来源 | `preview.error`、`post_generation_validation`、iframe runtime 或自动修复事件 |
+
+`diagnostics:autosave`、`diagnostics:collab` 和 `diagnostics:preview` 不再只返回单一事件组；它们同时带出 autosave/collab/preview/workspace 事件，便于在一次查询中从草稿 flush 追到 mutation receipt、projection ack 和 canonical materialization。
 
 ## 降级规则
 

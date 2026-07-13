@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import type { WorkspaceMutationOperation } from '@workbench/shared/contracts';
 import * as fs from 'fs';
 import * as path from 'path';
 import { syncBuiltinKnowledge } from '@/lib/knowledge/builtin-documents';
 import { ProjectAdminService } from '@workbench/project-core';
 import { getDataDir } from '@/lib/fs-utils';
+import { getLiveWorkspaceRouteContext, isLiveWorkspacePath } from '@/lib/live-workspace-route-context';
+import { commitWorkspaceMutation, WorkspaceAuthorityClientError } from '@/lib/workspace-authority-client';
 
 interface KnowledgeItem {
   id: string;
@@ -47,6 +51,35 @@ function writeManifest(workingDir: string, manifest: Manifest): void {
     path.join(knowledgeDir, 'manifest.json'),
     JSON.stringify(manifest, null, 2),
     'utf-8'
+  );
+}
+
+function hashText(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+function readManifestRaw(workingDir: string): string | null {
+  const manifestPath = path.join(workingDir, 'knowledge', 'manifest.json');
+  return fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf-8') : null;
+}
+
+function createLiveWorkspaceSessionError() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: 'WORKSPACE_AUTHORITY_NOT_READY',
+        message: 'live Workspace 知识写入必须提供有效 sessionId',
+      },
+    },
+    { status: 409 },
+  );
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    { success: false, error: { code: error.code, message: error.message } },
+    { status: error.status },
   );
 }
 
@@ -115,7 +148,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    syncBuiltinKnowledge(workingDir);
+    if (!isLiveWorkspacePath(workingDir)) syncBuiltinKnowledge(workingDir);
     const manifest = readManifest(workingDir);
     const userItems = (manifest?.items || []).filter(
       (item) => item.source !== 'system',
@@ -142,6 +175,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const liveSession = getLiveWorkspaceRouteContext({ request, workingDir, projectId });
+    if (isLiveWorkspacePath(workingDir) && !liveSession) return createLiveWorkspaceSessionError();
+    const versionProjectId = liveSession?.projectId ?? projectId;
+
     const body = await request.json();
     const { title, description, content } = body;
 
@@ -160,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     const knowledgeDir = path.join(workingDir, 'knowledge');
-    if (!fs.existsSync(knowledgeDir)) {
+    if (!liveSession && !fs.existsSync(knowledgeDir)) {
       fs.mkdirSync(knowledgeDir, { recursive: true });
     }
 
@@ -170,13 +207,15 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(knowledgeDir, fileName);
 
     // 写入 .md 文件
-    fs.writeFileSync(filePath, content, 'utf-8');
+    if (!liveSession) fs.writeFileSync(filePath, content, 'utf-8');
 
     // 读取或初始化 manifest；创作端知识库只保留用户文档
-    const manifest = syncBuiltinKnowledge(workingDir);
+    const previousManifest = readManifestRaw(workingDir);
+    const manifest = liveSession
+      ? readManifest(workingDir) ?? { version: 1, items: [] }
+      : syncBuiltinKnowledge(workingDir);
 
     const now = new Date().toISOString();
-    const stats = fs.statSync(filePath);
     const newItem: KnowledgeItem = {
       id: generateDocId(),
       title: title.trim(),
@@ -185,15 +224,45 @@ export async function POST(request: NextRequest) {
       fileName,
       addedAt: now,
       updatedAt: now,
-      sizeBytes: stats.size,
+      sizeBytes: Buffer.byteLength(content, 'utf-8'),
     };
 
     manifest.items.push(newItem);
-    writeManifest(workingDir, manifest);
-    createKnowledgeVersion(projectId, workingDir, newItem.id, `创建知识文档 ${newItem.title}`);
+    if (liveSession) {
+      const operations: WorkspaceMutationOperation[] = [
+        {
+          type: 'put_text',
+          path: `knowledge/${fileName}`,
+          content,
+          expectedAbsent: true,
+        },
+        {
+          type: 'put_text',
+          path: 'knowledge/manifest.json',
+          content: JSON.stringify(manifest, null, 2),
+          ...(previousManifest === null
+            ? { expectedAbsent: true }
+            : { expectedHash: hashText(previousManifest) }),
+        },
+      ];
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId: liveSession.projectId,
+        workspaceId: liveSession.workspaceId,
+        sessionId: liveSession.sessionId,
+        baseRevision: 0,
+        actor: 'author-site',
+        reason: 'create_knowledge_document',
+        operations,
+      });
+    } else {
+      writeManifest(workingDir, manifest);
+    }
+    createKnowledgeVersion(versionProjectId, workingDir, newItem.id, `创建知识文档 ${newItem.title}`);
 
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError) return createMutationErrorResponse(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       { success: false, error: { code: 'CREATE_FAILED', message } },

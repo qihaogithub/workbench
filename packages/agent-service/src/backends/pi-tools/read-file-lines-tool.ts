@@ -4,8 +4,9 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
-import { withPathPermissionCheck } from './permission-wrapper';
+import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from './permissions';
 import { resolveVirtualKnowledgeFile } from './virtual-knowledge';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const ReadFileLinesParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to read' }),
@@ -15,64 +16,91 @@ const ReadFileLinesParams = Type.Object({
 type ReadFileLinesParams = Static<typeof ReadFileLinesParams>;
 
 export function createReadFileLinesTool(config: AgentConfig): AgentTool<typeof ReadFileLinesParams> {
+  const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
   return {
     name: 'readFileWithLines',
     label: 'Read File With Lines',
     description:
       'Read file contents with line numbers. Supports reading a specific line range via startLine/endLine parameters (1-based, inclusive). Useful for precisely locating code to edit.',
     parameters: ReadFileLinesParams,
-    execute: withPathPermissionCheck(
-      config,
-      'readFileWithLines',
-      (args) => args.path,
-      async (toolCallId: string, args: ReadFileLinesParams) => {
-        const filePath = path.resolve(config.workingDir || '.', args.path);
+    execute: async (toolCallId: string, args: ReadFileLinesParams) => {
+      const filePath = path.resolve(config.workingDir || '.', args.path);
 
-        try {
-          const virtualFile = resolveVirtualKnowledgeFile(args.path, config.workingDir || '');
-          const content = virtualFile
-            ? virtualFile.content
+      if (!isPathAllowed(args.path, config.workingDir || '', permissions)) {
+        logger.warn({ path: args.path }, 'readFileWithLines denied by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: path "${args.path}" is not allowed by workspace permissions` }],
+          details: { path: args.path, error: 'permission denied' },
+          isError: true,
+        };
+      }
+
+      try {
+        const virtualFile = resolveVirtualKnowledgeFile(args.path, config.workingDir || '');
+        const liveWorkspace = !virtualFile && config.workingDir
+          ? resolveLiveWorkspaceMutationContext(config.workingDir)
+          : null;
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(liveWorkspace.projectId, liveWorkspace.workspaceId)
+          : null;
+        const content = virtualFile
+          ? virtualFile.content
+          : snapshot
+            ? snapshot.resources[args.path]
             : await fs.promises.readFile(filePath, 'utf-8');
-          const lines = content.split('\n');
-          const totalLines = lines.length;
-
-          const start = args.startLine ?? 1;
-          const end = args.endLine ?? totalLines;
-
-          const clampedStart = Math.max(1, start);
-          const clampedEnd = Math.min(totalLines, end);
-
-          if (clampedStart > clampedEnd) {
-            return {
-              content: [{ type: 'text', text: `Error: invalid line range (start=${start}, end=${end}). File has ${totalLines} lines.` }],
-              details: { path: args.path, error: 'invalid range' },
-              isError: true,
-            };
-          }
-
-          const selectedLines = lines.slice(clampedStart - 1, clampedEnd);
-          const numberedContent = selectedLines
-            .map((line, i) => `${clampedStart + i}→${line}`)
-            .join('\n');
-
-          const displayPath = virtualFile?.path || args.path;
-          const header = `File: ${displayPath} (${totalLines} lines total, showing ${clampedStart}-${clampedEnd})`;
-
-          logger.debug({ path: displayPath, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) }, 'File read with lines successfully');
+        if (content === undefined) {
           return {
-            content: [{ type: 'text', text: `${header}\n${numberedContent}` }],
-            details: { path: displayPath, totalLines, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) },
-          };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown error';
-          logger.error({ path: args.path, error: message }, 'Failed to read file with lines');
-          return {
-            content: [{ type: 'text', text: `Error reading file: ${message}` }],
-            details: { path: args.path, error: message },
+            content: [{ type: 'text', text: `Error reading file: ${args.path} is not a committed text resource` }],
+            details: { path: args.path, error: 'WORKSPACE_RESOURCE_NOT_FOUND' },
             isError: true,
           };
         }
-      },
-    ),
+        const lines = content.split('\n');
+        const totalLines = lines.length;
+
+        const start = args.startLine ?? 1;
+        const end = args.endLine ?? totalLines;
+
+        const clampedStart = Math.max(1, start);
+        const clampedEnd = Math.min(totalLines, end);
+
+        if (clampedStart > clampedEnd) {
+          return {
+            content: [{ type: 'text', text: `Error: invalid line range (start=${start}, end=${end}). File has ${totalLines} lines.` }],
+            details: { path: args.path, error: 'invalid range' },
+            isError: true,
+          };
+        }
+
+        const selectedLines = lines.slice(clampedStart - 1, clampedEnd);
+        const numberedContent = selectedLines
+          .map((line, i) => `${clampedStart + i}→${line}`)
+          .join('\n');
+
+        const displayPath = virtualFile?.path || args.path;
+        const header = `File: ${displayPath} (${totalLines} lines total, showing ${clampedStart}-${clampedEnd})`;
+
+        logger.debug({ path: displayPath, startLine: clampedStart, endLine: clampedEnd, virtual: Boolean(virtualFile) }, 'File read with lines successfully');
+        return {
+          content: [{ type: 'text', text: `${header}\n${numberedContent}` }],
+          details: {
+            path: displayPath,
+            totalLines,
+            startLine: clampedStart,
+            endLine: clampedEnd,
+            virtual: Boolean(virtualFile),
+            ...(snapshot ? { revision: snapshot.state.revision, hash: snapshot.state.resourceHashes[args.path] } : {}),
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.error({ path: args.path, error: message }, 'Failed to read file with lines');
+        return {
+          content: [{ type: 'text', text: `Error reading file: ${message}` }],
+          details: { path: args.path, error: message },
+          isError: true,
+        };
+      }
+    },
   };
 }

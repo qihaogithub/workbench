@@ -28,8 +28,14 @@ import {
 } from "./sketch-scene-tool";
 import { createWebSearchTool, isWebSearchEnabled } from "./web-search-tool";
 import { createWebReadTool, isWebReadEnabled } from "./web-read-tool";
-import { createRequestPlanApprovalTool, type PlanApprovalHandler } from "./plan-approval-tool";
-import { createRequestUserChoiceTool, type UserChoiceHandler } from "./user-choice-tool";
+import {
+  createRequestPlanApprovalTool,
+  type PlanApprovalHandler,
+} from "./plan-approval-tool";
+import {
+  createRequestUserChoiceTool,
+  type UserChoiceHandler,
+} from "./user-choice-tool";
 import { createUpdatePlanTool } from "./plan-tool";
 import {
   createDeletePageTool,
@@ -42,7 +48,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 16;
+export const WORKBENCH_TOOL_VERSION = 19;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -123,7 +129,7 @@ export function createWorkbenchTools(
   ];
 
   if (options.includeDelegateTask !== false && options.subagentRunner) {
-    tools.push(createDelegateTaskTool(options.subagentRunner));
+    tools.push(createDelegateTaskTool(options.subagentRunner, config));
   }
 
   return tools;
@@ -146,11 +152,15 @@ export function getViewerReadonlyToolCapabilities(): {
   toolVersion: number;
   toolNames: string[];
 } {
-  const tools = createWorkbenchTools({ sessionId: "viewer-readonly-capabilities" }, undefined, {
-    includeDelegateTask: false,
-    includePlanApproval: false,
-    mode: "viewer-readonly",
-  });
+  const tools = createWorkbenchTools(
+    { sessionId: "viewer-readonly-capabilities" },
+    undefined,
+    {
+      includeDelegateTask: false,
+      includePlanApproval: false,
+      mode: "viewer-readonly",
+    },
+  );
   return {
     toolVersion: WORKBENCH_TOOL_VERSION,
     toolNames: tools.map((tool) => tool.name),

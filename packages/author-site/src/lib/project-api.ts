@@ -3,8 +3,6 @@ import type {
   PageVersionHistoryResponse,
   PageVersionInfo,
   RestorePageVersionResponse,
-  RestoreVersionResponse,
-  RestoreVersionRequest,
   DemoPageMeta,
   DemoPageRuntimeType,
   DemoFolderMeta,
@@ -116,28 +114,6 @@ export class ProjectApiClient {
 
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '获取版本历史失败');
-    }
-
-    return response.data;
-  }
-
-  /**
-   * 恢复指定版本
-   */
-  async restoreVersion(
-    projectId: string,
-    request: RestoreVersionRequest
-  ): Promise<RestoreVersionResponse> {
-    const response = await this.request<RestoreVersionResponse>(
-      `/api/projects/${projectId}/restore`,
-      {
-        method: 'POST',
-        body: JSON.stringify(request),
-      }
-    );
-
-    if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '恢复版本失败');
     }
 
     return response.data;
