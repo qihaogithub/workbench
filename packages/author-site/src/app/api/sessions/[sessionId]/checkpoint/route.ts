@@ -57,12 +57,22 @@ export async function POST(
       );
     }
 
+    let synced: Awaited<ReturnType<typeof flushAndSyncProjectWorkspace>>;
     try {
-      await flushAndSyncProjectWorkspace({
+      synced = await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
         sessionId: params.sessionId,
       });
+      if (
+        synced.canonicalRevision === undefined ||
+        !synced.canonicalRootHash
+      ) {
+        return NextResponse.json(
+          createApiError("WORKSPACE_STALE", "项目基准工作区尚未绑定 committed revision"),
+          { status: 409 },
+        );
+      }
     } catch (error) {
       const flushError = getWorkspaceFlushErrorResponse(error);
       return NextResponse.json(
@@ -88,6 +98,9 @@ export async function POST(
       note,
       type: "auto_checkpoint",
       advanceWorkspaceId: session.workspaceId,
+      workspaceId: session.workspaceId,
+      workspaceRevision: synced.canonicalRevision,
+      workspaceRootHash: synced.canonicalRootHash,
     });
 
     if (!result.success || !result.version) {

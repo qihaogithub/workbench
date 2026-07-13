@@ -186,6 +186,13 @@ if [[ " ${DEPLOY_SERVICES} " != *" screenshot-service "* ]]; then
     echo -e "${YELLOW}⚠️  本次不会重建 screenshot-service。如需更新截图服务，执行 INCLUDE_SCREENSHOT_SERVICE=true scripts/deploy.sh${NC}"
 fi
 
+# ================= 0.5 Workspace Authority 静态部署前检查 =================
+echo -e "${BLUE}🔍 [0/4] 检查 Workspace Authority 写入门禁与 Compose DATA_DIR...${NC}"
+cd "${PROJECT_DIR}"
+corepack pnpm check:workspace-authority
+corepack pnpm check:workspace-deploy-compose
+echo -e "${GREEN}✅ Workspace Authority 静态部署前检查通过${NC}"
+
 # ================= 1. 检查 SSH Key =================
 echo -e "${BLUE}🔍 [1/4] 检查 SSH 连接...${NC}"
 if [ ! -f "${SSH_KEY}" ]; then
@@ -200,6 +207,42 @@ if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o ConnectTimeout=5 -o StrictHostKe
     exit 1
 fi
 echo -e "${GREEN}✅ SSH 连接正常${NC}"
+
+DEPLOY_APP_DATA_DIR="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' "${DEPLOY_ENV_FILE}")"
+DEPLOY_APP_DATA_DIR="${DEPLOY_APP_DATA_DIR:-/opt/workbench/data}"
+case "${DEPLOY_APP_DATA_DIR}" in
+    /*) ;;
+    *)
+        echo -e "${RED}❌ APP_DATA_DIR 必须是绝对路径，当前值: ${DEPLOY_APP_DATA_DIR}${NC}"
+        exit 1
+        ;;
+esac
+if [[ "${DEPLOY_APP_DATA_DIR}" == *"'"* ]] || [[ "${DEPLOY_APP_DATA_DIR}" == *$'\n'* ]]; then
+    echo -e "${RED}❌ APP_DATA_DIR 包含不安全字符${NC}"
+    exit 1
+fi
+
+echo -e "${BLUE}🔍 检查远端 live Workspace Authority 状态...${NC}"
+if ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "command -v node >/dev/null 2>&1"; then
+    if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+        "node - --data-dir '${DEPLOY_APP_DATA_DIR}' --json" \
+        < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
+        echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
+        exit 1
+    fi
+elif ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+    "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker ps --status running -q agent-service | grep -q ."; then
+    if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+        "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker exec -T agent-service node - --data-dir /app/data --json" \
+        < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
+        echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}❌ 无法在远端执行 Workspace Authority 部署前检查：宿主机无 Node，agent-service 容器也未运行${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ 远端 Workspace Authority 部署前检查通过${NC}"
 
 if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
     if ! docker info >/dev/null 2>&1; then

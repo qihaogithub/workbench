@@ -7,6 +7,7 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 import {
   addProjectImageManifestEntry,
   findProjectImageManifestEntry,
@@ -402,14 +403,38 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
       const workspacePath = getWorkspaceAssetPath(storedFilename);
       const relativePathFromPage = getDemoRelativeAssetPath(storedFilename);
 
-      ensureDir(assetsDir);
-
       try {
-        if (fs.existsSync(storedPath)) {
-          logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
+        const liveWorkspace = resolveLiveWorkspaceMutationContext(workspaceDir);
+        let receipt: unknown = null;
+        if (liveWorkspace) {
+          const previousHash = fs.existsSync(storedPath) ? computeSha256(fs.readFileSync(storedPath)) : null;
+          const staged = await liveWorkspace.authority.stageBinary(liveWorkspace.projectId, liveWorkspace.workspaceId, buffer);
+          receipt = await liveWorkspace.authority.mutate({
+            mutationId: crypto.randomUUID(),
+            projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId,
+            sessionId: config.sessionId,
+            baseRevision: 0,
+            actor: 'ai',
+            reason: 'agent_save_image',
+            operations: [{
+              type: 'put_binary',
+              path: workspacePath,
+              stagingId: staged.stagingId,
+              hash: staged.hash,
+              size: staged.size,
+              ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
+            }],
+          });
+          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, revision: (receipt as { revision?: number }).revision }, 'Image committed by Workspace Authority');
         } else {
-          await fs.promises.writeFile(storedPath, buffer);
-          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to project workspace');
+          ensureDir(assetsDir);
+          if (fs.existsSync(storedPath)) {
+            logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
+          } else {
+            await fs.promises.writeFile(storedPath, buffer);
+            logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to isolated project workspace');
+          }
         }
 
         if (manifestProjectId) {
@@ -450,6 +475,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
             format: ext,
             source,
             sha256: hashPrefix,
+            receipt,
           },
         };
       } catch (error) {

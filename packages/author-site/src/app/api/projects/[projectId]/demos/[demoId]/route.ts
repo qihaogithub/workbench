@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import path from "path";
+import {
+  isManagedWorkspaceResource,
+  type WorkspaceMutationOperation,
+} from "@workbench/shared/contracts";
+import type {
+  DemoFolderMeta,
+  DemoPageMeta,
+  WorkspaceTree,
+} from "@workbench/shared";
 import {
   createApiSuccess,
   createApiError,
@@ -18,7 +28,169 @@ import {
   restoreDeletedWorkspaceDemoPageSnapshot,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 import fs from "fs";
+
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function readWorkspaceTreeSnapshot(
+  workspacePath: string,
+): { content: string; tree: WorkspaceTree } | null {
+  const treePath = path.join(workspacePath, "workspace-tree.json");
+  if (!fs.existsSync(treePath)) return null;
+  try {
+    const content = fs.readFileSync(treePath, "utf-8");
+    const parsed = JSON.parse(content) as Partial<WorkspaceTree>;
+    return {
+      content,
+      tree: {
+        folders: Array.isArray(parsed.folders)
+          ? (parsed.folders as DemoFolderMeta[])
+          : [],
+        pages: Array.isArray(parsed.pages)
+          ? (parsed.pages as DemoPageMeta[])
+          : [],
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createWorkspaceTreePutOperation(input: {
+  previousContent: string;
+  tree: WorkspaceTree;
+}): WorkspaceMutationOperation {
+  return {
+    type: "put_text",
+    path: "workspace-tree.json",
+    content: JSON.stringify(input.tree, null, 2),
+    expectedHash: hashText(input.previousContent),
+  };
+}
+
+function createManagedPageDeleteOperations(
+  workspacePath: string,
+  demoId: string,
+): WorkspaceMutationOperation[] {
+  const pageDir = getDemoDirPath(workspacePath, demoId);
+  const operations: WorkspaceMutationOperation[] = [];
+  const walk = (directory: string) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const relativePath = path
+        .relative(workspacePath, fullPath)
+        .split(path.sep)
+        .join("/");
+      if (!isManagedWorkspaceResource(relativePath)) continue;
+      const content = fs.readFileSync(fullPath, "utf-8");
+      operations.push({
+        type: "delete_path",
+        path: relativePath,
+        expectedHash: hashText(content),
+      });
+    }
+  };
+  walk(pageDir);
+  return operations.sort((a, b) => {
+    const aPath = "path" in a ? a.path : a.from;
+    const bPath = "path" in b ? b.path : b.from;
+    return aPath.localeCompare(bPath);
+  });
+}
+
+function getDeletedPageSnapshotPath(
+  workspacePath: string,
+  snapshotId: string,
+): string {
+  return path.join(
+    workspacePath,
+    ".workbench",
+    "undo",
+    "deleted-pages",
+    snapshotId,
+  );
+}
+
+function isSafeSnapshotId(snapshotId: string): boolean {
+  return /^[A-Za-z0-9_.-]+$/.test(snapshotId) && !snapshotId.includes("..");
+}
+
+function readDeletedPageSnapshotMeta(
+  snapshotPath: string,
+): DemoPageMeta | null {
+  try {
+    const raw = fs.readFileSync(path.join(snapshotPath, "page.json"), "utf-8");
+    const parsed = JSON.parse(raw) as Partial<DemoPageMeta>;
+    if (!parsed.id || !parsed.name) return null;
+    return {
+      id: parsed.id,
+      name: parsed.name,
+      routeKey: parsed.routeKey,
+      runtimeType: parsed.runtimeType,
+      order: parsed.order ?? 0,
+      parentId: parsed.parentId ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createManagedPageRestoreOperations(input: {
+  snapshotPath: string;
+  demoId: string;
+}): WorkspaceMutationOperation[] {
+  const snapshotDemoDir = path.join(input.snapshotPath, "demos", input.demoId);
+  const operations: WorkspaceMutationOperation[] = [];
+  const walk = (directory: string) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const relativeFromSnapshotDemo = path
+        .relative(snapshotDemoDir, fullPath)
+        .split(path.sep)
+        .join("/");
+      const targetResourcePath = `demos/${input.demoId}/${relativeFromSnapshotDemo}`;
+      if (!isManagedWorkspaceResource(targetResourcePath)) continue;
+      operations.push({
+        type: "put_text",
+        path: targetResourcePath,
+        content: fs.readFileSync(fullPath, "utf-8"),
+        expectedAbsent: true,
+      });
+    }
+  };
+  walk(snapshotDemoDir);
+  return operations.sort((a, b) => {
+    const aPath = "path" in a ? a.path : a.from;
+    const bPath = "path" in b ? b.path : b.from;
+    return aPath.localeCompare(bPath);
+  });
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
 
 export async function GET(
   _request: NextRequest,
@@ -52,6 +224,7 @@ export async function GET(
 }
 
 interface SessionContext {
+  sessionId: string;
   workspaceId: string;
   workspacePath: string;
 }
@@ -60,8 +233,7 @@ async function resolveSessionWorkspace(
   request: NextRequest,
   projectId: string,
 ): Promise<
-  | { ok: true; ctx: SessionContext }
-  | { ok: false; response: NextResponse }
+  { ok: true; ctx: SessionContext } | { ok: false; response: NextResponse }
 > {
   const token = getAuthCookie();
   if (!token) {
@@ -176,7 +348,10 @@ async function resolveSessionWorkspace(
     };
   }
 
-  return { ok: true, ctx: { workspaceId: meta.workspaceId, workspacePath: wsPath } };
+  return {
+    ok: true,
+    ctx: { sessionId, workspaceId: meta.workspaceId, workspacePath: wsPath },
+  };
 }
 
 export async function PATCH(
@@ -195,11 +370,18 @@ export async function PATCH(
     if (!ctx.ok) return ctx.response;
 
     const body = await request.json().catch(() => ({}));
-    const { name, order, parentId } = body as { name?: string; order?: number; parentId?: string | null };
+    const { name, order, parentId } = body as {
+      name?: string;
+      order?: number;
+      parentId?: string | null;
+    };
 
     if (name === undefined && order === undefined && parentId === undefined) {
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "name、order 或 parentId 至少需提供一个"),
+        createApiError(
+          "INVALID_REQUEST",
+          "name、order 或 parentId 至少需提供一个",
+        ),
         { status: 400 },
       );
     }
@@ -211,9 +393,24 @@ export async function PATCH(
       });
     }
 
+    const liveWorkspace = isLiveWorkspacePath(ctx.ctx.workspacePath);
+    const treeSnapshot = liveWorkspace
+      ? readWorkspaceTreeSnapshot(ctx.ctx.workspacePath)
+      : null;
+    if (liveWorkspace && !treeSnapshot) {
+      return NextResponse.json(
+        createApiError(
+          "FILE_WRITE_ERROR",
+          "live Workspace 缺少有效 workspace-tree.json",
+        ),
+        { status: 409 },
+      );
+    }
+
     if (parentId !== undefined && parentId !== null) {
-      const folders = readFoldersMeta(ctx.ctx.workspacePath);
-      const folder = folders.find(f => f.id === parentId);
+      const folders =
+        treeSnapshot?.tree.folders ?? readFoldersMeta(ctx.ctx.workspacePath);
+      const folder = folders.find((f) => f.id === parentId);
       if (!folder) {
         return NextResponse.json(createApiError("FOLDER_NOT_FOUND"), {
           status: 404,
@@ -221,7 +418,8 @@ export async function PATCH(
       }
     }
 
-    const patch: { name?: string; order?: number; parentId?: string | null } = {};
+    const patch: { name?: string; order?: number; parentId?: string | null } =
+      {};
     if (typeof name === "string") {
       const trimmed = name.trim();
       if (!trimmed) {
@@ -239,9 +437,48 @@ export async function PATCH(
       patch.parentId = parentId;
     }
 
+    if (liveWorkspace && treeSnapshot) {
+      const pageIndex = treeSnapshot.tree.pages.findIndex(
+        (page) => page.id === demoId,
+      );
+      if (pageIndex === -1) {
+        return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
+          status: 404,
+        });
+      }
+      const updated: DemoPageMeta = {
+        ...treeSnapshot.tree.pages[pageIndex],
+        ...patch,
+      };
+      const nextPages = [...treeSnapshot.tree.pages];
+      nextPages[pageIndex] = updated;
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId,
+        workspaceId: ctx.ctx.workspaceId,
+        sessionId: ctx.ctx.sessionId,
+        baseRevision: 0,
+        actor: "author-site",
+        reason: "update_demo_page_meta",
+        operations: [
+          createWorkspaceTreePutOperation({
+            previousContent: treeSnapshot.content,
+            tree: {
+              folders: treeSnapshot.tree.folders,
+              pages: nextPages,
+            },
+          }),
+        ],
+      });
+      return NextResponse.json(createApiSuccess(updated));
+    }
+
+    // Branch/non-live workspace: direct file write is expected behavior. Live workspace writes go through Authority above.
     const updated = writeDemoPageMeta(ctx.ctx.workspacePath, demoId, patch);
     return NextResponse.json(createApiSuccess(updated));
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError)
+      return createMutationErrorResponse(error);
     console.error("Error patching demo page meta:", error);
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "更新页面元数据失败"),
@@ -277,7 +514,99 @@ export async function POST(
         { status: 400 },
       );
     }
+    if (!isSafeSnapshotId(snapshotId)) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "snapshotId 参数无效"),
+        { status: 400 },
+      );
+    }
 
+    const liveWorkspace = isLiveWorkspacePath(ctx.ctx.workspacePath);
+    const treeSnapshot = liveWorkspace
+      ? readWorkspaceTreeSnapshot(ctx.ctx.workspacePath)
+      : null;
+    if (liveWorkspace && !treeSnapshot) {
+      return NextResponse.json(
+        createApiError(
+          "FILE_WRITE_ERROR",
+          "live Workspace 缺少有效 workspace-tree.json",
+        ),
+        { status: 409 },
+      );
+    }
+
+    if (liveWorkspace && treeSnapshot) {
+      const snapshotPath = getDeletedPageSnapshotPath(
+        ctx.ctx.workspacePath,
+        snapshotId,
+      );
+      const snapshotDemoDir = path.join(snapshotPath, "demos", demoId);
+      if (!fs.existsSync(snapshotPath) || !fs.existsSync(snapshotDemoDir)) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+          { status: 404 },
+        );
+      }
+      const page = readDeletedPageSnapshotMeta(snapshotPath);
+      if (!page || page.id !== demoId) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+          { status: 500 },
+        );
+      }
+      const targetDemoDir = getDemoDirPath(ctx.ctx.workspacePath, demoId);
+      if (
+        fs.existsSync(targetDemoDir) ||
+        treeSnapshot.tree.pages.some((item) => item.id === demoId)
+      ) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+          { status: 409 },
+        );
+      }
+      if (
+        page.parentId &&
+        !treeSnapshot.tree.folders.some((folder) => folder.id === page.parentId)
+      ) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+          { status: 409 },
+        );
+      }
+      const operations = [
+        ...createManagedPageRestoreOperations({
+          snapshotPath,
+          demoId,
+        }),
+        createWorkspaceTreePutOperation({
+          previousContent: treeSnapshot.content,
+          tree: {
+            folders: treeSnapshot.tree.folders,
+            pages: [...treeSnapshot.tree.pages, page],
+          },
+        }),
+      ];
+      if (operations.length === 1) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
+          { status: 500 },
+        );
+      }
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId,
+        workspaceId: ctx.ctx.workspaceId,
+        sessionId: ctx.ctx.sessionId,
+        baseRevision: 0,
+        actor: "author-site",
+        reason: "restore_demo_page",
+        operations,
+      });
+      fs.rmSync(snapshotPath, { recursive: true, force: true });
+      return NextResponse.json(createApiSuccess(page));
+    }
+
+    // Branch/non-live workspace: direct file write is expected behavior. Live workspace writes go through Authority above.
     const result = restoreDeletedWorkspaceDemoPageSnapshot(
       ctx.ctx.workspaceId,
       demoId,
@@ -299,6 +628,8 @@ export async function POST(
 
     return NextResponse.json(createApiSuccess(result.page));
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError)
+      return createMutationErrorResponse(error);
     console.error("Error restoring demo page:", error);
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "恢复页面失败"),
@@ -329,6 +660,30 @@ export async function DELETE(
       });
     }
 
+    const liveWorkspace = isLiveWorkspacePath(ctx.ctx.workspacePath);
+    const treeSnapshot = liveWorkspace
+      ? readWorkspaceTreeSnapshot(ctx.ctx.workspacePath)
+      : null;
+    if (liveWorkspace && !treeSnapshot) {
+      return NextResponse.json(
+        createApiError(
+          "FILE_WRITE_ERROR",
+          "live Workspace 缺少有效 workspace-tree.json",
+        ),
+        { status: 409 },
+      );
+    }
+
+    if (
+      liveWorkspace &&
+      treeSnapshot &&
+      !treeSnapshot.tree.pages.some((page) => page.id === demoId)
+    ) {
+      return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
+        status: 404,
+      });
+    }
+
     const snapshot = createDeletedWorkspaceDemoPageSnapshot(
       ctx.ctx.workspaceId,
       demoId,
@@ -340,6 +695,32 @@ export async function DELETE(
       );
     }
 
+    if (liveWorkspace && treeSnapshot) {
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId,
+        workspaceId: ctx.ctx.workspaceId,
+        sessionId: ctx.ctx.sessionId,
+        baseRevision: 0,
+        actor: "author-site",
+        reason: "delete_demo_page",
+        operations: [
+          ...createManagedPageDeleteOperations(ctx.ctx.workspacePath, demoId),
+          createWorkspaceTreePutOperation({
+            previousContent: treeSnapshot.content,
+            tree: {
+              folders: treeSnapshot.tree.folders,
+              pages: treeSnapshot.tree.pages.filter(
+                (page) => page.id !== demoId,
+              ),
+            },
+          }),
+        ],
+      });
+      return NextResponse.json(createApiSuccess(snapshot));
+    }
+
+    // Branch/non-live workspace: direct file write is expected behavior. Live workspace writes go through Authority above.
     const success = deleteWorkspaceDemoPage(ctx.ctx.workspaceId, demoId);
     if (!success) {
       return NextResponse.json(
@@ -350,6 +731,8 @@ export async function DELETE(
 
     return NextResponse.json(createApiSuccess(snapshot));
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError)
+      return createMutationErrorResponse(error);
     console.error("Error deleting demo page:", error);
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "删除页面失败"),

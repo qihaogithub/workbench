@@ -24,6 +24,8 @@
 7. 运行低成本验证。
 8. 覆盖更新对应 state。
 
+当近期改动 Workspace 写入、Authority、部署或 `DATA_DIR` 时，追加运行 `corepack pnpm check:workspace-deploy-preflight`。该命令只读扫描本地 `data/`；若发现未注册 live Workspace、外部漂移、lease、prepared 事务、committed backup 缺口或 Compose 共享 `DATA_DIR` 不一致，只报告并保留失败，不自动 adopt/restore。
+
 ## 推荐验证
 
 优先选择：
@@ -31,6 +33,7 @@
 - `corepack pnpm check:repo`
 - `corepack pnpm check:automation`
 - `corepack pnpm check:project-cli`
+- `corepack pnpm check:workspace-deploy-preflight`
 
 只有当本轮触及具体包或失败指向具体包时，才追加包级检查。
 

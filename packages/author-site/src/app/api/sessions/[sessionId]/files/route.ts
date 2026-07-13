@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import path from "path";
+import fs from "fs";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import {
   getSessionMeta,
   sessionExists,
@@ -13,6 +17,43 @@ import {
   readFoldersMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
+
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function createPutTextOperation(input: {
+  workspacePath: string;
+  resourcePath: string;
+  content: string;
+}): WorkspaceMutationOperation {
+  const absolutePath = path.join(input.workspacePath, input.resourcePath);
+  const previousContent = fs.existsSync(absolutePath)
+    ? fs.readFileSync(absolutePath, "utf-8")
+    : null;
+  return {
+    type: "put_text",
+    path: input.resourcePath,
+    content: input.content,
+    ...(previousContent === null
+      ? { expectedAbsent: true }
+      : { expectedHash: hashText(previousContent) }),
+  };
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
 
 export async function GET(
   _request: NextRequest,
@@ -136,6 +177,14 @@ export async function PUT(
       );
     }
 
+    const workspacePath = findWorkspacePath(meta.workspaceId);
+    if (!workspacePath) {
+      return NextResponse.json(
+        createApiError("FILE_READ_ERROR", "工作空间路径不存在"),
+        { status: 500 },
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const { code, schema } = body as { code?: string; schema?: string };
 
@@ -158,19 +207,60 @@ export async function PUT(
     const targetDemoId = demoPages[0].id;
     console.warn(
       `[兼容层警告] PUT /api/sessions/${sessionId}/files 未指定 demoId，` +
-      `默认保存到第一个页面 ${targetDemoId}。` +
-      `前端应改用 PUT /api/sessions/${sessionId}/files/{demoId}`,
+        `默认保存到第一个页面 ${targetDemoId}。` +
+        `前端应改用 PUT /api/sessions/${sessionId}/files/{demoId}`,
     );
-    const success = updateWorkspaceDemoFiles(meta.workspaceId, targetDemoId, {
-      code,
-      schema,
-    });
+    if (isLiveWorkspacePath(workspacePath)) {
+      const operations: WorkspaceMutationOperation[] = [];
+      if (typeof code === "string") {
+        operations.push(
+          createPutTextOperation({
+            workspacePath,
+            resourcePath: `demos/${targetDemoId}/index.tsx`,
+            content: code,
+          }),
+        );
+      }
+      if (typeof schema === "string") {
+        operations.push(
+          createPutTextOperation({
+            workspacePath,
+            resourcePath: `demos/${targetDemoId}/config.schema.json`,
+            content: schema,
+          }),
+        );
+      }
 
-    if (!success) {
-      return NextResponse.json(
-        createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
-        { status: 500 },
-      );
+      try {
+        await commitWorkspaceMutation({
+          mutationId: crypto.randomUUID(),
+          projectId: meta.demoId,
+          workspaceId: meta.workspaceId,
+          sessionId,
+          baseRevision: 0,
+          actor: "author-site",
+          reason: "update_session_files_legacy",
+          operations,
+        });
+      } catch (error) {
+        if (error instanceof WorkspaceAuthorityClientError)
+          return createMutationErrorResponse(error);
+        throw error;
+      }
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      const success = updateWorkspaceDemoFiles(meta.workspaceId, targetDemoId, {
+        code,
+        schema,
+      });
+
+      if (!success) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json(createApiSuccess(null));

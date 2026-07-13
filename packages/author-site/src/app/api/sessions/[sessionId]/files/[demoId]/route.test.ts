@@ -9,6 +9,7 @@ import {
 
 jest.mock("fs", () => ({
   existsSync: jest.fn(() => true),
+  readFileSync: jest.fn(() => "not-json"),
 }));
 
 jest.mock("@/lib/auth/jwt", () => ({
@@ -46,6 +47,34 @@ jest.mock("@/lib/project-admin-service", () => ({
   getProjectAdminService: jest.fn(() => ({
     validateDemoPageFilesRuntime: jest.fn(() => ({ ok: true, issues: [] })),
   })),
+}));
+
+const commitWorkspaceMutation = jest.fn(async () => ({
+  committed: true,
+  mutationId: "mutation-test",
+  projectId: "project-1",
+  workspaceId: "workspace-1",
+  baseRevision: 0,
+  revision: 2,
+  rootHash: "root-hash",
+  actor: "author-site",
+  resources: [],
+  committedAt: Date.now(),
+}));
+
+class MockWorkspaceAuthorityClientError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+jest.mock("@/lib/workspace-authority-client", () => ({
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError: MockWorkspaceAuthorityClientError,
 }));
 
 jest.mock("@/lib/fs-utils", () => ({
@@ -152,6 +181,8 @@ describe("session demo page files route sketch patch", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.Response = TestResponse as unknown as typeof Response;
+    const fs = jest.requireMock("fs") as { readFileSync: jest.Mock };
+    fs.readFileSync.mockReturnValue("not-json");
   });
 
   afterEach(() => {
@@ -396,6 +427,72 @@ describe("session demo page files route sketch patch", () => {
         }),
       }),
     ]);
+  });
+
+  it("live Workspace 保存手绘页面时通过 Authority 提交 scene 与 meta", async () => {
+    const { PUT } = await import("./route");
+    const fsUtils = await import("@/lib/fs-utils");
+    const fs = jest.requireMock("fs") as { readFileSync: jest.Mock };
+    const baseScene = sceneWithTitle("基线标题");
+    const nextScene = sceneWithTitle("Authority 保存标题");
+    const nextSceneJson = JSON.stringify(nextScene);
+
+    fs.readFileSync.mockImplementation((filePath: string) => {
+      if (filePath.endsWith(".workspace.json")) {
+        return JSON.stringify({ workspaceId: "workspace-1", scope: "live", status: "active" });
+      }
+      if (filePath.endsWith("sketch.scene.json")) return JSON.stringify(baseScene);
+      if (filePath.endsWith("sketch.meta.json")) return JSON.stringify({ old: true });
+      return "not-json";
+    });
+    jest.mocked(fsUtils.getWorkspaceDemoPageFiles).mockReturnValue({
+      code: "",
+      schema: "{}",
+      prototypeHtml: undefined,
+      prototypeCss: undefined,
+      prototypeMeta: undefined,
+      sketchScene: JSON.stringify(baseScene),
+      sketchMeta: {},
+    });
+
+    const response = await PUT(
+      jsonRequest({
+        sketchScene: nextSceneJson,
+        sketchMeta: { source: "test" },
+      }),
+      { params: { sessionId: "session-1", demoId: "page-sketch" } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: {
+        runtimeValidation: { ok: true, issues: [] },
+      },
+    });
+    expect(fsUtils.updateWorkspaceDemoFiles).not.toHaveBeenCalled();
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        workspaceId: "workspace-1",
+        sessionId: "session-1",
+        actor: "author-site",
+        reason: "update_demo_page_files",
+        operations: [
+          expect.objectContaining({
+            type: "put_text",
+            path: "demos/page-sketch/sketch.scene.json",
+            content: nextSceneJson,
+          }),
+          expect.objectContaining({
+            type: "put_text",
+            path: "demos/page-sketch/sketch.meta.json",
+            content: JSON.stringify({ source: "test" }, null, 2),
+          }),
+        ],
+      }),
+    );
   });
 
   it("连续高频协同更新时拒绝旧基线 patch 且只保存最新基线改动", async () => {

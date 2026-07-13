@@ -1,14 +1,17 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { createHash, randomBytes } from 'crypto';
-import { Type, type Static } from 'typebox';
-import type { AgentTool } from '@earendil-works/pi-agent-core';
-import type { AgentConfig } from '../../core/types';
-import { logger } from '../../utils/logger';
+import * as fs from "fs";
+import * as path from "path";
+import { createHash, randomBytes, randomUUID } from "crypto";
+import { Type, type Static } from "typebox";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { isManagedWorkspaceResource } from "@workbench/shared/contracts";
+import type { AgentConfig } from "../../core/types";
+import { logger } from "../../utils/logger";
+import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
+import type { WorkspaceAuthoritySnapshot } from "../../workspace/workspace-mutation-authority";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
-const WORKSPACE_TREE_FILENAME = 'workspace-tree.json';
+const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 
 interface WorkspacePage {
   id: string;
@@ -47,7 +50,7 @@ interface DeletionPlan {
 }
 
 export interface DeletionPlanStore {
-  create(plan: Omit<DeletionPlan, 'planId' | 'expiresAt'>): DeletionPlan;
+  create(plan: Omit<DeletionPlan, "planId" | "expiresAt">): DeletionPlan;
   get(planId: string): DeletionPlan | null;
   delete(planId: string): void;
 }
@@ -57,11 +60,14 @@ type ListPagesParams = Static<typeof ListPagesParams>;
 
 const DeletePageParams = Type.Object({
   pageId: Type.String({
-    description: 'Exact page ID from listPages, for example "page_2vpk". Do not guess this value.',
+    description:
+      'Exact page ID from listPages, for example "page_2vpk". Do not guess this value.',
   }),
-  pageName: Type.Optional(Type.String({
-    description: 'Optional display name for confirmation only.',
-  })),
+  pageName: Type.Optional(
+    Type.String({
+      description: "Optional display name for confirmation only.",
+    }),
+  ),
 });
 
 type DeletePageParams = Static<typeof DeletePageParams>;
@@ -69,45 +75,58 @@ type DeletePageParams = Static<typeof DeletePageParams>;
 const DeletePagesParams = Type.Object({
   pageIds: Type.Array(
     Type.String({
-      description: 'Exact page ID from listPages. Do not guess this value.',
+      description: "Exact page ID from listPages. Do not guess this value.",
     }),
     {
       minItems: 1,
-      description: 'All exact page IDs to delete. Use this array for any request that deletes more than one page.',
+      description:
+        "All exact page IDs to delete. Use this array for any request that deletes more than one page.",
     },
   ),
 });
 
 type DeletePagesParams = Static<typeof DeletePagesParams>;
 
-const PreviewDeletePagesParams = Type.Object({
-  mode: Type.Union([
-    Type.Literal('nameIncludes'),
-    Type.Literal('folderId'),
-    Type.Literal('explicitIds'),
-  ], {
-    description: 'How to select pages for the deletion preview.',
-  }),
-  query: Type.Optional(Type.String({
-    minLength: 1,
-    description: 'Required for nameIncludes and folderId modes. Name substring or exact folder ID.',
-  })),
-  pageIds: Type.Optional(Type.Array(
-    Type.String({ description: 'Exact page IDs from listPages.' }),
-    {
-      minItems: 1,
-      description: 'Required for explicitIds mode.',
-    },
-  )),
-}, {
-  additionalProperties: false,
-});
+const PreviewDeletePagesParams = Type.Object(
+  {
+    mode: Type.Union(
+      [
+        Type.Literal("nameIncludes"),
+        Type.Literal("folderId"),
+        Type.Literal("explicitIds"),
+      ],
+      {
+        description: "How to select pages for the deletion preview.",
+      },
+    ),
+    query: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "Required for nameIncludes and folderId modes. Name substring or exact folder ID.",
+      }),
+    ),
+    pageIds: Type.Optional(
+      Type.Array(
+        Type.String({ description: "Exact page IDs from listPages." }),
+        {
+          minItems: 1,
+          description: "Required for explicitIds mode.",
+        },
+      ),
+    ),
+  },
+  {
+    additionalProperties: false,
+  },
+);
 
 type PreviewDeletePagesParams = Static<typeof PreviewDeletePagesParams>;
 
 const ExecuteDeletePagePlanParams = Type.Object({
   planId: Type.String({
-    description: 'Deletion plan ID returned by previewDeletePages. Do not invent this value.',
+    description:
+      "Deletion plan ID returned by previewDeletePages. Do not invent this value.",
   }),
 });
 
@@ -119,9 +138,14 @@ export interface PermissionRequestInfo {
   planId?: string;
 }
 
-export type PermissionHandler = (toolCallId: string, request: PermissionRequestInfo) => Promise<boolean>;
+export type PermissionHandler = (
+  toolCallId: string,
+  request: PermissionRequestInfo,
+) => Promise<boolean>;
 
-export function createDeletionPlanStore(now: () => number = () => Date.now()): DeletionPlanStore {
+export function createDeletionPlanStore(
+  now: () => number = () => Date.now(),
+): DeletionPlanStore {
   const plans = new Map<string, DeletionPlan>();
 
   function pruneExpired(): void {
@@ -138,7 +162,7 @@ export function createDeletionPlanStore(now: () => number = () => Date.now()): D
       pruneExpired();
       const created: DeletionPlan = {
         ...plan,
-        planId: `delete_plan_${randomBytes(6).toString('hex')}`,
+        planId: `delete_plan_${randomBytes(6).toString("hex")}`,
         expiresAt: now() + DELETION_PLAN_TTL_MS,
       };
       plans.set(created.planId, created);
@@ -163,19 +187,19 @@ function getWorkspaceTreePath(workingDir: string): string {
 }
 
 function getPageDir(workingDir: string, pageId: string): string {
-  return path.join(workingDir, 'demos', pageId);
+  return path.join(workingDir, "demos", pageId);
 }
 
 function isSafePageId(pageId: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(pageId) && !pageId.includes('..');
+  return /^[A-Za-z0-9_-]+$/.test(pageId) && !pageId.includes("..");
 }
 
 function isCompletePageDir(workingDir: string, pageId: string): boolean {
   const pageDir = getPageDir(workingDir, pageId);
   return (
     fs.existsSync(pageDir) &&
-    fs.existsSync(path.join(pageDir, 'index.tsx')) &&
-    fs.existsSync(path.join(pageDir, 'config.schema.json'))
+    fs.existsSync(path.join(pageDir, "index.tsx")) &&
+    fs.existsSync(path.join(pageDir, "config.schema.json"))
   );
 }
 
@@ -185,7 +209,9 @@ function readWorkspaceTree(workingDir: string): WorkspaceTree {
     return { folders: [], pages: [] };
   }
 
-  const parsed = JSON.parse(fs.readFileSync(treePath, 'utf-8')) as Partial<WorkspaceTree>;
+  const parsed = JSON.parse(
+    fs.readFileSync(treePath, "utf-8"),
+  ) as Partial<WorkspaceTree>;
   return {
     folders: Array.isArray(parsed.folders) ? parsed.folders : [],
     pages: Array.isArray(parsed.pages) ? parsed.pages : [],
@@ -194,59 +220,108 @@ function readWorkspaceTree(workingDir: string): WorkspaceTree {
 
 function getTreeSignature(workingDir: string): string {
   const treePath = getWorkspaceTreePath(workingDir);
-  const content = fs.existsSync(treePath) ? fs.readFileSync(treePath, 'utf-8') : '';
-  return createHash('sha256').update(content).digest('hex');
+  const content = fs.existsSync(treePath)
+    ? fs.readFileSync(treePath, "utf-8")
+    : "";
+  return createHash("sha256").update(content).digest("hex");
 }
 
 function writeWorkspaceTree(workingDir: string, tree: WorkspaceTree): void {
-  fs.writeFileSync(getWorkspaceTreePath(workingDir), JSON.stringify(tree, null, 2), 'utf-8');
+  fs.writeFileSync(
+    getWorkspaceTreePath(workingDir),
+    JSON.stringify(tree, null, 2),
+    "utf-8",
+  );
 }
 
 function listPages(workingDir: string): WorkspacePage[] {
   const tree = readWorkspaceTree(workingDir);
   return tree.pages
-    .filter((page) => isSafePageId(page.id) && isCompletePageDir(workingDir, page.id))
+    .filter(
+      (page) => isSafePageId(page.id) && isCompletePageDir(workingDir, page.id),
+    )
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+function listPagesFromSnapshot(
+  snapshot: WorkspaceAuthoritySnapshot,
+): WorkspacePage[] {
+  const treeContent = snapshot.resources[WORKSPACE_TREE_FILENAME];
+  if (!treeContent) return [];
+
+  let tree: WorkspaceTree;
+  try {
+    const parsed = JSON.parse(treeContent) as Partial<WorkspaceTree>;
+    tree = {
+      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+      pages: Array.isArray(parsed.pages) ? parsed.pages : [],
+    };
+  } catch {
+    return [];
+  }
+
+  return tree.pages
+    .filter((page) => {
+      if (!isSafePageId(page.id)) return false;
+      const hasIndex = `demos/${page.id}/index.tsx` in snapshot.resources;
+      const hasSchema =
+        `demos/${page.id}/config.schema.json` in snapshot.resources;
+      return hasIndex && hasSchema;
+    })
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
 function formatPages(pages: WorkspacePage[]): string {
-  if (pages.length === 0) return 'No pages found.';
+  if (pages.length === 0) return "No pages found.";
   return pages
     .map((page) => {
       const indexPath = `demos/${page.id}/index.tsx`;
       const schemaPath = `demos/${page.id}/config.schema.json`;
       return `- id: ${page.id}\n  name: ${page.name}\n  indexPath: ${indexPath}\n  schemaPath: ${schemaPath}`;
     })
-    .join('\n');
+    .join("\n");
 }
 
-function formatDeletionSummary(pages: DeletionPlanPage[], remainingCount: number): string {
-  const pageLines = pages.map((page, index) => `${index + 1}. ${page.name} (${page.id})`);
+function formatDeletionSummary(
+  pages: DeletionPlanPage[],
+  remainingCount: number,
+): string {
+  const pageLines = pages.map(
+    (page, index) => `${index + 1}. ${page.name} (${page.id})`,
+  );
   return [
     `将删除 ${pages.length} 个页面，删除后剩余 ${remainingCount} 个页面。`,
-    '',
+    "",
     ...pageLines,
-  ].join('\n');
+  ].join("\n");
 }
 
 function buildPreviewResult(plan: DeletionPlan) {
-  const expiresInSeconds = Math.max(0, Math.round((plan.expiresAt - Date.now()) / 1000));
+  const expiresInSeconds = Math.max(
+    0,
+    Math.round((plan.expiresAt - Date.now()) / 1000),
+  );
   return {
-    content: [{
-      type: 'text' as const,
-      text: [
-        plan.canExecute
-          ? `Prepared deletion plan ${plan.planId}. Ask the user to confirm, then call executeDeletePagePlan with this planId.`
-          : `Prepared deletion plan ${plan.planId}, but it cannot be executed: ${plan.reason || 'unknown reason'}.`,
-        '',
-        plan.confirmationSummary,
-      ].join('\n'),
-    }],
+    content: [
+      {
+        type: "text" as const,
+        text: [
+          plan.canExecute
+            ? `Prepared deletion plan ${plan.planId}. Ask the user to confirm, then call executeDeletePagePlan with this planId.`
+            : `Prepared deletion plan ${plan.planId}, but it cannot be executed: ${plan.reason || "unknown reason"}.`,
+          "",
+          plan.confirmationSummary,
+        ].join("\n"),
+      },
+    ],
     details: {
       planId: plan.planId,
       pages: plan.pages,
       pageIds: plan.pageIds,
-      remainingCount: Math.max(0, listPages(plan.workingDir).length - plan.pageIds.length),
+      remainingCount: Math.max(
+        0,
+        listPages(plan.workingDir).length - plan.pageIds.length,
+      ),
       canExecute: plan.canExecute,
       reason: plan.reason,
       confirmationSummary: plan.confirmationSummary,
@@ -256,38 +331,84 @@ function buildPreviewResult(plan: DeletionPlan) {
   };
 }
 
-function missingPageResult(workingDir: string, pageId: string, pageName?: string) {
+function missingPageResult(
+  workingDir: string,
+  pageId: string,
+  pageName?: string,
+) {
   const pages = listPages(workingDir);
-  const matches = pageName ? pages.filter((page) => page.name === pageName) : [];
+  const matches = pageName
+    ? pages.filter((page) => page.name === pageName)
+    : [];
   const hint =
     matches.length === 1
       ? ` A page with the same name exists: id=${matches[0].id}, name=${matches[0].name}. Use that exact ID and ask again.`
       : matches.length > 1
-        ? ` Multiple pages share that name: ${matches.map((page) => `${page.id} (${page.name})`).join(', ')}. Ask the user which ID to delete.`
-        : '';
+        ? ` Multiple pages share that name: ${matches.map((page) => `${page.id} (${page.name})`).join(", ")}. Ask the user which ID to delete.`
+        : "";
 
   return {
-    content: [{
-      type: 'text' as const,
-      text: `Error: page id "${pageId}" does not exist in the current workspace.${hint}`,
-    }],
+    content: [
+      {
+        type: "text" as const,
+        text: `Error: page id "${pageId}" does not exist in the current workspace.${hint}`,
+      },
+    ],
     details: {
       pageId,
       pageName,
-      error: 'page_not_found',
+      error: "page_not_found",
       candidates: matches.map((page) => ({ id: page.id, name: page.name })),
     },
     isError: true,
   };
 }
 
-function deleteOnePage(workingDir: string, pageId: string, pageName?: string) {
+function managedPageFiles(
+  workingDir: string,
+  pageId: string,
+): Array<{ path: string; content: string }> {
+  const pageDir = getPageDir(workingDir, pageId);
+  const files: Array<{ path: string; content: string }> = [];
+  const walk = (directory: string) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(fullPath);
+      else if (entry.isFile()) {
+        const relativePath = path
+          .relative(workingDir, fullPath)
+          .split(path.sep)
+          .join("/");
+        if (isManagedWorkspaceResource(relativePath)) {
+          files.push({
+            path: relativePath,
+            content: fs.readFileSync(fullPath, "utf-8"),
+          });
+        }
+      }
+    }
+  };
+  walk(pageDir);
+  return files;
+}
+
+async function deleteOnePage(
+  config: AgentConfig,
+  workingDir: string,
+  pageId: string,
+  pageName?: string,
+) {
   if (!isSafePageId(pageId)) {
     return {
       ok: false as const,
       result: {
-        content: [{ type: 'text' as const, text: `Error: invalid page id "${pageId}".` }],
-        details: { pageId, pageName, error: 'invalid_page_id' },
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: invalid page id "${pageId}".`,
+          },
+        ],
+        details: { pageId, pageName, error: "invalid_page_id" },
         isError: true,
       },
     };
@@ -296,29 +417,69 @@ function deleteOnePage(workingDir: string, pageId: string, pageName?: string) {
   const tree = readWorkspaceTree(workingDir);
   const existing = tree.pages.find((page) => page.id === pageId);
   if (!existing || !isCompletePageDir(workingDir, pageId)) {
-    return { ok: false as const, result: missingPageResult(workingDir, pageId, pageName) };
+    return {
+      ok: false as const,
+      result: missingPageResult(workingDir, pageId, pageName),
+    };
   }
-
-  const pageDir = getPageDir(workingDir, pageId);
-  fs.rmSync(pageDir, { recursive: true, force: true });
 
   const nextTree: WorkspaceTree = {
     ...tree,
     pages: tree.pages.filter((page) => page.id !== pageId),
   };
-  writeWorkspaceTree(workingDir, nextTree);
+  const pageDir = getPageDir(workingDir, pageId);
+  const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
+  let receipt: unknown;
+  if (liveWorkspace) {
+    const treeContent = fs.readFileSync(
+      getWorkspaceTreePath(workingDir),
+      "utf-8",
+    );
+    receipt = await liveWorkspace.authority.mutate({
+      mutationId: randomUUID(),
+      projectId: liveWorkspace.projectId,
+      workspaceId: liveWorkspace.workspaceId,
+      sessionId: config.sessionId,
+      baseRevision: 0,
+      actor: "ai",
+      reason: "agent_delete_page",
+      operations: [
+        ...managedPageFiles(workingDir, pageId).map((file) => ({
+          type: "delete_path" as const,
+          path: file.path,
+          expectedHash: createHash("sha256").update(file.content).digest("hex"),
+        })),
+        {
+          type: "put_text" as const,
+          path: WORKSPACE_TREE_FILENAME,
+          content: JSON.stringify(nextTree, null, 2),
+          expectedHash: createHash("sha256").update(treeContent).digest("hex"),
+        },
+      ],
+    });
+  } else {
+    fs.rmSync(pageDir, { recursive: true, force: true });
+    writeWorkspaceTree(workingDir, nextTree);
+  }
 
   const verifyTree = readWorkspaceTree(workingDir);
-  const stillExists = fs.existsSync(pageDir) || verifyTree.pages.some((page) => page.id === pageId);
+  const stillExists = verifyTree.pages.some((page) => page.id === pageId);
   if (stillExists) {
     return {
       ok: false as const,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: `Error: attempted to delete page "${existing.name}" (${pageId}), but verification failed.`,
-        }],
-        details: { pageId, pageName: existing.name, error: 'verification_failed' },
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: attempted to delete page "${existing.name}" (${pageId}), but verification failed.`,
+          },
+        ],
+        details: {
+          pageId,
+          pageName: existing.name,
+          error: "verification_failed",
+          receipt,
+        },
         isError: true,
       },
     };
@@ -329,21 +490,28 @@ function deleteOnePage(workingDir: string, pageId: string, pageName?: string) {
     ok: true as const,
     change: { pageId, pageName: existing.name, deletedPaths },
     result: {
-      content: [{
-        type: 'text' as const,
-        text: `Deleted page "${existing.name}" (${pageId}).`,
-      }],
+      content: [
+        {
+          type: "text" as const,
+          text: `Deleted page "${existing.name}" (${pageId}).`,
+        },
+      ],
       details: {
         pageId,
         pageName: existing.name,
         deleted: true,
         deletedPages: [{ pageId, pageName: existing.name, deletedPaths }],
+        receipt,
       },
     },
   };
 }
 
-function deletePageBatch(workingDir: string, pageIds: string[]) {
+async function deletePageBatch(
+  config: AgentConfig,
+  workingDir: string,
+  pageIds: string[],
+) {
   const tree = readWorkspaceTree(workingDir);
   const pages = listPages(workingDir);
   const byId = new Map(pages.map((page) => [page.id, page]));
@@ -353,35 +521,81 @@ function deletePageBatch(workingDir: string, pageIds: string[]) {
     return {
       ok: false as const,
       result: {
-        content: [{ type: 'text' as const, text: `Error: these page IDs no longer exist: ${missing.join(', ')}.` }],
-        details: { error: 'page_not_found', missingPageIds: missing },
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: these page IDs no longer exist: ${missing.join(", ")}.`,
+          },
+        ],
+        details: { error: "page_not_found", missingPageIds: missing },
         isError: true,
       },
     };
   }
 
   const pageIdSet = new Set(pageIds);
-  for (const pageId of pageIds) {
-    fs.rmSync(getPageDir(workingDir, pageId), { recursive: true, force: true });
-  }
-
-  writeWorkspaceTree(workingDir, {
+  const nextTree: WorkspaceTree = {
     ...tree,
     pages: tree.pages.filter((page) => !pageIdSet.has(page.id)),
-  });
+  };
+  const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
+  let receipt: unknown;
+  if (liveWorkspace) {
+    const treeContent = fs.readFileSync(
+      getWorkspaceTreePath(workingDir),
+      "utf-8",
+    );
+    receipt = await liveWorkspace.authority.mutate({
+      mutationId: randomUUID(),
+      projectId: liveWorkspace.projectId,
+      workspaceId: liveWorkspace.workspaceId,
+      sessionId: config.sessionId,
+      baseRevision: 0,
+      actor: "ai",
+      reason: "agent_delete_pages",
+      operations: [
+        ...pageIds.flatMap((pageId) =>
+          managedPageFiles(workingDir, pageId).map((file) => ({
+            type: "delete_path" as const,
+            path: file.path,
+            expectedHash: createHash("sha256")
+              .update(file.content)
+              .digest("hex"),
+          })),
+        ),
+        {
+          type: "put_text" as const,
+          path: WORKSPACE_TREE_FILENAME,
+          content: JSON.stringify(nextTree, null, 2),
+          expectedHash: createHash("sha256").update(treeContent).digest("hex"),
+        },
+      ],
+    });
+  } else {
+    for (const pageId of pageIds)
+      fs.rmSync(getPageDir(workingDir, pageId), {
+        recursive: true,
+        force: true,
+      });
+    writeWorkspaceTree(workingDir, nextTree);
+  }
 
   const verifyTree = readWorkspaceTree(workingDir);
-  const failed = pageIds.filter((pageId) => (
-    fs.existsSync(getPageDir(workingDir, pageId)) ||
-    verifyTree.pages.some((page) => page.id === pageId)
-  ));
+  const failed = pageIds.filter((pageId) =>
+    verifyTree.pages.some((page) => page.id === pageId),
+  );
 
   if (failed.length > 0) {
     return {
       ok: false as const,
       result: {
-        content: [{ type: 'text' as const, text: `Error: verification failed for pages: ${failed.join(', ')}.` }],
-        details: { error: 'verification_failed', failedPageIds: failed },
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: verification failed for pages: ${failed.join(", ")}.`,
+          },
+        ],
+        details: { error: "verification_failed", failedPageIds: failed },
         isError: true,
       },
     };
@@ -399,35 +613,55 @@ function deletePageBatch(workingDir: string, pageIds: string[]) {
   return {
     ok: true as const,
     result: {
-      content: [{
-        type: 'text' as const,
-        text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(', ')}.`,
-      }],
-      details: { deleted: true, deletedPages },
+      content: [
+        {
+          type: "text" as const,
+          text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.`,
+        },
+      ],
+      details: { deleted: true, deletedPages, receipt },
     },
   };
 }
 
-export function createListPagesTool(config: AgentConfig): AgentTool<typeof ListPagesParams> {
+export function createListPagesTool(
+  config: AgentConfig,
+): AgentTool<typeof ListPagesParams> {
   return {
-    name: 'listPages',
-    label: 'List Pages',
-    description: 'List all pages in the current workspace with exact IDs. Call this before deleting pages.',
+    name: "listPages",
+    label: "List Pages",
+    description:
+      "List all pages in the current workspace with exact IDs. Call this before deleting pages.",
     parameters: ListPagesParams,
     execute: async () => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: workingDir is required to list pages.' }],
-          details: { error: 'missing_working_dir' },
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: workingDir is required to list pages.",
+            },
+          ],
+          details: { error: "missing_working_dir" },
           isError: true,
         };
       }
 
       try {
-        const pages = listPages(workingDir);
+        const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
+
+        const pages = snapshot
+          ? listPagesFromSnapshot(snapshot)
+          : listPages(workingDir);
         return {
-          content: [{ type: 'text' as const, text: formatPages(pages) }],
+          content: [{ type: "text" as const, text: formatPages(pages) }],
           details: {
             pages: pages.map((page) => ({
               id: page.id,
@@ -435,14 +669,18 @@ export function createListPagesTool(config: AgentConfig): AgentTool<typeof ListP
               indexPath: `demos/${page.id}/index.tsx`,
               schemaPath: `demos/${page.id}/config.schema.json`,
             })),
+            ...(snapshot ? { revision: snapshot.state.revision } : {}),
           },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ error: message }, 'listPages failed');
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error({ error: message }, "listPages failed");
         return {
-          content: [{ type: 'text' as const, text: `Error listing pages: ${message}` }],
-          details: { error: 'list_failed', message },
+          content: [
+            { type: "text" as const, text: `Error listing pages: ${message}` },
+          ],
+          details: { error: "list_failed", message },
           isError: true,
         };
       }
@@ -455,17 +693,22 @@ export function createPreviewDeletePagesTool(
   planStore: DeletionPlanStore,
 ): AgentTool<typeof PreviewDeletePagesParams> {
   return {
-    name: 'previewDeletePages',
-    label: 'Preview Delete Pages',
+    name: "previewDeletePages",
+    label: "Preview Delete Pages",
     description:
-      'Preview a transactional page deletion plan. Use this before executeDeletePagePlan for all batch/all/conditional deletion requests.',
+      "Preview a transactional page deletion plan. Use this before executeDeletePagePlan for all batch/all/conditional deletion requests.",
     parameters: PreviewDeletePagesParams,
     execute: async (_toolCallId: string, args: PreviewDeletePagesParams) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: workingDir is required to preview page deletion.' }],
-          details: { error: 'missing_working_dir' },
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: workingDir is required to preview page deletion.",
+            },
+          ],
+          details: { error: "missing_working_dir" },
           isError: true,
         };
       }
@@ -473,11 +716,16 @@ export function createPreviewDeletePagesTool(
       try {
         const pages = listPages(workingDir);
         let pageIds: string[];
-        if (args.mode === 'explicitIds') {
+        if (args.mode === "explicitIds") {
           if (!Array.isArray(args.pageIds) || args.pageIds.length === 0) {
             return {
-              content: [{ type: 'text' as const, text: 'Error: explicitIds mode requires non-empty pageIds.' }],
-              details: { error: 'missing_page_ids', mode: args.mode },
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Error: explicitIds mode requires non-empty pageIds.",
+                },
+              ],
+              details: { error: "missing_page_ids", mode: args.mode },
               isError: true,
             };
           }
@@ -485,15 +733,25 @@ export function createPreviewDeletePagesTool(
         } else {
           if (!args.query) {
             return {
-              content: [{ type: 'text' as const, text: `Error: ${args.mode} mode requires query.` }],
-              details: { error: 'missing_query', mode: args.mode },
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Error: ${args.mode} mode requires query.`,
+                },
+              ],
+              details: { error: "missing_query", mode: args.mode },
               isError: true,
             };
           }
           const query = args.query;
-          pageIds = args.mode === 'folderId'
-            ? pages.filter((page) => page.parentId === query).map((page) => page.id)
-            : pages.filter((page) => page.name.includes(query)).map((page) => page.id);
+          pageIds =
+            args.mode === "folderId"
+              ? pages
+                  .filter((page) => page.parentId === query)
+                  .map((page) => page.id)
+              : pages
+                  .filter((page) => page.name.includes(query))
+                  .map((page) => page.id);
         }
 
         const byId = new Map(pages.map((page) => [page.id, page]));
@@ -507,10 +765,10 @@ export function createPreviewDeletePagesTool(
         let reason: string | undefined;
         if (matchedPages.length === 0) {
           canExecute = false;
-          reason = 'no_pages_matched';
+          reason = "no_pages_matched";
         } else if (missingIds.length > 0) {
           canExecute = false;
-          reason = `missing_page_ids:${missingIds.join(',')}`;
+          reason = `missing_page_ids:${missingIds.join(",")}`;
         }
 
         const planPages = matchedPages.map((page) => ({
@@ -518,9 +776,10 @@ export function createPreviewDeletePagesTool(
           name: page.name,
           parentId: page.parentId,
         }));
-        const confirmationSummary = planPages.length > 0
-          ? formatDeletionSummary(planPages, Math.max(0, remainingCount))
-          : '没有匹配到可删除页面。';
+        const confirmationSummary =
+          planPages.length > 0
+            ? formatDeletionSummary(planPages, Math.max(0, remainingCount))
+            : "没有匹配到可删除页面。";
 
         const plan = planStore.create({
           workingDir,
@@ -534,11 +793,17 @@ export function createPreviewDeletePagesTool(
 
         return buildPreviewResult(plan);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ error: message }, 'previewDeletePages failed');
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error({ error: message }, "previewDeletePages failed");
         return {
-          content: [{ type: 'text' as const, text: `Error previewing page deletion: ${message}` }],
-          details: { error: 'preview_failed', message },
+          content: [
+            {
+              type: "text" as const,
+              text: `Error previewing page deletion: ${message}`,
+            },
+          ],
+          details: { error: "preview_failed", message },
           isError: true,
         };
       }
@@ -552,17 +817,22 @@ export function createExecuteDeletePagePlanTool(
   permissionHandler?: PermissionHandler,
 ): AgentTool<typeof ExecuteDeletePagePlanParams> {
   return {
-    name: 'executeDeletePagePlan',
-    label: 'Execute Delete Page Plan',
+    name: "executeDeletePagePlan",
+    label: "Execute Delete Page Plan",
     description:
-      'Execute a page deletion plan returned by previewDeletePages. Never pass page IDs directly to this tool.',
+      "Execute a page deletion plan returned by previewDeletePages. Never pass page IDs directly to this tool.",
     parameters: ExecuteDeletePagePlanParams,
     execute: async (toolCallId: string, args: ExecuteDeletePagePlanParams) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: workingDir is required to execute page deletion.' }],
-          details: { planId: args.planId, error: 'missing_working_dir' },
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: workingDir is required to execute page deletion.",
+            },
+          ],
+          details: { planId: args.planId, error: "missing_working_dir" },
           isError: true,
         };
       }
@@ -571,32 +841,56 @@ export function createExecuteDeletePagePlanTool(
         const plan = planStore.get(args.planId);
         if (!plan) {
           return {
-            content: [{ type: 'text' as const, text: `Error: deletion plan "${args.planId}" does not exist or has expired. Preview again before deleting.` }],
-            details: { planId: args.planId, error: 'plan_not_found' },
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: deletion plan "${args.planId}" does not exist or has expired. Preview again before deleting.`,
+              },
+            ],
+            details: { planId: args.planId, error: "plan_not_found" },
             isError: true,
           };
         }
 
         if (!plan.canExecute) {
           return {
-            content: [{ type: 'text' as const, text: `Error: deletion plan "${args.planId}" cannot be executed: ${plan.reason || 'unknown reason'}.` }],
-            details: { planId: args.planId, error: 'plan_not_executable', reason: plan.reason },
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: deletion plan "${args.planId}" cannot be executed: ${plan.reason || "unknown reason"}.`,
+              },
+            ],
+            details: {
+              planId: args.planId,
+              error: "plan_not_executable",
+              reason: plan.reason,
+            },
             isError: true,
           };
         }
 
         if (path.resolve(plan.workingDir) !== workingDir) {
           return {
-            content: [{ type: 'text' as const, text: `Error: deletion plan "${args.planId}" belongs to a different workspace.` }],
-            details: { planId: args.planId, error: 'working_dir_mismatch' },
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: deletion plan "${args.planId}" belongs to a different workspace.`,
+              },
+            ],
+            details: { planId: args.planId, error: "working_dir_mismatch" },
             isError: true,
           };
         }
 
         if (getTreeSignature(workingDir) !== plan.treeSignature) {
           return {
-            content: [{ type: 'text' as const, text: `Error: workspace pages changed after preview. Run previewDeletePages again before deleting.` }],
-            details: { planId: args.planId, error: 'workspace_changed' },
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: workspace pages changed after preview. Run previewDeletePages again before deleting.`,
+              },
+            ],
+            details: { planId: args.planId, error: "workspace_changed" },
             isError: true,
           };
         }
@@ -609,30 +903,50 @@ export function createExecuteDeletePagePlanTool(
           });
           if (!approved) {
             return {
-              content: [{ type: 'text' as const, text: `User cancelled deletion plan "${plan.planId}".` }],
+              content: [
+                {
+                  type: "text" as const,
+                  text: `User cancelled deletion plan "${plan.planId}".`,
+                },
+              ],
               details: { planId: plan.planId, cancelled: true },
               isError: true,
             };
           }
         } else {
           return {
-            content: [{ type: 'text' as const, text: 'Error: deletion plan execution requires user permission.' }],
-            details: { planId: plan.planId, error: 'permission_required' },
+            content: [
+              {
+                type: "text" as const,
+                text: "Error: deletion plan execution requires user permission.",
+              },
+            ],
+            details: { planId: plan.planId, error: "permission_required" },
             isError: true,
           };
         }
 
-        const result = deletePageBatch(workingDir, plan.pageIds).result;
+        const result = (await deletePageBatch(config, workingDir, plan.pageIds))
+          .result;
         if (!result.isError) {
           planStore.delete(plan.planId);
         }
         return result;
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ planId: args.planId, error: message }, 'executeDeletePagePlan failed');
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error(
+          { planId: args.planId, error: message },
+          "executeDeletePagePlan failed",
+        );
         return {
-          content: [{ type: 'text' as const, text: `Error executing deletion plan "${args.planId}": ${message}` }],
-          details: { planId: args.planId, error: 'execute_failed', message },
+          content: [
+            {
+              type: "text" as const,
+              text: `Error executing deletion plan "${args.planId}": ${message}`,
+            },
+          ],
+          details: { planId: args.planId, error: "execute_failed", message },
           isError: true,
         };
       }
@@ -645,17 +959,22 @@ export function createDeletePageTool(
   permissionHandler?: PermissionHandler,
 ): AgentTool<typeof DeletePageParams> {
   return {
-    name: 'deletePage',
-    label: 'Delete Page',
+    name: "deletePage",
+    label: "Delete Page",
     description:
-      'Delete exactly one existing page by exact ID from listPages. Do not use this for batch/all/multiple page deletion; use deletePages instead.',
+      "Delete exactly one existing page by exact ID from listPages. Do not use this for batch/all/multiple page deletion; use deletePages instead.",
     parameters: DeletePageParams,
     execute: async (toolCallId: string, args: DeletePageParams) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: workingDir is required to delete pages.' }],
-          details: { pageId: args.pageId, error: 'missing_working_dir' },
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: workingDir is required to delete pages.",
+            },
+          ],
+          details: { pageId: args.pageId, error: "missing_working_dir" },
           isError: true,
         };
       }
@@ -673,20 +992,44 @@ export function createDeletePageTool(
           });
           if (!approved) {
             return {
-              content: [{ type: 'text' as const, text: `User cancelled deletion of page "${page.name}" (${page.id}).` }],
-              details: { pageId: page.id, pageName: page.name, cancelled: true },
+              content: [
+                {
+                  type: "text" as const,
+                  text: `User cancelled deletion of page "${page.name}" (${page.id}).`,
+                },
+              ],
+              details: {
+                pageId: page.id,
+                pageName: page.name,
+                cancelled: true,
+              },
               isError: true,
             };
           }
         }
 
-        return deleteOnePage(workingDir, page.id, page.name).result;
+        return (await deleteOnePage(config, workingDir, page.id, page.name))
+          .result;
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ pageId: args.pageId, error: message }, 'deletePage failed');
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error(
+          { pageId: args.pageId, error: message },
+          "deletePage failed",
+        );
         return {
-          content: [{ type: 'text' as const, text: `Error deleting page "${args.pageId}": ${message}` }],
-          details: { pageId: args.pageId, pageName: args.pageName, error: 'delete_failed', message },
+          content: [
+            {
+              type: "text" as const,
+              text: `Error deleting page "${args.pageId}": ${message}`,
+            },
+          ],
+          details: {
+            pageId: args.pageId,
+            pageName: args.pageName,
+            error: "delete_failed",
+            message,
+          },
           isError: true,
         };
       }
@@ -699,8 +1042,8 @@ export function createDeletePagesTool(
   permissionHandler?: PermissionHandler,
 ): AgentTool<typeof DeletePagesParams> {
   return {
-    name: 'deletePages',
-    label: 'Delete Pages',
+    name: "deletePages",
+    label: "Delete Pages",
     description:
       'Delete multiple existing pages by exact pageIds from listPages. Use this for any batch/all/multiple deletion request, including "delete all copy pages". This asks for confirmation once.',
     parameters: DeletePagesParams,
@@ -708,8 +1051,13 @@ export function createDeletePagesTool(
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: workingDir is required to delete pages.' }],
-          details: { error: 'missing_working_dir' },
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: workingDir is required to delete pages.",
+            },
+          ],
+          details: { error: "missing_working_dir" },
           isError: true,
         };
       }
@@ -721,11 +1069,13 @@ export function createDeletePagesTool(
         const missing = requestedIds.filter((pageId) => !byId.has(pageId));
         if (missing.length > 0) {
           return {
-            content: [{
-              type: 'text' as const,
-              text: `Error: these page IDs do not exist: ${missing.join(', ')}. Call listPages and retry with exact IDs.`,
-            }],
-            details: { error: 'page_not_found', missingPageIds: missing },
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: these page IDs do not exist: ${missing.join(", ")}. Call listPages and retry with exact IDs.`,
+              },
+            ],
+            details: { error: "page_not_found", missingPageIds: missing },
             isError: true,
           };
         }
@@ -735,7 +1085,7 @@ export function createDeletePagesTool(
             const page = byId.get(pageId)!;
             return `${page.name} (${page.id})`;
           })
-          .join(', ');
+          .join(", ");
         if (permissionHandler) {
           const approved = await permissionHandler(toolCallId, {
             title: `删除 ${requestedIds.length} 个页面`,
@@ -743,7 +1093,12 @@ export function createDeletePagesTool(
           });
           if (!approved) {
             return {
-              content: [{ type: 'text' as const, text: `User cancelled deletion of ${requestedIds.length} pages.` }],
+              content: [
+                {
+                  type: "text" as const,
+                  text: `User cancelled deletion of ${requestedIds.length} pages.`,
+                },
+              ],
               details: { cancelled: true, requestedPageIds: requestedIds },
               isError: true,
             };
@@ -753,41 +1108,53 @@ export function createDeletePagesTool(
         const deletedPages: DeletedPageChange[] = [];
         const failedPages: Array<{ pageId: string; error: string }> = [];
         for (const pageId of requestedIds) {
-          const result = deleteOnePage(workingDir, pageId, byId.get(pageId)?.name);
+          const result = await deleteOnePage(
+            config,
+            workingDir,
+            pageId,
+            byId.get(pageId)?.name,
+          );
           if (result.ok) {
             deletedPages.push(result.change);
           } else {
             failedPages.push({
               pageId,
-              error: String(result.result.details?.error || 'delete_failed'),
+              error: String(result.result.details?.error || "delete_failed"),
             });
           }
         }
 
         if (failedPages.length > 0) {
           return {
-            content: [{
-              type: 'text' as const,
-              text: `Deleted ${deletedPages.length} pages, but ${failedPages.length} failed: ${failedPages.map((page) => page.pageId).join(', ')}.`,
-            }],
-            details: { deletedPages, failedPages, error: 'partial_failure' },
+            content: [
+              {
+                type: "text" as const,
+                text: `Deleted ${deletedPages.length} pages, but ${failedPages.length} failed: ${failedPages.map((page) => page.pageId).join(", ")}.`,
+              },
+            ],
+            details: { deletedPages, failedPages, error: "partial_failure" },
             isError: true,
           };
         }
 
         return {
-          content: [{
-            type: 'text' as const,
-            text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(', ')}.`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.`,
+            },
+          ],
           details: { deleted: true, deletedPages },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ error: message }, 'deletePages failed');
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error({ error: message }, "deletePages failed");
         return {
-          content: [{ type: 'text' as const, text: `Error deleting pages: ${message}` }],
-          details: { error: 'delete_failed', message },
+          content: [
+            { type: "text" as const, text: `Error deleting pages: ${message}` },
+          ],
+          details: { error: "delete_failed", message },
           isError: true,
         };
       }

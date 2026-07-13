@@ -2,7 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/components/ai-elements";
-import type { StreamEvent, FileAttachment, ImageAttachment } from "@workbench/agent-client";
+import type {
+  StreamEvent,
+  FileAttachment,
+  ImageAttachment,
+} from "@workbench/agent-client";
 import { normalizeAiError } from "@workbench/shared";
 import {
   MissingTransactionalDeleteToolsError,
@@ -115,7 +119,12 @@ function addUserChoicePart(
   parts: NonNullable<ChatMessage["parts"]>,
   request: UserChoiceRequest,
 ): NonNullable<ChatMessage["parts"]> {
-  if (parts.some((part) => part.type === "user_choice" && part.requestId === request.requestId)) {
+  if (
+    parts.some(
+      (part) =>
+        part.type === "user_choice" && part.requestId === request.requestId,
+    )
+  ) {
     return parts;
   }
   return [
@@ -161,7 +170,9 @@ function updateUserChoicePart(
       };
     }
 
-    const option = part.options.find((item) => item.optionId === choice.optionId);
+    const option = part.options.find(
+      (item) => item.optionId === choice.optionId,
+    );
     return {
       ...part,
       status: "answered" as const,
@@ -176,9 +187,11 @@ function updateUserChoicePart(
 }
 
 function isBulkPageDeletionRequest(message: string): boolean {
-  return /删|删除|清理/.test(message) &&
+  return (
+    /删|删除|清理/.test(message) &&
     /页面|页/.test(message) &&
-    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message);
+    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message)
+  );
 }
 
 interface SendMessageRunOptions {
@@ -228,7 +241,10 @@ function buildAttachmentParts(
   ];
 }
 
-function getErrorDiagnosticDetails(error: unknown, fallbackMessage: string): {
+function getErrorDiagnosticDetails(
+  error: unknown,
+  fallbackMessage: string,
+): {
   message: string;
   phase?: string;
   errorCode?: string;
@@ -249,12 +265,16 @@ function getErrorDiagnosticDetails(error: unknown, fallbackMessage: string): {
     };
     if (typeof candidate.phase === "string") details.phase = candidate.phase;
     if (typeof candidate.code === "string") details.errorCode = candidate.code;
-    if (typeof candidate.status === "number") details.httpStatus = candidate.status;
+    if (typeof candidate.status === "number")
+      details.httpStatus = candidate.status;
   }
   return details;
 }
 
-function createSystemAutoRepairDedupeKey(title: string, hiddenPrompt: string): string {
+function createSystemAutoRepairDedupeKey(
+  title: string,
+  hiddenPrompt: string,
+): string {
   return `system_auto_repair:${title}:${hiddenPrompt}`;
 }
 
@@ -298,12 +318,14 @@ function appendMessageBeforeQueued(
 
 function hasVisibleAssistantContent(message: ChatMessage): boolean {
   if (message.content?.trim()) return true;
-  return Boolean(message.parts?.some((part) => {
-    if (part.type === "text" || part.type === "reasoning") {
-      return part.content.trim().length > 0;
-    }
-    return true;
-  }));
+  return Boolean(
+    message.parts?.some((part) => {
+      if (part.type === "text" || part.type === "reasoning") {
+        return part.content.trim().length > 0;
+      }
+      return true;
+    }),
+  );
 }
 
 interface UseChatStreamOptions {
@@ -314,7 +336,10 @@ interface UseChatStreamOptions {
   demoId?: string;
   activeViewContext?: ActiveViewContext;
   onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
-  onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
+  onSchemaUpdate?: (
+    schema: string,
+    source?: "ai-realtime" | "ai-finish",
+  ) => void;
   onFilesChange?: (
     files: Array<{
       path: string;
@@ -576,7 +601,9 @@ export function useChatStream(options: UseChatStreamOptions) {
         ? startOptions.displayMessageId || createLocalId("auto-repair")
         : undefined;
       const displayMessageId =
-        autoRepairMessageId || startOptions.displayMessageId || createLocalId("user");
+        autoRepairMessageId ||
+        startOptions.displayMessageId ||
+        createLocalId("user");
       onDiagnosticEvent?.({
         name: "ai.message_send_started",
         traceId,
@@ -628,11 +655,11 @@ export function useChatStream(options: UseChatStreamOptions) {
                   },
                 }
               : {
-                id: displayMessageId,
-                role: "user",
-                content: trimmedMessage,
-                parts: buildAttachmentParts(images, files),
-              };
+                  id: displayMessageId,
+                  role: "user",
+                  content: trimmedMessage,
+                  parts: buildAttachmentParts(images, files),
+                };
           return [...prev, nextMessage];
         });
       } else if (startOptions.displayMessageId) {
@@ -692,6 +719,12 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         let accumulatedContent = "";
 
+        // ── Silence 计时器约定 ──
+        // markActivity() 只在"实质性输出"事件上调用，用于重置前端 silence 计时器。
+        // 必须与后端 activityEvents（backend-agent.ts）保持一致：
+        //   ✅ onStream / onToolCall / onToolUpdate — 实质性模型输出
+        //   ❌ onThought — 纯推理，不算活动（模型可能长时间 reasoning 导致卡住）
+        // 前后端定义一致，才能保证 silence 提示与后端超时行为对齐。
         streamService.setHandlers({
           onStream: (content) => {
             markActivity();
@@ -711,7 +744,9 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onThought: (content) => {
-            markActivity();
+            // 注意：此处不调用 markActivity()，与后端超时判定保持一致——
+            // thought/reasoning 事件不算"实质性活动"，silence 计时器持续累加，
+            // 使前端能在模型长时间纯推理时正确触发黄色/红色超时警告。
             setCurrentMessage((prev) => ({
               ...prev,
               parts: addThoughtPart(prev.parts || [], content),
@@ -855,7 +890,8 @@ export function useChatStream(options: UseChatStreamOptions) {
                 finalFiles.length > 0
                   ? extractCodeAndSchemaUpdates(finalFiles, {
                       onCodeUpdate: (code) => onCodeUpdate?.(code, "ai-finish"),
-                      onSchemaUpdate: (schema) => onSchemaUpdate?.(schema, "ai-finish"),
+                      onSchemaUpdate: (schema) =>
+                        onSchemaUpdate?.(schema, "ai-finish"),
                     })
                   : { codeUpdated: false, schemaUpdated: false };
 
@@ -885,7 +921,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             } catch (error) {
               const message =
                 error instanceof Error ? error.message : "AI 完成收尾失败";
-              console.warn("[AIChat] stream finish finalization failed:", error);
+              console.warn(
+                "[AIChat] stream finish finalization failed:",
+                error,
+              );
               onDiagnosticEvent?.({
                 name: "ai.stream_finish_finalization_failed",
                 traceId,
@@ -948,11 +987,16 @@ export function useChatStream(options: UseChatStreamOptions) {
 
             const normalizedMessage = normalizeAiError(error).userMessage;
             const currentMsg = currentMessageRef.current;
-            const errorMessage: ChatMessage = hasVisibleAssistantContent(currentMsg)
+            const errorMessage: ChatMessage = hasVisibleAssistantContent(
+              currentMsg,
+            )
               ? {
                   id: currentMsg.id || `assistant-${Date.now()}`,
                   role: "assistant",
-                  content: currentMsg.content || accumulatedContent || normalizedMessage,
+                  content:
+                    currentMsg.content ||
+                    accumulatedContent ||
+                    normalizedMessage,
                   parts: [
                     ...(currentMsg.parts || []),
                     {
@@ -1103,7 +1147,8 @@ export function useChatStream(options: UseChatStreamOptions) {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
             role: "assistant",
-            content: "当前无法建立安全的事务化删除通道。请确认 Agent Service 已重启并刷新页面后再试。",
+            content:
+              "当前无法建立安全的事务化删除通道。请确认 Agent Service 已重启并刷新页面后再试。",
           };
           setMessages((prev) => [
             ...appendMessageBeforeQueued(
@@ -1122,7 +1167,8 @@ export function useChatStream(options: UseChatStreamOptions) {
           const { getAgentClient } = await import("@/lib/agent-client");
           const agentClient = getAgentClient();
 
-          const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
+          const activeViewPrefix =
+            buildActiveViewContextPrefix(activeViewContext);
           const content = activeViewPrefix
             ? `${activeViewPrefix}${outboundMessage}`
             : outboundMessage;
@@ -1303,7 +1349,9 @@ export function useChatStream(options: UseChatStreamOptions) {
       if (
         dedupeKey &&
         (activeRunDedupeKeyRef.current === dedupeKey ||
-          queuedMessagesRef.current.some((message) => message.dedupeKey === dedupeKey))
+          queuedMessagesRef.current.some(
+            (message) => message.dedupeKey === dedupeKey,
+          ))
       ) {
         return;
       }
@@ -1381,13 +1429,13 @@ export function useChatStream(options: UseChatStreamOptions) {
                   },
                 }
               : {
-                id: displayMessageId,
-                role: "user",
-                content: trimmedMessage,
-                queueId,
-                queueStatus: "queued",
-                parts: buildAttachmentParts(images, files),
-              },
+                  id: displayMessageId,
+                  role: "user",
+                  content: trimmedMessage,
+                  queueId,
+                  queueStatus: "queued",
+                  parts: buildAttachmentParts(images, files),
+                },
         ]);
         return;
       }
@@ -1424,7 +1472,9 @@ export function useChatStream(options: UseChatStreamOptions) {
           optionId,
           responseContent,
         );
-        if (pendingPermissionRequest.toolCall.approvalKind === "plan_approval") {
+        if (
+          pendingPermissionRequest.toolCall.approvalKind === "plan_approval"
+        ) {
           activeRunRef.current = true;
           setIsStreaming(true);
           startSilenceTracking();
@@ -1443,7 +1493,12 @@ export function useChatStream(options: UseChatStreamOptions) {
     (requestId: string, choice: UserChoiceResponse) => {
       const updateMessage = (message: ChatMessage): ChatMessage => {
         const parts = message.parts || [];
-        if (!parts.some((part) => part.type === "user_choice" && part.requestId === requestId)) {
+        if (
+          !parts.some(
+            (part) =>
+              part.type === "user_choice" && part.requestId === requestId,
+          )
+        ) {
           return message;
         }
         return {
@@ -1520,17 +1575,25 @@ export function useChatStream(options: UseChatStreamOptions) {
           parts: [],
         });
 
-        const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
-        const images: ImageAttachment[] | undefined = imageParts.length > 0
-          ? imageParts.map((p) => {
-              if (p.type !== "image") return undefined;
-              const match = p.url.match(/^data:(.+);base64,(.+)$/);
-              if (match) {
-                return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
-              }
-              return undefined;
-            }).filter((img): img is ImageAttachment => img !== undefined)
-          : undefined;
+        const imageParts =
+          userMsg.parts?.filter((p) => p.type === "image") || [];
+        const images: ImageAttachment[] | undefined =
+          imageParts.length > 0
+            ? imageParts
+                .map((p) => {
+                  if (p.type !== "image") return undefined;
+                  const match = p.url.match(/^data:(.+);base64,(.+)$/);
+                  if (match) {
+                    return {
+                      mimeType: match[1],
+                      data: match[2],
+                      name: "image",
+                    } as ImageAttachment;
+                  }
+                  return undefined;
+                })
+                .filter((img): img is ImageAttachment => img !== undefined)
+            : undefined;
 
         handleSend(userMsg.content, images);
         return;
@@ -1544,19 +1607,29 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const truncated = msgs.slice(0, targetIndex);
       setMessages(truncated);
-      void persistMessages(sessionId, truncated.filter((m) => !m.queueStatus)).catch(() => {});
+      void persistMessages(
+        sessionId,
+        truncated.filter((m) => !m.queueStatus),
+      ).catch(() => {});
 
       const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
-      const images: ImageAttachment[] | undefined = imageParts.length > 0
-        ? imageParts.map((p) => {
-            if (p.type !== "image") return undefined;
-            const match = p.url.match(/^data:(.+);base64,(.+)$/);
-            if (match) {
-              return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
-            }
-            return undefined;
-          }).filter((img): img is ImageAttachment => img !== undefined)
-        : undefined;
+      const images: ImageAttachment[] | undefined =
+        imageParts.length > 0
+          ? imageParts
+              .map((p) => {
+                if (p.type !== "image") return undefined;
+                const match = p.url.match(/^data:(.+);base64,(.+)$/);
+                if (match) {
+                  return {
+                    mimeType: match[1],
+                    data: match[2],
+                    name: "image",
+                  } as ImageAttachment;
+                }
+                return undefined;
+              })
+              .filter((img): img is ImageAttachment => img !== undefined)
+          : undefined;
 
       handleSend(userMsg.content, images);
     },
@@ -1606,20 +1679,30 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const truncated = msgs.slice(0, msgIndex);
       setMessages(truncated);
-      void persistMessages(sessionId, truncated.filter((m) => !m.queueStatus)).catch(() => {});
+      void persistMessages(
+        sessionId,
+        truncated.filter((m) => !m.queueStatus),
+      ).catch(() => {});
 
       const msg = msgs[msgIndex];
       const imageParts = msg.parts?.filter((p) => p.type === "image") || [];
-      const images: ImageAttachment[] | undefined = imageParts.length > 0
-        ? imageParts.map((p) => {
-            if (p.type !== "image") return undefined;
-            const match = p.url.match(/^data:(.+);base64,(.+)$/);
-            if (match) {
-              return { mimeType: match[1], data: match[2], name: "image" } as ImageAttachment;
-            }
-            return undefined;
-          }).filter((img): img is ImageAttachment => img !== undefined)
-        : undefined;
+      const images: ImageAttachment[] | undefined =
+        imageParts.length > 0
+          ? imageParts
+              .map((p) => {
+                if (p.type !== "image") return undefined;
+                const match = p.url.match(/^data:(.+);base64,(.+)$/);
+                if (match) {
+                  return {
+                    mimeType: match[1],
+                    data: match[2],
+                    name: "image",
+                  } as ImageAttachment;
+                }
+                return undefined;
+              })
+              .filter((img): img is ImageAttachment => img !== undefined)
+          : undefined;
 
       handleSend(newContent, images);
     },

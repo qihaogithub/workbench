@@ -40,6 +40,14 @@ jest.mock("@/lib/project-images", () => ({
   addProjectImage: jest.fn(),
 }));
 
+const commitWorkspaceMutation = jest.fn();
+const stageWorkspaceBinary = jest.fn();
+
+jest.mock("@/lib/workspace-authority-client", () => ({
+  commitWorkspaceMutation,
+  stageWorkspaceBinary,
+}));
+
 class TestResponse {
   status: number;
   headers: Headers;
@@ -72,6 +80,19 @@ describe("selected image localize route", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    stageWorkspaceBinary.mockResolvedValue({
+      stagingId: "staging-1",
+      hash: "asset-hash",
+      size: Buffer.from("image-bytes").length,
+    });
+    commitWorkspaceMutation.mockResolvedValue({
+      mutationId: "mutation-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      revision: 2,
+      resources: [],
+      committedAt: 1,
+    });
     global.Response = TestResponse as unknown as typeof Response;
   });
 
@@ -79,7 +100,7 @@ describe("selected image localize route", () => {
     global.Response = originalResponse;
   });
 
-  it("使用浏览器 Blob 写入 workspace asset 并登记项目图片", async () => {
+  it("使用浏览器 Blob 通过 Authority 提交 workspace asset 并登记项目图片", async () => {
     const fs = await import("fs");
     const projectImages = await import("@/lib/project-images");
     const { POST } = await import("./route");
@@ -116,14 +137,28 @@ describe("selected image localize route", () => {
         mimeType: "image/png",
       },
     });
-    expect(fs.mkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining("/tmp/workspace-1/assets/images"),
-      { recursive: true },
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining("/tmp/workspace-1/assets/images/"),
-      Buffer.from("image-bytes"),
-    );
+    expect(stageWorkspaceBinary).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+      content: Buffer.from("image-bytes"),
+    }));
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+      actor: "author-site",
+      reason: "localize_selected_asset",
+      operations: [expect.objectContaining({
+        type: "put_binary",
+        path: expect.stringMatching(/^assets\/images\/[a-f0-9]{12}-hero\.png$/),
+        stagingId: "staging-1",
+        hash: "asset-hash",
+        size: Buffer.from("image-bytes").length,
+        expectedAbsent: true,
+      })],
+    }));
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(projectImages.addProjectImage).toHaveBeenCalledWith(
       "project-1",
       expect.objectContaining({
@@ -166,6 +201,7 @@ describe("selected image localize route", () => {
       },
     });
     expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
     expect(projectImages.addProjectImage).not.toHaveBeenCalled();
   });
 });

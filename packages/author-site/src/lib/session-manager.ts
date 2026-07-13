@@ -23,9 +23,9 @@ import {
   getOrCreateProjectActiveWorkspace,
   isLiveWorkspace,
   findActiveWorkspace,
-  syncActiveWorkspaceToCanonical,
   advanceWorkspaceBaseIfLatestSessionVersion,
 } from "./workspace-manager";
+import { materializeCanonicalWorkspace } from "./canonical-materializer";
 import type {
   VersionInfo,
   MultiDemoFiles,
@@ -566,11 +566,20 @@ export interface SaveEditSessionResult {
   error?: string;
 }
 
+export interface SaveEditSessionOptions {
+  syncedWorkspace?: {
+    workspaceId: string;
+    revision?: number;
+    rootHash?: string;
+  };
+}
+
 export function saveEditSession(
   sessionId: string,
   username?: string,
   note?: string,
   versionType: VersionHistoryEntryType = "named_version",
+  options?: SaveEditSessionOptions,
 ): SaveEditSessionResult {
   const sessionMeta = getEditSession(sessionId);
   if (!sessionMeta) {
@@ -605,19 +614,22 @@ export function saveEditSession(
   }
 
   if (workspaceId) {
-    let synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
-    if (
-      !synced.success &&
-      synced.code === "WORKSPACE_STALE" &&
-      advanceWorkspaceBaseIfLatestSessionVersion(projectId, workspaceId, sessionId)
-    ) {
-      synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
-    }
-    if (!synced.success) {
-      return {
-        success: false,
-        error: synced.error || "Sync active workspace failed",
-      };
+    const hasSyncedWorkspace = options?.syncedWorkspace?.workspaceId === workspaceId;
+    if (!hasSyncedWorkspace) {
+      let synced = materializeCanonicalWorkspace({ projectId, workspaceId });
+      if (
+        !synced.success &&
+        synced.code === "WORKSPACE_STALE" &&
+        advanceWorkspaceBaseIfLatestSessionVersion(projectId, workspaceId, sessionId)
+      ) {
+        synced = materializeCanonicalWorkspace({ projectId, workspaceId });
+      }
+      if (!synced.success) {
+        return {
+          success: false,
+          error: synced.error || "Sync active workspace failed",
+        };
+      }
     }
     project = readProjectMeta(projectId);
     if (!project) {
@@ -635,6 +647,9 @@ export function saveEditSession(
       type: versionType,
       sourceWorkspacePath: workspacePath,
       advanceWorkspaceId: workspaceId,
+      workspaceId: options?.syncedWorkspace?.workspaceId,
+      workspaceRevision: options?.syncedWorkspace?.revision,
+      workspaceRootHash: options?.syncedWorkspace?.rootHash,
     });
 
     if (!result.success || !result.version) {
@@ -802,7 +817,7 @@ export function syncEditSessionToProjectWorkspace(
     return { success: false, error: "Project not found" };
   }
 
-  const synced = syncActiveWorkspaceToCanonical(projectId, workspaceId);
+  const synced = materializeCanonicalWorkspace({ projectId, workspaceId });
   return synced.success
     ? { success: true, projectId, workspacePath: synced.workspacePath }
     : { success: false, error: synced.error };

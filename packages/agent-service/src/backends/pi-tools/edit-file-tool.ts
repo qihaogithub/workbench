@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import crypto from 'crypto';
 import * as path from 'path';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
@@ -9,6 +10,7 @@ import {
   formatRuntimeValidationInstruction,
   validatePreviewFileWrite,
 } from './preview-validation';
+import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 
 const EditFileParams = Type.Object({
   path: Type.String({ description: 'Relative path to the file to edit' }),
@@ -38,7 +40,22 @@ export function createEditFileTool(config: AgentConfig): AgentTool<typeof EditFi
       }
 
       try {
-        const content = await fs.promises.readFile(filePath, 'utf-8');
+        const liveWorkspace = config.workingDir
+          ? resolveLiveWorkspaceMutationContext(config.workingDir)
+          : null;
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(liveWorkspace.projectId, liveWorkspace.workspaceId)
+          : null;
+        const content = snapshot
+          ? snapshot.resources[args.path]
+          : await fs.promises.readFile(filePath, 'utf-8');
+        if (content === undefined) {
+          return {
+            content: [{ type: 'text', text: `Error editing file: ${args.path} is not a committed text resource` }],
+            details: { path: args.path, error: 'WORKSPACE_RESOURCE_NOT_FOUND' },
+            isError: true,
+          };
+        }
 
         const matchIndex = content.indexOf(args.old_string);
         if (matchIndex === -1) {
@@ -82,7 +99,13 @@ export function createEditFileTool(config: AgentConfig): AgentTool<typeof EditFi
         // Perform the replacement
         const newContent = content.substring(0, matchIndex) + args.new_string + content.substring(matchIndex + args.old_string.length);
 
-        await fs.promises.writeFile(filePath, newContent, 'utf-8');
+        const receipt = liveWorkspace
+          ? await liveWorkspace.authority.mutate({
+            mutationId: crypto.randomUUID(), projectId: liveWorkspace.projectId, workspaceId: liveWorkspace.workspaceId,
+            sessionId: config.sessionId, baseRevision: snapshot!.state.revision, actor: 'ai', reason: 'agent_edit_file',
+            operations: [{ type: 'put_text', path: args.path, content: newContent, expectedHash: crypto.createHash('sha256').update(content).digest('hex') }],
+          })
+          : (await fs.promises.writeFile(filePath, newContent, 'utf-8'), null);
 
         // Calculate line number of the edit
         const beforeMatch = content.substring(0, matchIndex);
@@ -99,7 +122,7 @@ export function createEditFileTool(config: AgentConfig): AgentTool<typeof EditFi
             type: 'text',
             text: `Successfully edited ${args.path} at line ${lineNumber} (${oldLineCount} line(s) replaced with ${newLineCount} line(s))${validationText}`,
           }],
-          details: { path: args.path, lineNumber, oldLineCount, newLineCount, runtimeValidation },
+          details: { path: args.path, lineNumber, oldLineCount, newLineCount, runtimeValidation, receipt },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

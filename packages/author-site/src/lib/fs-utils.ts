@@ -270,6 +270,18 @@ function readTemplateMeta(templateId: string): ProjectTemplateMeta | null {
     return {
       id: parsed.id,
       sourceProjectId: parsed.sourceProjectId,
+      sourceWorkspaceId:
+        typeof parsed.sourceWorkspaceId === "string"
+          ? parsed.sourceWorkspaceId
+          : undefined,
+      sourceWorkspaceRevision:
+        typeof parsed.sourceWorkspaceRevision === "number"
+          ? parsed.sourceWorkspaceRevision
+          : undefined,
+      sourceWorkspaceRootHash:
+        typeof parsed.sourceWorkspaceRootHash === "string"
+          ? parsed.sourceWorkspaceRootHash
+          : undefined,
       category: parsed.category,
       name: parsed.name,
       description: parsed.description,
@@ -399,7 +411,7 @@ export function saveProjectAsTemplate(
   return template;
 }
 
-const DEFAULT_DEMO_CODE = `import React from 'react';
+export const DEFAULT_DEMO_CODE = `import React from 'react';
 
 interface DemoProps {
   title: string;
@@ -416,7 +428,7 @@ export default function Demo({ title, description }: DemoProps) {
 }
 `;
 
-const DEFAULT_DEMO_SCHEMA = JSON.stringify(
+export const DEFAULT_DEMO_SCHEMA = JSON.stringify(
   {
     $schema: "https://json-schema.org/draft/2020-12/schema",
     title: "Demo 配置",
@@ -1358,6 +1370,14 @@ export function readProjectMeta(projectId: string): Project | null {
         typeof parsed.canonicalSyncedWorkspaceId === "string"
           ? parsed.canonicalSyncedWorkspaceId
           : undefined,
+      canonicalSyncedRevision:
+        typeof parsed.canonicalSyncedRevision === "number"
+          ? parsed.canonicalSyncedRevision
+          : undefined,
+      canonicalSyncedRootHash:
+        typeof parsed.canonicalSyncedRootHash === "string"
+          ? parsed.canonicalSyncedRootHash
+          : undefined,
       canonicalSyncedAt:
         typeof parsed.canonicalSyncedAt === "number"
           ? parsed.canonicalSyncedAt
@@ -1440,6 +1460,9 @@ export function createProjectVersionSnapshot(
     type?: VersionHistoryEntryType;
     sourceWorkspacePath?: string;
     advanceWorkspaceId?: string | null;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
   },
 ): { success: boolean; version?: VersionInfo; error?: string } {
   const project = readProjectMeta(projectId);
@@ -1455,6 +1478,20 @@ export function createProjectVersionSnapshot(
   const workspaceToAdvance =
     options?.advanceWorkspaceId ??
     inferSyncedActiveWorkspaceForVersion(projectId, project, sourceWorkspacePath);
+  const consumedWorkspaceId =
+    options?.workspaceId ??
+    workspaceToAdvance ??
+    inferCanonicalWorkspaceIdForVersion(projectId, project, sourceWorkspacePath);
+  const consumedWorkspaceRevision =
+    options?.workspaceRevision ??
+    (consumedWorkspaceId === project.canonicalSyncedWorkspaceId
+      ? project.canonicalSyncedRevision
+      : undefined);
+  const consumedWorkspaceRootHash =
+    options?.workspaceRootHash ??
+    (consumedWorkspaceId === project.canonicalSyncedWorkspaceId
+      ? project.canonicalSyncedRootHash
+      : undefined);
   if (workspaceToAdvance && !canAdvanceWorkspaceBase(projectId, workspaceToAdvance)) {
     return { success: false, error: "Workspace 版本基线不可更新" };
   }
@@ -1484,6 +1521,9 @@ export function createProjectVersionSnapshot(
     sessionId: options?.sessionId ?? `snapshot-${versionId}`,
     snapshotPath,
     fileCount: countFiles(sourceWorkspacePath),
+    workspaceId: consumedWorkspaceId,
+    workspaceRevision: consumedWorkspaceRevision,
+    workspaceRootHash: consumedWorkspaceRootHash,
     note: options?.note,
   };
 
@@ -1496,6 +1536,23 @@ export function createProjectVersionSnapshot(
   }
 
   return { success: true, version: versionInfo };
+}
+
+function inferCanonicalWorkspaceIdForVersion(
+  projectId: string,
+  project: Project,
+  sourceWorkspacePath: string,
+): string | undefined {
+  if (!project.activeWorkspaceId) return undefined;
+  if (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId) return undefined;
+  if (typeof project.canonicalSyncedRevision !== "number") return undefined;
+  if (!project.canonicalSyncedRootHash) return undefined;
+
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  if (path.resolve(sourceWorkspacePath) !== path.resolve(projectWorkspacePath)) {
+    return undefined;
+  }
+  return project.activeWorkspaceId;
 }
 
 function canAdvanceWorkspaceBase(projectId: string, workspaceId: string): boolean {
@@ -1516,6 +1573,8 @@ function inferSyncedActiveWorkspaceForVersion(
 ): string | null {
   if (!project.activeWorkspaceId) return null;
   if (project.canonicalSyncedWorkspaceId !== project.activeWorkspaceId) return null;
+  if (typeof project.canonicalSyncedRevision !== "number") return null;
+  if (!project.canonicalSyncedRootHash) return null;
 
   const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
   if (path.resolve(sourceWorkspacePath) !== path.resolve(projectWorkspacePath)) {
@@ -1547,120 +1606,6 @@ export function getLatestVersion(projectId: string): VersionInfo | null {
   const project = readProjectMeta(projectId);
   if (!project || project.versions.length === 0) return null;
   return project.versions[project.versions.length - 1];
-}
-
-// ========================================
-// 版本恢复
-// ========================================
-
-export function restoreVersion(
-  projectId: string,
-  versionId: string,
-  username?: string,
-): { success: boolean; newVersionId?: string; error?: string } {
-  const project = readProjectMeta(projectId);
-  if (!project) {
-    return { success: false, error: "项目不存在" };
-  }
-
-  const targetVersion = project.versions.find((v) => v.versionId === versionId);
-  if (!targetVersion) {
-    return { success: false, error: `版本 ${versionId} 不存在` };
-  }
-
-  if (!fs.existsSync(targetVersion.snapshotPath)) {
-    return { success: false, error: `版本快照已丢失: ${versionId}` };
-  }
-
-  const workspacePath = path.join(getProjectPath(projectId), "workspace");
-
-  // 1. 备份当前 workspace
-  const backupVersionId = generateVersionId(project);
-  const backupSnapshotPath = getSnapshotPath(projectId, backupVersionId);
-  fs.mkdirSync(path.dirname(backupSnapshotPath), { recursive: true });
-  fs.cpSync(workspacePath, backupSnapshotPath, { recursive: true });
-
-  const backupVersion: VersionInfo = {
-    versionId: backupVersionId,
-    type: "auto_checkpoint",
-    savedAt: Date.now(),
-    savedBy: username || "system",
-    sessionId: `restore-from-${versionId}`,
-    snapshotPath: backupSnapshotPath,
-    fileCount: countFiles(workspacePath),
-    note: `恢复版本前的自动备份 (基于 ${versionId})`,
-  };
-  project.versions.push(backupVersion);
-
-  // 2. 用目标版本快照覆盖 workspace
-  fs.rmSync(workspacePath, { recursive: true, force: true });
-  fs.cpSync(targetVersion.snapshotPath, workspacePath, { recursive: true });
-  if (project.activeWorkspaceId) {
-    const activeWorkspacePath = findWorkspacePath(project.activeWorkspaceId);
-    if (activeWorkspacePath) {
-      const activeMetaPath = path.join(activeWorkspacePath, ".workspace.json");
-      const activeMeta = fs.existsSync(activeMetaPath)
-        ? JSON.parse(fs.readFileSync(activeMetaPath, "utf-8"))
-        : {
-            workspaceId: project.activeWorkspaceId,
-            demoId: projectId,
-            projectId,
-            scope: "live",
-            status: "active",
-            createdAt: Date.now(),
-          };
-      fs.rmSync(activeWorkspacePath, { recursive: true, force: true });
-      fs.cpSync(targetVersion.snapshotPath, activeWorkspacePath, { recursive: true });
-      fs.writeFileSync(
-        path.join(activeWorkspacePath, ".workspace.json"),
-        JSON.stringify(
-          {
-            ...activeMeta,
-            demoId: projectId,
-            projectId,
-            scope: activeMeta.scope ?? "live",
-            status: activeMeta.status ?? "active",
-            updatedAt: Date.now(),
-          },
-          null,
-          2,
-        ),
-        "utf-8",
-      );
-      project.activeWorkspaceUpdatedAt = Date.now();
-      project.canonicalSyncedWorkspaceId = project.activeWorkspaceId;
-      project.canonicalSyncedAt = Date.now();
-    }
-  }
-
-  // 3. 记录恢复操作作为新版本
-  const restoreVersionId = generateVersionId(project);
-  const restoreSnapshotPath = getSnapshotPath(projectId, restoreVersionId);
-  fs.cpSync(workspacePath, restoreSnapshotPath, { recursive: true });
-
-  const restoreVersionInfo: VersionInfo = {
-    versionId: restoreVersionId,
-    type: "restore_snapshot",
-    savedAt: Date.now(),
-    savedBy: username || "system",
-    sessionId: `restore-${versionId}`,
-    snapshotPath: restoreSnapshotPath,
-    fileCount: countFiles(workspacePath),
-    note: `恢复到版本 ${versionId}`,
-  };
-  project.versions.push(restoreVersionInfo);
-  project.updatedAt = Date.now();
-  if (project.activeWorkspaceId) {
-    markWorkspaceBasedOnVersion(project.activeWorkspaceId, restoreVersionId);
-  }
-
-  // 4. 清理旧版本
-  cleanupOldVersions(project);
-
-  // 5. 保存项目元数据
-  writeProjectMeta(projectId, project);
-
-  return { success: true, newVersionId: restoreVersionId };
 }
 
 // ========================================

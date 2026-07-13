@@ -317,6 +317,28 @@ try {
   assert.equal(duplicateCommit.result.status, 1);
   assert.equal(duplicateCommit.payload.ok, false);
 
+  const liveEdit = runCli(["edit", "begin", createdData.id], tempDir);
+  assert.equal(liveEdit.result.status, 0);
+  const liveEditData = liveEdit.payload.data as { editId: string; workspacePath: string };
+  fs.writeFileSync(
+    path.join(liveEditData.workspacePath, ".workspace.json"),
+    JSON.stringify({
+      workspaceId: path.basename(liveEditData.workspacePath),
+      projectId: createdData.id,
+      scope: "live",
+      status: "active",
+    }, null, 2),
+    "utf-8",
+  );
+  const liveBlocked = runCli(
+    ["page", "create", "--edit-id", liveEditData.editId, "--page-id", "live-blocked", "--name", "Live Blocked"],
+    tempDir,
+  );
+  assert.equal(liveBlocked.result.status, 1);
+  assert.equal(liveBlocked.payload.ok, false);
+  assert.equal((liveBlocked.payload.error as { code?: string }).code, "WORKSPACE_AUTHORITY_REQUIRED");
+  assert.equal(fs.existsSync(path.join(liveEditData.workspacePath, "demos", "live-blocked")), false);
+
   const multiPageEdit = runCli(["edit", "begin", createdData.id], tempDir);
   assert.equal(multiPageEdit.result.status, 0);
   const multiPageEditData = multiPageEdit.payload.data as { editId: string };

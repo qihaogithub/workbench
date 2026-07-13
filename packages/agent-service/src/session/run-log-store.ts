@@ -114,7 +114,6 @@ export class AgentRunLog {
   private finishContentLength = 0;
   private toolResultCount = 0;
   private subagentResultCount = 0;
-  private fileOperationCount = 0;
   private hasModelOutput = false;
   private toolNames = new Map<string, string>();
   private diagnosticSequence = 0;
@@ -247,24 +246,6 @@ export class AgentRunLog {
         });
         break;
 
-      case 'file_operation':
-        this.fileOperationCount += 1;
-        this.append({
-          level: 'info',
-          source: 'file',
-          eventType: 'file_operation',
-          title: event.fileOperation.path
-            ? `File operation: ${event.fileOperation.path}`
-            : 'File operation',
-          summary: event.fileOperation.method,
-          payload: {
-            method: event.fileOperation.method,
-            path: event.fileOperation.path,
-            contentLength: event.fileOperation.content?.length,
-          },
-        });
-        break;
-
       case 'plan':
         this.append({
           level: 'info',
@@ -306,7 +287,6 @@ export class AgentRunLog {
         accumulatedStreamLength: this.streamLength,
         toolResultCount: this.toolResultCount,
         subagentResultCount: this.subagentResultCount,
-        fileOperationCount: this.fileOperationCount,
         fileCount: result.files?.length || 0,
         error: result.error,
         metadata: result.metadata,
@@ -338,7 +318,6 @@ export class AgentRunLog {
       run_start: 'ai.run_started',
       tool_call: 'ai.tool_call_started',
       tool_call_update: 'ai.tool_call_finished',
-      file_operation: 'ai.file_change_detected',
       finish: 'ai.run_finished',
       error: 'ai.run_failed',
       agent_error: 'ai.run_failed',

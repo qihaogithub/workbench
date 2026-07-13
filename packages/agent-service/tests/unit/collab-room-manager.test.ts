@@ -1,4 +1,5 @@
 import fs from "fs";
+import crypto from "crypto";
 import os from "os";
 import path from "path";
 
@@ -12,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { CollabRoomManager } from "../../src/collab/collab-room-manager";
 import { WorkspaceFilePersistence } from "../../src/collab/workspace-file-persistence";
+import { resolveLiveWorkspaceMutationContext } from "../../src/workspace/workspace-mutation-authority";
 
 interface TestRoom {
   text: Y.Text;
@@ -51,9 +53,6 @@ class MockSocket {
 let tempDir: string;
 let workspacePath: string;
 let pagePath: string;
-let schemaPath: string;
-let sketchScenePath: string;
-let prototypeHtmlPath: string;
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
@@ -64,16 +63,16 @@ function writeJson(filePath: string, value: unknown): void {
 }
 
 function setupWorkspace(): void {
-  workspacePath = path.join(tempDir, "workspaces", "projects", "proj-1", "ws-1");
+  workspacePath = path.join(
+    tempDir,
+    "workspaces",
+    "projects",
+    "proj-1",
+    "ws-1",
+  );
   pagePath = path.join(workspacePath, "demos", "page-1", "index.tsx");
-  schemaPath = path.join(workspacePath, "demos", "page-1", "config.schema.json");
-  sketchScenePath = path.join(workspacePath, "demos", "page-1", "sketch.scene.json");
-  prototypeHtmlPath = path.join(workspacePath, "demos", "page-1", "prototype.html");
   fs.mkdirSync(path.dirname(pagePath), { recursive: true });
   fs.writeFileSync(pagePath, "old file", "utf-8");
-  fs.writeFileSync(schemaPath, `{"type":"object"}`, "utf-8");
-  fs.writeFileSync(sketchScenePath, `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[]}`, "utf-8");
-  fs.writeFileSync(prototypeHtmlPath, "<main>old prototype</main>", "utf-8");
   writeJson(path.join(workspacePath, ".workspace.json"), {
     workspaceId: "ws-1",
     projectId: "proj-1",
@@ -81,13 +80,23 @@ function setupWorkspace(): void {
     status: "active",
     updatedAt: 1,
   });
-  writeJson(path.join(tempDir, "sessions", "user-1", "proj-1", "session-1", ".session.json"), {
-    sessionId: "session-1",
-    demoId: "proj-1",
-    userId: "user-1",
-    workspaceId: "ws-1",
-    expiresAt: Date.now() + 60_000,
-  });
+  writeJson(
+    path.join(
+      tempDir,
+      "sessions",
+      "user-1",
+      "proj-1",
+      "session-1",
+      ".session.json",
+    ),
+    {
+      sessionId: "session-1",
+      demoId: "proj-1",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      expiresAt: Date.now() + 60_000,
+    },
+  );
 }
 
 async function createPageRoom(manager: CollabRoomManager): Promise<TestRoom> {
@@ -105,7 +114,9 @@ async function createPageRoom(manager: CollabRoomManager): Promise<TestRoom> {
   return room;
 }
 
-async function connectPageSocket(manager: CollabRoomManager): Promise<MockSocket> {
+async function connectPageSocket(
+  manager: CollabRoomManager,
+): Promise<MockSocket> {
   const socket = new MockSocket();
   await manager.handleConnection(socket as unknown as WebSocket, {
     projectId: "proj-1",
@@ -191,51 +202,6 @@ function applyAwarenessMessages(
   }
 }
 
-async function createSchemaRoom(manager: CollabRoomManager): Promise<TestRoom> {
-  await manager.handleConnection(new MockSocket() as unknown as WebSocket, {
-    projectId: "proj-1",
-    workspaceId: "ws-1",
-    sessionId: "session-1",
-    resourcePath: "demos/page-1/config.schema.json",
-    kind: "page-schema",
-  });
-
-  const rooms = (manager as unknown as { rooms: Map<string, TestRoom> }).rooms;
-  const room = Array.from(rooms.values())[0];
-  if (!room) throw new Error("Expected collab room to be created");
-  return room;
-}
-
-async function createSketchSceneRoom(manager: CollabRoomManager): Promise<TestRoom> {
-  await manager.handleConnection(new MockSocket() as unknown as WebSocket, {
-    projectId: "proj-1",
-    workspaceId: "ws-1",
-    sessionId: "session-1",
-    resourcePath: "demos/page-1/sketch.scene.json",
-    kind: "page-sketch-scene",
-  });
-
-  const rooms = (manager as unknown as { rooms: Map<string, TestRoom> }).rooms;
-  const room = Array.from(rooms.values())[0];
-  if (!room) throw new Error("Expected collab room to be created");
-  return room;
-}
-
-async function createPrototypeHtmlRoom(manager: CollabRoomManager): Promise<TestRoom> {
-  await manager.handleConnection(new MockSocket() as unknown as WebSocket, {
-    projectId: "proj-1",
-    workspaceId: "ws-1",
-    sessionId: "session-1",
-    resourcePath: "demos/page-1/prototype.html",
-    kind: "page-prototype-html",
-  });
-
-  const rooms = (manager as unknown as { rooms: Map<string, TestRoom> }).rooms;
-  const room = Array.from(rooms.values())[0];
-  if (!room) throw new Error("Expected prototype HTML collab room to be created");
-  return room;
-}
-
 beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "collab-room-manager-"));
   setupWorkspace();
@@ -247,7 +213,9 @@ afterEach(() => {
 
 describe("CollabRoomManager", () => {
   it("通过真实 Yjs sync 消息把客户端 A 的文本更新广播给客户端 B", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const socketA = await connectPageSocket(manager);
     const socketB = await connectPageSocket(manager);
     const docA = new Y.Doc();
@@ -273,11 +241,15 @@ describe("CollabRoomManager", () => {
     }
 
     expect(textB.toString()).toBe("old file from client A");
-    expect(getSingleRoom(manager).text.toString()).toBe("old file from client A");
+    expect(getSingleRoom(manager).text.toString()).toBe(
+      "old file from client A",
+    );
   });
 
   it("通过真实 awareness 消息广播在线状态，并在断连后移除该客户端状态", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const socketA = await connectPageSocket(manager);
     const socketB = await connectPageSocket(manager);
     const docA = new Y.Doc();
@@ -297,15 +269,15 @@ describe("CollabRoomManager", () => {
     });
 
     const addedStart = socketB.sent.length;
-    socketA.emit(
-      "message",
-      encodeAwarenessUpdate(awarenessA, [docA.clientID]),
-    );
+    socketA.emit("message", encodeAwarenessUpdate(awarenessA, [docA.clientID]));
     applyAwarenessMessages(awarenessB, socketB.sent.slice(addedStart));
 
     expect(
       Array.from(awarenessB.getStates().values()).some((state) => {
-        return (state as { presence?: { userId?: string } }).presence?.userId === "session-1";
+        return (
+          (state as { presence?: { userId?: string } }).presence?.userId ===
+          "session-1"
+        );
       }),
     ).toBe(true);
 
@@ -315,13 +287,18 @@ describe("CollabRoomManager", () => {
 
     expect(
       Array.from(awarenessB.getStates().values()).some((state) => {
-        return (state as { presence?: { userId?: string } }).presence?.userId === "session-1";
+        return (
+          (state as { presence?: { userId?: string } }).presence?.userId ===
+          "session-1"
+        );
       }),
     ).toBe(false);
   });
 
   it("客户端文本更新后 flushWorkspace 会落盘并清除 dirty 状态", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const socket = await connectPageSocket(manager);
     const doc = new Y.Doc();
     const text = doc.getText("content");
@@ -343,40 +320,51 @@ describe("CollabRoomManager", () => {
 
     const result = await manager.flushWorkspace("proj-1", "ws-1", "session-1");
 
-    expect(result).toEqual({ flushedRooms: 1, status: "flushed" });
+    expect(result).toEqual({ flushedRooms: 1, status: "flushed", revision: 2 });
     expect(room.dirty).toBe(false);
     expect(fs.readFileSync(pagePath, "utf-8")).toBe("client saved content");
   });
 
   it("连接参数非法时用 1008 关闭并返回可诊断 reason", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
 
     const missingSessionSocket = new MockSocket();
-    await manager.handleConnection(missingSessionSocket as unknown as WebSocket, {
-      projectId: "proj-1",
-      workspaceId: "ws-1",
-      sessionId: "missing-session",
-      resourcePath: "demos/page-1/index.tsx",
-      kind: "page-code",
-    });
+    await manager.handleConnection(
+      missingSessionSocket as unknown as WebSocket,
+      {
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "missing-session",
+        resourcePath: "demos/page-1/index.tsx",
+        kind: "page-code",
+      },
+    );
 
     const workspaceMismatchSocket = new MockSocket();
-    await manager.handleConnection(workspaceMismatchSocket as unknown as WebSocket, {
-      projectId: "proj-1",
-      workspaceId: "ws-other",
-      sessionId: "session-1",
-      resourcePath: "demos/page-1/index.tsx",
-      kind: "page-code",
-    });
+    await manager.handleConnection(
+      workspaceMismatchSocket as unknown as WebSocket,
+      {
+        projectId: "proj-1",
+        workspaceId: "ws-other",
+        sessionId: "session-1",
+        resourcePath: "demos/page-1/index.tsx",
+        kind: "page-code",
+      },
+    );
 
     const invalidResourceSocket = new MockSocket();
-    await manager.handleConnection(invalidResourceSocket as unknown as WebSocket, {
-      projectId: "proj-1",
-      workspaceId: "ws-1",
-      sessionId: "session-1",
-      resourcePath: "../project.json",
-      kind: "page-code",
-    });
+    await manager.handleConnection(
+      invalidResourceSocket as unknown as WebSocket,
+      {
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        resourcePath: "../project.json",
+        kind: "page-code",
+      },
+    );
 
     expect(missingSessionSocket.closed).toEqual({
       code: 1008,
@@ -392,144 +380,275 @@ describe("CollabRoomManager", () => {
     });
   });
 
-  it("AI 写入磁盘后重载旧协同房间，后续 flush 不会把旧文本写回", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createPageRoom(manager);
-
-    room.text.delete(0, room.text.length);
-    room.text.insert(0, "stale collab text");
-    expect(room.dirty).toBe(true);
-
-    fs.writeFileSync(pagePath, "ai fixed file", "utf-8");
-
-    const result = manager.applyExternalFileChanges(workspacePath, [
-      { path: "demos/page-1/index.tsx", action: "modified" },
-    ]);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(result.reloadedRooms).toBe(1);
-    expect(room.text.toString()).toBe("ai fixed file");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
-  });
-
-  it("AI 修改 prototype.html 后重载原型页协同房间，旧快照不能覆盖新文件", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createPrototypeHtmlRoom(manager);
-
-    room.text.delete(0, room.text.length);
-    room.text.insert(0, "<main>stale prototype</main>");
-    fs.writeFileSync(prototypeHtmlPath, "<main>AI updated prototype</main>", "utf-8");
-
-    const result = manager.applyExternalFileChanges(workspacePath, [
-      { path: "demos/page-1/prototype.html", action: "modified" },
-    ]);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(result.reloadedRooms).toBe(1);
-    expect(room.text.toString()).toBe("<main>AI updated prototype</main>");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(prototypeHtmlPath, "utf-8")).toBe(
-      "<main>AI updated prototype</main>",
-    );
-  });
-
-  it("当前页相对路径会回退命中嵌套页面协同房间", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createPageRoom(manager);
-
-    expect(room.text.toString()).toBe("old file");
-    expect(room.dirty).toBe(false);
-
-    fs.writeFileSync(pagePath, "ai fixed file", "utf-8");
-
-    const result = manager.applyExternalFileChanges(workspacePath, [
-      { path: "index.tsx", action: "modified" },
-    ]);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(result.reloadedRooms).toBe(1);
-    expect(room.text.toString()).toBe("ai fixed file");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
-  });
-
-  it("workspace 根目录存在同名文件时当前页相对路径不会误命中嵌套页面", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createPageRoom(manager);
-
-    const rootIndexPath = path.join(workspacePath, "index.tsx");
-    fs.writeFileSync(rootIndexPath, "root file", "utf-8");
-
-    const result = manager.applyExternalFileChanges(workspacePath, [
-      { path: "index.tsx", action: "modified" },
-    ]);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(result.reloadedRooms).toBe(0);
-    expect(room.text.toString()).toBe("old file");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("old file");
-    expect(fs.readFileSync(rootIndexPath, "utf-8")).toBe("root file");
-  });
-
   it("即使外部写入通知缺失，flush 前也会拒绝旧协同文本覆盖新文件", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const room = await createPageRoom(manager);
 
     room.text.delete(0, room.text.length);
     room.text.insert(0, "stale collab text");
     fs.writeFileSync(pagePath, "ai fixed file", "utf-8");
 
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
+    await expect(
+      manager.flushWorkspace("proj-1", "ws-1", "session-1"),
+    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+
+    expect(room.text.toString()).toBe("stale collab text");
+    expect(room.dirty).toBe(true);
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
+  });
+
+  it("AI mutation 前会先 flush 目标资源协同草稿，避免旧 hash 覆盖未落盘内容", async () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+    const manager = new CollabRoomManager(persistence);
+    const room = await createPageRoom(manager);
+
+    room.text.delete(0, room.text.length);
+    room.text.insert(0, "unsaved collab draft");
+
+    await expect(
+      persistence.commitMutation({
+        mutationId: "ai-commit-after-draft-flush",
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        baseRevision: 0,
+        actor: "ai",
+        reason: "test",
+        operations: [
+          {
+            type: "put_text",
+            path: "demos/page-1/index.tsx",
+            content: "ai fixed file",
+            expectedHash: crypto
+              .createHash("sha256")
+              .update("old file")
+              .digest("hex"),
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+
+    expect(room.text.toString()).toBe("unsaved collab draft");
+    expect(room.dirty).toBe(false);
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("unsaved collab draft");
+
+    await persistence.commitMutation({
+      mutationId: "ai-commit-after-draft-reread",
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "test",
+      operations: [
+        {
+          type: "put_text",
+          path: "demos/page-1/index.tsx",
+          content: "ai fixed file",
+          expectedHash: crypto
+            .createHash("sha256")
+            .update("unsaved collab draft")
+            .digest("hex"),
+        },
+      ],
+    });
 
     expect(room.text.toString()).toBe("ai fixed file");
     expect(room.dirty).toBe(false);
     expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
   });
 
-  it("客户端同步把磁盘基线重复合并时会重置为单份内容", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
+  it("Pi 工具的新 Authority 实例也会触发协同草稿 barrier", async () => {
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const room = await createPageRoom(manager);
-
-    room.text.insert(room.text.length, "old file");
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(room.text.toString()).toBe("old file");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("old file");
-  });
-
-  it("重复拼接的 JSON schema 会被归一化为单份内容再落盘", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createSchemaRoom(manager);
-    const schema = `{"type":"object"}`;
-
-    room.text.insert(room.text.length, `${schema}\n`);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
-
-    expect(room.text.toString()).toBe(schema);
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(schemaPath, "utf-8")).toBe(schema);
-  });
-
-  it("手绘 scene 协同房间在外部 patch 写入后重载，flush 不会覆盖新 scene", async () => {
-    const manager = new CollabRoomManager(new WorkspaceFilePersistence(tempDir));
-    const room = await createSketchSceneRoom(manager);
-    const externalScene = `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[{"id":"a"}]}`;
+    const liveWorkspace = resolveLiveWorkspaceMutationContext(workspacePath);
+    if (!liveWorkspace) throw new Error("Expected live workspace context");
 
     room.text.delete(0, room.text.length);
-    room.text.insert(0, `{"version":1,"pageSize":{"width":800,"height":600},"nodes":[{"id":"stale"}]}`);
-    fs.writeFileSync(sketchScenePath, externalScene, "utf-8");
+    room.text.insert(0, "draft from collab room");
 
-    const result = manager.applyExternalFileChanges(workspacePath, [
-      { path: "demos/page-1/sketch.scene.json", action: "modified" },
-    ]);
-    await manager.flushWorkspace("proj-1", "ws-1", "session-1");
+    await expect(
+      liveWorkspace.authority.mutate({
+        mutationId: "pi-tool-commit-after-draft-flush",
+        projectId: liveWorkspace.projectId,
+        workspaceId: liveWorkspace.workspaceId,
+        sessionId: "session-1",
+        baseRevision: 0,
+        actor: "ai",
+        reason: "test",
+        operations: [
+          {
+            type: "put_text",
+            path: "demos/page-1/index.tsx",
+            content: "pi tool content",
+            expectedHash: crypto
+              .createHash("sha256")
+              .update("old file")
+              .digest("hex"),
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
 
-    expect(result.reloadedRooms).toBe(1);
-    expect(room.text.toString()).toBe(externalScene);
+    expect(room.text.toString()).toBe("draft from collab room");
     expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(sketchScenePath, "utf-8")).toBe(externalScene);
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("draft from collab room");
+  });
+
+  it("Authority receipt 按确切资源路径更新协同房间，不依赖 legacy 文件事件", async () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+    const manager = new CollabRoomManager(persistence);
+    const room = await createPageRoom(manager);
+    const content = "committed by authority";
+
+    await persistence.commitMutation({
+      mutationId: "authority-to-room",
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "test",
+      operations: [
+        {
+          type: "put_text",
+          path: "demos/page-1/index.tsx",
+          content,
+          expectedHash: crypto
+            .createHash("sha256")
+            .update("old file")
+            .digest("hex"),
+        },
+      ],
+    });
+
+    expect(room.text.toString()).toBe(content);
+    expect(room.dirty).toBe(false);
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe(content);
+  });
+
+  it("saving 期间到达的外部 mutation 标记 pendingExternalReload，flush 完成后自动补偿 reload", async () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+    const manager = new CollabRoomManager(persistence);
+    const room = await createPageRoom(manager);
+
+    // Make the room dirty with new content
+    room.text.delete(0, room.text.length);
+    room.text.insert(0, "dirty draft");
+
+    // Mock commitResource: delay, simulate external mutation, then succeed.
+    // We cannot call the real commitResource because the external mutation
+    // changes the file hash before the delayed commit completes.
+    let resolveCommit!: () => void;
+    persistence.commitResource = (() => {
+      return new Promise<{
+        state: { hash: string };
+        receipt: { revision: number };
+      }>((resolve) => {
+        resolveCommit = () =>
+          resolve({
+            state: {
+              hash: crypto
+                .createHash("sha256")
+                .update("dirty draft")
+                .digest("hex"),
+            },
+            receipt: { revision: 3 },
+          });
+      });
+    }) as typeof persistence.commitResource;
+
+    // Start flush (will hang at mocked commitResource)
+    const flushPromise = (
+      manager as unknown as {
+        flushRoom: (room: TestRoom) => Promise<void>;
+      }
+    ).flushRoom(room as TestRoom);
+
+    // Wait for flushRoom to reach the await on commitResource
+    await new Promise((r) => setTimeout(r, 10));
+    expect((room as unknown as { saving: boolean }).saving).toBe(true);
+
+    // The external mutation's onMutationCommitted fires synchronously when
+    // persistence.commitMutation runs; here the file was already written
+    // above, and we simulate the receipt callback by triggering a second
+    // commitMutation that writes the same content.
+    await persistence.commitMutation({
+      mutationId: "deferred-reload-test",
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "test",
+      operations: [
+        {
+          type: "put_text",
+          path: "demos/page-1/index.tsx",
+          content: "ai authoritative content",
+          expectedHash: crypto
+            .createHash("sha256")
+            .update("old file")
+            .digest("hex"),
+        },
+      ],
+    });
+
+    // Should be marked for deferred reload
+    expect(
+      (room as unknown as { pendingExternalReload: boolean })
+        .pendingExternalReload,
+    ).toBe(true);
+
+    // Let the flush complete
+    resolveCommit();
+    await flushPromise;
+
+    // Compensation should have reloaded from disk (the authoritative mutation content)
+    expect(
+      (room as unknown as { pendingExternalReload: boolean })
+        .pendingExternalReload,
+    ).toBe(false);
+    expect(room.text.toString()).toBe("ai authoritative content");
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai authoritative content");
+  });
+
+  it("非 saving 状态下到达的外部 mutation 不设置 pendingExternalReload", async () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+    const manager = new CollabRoomManager(persistence);
+    const room = await createPageRoom(manager);
+
+    // External mutation arrives when room is NOT saving
+    await persistence.commitMutation({
+      mutationId: "no-defer-test",
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      sessionId: "session-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "test",
+      operations: [
+        {
+          type: "put_text",
+          path: "demos/page-1/index.tsx",
+          content: "immediate reload content",
+          expectedHash: crypto
+            .createHash("sha256")
+            .update("old file")
+            .digest("hex"),
+        },
+      ],
+    });
+
+    // Should reload immediately, no deferred flag
+    expect(
+      (room as unknown as { pendingExternalReload: boolean })
+        .pendingExternalReload,
+    ).toBe(false);
+    expect(room.text.toString()).toBe("immediate reload content");
   });
 });

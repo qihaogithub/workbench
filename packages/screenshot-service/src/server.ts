@@ -14,6 +14,7 @@ import { getScreenshotMetrics } from "./utils/screenshot-metrics";
 
 async function start() {
   const fastify = Fastify({
+    bodyLimit: 10 * 1024 * 1024,
     logger: {
       level: config.logLevel,
       transport: {
@@ -87,19 +88,21 @@ async function start() {
   );
 
   if (config.screenshotWarmup) {
-    void getBrowserPool().warmup().then((result) => {
-      if (result.ok) {
-        fastify.log.info(
-          { elapsed: result.elapsed },
-          "screenshot browser warmup completed",
+    void getBrowserPool()
+      .warmup()
+      .then((result) => {
+        if (result.ok) {
+          fastify.log.info(
+            { elapsed: result.elapsed },
+            "screenshot browser warmup completed",
+          );
+          return;
+        }
+        fastify.log.warn(
+          { elapsed: result.elapsed, error: result.error },
+          "screenshot browser warmup failed",
         );
-        return;
-      }
-      fastify.log.warn(
-        { elapsed: result.elapsed, error: result.error },
-        "screenshot browser warmup failed",
-      );
-    });
+      });
   }
 }
 

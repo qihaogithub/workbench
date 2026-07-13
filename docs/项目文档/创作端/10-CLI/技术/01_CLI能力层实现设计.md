@@ -13,6 +13,8 @@ covers:
   - packages/project-cli/AGENTS.md
   - packages/project-core/src/service.ts
   - packages/project-core/src/types.ts
+  - packages/project-core/src/__tests__/service.test.ts
+  - scripts/check-workspace-authority-guards.mjs
   - packages/preview-contract/src/index.ts
   - package.json
 ---
@@ -137,6 +139,10 @@ CLI 打开的编辑事务使用 `cli_` 前缀标识工作区，审计 actor sour
 
 删除项目、删除页面、删除文件夹、删除资产和发布回滚等操作继续走预览计划与确认执行两阶段。CLI 不绕过 `project-core` 的 dry-run、confirm token、锁定检查和审计规则。
 
+live Workspace 是单写者 Authority 的受管范围，不是 CLI 的普通本地事务目录。`project-core` 的写入型事务方法会在实际落盘前检查事务 `workspaceScope` 和工作区 `.workspace.json`；如果发现目标是 `scope=live` 或非 branch 事务，会返回 `WORKSPACE_AUTHORITY_REQUIRED`，CLI 只透传该结构化失败，不回退到裸文件写入。CLI 回归测试会覆盖“事务元数据被标记为 live 后，页面创建命令失败且不创建页面目录”的场景。
+
+因此当前 CLI 的安全边界分为两层：`edit begin` 创建的 `scope=branch` 工作区仍可由 `project-core` 隔离写入和提交；任何直接读写 live Workspace、合并到 live 当前态或 canonical 切换的能力，都必须继续迁移到 Authority 协议。静态门禁 `check:workspace-authority` 会检查 project-core 保留这条 fail-closed 防线，并要求 `project-cli` 源码不直接调用本地文件写入、删除、重命名或复制 API；CLI 新增写能力必须继续经过 `ProjectAdminService`。
+
 ## 资源历史与内容图
 
 资源历史命令是页面版本命令的通用化入口：
@@ -189,4 +195,10 @@ pnpm check:project-cli
 ```bash
 pnpm check:project-core
 pnpm check:project-scaffold
+```
+
+涉及 live Workspace 单写者边界时，还需要运行：
+
+```bash
+pnpm check:workspace-authority
 ```

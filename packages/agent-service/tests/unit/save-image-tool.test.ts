@@ -5,6 +5,7 @@ import * as https from 'https';
 import { EventEmitter } from 'events';
 import { createSaveImageTool } from '../../src/backends/pi-tools/save-image-tool';
 import type { AgentConfig } from '../../src/core/types';
+import { resolveLiveWorkspaceMutationContext } from '../../src/workspace/workspace-mutation-authority';
 
 vi.mock('fs', () => ({
   promises: {
@@ -25,6 +26,10 @@ vi.mock('../../src/utils/logger', () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('../../src/workspace/workspace-mutation-authority', () => ({
+  resolveLiveWorkspaceMutationContext: vi.fn(() => null),
 }));
 
 class MockResponse extends EventEmitter {
@@ -53,6 +58,7 @@ function createTool(config: AgentConfig = baseConfig) {
 describe('createSaveImageTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveLiveWorkspaceMutationContext).mockReturnValue(null);
   });
 
   describe('参数校验', () => {
@@ -97,6 +103,25 @@ describe('createSaveImageTool', () => {
   });
 
   describe('Base64 来源', () => {
+    it('live Workspace 资产通过 Authority staging 提交，绝不直接写文件', async () => {
+      const stageBinary = vi.fn(async () => ({ stagingId: '11111111-1111-1111-1111-111111111111', hash: 'hash', size: 4 }));
+      const mutate = vi.fn(async () => ({ committed: true, revision: 2 }));
+      vi.mocked(resolveLiveWorkspaceMutationContext).mockReturnValue({
+        projectId: 'project-1', workspaceId: 'workspace-1', authority: { stageBinary, mutate } as any,
+      });
+
+      const result = await createTool().execute('id', {
+        source: 'base64', data: 'dGVzdA==', filename: 'test.png',
+      } as any);
+
+      expect(result.isError).toBeFalsy();
+      expect(stageBinary).toHaveBeenCalledWith('project-1', 'workspace-1', Buffer.from('test'));
+      expect(mutate).toHaveBeenCalledWith(expect.objectContaining({
+        operations: [expect.objectContaining({ type: 'put_binary', path: 'assets/images/9f86d081884c-test.png', stagingId: '11111111-1111-1111-1111-111111111111' })],
+      }));
+      expect(fs.promises.writeFile).not.toHaveBeenCalled();
+    });
+
     it('应正确解码并保存 Base64 图片到项目工作区', async () => {
       (fs.promises.mkdir as any).mockResolvedValue(undefined);
       (fs.promises.writeFile as any).mockResolvedValue(undefined);

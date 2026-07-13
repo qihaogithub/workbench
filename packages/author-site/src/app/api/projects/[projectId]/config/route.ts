@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import {
   createApiSuccess,
   createApiError,
@@ -18,6 +20,12 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  createTextWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 
 export async function GET(
   _request: NextRequest,
@@ -60,8 +68,7 @@ async function resolveSessionWorkspace(
   projectId: string,
   sessionId: string | undefined,
 ): Promise<
-  | { ok: true; ctx: SessionContext }
-  | { ok: false; response: NextResponse }
+  { ok: true; ctx: SessionContext } | { ok: false; response: NextResponse }
 > {
   const token = getAuthCookie();
   if (!token) {
@@ -163,7 +170,10 @@ async function resolveSessionWorkspace(
     };
   }
 
-  return { ok: true, ctx: { workspaceId: meta.workspaceId, workspacePath: wsPath } };
+  return {
+    ok: true,
+    ctx: { workspaceId: meta.workspaceId, workspacePath: wsPath },
+  };
 }
 
 function collectPageSchemas(workspacePath: string): Record<string, string> {
@@ -179,6 +189,19 @@ function collectPageSchemas(workspacePath: string): Record<string, string> {
     }
   }
   return result;
+}
+
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
 }
 
 export async function PUT(
@@ -208,6 +231,13 @@ export async function PUT(
 
     const ctx = await resolveSessionWorkspace(request, projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    const resolvedSessionId = sessionId;
+    if (!resolvedSessionId) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sessionId 参数必填"),
+        { status: 400 },
+      );
+    }
 
     const pageSchemas = collectPageSchemas(ctx.ctx.workspacePath);
     const conflictResult = validateNoSchemaConflictFromStrings(
@@ -217,16 +247,43 @@ export async function PUT(
 
     if (!conflictResult.ok) {
       return NextResponse.json(
-        createApiError(
-          "SCHEMA_CONFLICT",
-          "项目级 Schema 与页面级字段冲突",
-          { conflicts: conflictResult.conflicts },
-        ),
+        createApiError("SCHEMA_CONFLICT", "项目级 Schema 与页面级字段冲突", {
+          conflicts: conflictResult.conflicts,
+        }),
         { status: 400 },
       );
     }
 
-    saveProjectConfigSchema(ctx.ctx.workspacePath, schema);
+    if (isLiveWorkspacePath(ctx.ctx.workspacePath)) {
+      const configPath = path.join(
+        ctx.ctx.workspacePath,
+        "project.config.schema.json",
+      );
+      const previousContent = fs.existsSync(configPath)
+        ? fs.readFileSync(configPath, "utf-8")
+        : null;
+      try {
+        await commitWorkspaceMutation(
+          createTextWorkspaceMutation({
+            projectId,
+            workspaceId: ctx.ctx.workspaceId,
+            sessionId: resolvedSessionId,
+            path: "project.config.schema.json",
+            content: schema,
+            previousContent,
+            reason: "update_project_config_schema",
+          }),
+        );
+      } catch (error) {
+        if (error instanceof WorkspaceAuthorityClientError)
+          return createMutationErrorResponse(error);
+        throw error;
+      }
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      saveProjectConfigSchema(ctx.ctx.workspacePath, schema);
+    }
 
     return NextResponse.json(createApiSuccess({ schema, exists: true }));
   } catch (error) {
@@ -265,11 +322,55 @@ export async function DELETE(
 
     const ctx = await resolveSessionWorkspace(request, projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    const resolvedSessionId = sessionId;
+    if (!resolvedSessionId) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sessionId 参数必填"),
+        { status: 400 },
+      );
+    }
 
-    const removed = deleteProjectConfigSchema(ctx.ctx.workspacePath);
-    return NextResponse.json(
-      createApiSuccess({ removed, exists: false }),
-    );
+    let removed: boolean;
+    if (isLiveWorkspacePath(ctx.ctx.workspacePath)) {
+      const configPath = path.join(
+        ctx.ctx.workspacePath,
+        "project.config.schema.json",
+      );
+      if (!fs.existsSync(configPath)) {
+        removed = false;
+      } else {
+        const previousContent = fs.readFileSync(configPath, "utf-8");
+        const operations: WorkspaceMutationOperation[] = [
+          {
+            type: "delete_path",
+            path: "project.config.schema.json",
+            expectedHash: hashText(previousContent),
+          },
+        ];
+        try {
+          await commitWorkspaceMutation({
+            mutationId: crypto.randomUUID(),
+            projectId,
+            workspaceId: ctx.ctx.workspaceId,
+            sessionId: resolvedSessionId,
+            baseRevision: 0,
+            actor: "author-site",
+            reason: "delete_project_config_schema",
+            operations,
+          });
+        } catch (error) {
+          if (error instanceof WorkspaceAuthorityClientError)
+            return createMutationErrorResponse(error);
+          throw error;
+        }
+        removed = true;
+      }
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      removed = deleteProjectConfigSchema(ctx.ctx.workspacePath);
+    }
+    return NextResponse.json(createApiSuccess({ removed, exists: false }));
   } catch (error) {
     console.error("Error deleting project config:", error);
     return NextResponse.json(

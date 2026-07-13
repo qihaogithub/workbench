@@ -165,6 +165,7 @@ export function KnowledgeDocDialog({
         if (!addTitle.trim() || !addContent.trim()) return;
         const params = new URLSearchParams({ workingDir });
         if (projectId) params.set("projectId", projectId);
+        if (sessionId) params.set("sessionId", sessionId);
         const res = await fetch(
           `/api/knowledge?${params.toString()}`,
           {
@@ -198,6 +199,7 @@ export function KnowledgeDocDialog({
           : editContent;
         const params = new URLSearchParams({ workingDir });
         if (projectId) params.set("projectId", projectId);
+        if (sessionId) params.set("sessionId", sessionId);
         const res = await fetch(
           `/api/knowledge/${item.id}?${params.toString()}`,
           {

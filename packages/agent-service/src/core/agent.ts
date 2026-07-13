@@ -13,7 +13,6 @@ import {
   ErrorEvent,
   FinishEvent,
   StatusEvent,
-  FileOperationEvent,
   PermissionRequestEvent,
   UserChoiceRequestEvent,
   ConfigUpdatedEvent,
@@ -121,7 +120,6 @@ interface EventMap {
   error: ErrorEvent;
   finish: FinishEvent;
   status: StatusEvent;
-  file_operation: FileOperationEvent;
   permission_request: PermissionRequestEvent;
   user_choice_request: UserChoiceRequestEvent;
   config_updated: ConfigUpdatedEvent;
