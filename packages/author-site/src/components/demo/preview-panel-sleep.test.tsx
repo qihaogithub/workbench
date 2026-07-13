@@ -37,21 +37,23 @@ describe("PreviewPanel iframe sleep", () => {
         disconnect() {}
       },
     });
-    jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1133);
-    jest.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(749);
     jest
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue({
-        x: 0,
-        y: 0,
-        top: 0,
-        left: 0,
-        right: 487,
-        bottom: 322,
-        width: 487,
-        height: 322,
-        toJSON: () => ({}),
-      } as DOMRect);
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(1133);
+    jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(749);
+    jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 487,
+      bottom: 322,
+      width: 487,
+      height: 322,
+      toJSON: () => ({}),
+    } as DOMRect);
 
     const { getByTitle } = render(
       <PreviewPanel
@@ -137,21 +139,19 @@ describe("PreviewPanel iframe sleep", () => {
 
   it("编译接口返回 HTML 时回传明确的非 JSON 错误", async () => {
     const onError = jest.fn();
-    global.fetch = jest.fn().mockResolvedValue(
-      {
-        status: 404,
-        statusText: "Not Found",
-        ok: false,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === "content-type" ? "text/html" : null,
-        },
-        text: async () => "<!DOCTYPE html><html><body>not found</body></html>",
-        json: async () => {
-          throw new Error("json should not be called");
-        },
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 404,
+      statusText: "Not Found",
+      ok: false,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "text/html" : null,
       },
-    ) as typeof fetch;
+      text: async () => "<!DOCTYPE html><html><body>not found</body></html>",
+      json: async () => {
+        throw new Error("json should not be called");
+      },
+    }) as typeof fetch;
 
     const { findByText } = render(
       <PreviewPanel

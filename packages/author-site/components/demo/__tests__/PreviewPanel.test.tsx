@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { PreviewPanel } from "@workbench/demo-ui";
 
 global.fetch = jest.fn();
@@ -43,14 +49,18 @@ describe("PreviewPanel", () => {
 
     render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
-    expect(screen.getByRole("status", { name: "预览加载中" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "预览加载中" }),
+    ).toBeInTheDocument();
   });
 
   it("空代码等待加载时不应显示预览加载中", async () => {
     render(<PreviewPanel code="" configData={{ title: "Test" }} />);
 
     expect(await screen.findByText("等待页面代码加载")).toBeInTheDocument();
-    expect(screen.queryByRole("status", { name: "预览加载中" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: "预览加载中" }),
+    ).not.toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -59,7 +69,13 @@ describe("PreviewPanel", () => {
       jsonResponse({ success: false, error: { message: "语法错误: 第3行" } }),
     );
 
-    render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} isAutoRepairing />);
+    render(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        isAutoRepairing
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("正在修复预览")).toBeInTheDocument();
@@ -132,12 +148,7 @@ describe("PreviewPanel", () => {
       }),
     );
 
-    render(
-      <PreviewPanel
-        code={mockCode}
-        configData={{ title: "Test" }}
-      />,
-    );
+    render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
 
     await waitFor(() => {
       expect(screen.getByTitle("预览")).toBeInTheDocument();
@@ -659,8 +670,12 @@ describe("PreviewPanel", () => {
       );
     });
 
-    expect(screen.getByRole("menu", { name: "预览区图层" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /去看看/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menu", { name: "预览区图层" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /去看看/ }),
+    ).toBeInTheDocument();
     expect(handleVisualLayerMenu).not.toHaveBeenCalled();
   });
 
@@ -794,7 +809,9 @@ describe("PreviewPanel", () => {
     });
 
     const menu = screen.getByRole("menu", { name: "预览区图层" });
-    expect(menu.querySelector(".layer-tree-menu-scrollbar")).toBeInTheDocument();
+    expect(
+      menu.querySelector(".layer-tree-menu-scrollbar"),
+    ).toBeInTheDocument();
   });
 
   it("应在 iframe 上报空白点击时清空选中和图层栈", async () => {
@@ -887,10 +904,13 @@ describe("PreviewPanel", () => {
     render(<PreviewPanel sessionId="test-session" configData={{}} />);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/compile", expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining("test-session"),
-      }));
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/compile",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("test-session"),
+        }),
+      );
     });
   });
 });

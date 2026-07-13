@@ -89,7 +89,12 @@ describe("剪贴板工具模块", () => {
       expect(result!.nodes[0].id).toBe("doc-1");
       expect(result!.nodes[0].kind).toBe("document");
       expect(result!.sourceProjectId).toBe("proj-1");
-      expect(result!.bounds).toEqual({ x: 100, y: 200, width: 300, height: 400 });
+      expect(result!.bounds).toEqual({
+        x: 100,
+        y: 200,
+        width: 300,
+        height: 400,
+      });
     });
 
     it("localStorage 写入失败时静默失败", () => {
@@ -112,21 +117,39 @@ describe("剪贴板工具模块", () => {
 
     it("版本不匹配返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify({ version: 2, nodes: [], pages: [], pageLayouts: {}, pageGroups: [] }),
+        JSON.stringify({
+          version: 2,
+          nodes: [],
+          pages: [],
+          pageLayouts: {},
+          pageGroups: [],
+        }),
       );
       expect(readCanvasClipboard()).toBeNull();
     });
 
     it("nodes 不是数组返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify({ version: 1, nodes: "not-array", pages: [], pageLayouts: {}, pageGroups: [] }),
+        JSON.stringify({
+          version: 1,
+          nodes: "not-array",
+          pages: [],
+          pageLayouts: {},
+          pageGroups: [],
+        }),
       );
       expect(readCanvasClipboard()).toBeNull();
     });
 
     it("pages 不是数组返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify({ version: 1, nodes: [], pages: 123, pageLayouts: {}, pageGroups: [] }),
+        JSON.stringify({
+          version: 1,
+          nodes: [],
+          pages: 123,
+          pageLayouts: {},
+          pageGroups: [],
+        }),
       );
       expect(readCanvasClipboard()).toBeNull();
     });

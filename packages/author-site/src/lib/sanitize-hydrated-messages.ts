@@ -28,7 +28,8 @@ export function sanitizeHydratedMessages(raw: unknown[]): ChatMessage[] {
         const ar = sanitized.autoRepair as Record<string, unknown>;
         if (
           typeof ar.status === "string" &&
-          (!VALID_AUTO_REPAIR_STATUSES.has(ar.status) || ar.status === "running")
+          (!VALID_AUTO_REPAIR_STATUSES.has(ar.status) ||
+            ar.status === "running")
         ) {
           sanitized.autoRepair = { ...ar, status: "failed" };
         }
