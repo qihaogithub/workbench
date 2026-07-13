@@ -1,7 +1,9 @@
 import {
   AUTO_PREVIEW_REPAIR_HISTORY_KEY,
+  PAGE_REPAIR_BUDGET_LIMIT,
   buildAutoPreviewRepairFingerprint,
   getAutoPreviewRepairAttemptCount,
+  getPageRepairBudget,
   recordAutoPreviewRepairAttempt,
 } from "../auto-preview-repair-guard";
 
@@ -107,5 +109,67 @@ describe("auto preview repair guard", () => {
         now: 8 * 24 * 60 * 60 * 1000,
       }),
     ).toBe(0);
+  });
+});
+
+describe("getPageRepairBudget", () => {
+  it("returns 0 when no history exists", () => {
+    const storage = new MemoryStorage();
+    expect(getPageRepairBudget("proj-1", "page-1", storage)).toBe(0);
+  });
+
+  it("sums counts across different fingerprints for the same page", () => {
+    const storage = new MemoryStorage();
+    const now = Date.now();
+    storage.setItem(
+      AUTO_PREVIEW_REPAIR_HISTORY_KEY,
+      JSON.stringify({
+        version: 1,
+        entries: {
+          "proj-1::page-1::hash-a": { count: 2, updatedAt: now },
+          "proj-1::page-1::hash-b": { count: 3, updatedAt: now },
+        },
+      }),
+    );
+
+    expect(getPageRepairBudget("proj-1", "page-1", storage)).toBe(5);
+  });
+
+  it("excludes entries from different pages", () => {
+    const storage = new MemoryStorage();
+    const now = Date.now();
+    storage.setItem(
+      AUTO_PREVIEW_REPAIR_HISTORY_KEY,
+      JSON.stringify({
+        version: 1,
+        entries: {
+          "proj-1::page-1::hash-a": { count: 2, updatedAt: now },
+          "proj-1::page-2::hash-b": { count: 10, updatedAt: now },
+        },
+      }),
+    );
+
+    expect(getPageRepairBudget("proj-1", "page-1", storage)).toBe(2);
+  });
+
+  it("ignores expired entries", () => {
+    const storage = new MemoryStorage();
+    const expiredTime = 1000;
+    const now = 8 * 24 * 60 * 60 * 1000;
+    storage.setItem(
+      AUTO_PREVIEW_REPAIR_HISTORY_KEY,
+      JSON.stringify({
+        version: 1,
+        entries: {
+          "proj-1::page-1::hash-a": { count: 5, updatedAt: expiredTime },
+        },
+      }),
+    );
+
+    expect(getPageRepairBudget("proj-1", "page-1", storage, { now })).toBe(0);
+  });
+
+  it("PAGE_REPAIR_BUDGET_LIMIT is 5", () => {
+    expect(PAGE_REPAIR_BUDGET_LIMIT).toBe(5);
   });
 });

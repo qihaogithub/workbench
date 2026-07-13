@@ -489,7 +489,11 @@ function AutoRepairMessage({
       icon: AlertTriangle,
       className: "border-destructive/30 bg-destructive/10 text-destructive",
     },
-  }[autoRepair.status];
+  }[autoRepair.status] ?? {
+    label: "修复记录",
+    icon: AlertTriangle,
+    className: "border-muted bg-muted/10 text-muted-foreground",
+  };
   const StatusIcon = statusConfig.icon;
   const canRetry = autoRepair.status === "failed" && autoRepair.hiddenPrompt && onRetry;
 

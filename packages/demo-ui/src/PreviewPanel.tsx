@@ -266,6 +266,7 @@ export function PreviewPanel({
   onStaticPrototypeSnapshot,
   onVisualInlineEdit,
   onVisualAnnotationCreate,
+  isAutoRepairing,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1294,7 +1295,7 @@ export function PreviewPanel({
         </div>
       )}
 
-      {compileError && !isCompiling && (
+      {compileError && !isCompiling && isAutoRepairing && (
         <div
           className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
         >
@@ -1302,7 +1303,7 @@ export function PreviewPanel({
         </div>
       )}
 
-      {runtimeError && !isCompiling && (
+      {runtimeError && !isCompiling && isAutoRepairing && (
         <div
           className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
         >

@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "2ad4ffb8-f38a-4159-94ac-8c1351e9e7ea",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 0,
+  "revision": 13,
+  "rootHash": "ae2907f398e9f58f7ae6d530e916a5a70c240d66a96cc9c8385bd6936adc5787",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/growth-bean-mall_x8k2/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "a772abd3554afd18557e9fb8464e596aa657d3508e74725f63fda1917484a0bc",
+      "afterHash": null
+    },
+    {
+      "path": "demos/growth-bean-mall_x8k2/index.tsx",
+      "action": "deleted",
+      "beforeHash": "0ca257d0c956ccf3de5bed9e89a8b337658b7636d59b3af658a176fe618f80e9",
+      "afterHash": null
+    },
+    {
+      "path": "demos/growth-bean-mall_x8k2/prototype.css",
+      "action": "deleted",
+      "beforeHash": "4058fbe76575c8c0d29a7cab242aaf4986fb4ec5d829f10cd0cc15a3913dfc46",
+      "afterHash": null
+    },
+    {
+      "path": "demos/growth-bean-mall_x8k2/prototype.html",
+      "action": "deleted",
+      "beforeHash": "c91fc381c6772f5abc9c2f15d35579fe256655b205f473fb158526979bb2782b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/growth-bean-mall_x8k2/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "0571dbbd2b100f5eb37e407af05ca04b6430e0710e710a22c04a97f2044a41b8",
+      "afterHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+    }
+  ],
+  "committedAt": 1783931677060
+}

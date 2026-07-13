@@ -159,6 +159,7 @@ describe("PreviewPanel iframe sleep", () => {
         configData={{}}
         onError={onError}
         fillContainer
+        isAutoRepairing
       />,
     );
 

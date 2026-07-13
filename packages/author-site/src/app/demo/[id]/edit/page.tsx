@@ -70,6 +70,8 @@ import {
 import {
   buildAutoPreviewRepairFingerprint,
   getAutoPreviewRepairAttemptCount,
+  getPageRepairBudget,
+  PAGE_REPAIR_BUDGET_LIMIT,
   recordAutoPreviewRepairAttempt,
 } from "@/lib/auto-preview-repair-guard";
 import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
@@ -185,6 +187,9 @@ import type {
   CanvasKnowledgeDocument,
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
+  CanvasPageData,
+  CanvasPageLayout,
+  CanvasPageGroup,
   PreviewDiagnosticError,
 } from "@workbench/demo-ui";
 import type {
@@ -201,6 +206,7 @@ import type {
 import { projectApiClient } from "@/lib/project-api";
 import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
+import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -1589,6 +1595,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >(null);
   // visualEditMode and related state moved to useVisualEditState hook
 
+  // 自动修复是否正在进行中：待发送的 auto_repair 触发 或 消息列表中存在 running 状态的 autoRepair
+  const isAutoRepairing =
+    (triggerAutoSend != null &&
+      typeof triggerAutoSend === "object" &&
+      "kind" in triggerAutoSend &&
+      triggerAutoSend.kind === "auto_repair") ||
+    aiMessages.some((msg) => msg.autoRepair?.status === "running");
+
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
   const autoPreviewRepairCountsRef = useRef<Map<string, number>>(
@@ -2051,6 +2065,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (isRepeatedPreviewError) {
         return;
       }
+      // 页面级修复预算检查（跨 fingerprint）
+      const pageTotalRepairs = pageId ? getPageRepairBudget(demoId, pageId) : 0;
+      if (pageId && pageTotalRepairs >= PAGE_REPAIR_BUDGET_LIMIT) {
+        recordDiagnosticEvent({
+          category: "ai",
+          name: "ai.auto_repair_budget_exhausted",
+          level: "error",
+          traceId: createDiagnosticTraceId("preview"),
+          details: {
+            pageId,
+            totalRepairs: pageTotalRepairs,
+            budgetLimit: PAGE_REPAIR_BUDGET_LIMIT,
+          },
+        });
+        return;
+      }
       if (pageId && repairCount < 2) {
         const nextRepairCount = repairFingerprint
           ? recordAutoPreviewRepairAttempt(
@@ -2070,6 +2100,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           },
         });
         setTabValue("ai");
+        const isSchemaRelatedError =
+          /children|schema|component|map|undefined/i.test(
+            normalizedDiagnostic.message || "",
+          );
+        const schemaHint = isSchemaRelatedError
+          ? `\n- 页面 Schema 结构约定:\n  - config.schema.json 中的 "children" 字段是子组件数组，每个元素包含 componentKey、props、children 等字段。\n  - 遍历子组件时使用 children.map(child => renderComponent(child))，不要使用 children.data。\n  - children 本身就是数组，不存在 children.data 属性。\n  - data.json 中的组件树通过 children 数组嵌套，不要用 children.data 访问子组件。`
+          : "";
         const hiddenPrompt = `当前页面预览诊断失败，请自动修复一次。
 
 页面: ${pageId}
@@ -2084,7 +2121,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 - 保持页面原有产品意图、视觉结构和配置字段不变。
 - 优先使用 @preview/sdk 的受控能力，避免未登记依赖和不存在的 named import。
 - 如果错误指向重复顶层声明或多个 default export，请删除重复拼接块，只保留一个完整 React 组件模块。
-- 修复后不要新增无关文件。`;
+- 修复后不要新增无关文件。${schemaHint}`;
         setTriggerAutoSend({
           kind: "auto_repair",
           visibleTitle: "检测到预览异常，正在自动修复",
@@ -3142,6 +3179,7 @@ ${context.details}
         }
 
         setSessionId(sessionData.data.sessionId);
+
         setWorkspaceId(sessionData.data.workspaceId || "");
         setWorkspacePath(
           sessionData.data.workspacePath ||
@@ -4034,6 +4072,83 @@ ${context.details}
       restoreDeletedPageSnapshot,
       toast,
     ],
+  );
+
+  // 跨项目粘贴页面回调
+  const handlePastePages = useCallback(
+    async (input: {
+      pages: CanvasPageData[];
+      pageLayouts: Record<string, CanvasPageLayout>;
+      pageGroups: CanvasPageGroup[];
+    }): Promise<{ pageIdMapping: Map<string, string> }> => {
+      const pageIdMapping = new Map<string, string>();
+      if (!sessionId) return { pageIdMapping };
+
+      const createdPages: DemoPageMeta[] = [];
+      for (const srcPage of input.pages) {
+        try {
+          const runtimeType = srcPage.runtimeType ?? undefined;
+          const newPage = await projectApiClient.createDemoPage(
+            demoId,
+            srcPage.name,
+            sessionId,
+            null,
+            runtimeType,
+          );
+          pageIdMapping.set(srcPage.id, newPage.id);
+          createdPages.push(newPage);
+
+          // 写入页面内容
+          const files: {
+            code?: string;
+            schema?: string;
+            prototypeHtml?: string;
+            prototypeCss?: string;
+            prototypeMeta?: Record<string, unknown>;
+          } = {};
+          if (srcPage.code) files.code = srcPage.code;
+          if (srcPage.prototypeHtml)
+            files.prototypeHtml = srcPage.prototypeHtml;
+          if (srcPage.prototypeCss) files.prototypeCss = srcPage.prototypeCss;
+          if (srcPage.prototypeMeta)
+            files.prototypeMeta = srcPage.prototypeMeta;
+          // configData 作为 schema 传入
+          if (srcPage.configData) {
+            files.schema = JSON.stringify(srcPage.configData, null, 2);
+          }
+          // 如果源页面没有 code 但有 sketchScene，通过文件更新接口写入
+          if (srcPage.sketchScene) {
+            files.code = srcPage.sketchScene;
+          }
+          if (Object.keys(files).length > 0) {
+            await projectApiClient.updateDemoPageFiles(
+              demoId,
+              newPage.id,
+              sessionId,
+              files,
+            );
+          }
+        } catch (err) {
+          console.error(`粘贴页面 "${srcPage.name}" 失败:`, err);
+        }
+      }
+
+      if (createdPages.length > 0) {
+        setDemoPages((current) =>
+          [...current, ...createdPages].sort((a, b) => a.order - b.order),
+        );
+        handleWorkspaceTreeChanged();
+        toast({
+          title:
+            createdPages.length === 1
+              ? `已粘贴页面「${createdPages[0].name}」`
+              : `已粘贴 ${createdPages.length} 个页面`,
+        });
+      }
+
+      return { pageIdMapping };
+    },
+    [demoId, sessionId, handleWorkspaceTreeChanged, toast],
   );
 
   const handleSinglePreviewPageSelect = useCallback(
@@ -6134,7 +6249,9 @@ ${context.details}
                       );
                       const messagesData = await messagesRes.json();
                       setAiMessages(
-                        messagesData.success ? messagesData.data || [] : [],
+                        messagesData.success && Array.isArray(messagesData.data)
+                          ? sanitizeHydratedMessages(messagesData.data)
+                          : [],
                       );
                       setAiCurrentMessage({
                         role: "assistant",
@@ -6692,6 +6809,7 @@ ${context.details}
                       canvasState={canvasState}
                       onCanvasStateChange={setCanvasState}
                       onRequestDeletePages={requestDeletePages}
+                      onRequestPastePages={handlePastePages}
                       onRuntimeConversionRequest={
                         handleRequestRuntimeConversion
                       }
@@ -7119,6 +7237,7 @@ ${context.details}
                           }
                           onConsoleEntry={handleDiagnosticConsoleEntry}
                           onError={handlePreviewError}
+                          isAutoRepairing={isAutoRepairing}
                           onContentLoaded={() => {
                             recordDiagnosticEvent({
                               category: "preview",

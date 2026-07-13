@@ -663,10 +663,11 @@ export function AssistantMessage({
         }
 
         if (block.type === "tool-group") {
+          const safeBlockParts = block.parts ?? [];
           if (block.toolKind === "delegate") {
             return (
               <div key={`tool-group-${index}`} className="space-y-1">
-                {block.parts.map((part, partIndex) => (
+                {safeBlockParts.map((part, partIndex) => (
                   <SubagentTaskBlock
                     key={`delegate-${part.toolCallId || partIndex}`}
                     part={part}
@@ -679,15 +680,15 @@ export function AssistantMessage({
 
           const Icon = getToolIcon(block.toolKind);
           const label = getToolGroupLabel(block.toolKind);
-          const hasRunning = block.parts.some((p) => p.status === "running");
+          const hasRunning = safeBlockParts.some((p) => p.status === "running");
 
           return (
             <ToolCallGroup
               key={`tool-group-${index}`}
               icon={Icon}
               label={label}
-              count={block.parts.length}
-              parts={block.parts}
+              count={safeBlockParts.length}
+              parts={safeBlockParts}
               isRunning={hasRunning}
               externalAuthSessionId={externalAuthSessionId}
             />
@@ -847,7 +848,7 @@ function ToolCallGroup({
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
         <div className="pl-4 border-l border-border/20 ml-[5px] mt-0.5">
-            {parts.map((p, i) => (
+            {(parts ?? []).map((p, i) => (
             getExternalAuthRequiredDetails(p) ? (
               <ExternalAuthCard
                 key={`auth-${p.toolCallId || i}`}
@@ -1422,12 +1423,13 @@ function ExecutionPhase({
     }
   }, [isStreaming, isComplete]);
 
-  const reasoningCount = parts.filter((p) => p.type === "reasoning").length;
-  const delegateCount = parts.filter(
-    (p) => p.type === "tool" && isDelegateTask(p),
+  const safeParts = parts ?? [];
+  const reasoningCount = safeParts.filter((p): p is Extract<MessagePart, { type: "reasoning" }> => p.type === "reasoning").length;
+  const delegateCount = safeParts.filter(
+    (p): p is Extract<MessagePart, { type: "tool" }> => p.type === "tool" && isDelegateTask(p),
   ).length;
-  const toolCount = parts.filter(
-    (p) => p.type === "tool" && !isDelegateTask(p),
+  const toolCount = safeParts.filter(
+    (p): p is Extract<MessagePart, { type: "tool" }> => p.type === "tool" && !isDelegateTask(p),
   ).length;
 
   const summaryParts: string[] = [];
@@ -1435,8 +1437,8 @@ function ExecutionPhase({
   if (delegateCount > 0) summaryParts.push(`${delegateCount} 个子 Agent`);
   if (toolCount > 0) summaryParts.push(`${toolCount} 次工具调用`);
 
-  const hasRunning = parts.some(
-    (p) => p.type === "tool" && p.status === "running",
+  const hasRunning = safeParts.some(
+    (p): p is Extract<MessagePart, { type: "tool" }> => p.type === "tool" && p.status === "running",
   );
 
   return (
@@ -1467,7 +1469,7 @@ function ExecutionPhase({
             onScroll={handlePhaseScroll}
             className="pl-4 border-l border-border/20 ml-[5px] mt-0.5 space-y-0.5 max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin"
           >
-            {parts.map((part, i) => {
+            {safeParts.map((part, i) => {
               if (part.type === "reasoning") {
                 return (
                   <div

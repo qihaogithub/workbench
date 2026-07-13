@@ -136,6 +136,8 @@ export interface PreviewPanelProps {
     annotationId?: string,
     styleChanges?: VisualStyleChange[],
   ) => void;
+  /** 当前是否有自动修复正在进行中，控制"正在修复预览"覆盖层的显示 */
+  isAutoRepairing?: boolean;
 }
 
 export interface ConfigFormProps {
@@ -411,6 +413,12 @@ export interface PreviewCanvasProps {
     input: CanvasKnowledgeDocumentUpdateInput,
   ) => Promise<CanvasKnowledgeDocument>;
   onReadKnowledgeDocument?: (document: CanvasKnowledgeDocument) => Promise<string>;
+  /** 粘贴页面时触发，由父组件调用 API 创建页面并返回 ID 映射 */
+  onRequestPastePages?: (input: {
+    pages: CanvasPageData[];
+    pageLayouts: Record<string, CanvasPageLayout>;
+    pageGroups: CanvasPageGroup[];
+  }) => Promise<{ pageIdMapping: Map<string, string> }>;
 }
 
 export interface PreviewState {

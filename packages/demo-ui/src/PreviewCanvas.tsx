@@ -48,6 +48,12 @@ import {
   withCanvasAnnotationNodes,
 } from "./canvas-kernel";
 import {
+  writeCanvasClipboard,
+  readCanvasClipboard,
+  computeBounds,
+  isEditableTarget,
+} from "./canvas-clipboard";
+import {
   SNAP_THRESHOLD,
   PAGE_GROUP_DIRECTORY_WIDTH,
   PAGE_GROUP_DIRECTORY_GAP,
@@ -456,6 +462,7 @@ export function PreviewCanvas({
   onCreateKnowledgeDocument,
   onUpdateKnowledgeDocument,
   onReadKnowledgeDocument,
+  onRequestPastePages,
 }: PreviewCanvasProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const isEditorMode = resolvedInteractionMode === "editor";
@@ -1361,6 +1368,256 @@ export function PreviewCanvas({
     selectedDocumentNodeIds,
     selectedNodeId,
     selectedPageIds,
+  ]);
+
+  // ── 复制快捷键（Ctrl/Cmd+C）──
+  useEffect(() => {
+    if (!isEditorMode || documentDraft) return;
+    const hasSelection =
+      selectedNodeId ||
+      selectedDocumentNodeIds.length > 0 ||
+      selectedPageIds.length > 0 ||
+      selectedPageGroupIds.length > 0;
+    if (!hasSelection) return;
+
+    const handleCopy = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (key !== "c" || !(event.metaKey || event.ctrlKey)) return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+
+      // 收集选中的自由节点
+      const copiedNodeIds = new Set<string>();
+      if (selectedDocumentNodeIds.length > 0) {
+        selectedDocumentNodeIds.forEach((id) => copiedNodeIds.add(id));
+      } else if (selectedNodeId) {
+        copiedNodeIds.add(selectedNodeId);
+      }
+      const copiedNodes: CanvasFreeNode[] = [];
+      copiedNodeIds.forEach((id) => {
+        const node = effectiveNodes[id];
+        if (node) copiedNodes.push(node);
+      });
+
+      // 收集选中的页面及布局
+      const copiedPages: CanvasPageData[] = [];
+      const copiedPageLayouts: Record<string, CanvasPageLayout> = {};
+      selectedPageIds.forEach((pageId) => {
+        const page = pagesById.get(pageId);
+        const layout = effectivePages[pageId];
+        if (page) copiedPages.push(page);
+        if (layout) copiedPageLayouts[pageId] = layout;
+      });
+
+      // 收集选中的页面组
+      const copiedPageGroups: CanvasPageGroup[] = [];
+      selectedPageGroupIds.forEach((groupId) => {
+        const group = canvasState.pageGroups?.[groupId];
+        if (group) copiedPageGroups.push(group);
+      });
+
+      const bounds = computeBounds(copiedPageLayouts, copiedNodes);
+
+      writeCanvasClipboard({
+        version: 1,
+        copiedAt: Date.now(),
+        sourceProjectId: projectId,
+        sourceSessionId: sessionId,
+        nodes: copiedNodes,
+        pages: copiedPages,
+        pageLayouts: copiedPageLayouts,
+        pageGroups: copiedPageGroups,
+        bounds,
+      });
+    };
+
+    window.addEventListener("keydown", handleCopy);
+    return () => window.removeEventListener("keydown", handleCopy);
+  }, [
+    isEditorMode,
+    documentDraft,
+    selectedNodeId,
+    selectedDocumentNodeIds,
+    selectedPageIds,
+    selectedPageGroupIds,
+    effectiveNodes,
+    effectivePages,
+    pagesById,
+    canvasState.pageGroups,
+    projectId,
+    sessionId,
+  ]);
+
+  // ── 粘贴快捷键（Ctrl/Cmd+V）──
+  useEffect(() => {
+    if (!isEditorMode || documentDraft) return;
+
+    const handlePaste = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (key !== "v" || !(event.metaKey || event.ctrlKey)) return;
+      if (isEditableTarget(event.target)) return;
+      // 如果系统剪贴板有文件，让现有 onPaste 处理
+      // （keyboard event 无法直接读取 clipboardData.files，此处不阻止）
+
+      const clipboardData = readCanvasClipboard();
+      if (!clipboardData) return;
+      const hasContent =
+        clipboardData.nodes.length > 0 ||
+        clipboardData.pages.length > 0 ||
+        clipboardData.pageGroups.length > 0;
+      if (!hasContent) return;
+      event.preventDefault();
+
+      const PASTE_OFFSET = 24;
+      const zoom = canvasState.viewport.zoom || 1;
+      const centerX =
+        (-canvasState.viewport.x + containerSize.width / 2) / zoom;
+      const centerY =
+        (-canvasState.viewport.y + containerSize.height / 2) / zoom;
+      const offsetX =
+        clipboardData.bounds
+          ? centerX - clipboardData.bounds.x + PASTE_OFFSET
+          : PASTE_OFFSET;
+      const offsetY =
+        clipboardData.bounds
+          ? centerY - clipboardData.bounds.y + PASTE_OFFSET
+          : PASTE_OFFSET;
+      const now = Date.now();
+      const maxZ = Math.max(
+        0,
+        ...Object.values(allItemLayouts).map((l) => l.zIndex ?? 0),
+      );
+
+      // A. 粘贴自由节点
+      const newNodeIds: string[] = [];
+      if (clipboardData.nodes.length > 0) {
+        const newNodes: CanvasFreeNode[] = clipboardData.nodes.map(
+          (node, index) => {
+            const prefix =
+              node.kind === "text"
+                ? "text"
+                : node.kind === "image"
+                  ? "img"
+                  : "doc";
+            const newId = `${prefix}-${crypto.randomUUID()}`;
+            newNodeIds.push(newId);
+            return {
+              ...node,
+              id: newId,
+              layout: {
+                ...node.layout,
+                x: node.layout.x + offsetX,
+                y: node.layout.y + offsetY,
+                zIndex: maxZ + 1 + index,
+              },
+              createdAt: now,
+              updatedAt: now,
+            } as CanvasFreeNode;
+          },
+        );
+
+        updateState((prev) => {
+          const nextNodes = { ...(prev.nodes ?? {}) };
+          for (const node of newNodes) {
+            nextNodes[node.id] = node;
+          }
+          return withCanvasAnnotationNodes(prev, nextNodes);
+        });
+      }
+
+      // B. 粘贴页面（通过回调通知父组件）
+      if (
+        clipboardData.pages.length > 0 &&
+        onRequestPastePages
+      ) {
+        // 对页面布局应用偏移
+        const shiftedPageLayouts: Record<string, CanvasPageLayout> = {};
+        for (const [pageId, layout] of Object.entries(
+          clipboardData.pageLayouts,
+        )) {
+          shiftedPageLayouts[pageId] = {
+            ...layout,
+            x: layout.x + offsetX,
+            y: layout.y + offsetY,
+            zIndex: maxZ + 1,
+          };
+        }
+
+        void onRequestPastePages({
+          pages: clipboardData.pages,
+          pageLayouts: shiftedPageLayouts,
+          pageGroups: clipboardData.pageGroups,
+        }).then(({ pageIdMapping }) => {
+          // 将新页面布局写入画布状态
+          updateState((prev) => {
+            const nextPages = { ...prev.pages };
+            pageIdMapping.forEach((newId, oldId) => {
+              const layout = shiftedPageLayouts[oldId];
+              if (layout) nextPages[newId] = layout;
+            });
+            // 更新页面组中的 pageId 引用
+            const nextGroups = { ...(prev.pageGroups ?? {}) };
+            for (const oldGroup of clipboardData.pageGroups) {
+              const newGroupPages = oldGroup.pages.map((entry) => ({
+                ...entry,
+                pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
+              }));
+              const newActivePageId =
+                pageIdMapping.get(oldGroup.activePageId) ??
+                oldGroup.activePageId;
+              const groupId = `page-group-${crypto.randomUUID()}`;
+              nextGroups[groupId] = {
+                ...oldGroup,
+                id: groupId,
+                pages: newGroupPages,
+                activePageId: newActivePageId,
+                createdAt: now,
+                updatedAt: now,
+              };
+            }
+            return {
+              ...prev,
+              pages: nextPages,
+              pageGroups: Object.keys(nextGroups).length > 0
+                ? nextGroups
+                : prev.pageGroups,
+            };
+          });
+
+          // 选中新粘贴的页面
+          const newPageIds = Array.from(pageIdMapping.values());
+          setSelectedPageIds(newPageIds);
+          setSelectedNodeId(null);
+          setSelectedDocumentNodeIds([]);
+          setSelectedPageGroupIds([]);
+        });
+      }
+
+      // 选中粘贴的节点（如果有节点且无页面）
+      if (newNodeIds.length > 0 && clipboardData.pages.length === 0) {
+        if (newNodeIds.length === 1) {
+          setSelectedNodeId(newNodeIds[0]);
+          setSelectedDocumentNodeIds([]);
+        } else {
+          setSelectedNodeId(null);
+          setSelectedDocumentNodeIds(newNodeIds);
+        }
+        setSelectedPageIds([]);
+        setSelectedPageGroupIds([]);
+      }
+    };
+
+    window.addEventListener("keydown", handlePaste);
+    return () => window.removeEventListener("keydown", handlePaste);
+  }, [
+    isEditorMode,
+    documentDraft,
+    canvasState.viewport,
+    containerSize.width,
+    containerSize.height,
+    allItemLayouts,
+    updateState,
+    onRequestPastePages,
   ]);
 
   // 开始拖拽/缩放时，清空辅助线
