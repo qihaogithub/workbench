@@ -1,0 +1,19 @@
+schema_version: 1
+module_path: ""
+title: Workbench 多包 Monorepo 与编排根
+scope:
+    - AGENTS.md
+    - .gitignore
+    - .npmrc
+    - pnpm-workspace.yaml
+    - package.json
+    - pnpm-lock.yaml
+    - turbo.json
+    - docker-compose.yml
+    - .dockerignore
+    - .env.docker
+    - .env.example
+    - CLAUDE.md
+source_files: []
+depends_on: []
+related_to: []

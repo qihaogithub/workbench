@@ -1,0 +1,946 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: main
+nodes_managed: true
+exported_at: "2026-07-11T03:04:05Z"
+modules:
+    "":
+        dir_name: Workbench 多包 Monorepo 与编排根
+        title: Workbench 多包 Monorepo 与编排根
+        scope:
+            - AGENTS.md
+            - .gitignore
+            - .npmrc
+            - pnpm-workspace.yaml
+            - package.json
+            - pnpm-lock.yaml
+            - turbo.json
+            - docker-compose.yml
+            - .dockerignore
+            - .env.docker
+            - .env.example
+            - CLAUDE.md
+        source_files: []
+        children:
+            - agent_service
+            - author_site
+            - data_artifacts
+            - demo_ui
+            - docs
+            - infra_docker
+            - knowledge_service
+            - ops_cli
+            - preview_contract
+            - project_core
+            - screenshot_service
+            - scripts
+            - shared_lib
+            - sketch_system
+            - tests
+            - viewer_site
+        depends_on: []
+        related_to: []
+    agent_service:
+        dir_name: Agent Service 服务端与客户端 SDK
+        title: Agent Service 服务端与客户端 SDK
+        scope:
+            - packages/agent-service/
+            - packages/agent-client/
+        source_files: []
+        children:
+            - agent_service/agent_client_sdk
+            - agent_service/agent_service_server
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: author_site/client_libs/agent_ai_chat
+            - path: data_artifacts
+            - path: infra_docker
+            - path: ops_cli
+            - path: shared_lib
+    agent_service/agent_client_sdk:
+        dir_name: Agent Service HTTP_WS 客户端 SDK
+        title: Agent Service HTTP/WS 客户端 SDK
+        scope:
+            - packages/agent-client/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server:
+        dir_name: Agent Service 进程入口与启动编排
+        title: Agent Service 进程入口与启动编排
+        scope:
+            - packages/agent-service/
+        source_files: []
+        children:
+            - agent_service/agent_service_server/backends_providers
+            - agent_service/agent_service_server/core_agent_runtime
+            - agent_service/agent_service_server/routes_api_layer
+            - agent_service/agent_service_server/shared_infrastructure
+            - agent_service/agent_service_server/tests
+            - agent_service/agent_service_server/tools_pi_tools
+            - agent_service/agent_service_server/workspace_session
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/backends_providers:
+        dir_name: AI 后端适配层与供应商配置管理
+        title: AI 后端适配层与供应商配置管理
+        scope:
+            - packages/agent-service/src/backends/
+            - packages/agent-service/src/config/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/core_agent_runtime:
+        dir_name: Agent 运行时核心与事件总线
+        title: Agent 运行时核心与事件总线
+        scope:
+            - packages/agent-service/src/core/
+            - packages/agent-service/src/events/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/routes_api_layer:
+        dir_name: Agent Service HTTP_WebSocket API 路由层
+        title: Agent Service HTTP/WebSocket API 路由层
+        scope:
+            - packages/agent-service/src/routes/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/shared_infrastructure:
+        dir_name: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
+        title: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
+        scope:
+            - packages/agent-service/src/utils/
+            - packages/agent-service/src/services/
+            - packages/agent-service/src/scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/tests:
+        dir_name: Agent Service 测试套件（Vitest）
+        title: Agent Service 测试套件（Vitest）
+        scope:
+            - packages/agent-service/tests/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/tools_pi_tools:
+        dir_name: Pi Agent 工作台工具集与运行时管理器
+        title: Pi Agent 工作台工具集与运行时管理器
+        scope:
+            - packages/agent-service/src/backends/pi-tools/
+            - packages/agent-service/src/backends/managers/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agent_service/agent_service_server/workspace_session:
+        dir_name: 工作空间、会话与协作编辑子系统
+        title: 工作空间、会话与协作编辑子系统
+        scope:
+            - packages/agent-service/src/workspace/
+            - packages/agent-service/src/session/
+            - packages/agent-service/src/collab/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site:
+        dir_name: Author Site 作者站点（Next.js 全栈应用）
+        title: Author Site 作者站点（Next.js 全栈应用）
+        scope:
+            - packages/author-site/
+        source_files: []
+        children:
+            - author_site/admin_panel
+            - author_site/ai_chat_components
+            - author_site/api_ai_chat_knowledge
+            - author_site/api_auth_user_admin
+            - author_site/api_projects_workspaces
+            - author_site/api_screenshots_preview
+            - author_site/api_sessions_canvas
+            - author_site/api_templates_demos_viewer_data
+            - author_site/auth_routes_and_ui
+            - author_site/client_libs
+            - author_site/demo_editor_app
+            - author_site/explore_wish_cli_pages
+            - author_site/scripts_and_assets
+            - author_site/server_libs
+            - author_site/shared_components
+            - author_site/viewer_app
+        depends_on: []
+        related_to:
+            - path: agent_service
+            - path: data_artifacts
+            - path: demo_ui
+            - path: docs
+            - path: infra_docker
+            - path: knowledge_service
+            - path: preview_contract
+            - path: screenshot_service
+            - path: sketch_system
+            - path: tests
+    author_site/admin_panel:
+        dir_name: 管理后台前端（Admin Panel）
+        title: 管理后台前端（Admin Panel）
+        scope:
+            - packages/author-site/src/app/admin/
+            - packages/author-site/src/lib/admin-auth.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/ai_chat_components:
+        dir_name: AI 对话与流式渲染组件集
+        title: AI 对话与流式渲染组件集
+        scope:
+            - packages/author-site/src/components/ai-elements/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_ai_chat_knowledge:
+        dir_name: AI 对话与知识库管理 API
+        title: AI 对话与知识库管理 API
+        scope:
+            - packages/author-site/src/app/api/ai/
+            - packages/author-site/src/app/api/knowledge/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_auth_user_admin:
+        dir_name: 作者站认证与用户管理 API
+        title: 作者站认证与用户管理 API
+        scope:
+            - packages/author-site/src/app/api/auth/
+            - packages/author-site/src/app/api/user/
+            - packages/author-site/src/app/api/admin/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_projects_workspaces:
+        dir_name: Author Site 项目与工作区 API 聚合层
+        title: Author Site 项目与工作区 API 聚合层
+        scope:
+            - packages/author-site/src/app/api/projects/
+            - packages/author-site/src/app/api/workspaces/
+            - packages/author-site/src/app/api/workspace-authority/
+        source_files: []
+        children:
+            - author_site/api_projects_workspaces/demos_templates
+            - author_site/api_projects_workspaces/projects_crud
+            - author_site/api_projects_workspaces/publish_pipeline
+            - author_site/api_projects_workspaces/resources_versions
+        depends_on: []
+        related_to: []
+    author_site/api_projects_workspaces/demos_templates:
+        dir_name: Demo 页面与运行时模板 API
+        title: Demo 页面与运行时模板 API
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/demos/
+            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+        source_files: []
+        children:
+            - author_site/api_projects_workspaces/demos_templates/demos_crud_and_execution
+        depends_on: []
+        related_to: []
+    author_site/api_projects_workspaces/demos_templates/demos_crud_and_execution:
+        dir_name: Demo 页面 CRUD 与运行时切换 API
+        title: Demo 页面 CRUD 与运行时切换 API
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/demos/
+            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_projects_workspaces/projects_crud:
+        dir_name: 项目资源 CRUD API（提交、文件夹、配置）
+        title: 项目资源 CRUD API（提交、文件夹、配置）
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/commits/
+            - packages/author-site/src/app/api/projects/[projectId]/folders/
+            - packages/author-site/src/app/api/projects/[projectId]/config/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_projects_workspaces/publish_pipeline:
+        dir_name: 项目发布与物化 API
+        title: 项目发布与物化 API
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/publish/
+            - packages/author-site/src/app/api/projects/[projectId]/publish-status/
+            - packages/author-site/src/app/api/projects/[projectId]/materialize/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: project_core
+    author_site/api_projects_workspaces/resources_versions:
+        dir_name: 资源版本管理 API（列表_创建_读取_恢复）
+        title: 资源版本管理 API（列表/创建/读取/恢复）
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/resources/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_screenshots_preview:
+        dir_name: 截图生成与预览模块分发 API
+        title: 截图生成与预览模块分发 API
+        scope:
+            - packages/author-site/src/app/api/screenshots/
+            - packages/author-site/src/app/api/preview-modules/
+            - packages/author-site/src/app/api/preview-runtime/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_sessions_canvas:
+        dir_name: 作者站编辑会话 API（Next.js Route Handlers）
+        title: 作者站编辑会话 API（Next.js Route Handlers）
+        scope:
+            - packages/author-site/src/app/api/sessions/
+        source_files: []
+        children:
+            - author_site/api_sessions_canvas/assets_attachments
+            - author_site/api_sessions_canvas/canvas_state
+            - author_site/api_sessions_canvas/merge_persist
+            - author_site/api_sessions_canvas/project_session_helpers
+            - author_site/api_sessions_canvas/session_core
+            - author_site/api_sessions_canvas/workspace_files
+        depends_on: []
+        related_to: []
+    author_site/api_sessions_canvas/assets_attachments:
+        dir_name: 会话资源与 AI 附件上传 API
+        title: 会话资源与 AI 附件上传 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/ai-attachments/
+            - packages/author-site/src/app/api/sessions/[sessionId]/assets/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_sessions_canvas/canvas_state:
+        dir_name: 画布布局与自动保存检查点 API
+        title: 画布布局与自动保存检查点 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/canvas-layout/
+            - packages/author-site/src/app/api/sessions/[sessionId]/checkpoint/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_sessions_canvas/merge_persist:
+        dir_name: 会话工作区持久化与合并 API
+        title: 会话工作区持久化与合并 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/merge/
+            - packages/author-site/src/app/api/sessions/[sessionId]/persist-workspace/
+            - packages/author-site/src/app/api/sessions/[sessionId]/workspace-flush/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site/api_sessions_canvas/session_core
+    author_site/api_sessions_canvas/project_session_helpers:
+        dir_name: 会话清理与项目_元数据管理 API
+        title: 会话清理与项目/元数据管理 API
+        scope:
+            - packages/author-site/src/app/api/sessions/cleanup/
+            - packages/author-site/src/app/api/sessions/project/
+            - packages/author-site/src/app/api/sessions/[sessionId]/meta/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_sessions_canvas/session_core:
+        dir_name: 编辑会话生命周期 API（创建_保存_放弃）
+        title: 编辑会话生命周期 API（创建/保存/放弃）
+        scope:
+            - packages/author-site/src/app/api/sessions/route.ts
+            - packages/author-site/src/app/api/sessions/[sessionId]/discard/
+            - packages/author-site/src/app/api/sessions/[sessionId]/save/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site/api_sessions_canvas/merge_persist
+    author_site/api_sessions_canvas/workspace_files:
+        dir_name: Session 工作区与 Demo 页面文件 API
+        title: Session 工作区与 Demo 页面文件 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/workspace/
+            - packages/author-site/src/app/api/sessions/[sessionId]/files/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/api_templates_demos_viewer_data:
+        dir_name: 模板_演示项目与预览数据 API（Next.js App Router）
+        title: 模板/演示项目与预览数据 API（Next.js App Router）
+        scope:
+            - packages/author-site/src/app/api/templates/
+            - packages/author-site/src/app/api/demos/
+            - packages/author-site/src/app/api/viewer/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/auth_routes_and_ui:
+        dir_name: 作者站认证路由与 UI
+        title: 作者站认证路由与 UI
+        scope:
+            - packages/author-site/src/app/(auth)/
+            - packages/author-site/src/components/auth/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site/client_libs/admin_auth
+    author_site/client_libs:
+        dir_name: Author Site 客户端共享库与 Hook 层
+        title: Author Site 客户端共享库与 Hook 层
+        scope:
+            - packages/author-site/src/lib/
+            - packages/author-site/src/hooks/
+        source_files: []
+        children:
+            - author_site/client_libs/admin_auth
+            - author_site/client_libs/agent_ai_chat
+            - author_site/client_libs/api_client_utils
+            - author_site/client_libs/db_schema
+            - author_site/client_libs/editor_diagnostics
+            - author_site/client_libs/preview_compiler
+            - author_site/client_libs/prototype_visual_editor
+            - author_site/client_libs/publishing
+            - author_site/client_libs/user_config
+            - author_site/client_libs/workspace_files
+        depends_on: []
+        related_to: []
+    author_site/client_libs/admin_auth:
+        dir_name: 作者站认证与会话管理
+        title: 作者站认证与会话管理
+        scope:
+            - packages/author-site/src/lib/auth/
+            - packages/author-site/src/lib/admin-auth.ts
+            - packages/author-site/src/lib/dingtalk-login.ts
+            - packages/author-site/src/lib/external-auth.ts
+            - packages/author-site/src/lib/session-manager.ts
+            - packages/author-site/src/lib/user.ts
+            - packages/author-site/src/lib/project-admin-service.ts
+            - packages/author-site/src/lib/workspace-authority-browser-client.ts
+            - packages/author-site/src/lib/workspace-authority-client.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site/auth_routes_and_ui
+    author_site/client_libs/agent_ai_chat:
+        dir_name: Author Site Agent 客户端与提示词装配层
+        title: Author Site Agent 客户端与提示词装配层
+        scope:
+            - packages/author-site/src/lib/agent/
+            - packages/author-site/src/lib/agent-prompts/
+            - packages/author-site/src/lib/agent-client.ts
+            - packages/author-site/src/lib/agent-providers.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: agent_service
+    author_site/client_libs/api_client_utils:
+        dir_name: 作者站 API 客户端与协作文档工具
+        title: 作者站 API 客户端与协作文档工具
+        scope:
+            - packages/author-site/src/lib/api.ts
+            - packages/author-site/src/lib/mock-api.ts
+            - packages/author-site/src/lib/fs-utils.ts
+            - packages/author-site/src/lib/utils.ts
+            - packages/author-site/src/hooks/useCollabDocument.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/db_schema:
+        dir_name: SQLite 用户数据持久化与 JSON Schema 工具集
+        title: SQLite 用户数据持久化与 JSON Schema 工具集
+        scope:
+            - packages/author-site/src/lib/db/
+            - packages/author-site/src/lib/schema-defaults.ts
+            - packages/author-site/src/lib/schema-generator.ts
+            - packages/author-site/src/lib/schema-validator.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/editor_diagnostics:
+        dir_name: 编辑器诊断事件持久化与导出
+        title: 编辑器诊断事件持久化与导出
+        scope:
+            - packages/author-site/src/lib/editor-diagnostics/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/preview_compiler:
+        dir_name: 预览编译与运行时依赖治理
+        title: 预览编译与运行时依赖治理
+        scope:
+            - packages/author-site/src/lib/compiler.ts
+            - packages/author-site/src/lib/compiler-client.ts
+            - packages/author-site/src/lib/preview-runtime-manifest.ts
+            - packages/author-site/src/lib/preview-dependency-policy.ts
+            - packages/author-site/src/lib/preview-module-store.ts
+            - packages/author-site/src/lib/preview-page-code.ts
+            - packages/author-site/src/lib/preview-projection-tracker.ts
+            - packages/author-site/src/lib/preview-size.ts
+            - packages/author-site/src/lib/preview-validation.ts
+            - packages/author-site/src/lib/canvas-layout-file.ts
+            - packages/author-site/src/lib/sandpack-deps.ts
+            - packages/author-site/src/lib/rewrite-local-paths.ts
+            - packages/author-site/src/lib/auto-preview-repair-guard.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/prototype_visual_editor:
+        dir_name: 原型可视化编辑器与配置注入运行时
+        title: 原型可视化编辑器与配置注入运行时
+        scope:
+            - packages/author-site/src/lib/prototype-visual-editor.ts
+            - packages/author-site/src/lib/prototype-preview-size.ts
+            - packages/author-site/src/lib/visual-configurator.ts
+            - packages/author-site/src/lib/viewer-app-graph-runtime.ts
+            - packages/author-site/src/lib/sketch-editor-engine.ts
+            - packages/author-site/src/lib/screenshot-service.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/publishing:
+        dir_name: 项目发布与后端配置同步
+        title: 项目发布与后端配置同步
+        scope:
+            - packages/author-site/src/lib/publish-manager.ts
+            - packages/author-site/src/lib/project-api.ts
+            - packages/author-site/src/lib/project-cli-url.ts
+            - packages/author-site/src/lib/project-images.ts
+            - packages/author-site/src/lib/backend-providers-sync.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/user_config:
+        dir_name: 作者站配置与运行时参数层
+        title: 作者站配置与运行时参数层
+        scope:
+            - packages/author-site/src/lib/model-config.ts
+            - packages/author-site/src/lib/user-model-config.ts
+            - packages/author-site/src/lib/user-authoring-preferences.ts
+            - packages/author-site/src/lib/runtime-config.ts
+            - packages/author-site/src/lib/runtime-props.ts
+            - packages/author-site/src/lib/config-merge.ts
+            - packages/author-site/src/lib/authoring-feature-flags.ts
+            - packages/author-site/src/lib/db-config.ts
+            - packages/author-site/src/lib/cdn-config.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/client_libs/workspace_files:
+        dir_name: 工作区与协同草稿持久化子系统
+        title: 工作区与协同草稿持久化子系统
+        scope:
+            - packages/author-site/src/lib/workspace-manager.ts
+            - packages/author-site/src/lib/workspace-file-utils.ts
+            - packages/author-site/src/lib/workspace-flush.ts
+            - packages/author-site/src/lib/workspace-autosave-scheduler.ts
+            - packages/author-site/src/lib/workspace-offline-drafts.ts
+            - packages/author-site/src/lib/workspace-performance-sampling.ts
+            - packages/author-site/src/lib/workspace-save-state-machine.ts
+            - packages/author-site/src/lib/client-workspace-flush.ts
+            - packages/author-site/src/lib/live-workspace-route-context.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/demo_editor_app:
+        dir_name: Author Site Demo 编辑器应用
+        title: Author Site Demo 编辑器应用
+        scope:
+            - packages/author-site/src/app/demo/
+            - packages/author-site/src/components/demo/
+        source_files: []
+        children:
+            - author_site/demo_editor_app/canvas_preview_system
+            - author_site/demo_editor_app/import_export_tools
+            - author_site/demo_editor_app/version_history
+            - author_site/demo_editor_app/visual_property_panel
+        depends_on: []
+        related_to:
+            - path: demo_ui
+    author_site/demo_editor_app/canvas_preview_system:
+        dir_name: Demo 可视化编辑器与画布预览系统
+        title: Demo 可视化编辑器与画布预览系统
+        scope:
+            - packages/author-site/src/app/demo/[id]/edit/
+            - packages/author-site/src/components/demo/home-page.tsx
+            - packages/author-site/src/components/demo/create-demo-dialog.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/demo_editor_app/import_export_tools:
+        dir_name: 演示编辑器导入导出与知识库弹窗工具
+        title: 演示编辑器导入导出与知识库弹窗工具
+        scope:
+            - packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx
+            - packages/author-site/src/components/demo/save-template-dialog.tsx
+            - packages/author-site/src/components/demo/KnowledgeDocDialog.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/demo_editor_app/version_history:
+        dir_name: 版本历史与撤销重做子系统
+        title: 版本历史与撤销重做子系统
+        scope:
+            - packages/author-site/src/app/demo/[id]/edit/hooks/useVersionControl.ts
+            - packages/author-site/src/app/demo/[id]/edit/hooks/useCommandHistory.ts
+            - packages/author-site/src/app/demo/[id]/edit/single-preview-history.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/demo_editor_app/visual_property_panel:
+        dir_name: 可视化属性面板与草稿操作栏
+        title: 可视化属性面板与草稿操作栏
+        scope:
+            - packages/author-site/src/app/demo/[id]/edit/components/VisualPropertyPanel.tsx
+            - packages/author-site/src/app/demo/[id]/edit/components/VisualDraftActionBar.tsx
+            - packages/author-site/src/components/demo/page-config-panel.test.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/explore_wish_cli_pages:
+        dir_name: 作者站点探索_愿望清单_CLI 文档路由页
+        title: 作者站点探索/愿望清单/CLI 文档路由页
+        scope:
+            - packages/author-site/src/app/explore/
+            - packages/author-site/src/app/wish/
+            - packages/author-site/src/app/cli/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/scripts_and_assets:
+        dir_name: 作者站初始化脚本与静态资源
+        title: 作者站初始化脚本与静态资源
+        scope:
+            - packages/author-site/scripts/
+            - packages/author-site/public/
+            - packages/author-site/data/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/server_libs:
+        dir_name: Figma 导出格式解析与校验工具库
+        title: Figma 导出格式解析与校验工具库
+        scope:
+            - packages/author-site/lib/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/shared_components:
+        dir_name: 作者站点共享 UI 组件与布局
+        title: 作者站点共享 UI 组件与布局
+        scope:
+            - packages/author-site/src/components/ui/
+            - packages/author-site/src/components/providers/
+            - packages/author-site/src/components/layout/
+            - packages/author-site/src/components/settings/
+            - packages/author-site/src/components/cover-image-dialog.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    author_site/viewer_app:
+        dir_name: Demo 预览与嵌入页面（Viewer & Embed）
+        title: Demo 预览与嵌入页面（Viewer & Embed）
+        scope:
+            - packages/author-site/src/app/viewer/
+            - packages/author-site/src/app/embed/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    data_artifacts:
+        dir_name: 运行时数据与问题追踪持久化
+        title: 运行时数据与问题追踪持久化
+        scope:
+            - data/
+            - issues/
+            - tmp/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: agent_service
+            - path: author_site
+    demo_ui:
+        dir_name: Demo 预览与画布 UI 组件库
+        title: Demo 预览与画布 UI 组件库
+        scope:
+            - packages/demo-ui/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: author_site/demo_editor_app
+            - path: viewer_site
+    docs:
+        dir_name: 项目文档与方案归档
+        title: 项目文档与方案归档
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+    infra_docker:
+        dir_name: 工作bench多服务容器镜像构建
+        title: 工作bench多服务容器镜像构建
+        scope:
+            - docker/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: agent_service
+            - path: author_site
+            - path: screenshot_service
+            - path: scripts
+            - path: viewer_site
+    knowledge_service:
+        dir_name: 知识索引与检索服务（Core + Service）
+        title: 知识索引与检索服务（Core + Service）
+        scope:
+            - packages/knowledge-service/
+            - packages/knowledge-core/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: shared_lib
+    ops_cli:
+        dir_name: Agent Service 运维诊断 CLI（ops-cli）
+        title: Agent Service 运维诊断 CLI（ops-cli）
+        scope:
+            - OPS/CLI/
+        source_files: []
+        children:
+            - ops_cli/diagnostics_health
+            - ops_cli/file_workspace
+            - ops_cli/http_interactive
+            - ops_cli/session_commands
+            - ops_cli/system_models
+        depends_on: []
+        related_to:
+            - path: agent_service
+    ops_cli/diagnostics_health:
+        dir_name: 运维诊断与健康检查命令集
+        title: 运维诊断与健康检查命令集
+        scope:
+            - OPS/CLI/src/commands/diagnose.ts
+            - OPS/CLI/src/commands/diagnostics.ts
+            - OPS/CLI/src/commands/logs.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ops_cli/file_workspace:
+        dir_name: 工作空间与文件变更 CLI 命令
+        title: 工作空间与文件变更 CLI 命令
+        scope:
+            - OPS/CLI/src/commands/files.ts
+            - OPS/CLI/src/commands/workspace.ts
+            - OPS/CLI/src/commands/workspace-authority.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ops_cli/http_interactive:
+        dir_name: Agent 服务交互与诊断命令
+        title: Agent 服务交互与诊断命令
+        scope:
+            - OPS/CLI/src/commands/http-message.ts
+            - OPS/CLI/src/commands/interactive.ts
+            - OPS/CLI/src/commands/health.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: ops_cli/system_models
+    ops_cli/session_commands:
+        dir_name: 会话管理命令（列表_详情_销毁）
+        title: 会话管理命令（列表/详情/销毁）
+        scope:
+            - OPS/CLI/src/commands/destroy-session.ts
+            - OPS/CLI/src/commands/list-sessions.ts
+            - OPS/CLI/src/commands/session-info.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ops_cli/system_models:
+        dir_name: 系统诊断、模型列表与 WebSocket 流式测试命令
+        title: 系统诊断、模型列表与 WebSocket 流式测试命令
+        scope:
+            - OPS/CLI/src/commands/system.ts
+            - OPS/CLI/src/commands/models.ts
+            - OPS/CLI/src/commands/websocket-stream.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: ops_cli/http_interactive
+    preview_contract:
+        dir_name: 预览页面运行时契约与编译器
+        title: 预览页面运行时契约与编译器
+        scope:
+            - packages/preview-contract/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: viewer_site
+    project_core:
+        dir_name: 项目核心服务与脚手架导出
+        title: 项目核心服务与脚手架导出
+        scope:
+            - packages/project-core/
+            - packages/project-scaffold/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site/api_projects_workspaces/publish_pipeline
+    screenshot_service:
+        dir_name: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
+        title: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
+        scope:
+            - packages/screenshot-service/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: infra_docker
+    scripts:
+        dir_name: 仓库级构建、部署与开发诊断脚本集
+        title: 仓库级构建、部署与开发诊断脚本集
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: infra_docker
+    shared_lib:
+        dir_name: Workbench 共享类型与领域契约库
+        title: Workbench 共享类型与领域契约库
+        scope:
+            - packages/shared/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: agent_service
+            - path: knowledge_service
+    sketch_system:
+        dir_name: Sketch SDK 三层包体系
+        title: Sketch SDK 三层包体系
+        scope:
+            - packages/sketch-core/
+            - packages/sketch-react/
+            - packages/sketch-playground/
+        source_files: []
+        children:
+            - sketch_system/sketch_core
+            - sketch_system/sketch_playground
+            - sketch_system/sketch_react
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: tests
+    sketch_system/sketch_core:
+        dir_name: 手绘场景核心数据与渲染引擎
+        title: 手绘场景核心数据与渲染引擎
+        scope:
+            - packages/sketch-core/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    sketch_system/sketch_playground:
+        dir_name: Sketch SDK 交互式开发沙盒
+        title: Sketch SDK 交互式开发沙盒
+        scope:
+            - packages/sketch-playground/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    sketch_system/sketch_react:
+        dir_name: Sketch 可视化编辑器 React 组件库
+        title: Sketch 可视化编辑器 React 组件库
+        scope:
+            - packages/sketch-react/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    tests:
+        dir_name: E2E 端到端测试套件（创作端与 Sketch Playground）
+        title: E2E 端到端测试套件（创作端与 Sketch Playground）
+        scope:
+            - test/
+            - test-results/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: author_site
+            - path: sketch_system
+    viewer_site:
+        dir_name: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+        title: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+        scope:
+            - packages/viewer-site/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: demo_ui
+            - path: infra_docker
+            - path: preview_contract

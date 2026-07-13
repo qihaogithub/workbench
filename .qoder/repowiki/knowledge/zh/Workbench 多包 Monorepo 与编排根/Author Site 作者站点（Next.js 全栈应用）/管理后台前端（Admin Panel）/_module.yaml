@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: author_site/admin_panel
+title: 管理后台前端（Admin Panel）
+scope:
+    - packages/author-site/src/app/admin/
+    - packages/author-site/src/lib/admin-auth.ts
+source_files: []
+depends_on: []
+related_to: []

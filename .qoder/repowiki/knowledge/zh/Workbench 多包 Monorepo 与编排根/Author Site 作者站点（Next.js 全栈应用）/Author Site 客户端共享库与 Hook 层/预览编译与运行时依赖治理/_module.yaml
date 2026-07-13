@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: author_site/client_libs/preview_compiler
+title: 预览编译与运行时依赖治理
+scope:
+    - packages/author-site/src/lib/compiler.ts
+    - packages/author-site/src/lib/compiler-client.ts
+    - packages/author-site/src/lib/preview-runtime-manifest.ts
+    - packages/author-site/src/lib/preview-dependency-policy.ts
+    - packages/author-site/src/lib/preview-module-store.ts
+    - packages/author-site/src/lib/preview-page-code.ts
+    - packages/author-site/src/lib/preview-projection-tracker.ts
+    - packages/author-site/src/lib/preview-size.ts
+    - packages/author-site/src/lib/preview-validation.ts
+    - packages/author-site/src/lib/canvas-layout-file.ts
+    - packages/author-site/src/lib/sandpack-deps.ts
+    - packages/author-site/src/lib/rewrite-local-paths.ts
+    - packages/author-site/src/lib/auto-preview-repair-guard.ts
+source_files: []
+depends_on: []
+related_to: []

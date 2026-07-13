@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: author_site/api_projects_workspaces/publish_pipeline
+title: 项目发布与物化 API
+scope:
+    - packages/author-site/src/app/api/projects/[projectId]/publish/
+    - packages/author-site/src/app/api/projects/[projectId]/publish-status/
+    - packages/author-site/src/app/api/projects/[projectId]/materialize/
+source_files: []
+depends_on: []
+related_to:
+    - path: project_core

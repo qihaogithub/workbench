@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: agent_service/agent_service_server/core_agent_runtime
+title: Agent 运行时核心与事件总线
+scope:
+    - packages/agent-service/src/core/
+    - packages/agent-service/src/events/
+source_files: []
+depends_on: []
+related_to: []

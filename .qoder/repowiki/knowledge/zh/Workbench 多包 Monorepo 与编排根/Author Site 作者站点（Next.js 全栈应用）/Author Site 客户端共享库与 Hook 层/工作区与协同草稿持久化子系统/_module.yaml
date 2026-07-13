@@ -1,0 +1,16 @@
+schema_version: 1
+module_path: author_site/client_libs/workspace_files
+title: 工作区与协同草稿持久化子系统
+scope:
+    - packages/author-site/src/lib/workspace-manager.ts
+    - packages/author-site/src/lib/workspace-file-utils.ts
+    - packages/author-site/src/lib/workspace-flush.ts
+    - packages/author-site/src/lib/workspace-autosave-scheduler.ts
+    - packages/author-site/src/lib/workspace-offline-drafts.ts
+    - packages/author-site/src/lib/workspace-performance-sampling.ts
+    - packages/author-site/src/lib/workspace-save-state-machine.ts
+    - packages/author-site/src/lib/client-workspace-flush.ts
+    - packages/author-site/src/lib/live-workspace-route-context.ts
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: sketch_system/sketch_core
+title: 手绘场景核心数据与渲染引擎
+scope:
+    - packages/sketch-core/
+source_files: []
+depends_on: []
+related_to: []

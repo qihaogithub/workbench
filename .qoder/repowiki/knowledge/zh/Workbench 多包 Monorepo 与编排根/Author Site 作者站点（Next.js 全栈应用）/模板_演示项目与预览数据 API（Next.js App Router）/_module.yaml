@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: author_site/api_templates_demos_viewer_data
+title: 模板/演示项目与预览数据 API（Next.js App Router）
+scope:
+    - packages/author-site/src/app/api/templates/
+    - packages/author-site/src/app/api/demos/
+    - packages/author-site/src/app/api/viewer/
+source_files: []
+depends_on: []
+related_to: []

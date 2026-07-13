@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: author_site/api_sessions_canvas/project_session_helpers
+title: 会话清理与项目/元数据管理 API
+scope:
+    - packages/author-site/src/app/api/sessions/cleanup/
+    - packages/author-site/src/app/api/sessions/project/
+    - packages/author-site/src/app/api/sessions/[sessionId]/meta/
+source_files: []
+depends_on: []
+related_to: []

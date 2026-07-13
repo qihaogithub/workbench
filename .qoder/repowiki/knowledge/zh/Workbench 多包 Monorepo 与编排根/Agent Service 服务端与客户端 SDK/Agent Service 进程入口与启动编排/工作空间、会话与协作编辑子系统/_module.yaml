@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: agent_service/agent_service_server/workspace_session
+title: 工作空间、会话与协作编辑子系统
+scope:
+    - packages/agent-service/src/workspace/
+    - packages/agent-service/src/session/
+    - packages/agent-service/src/collab/
+source_files: []
+depends_on: []
+related_to: []
