@@ -11,6 +11,7 @@ out
 .env.*.local
 .playwright-cli/*
 .worktrees
+.qoder
 /test/**/test-outputs/
 /data/agent-run-logs/
 /data/screenshots/

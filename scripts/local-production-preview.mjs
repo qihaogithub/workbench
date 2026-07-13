@@ -147,27 +147,17 @@ const sleep = (ms) =>
     setTimeout(resolvePromise, ms);
   });
 
-async function stopLocalAuthorProcesses() {
-  const composePs = spawnSync(
-    "docker",
-    ["compose", "ps", "-q", "author-site"],
-    { cwd: PROJECT_DIR, encoding: "utf8" },
+/**
+ * 向指定端口的 LISTEN 进程发送 SIGTERM，等待后对残留进程发送 SIGKILL。
+ * 端口空闲时直接返回。返回值为是否进行了 kill 操作。
+ */
+async function terminateByPort(port, label = `${port}`) {
+  const pids = findListeningPids(port);
+  if (pids.length === 0) return false;
+
+  console.log(
+    `[本地准生产预览] 停止 ${label} 端口现有进程: ${pids.join(", ")}`,
   );
-
-  if (composePs.status === 0 && composePs.stdout.trim()) {
-    console.log(
-      "[本地准生产预览] 停止本项目 Docker author-site，保留其他服务和 data。",
-    );
-    run("docker", ["compose", "stop", "author-site"]);
-  }
-
-  const pids = findListeningPids(AUTHOR_PORT);
-  if (pids.length === 0) {
-    console.log("[本地准生产预览] 3200 端口已空闲。");
-    return;
-  }
-
-  console.log(`[本地准生产预览] 停止 3200 端口现有进程: ${pids.join(", ")}`);
   for (const pid of pids) {
     try {
       process.kill(pid, "SIGTERM");
@@ -184,6 +174,51 @@ async function stopLocalAuthorProcesses() {
       if (error.code !== "ESRCH") throw error;
     }
   }
+  return true;
+}
+
+/**
+ * 释放指定端口：先终止残留进程，再轮询等待端口真正空闲。
+ * 超时则抛出错误，避免后续 EADDRINUSE 启动失败。
+ */
+async function freePort(port, label = `${port}`, timeoutMs = 10_000) {
+  await terminateByPort(port, label);
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (findListeningPids(port).length === 0) return;
+    await sleep(500);
+  }
+  const remaining = findListeningPids(port);
+  if (remaining.length > 0) {
+    throw new Error(
+      `${label} 端口在 ${timeoutMs / 1000}s 内未释放，残留 PID(s): ${remaining.join(", ")}`,
+    );
+  }
+}
+
+async function stopLocalAuthorProcesses() {
+  const composePs = spawnSync(
+    "docker",
+    ["compose", "ps", "-q", "author-site"],
+    { cwd: PROJECT_DIR, encoding: "utf8" },
+  );
+
+  if (composePs.status === 0 && composePs.stdout.trim()) {
+    console.log(
+      "[本地准生产预览] 停止本项目 Docker author-site，保留其他服务和 data。",
+    );
+    run("docker", ["compose", "stop", "author-site"]);
+    // docker compose stop 是同步阻塞的，但容器退出到端口释放可能仍有延迟，
+    // 后续由 freePort 统一兜底。
+  }
+
+  if (findListeningPids(AUTHOR_PORT).length === 0) {
+    console.log("[本地准生产预览] 3200 端口已空闲。");
+    return;
+  }
+
+  await freePort(AUTHOR_PORT, "3200");
+  console.log("[本地准生产预览] 3200 端口已空闲。");
 }
 
 async function isServiceHealthy(url) {
@@ -237,20 +272,7 @@ async function ensureService(
     `[本地准生产预览] ${name} 未运行，自动以 dev 模式启动 (${filter})…`,
   );
   for (const port of ports) {
-    const pids = findListeningPids(port);
-    if (pids.length > 0) {
-      console.log(
-        `[本地准生产预览] 释放 ${port} 端口残留进程: ${pids.join(", ")}`,
-      );
-      for (const pid of pids) {
-        try {
-          process.kill(pid, "SIGTERM");
-        } catch (error) {
-          if (error.code !== "ESRCH") throw error;
-        }
-      }
-      await sleep(SHUTDOWN_WAIT_MS);
-    }
+    await freePort(port, `${port} (${name})`);
   }
 
   const child = spawn("corepack", ["pnpm", "--filter", filter, "dev"], {
@@ -361,6 +383,9 @@ try {
     }
     process.exit(0);
   }
+
+  // 启动 author-site 前再次释放 3200，防止构建期间端口被重新占用。
+  await freePort(AUTHOR_PORT, "3200");
 
   console.log("[本地准生产预览] 启动 http://localhost:3200");
   const authorChild = spawn(process.execPath, [standaloneServerPath], {
