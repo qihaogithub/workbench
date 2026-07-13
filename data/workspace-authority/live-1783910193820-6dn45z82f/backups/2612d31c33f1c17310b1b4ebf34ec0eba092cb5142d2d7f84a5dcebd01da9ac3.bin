@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "heroTitle": {
+      "type": "string",
+      "default": "创新科技，智造未来",
+      "description": "主标题"
+    },
+    "heroSubtitle": {
+      "type": "string",
+      "default": "我们致力于通过前沿技术，为企业提供智能化解决方案，助力数字化转型",
+      "description": "副标题"
+    },
+    "ctaLabel": {
+      "type": "string",
+      "default": "了解详情",
+      "description": "按钮文字"
+    },
+    "featuresTitle": {
+      "type": "string",
+      "default": "核心优势",
+      "description": "特色区域标题"
+    }
+  },
+  "required": ["heroTitle", "ctaLabel"]
+}

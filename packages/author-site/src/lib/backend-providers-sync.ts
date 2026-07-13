@@ -6,14 +6,21 @@ import {
   type PushResult,
 } from "./agent-providers";
 import { readDbConfigWithMeta } from "./db-config";
+import { getServerAgentServiceUrl } from "./runtime-config";
 
 const CONFIG_ID = "model_config";
 const STARTUP_SYNC_DELAY_MS = 3000;
 const BASE_RETRY_DELAY_MS = 2000;
 const MAX_RETRY_DELAY_MS = 60_000;
 const MAX_RETRY_ATTEMPTS = 8;
+const RECOVERY_CHECK_INTERVAL_MS = 15_000;
 
-export type BackendProvidersSyncSource = "startup" | "save" | "manual" | "retry";
+export type BackendProvidersSyncSource =
+  | "startup"
+  | "save"
+  | "manual"
+  | "retry"
+  | "recovery";
 
 export interface StoredBackendProvidersSummary {
   exists: boolean;
@@ -59,6 +66,8 @@ interface StoredBackendProviders {
 
 let startupScheduled = false;
 let retryTimer: NodeJS.Timeout | null = null;
+let recoveryTimer: NodeJS.Timeout | null = null;
+let lastAgentReachable: boolean | null = null;
 let syncState: BackendProvidersSyncRuntimeState = {
   inProgress: false,
   attemptCount: 0,
@@ -157,10 +166,16 @@ function updateStateForResult(result: PushResult): void {
 
   if (result.ok) {
     clearRetryTimer();
+    stopRecoveryMonitoring();
+    syncState = { ...syncState, attemptCount: 0 };
+  } else if (hasExhaustedRetries()) {
+    startRecoveryMonitoring();
   }
 }
 
-function updateStateForMissingConfig(source: BackendProvidersSyncSource): PushResult {
+function updateStateForMissingConfig(
+  source: BackendProvidersSyncSource,
+): PushResult {
   const result: PushResult = {
     ok: false,
     message: "数据库中没有 backendProviders 配置",
@@ -259,6 +274,81 @@ export function scheduleStartupBackendProvidersSync(): void {
   unrefTimer(timer);
 }
 
+// ── Agent-service 健康恢复监控 ──
+
+async function checkAgentServiceHealth(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    unrefTimer(timeout);
+    const res = await fetch(`${getServerAgentServiceUrl()}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function hasPendingRetry(): boolean {
+  return Boolean(retryTimer);
+}
+
+function hasExhaustedRetries(): boolean {
+  return (
+    !retryTimer &&
+    syncState.attemptCount >= MAX_RETRY_ATTEMPTS &&
+    syncState.lastResult?.ok === false
+  );
+}
+
+async function recoveryTick(): Promise<void> {
+  const reachable = await checkAgentServiceHealth();
+  const wasUnreachable = lastAgentReachable === false;
+  lastAgentReachable = reachable;
+
+  if (
+    reachable &&
+    wasUnreachable &&
+    !hasPendingRetry() &&
+    !syncState.inProgress
+  ) {
+    console.log(
+      "[BackendProviders Sync] agent-service recovered, triggering auto-sync",
+    );
+    void syncStoredBackendProvidersToAgent("recovery", {
+      scheduleRetryOnFailure: true,
+    });
+  }
+}
+
+function startRecoveryMonitoring(): void {
+  if (recoveryTimer) return;
+  lastAgentReachable = false;
+  recoveryTimer = setInterval(() => {
+    void recoveryTick();
+  }, RECOVERY_CHECK_INTERVAL_MS);
+  unrefTimer(recoveryTimer);
+  console.log(
+    `[BackendProviders Sync] recovery monitoring started (interval=${RECOVERY_CHECK_INTERVAL_MS / 1000}s)`,
+  );
+}
+
+function stopRecoveryMonitoring(): void {
+  if (recoveryTimer) {
+    clearInterval(recoveryTimer);
+    recoveryTimer = null;
+    lastAgentReachable = null;
+  }
+}
+
+/** @internal exported for unit testing only */
+export {
+  recoveryTick as _recoveryTick,
+  stopRecoveryMonitoring as _stopRecoveryMonitoring,
+};
+
 export async function getBackendProvidersSyncStatus(): Promise<BackendProvidersSyncStatus> {
   const stored = readStoredBackendProvidersConfig();
   const agentResult = await fetchBackendProvidersFromAgent();
@@ -266,17 +356,18 @@ export async function getBackendProvidersSyncStatus(): Promise<BackendProvidersS
   return {
     dbConfig: stored.summary,
     syncState: getBackendProvidersSyncStateSnapshot(),
-    agentConfig: agentResult.ok && agentResult.config
-      ? {
-          reachable: true,
-          providerCount: agentResult.config.providers.length,
-          activeProviderId: agentResult.config.activeProviderId,
-          activeModelId: agentResult.config.activeModelId,
-        }
-      : {
-          reachable: false,
-          providerCount: 0,
-          message: agentResult.message || "agent-service 配置状态不可用",
-        },
+    agentConfig:
+      agentResult.ok && agentResult.config
+        ? {
+            reachable: true,
+            providerCount: agentResult.config.providers.length,
+            activeProviderId: agentResult.config.activeProviderId,
+            activeModelId: agentResult.config.activeModelId,
+          }
+        : {
+            reachable: false,
+            providerCount: 0,
+            message: agentResult.message || "agent-service 配置状态不可用",
+          },
   };
 }
