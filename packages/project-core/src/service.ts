@@ -11,9 +11,7 @@ import {
   type RuntimeContractIssue,
 } from "@workbench/preview-contract/runtime";
 import { compilePreviewPageSource } from "@workbench/preview-contract/compiler";
-import {
-  validateSketchSceneDocument,
-} from "@workbench/sketch-core";
+import { validateSketchSceneDocument } from "@workbench/sketch-core";
 import type {
   DemoFiles,
   DemoFolderMeta,
@@ -159,6 +157,17 @@ import {
   ok,
   fail,
 } from "./utils.js";
+
+interface CanonicalWorkspaceProof {
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
+}
+
+interface WorkspaceMetadataFile {
+  scope?: "live" | "branch" | "snapshot-source" | "legacy";
+  [key: string]: unknown;
+}
 
 export class ProjectAdminService {
   readonly dataDir: string;
@@ -4298,9 +4307,7 @@ export class ProjectAdminService {
     return ok({ sessionId, logs });
   }
 
-  aiWorkspaceContext(
-    sessionId: string,
-  ): ProjectAdminResult<{
+  aiWorkspaceContext(sessionId: string): ProjectAdminResult<{
     sessionId: string;
     workspacePath?: string;
     files: string[];
@@ -5617,11 +5624,14 @@ export class ProjectAdminService {
       );
     }
     if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
-      addIssue({
-        code: "PROTOTYPE_HTML_TOO_LARGE",
-        message: "原型页 HTML 超过 MVP 限制",
-        instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
-      }, "repair_prototype");
+      addIssue(
+        {
+          code: "PROTOTYPE_HTML_TOO_LARGE",
+          message: "原型页 HTML 超过 MVP 限制",
+          instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
+        },
+        "repair_prototype",
+      );
     }
     if (css.length > MAX_PROTOTYPE_CSS_LENGTH) {
       addIssue(

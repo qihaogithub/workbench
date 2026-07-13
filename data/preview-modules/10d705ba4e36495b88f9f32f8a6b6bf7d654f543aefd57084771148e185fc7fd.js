@@ -8,11 +8,11 @@ import {jsxs as _jsxs, jsx as _jsx} from "http://localhost:3200/preview-runtime/
 
 export default function ContactSection(props) {
   const {
-    contactEmail,
-    contactPhone,
-    address,
-    workingHours,
-    showFooter,
+    contactEmail = "contact@startech.com",
+    contactPhone = "400-888-9999",
+    address = "北京市朝阳区科技大厦 A 座 18 层",
+    workingHours = "周一至周五 9:00 - 18:00",
+    showFooter = true,
   } = props;
 
   const p = props ;
@@ -181,8 +181,7 @@ export default function ContactSection(props) {
                     , _jsx('input', {
                       type: "text",
                       placeholder: "您的姓名",
-                      className: "w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 text-sm"         ,
-                      style: { focusRing: primaryColor },}
+                      className: "w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 text-sm"         ,}
                     )
                   ]})
                   , _jsxs('div', { children: [
