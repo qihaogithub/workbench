@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/2a6e230f-8d3a-4c46-8b7c-a0d51eb19fd2
+title: Agent 服务交互与诊断命令
+scope:
+    - OPS/CLI/src/commands/http-message.ts
+    - OPS/CLI/src/commands/interactive.ts
+    - OPS/CLI/src/commands/health.ts
+source_files: []
+depends_on: []
+related_to: []

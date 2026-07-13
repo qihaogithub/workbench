@@ -1,11 +1,8 @@
 ---
 kind: external_dependency
 name: Figma MCP 服务
-slug: figma-mcp
+slug: figma-mcp-服务
 category: external_dependency
-category_hints:
-    - vendor_identity
-    - auth_protocol
 scope:
     - '**'
 ---

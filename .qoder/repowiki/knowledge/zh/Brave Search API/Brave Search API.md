@@ -1,11 +1,8 @@
 ---
 kind: external_dependency
 name: Brave Search API
-slug: brave-search
+slug: brave-search-api
 category: external_dependency
-category_hints:
-    - vendor_identity
-    - auth_protocol
 scope:
     - '**'
 ---

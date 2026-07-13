@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 77c50bda-cadb-4114-b9ad-c46b71719a06/5805a2c0-3a39-4716-8007-1cef5c831b85
+title: 演示编辑器导入导出与知识库弹窗工具
+scope:
+    - packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx
+    - packages/author-site/src/components/demo/save-template-dialog.tsx
+    - packages/author-site/src/components/demo/KnowledgeDocDialog.tsx
+source_files: []
+depends_on: []
+related_to: []

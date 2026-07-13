@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746
+title: Agent Service 进程入口与启动编排
+scope:
+    - packages/agent-service/
+source_files: []
+depends_on: []
+related_to: []

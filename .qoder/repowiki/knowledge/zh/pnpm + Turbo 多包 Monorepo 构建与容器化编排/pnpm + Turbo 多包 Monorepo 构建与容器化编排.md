@@ -1,20 +1,10 @@
 ---
 kind: build_system
 name: pnpm + Turbo 多包 Monorepo 构建与容器化编排
+slug: build_system
 category: build_system
 scope:
     - '**'
-source_files:
-    - package.json
-    - turbo.json
-    - pnpm-workspace.yaml
-    - docker-compose.yml
-    - scripts/deploy.sh
-    - scripts/docker-build-check.sh
-    - docker/agent-service/Dockerfile
-    - docker/author-site/Dockerfile
-    - scripts/check-contracts.mjs
-    - scripts/check-workspace-deploy-preflight.mjs
 ---
 
 ## 1. 系统概览

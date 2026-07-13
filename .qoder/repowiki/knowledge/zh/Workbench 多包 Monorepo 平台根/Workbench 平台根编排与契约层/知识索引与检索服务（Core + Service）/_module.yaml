@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/2a808b9b-76c0-4dc7-9935-630852f69500
+title: 知识索引与检索服务（Core + Service）
+scope:
+    - packages/knowledge-service/
+    - packages/knowledge-core/
+source_files: []
+depends_on: []
+related_to: []

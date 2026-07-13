@@ -1,11 +1,8 @@
 ---
 kind: external_dependency
 name: Puppeteer 浏览器自动化
-slug: puppeteer
+slug: puppeteer-浏览器自动化
 category: external_dependency
-category_hints:
-    - vendor_identity
-    - client_constraint
 scope:
     - '**'
 ---

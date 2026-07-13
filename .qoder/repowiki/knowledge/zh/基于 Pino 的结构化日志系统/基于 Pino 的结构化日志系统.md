@@ -1,15 +1,10 @@
 ---
 kind: logging_system
 name: 基于 Pino 的结构化日志系统
+slug: logging_system
 category: logging_system
 scope:
     - '**'
-source_files:
-    - packages/agent-service/src/utils/logger.ts
-    - packages/agent-service/src/server.ts
-    - packages/screenshot-service/src/server.ts
-    - packages/agent-service/package.json
-    - packages/screenshot-service/package.json
 ---
 
 ## 系统概述

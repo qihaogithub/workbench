@@ -3,224 +3,27 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-07-13T02:41:24Z"
+exported_at: "2026-07-13T03:10:21Z"
 modules:
     "":
-        dir_name: Workbench 多包 Monorepo 编排根
-        title: Workbench 多包 Monorepo 编排根
-        scope:
-            - AGENTS.md
-            - .gitignore
-            - .npmrc
-            - pnpm-workspace.yaml
-            - package.json
-            - pnpm-lock.yaml
-            - turbo.json
-            - docker-compose.yml
-            - .dockerignore
-            - .env.docker
-            - .env.example
-            - CLAUDE.md
+        dir_name: Workbench 多包 Monorepo 平台根
+        title: Workbench 多包 Monorepo 平台根
+        scope: []
         source_files: []
         children:
-            - agent_service
-            - author_site
-            - data_artifacts
-            - demo_ui
-            - docs
-            - infra_docker
-            - knowledge_service
-            - ops_cli
-            - preview_contract
-            - project_core
-            - screenshot_service
-            - scripts
-            - shared_lib
-            - sketch_system
-            - tests
-            - viewer_site
+            - 0ecacaa0-1692-427d-bfdb-c831073b559d
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92
+            - 77c50bda-cadb-4114-b9ad-c46b71719a06
+            - agents_skills
+            - ba873606-b4ac-4314-832c-340d5d615790
+            - bcff1473-ab8b-41c5-8a01-8528fbe47684
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31
+            - f182ce66-05a1-413c-9e03-8471e20ce412
+            - f76336ab-f8cf-4b05-a578-36dd826c1969
         depends_on: []
         related_to: []
-    agent_service:
-        dir_name: Agent Service 服务端与客户端 SDK
-        title: Agent Service 服务端与客户端 SDK
-        scope:
-            - packages/agent-service/
-            - packages/agent-client/
-        source_files: []
-        children:
-            - agent_service/agent_client_sdk
-            - agent_service/agent_service_server
-        depends_on: []
-        related_to: []
-    agent_service/agent_client_sdk:
-        dir_name: Agent Service HTTP_WS 客户端 SDK
-        title: Agent Service HTTP/WS 客户端 SDK
-        scope:
-            - packages/agent-client/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: author_site/api_ai_chat_knowledge
-            - path: author_site/client_libs/agent_ai_chat
-            - path: ops_cli/http_interactive
-            - path: ops_cli/session_commands
-            - path: ops_cli/system_models
-    agent_service/agent_service_server:
-        dir_name: Agent Service 进程入口与启动编排
-        title: Agent Service 进程入口与启动编排
-        scope:
-            - packages/agent-service/
-        source_files: []
-        children:
-            - agent_service/agent_service_server/backends_providers
-            - agent_service/agent_service_server/core_agent_runtime
-            - agent_service/agent_service_server/routes_api_layer
-            - agent_service/agent_service_server/shared_infrastructure
-            - agent_service/agent_service_server/tests
-            - agent_service/agent_service_server/tools_pi_tools
-            - agent_service/agent_service_server/workspace_session
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/backends_providers:
-        dir_name: AI 后端适配器与供应商配置中心
-        title: AI 后端适配器与供应商配置中心
-        scope:
-            - packages/agent-service/src/backends/
-            - packages/agent-service/src/config/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/core_agent_runtime:
-        dir_name: Agent 运行时核心与事件总线
-        title: Agent 运行时核心与事件总线
-        scope:
-            - packages/agent-service/src/core/
-            - packages/agent-service/src/events/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/routes_api_layer:
-        dir_name: Agent Service HTTP_WebSocket API 路由层
-        title: Agent Service HTTP/WebSocket API 路由层
-        scope:
-            - packages/agent-service/src/routes/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/shared_infrastructure:
-        dir_name: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
-        title: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
-        scope:
-            - packages/agent-service/src/utils/
-            - packages/agent-service/src/services/
-            - packages/agent-service/src/scripts/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/tests:
-        dir_name: Agent Service 测试套件（Vitest）
-        title: Agent Service 测试套件（Vitest）
-        scope:
-            - packages/agent-service/tests/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/tools_pi_tools:
-        dir_name: Pi Agent 工具集与执行期管理器
-        title: Pi Agent 工具集与执行期管理器
-        scope:
-            - packages/agent-service/src/backends/pi-tools/
-            - packages/agent-service/src/backends/managers/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    agent_service/agent_service_server/workspace_session:
-        dir_name: 工作空间生命周期、会话持久化与 Yjs 协作层
-        title: 工作空间生命周期、会话持久化与 Yjs 协作层
-        scope:
-            - packages/agent-service/src/workspace/
-            - packages/agent-service/src/session/
-            - packages/agent-service/src/collab/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site:
-        dir_name: 作者站点（Author Site）
-        title: 作者站点（Author Site）
-        scope:
-            - packages/author-site/
-        source_files: []
-        children:
-            - author_site/admin_panel
-            - author_site/ai_chat_components
-            - author_site/api_ai_chat_knowledge
-            - author_site/api_auth_user_admin
-            - author_site/api_projects_workspaces
-            - author_site/api_screenshots_preview
-            - author_site/api_sessions_canvas
-            - author_site/api_templates_demos_viewer_data
-            - author_site/auth_routes_and_ui
-            - author_site/client_libs
-            - author_site/demo_editor_app
-            - author_site/explore_wish_cli_pages
-            - author_site/scripts_and_assets
-            - author_site/server_libs
-            - author_site/shared_components
-            - author_site/viewer_app
-        depends_on: []
-        related_to: []
-    author_site/admin_panel:
-        dir_name: 管理后台前端（Admin Panel）
-        title: 管理后台前端（Admin Panel）
-        scope:
-            - packages/author-site/src/app/admin/
-            - packages/author-site/src/lib/admin-auth.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/ai_chat_components:
-        dir_name: AI 对话与流式渲染组件集
-        title: AI 对话与流式渲染组件集
-        scope:
-            - packages/author-site/src/components/ai-elements/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_ai_chat_knowledge:
-        dir_name: AI 对话与知识库管理 API
-        title: AI 对话与知识库管理 API
-        scope:
-            - packages/author-site/src/app/api/ai/
-            - packages/author-site/src/app/api/knowledge/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: agent_service/agent_client_sdk
-            - path: knowledge_service
-    author_site/api_auth_user_admin:
-        dir_name: 作者站认证与用户管理 API
-        title: 作者站认证与用户管理 API
-        scope:
-            - packages/author-site/src/app/api/auth/
-            - packages/author-site/src/app/api/user/
-            - packages/author-site/src/app/api/admin/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_projects_workspaces:
+    0ecacaa0-1692-427d-bfdb-c831073b559d:
         dir_name: Author Site 项目与工作区 REST API 网关
         title: Author Site 项目与工作区 REST API 网关
         scope:
@@ -229,34 +32,32 @@ modules:
             - packages/author-site/src/app/api/workspace-authority/
         source_files: []
         children:
-            - author_site/api_projects_workspaces/demos_templates
-            - author_site/api_projects_workspaces/projects_crud
-            - author_site/api_projects_workspaces/publish_pipeline
-            - author_site/api_projects_workspaces/resources_versions
+            - 0ecacaa0-1692-427d-bfdb-c831073b559d/03fb0b84-b50b-49cb-adc7-b919424cb51f
+            - 0ecacaa0-1692-427d-bfdb-c831073b559d/6995829e-a76b-49da-8a41-dd8baf8c2aea
+            - 0ecacaa0-1692-427d-bfdb-c831073b559d/dcd5f70e-9913-49ae-a4d1-a36deca86d1f
         depends_on: []
         related_to: []
-    author_site/api_projects_workspaces/demos_templates:
-        dir_name: Demo 页面与运行时模板 API
-        title: Demo 页面与运行时模板 API
+    0ecacaa0-1692-427d-bfdb-c831073b559d/03fb0b84-b50b-49cb-adc7-b919424cb51f:
+        dir_name: 项目发布与物化 API
+        title: 项目发布与物化 API
         scope:
-            - packages/author-site/src/app/api/projects/[projectId]/demos/
-            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
-        source_files: []
-        children:
-            - author_site/api_projects_workspaces/demos_templates/demos_crud_and_execution
-        depends_on: []
-        related_to: []
-    author_site/api_projects_workspaces/demos_templates/demos_crud_and_execution:
-        dir_name: Demo 页面 CRUD 与运行时切换 API
-        title: Demo 页面 CRUD 与运行时切换 API
-        scope:
-            - packages/author-site/src/app/api/projects/[projectId]/demos/
-            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+            - packages/author-site/src/app/api/projects/[projectId]/publish/
+            - packages/author-site/src/app/api/projects/[projectId]/publish-status/
+            - packages/author-site/src/app/api/projects/[projectId]/materialize/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/api_projects_workspaces/projects_crud:
+    0ecacaa0-1692-427d-bfdb-c831073b559d/6995829e-a76b-49da-8a41-dd8baf8c2aea:
+        dir_name: 资源版本管理 API（列表_创建_读取_恢复）
+        title: 资源版本管理 API（列表/创建/读取/恢复）
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/resources/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    0ecacaa0-1692-427d-bfdb-c831073b559d/dcd5f70e-9913-49ae-a4d1-a36deca86d1f:
         dir_name: 项目资源 CRUD API（提交、文件夹、配置）
         title: 项目资源 CRUD API（提交、文件夹、配置）
         scope:
@@ -267,139 +68,25 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/api_projects_workspaces/publish_pipeline:
-        dir_name: 项目发布与物化 API
-        title: 项目发布与物化 API
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959:
+        dir_name: 作者站配置与运行时参数层
+        title: 作者站配置与运行时参数层
         scope:
-            - packages/author-site/src/app/api/projects/[projectId]/publish/
-            - packages/author-site/src/app/api/projects/[projectId]/publish-status/
-            - packages/author-site/src/app/api/projects/[projectId]/materialize/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: project_core
-    author_site/api_projects_workspaces/resources_versions:
-        dir_name: 资源版本管理 API（列表_创建_读取_恢复）
-        title: 资源版本管理 API（列表/创建/读取/恢复）
-        scope:
-            - packages/author-site/src/app/api/projects/[projectId]/resources/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_screenshots_preview:
-        dir_name: 截图生成与预览模块分发 API
-        title: 截图生成与预览模块分发 API
-        scope:
-            - packages/author-site/src/app/api/screenshots/
-            - packages/author-site/src/app/api/preview-modules/
-            - packages/author-site/src/app/api/preview-runtime/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: screenshot_service
-    author_site/api_sessions_canvas:
-        dir_name: 作者站编辑会话 API（按 Session 路由聚合）
-        title: 作者站编辑会话 API（按 Session 路由聚合）
-        scope:
-            - packages/author-site/src/app/api/sessions/
+            - packages/author-site/src/lib/model-config.ts
+            - packages/author-site/src/lib/user-model-config.ts
+            - packages/author-site/src/lib/user-authoring-preferences.ts
+            - packages/author-site/src/lib/runtime-config.ts
+            - packages/author-site/src/lib/runtime-props.ts
+            - packages/author-site/src/lib/config-merge.ts
+            - packages/author-site/src/lib/authoring-feature-flags.ts
+            - packages/author-site/src/lib/db-config.ts
+            - packages/author-site/src/lib/cdn-config.ts
         source_files: []
         children:
-            - author_site/api_sessions_canvas/assets_attachments
-            - author_site/api_sessions_canvas/canvas_state
-            - author_site/api_sessions_canvas/merge_persist
-            - author_site/api_sessions_canvas/project_session_helpers
-            - author_site/api_sessions_canvas/session_core
-            - author_site/api_sessions_canvas/workspace_files
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552
         depends_on: []
         related_to: []
-    author_site/api_sessions_canvas/assets_attachments:
-        dir_name: 会话资源与 AI 附件上传 API
-        title: 会话资源与 AI 附件上传 API
-        scope:
-            - packages/author-site/src/app/api/sessions/[sessionId]/ai-attachments/
-            - packages/author-site/src/app/api/sessions/[sessionId]/assets/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_sessions_canvas/canvas_state:
-        dir_name: 画布布局与自动保存检查点 API
-        title: 画布布局与自动保存检查点 API
-        scope:
-            - packages/author-site/src/app/api/sessions/[sessionId]/canvas-layout/
-            - packages/author-site/src/app/api/sessions/[sessionId]/checkpoint/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_sessions_canvas/merge_persist:
-        dir_name: 会话工作区持久化与合并 API
-        title: 会话工作区持久化与合并 API
-        scope:
-            - packages/author-site/src/app/api/sessions/[sessionId]/merge/
-            - packages/author-site/src/app/api/sessions/[sessionId]/persist-workspace/
-            - packages/author-site/src/app/api/sessions/[sessionId]/workspace-flush/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_sessions_canvas/project_session_helpers:
-        dir_name: 会话清理与项目_元数据管理 API
-        title: 会话清理与项目/元数据管理 API
-        scope:
-            - packages/author-site/src/app/api/sessions/cleanup/
-            - packages/author-site/src/app/api/sessions/project/
-            - packages/author-site/src/app/api/sessions/[sessionId]/meta/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_sessions_canvas/session_core:
-        dir_name: 编辑会话生命周期 API（创建_保存_放弃）
-        title: 编辑会话生命周期 API（创建/保存/放弃）
-        scope:
-            - packages/author-site/src/app/api/sessions/route.ts
-            - packages/author-site/src/app/api/sessions/[sessionId]/discard/
-            - packages/author-site/src/app/api/sessions/[sessionId]/save/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_sessions_canvas/workspace_files:
-        dir_name: Session 工作区与 Demo 页面文件 API
-        title: Session 工作区与 Demo 页面文件 API
-        scope:
-            - packages/author-site/src/app/api/sessions/[sessionId]/workspace/
-            - packages/author-site/src/app/api/sessions/[sessionId]/files/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/api_templates_demos_viewer_data:
-        dir_name: 模板_演示项目与预览数据 API（Next.js App Router）
-        title: 模板/演示项目与预览数据 API（Next.js App Router）
-        scope:
-            - packages/author-site/src/app/api/templates/
-            - packages/author-site/src/app/api/demos/
-            - packages/author-site/src/app/api/viewer/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/auth_routes_and_ui:
-        dir_name: 作者站认证路由与 UI
-        title: 作者站认证路由与 UI
-        scope:
-            - packages/author-site/src/app/(auth)/
-            - packages/author-site/src/components/auth/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/client_libs:
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552:
         dir_name: Author Site 前端共享能力库
         title: Author Site 前端共享能力库
         scope:
@@ -407,49 +94,32 @@ modules:
             - packages/author-site/src/hooks/
         source_files: []
         children:
-            - author_site/client_libs/admin_auth
-            - author_site/client_libs/agent_ai_chat
-            - author_site/client_libs/api_client_utils
-            - author_site/client_libs/db_schema
-            - author_site/client_libs/editor_diagnostics
-            - author_site/client_libs/preview_compiler
-            - author_site/client_libs/prototype_visual_editor
-            - author_site/client_libs/publishing
-            - author_site/client_libs/user_config
-            - author_site/client_libs/workspace_files
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/0ac53af2-7e16-4a72-a9d5-f063e8353677
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/0e324010-f7b9-41a1-8181-a5e9391b6472
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/3ea5dc47-3d30-4d1b-86fc-8f77cdace635
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/512094ef-bc14-41e9-a17a-ff68e8f50d2c
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/75d3661c-342e-4897-9a77-de19d0edc009
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/c1c37c12-815d-40a8-a4cf-9a5fd857b848
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/c5d311de-db2d-477e-8245-4855251881d6
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/f5464b0d-0188-48b3-94f1-2409c9e84383
+            - 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/fb73e700-4add-44af-ad46-0709b0b6a1ea
         depends_on: []
         related_to: []
-    author_site/client_libs/admin_auth:
-        dir_name: 作者站认证与会话管理
-        title: 作者站认证与会话管理
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/0ac53af2-7e16-4a72-a9d5-f063e8353677:
+        dir_name: 原型可视化编辑器与配置注入运行时
+        title: 原型可视化编辑器与配置注入运行时
         scope:
-            - packages/author-site/src/lib/auth/
-            - packages/author-site/src/lib/admin-auth.ts
-            - packages/author-site/src/lib/dingtalk-login.ts
-            - packages/author-site/src/lib/external-auth.ts
-            - packages/author-site/src/lib/session-manager.ts
-            - packages/author-site/src/lib/user.ts
-            - packages/author-site/src/lib/project-admin-service.ts
-            - packages/author-site/src/lib/workspace-authority-browser-client.ts
-            - packages/author-site/src/lib/workspace-authority-client.ts
+            - packages/author-site/src/lib/prototype-visual-editor.ts
+            - packages/author-site/src/lib/prototype-preview-size.ts
+            - packages/author-site/src/lib/visual-configurator.ts
+            - packages/author-site/src/lib/viewer-app-graph-runtime.ts
+            - packages/author-site/src/lib/sketch-editor-engine.ts
+            - packages/author-site/src/lib/screenshot-service.ts
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/agent_ai_chat:
-        dir_name: Author Site Agent 客户端与提示词装配层
-        title: Author Site Agent 客户端与提示词装配层
-        scope:
-            - packages/author-site/src/lib/agent/
-            - packages/author-site/src/lib/agent-prompts/
-            - packages/author-site/src/lib/agent-client.ts
-            - packages/author-site/src/lib/agent-providers.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: agent_service/agent_client_sdk
-    author_site/client_libs/api_client_utils:
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/0e324010-f7b9-41a1-8181-a5e9391b6472:
         dir_name: 作者站 API 客户端与协作文档工具
         title: 作者站 API 客户端与协作文档工具
         scope:
@@ -462,19 +132,36 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/db_schema:
-        dir_name: SQLite 用户数据持久化与 JSON Schema 工具集
-        title: SQLite 用户数据持久化与 JSON Schema 工具集
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/3ea5dc47-3d30-4d1b-86fc-8f77cdace635:
+        dir_name: Author Site Agent 客户端与提示词装配层
+        title: Author Site Agent 客户端与提示词装配层
         scope:
-            - packages/author-site/src/lib/db/
-            - packages/author-site/src/lib/schema-defaults.ts
-            - packages/author-site/src/lib/schema-generator.ts
-            - packages/author-site/src/lib/schema-validator.ts
+            - packages/author-site/src/lib/agent/
+            - packages/author-site/src/lib/agent-prompts/
+            - packages/author-site/src/lib/agent-client.ts
+            - packages/author-site/src/lib/agent-providers.ts
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/editor_diagnostics:
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/75d3661c-342e-4897-9a77-de19d0edc009:
+        dir_name: 工作区与协同草稿持久化子系统
+        title: 工作区与协同草稿持久化子系统
+        scope:
+            - packages/author-site/src/lib/workspace-manager.ts
+            - packages/author-site/src/lib/workspace-file-utils.ts
+            - packages/author-site/src/lib/workspace-flush.ts
+            - packages/author-site/src/lib/workspace-autosave-scheduler.ts
+            - packages/author-site/src/lib/workspace-offline-drafts.ts
+            - packages/author-site/src/lib/workspace-performance-sampling.ts
+            - packages/author-site/src/lib/workspace-save-state-machine.ts
+            - packages/author-site/src/lib/client-workspace-flush.ts
+            - packages/author-site/src/lib/live-workspace-route-context.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/512094ef-bc14-41e9-a17a-ff68e8f50d2c:
         dir_name: 编辑器诊断事件持久化与导出
         title: 编辑器诊断事件持久化与导出
         scope:
@@ -483,7 +170,20 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/preview_compiler:
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/c1c37c12-815d-40a8-a4cf-9a5fd857b848:
+        dir_name: 项目发布与后端配置同步
+        title: 项目发布与后端配置同步
+        scope:
+            - packages/author-site/src/lib/publish-manager.ts
+            - packages/author-site/src/lib/project-api.ts
+            - packages/author-site/src/lib/project-cli-url.ts
+            - packages/author-site/src/lib/project-images.ts
+            - packages/author-site/src/lib/backend-providers-sync.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/c5d311de-db2d-477e-8245-4855251881d6:
         dir_name: 预览编译与运行时依赖治理
         title: 预览编译与运行时依赖治理
         scope:
@@ -504,69 +204,114 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/prototype_visual_editor:
-        dir_name: 原型可视化编辑器与配置注入运行时
-        title: 原型可视化编辑器与配置注入运行时
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/f5464b0d-0188-48b3-94f1-2409c9e84383:
+        dir_name: SQLite 用户数据持久化与 JSON Schema 工具集
+        title: SQLite 用户数据持久化与 JSON Schema 工具集
         scope:
-            - packages/author-site/src/lib/prototype-visual-editor.ts
-            - packages/author-site/src/lib/prototype-preview-size.ts
-            - packages/author-site/src/lib/visual-configurator.ts
-            - packages/author-site/src/lib/viewer-app-graph-runtime.ts
-            - packages/author-site/src/lib/sketch-editor-engine.ts
-            - packages/author-site/src/lib/screenshot-service.ts
+            - packages/author-site/src/lib/db/
+            - packages/author-site/src/lib/schema-defaults.ts
+            - packages/author-site/src/lib/schema-generator.ts
+            - packages/author-site/src/lib/schema-validator.ts
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/publishing:
-        dir_name: 项目发布与后端配置同步
-        title: 项目发布与后端配置同步
+    0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/fb73e700-4add-44af-ad46-0709b0b6a1ea:
+        dir_name: 作者站认证与会话管理
+        title: 作者站认证与会话管理
         scope:
-            - packages/author-site/src/lib/publish-manager.ts
-            - packages/author-site/src/lib/project-api.ts
-            - packages/author-site/src/lib/project-cli-url.ts
-            - packages/author-site/src/lib/project-images.ts
-            - packages/author-site/src/lib/backend-providers-sync.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: project_core
-    author_site/client_libs/user_config:
-        dir_name: 作者站配置与运行时参数层
-        title: 作者站配置与运行时参数层
-        scope:
-            - packages/author-site/src/lib/model-config.ts
-            - packages/author-site/src/lib/user-model-config.ts
-            - packages/author-site/src/lib/user-authoring-preferences.ts
-            - packages/author-site/src/lib/runtime-config.ts
-            - packages/author-site/src/lib/runtime-props.ts
-            - packages/author-site/src/lib/config-merge.ts
-            - packages/author-site/src/lib/authoring-feature-flags.ts
-            - packages/author-site/src/lib/db-config.ts
-            - packages/author-site/src/lib/cdn-config.ts
+            - packages/author-site/src/lib/auth/
+            - packages/author-site/src/lib/admin-auth.ts
+            - packages/author-site/src/lib/dingtalk-login.ts
+            - packages/author-site/src/lib/external-auth.ts
+            - packages/author-site/src/lib/session-manager.ts
+            - packages/author-site/src/lib/user.ts
+            - packages/author-site/src/lib/project-admin-service.ts
+            - packages/author-site/src/lib/workspace-authority-browser-client.ts
+            - packages/author-site/src/lib/workspace-authority-client.ts
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/client_libs/workspace_files:
-        dir_name: 工作区与协同草稿持久化子系统
-        title: 工作区与协同草稿持久化子系统
+    22d9d02b-bd3a-45e8-b811-65f332a97e92:
+        dir_name: 作者站编辑会话 API（按 Session 路由聚合）
+        title: 作者站编辑会话 API（按 Session 路由聚合）
         scope:
-            - packages/author-site/src/lib/workspace-manager.ts
-            - packages/author-site/src/lib/workspace-file-utils.ts
-            - packages/author-site/src/lib/workspace-flush.ts
-            - packages/author-site/src/lib/workspace-autosave-scheduler.ts
-            - packages/author-site/src/lib/workspace-offline-drafts.ts
-            - packages/author-site/src/lib/workspace-performance-sampling.ts
-            - packages/author-site/src/lib/workspace-save-state-machine.ts
-            - packages/author-site/src/lib/client-workspace-flush.ts
-            - packages/author-site/src/lib/live-workspace-route-context.ts
+            - packages/author-site/src/app/api/sessions/
+        source_files: []
+        children:
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/2036808c-d975-4401-a4f5-d77d6ec75ece
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/3eb6d1fe-e5bb-433a-af4f-56845722c0c2
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/9657adcf-e3b3-4ddb-bac2-d2a9a07b6056
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/a0372c12-63b2-4cf4-bc80-ba22d825f2d1
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/c75bc435-c03c-4891-a08c-d8a2600c10db
+            - 22d9d02b-bd3a-45e8-b811-65f332a97e92/df6e2c32-d791-4ed2-a0aa-83d646074d11
+        depends_on: []
+        related_to: []
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/3eb6d1fe-e5bb-433a-af4f-56845722c0c2:
+        dir_name: 编辑会话生命周期 API（创建_保存_放弃）
+        title: 编辑会话生命周期 API（创建/保存/放弃）
+        scope:
+            - packages/author-site/src/app/api/sessions/route.ts
+            - packages/author-site/src/app/api/sessions/[sessionId]/discard/
+            - packages/author-site/src/app/api/sessions/[sessionId]/save/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/demo_editor_app:
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/9657adcf-e3b3-4ddb-bac2-d2a9a07b6056:
+        dir_name: 画布布局与自动保存检查点 API
+        title: 画布布局与自动保存检查点 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/canvas-layout/
+            - packages/author-site/src/app/api/sessions/[sessionId]/checkpoint/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/2036808c-d975-4401-a4f5-d77d6ec75ece:
+        dir_name: 会话资源与 AI 附件上传 API
+        title: 会话资源与 AI 附件上传 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/ai-attachments/
+            - packages/author-site/src/app/api/sessions/[sessionId]/assets/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/a0372c12-63b2-4cf4-bc80-ba22d825f2d1:
+        dir_name: 会话清理与项目_元数据管理 API
+        title: 会话清理与项目/元数据管理 API
+        scope:
+            - packages/author-site/src/app/api/sessions/cleanup/
+            - packages/author-site/src/app/api/sessions/project/
+            - packages/author-site/src/app/api/sessions/[sessionId]/meta/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/c75bc435-c03c-4891-a08c-d8a2600c10db:
+        dir_name: 会话工作区持久化与合并 API
+        title: 会话工作区持久化与合并 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/merge/
+            - packages/author-site/src/app/api/sessions/[sessionId]/persist-workspace/
+            - packages/author-site/src/app/api/sessions/[sessionId]/workspace-flush/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    22d9d02b-bd3a-45e8-b811-65f332a97e92/df6e2c32-d791-4ed2-a0aa-83d646074d11:
+        dir_name: Session 工作区与 Demo 页面文件 API
+        title: Session 工作区与 Demo 页面文件 API
+        scope:
+            - packages/author-site/src/app/api/sessions/[sessionId]/workspace/
+            - packages/author-site/src/app/api/sessions/[sessionId]/files/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    77c50bda-cadb-4114-b9ad-c46b71719a06:
         dir_name: Author Site Demo 编辑器应用
         title: Author Site Demo 编辑器应用
         scope:
@@ -574,46 +319,13 @@ modules:
             - packages/author-site/src/components/demo/
         source_files: []
         children:
-            - author_site/demo_editor_app/canvas_preview_system
-            - author_site/demo_editor_app/import_export_tools
-            - author_site/demo_editor_app/version_history
-            - author_site/demo_editor_app/visual_property_panel
+            - 77c50bda-cadb-4114-b9ad-c46b71719a06/26c45aec-ba64-432d-9e56-ca4de2110eb3
+            - 77c50bda-cadb-4114-b9ad-c46b71719a06/5805a2c0-3a39-4716-8007-1cef5c831b85
+            - 77c50bda-cadb-4114-b9ad-c46b71719a06/819a3ca6-addf-4097-9992-19f0d0f412df
+            - 77c50bda-cadb-4114-b9ad-c46b71719a06/9f1062f2-c26c-4b82-a109-1e0af45f36a0
         depends_on: []
         related_to: []
-    author_site/demo_editor_app/canvas_preview_system:
-        dir_name: Demo 可视化编辑器与画布预览系统
-        title: Demo 可视化编辑器与画布预览系统
-        scope:
-            - packages/author-site/src/app/demo/[id]/edit/
-            - packages/author-site/src/components/demo/home-page.tsx
-            - packages/author-site/src/components/demo/create-demo-dialog.tsx
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/demo_editor_app/import_export_tools:
-        dir_name: 演示编辑器导入导出与知识库弹窗工具
-        title: 演示编辑器导入导出与知识库弹窗工具
-        scope:
-            - packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx
-            - packages/author-site/src/components/demo/save-template-dialog.tsx
-            - packages/author-site/src/components/demo/KnowledgeDocDialog.tsx
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/demo_editor_app/version_history:
-        dir_name: 版本历史与撤销重做子系统
-        title: 版本历史与撤销重做子系统
-        scope:
-            - packages/author-site/src/app/demo/[id]/edit/hooks/useVersionControl.ts
-            - packages/author-site/src/app/demo/[id]/edit/hooks/useCommandHistory.ts
-            - packages/author-site/src/app/demo/[id]/edit/single-preview-history.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    author_site/demo_editor_app/visual_property_panel:
+    77c50bda-cadb-4114-b9ad-c46b71719a06/9f1062f2-c26c-4b82-a109-1e0af45f36a0:
         dir_name: 可视化属性面板与草稿操作栏
         title: 可视化属性面板与草稿操作栏
         scope:
@@ -624,7 +336,81 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/explore_wish_cli_pages:
+    77c50bda-cadb-4114-b9ad-c46b71719a06/26c45aec-ba64-432d-9e56-ca4de2110eb3:
+        dir_name: Demo 可视化编辑器与画布预览系统
+        title: Demo 可视化编辑器与画布预览系统
+        scope:
+            - packages/author-site/src/app/demo/[id]/edit/
+            - packages/author-site/src/components/demo/home-page.tsx
+            - packages/author-site/src/components/demo/create-demo-dialog.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    77c50bda-cadb-4114-b9ad-c46b71719a06/819a3ca6-addf-4097-9992-19f0d0f412df:
+        dir_name: 版本历史与撤销重做子系统
+        title: 版本历史与撤销重做子系统
+        scope:
+            - packages/author-site/src/app/demo/[id]/edit/hooks/useVersionControl.ts
+            - packages/author-site/src/app/demo/[id]/edit/hooks/useCommandHistory.ts
+            - packages/author-site/src/app/demo/[id]/edit/single-preview-history.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    77c50bda-cadb-4114-b9ad-c46b71719a06/5805a2c0-3a39-4716-8007-1cef5c831b85:
+        dir_name: 演示编辑器导入导出与知识库弹窗工具
+        title: 演示编辑器导入导出与知识库弹窗工具
+        scope:
+            - packages/author-site/src/components/demo/ImportFromFigmaDialog.tsx
+            - packages/author-site/src/components/demo/save-template-dialog.tsx
+            - packages/author-site/src/components/demo/KnowledgeDocDialog.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    agents_skills:
+        dir_name: Agent Skills 知识库（.agents_skills）
+        title: Agent Skills 知识库（.agents/skills）
+        scope:
+            - .agents/skills/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790:
+        dir_name: 作者站点（Author Site）
+        title: 作者站点（Author Site）
+        scope:
+            - packages/author-site/
+        source_files: []
+        children:
+            - ba873606-b4ac-4314-832c-340d5d615790/0fbbe89f-854a-4441-b19a-093122a83d77
+            - ba873606-b4ac-4314-832c-340d5d615790/246aa113-0d5a-4059-b52f-8ce8f1e1ae83
+            - ba873606-b4ac-4314-832c-340d5d615790/2c3964a7-7751-46c1-aca3-d3c6b825437f
+            - ba873606-b4ac-4314-832c-340d5d615790/42ca8271-afcd-43ef-a68c-b0da027c3fe7
+            - ba873606-b4ac-4314-832c-340d5d615790/75931dac-27ac-420b-8c94-952f311192bc
+            - ba873606-b4ac-4314-832c-340d5d615790/89524f11-c9e4-4f1c-8b42-63f5956d1fd2
+            - ba873606-b4ac-4314-832c-340d5d615790/978229d8-2528-442d-8c9e-552c703cf9b3
+            - ba873606-b4ac-4314-832c-340d5d615790/a65b2aac-aa53-4b1a-8912-91e44d59e74a
+            - ba873606-b4ac-4314-832c-340d5d615790/c363bb0d-5087-43a3-b7e1-c5096f0d18c0
+            - ba873606-b4ac-4314-832c-340d5d615790/d96c1b95-66bc-4a15-b2b3-1a20cd318269
+            - ba873606-b4ac-4314-832c-340d5d615790/ed5d9ce9-48b1-4466-9ea0-8bdc1ccb9bc4
+            - ba873606-b4ac-4314-832c-340d5d615790/f7afef50-dea1-4546-a439-020d538849ba
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/0fbbe89f-854a-4441-b19a-093122a83d77:
+        dir_name: 模板_演示项目与预览数据 API（Next.js App Router）
+        title: 模板/演示项目与预览数据 API（Next.js App Router）
+        scope:
+            - packages/author-site/src/app/api/templates/
+            - packages/author-site/src/app/api/demos/
+            - packages/author-site/src/app/api/viewer/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/2c3964a7-7751-46c1-aca3-d3c6b825437f:
         dir_name: 作者站点探索_愿望清单_CLI 文档路由页
         title: 作者站点探索/愿望清单/CLI 文档路由页
         scope:
@@ -635,27 +421,27 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/scripts_and_assets:
-        dir_name: 作者站初始化脚本与静态资源
-        title: 作者站初始化脚本与静态资源
+    ba873606-b4ac-4314-832c-340d5d615790/42ca8271-afcd-43ef-a68c-b0da027c3fe7:
+        dir_name: Demo 预览与嵌入页面（Viewer & Embed）
+        title: Demo 预览与嵌入页面（Viewer & Embed）
         scope:
-            - packages/author-site/scripts/
-            - packages/author-site/public/
-            - packages/author-site/data/
+            - packages/author-site/src/app/viewer/
+            - packages/author-site/src/app/embed/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/server_libs:
-        dir_name: Figma 导出格式解析与校验工具库
-        title: Figma 导出格式解析与校验工具库
+    ba873606-b4ac-4314-832c-340d5d615790/246aa113-0d5a-4059-b52f-8ce8f1e1ae83:
+        dir_name: AI 对话与知识库管理 API
+        title: AI 对话与知识库管理 API
         scope:
-            - packages/author-site/lib/
+            - packages/author-site/src/app/api/ai/
+            - packages/author-site/src/app/api/knowledge/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    author_site/shared_components:
+    ba873606-b4ac-4314-832c-340d5d615790/75931dac-27ac-420b-8c94-952f311192bc:
         dir_name: 作者站点共享 UI 组件与布局
         title: 作者站点共享 UI 组件与布局
         scope:
@@ -668,19 +454,154 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    author_site/viewer_app:
-        dir_name: Demo 预览与嵌入页面（Viewer & Embed）
-        title: Demo 预览与嵌入页面（Viewer & Embed）
+    ba873606-b4ac-4314-832c-340d5d615790/89524f11-c9e4-4f1c-8b42-63f5956d1fd2:
+        dir_name: 作者站认证路由与 UI
+        title: 作者站认证路由与 UI
         scope:
-            - packages/author-site/src/app/viewer/
-            - packages/author-site/src/app/embed/
+            - packages/author-site/src/app/(auth)/
+            - packages/author-site/src/components/auth/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    data_artifacts:
-        dir_name: 运行时数据与问题跟踪持久化层
-        title: 运行时数据与问题跟踪持久化层
+    ba873606-b4ac-4314-832c-340d5d615790/978229d8-2528-442d-8c9e-552c703cf9b3:
+        dir_name: 截图生成与预览模块分发 API
+        title: 截图生成与预览模块分发 API
+        scope:
+            - packages/author-site/src/app/api/screenshots/
+            - packages/author-site/src/app/api/preview-modules/
+            - packages/author-site/src/app/api/preview-runtime/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/a65b2aac-aa53-4b1a-8912-91e44d59e74a:
+        dir_name: 作者站认证与用户管理 API
+        title: 作者站认证与用户管理 API
+        scope:
+            - packages/author-site/src/app/api/auth/
+            - packages/author-site/src/app/api/user/
+            - packages/author-site/src/app/api/admin/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/c363bb0d-5087-43a3-b7e1-c5096f0d18c0:
+        dir_name: 管理后台前端（Admin Panel）
+        title: 管理后台前端（Admin Panel）
+        scope:
+            - packages/author-site/src/app/admin/
+            - packages/author-site/src/lib/admin-auth.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/d96c1b95-66bc-4a15-b2b3-1a20cd318269:
+        dir_name: 作者站初始化脚本与静态资源
+        title: 作者站初始化脚本与静态资源
+        scope:
+            - packages/author-site/scripts/
+            - packages/author-site/public/
+            - packages/author-site/data/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/ed5d9ce9-48b1-4466-9ea0-8bdc1ccb9bc4:
+        dir_name: AI 对话与流式渲染组件集
+        title: AI 对话与流式渲染组件集
+        scope:
+            - packages/author-site/src/components/ai-elements/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ba873606-b4ac-4314-832c-340d5d615790/f7afef50-dea1-4546-a439-020d538849ba:
+        dir_name: Figma 导出格式解析与校验工具库
+        title: Figma 导出格式解析与校验工具库
+        scope:
+            - packages/author-site/lib/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    bcff1473-ab8b-41c5-8a01-8528fbe47684:
+        dir_name: Sketch SDK 三层包体系
+        title: Sketch SDK 三层包体系
+        scope:
+            - packages/sketch-core/
+            - packages/sketch-react/
+            - packages/sketch-playground/
+        source_files: []
+        children:
+            - bcff1473-ab8b-41c5-8a01-8528fbe47684/39386635-a85d-4560-ab80-0cb723187931
+            - bcff1473-ab8b-41c5-8a01-8528fbe47684/3ccad570-04bb-4c1a-86ba-690860efc8bc
+            - bcff1473-ab8b-41c5-8a01-8528fbe47684/9e7f3f12-f2bb-4d7d-b378-0262d0d8c3c5
+        depends_on: []
+        related_to: []
+    bcff1473-ab8b-41c5-8a01-8528fbe47684/3ccad570-04bb-4c1a-86ba-690860efc8bc:
+        dir_name: 手绘场景核心数据与渲染引擎
+        title: 手绘场景核心数据与渲染引擎
+        scope:
+            - packages/sketch-core/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    bcff1473-ab8b-41c5-8a01-8528fbe47684/9e7f3f12-f2bb-4d7d-b378-0262d0d8c3c5:
+        dir_name: Sketch 可视化编辑器 React 组件库
+        title: Sketch 可视化编辑器 React 组件库
+        scope:
+            - packages/sketch-react/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    bcff1473-ab8b-41c5-8a01-8528fbe47684/39386635-a85d-4560-ab80-0cb723187931:
+        dir_name: Sketch SDK 交互式开发沙盒
+        title: Sketch SDK 交互式开发沙盒
+        scope:
+            - packages/sketch-playground/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31:
+        dir_name: Workbench 平台根编排与契约层
+        title: Workbench 平台根编排与契约层
+        scope:
+            - AGENTS.md
+            - .gitignore
+            - .npmrc
+            - pnpm-workspace.yaml
+            - package.json
+            - pnpm-lock.yaml
+            - turbo.json
+            - docker-compose.yml
+            - .dockerignore
+            - .env.docker
+            - .env.example
+            - CLAUDE.md
+        source_files: []
+        children:
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/09af8fcc-7401-496c-ac1a-c314edeee1ad
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/1d70be84-6573-4c71-b9f6-4a69d424276b
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/2a808b9b-76c0-4dc7-9935-630852f69500
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/418f71bb-7c7b-46d1-936b-0a12e65ad4c6
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/82de9587-0ab3-48da-803e-cef80cdcda04
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/8649803c-6320-471a-ae78-0044536143a5
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/a92bd074-26fe-4299-97ed-fa861583f688
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/ab9431f5-f502-467c-895e-4a23fb4eb87b
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/b649ff18-69f5-44c0-9a65-250dd7209c13
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/bff5f573-269f-4ff1-bd92-331b725a7b4f
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c3cf4a7a-d79e-480e-b3ed-734a80986ad1
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/de34265e-7fa6-44f6-b09b-cf8543530378
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/1d70be84-6573-4c71-b9f6-4a69d424276b:
+        dir_name: 运行期持久化数据与问题跟踪目录
+        title: 运行期持久化数据与问题跟踪目录
         scope:
             - data/
             - issues/
@@ -689,37 +610,7 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    demo_ui:
-        dir_name: Demo 预览与画布 UI 组件库
-        title: Demo 预览与画布 UI 组件库
-        scope:
-            - packages/demo-ui/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: preview_contract
-            - path: sketch_system/sketch_react
-            - path: viewer_site
-    docs:
-        dir_name: Workbench 全量文档资产库
-        title: Workbench 全量文档资产库
-        scope:
-            - docs/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    infra_docker:
-        dir_name: 工作bench多服务容器镜像构建
-        title: 工作bench多服务容器镜像构建
-        scope:
-            - docker/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    knowledge_service:
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/2a808b9b-76c0-4dc7-9935-630852f69500:
         dir_name: 知识索引与检索服务（Core + Service）
         title: 知识索引与检索服务（Core + Service）
         scope:
@@ -728,35 +619,115 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: author_site/api_ai_chat_knowledge
-            - path: viewer_site
-    ops_cli:
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/09af8fcc-7401-496c-ac1a-c314edeee1ad:
+        dir_name: 预览页面运行时契约与编译器
+        title: 预览页面运行时契约与编译器
+        scope:
+            - packages/preview-contract/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/82de9587-0ab3-48da-803e-cef80cdcda04:
+        dir_name: 仓库级构建、部署与开发诊断脚本集
+        title: 仓库级构建、部署与开发诊断脚本集
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/418f71bb-7c7b-46d1-936b-0a12e65ad4c6:
+        dir_name: Workbench 全量文档资产库
+        title: Workbench 全量文档资产库
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/8649803c-6320-471a-ae78-0044536143a5:
+        dir_name: E2E 端到端测试套件（创作端与 Sketch Playground）
+        title: E2E 端到端测试套件（创作端与 Sketch Playground）
+        scope:
+            - test/
+            - test-results/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/a92bd074-26fe-4299-97ed-fa861583f688:
+        dir_name: 工作bench多服务容器镜像构建
+        title: 工作bench多服务容器镜像构建
+        scope:
+            - docker/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/ab9431f5-f502-467c-895e-4a23fb4eb87b:
+        dir_name: Workbench 跨包共享类型与契约库
+        title: Workbench 跨包共享类型与契约库
+        scope:
+            - packages/shared/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/b649ff18-69f5-44c0-9a65-250dd7209c13:
+        dir_name: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+        title: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+        scope:
+            - packages/viewer-site/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/bff5f573-269f-4ff1-bd92-331b725a7b4f:
+        dir_name: Demo 预览与画布 UI 组件库
+        title: Demo 预览与画布 UI 组件库
+        scope:
+            - packages/demo-ui/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c3cf4a7a-d79e-480e-b3ed-734a80986ad1:
+        dir_name: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
+        title: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
+        scope:
+            - packages/screenshot-service/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278:
         dir_name: Agent Service 运维 CLI（ops-cli）
         title: Agent Service 运维 CLI（ops-cli）
         scope:
             - OPS/CLI/
         source_files: []
         children:
-            - ops_cli/diagnostics_health
-            - ops_cli/file_workspace
-            - ops_cli/http_interactive
-            - ops_cli/session_commands
-            - ops_cli/system_models
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/2a6e230f-8d3a-4c46-8b7c-a0d51eb19fd2
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/40ab64c4-fdfa-4913-ac4b-cc3d32528983
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/825e6ec6-5ee6-49ad-85ae-fa9bc1f9a427
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/90d771d4-d7df-420b-b89d-4ade48ca3702
+            - c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/e660e951-59ea-402e-acc5-2c96dee82528
         depends_on: []
         related_to: []
-    ops_cli/diagnostics_health:
-        dir_name: 运维诊断与健康检查命令集
-        title: 运维诊断与健康检查命令集
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/2a6e230f-8d3a-4c46-8b7c-a0d51eb19fd2:
+        dir_name: Agent 服务交互与诊断命令
+        title: Agent 服务交互与诊断命令
         scope:
-            - OPS/CLI/src/commands/diagnose.ts
-            - OPS/CLI/src/commands/diagnostics.ts
-            - OPS/CLI/src/commands/logs.ts
+            - OPS/CLI/src/commands/http-message.ts
+            - OPS/CLI/src/commands/interactive.ts
+            - OPS/CLI/src/commands/health.ts
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    ops_cli/file_workspace:
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/40ab64c4-fdfa-4913-ac4b-cc3d32528983:
         dir_name: 工作空间与文件变更 CLI 命令
         title: 工作空间与文件变更 CLI 命令
         scope:
@@ -767,31 +738,7 @@ modules:
         children: []
         depends_on: []
         related_to: []
-    ops_cli/http_interactive:
-        dir_name: Agent 服务交互与诊断命令
-        title: Agent 服务交互与诊断命令
-        scope:
-            - OPS/CLI/src/commands/http-message.ts
-            - OPS/CLI/src/commands/interactive.ts
-            - OPS/CLI/src/commands/health.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: agent_service/agent_client_sdk
-    ops_cli/session_commands:
-        dir_name: 会话管理命令（列表_详情_销毁）
-        title: 会话管理命令（列表/详情/销毁）
-        scope:
-            - OPS/CLI/src/commands/destroy-session.ts
-            - OPS/CLI/src/commands/list-sessions.ts
-            - OPS/CLI/src/commands/session-info.ts
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: agent_service/agent_client_sdk
-    ops_cli/system_models:
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/90d771d4-d7df-420b-b89d-4ade48ca3702:
         dir_name: 系统诊断、模型列表与 WebSocket 流式测试命令
         title: 系统诊断、模型列表与 WebSocket 流式测试命令
         scope:
@@ -801,19 +748,30 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: agent_service/agent_client_sdk
-    preview_contract:
-        dir_name: 预览页面运行时契约与编译器
-        title: 预览页面运行时契约与编译器
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/825e6ec6-5ee6-49ad-85ae-fa9bc1f9a427:
+        dir_name: 运维诊断与健康检查命令集
+        title: 运维诊断与健康检查命令集
         scope:
-            - packages/preview-contract/
+            - OPS/CLI/src/commands/diagnose.ts
+            - OPS/CLI/src/commands/diagnostics.ts
+            - OPS/CLI/src/commands/logs.ts
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: demo_ui
-    project_core:
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/e660e951-59ea-402e-acc5-2c96dee82528:
+        dir_name: 会话管理命令（列表_详情_销毁）
+        title: 会话管理命令（列表/详情/销毁）
+        scope:
+            - OPS/CLI/src/commands/destroy-session.ts
+            - OPS/CLI/src/commands/list-sessions.ts
+            - OPS/CLI/src/commands/session-info.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    c2f00d38-85b9-495b-9dfa-7c2d682fcd31/de34265e-7fa6-44f6-b09b-cf8543530378:
         dir_name: 项目管理员服务与本地脚手架导出包
         title: 项目管理员服务与本地脚手架导出包
         scope:
@@ -822,99 +780,132 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: author_site/api_projects_workspaces/publish_pipeline
-            - path: author_site/client_libs/publishing
-    screenshot_service:
-        dir_name: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
-        title: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
-        scope:
-            - packages/screenshot-service/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: author_site/api_screenshots_preview
-            - path: sketch_system/sketch_core
-    scripts:
-        dir_name: 仓库级构建、部署与开发诊断脚本集
-        title: 仓库级构建、部署与开发诊断脚本集
-        scope:
-            - scripts/
-        source_files: []
-        children: []
-        depends_on: []
         related_to: []
-    shared_lib:
-        dir_name: Workbench 跨包共享类型与契约库
-        title: Workbench 跨包共享类型与契约库
+    f182ce66-05a1-413c-9e03-8471e20ce412:
+        dir_name: Agent 运行时核心与事件总线
+        title: Agent 运行时核心与事件总线
         scope:
-            - packages/shared/
-        source_files: []
-        children: []
-        depends_on: []
-        related_to: []
-    sketch_system:
-        dir_name: Sketch SDK 三层包体系
-        title: Sketch SDK 三层包体系
-        scope:
-            - packages/sketch-core/
-            - packages/sketch-react/
-            - packages/sketch-playground/
+            - packages/agent-service/src/core/
+            - packages/agent-service/src/events/
         source_files: []
         children:
-            - sketch_system/sketch_core
-            - sketch_system/sketch_playground
-            - sketch_system/sketch_react
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746
         depends_on: []
         related_to: []
-    sketch_system/sketch_core:
-        dir_name: 手绘场景核心数据与渲染引擎
-        title: 手绘场景核心数据与渲染引擎
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746:
+        dir_name: Agent Service 进程入口与启动编排
+        title: Agent Service 进程入口与启动编排
         scope:
-            - packages/sketch-core/
+            - packages/agent-service/
         source_files: []
-        children: []
-        depends_on: []
-        related_to:
-            - path: screenshot_service
-    sketch_system/sketch_playground:
-        dir_name: Sketch SDK 交互式开发沙盒
-        title: Sketch SDK 交互式开发沙盒
-        scope:
-            - packages/sketch-playground/
-        source_files: []
-        children: []
+        children:
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/3507a240-45a4-4de0-94d8-0c870af27d89
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/3551144a-fd50-4fdf-a569-5e6a6c9ce918
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/412d843d-bbe3-4e99-a455-7d7f07e970a6
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/68846cde-4071-4cc4-9159-036d4cca887a
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/9e4ee96e-965b-4f7e-a373-131b74ef455c
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/c0eaa497-1129-4db5-bc46-73d0608091cf
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/fe00b2f8-6a74-4807-8cd7-b3cc35d76510
         depends_on: []
         related_to: []
-    sketch_system/sketch_react:
-        dir_name: Sketch 可视化编辑器 React 组件库
-        title: Sketch 可视化编辑器 React 组件库
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/9e4ee96e-965b-4f7e-a373-131b74ef455c:
+        dir_name: Agent Service 服务端与客户端 SDK
+        title: Agent Service 服务端与客户端 SDK
         scope:
-            - packages/sketch-react/
+            - packages/agent-service/
+            - packages/agent-client/
         source_files: []
-        children: []
+        children:
+            - f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/9e4ee96e-965b-4f7e-a373-131b74ef455c/963d9532-3b2c-4e3c-b8f4-4a28d747f829
         depends_on: []
-        related_to:
-            - path: demo_ui
-    tests:
-        dir_name: E2E 端到端测试套件（创作端与 Sketch Playground）
-        title: E2E 端到端测试套件（创作端与 Sketch Playground）
+        related_to: []
+    ? f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/9e4ee96e-965b-4f7e-a373-131b74ef455c/963d9532-3b2c-4e3c-b8f4-4a28d747f829
+    :   dir_name: Agent Service HTTP_WS 客户端 SDK
+        title: Agent Service HTTP/WS 客户端 SDK
         scope:
-            - test/
-            - test-results/
+            - packages/agent-client/
         source_files: []
         children: []
         depends_on: []
         related_to: []
-    viewer_site:
-        dir_name: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
-        title: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/412d843d-bbe3-4e99-a455-7d7f07e970a6:
+        dir_name: Agent Service HTTP_WebSocket API 路由层
+        title: Agent Service HTTP/WebSocket API 路由层
         scope:
-            - packages/viewer-site/
+            - packages/agent-service/src/routes/
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: demo_ui
-            - path: knowledge_service
+        related_to: []
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/3507a240-45a4-4de0-94d8-0c870af27d89:
+        dir_name: 工作空间生命周期、会话持久化与 Yjs 协作层
+        title: 工作空间生命周期、会话持久化与 Yjs 协作层
+        scope:
+            - packages/agent-service/src/workspace/
+            - packages/agent-service/src/session/
+            - packages/agent-service/src/collab/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/68846cde-4071-4cc4-9159-036d4cca887a:
+        dir_name: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
+        title: Agent Service 共享基础设施（配置、日志、附件与 AI 上下文）
+        scope:
+            - packages/agent-service/src/utils/
+            - packages/agent-service/src/services/
+            - packages/agent-service/src/scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/3551144a-fd50-4fdf-a569-5e6a6c9ce918:
+        dir_name: Agent Service 测试套件（Vitest）
+        title: Agent Service 测试套件（Vitest）
+        scope:
+            - packages/agent-service/tests/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/c0eaa497-1129-4db5-bc46-73d0608091cf:
+        dir_name: Pi Agent 工具集与执行期管理器
+        title: Pi Agent 工具集与执行期管理器
+        scope:
+            - packages/agent-service/src/backends/pi-tools/
+            - packages/agent-service/src/backends/managers/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/fe00b2f8-6a74-4807-8cd7-b3cc35d76510:
+        dir_name: AI 后端适配器与供应商配置中心
+        title: AI 后端适配器与供应商配置中心
+        scope:
+            - packages/agent-service/src/backends/
+            - packages/agent-service/src/config/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    f76336ab-f8cf-4b05-a578-36dd826c1969:
+        dir_name: Demo 页面 CRUD 与运行时切换 API
+        title: Demo 页面 CRUD 与运行时切换 API
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/demos/
+            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+        source_files: []
+        children:
+            - f76336ab-f8cf-4b05-a578-36dd826c1969/b3b00a01-f85b-4f24-b55c-14a96df24616
+        depends_on: []
+        related_to: []
+    f76336ab-f8cf-4b05-a578-36dd826c1969/b3b00a01-f85b-4f24-b55c-14a96df24616:
+        dir_name: Demo 页面与运行时模板 API
+        title: Demo 页面与运行时模板 API
+        scope:
+            - packages/author-site/src/app/api/projects/[projectId]/demos/
+            - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

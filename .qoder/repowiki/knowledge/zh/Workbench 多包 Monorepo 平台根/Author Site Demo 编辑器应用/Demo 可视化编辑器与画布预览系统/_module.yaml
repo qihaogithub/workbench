@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 77c50bda-cadb-4114-b9ad-c46b71719a06/26c45aec-ba64-432d-9e56-ca4de2110eb3
+title: Demo 可视化编辑器与画布预览系统
+scope:
+    - packages/author-site/src/app/demo/[id]/edit/
+    - packages/author-site/src/components/demo/home-page.tsx
+    - packages/author-site/src/components/demo/create-demo-dialog.tsx
+source_files: []
+depends_on: []
+related_to: []

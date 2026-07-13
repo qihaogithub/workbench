@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: bcff1473-ab8b-41c5-8a01-8528fbe47684
+title: Sketch SDK 三层包体系
+scope:
+    - packages/sketch-core/
+    - packages/sketch-react/
+    - packages/sketch-playground/
+source_files: []
+depends_on: []
+related_to: []

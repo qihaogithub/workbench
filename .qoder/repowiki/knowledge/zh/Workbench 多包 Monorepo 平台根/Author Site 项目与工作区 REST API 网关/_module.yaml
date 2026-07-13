@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 0ecacaa0-1692-427d-bfdb-c831073b559d
+title: Author Site 项目与工作区 REST API 网关
+scope:
+    - packages/author-site/src/app/api/projects/
+    - packages/author-site/src/app/api/workspaces/
+    - packages/author-site/src/app/api/workspace-authority/
+source_files: []
+depends_on: []
+related_to: []

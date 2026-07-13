@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ba873606-b4ac-4314-832c-340d5d615790/42ca8271-afcd-43ef-a68c-b0da027c3fe7
+title: Demo 预览与嵌入页面（Viewer & Embed）
+scope:
+    - packages/author-site/src/app/viewer/
+    - packages/author-site/src/app/embed/
+source_files: []
+depends_on: []
+related_to: []

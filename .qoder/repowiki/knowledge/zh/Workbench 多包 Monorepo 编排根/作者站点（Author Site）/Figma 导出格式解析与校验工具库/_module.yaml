@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: author_site/server_libs
-title: Figma 导出格式解析与校验工具库
-scope:
-    - packages/author-site/lib/
-source_files: []
-depends_on: []
-related_to: []

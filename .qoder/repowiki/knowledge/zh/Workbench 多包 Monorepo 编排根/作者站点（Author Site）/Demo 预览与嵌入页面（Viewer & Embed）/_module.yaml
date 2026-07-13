@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: author_site/viewer_app
-title: Demo 预览与嵌入页面（Viewer & Embed）
-scope:
-    - packages/author-site/src/app/viewer/
-    - packages/author-site/src/app/embed/
-source_files: []
-depends_on: []
-related_to: []

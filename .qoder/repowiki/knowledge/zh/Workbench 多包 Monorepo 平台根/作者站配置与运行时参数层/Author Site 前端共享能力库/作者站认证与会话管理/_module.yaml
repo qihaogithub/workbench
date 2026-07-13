@@ -1,0 +1,16 @@
+schema_version: 1
+module_path: 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/fb73e700-4add-44af-ad46-0709b0b6a1ea
+title: 作者站认证与会话管理
+scope:
+    - packages/author-site/src/lib/auth/
+    - packages/author-site/src/lib/admin-auth.ts
+    - packages/author-site/src/lib/dingtalk-login.ts
+    - packages/author-site/src/lib/external-auth.ts
+    - packages/author-site/src/lib/session-manager.ts
+    - packages/author-site/src/lib/user.ts
+    - packages/author-site/src/lib/project-admin-service.ts
+    - packages/author-site/src/lib/workspace-authority-browser-client.ts
+    - packages/author-site/src/lib/workspace-authority-client.ts
+source_files: []
+depends_on: []
+related_to: []

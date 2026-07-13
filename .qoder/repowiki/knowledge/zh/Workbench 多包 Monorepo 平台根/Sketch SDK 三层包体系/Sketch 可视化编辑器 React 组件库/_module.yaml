@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: bcff1473-ab8b-41c5-8a01-8528fbe47684/9e7f3f12-f2bb-4d7d-b378-0262d0d8c3c5
+title: Sketch 可视化编辑器 React 组件库
+scope:
+    - packages/sketch-react/
+source_files: []
+depends_on: []
+related_to: []

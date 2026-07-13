@@ -1,16 +1,10 @@
 ---
 kind: frontend_style
 name: 基于 Tailwind CSS + shadcn/ui 的原子化样式体系
+slug: frontend_style
 category: frontend_style
 scope:
     - '**'
-source_files:
-    - packages/author-site/tailwind.config.ts
-    - packages/author-site/postcss.config.js
-    - packages/author-site/src/app/globals.css
-    - packages/author-site/src/components/ui/button.tsx
-    - packages/viewer-site/tailwind.config.ts
-    - packages/viewer-site/src/app/globals.css
 ---
 
 ## 系统概述

@@ -1,18 +1,10 @@
 ---
 kind: configuration_system
 name: Workbench 多服务配置系统：环境变量 + 数据库动态配置 + 运行时推送
+slug: configuration_system
 category: configuration_system
 scope:
     - '**'
-source_files:
-    - .env.example
-    - .env.docker
-    - packages/agent-service/src/utils/config.ts
-    - packages/agent-service/src/config/backend-providers.ts
-    - packages/agent-service/src/config/session-model-configs.ts
-    - packages/author-site/src/lib/runtime-config.ts
-    - packages/author-site/src/lib/db-config.ts
-    - packages/author-site/src/lib/model-config.ts
 ---
 
 ## 体系概览

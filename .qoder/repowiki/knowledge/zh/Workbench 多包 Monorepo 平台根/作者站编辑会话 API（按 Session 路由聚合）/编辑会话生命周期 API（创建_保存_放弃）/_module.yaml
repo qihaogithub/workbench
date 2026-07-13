@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 22d9d02b-bd3a-45e8-b811-65f332a97e92/3eb6d1fe-e5bb-433a-af4f-56845722c0c2
+title: 编辑会话生命周期 API（创建/保存/放弃）
+scope:
+    - packages/author-site/src/app/api/sessions/route.ts
+    - packages/author-site/src/app/api/sessions/[sessionId]/discard/
+    - packages/author-site/src/app/api/sessions/[sessionId]/save/
+source_files: []
+depends_on: []
+related_to: []

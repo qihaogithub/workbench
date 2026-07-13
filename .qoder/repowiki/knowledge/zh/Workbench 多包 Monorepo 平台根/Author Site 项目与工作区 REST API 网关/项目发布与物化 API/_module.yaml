@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 0ecacaa0-1692-427d-bfdb-c831073b559d/03fb0b84-b50b-49cb-adc7-b919424cb51f
+title: 项目发布与物化 API
+scope:
+    - packages/author-site/src/app/api/projects/[projectId]/publish/
+    - packages/author-site/src/app/api/projects/[projectId]/publish-status/
+    - packages/author-site/src/app/api/projects/[projectId]/materialize/
+source_files: []
+depends_on: []
+related_to: []

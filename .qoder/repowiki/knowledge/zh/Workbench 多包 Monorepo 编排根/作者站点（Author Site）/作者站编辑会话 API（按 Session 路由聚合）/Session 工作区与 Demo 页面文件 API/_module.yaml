@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: author_site/api_sessions_canvas/workspace_files
-title: Session 工作区与 Demo 页面文件 API
-scope:
-    - packages/author-site/src/app/api/sessions/[sessionId]/workspace/
-    - packages/author-site/src/app/api/sessions/[sessionId]/files/
-source_files: []
-depends_on: []
-related_to: []
