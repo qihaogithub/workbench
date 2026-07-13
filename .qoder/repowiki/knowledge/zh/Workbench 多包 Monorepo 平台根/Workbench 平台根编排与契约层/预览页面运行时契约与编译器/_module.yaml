@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/09af8fcc-7401-496c-ac1a-c314edeee1ad
-title: 预览页面运行时契约与编译器
-scope:
-    - packages/preview-contract/
-source_files: []
-depends_on: []
-related_to: []

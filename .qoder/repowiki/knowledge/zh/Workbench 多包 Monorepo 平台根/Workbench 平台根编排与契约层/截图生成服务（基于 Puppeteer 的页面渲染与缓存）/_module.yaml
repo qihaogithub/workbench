@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c3cf4a7a-d79e-480e-b3ed-734a80986ad1
-title: 截图生成服务（基于 Puppeteer 的页面渲染与缓存）
-scope:
-    - packages/screenshot-service/
-source_files: []
-depends_on: []
-related_to: []

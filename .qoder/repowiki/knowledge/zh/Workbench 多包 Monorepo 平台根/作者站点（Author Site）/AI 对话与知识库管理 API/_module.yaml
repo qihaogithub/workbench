@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: ba873606-b4ac-4314-832c-340d5d615790/246aa113-0d5a-4059-b52f-8ce8f1e1ae83
-title: AI 对话与知识库管理 API
-scope:
-    - packages/author-site/src/app/api/ai/
-    - packages/author-site/src/app/api/knowledge/
-source_files: []
-depends_on: []
-related_to: []

@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/c0eaa497-1129-4db5-bc46-73d0608091cf
-title: Pi Agent 工具集与执行期管理器
-scope:
-    - packages/agent-service/src/backends/pi-tools/
-    - packages/agent-service/src/backends/managers/
-source_files: []
-depends_on: []
-related_to: []

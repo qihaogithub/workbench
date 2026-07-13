@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278
-title: Agent Service 运维 CLI（ops-cli）
-scope:
-    - OPS/CLI/
-source_files: []
-depends_on: []
-related_to: []

@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: f182ce66-05a1-413c-9e03-8471e20ce412
-title: Agent 运行时核心与事件总线
-scope:
-    - packages/agent-service/src/core/
-    - packages/agent-service/src/events/
-source_files: []
-depends_on: []
-related_to: []
