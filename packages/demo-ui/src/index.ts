@@ -1,42 +1,171 @@
-export type { PreviewSize, PreviewDiagnostic, PreviewDiagnosticError, DemoMeta, DemoSchema, PreviewPanelProps, ConfigFormProps, PreviewMode, PreviewState, CanvasToolMode, CanvasInteractionMode, CanvasPageSizeMode, CanvasPageRuntimeType, CanvasPageLayout, CanvasViewportState, CanvasState, CanvasPageGroup, CanvasPageGroupEntry, CanvasLayersState, CanvasSaveStatus, CanvasPageData, CanvasScreenshotState, CanvasPageRenderMode, ScreenshotRenderBox, PreviewCanvasProps, CanvasFreeNodeKind, CanvasFreeNodeBase, CanvasDocumentNode, CanvasDocumentEntry, CanvasImageNode, CanvasTextNode, CanvasTextNodeSummary, CanvasFreeNode, CanvasKnowledgeDocument, CanvasKnowledgeDocumentCreateInput, CanvasKnowledgeDocumentUpdateInput, PositionableConfig, PositionItem, PositionableSizeItem, VisualAnnotation, VisualEditPatch, VisualInlineEditPayload, VisualNodeInfo, VisualNodeTreeItem, VisualNodeRect, VisualPropertyChange, VisualPropertyChangeKind, VisualStyleChange, AppActionPayload } from './types';
-export type { IframeOutMessageType, IframeInMessageType, ConsoleLogPayload, PositionableSizeItem as IframePositionableSizeItem } from './iframe-types';
-export { getOrderable, getOrderableHorizontal, getPositionable, getDefaultValues, getPreviewSize, isSchemaEmpty } from './validator';
-export { BUILT_IN_CONFIG_CATEGORIES, configFieldMatchesCategoryFilter, getAvailableConfigCategories, getConfigFieldCategory, getSchemaConfigCategories, getSchemaFieldCountByCategory, orderConfigCategories } from './config-categories';
-export { getCachedCompile, setCachedCompile, invalidateCompileCache } from './compile-cache';
-export { computeCanvasRenderModes, DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES, DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES, MIN_CANVAS_SCREENSHOT_PAGE_COUNT } from './canvas-render-scheduler';
-export { computePreviewRuntimePoolPlan } from './preview-runtime-pool';
-export type { PreviewRuntimePoolInput, PreviewRuntimePoolMode, PreviewRuntimePoolPlan } from './preview-runtime-pool';
-export { buildPreviewResourceFingerprint, clearPreviewResourceCacheForTests, extractPreviewImageUrls, getPreviewPageResourceDescriptor, getPreviewResourceCacheStats, normalizePreviewImageUrl, prewarmPreviewImageUrls, resolvePreviewRelativePath } from './preview-resource-cache';
-export { ConfigScopeWrapper } from './ConfigScopeWrapper';
-export { extractPrototypeConfigBindingKeys, PageConfigPanel } from './PageConfigPanel';
-export type { PageConfigPanelPage } from './PageConfigPanel';
-export { ConfigForm } from './ConfigForm';
-export { PreviewPanel } from './PreviewPanel';
-export { PrototypePagePreview } from './PrototypePagePreview';
-export { IframePreviewFrame } from './IframePreviewFrame';
-export { SketchPageEditor, SketchPagePreview } from './SketchPagePreview';
-export { sanitizePrototypeCss, sanitizePrototypeHtml } from '@workbench/shared';
-export { LayerTreeMenu, getLayerTreeNodeKind, getLayerTreeNodeLabel } from './LayerTreeMenu';
-export { NoteButton } from './NoteButton';
-export { NoteDialog } from './NoteDialog';
-export { NotePreview, stripHtml } from './NotePreview';
-export { DocumentEditor } from './DocumentEditor';
-export type { DocumentEditorFormat, DocumentEditorProps } from './DocumentEditor';
-export { RichTextEditor, sanitizeNoteHtml } from './RichTextEditor';
-export { customWidgets, ColorPickerWidget, FileUploadWidget, RichTextWidget } from './widgets';
-export type { FileUploadWidgetOptions, FileUploadWidgetProps } from './widgets';
-export { ImageListWidget } from './ImageListWidget';
-export type { ImageItem, ImageListWidgetProps } from './ImageListWidget';
-export { generateIframeHtml, buildIframeHtml } from './iframe-template';
-export { PreviewCanvas } from './PreviewCanvas';
-export { CanvasViewport } from './CanvasViewport';
-export { CanvasPageItem, CanvasPagePreviewContent } from './CanvasPageItem';
-export { CanvasFreeNodeItem } from './CanvasFreeNodeItem';
-export { CanvasDocumentContent } from './CanvasDocumentContent';
-export { CanvasToolbar } from './CanvasToolbar';
-export { PageSkeleton } from './PageSkeleton';
-export { loadCanvasLayout, saveCanvasLayout } from './canvas-utils';
-export { useCanvasDocumentMarkdown } from './useCanvasDocumentMarkdown';
-export { getCanvasPreviewSizeKey, normalizeCanvasPageLayout, normalizeCanvasPageLayouts, resolveCanvasContentHeightLayout, resolveCanvasPageSize } from './canvas-layout';
-export { getActiveCanvasDocumentEntry, getAnnotationsFromCanvasState, getCanvasDocumentEntries, normalizeCanvasStateLayers, routeCanvasPointerLayer, screenPointToCanvasPoint, summarizeCanvasTextNodes, withCanvasAnnotationNodes } from './canvas-kernel';
-export { cn, debounce } from './utils';
+export type {
+  PreviewSize,
+  PreviewDiagnostic,
+  PreviewDiagnosticError,
+  DemoMeta,
+  DemoSchema,
+  PreviewPanelProps,
+  ConfigFormProps,
+  PreviewMode,
+  PreviewState,
+  CanvasToolMode,
+  CanvasInteractionMode,
+  CanvasPageSizeMode,
+  CanvasPageRuntimeType,
+  CanvasPageLayout,
+  CanvasViewportState,
+  CanvasState,
+  CanvasPageGroup,
+  CanvasPageGroupEntry,
+  CanvasLayersState,
+  CanvasSaveStatus,
+  CanvasPageData,
+  CanvasScreenshotState,
+  CanvasPageRenderMode,
+  ScreenshotRenderBox,
+  PreviewCanvasProps,
+  CanvasFreeNodeKind,
+  CanvasFreeNodeBase,
+  CanvasDocumentNode,
+  CanvasDocumentEntry,
+  CanvasImageNode,
+  CanvasTextNode,
+  CanvasTextNodeSummary,
+  CanvasFreeNode,
+  CanvasKnowledgeDocument,
+  CanvasKnowledgeDocumentCreateInput,
+  CanvasKnowledgeDocumentUpdateInput,
+  PositionableConfig,
+  PositionItem,
+  PositionableSizeItem,
+  VisualAnnotation,
+  VisualEditPatch,
+  VisualInlineEditPayload,
+  VisualNodeInfo,
+  VisualNodeTreeItem,
+  VisualNodeRect,
+  VisualPropertyChange,
+  VisualPropertyChangeKind,
+  VisualStyleChange,
+  AppActionPayload,
+} from "./types";
+export type {
+  IframeOutMessageType,
+  IframeInMessageType,
+  ConsoleLogPayload,
+  PositionableSizeItem as IframePositionableSizeItem,
+} from "./iframe-types";
+export {
+  getOrderable,
+  getOrderableHorizontal,
+  getPositionable,
+  getDefaultValues,
+  getPreviewSize,
+  isSchemaEmpty,
+} from "./validator";
+export {
+  BUILT_IN_CONFIG_CATEGORIES,
+  configFieldMatchesCategoryFilter,
+  getAvailableConfigCategories,
+  getConfigFieldCategory,
+  getSchemaConfigCategories,
+  getSchemaFieldCountByCategory,
+  orderConfigCategories,
+} from "./config-categories";
+export {
+  getCachedCompile,
+  setCachedCompile,
+  invalidateCompileCache,
+} from "./compile-cache";
+export {
+  computeCanvasRenderModes,
+  DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
+  DEFAULT_MAX_SLEEPING_CANVAS_IFRAMES,
+  MIN_CANVAS_SCREENSHOT_PAGE_COUNT,
+} from "./canvas-render-scheduler";
+export { computePreviewRuntimePoolPlan } from "./preview-runtime-pool";
+export type {
+  PreviewRuntimePoolInput,
+  PreviewRuntimePoolMode,
+  PreviewRuntimePoolPlan,
+} from "./preview-runtime-pool";
+export {
+  buildPreviewResourceFingerprint,
+  clearPreviewResourceCacheForTests,
+  extractPreviewImageUrls,
+  getPreviewPageResourceDescriptor,
+  getPreviewResourceCacheStats,
+  normalizePreviewImageUrl,
+  prewarmPreviewImageUrls,
+  resolvePreviewRelativePath,
+} from "./preview-resource-cache";
+export { ConfigScopeWrapper } from "./ConfigScopeWrapper";
+export {
+  extractPrototypeConfigBindingKeys,
+  PageConfigPanel,
+} from "./PageConfigPanel";
+export type { PageConfigPanelPage } from "./PageConfigPanel";
+export { ConfigForm } from "./ConfigForm";
+export { PreviewPanel } from "./PreviewPanel";
+export { PrototypePagePreview } from "./PrototypePagePreview";
+export { IframePreviewFrame } from "./IframePreviewFrame";
+export { SketchPageEditor, SketchPagePreview } from "./SketchPagePreview";
+export { sanitizePrototypeCss, sanitizePrototypeHtml } from "@workbench/shared";
+export {
+  LayerTreeMenu,
+  getLayerTreeNodeKind,
+  getLayerTreeNodeLabel,
+} from "./LayerTreeMenu";
+export { NoteButton } from "./NoteButton";
+export { NoteDialog } from "./NoteDialog";
+export { NotePreview, stripHtml } from "./NotePreview";
+export { DocumentEditor } from "./DocumentEditor";
+export type {
+  DocumentEditorFormat,
+  DocumentEditorProps,
+} from "./DocumentEditor";
+export { RichTextEditor, sanitizeNoteHtml } from "./RichTextEditor";
+export {
+  customWidgets,
+  ColorPickerWidget,
+  FileUploadWidget,
+  RichTextWidget,
+} from "./widgets";
+export type { FileUploadWidgetOptions, FileUploadWidgetProps } from "./widgets";
+export { ImageListWidget } from "./ImageListWidget";
+export type { ImageItem, ImageListWidgetProps } from "./ImageListWidget";
+export { generateIframeHtml, buildIframeHtml } from "./iframe-template";
+export { PreviewCanvas } from "./PreviewCanvas";
+export { CanvasViewport } from "./CanvasViewport";
+export { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";
+export { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
+export { CanvasDocumentContent } from "./CanvasDocumentContent";
+export { CanvasToolbar } from "./CanvasToolbar";
+export { PageSkeleton } from "./PageSkeleton";
+export { loadCanvasLayout, saveCanvasLayout } from "./canvas-utils";
+export { useCanvasDocumentMarkdown } from "./useCanvasDocumentMarkdown";
+export {
+  getCanvasPreviewSizeKey,
+  normalizeCanvasPageLayout,
+  normalizeCanvasPageLayouts,
+  resolveCanvasContentHeightLayout,
+  resolveCanvasPageSize,
+} from "./canvas-layout";
+export {
+  getActiveCanvasDocumentEntry,
+  getAnnotationsFromCanvasState,
+  getCanvasDocumentEntries,
+  normalizeCanvasStateLayers,
+  routeCanvasPointerLayer,
+  screenPointToCanvasPoint,
+  summarizeCanvasTextNodes,
+  withCanvasAnnotationNodes,
+} from "./canvas-kernel";
+export { cn, debounce } from "./utils";
+export {
+  writeCanvasClipboard,
+  readCanvasClipboard,
+  computeBounds,
+  isEditableTarget,
+} from "./canvas-clipboard";
+export type { CanvasClipboardData } from "./canvas-clipboard";

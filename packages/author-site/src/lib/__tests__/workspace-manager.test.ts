@@ -57,6 +57,7 @@ function writeProject(
 
 function writeWorkspace(
   dataDir: string,
+  userId: string,
   projectId: string,
   workspaceId: string,
   baseVersion: string,
@@ -64,7 +65,7 @@ function writeWorkspace(
   const workspacePath = path.join(
     dataDir,
     "workspaces",
-    "projects",
+    userId,
     projectId,
     workspaceId,
   );
@@ -148,7 +149,10 @@ describe("workspace manager diagnostics", () => {
     });
     const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
 
-    const result = workspaceManager.syncActiveWorkspaceToCanonical(projectId, "live-requested");
+    const result = workspaceManager.syncActiveWorkspaceToCanonical(
+      projectId,
+      "live-requested",
+    );
 
     expect(result).toMatchObject({
       success: false,
@@ -179,10 +183,13 @@ describe("workspace manager diagnostics", () => {
       activeWorkspaceId: workspaceId,
       canonicalSyncedWorkspaceId: workspaceId,
     });
-    writeWorkspace(dataDir, projectId, workspaceId, "v1");
+    writeWorkspace(dataDir, "user1", projectId, workspaceId, "v1");
     const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
 
-    const result = workspaceManager.syncActiveWorkspaceToCanonical(projectId, workspaceId);
+    const result = workspaceManager.syncActiveWorkspaceToCanonical(
+      projectId,
+      workspaceId,
+    );
 
     expect(result).toMatchObject({
       success: false,
@@ -218,10 +225,11 @@ describe("workspace manager diagnostics", () => {
       canonicalSyncedRootHash: "stale-root-hash",
       canonicalSyncedAt: 20,
     });
-    writeWorkspace(dataDir, projectId, staleWorkspaceId, "v1");
+    writeWorkspace(dataDir, "user1", projectId, staleWorkspaceId, "v1");
     const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
 
-    const result = workspaceManager.getOrCreateProjectActiveWorkspace(projectId);
+    const result =
+      workspaceManager.getOrCreateProjectActiveWorkspace(projectId);
     const project = JSON.parse(
       fs.readFileSync(
         path.join(dataDir, "projects", projectId, "project.json"),
@@ -244,12 +252,12 @@ describe("workspace manager diagnostics", () => {
       activeWorkspaceId: workspaceId,
       activeWorkspaceUpdatedAt: 1,
     });
-    writeWorkspace(dataDir, projectId, workspaceId, "v2");
+    writeWorkspace(dataDir, "user1", projectId, workspaceId, "v2");
     fs.writeFileSync(
       path.join(
         dataDir,
         "workspaces",
-        "projects",
+        "user1",
         projectId,
         workspaceId,
         "prototype.html",
@@ -259,10 +267,14 @@ describe("workspace manager diagnostics", () => {
     );
     const { workspaceManager, diagnosticsStore } = await importModules(dataDir);
 
-    const result = workspaceManager.syncActiveWorkspaceToCanonical(projectId, workspaceId, {
-      revision: 12,
-      rootHash: "root-hash-12",
-    });
+    const result = workspaceManager.syncActiveWorkspaceToCanonical(
+      projectId,
+      workspaceId,
+      {
+        revision: 12,
+        rootHash: "root-hash-12",
+      },
+    );
     const project = JSON.parse(
       fs.readFileSync(
         path.join(dataDir, "projects", projectId, "project.json"),
@@ -286,14 +298,18 @@ describe("workspace manager diagnostics", () => {
       "workspace.canonical_materialization_succeeded",
     ]);
     for (const event of diagnostics.events) {
-      expect(event.operationId).toBe(`canonical:${projectId}:${workspaceId}:12`);
+      expect(event.operationId).toBe(
+        `canonical:${projectId}:${workspaceId}:12`,
+      );
       expect(event.traceId).toBe(event.operationId);
-      expect(event.payload).toEqual(expect.objectContaining({
-        phase: "canonical-materialization",
-        revision: 12,
-        rootHash: "root-hash-12",
-        durationMs: expect.any(Number),
-      }));
+      expect(event.payload).toEqual(
+        expect.objectContaining({
+          phase: "canonical-materialization",
+          revision: 12,
+          rootHash: "root-hash-12",
+          durationMs: expect.any(Number),
+        }),
+      );
     }
   });
 
@@ -362,5 +378,162 @@ describe("workspace manager diagnostics", () => {
     expect(project.canonicalSyncedRevision).toBe(13);
     expect(project.canonicalSyncedRootHash).toBe("root-hash-13");
     expect(project.canonicalSyncedAt).toBe(30);
+  });
+});
+
+function writeSession(
+  dataDir: string,
+  userId: string,
+  projectId: string,
+  sessionId: string,
+  workspaceId: string,
+  expiresAt: number,
+): void {
+  const sessionDir = path.join(
+    dataDir,
+    "sessions",
+    userId,
+    projectId,
+    sessionId,
+  );
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(sessionDir, ".session.json"),
+    JSON.stringify({ sessionId, workspaceId, expiresAt }),
+    "utf-8",
+  );
+}
+
+function writeWorkspaceWithMeta(
+  dataDir: string,
+  userId: string,
+  projectId: string,
+  workspaceId: string,
+  meta: Record<string, unknown>,
+): string {
+  const wsPath = path.join(
+    dataDir,
+    "workspaces",
+    userId,
+    projectId,
+    workspaceId,
+  );
+  fs.mkdirSync(wsPath, { recursive: true });
+  fs.writeFileSync(
+    path.join(wsPath, ".workspace.json"),
+    JSON.stringify(meta),
+    "utf-8",
+  );
+  return wsPath;
+}
+
+describe("cleanupOrphanWorkspaces", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("清理过期且无活跃 session 引用的 non-live workspace", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    const expiredAt = Date.now() - 48 * 60 * 60 * 1000;
+    writeWorkspaceWithMeta(dataDir, "user1", "proj-1", "ws-orphan", {
+      workspaceId: "ws-orphan",
+      scope: "session",
+      updatedAt: expiredAt,
+    });
+
+    const cleaned = workspaceManager.cleanupOrphanWorkspaces();
+
+    expect(cleaned).toEqual(["ws-orphan"]);
+    expect(
+      fs.existsSync(
+        path.join(dataDir, "workspaces", "user1", "proj-1", "ws-orphan"),
+      ),
+    ).toBe(false);
+  });
+
+  it("保留 scope=live 的 workspace 即使已过期", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    const expiredAt = Date.now() - 48 * 60 * 60 * 1000;
+    writeWorkspaceWithMeta(dataDir, "user1", "proj-1", "ws-live-old", {
+      workspaceId: "ws-live-old",
+      scope: "live",
+      updatedAt: expiredAt,
+    });
+
+    const cleaned = workspaceManager.cleanupOrphanWorkspaces();
+
+    expect(cleaned).toEqual([]);
+    expect(
+      fs.existsSync(
+        path.join(dataDir, "workspaces", "user1", "proj-1", "ws-live-old"),
+      ),
+    ).toBe(true);
+  });
+
+  it("保留被活跃 session 引用的 workspace", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    const recentAt = Date.now() - 1 * 60 * 60 * 1000;
+    writeWorkspaceWithMeta(dataDir, "user1", "proj-1", "ws-active", {
+      workspaceId: "ws-active",
+      scope: "session",
+      updatedAt: recentAt,
+    });
+    writeSession(
+      dataDir,
+      "user1",
+      "proj-1",
+      "sess-1",
+      "ws-active",
+      Date.now() + 60 * 60 * 1000,
+    );
+
+    const cleaned = workspaceManager.cleanupOrphanWorkspaces();
+
+    expect(cleaned).toEqual([]);
+    expect(
+      fs.existsSync(
+        path.join(dataDir, "workspaces", "user1", "proj-1", "ws-active"),
+      ),
+    ).toBe(true);
+  });
+
+  it("无 .workspace.json 时按 mtime 判断是否过期", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    const wsPath = path.join(
+      dataDir,
+      "workspaces",
+      "user1",
+      "proj-1",
+      "ws-no-meta",
+    );
+    fs.mkdirSync(wsPath, { recursive: true });
+    const oldTime = Date.now() - 48 * 60 * 60 * 1000;
+    fs.utimesSync(wsPath, oldTime / 1000, oldTime / 1000);
+
+    const cleaned = workspaceManager.cleanupOrphanWorkspaces();
+
+    expect(cleaned).toEqual(["ws-no-meta"]);
+    expect(fs.existsSync(wsPath)).toBe(false);
+  });
+
+  it("workspaces 目录不存在时返回空数组", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    fs.rmSync(path.join(dataDir, "workspaces"), {
+      recursive: true,
+      force: true,
+    });
+
+    const cleaned = workspaceManager.cleanupOrphanWorkspaces();
+
+    expect(cleaned).toEqual([]);
   });
 });

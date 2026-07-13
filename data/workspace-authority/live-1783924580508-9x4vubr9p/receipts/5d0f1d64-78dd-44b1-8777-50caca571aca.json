@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "5d0f1d64-78dd-44b1-8777-50caca571aca",
+  "projectId": "proj_1782718595285_h4lda7",
+  "workspaceId": "live-1783924580508-9x4vubr9p",
+  "baseRevision": 6,
+  "revision": 7,
+  "rootHash": "c92e171ba64c19a8a02b086aa52adcfc991dae03a7602a3fa64a41ff47f7b078",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/demo_omrf/prototype.html",
+      "action": "modified",
+      "beforeHash": "4668afc540dd578af205e04aa83948da6ca8b3b9f4aeec0c324233dd3c6b77a0",
+      "afterHash": "bfd97fbce640185322cacb764d11a115144525dbdb396921f11afc1b3cea3f86"
+    }
+  ],
+  "committedAt": 1783930864773
+}

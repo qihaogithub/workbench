@@ -59,7 +59,7 @@ describe("PreviewPanel", () => {
       jsonResponse({ success: false, error: { message: "语法错误: 第3行" } }),
     );
 
-    render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
+    render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} isAutoRepairing />);
 
     await waitFor(() => {
       expect(screen.getByText("正在修复预览")).toBeInTheDocument();

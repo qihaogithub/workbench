@@ -5,20 +5,18 @@
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1783585261167_7h7prw/workspace",
   "demoPages": [
     {
-      "id": "growth-bean-mall_x8k2",
-      "name": "成长豆商城",
-      "order": 1,
+      "id": "figma_7zwt",
+      "name": "figma",
+      "order": 0,
       "parentId": null,
-      "runtimeType": "prototype-html-css",
-      "routeKey": "page"
+      "routeKey": "figma"
     },
     {
-      "id": "figma_7zwt",
-      "name": "从Figma导入的页面",
-      "routeKey": "figma",
-      "runtimeType": "prototype-html-css",
-      "order": 2,
-      "parentId": null
+      "id": "growth-bean-mall_x8k2",
+      "name": "growth bean mall",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "growth-bean-mall"
     }
   ],
   "demoFolders": [],
@@ -174,11 +172,11 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1783762041925,
+  "updatedAt": 1783931616184,
   "activeWorkspaceId": "live-1783654372084-5b2qhswm4",
   "activeWorkspaceUpdatedAt": 1783659602211,
   "canonicalSyncedWorkspaceId": "live-1783654372084-5b2qhswm4",
-  "canonicalSyncedAt": 1783762041925,
-  "canonicalSyncedRevision": 4,
-  "canonicalSyncedRootHash": "4ed0d1a264693dede7ea4e6c2cad6aadf059f7b5018ac2959bc732ab40f05c18"
+  "canonicalSyncedAt": 1783931616184,
+  "canonicalSyncedRevision": 10,
+  "canonicalSyncedRootHash": "3c74e7931c1d4fa29086a7b61dfe7bf531372998efe29f27d6e36cde078f3e25"
 }

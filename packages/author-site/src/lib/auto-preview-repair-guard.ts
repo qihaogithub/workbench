@@ -1,6 +1,8 @@
 export const AUTO_PREVIEW_REPAIR_HISTORY_KEY =
   "workbench:auto-preview-repair-history:v1";
 
+export const PAGE_REPAIR_BUDGET_LIMIT = 5;
+
 const AUTO_PREVIEW_REPAIR_HISTORY_VERSION = 1;
 const AUTO_PREVIEW_REPAIR_HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTO_PREVIEW_REPAIR_HISTORY_MAX_ENTRIES = 200;
@@ -122,6 +124,24 @@ function writeHistory(
 function normalizeFingerprintPart(value: string | undefined): string {
   const trimmed = value?.trim();
   return trimmed ? trimmed : "unknown";
+}
+
+export function getPageRepairBudget(
+  projectId: string,
+  pageId: string,
+  storage?: AutoPreviewRepairStorage | null,
+  options: { now?: number } = {},
+): number {
+  const resolvedStorage = storage ?? getBrowserStorage();
+  const history = readHistory(resolvedStorage, options.now);
+  const prefix = `${normalizeFingerprintPart(projectId)}::${normalizeFingerprintPart(pageId)}::`;
+  let total = 0;
+  for (const [key, entry] of Object.entries(history.entries)) {
+    if (key.startsWith(prefix)) {
+      total += entry.count;
+    }
+  }
+  return total;
 }
 
 export function buildAutoPreviewRepairFingerprint(params: {
