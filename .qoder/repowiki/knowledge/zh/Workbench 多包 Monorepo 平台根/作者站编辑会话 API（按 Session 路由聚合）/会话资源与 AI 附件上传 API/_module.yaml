@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: 22d9d02b-bd3a-45e8-b811-65f332a97e92/2036808c-d975-4401-a4f5-d77d6ec75ece
-title: 会话资源与 AI 附件上传 API
-scope:
-    - packages/author-site/src/app/api/sessions/[sessionId]/ai-attachments/
-    - packages/author-site/src/app/api/sessions/[sessionId]/assets/
-source_files: []
-depends_on: []
-related_to: []

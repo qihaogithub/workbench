@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/a92bd074-26fe-4299-97ed-fa861583f688
-title: 工作bench多服务容器镜像构建
-scope:
-    - docker/
-source_files: []
-depends_on: []
-related_to: []

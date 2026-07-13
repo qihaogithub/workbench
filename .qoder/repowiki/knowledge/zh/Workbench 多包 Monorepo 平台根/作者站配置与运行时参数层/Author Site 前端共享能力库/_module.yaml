@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552
-title: Author Site 前端共享能力库
-scope:
-    - packages/author-site/src/lib/
-    - packages/author-site/src/hooks/
-source_files: []
-depends_on: []
-related_to: []

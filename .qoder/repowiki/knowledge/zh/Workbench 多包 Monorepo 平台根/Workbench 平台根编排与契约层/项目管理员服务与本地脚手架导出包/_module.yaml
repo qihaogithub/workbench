@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/de34265e-7fa6-44f6-b09b-cf8543530378
-title: 项目管理员服务与本地脚手架导出包
-scope:
-    - packages/project-core/
-    - packages/project-scaffold/
-source_files: []
-depends_on: []
-related_to: []

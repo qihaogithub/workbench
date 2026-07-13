@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/ab9431f5-f502-467c-895e-4a23fb4eb87b
-title: Workbench 跨包共享类型与契约库
-scope:
-    - packages/shared/
-source_files: []
-depends_on: []
-related_to: []

@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: 77c50bda-cadb-4114-b9ad-c46b71719a06
-title: Author Site Demo 编辑器应用
-scope:
-    - packages/author-site/src/app/demo/
-    - packages/author-site/src/components/demo/
-source_files: []
-depends_on: []
-related_to: []

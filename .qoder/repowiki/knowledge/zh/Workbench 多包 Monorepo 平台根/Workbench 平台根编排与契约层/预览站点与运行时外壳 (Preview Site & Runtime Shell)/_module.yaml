@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/b649ff18-69f5-44c0-9a65-250dd7209c13
-title: 预览站点与运行时外壳 (Preview Site & Runtime Shell)
-scope:
-    - packages/viewer-site/
-source_files: []
-depends_on: []
-related_to: []

@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: 22d9d02b-bd3a-45e8-b811-65f332a97e92/9657adcf-e3b3-4ddb-bac2-d2a9a07b6056
-title: 画布布局与自动保存检查点 API
-scope:
-    - packages/author-site/src/app/api/sessions/[sessionId]/canvas-layout/
-    - packages/author-site/src/app/api/sessions/[sessionId]/checkpoint/
-source_files: []
-depends_on: []
-related_to: []
