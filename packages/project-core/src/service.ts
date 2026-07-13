@@ -93,6 +93,7 @@ import type {
   VisualCheckInput,
   VisualCheckPageResult,
   VisualCheckResult,
+  WorkspaceMutationPort,
 } from "./types.js";
 import {
   getAgentServiceUrl,
@@ -205,6 +206,15 @@ export class ProjectAdminService {
     ].forEach(ensureDir);
   }
 
+  getWorkspaceAuthorityPort(): WorkspaceMutationPort | undefined {
+    return this.config.workspaceAuthorityPort;
+  }
+
+  isWorkspaceLive(workspacePath: string): boolean {
+    const metadata = this.readWorkspaceMetadata(workspacePath);
+    return metadata?.scope === "live";
+  }
+
   private regeneratePublishedProjectsIndex(): void {
     if (!fs.existsSync(this.publishedDir)) return;
 
@@ -220,7 +230,11 @@ export class ProjectAdminService {
 
     for (const dirName of fs.readdirSync(this.publishedDir)) {
       if (dirName.startsWith(".")) continue;
-      const projectJsonPath = path.join(this.publishedDir, dirName, "project.json");
+      const projectJsonPath = path.join(
+        this.publishedDir,
+        dirName,
+        "project.json",
+      );
       if (!fs.existsSync(projectJsonPath)) continue;
 
       try {
@@ -245,8 +259,10 @@ export class ProjectAdminService {
         projects.push({
           id: data.id,
           name: data.name,
-          description: typeof data.description === "string" ? data.description : undefined,
-          thumbnail: typeof data.thumbnail === "string" ? data.thumbnail : undefined,
+          description:
+            typeof data.description === "string" ? data.description : undefined,
+          thumbnail:
+            typeof data.thumbnail === "string" ? data.thumbnail : undefined,
           publishedAt: data.publishedAt,
           publishedVersion: data.publishedVersion,
           demoCount: Array.isArray(data.demoPages) ? data.demoPages.length : 0,
@@ -273,7 +289,9 @@ export class ProjectAdminService {
     return existed;
   }
 
-  capabilities(actor = this.defaultActor()): ProjectAdminResult<CapabilitySummary> {
+  capabilities(
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<CapabilitySummary> {
     const writable = actor.role !== "readonly";
     return ok({
       actor,
@@ -308,10 +326,14 @@ export class ProjectAdminService {
     };
   }
 
-  listProjects(actor = this.defaultActor()): ProjectAdminResult<ProjectSummary[]> {
+  listProjects(
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectSummary[]> {
     this.ensureDirs();
     const projects: ProjectSummary[] = [];
-    for (const entry of fs.readdirSync(this.projectsDir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(this.projectsDir, {
+      withFileTypes: true,
+    })) {
       if (!entry.isDirectory()) continue;
       if (!this.canAccessProject(entry.name, actor)) continue;
       const projectPath = this.getProjectPath(entry.name);
@@ -337,7 +359,10 @@ export class ProjectAdminService {
     return ok(projects.sort((a, b) => b.updatedAt - a.updatedAt));
   }
 
-  getProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<ProjectDetail> {
+  getProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectDetail> {
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
@@ -354,8 +379,32 @@ export class ProjectAdminService {
       folders: tree.folders,
       versions: [...project.versions].reverse(),
       projectConfigSchema: this.readProjectConfig(workspacePath) ?? undefined,
-      projectConfigValues: this.readProjectConfigValues(workspacePath) ?? undefined,
+      projectConfigValues:
+        this.readProjectConfigValues(workspacePath) ?? undefined,
       locked: this.isProjectLocked(projectId),
+    });
+  }
+
+  private requireCanonicalWorkspaceProof(
+    project: Project,
+    action: string,
+  ): ProjectAdminResult<CanonicalWorkspaceProof> {
+    const activeWorkspaceId = project.activeWorkspaceId;
+    if (!activeWorkspaceId) return ok({});
+    if (
+      project.canonicalSyncedWorkspaceId !== activeWorkspaceId ||
+      typeof project.canonicalSyncedRevision !== "number" ||
+      !project.canonicalSyncedRootHash
+    ) {
+      return fail(
+        "WORKSPACE_STALE",
+        `项目工作区尚未同步到当前 live Workspace revision，不能${action}`,
+      );
+    }
+    return ok({
+      workspaceId: activeWorkspaceId,
+      workspaceRevision: project.canonicalSyncedRevision,
+      workspaceRootHash: project.canonicalSyncedRootHash,
     });
   }
 
@@ -365,15 +414,22 @@ export class ProjectAdminService {
   ): ProjectAdminResult<ProjectPackageExport> {
     const detail = this.getProject(projectId, actor);
     if (!detail.ok || !detail.data) {
-      return fail(detail.error?.code ?? "PROJECT_NOT_FOUND", detail.error?.message ?? "项目不存在");
+      return fail(
+        detail.error?.code ?? "PROJECT_NOT_FOUND",
+        detail.error?.message ?? "项目不存在",
+      );
     }
     const workspacePath = this.projectWorkspacePath(projectId);
     const runtimeValidation = this.validateWorkspaceRuntime(workspacePath);
     if (!runtimeValidation.ok) {
-      return fail("VALIDATION_BLOCKED", "项目运行契约校验失败，不能导出项目包", {
-        validation: this.runtimeToValidationResult(runtimeValidation),
-        runtimeValidation,
-      });
+      return fail(
+        "VALIDATION_BLOCKED",
+        "项目运行契约校验失败，不能导出项目包",
+        {
+          validation: this.runtimeToValidationResult(runtimeValidation),
+          runtimeValidation,
+        },
+      );
     }
     const pages: PageDetail[] = [];
     for (const page of detail.data.pages) {
@@ -386,7 +442,10 @@ export class ProjectAdminService {
     const assets = this.walkFiles(path.join(workspacePath, "assets"))
       .filter((file) => fs.statSync(file).isFile())
       .map((file) => {
-        const relativePath = ["assets", path.relative(path.join(workspacePath, "assets"), file)]
+        const relativePath = [
+          "assets",
+          path.relative(path.join(workspacePath, "assets"), file),
+        ]
           .join("/")
           .split(path.sep)
           .join("/");
@@ -400,7 +459,10 @@ export class ProjectAdminService {
     const knowledgeFiles = this.walkFiles(path.join(workspacePath, "knowledge"))
       .filter((file) => fs.statSync(file).isFile())
       .map((file) => {
-        const relativePath = ["knowledge", path.relative(path.join(workspacePath, "knowledge"), file)]
+        const relativePath = [
+          "knowledge",
+          path.relative(path.join(workspacePath, "knowledge"), file),
+        ]
           .join("/")
           .split(path.sep)
           .join("/");
@@ -411,9 +473,17 @@ export class ProjectAdminService {
           size: buffer.length,
         };
       });
+    const project = detail.data.project;
     const baseVersion = detail.data.versions[0]?.versionId ?? "v0";
+    const proof = this.requireCanonicalWorkspaceProof(project, "导出项目包");
+    if (!proof.ok || !proof.data) {
+      return fail(
+        proof.error?.code ?? "WORKSPACE_STALE",
+        proof.error?.message ?? "项目工作区尚未同步",
+      );
+    }
     return ok({
-      project: detail.data.project,
+      project,
       pages,
       folders: detail.data.folders,
       versions: detail.data.versions,
@@ -423,6 +493,9 @@ export class ProjectAdminService {
       assets,
       knowledgeFiles,
       baseVersion,
+      workspaceId: proof.data.workspaceId,
+      workspaceRevision: proof.data.workspaceRevision,
+      workspaceRootHash: proof.data.workspaceRootHash,
     });
   }
 
@@ -430,7 +503,8 @@ export class ProjectAdminService {
     input: CreateProjectInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const name = input.name.trim();
     if (!name) return fail("INVALID_REQUEST", "项目名称不能为空");
     const category = normalizeProjectCategory(input.category);
@@ -458,7 +532,10 @@ export class ProjectAdminService {
     ensureDir(projectPath);
 
     if (input.templateId) {
-      const templateWorkspace = path.join(this.getTemplatePath(input.templateId), "workspace");
+      const templateWorkspace = path.join(
+        this.getTemplatePath(input.templateId),
+        "workspace",
+      );
       if (!fs.existsSync(templateWorkspace)) {
         return fail("TEMPLATE_NOT_FOUND", "模板不存在");
       }
@@ -511,7 +588,8 @@ export class ProjectAdminService {
     input: UpdateProjectInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<Project> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
@@ -563,14 +641,24 @@ export class ProjectAdminService {
       description: "项目复制临时快照",
     });
     const created = this.createProject(
-      { name: name ?? `${source.name} 副本`, category: normalizeProjectCategory(category ?? source.category), templateId },
+      {
+        name: name ?? `${source.name} 副本`,
+        category: normalizeProjectCategory(category ?? source.category),
+        templateId,
+      },
       actor,
     );
-    fs.rmSync(this.getTemplatePath(templateId), { recursive: true, force: true });
+    fs.rmSync(this.getTemplatePath(templateId), {
+      recursive: true,
+      force: true,
+    });
     return created;
   }
 
-  deleteProjectPreview(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PreviewPlan> {
+  deleteProjectPreview(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PreviewPlan> {
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
@@ -591,7 +679,8 @@ export class ProjectAdminService {
     confirmToken: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ deleted: boolean; projectId: string }> {
-    if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以删除项目");
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以删除项目");
     const plan = this.readPlan(planId);
     if (!plan || plan.operation !== "project_delete") {
       return fail("PLAN_NOT_FOUND", "删除预览计划不存在");
@@ -601,8 +690,13 @@ export class ProjectAdminService {
     }
     const access = this.requireProjectAccess(plan.resourceId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
-    fs.rmSync(this.getProjectPath(plan.resourceId), { recursive: true, force: true });
-    const deletedPublishedArtifact = this.deletePublishedProjectArtifact(plan.resourceId);
+    fs.rmSync(this.getProjectPath(plan.resourceId), {
+      recursive: true,
+      force: true,
+    });
+    const deletedPublishedArtifact = this.deletePublishedProjectArtifact(
+      plan.resourceId,
+    );
     const deleted = [
       `project:${plan.resourceId}`,
       ...(deletedPublishedArtifact ? [`published:${plan.resourceId}`] : []),
@@ -628,24 +722,32 @@ export class ProjectAdminService {
       : fail("PROJECT_NOT_FOUND", "项目不存在");
   }
 
-  listTemplates(filter: TemplateListFilter = {}): ProjectAdminResult<ProjectTemplateMeta[]> {
+  listTemplates(
+    filter: TemplateListFilter = {},
+  ): ProjectAdminResult<ProjectTemplateMeta[]> {
     this.ensureDirs();
     const templates: ProjectTemplateMeta[] = [];
-    for (const entry of fs.readdirSync(this.templatesDir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(this.templatesDir, {
+      withFileTypes: true,
+    })) {
       if (!entry.isDirectory()) continue;
       const meta = this.readTemplate(entry.name);
       if (meta) templates.push(meta);
     }
     const filtered = templates.filter((template) => {
       if (filter.scope && template.scope !== filter.scope) return false;
-      if (filter.official !== undefined && Boolean(template.official) !== filter.official) {
+      if (
+        filter.official !== undefined &&
+        Boolean(template.official) !== filter.official
+      ) {
         return false;
       }
       return true;
     });
     return ok(
       filtered.sort((a, b) => {
-        if (Boolean(a.official) !== Boolean(b.official)) return a.official ? -1 : 1;
+        if (Boolean(a.official) !== Boolean(b.official))
+          return a.official ? -1 : 1;
         return b.updatedAt - a.updatedAt;
       }),
     );
@@ -662,7 +764,8 @@ export class ProjectAdminService {
     input: TemplateMetaInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectTemplateMeta> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
@@ -670,21 +773,40 @@ export class ProjectAdminService {
     }
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const runtimeValidation = this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId));
+    const proof = this.requireCanonicalWorkspaceProof(project, "保存为模板");
+    if (!proof.ok) {
+      return fail(
+        proof.error?.code ?? "WORKSPACE_STALE",
+        proof.error?.message ?? "项目工作区尚未同步",
+      );
+    }
+    const runtimeValidation = this.validateWorkspaceRuntime(
+      this.projectWorkspacePath(projectId),
+    );
     if (!runtimeValidation.ok) {
-      return fail("VALIDATION_BLOCKED", "项目运行契约校验失败，不能保存为模板", {
-        validation: this.runtimeToValidationResult(runtimeValidation),
-        runtimeValidation,
-      });
+      return fail(
+        "VALIDATION_BLOCKED",
+        "项目运行契约校验失败，不能保存为模板",
+        {
+          validation: this.runtimeToValidationResult(runtimeValidation),
+          runtimeValidation,
+        },
+      );
     }
     const templateId = this.createTemplateSnapshot(projectId, input);
     const template = this.readTemplate(templateId);
     if (!template) return fail("FILE_WRITE_ERROR", "模板写入失败");
-    const auditId = this.audit("template_create_from_project", actor, "L2", true, {
-      projectId,
-      resourceId: templateId,
-      diffSummary: { created: [`template:${templateId}`] },
-    });
+    const auditId = this.audit(
+      "template_create_from_project",
+      actor,
+      "L2",
+      true,
+      {
+        projectId,
+        resourceId: templateId,
+        diffSummary: { created: [`template:${templateId}`] },
+      },
+    );
     return ok(template, {
       auditId,
       diffSummary: { created: [`template:${templateId}`] },
@@ -696,7 +818,8 @@ export class ProjectAdminService {
     input: Partial<TemplateMetaInput>,
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectTemplateMeta> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const template = this.readTemplate(templateId);
     if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
     const updated: ProjectTemplateMeta = {
@@ -716,14 +839,20 @@ export class ProjectAdminService {
       resourceId: templateId,
       diffSummary: { updated: [`template:${templateId}`] },
     });
-    return ok(updated, { auditId, diffSummary: { updated: [`template:${templateId}`] } });
+    return ok(updated, {
+      auditId,
+      diffSummary: { updated: [`template:${templateId}`] },
+    });
   }
 
-  checkTemplateHealth(templateId?: string): ProjectAdminResult<TemplateHealthReport> {
+  checkTemplateHealth(
+    templateId?: string,
+  ): ProjectAdminResult<TemplateHealthReport> {
     this.ensureDirs();
     const templateIds = templateId
       ? [templateId]
-      : fs.readdirSync(this.templatesDir, { withFileTypes: true })
+      : fs
+          .readdirSync(this.templatesDir, { withFileTypes: true })
           .filter((entry) => entry.isDirectory())
           .map((entry) => entry.name);
     const items = templateIds.map((id) => {
@@ -748,7 +877,11 @@ export class ProjectAdminService {
       } else {
         const validation = this.validateWorkspace(workspacePath);
         issues.push(...validation.issues);
-        if (template && template.demoCount !== this.readWorkspaceTree(workspacePath).pages.length) {
+        if (
+          template &&
+          template.demoCount !==
+            this.readWorkspaceTree(workspacePath).pages.length
+        ) {
           issues.push({
             code: "TEMPLATE_DEMO_COUNT_MISMATCH",
             message: "模板页面数量与 workspace-tree 不一致",
@@ -772,7 +905,10 @@ export class ProjectAdminService {
       ok: items.every((item) => item.ok),
       items,
     };
-    writeJsonFile(path.join(this.internalDir, "template-health", "latest.json"), report);
+    writeJsonFile(
+      path.join(this.internalDir, "template-health", "latest.json"),
+      report,
+    );
     return ok(report, {
       validation: {
         ok: report.ok,
@@ -799,7 +935,8 @@ export class ProjectAdminService {
     confirmToken: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ deleted: boolean; templateId: string }> {
-    if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以删除模板");
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以删除模板");
     const plan = this.readPlan(planId);
     if (!plan || plan.operation !== "template_delete") {
       return fail("PLAN_NOT_FOUND", "模板删除预览计划不存在");
@@ -807,7 +944,10 @@ export class ProjectAdminService {
     if (plan.confirmToken !== confirmToken) {
       return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
     }
-    fs.rmSync(this.getTemplatePath(plan.resourceId), { recursive: true, force: true });
+    fs.rmSync(this.getTemplatePath(plan.resourceId), {
+      recursive: true,
+      force: true,
+    });
     const auditId = this.audit("template_delete_execute", actor, "L3", true, {
       resourceId: plan.resourceId,
       diffSummary: { deleted: [`template:${plan.resourceId}`] },
@@ -822,7 +962,8 @@ export class ProjectAdminService {
     templateId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const template = this.readTemplate(templateId);
     if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
 
@@ -837,15 +978,24 @@ export class ProjectAdminService {
     );
     if (!created.ok || !created.data) return created;
 
-    fs.rmSync(this.getTemplatePath(templateId), { recursive: true, force: true });
-    const auditId = this.audit("template_convert_to_project", actor, "L2", true, {
-      projectId: created.data.id,
-      resourceId: templateId,
-      diffSummary: {
-        created: [`project:${created.data.id}`],
-        deleted: [`template:${templateId}`],
-      },
+    fs.rmSync(this.getTemplatePath(templateId), {
+      recursive: true,
+      force: true,
     });
+    const auditId = this.audit(
+      "template_convert_to_project",
+      actor,
+      "L2",
+      true,
+      {
+        projectId: created.data.id,
+        resourceId: templateId,
+        diffSummary: {
+          created: [`project:${created.data.id}`],
+          deleted: [`template:${templateId}`],
+        },
+      },
+    );
     return ok(created.data, {
       auditId,
       diffSummary: {
@@ -866,11 +1016,15 @@ export class ProjectAdminService {
     const query = description.toLowerCase();
     const scored = templates
       .map((template) => {
-        const haystack = `${template.category} ${template.name} ${template.description}`.toLowerCase();
+        const haystack =
+          `${template.category} ${template.name} ${template.description}`.toLowerCase();
         const score = query
           .split(/\s+/)
           .filter(Boolean)
-          .reduce((total, token) => total + (haystack.includes(token) ? 1 : 0), 0);
+          .reduce(
+            (total, token) => total + (haystack.includes(token) ? 1 : 0),
+            0,
+          );
         return { template, score };
       })
       .sort((a, b) => b.score - a.score);
@@ -880,8 +1034,12 @@ export class ProjectAdminService {
     }
     return ok({
       templateId: best.template.id,
-      reason: best.score > 0 ? "模板元信息与描述存在关键词匹配" : "未命中关键词，返回最近更新模板",
-      confidence: best.score > 0 ? Math.min(0.95, 0.45 + best.score * 0.15) : 0.25,
+      reason:
+        best.score > 0
+          ? "模板元信息与描述存在关键词匹配"
+          : "未命中关键词，返回最近更新模板",
+      confidence:
+        best.score > 0 ? Math.min(0.95, 0.45 + best.score * 0.15) : 0.25,
       template: best.template,
     });
   }
@@ -905,7 +1063,8 @@ export class ProjectAdminService {
     projectId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<EditTransaction> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
@@ -914,12 +1073,19 @@ export class ProjectAdminService {
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const source = this.projectWorkspacePath(projectId);
-    if (!fs.existsSync(source)) return fail("WORKSPACE_NOT_FOUND", "项目工作空间不存在");
+    if (!fs.existsSync(source))
+      return fail("WORKSPACE_NOT_FOUND", "项目工作空间不存在");
 
     const editId = nowId("edit");
-    const workspacePrefix = actor.source === "project-admin-cli" ? "cli" : "core";
+    const workspacePrefix =
+      actor.source === "project-admin-cli" ? "cli" : "core";
     const workspaceId = `${workspacePrefix}_${editId}`;
-    const workspacePath = path.join(this.workspacesDir, actor.id, projectId, workspaceId);
+    const workspacePath = path.join(
+      this.workspacesDir,
+      actor.id,
+      projectId,
+      workspaceId,
+    );
     ensureDir(path.dirname(workspacePath));
     copyWorkspace(source, workspacePath);
     writeJsonFile(path.join(workspacePath, ".workspace.json"), {
@@ -950,7 +1116,10 @@ export class ProjectAdminService {
       projectId,
       resourceId: editId,
     });
-    return ok(transaction, { auditId, nextActions: ["page_list", "edit_validate"] });
+    return ok(transaction, {
+      auditId,
+      nextActions: ["page_list", "edit_validate"],
+    });
   }
 
   editStatus(editId: string): ProjectAdminResult<EditStatus> {
@@ -967,7 +1136,8 @@ export class ProjectAdminService {
 
   editDiff(editId: string): ProjectAdminResult<DiffSummary> {
     const status = this.editStatus(editId);
-    if (!status.ok || !status.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!status.ok || !status.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     return ok({
       updated: status.data.changedFiles,
       notes:
@@ -1022,11 +1192,23 @@ export class ProjectAdminService {
     }
 
     const projectWorkspace = this.projectWorkspacePath(transaction.projectId);
-    const changedFiles = this.diffWorkspaceFiles(projectWorkspace, transaction.workspacePath)
-      .filter((file) => !isWorkspaceMetadataPath(file));
+    const changedFiles = this.diffWorkspaceFiles(
+      projectWorkspace,
+      transaction.workspacePath,
+    ).filter((file) => !isWorkspaceMetadataPath(file));
     fs.rmSync(projectWorkspace, { recursive: true, force: true });
-    copyWorkspaceWithoutRuntimeMetadata(transaction.workspacePath, projectWorkspace);
-    const version = this.createProjectVersion(project, projectWorkspace, actor.name, editId, note, "named_version");
+    copyWorkspaceWithoutRuntimeMetadata(
+      transaction.workspacePath,
+      projectWorkspace,
+    );
+    const version = this.createProjectVersion(
+      project,
+      projectWorkspace,
+      actor.name,
+      editId,
+      note,
+      "named_version",
+    );
     const tree = this.readWorkspaceTree(projectWorkspace);
     const committedAt = Date.now();
     const updatedProject: Project = {
@@ -1035,6 +1217,8 @@ export class ProjectAdminService {
       activeWorkspaceId: undefined,
       activeWorkspaceUpdatedAt: undefined,
       canonicalSyncedWorkspaceId: undefined,
+      canonicalSyncedRevision: undefined,
+      canonicalSyncedRootHash: undefined,
       canonicalSyncedAt: committedAt,
       demoPages: sortPages(tree.pages),
       demoFolders: tree.folders,
@@ -1060,7 +1244,10 @@ export class ProjectAdminService {
     );
   }
 
-  discardEdit(editId: string, actor = this.defaultActor()): ProjectAdminResult<{ discarded: boolean }> {
+  discardEdit(
+    editId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ discarded: boolean }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     transaction.status = "discarded";
@@ -1081,7 +1268,9 @@ export class ProjectAdminService {
     return ok(transaction);
   }
 
-  listPages(editId: string): ProjectAdminResult<{ pages: DemoPageMeta[]; folders: DemoFolderMeta[] }> {
+  listPages(
+    editId: string,
+  ): ProjectAdminResult<{ pages: DemoPageMeta[]; folders: DemoFolderMeta[] }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.workspacePath);
@@ -1111,8 +1300,11 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const versions = this.listResourceVersionsFromDisk(input.projectId, input.kind, input.resourceId)
-      .filter((version) => input.includeDraft || version.source !== "system");
+    const versions = this.listResourceVersionsFromDisk(
+      input.projectId,
+      input.kind,
+      input.resourceId,
+    ).filter((version) => input.includeDraft || version.source !== "system");
     return ok({
       projectId: input.projectId,
       kind: input.kind,
@@ -1136,14 +1328,25 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const version = this.readResourceVersion(input.projectId, input.kind, input.resourceId, input.versionId);
-    if (!version) return fail("VERSION_NOT_FOUND", `资源版本 ${input.versionId} 不存在`);
-    const content = input.kind === "page"
-      ? this.pageFilesFromResourceVersion(version)
-      : input.kind === "knowledge_document"
-        ? this.knowledgeContentFromResourceVersion(version)
-        : undefined;
-    if (content === null) return fail("VERSION_SNAPSHOT_MISSING", `资源版本内容已丢失: ${input.versionId}`);
+    const version = this.readResourceVersion(
+      input.projectId,
+      input.kind,
+      input.resourceId,
+      input.versionId,
+    );
+    if (!version)
+      return fail("VERSION_NOT_FOUND", `资源版本 ${input.versionId} 不存在`);
+    const content =
+      input.kind === "page"
+        ? this.pageFilesFromResourceVersion(version)
+        : input.kind === "knowledge_document"
+          ? this.knowledgeContentFromResourceVersion(version)
+          : undefined;
+    if (content === null)
+      return fail(
+        "VERSION_SNAPSHOT_MISSING",
+        `资源版本内容已丢失: ${input.versionId}`,
+      );
     return ok({
       projectId: input.projectId,
       kind: input.kind,
@@ -1158,28 +1361,42 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<ResourceVersion> {
     if (input.kind === "page") {
-      const created = this.createPageVersion({
-        projectId: input.projectId,
-        pageId: input.resourceId,
-        editId: input.editId,
-        sourceWorkspacePath: input.sourceWorkspacePath,
-        note: input.note,
-        sketchPatchSummary: input.sketchPatchSummary,
-      }, actor);
+      const created = this.createPageVersion(
+        {
+          projectId: input.projectId,
+          pageId: input.resourceId,
+          editId: input.editId,
+          sourceWorkspacePath: input.sourceWorkspacePath,
+          workspaceId: input.workspaceId,
+          workspaceRevision: input.workspaceRevision,
+          workspaceRootHash: input.workspaceRootHash,
+          note: input.note,
+          sketchPatchSummary: input.sketchPatchSummary,
+        },
+        actor,
+      );
       if (!created.ok || !created.data?.resourceVersion) {
-        return fail(created.error?.code ?? "FILE_WRITE_ERROR", created.error?.message ?? "创建页面资源版本失败");
+        return fail(
+          created.error?.code ?? "FILE_WRITE_ERROR",
+          created.error?.message ?? "创建页面资源版本失败",
+        );
       }
       return ok(created.data.resourceVersion);
     }
     if (input.kind !== "knowledge_document") {
-      return fail("UNSUPPORTED_RESOURCE_KIND", `暂不支持创建 ${input.kind} 资源版本`);
+      return fail(
+        "UNSUPPORTED_RESOURCE_KIND",
+        `暂不支持创建 ${input.kind} 资源版本`,
+      );
     }
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const workspacePath = input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
+    const workspacePath =
+      input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
     const manifest = this.readKnowledgeManifest(workspacePath);
     const item = manifest.items.find((entry) => entry.id === input.resourceId);
     if (!item) return fail("KNOWLEDGE_DOCUMENT_NOT_FOUND", "知识文档不存在");
@@ -1194,52 +1411,111 @@ export class ProjectAdminService {
       actor,
       source: input.source ?? "user",
       note: input.note,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
     });
-    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
-      .find((pointer) => pointer.kind === "knowledge_document" && pointer.resourceId === input.resourceId);
+    const previous = this.readHeadCommit(
+      input.projectId,
+    )?.resourcePointers.find(
+      (pointer) =>
+        pointer.kind === "knowledge_document" &&
+        pointer.resourceId === input.resourceId,
+    );
     const commit = this.createContentCommit({
       projectId: input.projectId,
       visibility: input.visibility ?? "semantic",
       intent: input.source === "ai" ? "ai" : "edit",
       title: input.note ?? `更新知识文档 ${item.title}`,
-      pointers: [{ kind: "knowledge_document", resourceId: input.resourceId, versionId: version.id }],
-      changedResources: [{
-        kind: "knowledge_document",
-        resourceId: input.resourceId,
-        fromVersionId: previous?.versionId,
-        toVersionId: version.id,
-      }],
+      pointers: [
+        {
+          kind: "knowledge_document",
+          resourceId: input.resourceId,
+          versionId: version.id,
+        },
+      ],
+      changedResources: [
+        {
+          kind: "knowledge_document",
+          resourceId: input.resourceId,
+          fromVersionId: previous?.versionId,
+          toVersionId: version.id,
+        },
+      ],
       actor,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
     });
     this.writeMaterializationManifest(input.projectId, commit.id, [version]);
-    return ok(version, { diffSummary: { created: [`knowledge-version:${input.resourceId}:${version.id}`] } });
+    return ok(version, {
+      diffSummary: {
+        created: [`knowledge-version:${input.resourceId}:${version.id}`],
+      },
+    });
   }
 
-  resourceRestore(input: ResourceRestoreInput, actor = this.defaultActor()): ProjectAdminResult<ProjectCommit> {
+  resourceRestore(
+    input: ResourceRestoreInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ProjectCommit> {
     if (input.kind === "page") {
-      const restored = this.restorePageVersion(input.projectId, input.resourceId, input.versionId, actor);
+      const restored = this.restorePageVersion(
+        input.projectId,
+        input.resourceId,
+        input.versionId,
+        actor,
+        {
+          workspaceId: input.workspaceId,
+          workspaceRevision: input.workspaceRevision,
+          workspaceRootHash: input.workspaceRootHash,
+          sessionId: input.sessionId,
+        },
+      );
       if (!restored.ok || !restored.data?.commitId) {
-        return fail(restored.error?.code ?? "FILE_WRITE_ERROR", restored.error?.message ?? "恢复页面资源失败");
+        return fail(
+          restored.error?.code ?? "FILE_WRITE_ERROR",
+          restored.error?.message ?? "恢复页面资源失败",
+        );
       }
       const commit = this.readCommit(input.projectId, restored.data.commitId);
       return commit ? ok(commit) : fail("COMMIT_NOT_FOUND", "恢复提交不存在");
     }
     if (input.kind !== "knowledge_document") {
-      return fail("UNSUPPORTED_RESOURCE_KIND", `暂不支持恢复 ${input.kind} 资源`);
+      return fail(
+        "UNSUPPORTED_RESOURCE_KIND",
+        `暂不支持恢复 ${input.kind} 资源`,
+      );
     }
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
-    const version = this.readResourceVersion(input.projectId, "knowledge_document", input.resourceId, input.versionId);
-    if (!version) return fail("VERSION_NOT_FOUND", `知识文档版本 ${input.versionId} 不存在`);
+    const version = this.readResourceVersion(
+      input.projectId,
+      "knowledge_document",
+      input.resourceId,
+      input.versionId,
+    );
+    if (!version)
+      return fail(
+        "VERSION_NOT_FOUND",
+        `知识文档版本 ${input.versionId} 不存在`,
+      );
     const payload = this.knowledgeContentFromResourceVersion(version);
-    if (!payload) return fail("VERSION_SNAPSHOT_MISSING", `知识文档版本内容已丢失: ${input.versionId}`);
+    if (!payload)
+      return fail(
+        "VERSION_SNAPSHOT_MISSING",
+        `知识文档版本内容已丢失: ${input.versionId}`,
+      );
     if (payload.item.readonly || payload.item.source === "system") {
       return fail("FORBIDDEN", "系统只读文档不能恢复写入");
     }
     const workspacePath = this.projectWorkspacePath(input.projectId);
     const manifest = this.readKnowledgeManifest(workspacePath);
-    const index = manifest.items.findIndex((item) => item.id === input.resourceId);
+    const index = manifest.items.findIndex(
+      (item) => item.id === input.resourceId,
+    );
     const restoredItem = {
       ...payload.item,
       updatedAt: new Date().toISOString(),
@@ -1251,63 +1527,105 @@ export class ProjectAdminService {
       manifest.items[index] = restoredItem;
     }
     ensureDir(path.join(workspacePath, "knowledge"));
-    fs.writeFileSync(path.join(workspacePath, "knowledge", path.basename(restoredItem.fileName)), payload.content, "utf-8");
+    fs.writeFileSync(
+      path.join(
+        workspacePath,
+        "knowledge",
+        path.basename(restoredItem.fileName),
+      ),
+      payload.content,
+      "utf-8",
+    );
     this.writeKnowledgeManifest(workspacePath, manifest);
-    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
-      .find((pointer) => pointer.kind === "knowledge_document" && pointer.resourceId === input.resourceId);
+    const previous = this.readHeadCommit(
+      input.projectId,
+    )?.resourcePointers.find(
+      (pointer) =>
+        pointer.kind === "knowledge_document" &&
+        pointer.resourceId === input.resourceId,
+    );
     const commit = this.createContentCommit({
       projectId: input.projectId,
       visibility: "semantic",
       intent: "restore",
       title: `恢复知识文档 ${restoredItem.title}`,
-      pointers: [{ kind: "knowledge_document", resourceId: input.resourceId, versionId: input.versionId }],
-      changedResources: [{
-        kind: "knowledge_document",
-        resourceId: input.resourceId,
-        fromVersionId: previous?.versionId,
-        toVersionId: input.versionId,
-      }],
+      pointers: [
+        {
+          kind: "knowledge_document",
+          resourceId: input.resourceId,
+          versionId: input.versionId,
+        },
+      ],
+      changedResources: [
+        {
+          kind: "knowledge_document",
+          resourceId: input.resourceId,
+          fromVersionId: previous?.versionId,
+          toVersionId: input.versionId,
+        },
+      ],
       actor,
       sessionId: input.sessionId,
       workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
     });
     this.writeMaterializationManifest(input.projectId, commit.id, [version]);
     const project = this.readProject(input.projectId);
-    if (project) this.writeProject(input.projectId, { ...project, updatedAt: Date.now() });
-    return ok(commit, { diffSummary: { updated: [`knowledge:${input.resourceId}`] } });
+    if (project)
+      this.writeProject(input.projectId, { ...project, updatedAt: Date.now() });
+    return ok(commit, {
+      diffSummary: { updated: [`knowledge:${input.resourceId}`] },
+    });
   }
 
   resourceDelete(
-    input: { projectId: string; kind: ProjectResourceKind; resourceId: string; title?: string },
+    input: {
+      projectId: string;
+      kind: ProjectResourceKind;
+      resourceId: string;
+      title?: string;
+    },
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectCommit> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const previous = this.readHeadCommit(input.projectId)?.resourcePointers
-      .find((pointer) => pointer.kind === input.kind && pointer.resourceId === input.resourceId);
+    const previous = this.readHeadCommit(
+      input.projectId,
+    )?.resourcePointers.find(
+      (pointer) =>
+        pointer.kind === input.kind && pointer.resourceId === input.resourceId,
+    );
     const commit = this.createContentCommit({
       projectId: input.projectId,
       visibility: "semantic",
       intent: "edit",
       title: input.title ?? `删除资源 ${input.kind}:${input.resourceId}`,
-      pointers: [{
-        kind: input.kind,
-        resourceId: input.resourceId,
-        versionId: previous?.versionId,
-        deleted: true,
-      }],
-      changedResources: [{
-        kind: input.kind,
-        resourceId: input.resourceId,
-        fromVersionId: previous?.versionId,
-        deleted: true,
-      }],
+      pointers: [
+        {
+          kind: input.kind,
+          resourceId: input.resourceId,
+          versionId: previous?.versionId,
+          deleted: true,
+        },
+      ],
+      changedResources: [
+        {
+          kind: input.kind,
+          resourceId: input.resourceId,
+          fromVersionId: previous?.versionId,
+          deleted: true,
+        },
+      ],
       actor,
     });
-    return ok(commit, { diffSummary: { deleted: [`${input.kind}:${input.resourceId}`] } });
+    return ok(commit, {
+      diffSummary: { deleted: [`${input.kind}:${input.resourceId}`] },
+    });
   }
 
   projectCommitList(
@@ -1318,8 +1636,9 @@ export class ProjectAdminService {
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const state = this.readContentState(projectId);
-    const commits = this.listCommitsFromDisk(projectId)
-      .filter((commit) => includeDraft || commit.visibility !== "draft_checkpoint");
+    const commits = this.listCommitsFromDisk(projectId).filter(
+      (commit) => includeDraft || commit.visibility !== "draft_checkpoint",
+    );
     return ok({
       projectId,
       headCommitId: state?.headCommitId,
@@ -1362,19 +1681,28 @@ export class ProjectAdminService {
     const commitId = input.commitId ?? state?.headCommitId;
     if (!commitId) return fail("COMMIT_NOT_FOUND", "项目还没有内容图提交");
     const commit = this.readCommit(input.projectId, commitId);
-    if (!commit) return fail("COMMIT_NOT_FOUND", `内容图提交不存在: ${commitId}`);
+    if (!commit)
+      return fail("COMMIT_NOT_FOUND", `内容图提交不存在: ${commitId}`);
     const missingBlobs: string[] = [];
     const versions: ResourceVersion[] = [];
     for (const pointer of commit.resourcePointers) {
       if (!pointer.versionId || pointer.deleted) continue;
-      const version = this.readResourceVersion(input.projectId, pointer.kind, pointer.resourceId, pointer.versionId);
+      const version = this.readResourceVersion(
+        input.projectId,
+        pointer.kind,
+        pointer.resourceId,
+        pointer.versionId,
+      );
       if (!version) {
-        missingBlobs.push(`${pointer.kind}:${pointer.resourceId}:${pointer.versionId}`);
+        missingBlobs.push(
+          `${pointer.kind}:${pointer.resourceId}:${pointer.versionId}`,
+        );
         continue;
       }
       versions.push(version);
       for (const hash of version.blobRefs) {
-        if (!fs.existsSync(this.blobPath(input.projectId, hash))) missingBlobs.push(hash);
+        if (!fs.existsSync(this.blobPath(input.projectId, hash)))
+          missingBlobs.push(hash);
       }
     }
     if (missingBlobs.length > 0) {
@@ -1418,45 +1746,96 @@ export class ProjectAdminService {
         const runtimeType = resolvePageRuntimeType(metadata.page);
         if (runtimeType === "prototype-html-css") {
           fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
-          fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
-          fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
-          writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
-          writtenFiles.push(`demos/${version.resourceId}/prototype.html`, `demos/${version.resourceId}/prototype.css`, `demos/${version.resourceId}/prototype.meta.json`);
+          fs.writeFileSync(
+            path.join(demoDir, "prototype.html"),
+            files.prototypeHtml ?? "",
+            "utf-8",
+          );
+          fs.writeFileSync(
+            path.join(demoDir, "prototype.css"),
+            files.prototypeCss ?? "",
+            "utf-8",
+          );
+          writeJsonFile(
+            path.join(demoDir, "prototype.meta.json"),
+            files.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+          );
+          writtenFiles.push(
+            `demos/${version.resourceId}/prototype.html`,
+            `demos/${version.resourceId}/prototype.css`,
+            `demos/${version.resourceId}/prototype.meta.json`,
+          );
         } else if (runtimeType === "sketch-scene") {
           fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
           fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
           fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
-          fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), files.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
-          writeJsonFile(path.join(demoDir, "sketch.meta.json"), files.sketchMeta ?? DEFAULT_SKETCH_META);
-          writtenFiles.push(`demos/${version.resourceId}/sketch.scene.json`, `demos/${version.resourceId}/sketch.meta.json`);
+          fs.writeFileSync(
+            path.join(demoDir, "sketch.scene.json"),
+            files.sketchScene ?? createDefaultSketchSceneText(),
+            "utf-8",
+          );
+          writeJsonFile(
+            path.join(demoDir, "sketch.meta.json"),
+            files.sketchMeta ?? DEFAULT_SKETCH_META,
+          );
+          writtenFiles.push(
+            `demos/${version.resourceId}/sketch.scene.json`,
+            `demos/${version.resourceId}/sketch.meta.json`,
+          );
         } else {
           fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
-          fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
+          fs.writeFileSync(
+            path.join(demoDir, "index.tsx"),
+            files.code,
+            "utf-8",
+          );
           writtenFiles.push(`demos/${version.resourceId}/index.tsx`);
         }
-        fs.writeFileSync(path.join(demoDir, "config.schema.json"), files.schema, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "config.schema.json"),
+          files.schema,
+          "utf-8",
+        );
         writtenFiles.push(`demos/${version.resourceId}/config.schema.json`);
         const materializedPage = metadata.page;
-        const pageIndex = tree.pages.findIndex((page) => page.id === version.resourceId);
+        const pageIndex = tree.pages.findIndex(
+          (page) => page.id === version.resourceId,
+        );
         tree = {
           ...tree,
-          pages: pageIndex === -1
-            ? [...tree.pages, materializedPage]
-            : tree.pages.map((page) => page.id === version.resourceId ? materializedPage : page),
+          pages:
+            pageIndex === -1
+              ? [...tree.pages, materializedPage]
+              : tree.pages.map((page) =>
+                  page.id === version.resourceId ? materializedPage : page,
+                ),
         };
       }
       if (version.kind === "knowledge_document") {
         const payload = this.knowledgeContentFromResourceVersion(version);
         if (!payload) continue;
         ensureDir(path.join(workspacePath, "knowledge"));
-        fs.writeFileSync(path.join(workspacePath, "knowledge", path.basename(payload.item.fileName)), payload.content, "utf-8");
+        fs.writeFileSync(
+          path.join(
+            workspacePath,
+            "knowledge",
+            path.basename(payload.item.fileName),
+          ),
+          payload.content,
+          "utf-8",
+        );
         writtenFiles.push(`knowledge/${payload.item.fileName}`);
-        const itemIndex = knowledgeManifest.items.findIndex((item) => item.id === payload.item.id);
+        const itemIndex = knowledgeManifest.items.findIndex(
+          (item) => item.id === payload.item.id,
+        );
         knowledgeManifest = {
           ...knowledgeManifest,
-          items: itemIndex === -1
-            ? [...knowledgeManifest.items, payload.item]
-            : knowledgeManifest.items.map((item) => item.id === payload.item.id ? payload.item : item),
+          items:
+            itemIndex === -1
+              ? [...knowledgeManifest.items, payload.item]
+              : knowledgeManifest.items.map((item) =>
+                  item.id === payload.item.id ? payload.item : item,
+                ),
         };
       }
     }
@@ -1498,25 +1877,46 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const blobRoot = path.join(this.contentDir(projectId), "blobs");
     if (!fs.existsSync(blobRoot)) {
-      return ok({ projectId, dryRun: options.dryRun ?? true, removableBlobs: [], removedBlobs: [] });
+      return ok({
+        projectId,
+        dryRun: options.dryRun ?? true,
+        removableBlobs: [],
+        removedBlobs: [],
+      });
     }
     const referenced = new Set<string>();
-    for (const kind of ["page", "knowledge_document", "canvas", "asset", "project_config"] as ProjectResourceKind[]) {
+    for (const kind of [
+      "page",
+      "knowledge_document",
+      "canvas",
+      "asset",
+      "project_config",
+    ] as ProjectResourceKind[]) {
       const kindDir = path.join(this.contentDir(projectId), "resources", kind);
       if (!fs.existsSync(kindDir)) continue;
       for (const resourceId of fs.readdirSync(kindDir)) {
-        for (const version of this.listResourceVersionsFromDisk(projectId, kind, resourceId)) {
+        for (const version of this.listResourceVersionsFromDisk(
+          projectId,
+          kind,
+          resourceId,
+        )) {
           version.blobRefs.forEach((hash) => referenced.add(hash));
         }
       }
     }
-    const allBlobs = this.walkFiles(blobRoot).filter((file) => fs.statSync(file).isFile());
-    const removableFiles = allBlobs.filter((file) => !referenced.has(path.basename(file)));
+    const allBlobs = this.walkFiles(blobRoot).filter((file) =>
+      fs.statSync(file).isFile(),
+    );
+    const removableFiles = allBlobs.filter(
+      (file) => !referenced.has(path.basename(file)),
+    );
     if (options.dryRun ?? true) {
       return ok({
         projectId,
         dryRun: true,
-        removableBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
+        removableBlobs: removableFiles.map((file) =>
+          path.relative(blobRoot, file),
+        ),
         removedBlobs: [],
       });
     }
@@ -1524,7 +1924,9 @@ export class ProjectAdminService {
     return ok({
       projectId,
       dryRun: false,
-      removableBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
+      removableBlobs: removableFiles.map((file) =>
+        path.relative(blobRoot, file),
+      ),
       removedBlobs: removableFiles.map((file) => path.relative(blobRoot, file)),
     });
   }
@@ -1534,9 +1936,15 @@ export class ProjectAdminService {
     pageId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageVersionHistory> {
-    const history = this.resourceVersionList({ projectId, kind: "page", resourceId: pageId }, actor);
+    const history = this.resourceVersionList(
+      { projectId, kind: "page", resourceId: pageId },
+      actor,
+    );
     if (!history.ok || !history.data) {
-      return fail(history.error?.code ?? "FILE_READ_ERROR", history.error?.message ?? "读取页面历史失败");
+      return fail(
+        history.error?.code ?? "FILE_READ_ERROR",
+        history.error?.message ?? "读取页面历史失败",
+      );
     }
     const versions = history.data.versions.map((version): PageVersionInfo => {
       const metadata = version.metadata as Partial<PageResourceMetadata>;
@@ -1548,7 +1956,12 @@ export class ProjectAdminService {
         savedAt: version.createdAt,
         savedBy: version.createdBy,
         sessionId: `resource-${version.id}`,
-        snapshotPath: this.resourceVersionPath(projectId, "page", pageId, version.id),
+        snapshotPath: this.resourceVersionPath(
+          projectId,
+          "page",
+          pageId,
+          version.id,
+        ),
         fileCount: version.blobRefs.length,
         note: version.note,
         resourceVersion: version,
@@ -1569,13 +1982,24 @@ export class ProjectAdminService {
     versionId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageVersionDetail> {
-    const detail = this.resourceVersionGet({ projectId, kind: "page", resourceId: pageId, versionId }, actor);
+    const detail = this.resourceVersionGet(
+      { projectId, kind: "page", resourceId: pageId, versionId },
+      actor,
+    );
     if (!detail.ok || !detail.data) {
-      return fail(detail.error?.code ?? "VERSION_NOT_FOUND", detail.error?.message ?? `页面版本 ${versionId} 不存在`);
+      return fail(
+        detail.error?.code ?? "VERSION_NOT_FOUND",
+        detail.error?.message ?? `页面版本 ${versionId} 不存在`,
+      );
     }
     const files = detail.data.content as DemoFiles | undefined;
-    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本内容已丢失: ${versionId}`);
-    const metadata = detail.data.version.metadata as Partial<PageResourceMetadata>;
+    if (!files)
+      return fail(
+        "VERSION_SNAPSHOT_MISSING",
+        `页面版本内容已丢失: ${versionId}`,
+      );
+    const metadata = detail.data.version
+      .metadata as Partial<PageResourceMetadata>;
     return ok({
       projectId,
       pageId,
@@ -1587,7 +2011,12 @@ export class ProjectAdminService {
         savedAt: detail.data.version.createdAt,
         savedBy: detail.data.version.createdBy,
         sessionId: `resource-${versionId}`,
-        snapshotPath: this.resourceVersionPath(projectId, "page", pageId, versionId),
+        snapshotPath: this.resourceVersionPath(
+          projectId,
+          "page",
+          pageId,
+          versionId,
+        ),
         fileCount: detail.data.version.blobRefs.length,
         note: detail.data.version.note,
         resourceVersion: detail.data.version,
@@ -1596,9 +2025,13 @@ export class ProjectAdminService {
     });
   }
 
-  createPage(input: PageCreateInput, actor = this.defaultActor()): ProjectAdminResult<PageDetail> {
+  createPage(
+    input: PageCreateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageDetail> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const workspacePath = transaction.data.workspacePath;
     const tree = this.readWorkspaceTree(workspacePath);
     const parentId = input.parentId ?? null;
@@ -1612,19 +2045,26 @@ export class ProjectAdminService {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
     const runtimeType: DemoPageRuntimeType =
-      input.runtimeType === "prototype-html-css"
-        ? "prototype-html-css"
-        : input.runtimeType === "sketch-scene"
-          ? "sketch-scene"
-          : "high-fidelity-react";
+      input.runtimeType === "high-fidelity-react"
+        ? "high-fidelity-react"
+        : input.runtimeType === "prototype-html-css"
+          ? "prototype-html-css"
+          : input.runtimeType === "sketch-scene"
+            ? "sketch-scene"
+            : input.code
+              ? "high-fidelity-react"
+              : "prototype-html-css";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
       routeKey: makeUniqueRouteKey(
         input.routeKey ?? input.name,
-        new Set(tree.pages.map((page) => page.routeKey).filter(Boolean) as string[]),
+        new Set(
+          tree.pages.map((page) => page.routeKey).filter(Boolean) as string[],
+        ),
       ),
-      runtimeType: runtimeType === "high-fidelity-react" ? undefined : runtimeType,
+      runtimeType:
+        runtimeType === "high-fidelity-react" ? undefined : runtimeType,
       order: input.order ?? tree.pages.length,
       parentId,
     };
@@ -1642,14 +2082,19 @@ export class ProjectAdminService {
             ? {
                 code: "",
                 schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
-                sketchScene: input.sketchScene ?? createDefaultSketchSceneText(),
+                sketchScene:
+                  input.sketchScene ?? createDefaultSketchSceneText(),
                 sketchMeta: input.sketchMeta ?? DEFAULT_SKETCH_META,
               }
             : {
                 code: input.code ?? DEFAULT_DEMO_CODE,
                 schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
               };
-      const runtimeValidation = this.validatePageFilesRuntime(pageId, runtimeType, files);
+      const runtimeValidation = this.validatePageFilesRuntime(
+        pageId,
+        runtimeType,
+        files,
+      );
       return ok(
         { meta, files },
         {
@@ -1658,33 +2103,80 @@ export class ProjectAdminService {
         },
       );
     }
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "page_create",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     const demoDir = this.pageDir(workspacePath, pageId);
     ensureDir(demoDir);
     if (runtimeType === "prototype-html-css") {
-      fs.writeFileSync(path.join(demoDir, "prototype.html"), input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
-      fs.writeFileSync(path.join(demoDir, "prototype.css"), input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
-      writeJsonFile(path.join(demoDir, "prototype.meta.json"), input.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+      fs.writeFileSync(
+        path.join(demoDir, "prototype.html"),
+        input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+        "utf-8",
+      );
+      fs.writeFileSync(
+        path.join(demoDir, "prototype.css"),
+        input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+        "utf-8",
+      );
+      writeJsonFile(
+        path.join(demoDir, "prototype.meta.json"),
+        input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+      );
     } else if (runtimeType === "sketch-scene") {
-      fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), input.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
-      writeJsonFile(path.join(demoDir, "sketch.meta.json"), input.sketchMeta ?? DEFAULT_SKETCH_META);
+      fs.writeFileSync(
+        path.join(demoDir, "sketch.scene.json"),
+        input.sketchScene ?? createDefaultSketchSceneText(),
+        "utf-8",
+      );
+      writeJsonFile(
+        path.join(demoDir, "sketch.meta.json"),
+        input.sketchMeta ?? DEFAULT_SKETCH_META,
+      );
     } else {
-      fs.writeFileSync(path.join(demoDir, "index.tsx"), input.code ?? DEFAULT_DEMO_CODE, "utf-8");
+      fs.writeFileSync(
+        path.join(demoDir, "index.tsx"),
+        input.code ?? DEFAULT_DEMO_CODE,
+        "utf-8",
+      );
     }
     fs.writeFileSync(
       path.join(demoDir, "config.schema.json"),
       input.schema ?? DEFAULT_DEMO_SCHEMA,
       "utf-8",
     );
-    this.writeWorkspaceTree(workspacePath, { ...tree, pages: [...tree.pages, meta] });
+    this.writeWorkspaceTree(workspacePath, {
+      ...tree,
+      pages: [...tree.pages, meta],
+    });
     const auditId = this.audit("page_create", actor, "L1", true, {
       projectId: transaction.data.projectId,
       resourceId: pageId,
       diffSummary: { created: [`page:${pageId}`] },
     });
-    const runtimeValidation = this.validateWorkspaceRuntime(workspacePath, pageId);
+    const runtimeValidation = this.validateWorkspaceRuntime(
+      workspacePath,
+      pageId,
+    );
     return ok(
-      { meta, files: this.readPageFiles(workspacePath, pageId) ?? { code: "", schema: "" } },
-      { auditId, diffSummary: { created: [`page:${pageId}`] }, runtimeValidation },
+      {
+        meta,
+        files: this.readPageFiles(workspacePath, pageId) ?? {
+          code: "",
+          schema: "",
+        },
+      },
+      {
+        auditId,
+        diffSummary: { created: [`page:${pageId}`] },
+        runtimeValidation,
+      },
     );
   }
 
@@ -1695,23 +2187,31 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageDetail> {
     const page = this.getPage(editId, pageId);
-    if (!page.ok || !page.data) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
-    return this.createPage({
-      editId,
-      name: name ?? `${page.data.meta.name} 副本`,
-      parentId: page.data.meta.parentId,
-      runtimeType: resolvePageRuntimeType(page.data.meta),
-      code: page.data.files.code,
-      schema: page.data.files.schema,
-      prototypeHtml: page.data.files.prototypeHtml,
-      prototypeCss: page.data.files.prototypeCss,
-      prototypeMeta: page.data.files.prototypeMeta,
-    }, actor);
+    if (!page.ok || !page.data)
+      return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    return this.createPage(
+      {
+        editId,
+        name: name ?? `${page.data.meta.name} 副本`,
+        parentId: page.data.meta.parentId,
+        runtimeType: resolvePageRuntimeType(page.data.meta),
+        code: page.data.files.code,
+        schema: page.data.files.schema,
+        prototypeHtml: page.data.files.prototypeHtml,
+        prototypeCss: page.data.files.prototypeCss,
+        prototypeMeta: page.data.files.prototypeMeta,
+      },
+      actor,
+    );
   }
 
-  updatePage(input: PageUpdateInput, actor = this.defaultActor()): ProjectAdminResult<PageDetail> {
+  updatePage(
+    input: PageUpdateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PageDetail> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const workspacePath = transaction.data.workspacePath;
     const tree = this.readWorkspaceTree(workspacePath);
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
@@ -1728,31 +2228,57 @@ export class ProjectAdminService {
       name: input.name?.trim() || current.name,
       routeKey: input.routeKey
         ? makeUniqueRouteKey(input.routeKey, usedRouteKeys)
-        : current.routeKey ?? makeUniqueRouteKey(input.name ?? current.name, usedRouteKeys),
-      parentId: input.parentId !== undefined ? input.parentId : current.parentId,
+        : (current.routeKey ??
+          makeUniqueRouteKey(input.name ?? current.name, usedRouteKeys)),
+      parentId:
+        input.parentId !== undefined ? input.parentId : current.parentId,
       order: input.order ?? current.order,
     };
-    if (nextMeta.parentId && !tree.folders.some((folder) => folder.id === nextMeta.parentId)) {
+    if (
+      nextMeta.parentId &&
+      !tree.folders.some((folder) => folder.id === nextMeta.parentId)
+    ) {
       return fail("FOLDER_NOT_FOUND", "父文件夹不存在");
     }
     const validation = this.validateSchemaPair(
       this.readProjectConfig(workspacePath),
       input.schema ?? this.readPageFiles(workspacePath, input.pageId)?.schema,
     );
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
     const diff: DiffSummary = { updated: [] };
-    if (input.code !== undefined) diff.updated?.push(`page:${input.pageId}:code`);
-    if (input.schema !== undefined) diff.updated?.push(`page:${input.pageId}:schema`);
-    if (input.name !== undefined || input.routeKey !== undefined || input.parentId !== undefined || input.order !== undefined) {
+    if (input.code !== undefined)
+      diff.updated?.push(`page:${input.pageId}:code`);
+    if (input.schema !== undefined)
+      diff.updated?.push(`page:${input.pageId}:schema`);
+    if (
+      input.name !== undefined ||
+      input.routeKey !== undefined ||
+      input.parentId !== undefined ||
+      input.order !== undefined
+    ) {
       diff.updated?.push(`page:${input.pageId}:meta`);
     }
     if (!input.dryRun) {
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "page_update",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
       const demoDir = this.pageDir(workspacePath, input.pageId);
       if (input.code !== undefined) {
         fs.writeFileSync(path.join(demoDir, "index.tsx"), input.code, "utf-8");
       }
       if (input.schema !== undefined) {
-        fs.writeFileSync(path.join(demoDir, "config.schema.json"), input.schema, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "config.schema.json"),
+          input.schema,
+          "utf-8",
+        );
       }
       const pages = [...tree.pages];
       pages[pageIndex] = nextMeta;
@@ -1770,9 +2296,14 @@ export class ProjectAdminService {
       code: input.code ?? "",
       schema: input.schema ?? "",
     };
-    const runtimeValidation = input.code !== undefined
-      ? this.validatePageFilesRuntime(input.pageId, resolvePageRuntimeType(nextMeta), files)
-      : undefined;
+    const runtimeValidation =
+      input.code !== undefined
+        ? this.validatePageFilesRuntime(
+            input.pageId,
+            resolvePageRuntimeType(nextMeta),
+            files,
+          )
+        : undefined;
     return ok(
       { meta: nextMeta, files },
       { auditId, diffSummary: diff, validation, runtimeValidation },
@@ -1784,7 +2315,8 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageDetail> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const workspacePath = transaction.data.workspacePath;
     const tree = this.readWorkspaceTree(workspacePath);
     const page = tree.pages.find((item) => item.id === input.pageId);
@@ -1796,9 +2328,18 @@ export class ProjectAdminService {
     if (!currentFiles) return fail("FILE_READ_ERROR", "页面文件不存在");
     const nextFiles: DemoFiles = {
       ...currentFiles,
-      prototypeHtml: input.prototypeHtml ?? currentFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
-      prototypeCss: input.prototypeCss ?? currentFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
-      prototypeMeta: input.prototypeMeta ?? currentFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+      prototypeHtml:
+        input.prototypeHtml ??
+        currentFiles.prototypeHtml ??
+        DEFAULT_PROTOTYPE_HTML,
+      prototypeCss:
+        input.prototypeCss ??
+        currentFiles.prototypeCss ??
+        DEFAULT_PROTOTYPE_CSS,
+      prototypeMeta:
+        input.prototypeMeta ??
+        currentFiles.prototypeMeta ??
+        DEFAULT_PROTOTYPE_META,
     };
     const runtimeValidation = this.validatePageFilesRuntime(
       input.pageId,
@@ -1812,27 +2353,50 @@ export class ProjectAdminService {
       });
     }
     const diff: DiffSummary = { updated: [] };
-    if (input.prototypeHtml !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeHtml`);
-    if (input.prototypeCss !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeCss`);
-    if (input.prototypeMeta !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
+    if (input.prototypeHtml !== undefined)
+      diff.updated?.push(`page:${input.pageId}:prototypeHtml`);
+    if (input.prototypeCss !== undefined)
+      diff.updated?.push(`page:${input.pageId}:prototypeCss`);
+    if (input.prototypeMeta !== undefined)
+      diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
 
     if (!input.dryRun) {
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "page_update_prototype",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
       const demoDir = this.pageDir(workspacePath, input.pageId);
       ensureDir(demoDir);
       if (input.prototypeHtml !== undefined) {
-        fs.writeFileSync(path.join(demoDir, "prototype.html"), input.prototypeHtml, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "prototype.html"),
+          input.prototypeHtml,
+          "utf-8",
+        );
       }
       if (input.prototypeCss !== undefined) {
-        fs.writeFileSync(path.join(demoDir, "prototype.css"), input.prototypeCss, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "prototype.css"),
+          input.prototypeCss,
+          "utf-8",
+        );
       }
       if (input.prototypeMeta !== undefined) {
-        writeJsonFile(path.join(demoDir, "prototype.meta.json"), input.prototypeMeta);
+        writeJsonFile(
+          path.join(demoDir, "prototype.meta.json"),
+          input.prototypeMeta,
+        );
       }
     }
 
     const files = input.dryRun
       ? nextFiles
-      : this.readPageFiles(workspacePath, input.pageId) ?? nextFiles;
+      : (this.readPageFiles(workspacePath, input.pageId) ?? nextFiles);
     const auditId = input.dryRun
       ? undefined
       : this.audit("page_update_prototype", actor, "L1", true, {
@@ -1851,7 +2415,8 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageDetail> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const workspacePath = transaction.data.workspacePath;
     const tree = this.readWorkspaceTree(workspacePath);
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
@@ -1877,17 +2442,31 @@ export class ProjectAdminService {
       ...currentFiles,
       code: input.code ?? currentFiles.code ?? DEFAULT_DEMO_CODE,
       schema: input.schema ?? currentFiles.schema ?? DEFAULT_DEMO_SCHEMA,
-      prototypeHtml: input.prototypeHtml ?? currentFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
-      prototypeCss: input.prototypeCss ?? currentFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
-      prototypeMeta: input.prototypeMeta ?? currentFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
-      sketchScene: input.sketchScene ?? currentFiles.sketchScene ?? createDefaultSketchSceneText(),
-      sketchMeta: input.sketchMeta ?? currentFiles.sketchMeta ?? DEFAULT_SKETCH_META,
+      prototypeHtml:
+        input.prototypeHtml ??
+        currentFiles.prototypeHtml ??
+        DEFAULT_PROTOTYPE_HTML,
+      prototypeCss:
+        input.prototypeCss ??
+        currentFiles.prototypeCss ??
+        DEFAULT_PROTOTYPE_CSS,
+      prototypeMeta:
+        input.prototypeMeta ??
+        currentFiles.prototypeMeta ??
+        DEFAULT_PROTOTYPE_META,
+      sketchScene:
+        input.sketchScene ??
+        currentFiles.sketchScene ??
+        createDefaultSketchSceneText(),
+      sketchMeta:
+        input.sketchMeta ?? currentFiles.sketchMeta ?? DEFAULT_SKETCH_META,
     };
     const validation = this.validateSchemaPair(
       this.readProjectConfig(workspacePath),
       nextFiles.schema,
     );
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
 
     const runtimeValidation = this.validatePageFilesRuntime(
       input.pageId,
@@ -1895,15 +2474,22 @@ export class ProjectAdminService {
       nextFiles,
     );
     if (!runtimeValidation.ok) {
-      return fail("VALIDATION_BLOCKED", "页面类型切换校验失败，已保留原页面内容", {
-        validation: this.runtimeToValidationResult(runtimeValidation),
-        runtimeValidation,
-      });
+      return fail(
+        "VALIDATION_BLOCKED",
+        "页面类型切换校验失败，已保留原页面内容",
+        {
+          validation: this.runtimeToValidationResult(runtimeValidation),
+          runtimeValidation,
+        },
+      );
     }
 
     const nextMeta: DemoPageMeta = {
       ...current,
-      runtimeType: targetRuntimeType === "high-fidelity-react" ? undefined : targetRuntimeType,
+      runtimeType:
+        targetRuntimeType === "high-fidelity-react"
+          ? undefined
+          : targetRuntimeType,
     };
     const diff: DiffSummary = {
       updated: [
@@ -1912,36 +2498,77 @@ export class ProjectAdminService {
       notes: input.reason ? [input.reason] : undefined,
     };
     if (targetRuntimeType === "prototype-html-css") {
-      diff.updated?.push(`page:${input.pageId}:prototypeHtml`, `page:${input.pageId}:prototypeCss`);
-      if (input.prototypeMeta !== undefined) diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
+      diff.updated?.push(
+        `page:${input.pageId}:prototypeHtml`,
+        `page:${input.pageId}:prototypeCss`,
+      );
+      if (input.prototypeMeta !== undefined)
+        diff.updated?.push(`page:${input.pageId}:prototypeMeta`);
     } else if (targetRuntimeType === "sketch-scene") {
       diff.updated?.push(`page:${input.pageId}:sketchScene`);
-      if (input.sketchMeta !== undefined) diff.updated?.push(`page:${input.pageId}:sketchMeta`);
+      if (input.sketchMeta !== undefined)
+        diff.updated?.push(`page:${input.pageId}:sketchMeta`);
     } else {
       diff.updated?.push(`page:${input.pageId}:code`);
     }
-    if (input.schema !== undefined) diff.updated?.push(`page:${input.pageId}:schema`);
+    if (input.schema !== undefined)
+      diff.updated?.push(`page:${input.pageId}:schema`);
 
     if (!input.dryRun) {
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "page_switch_runtime",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
       const demoDir = this.pageDir(workspacePath, input.pageId);
       ensureDir(demoDir);
       if (targetRuntimeType === "prototype-html-css") {
-        fs.writeFileSync(path.join(demoDir, "prototype.html"), nextFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML, "utf-8");
-        fs.writeFileSync(path.join(demoDir, "prototype.css"), nextFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS, "utf-8");
-        writeJsonFile(path.join(demoDir, "prototype.meta.json"), nextFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+        fs.writeFileSync(
+          path.join(demoDir, "prototype.html"),
+          nextFiles.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
+          "utf-8",
+        );
+        fs.writeFileSync(
+          path.join(demoDir, "prototype.css"),
+          nextFiles.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
+          "utf-8",
+        );
+        writeJsonFile(
+          path.join(demoDir, "prototype.meta.json"),
+          nextFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+        );
         fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
       } else if (targetRuntimeType === "sketch-scene") {
         fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
         fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
         fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
-        fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), nextFiles.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
-        writeJsonFile(path.join(demoDir, "sketch.meta.json"), nextFiles.sketchMeta ?? DEFAULT_SKETCH_META);
+        fs.writeFileSync(
+          path.join(demoDir, "sketch.scene.json"),
+          nextFiles.sketchScene ?? createDefaultSketchSceneText(),
+          "utf-8",
+        );
+        writeJsonFile(
+          path.join(demoDir, "sketch.meta.json"),
+          nextFiles.sketchMeta ?? DEFAULT_SKETCH_META,
+        );
       } else {
         fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
-        fs.writeFileSync(path.join(demoDir, "index.tsx"), nextFiles.code || DEFAULT_DEMO_CODE, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "index.tsx"),
+          nextFiles.code || DEFAULT_DEMO_CODE,
+          "utf-8",
+        );
       }
       if (input.schema !== undefined) {
-        fs.writeFileSync(path.join(demoDir, "config.schema.json"), nextFiles.schema, "utf-8");
+        fs.writeFileSync(
+          path.join(demoDir, "config.schema.json"),
+          nextFiles.schema,
+          "utf-8",
+        );
       }
       const pages = [...tree.pages];
       pages[pageIndex] = nextMeta;
@@ -1950,7 +2577,7 @@ export class ProjectAdminService {
 
     const files = input.dryRun
       ? nextFiles
-      : this.readPageFiles(workspacePath, input.pageId) ?? nextFiles;
+      : (this.readPageFiles(workspacePath, input.pageId) ?? nextFiles);
     const auditId = input.dryRun
       ? undefined
       : this.audit("page_switch_runtime", actor, "L2", true, {
@@ -1968,7 +2595,8 @@ export class ProjectAdminService {
     input: PageVersionCreateInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<PageVersionInfo> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(input.projectId) && actor.role !== "admin") {
@@ -1978,10 +2606,12 @@ export class ProjectAdminService {
     const project = this.readProject(input.projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
 
-    let sourceWorkspacePath = input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
+    let sourceWorkspacePath =
+      input.sourceWorkspacePath ?? this.projectWorkspacePath(input.projectId);
     if (input.editId) {
       const transaction = this.requireEditable(input.editId);
-      if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+      if (!transaction.ok || !transaction.data)
+        return fail("EDIT_NOT_FOUND", "编辑事务不存在");
       if (transaction.data.projectId !== input.projectId) {
         return fail("INVALID_REQUEST", "editId 与 projectId 不匹配");
       }
@@ -1996,8 +2626,12 @@ export class ProjectAdminService {
     const files = this.readPageFiles(sourceWorkspacePath, input.pageId);
     if (!files) return fail("FILE_READ_ERROR", "页面文件不存在");
 
-    const validation = this.validateSchemaPair(this.readProjectConfig(sourceWorkspacePath), files.schema);
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
+    const validation = this.validateSchemaPair(
+      this.readProjectConfig(sourceWorkspacePath),
+      files.schema,
+    );
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
     const runtimeValidation = this.validatePageFilesRuntime(
       input.pageId,
       resolvePageRuntimeType(page),
@@ -2021,23 +2655,35 @@ export class ProjectAdminService {
       source: "user",
       note: input.note,
       sketchPatchSummary: input.sketchPatchSummary,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
     });
-    const previousPointer = this.readHeadCommit(input.projectId)?.resourcePointers
-      .find((pointer) => pointer.kind === "page" && pointer.resourceId === input.pageId);
+    const previousPointer = this.readHeadCommit(
+      input.projectId,
+    )?.resourcePointers.find(
+      (pointer) =>
+        pointer.kind === "page" && pointer.resourceId === input.pageId,
+    );
     const commit = this.createContentCommit({
       projectId: input.projectId,
       visibility: "semantic",
       intent: "edit",
       title: input.note ?? `保存页面 ${page.name} 历史版本`,
       pointers: [{ kind: "page", resourceId: input.pageId, versionId }],
-      changedResources: [{
-        kind: "page",
-        resourceId: input.pageId,
-        fromVersionId: previousPointer?.versionId,
-        toVersionId: versionId,
-      }],
+      changedResources: [
+        {
+          kind: "page",
+          resourceId: input.pageId,
+          fromVersionId: previousPointer?.versionId,
+          toVersionId: versionId,
+        },
+      ],
       actor,
       sessionId: input.editId,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
     });
     const version: PageVersionInfo = {
       versionId,
@@ -2047,15 +2693,25 @@ export class ProjectAdminService {
       savedAt,
       savedBy: actor.name,
       sessionId: input.editId ?? `resource-${versionId}`,
-      snapshotPath: this.resourceVersionPath(input.projectId, "page", input.pageId, versionId),
+      snapshotPath: this.resourceVersionPath(
+        input.projectId,
+        "page",
+        input.pageId,
+        versionId,
+      ),
       fileCount: resourceVersion.blobRefs.length,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
       note: input.note,
       resourceVersion,
       commitId: commit.id,
     };
     version.resourceVersion = resourceVersion;
     version.commitId = commit.id;
-    this.writeMaterializationManifest(input.projectId, commit.id, [resourceVersion]);
+    this.writeMaterializationManifest(input.projectId, commit.id, [
+      resourceVersion,
+    ]);
     this.writeProject(input.projectId, { ...project, updatedAt: savedAt });
 
     const auditId = this.audit("page_create_version", actor, "L2", true, {
@@ -2073,19 +2729,33 @@ export class ProjectAdminService {
     });
   }
 
-  deletePagePreview(editId: string, pageIds: string[]): ProjectAdminResult<PreviewPlan> {
+  deletePagePreview(
+    editId: string,
+    pageIds: string[],
+  ): ProjectAdminResult<PreviewPlan> {
     if (pageIds.length > this.maxBatchSize) {
-      return fail("BATCH_LIMIT_EXCEEDED", `批量删除页面不能超过 ${this.maxBatchSize} 个`);
+      return fail(
+        "BATCH_LIMIT_EXCEEDED",
+        `批量删除页面不能超过 ${this.maxBatchSize} 个`,
+      );
     }
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.workspacePath);
-    const missing = pageIds.filter((id) => !tree.pages.some((page) => page.id === id));
-    if (missing.length > 0) return fail("DEMO_PAGE_NOT_FOUND", `页面不存在: ${missing.join(", ")}`);
+    const missing = pageIds.filter(
+      (id) => !tree.pages.some((page) => page.id === id),
+    );
+    if (missing.length > 0)
+      return fail("DEMO_PAGE_NOT_FOUND", `页面不存在: ${missing.join(", ")}`);
     return ok(
-      this.createPlan("page_delete", editId, pageIds.map((id) => `删除页面 ${id}`), {
-        pageIds,
-      }),
+      this.createPlan(
+        "page_delete",
+        editId,
+        pageIds.map((id) => `删除页面 ${id}`),
+        {
+          pageIds,
+        },
+      ),
       { diffSummary: { deleted: pageIds.map((id) => `page:${id}`) } },
     );
   }
@@ -2096,17 +2766,32 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ deleted: string[] }> {
     const plan = this.readPlan(planId);
-    if (!plan || plan.operation !== "page_delete") return fail("PLAN_NOT_FOUND", "页面删除计划不存在");
-    if (plan.confirmToken !== confirmToken) return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
+    if (!plan || plan.operation !== "page_delete")
+      return fail("PLAN_NOT_FOUND", "页面删除计划不存在");
+    if (plan.confirmToken !== confirmToken)
+      return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
     const editId = plan.resourceId;
     const transaction = this.requireEditable(editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const pageIds = Array.isArray(plan.extra?.pageIds)
       ? plan.extra.pageIds.filter((id): id is string => typeof id === "string")
       : [];
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "page_delete_execute",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     for (const pageId of pageIds) {
-      fs.rmSync(this.pageDir(transaction.data.workspacePath, pageId), { recursive: true, force: true });
+      fs.rmSync(this.pageDir(transaction.data.workspacePath, pageId), {
+        recursive: true,
+        force: true,
+      });
     }
     this.writeWorkspaceTree(transaction.data.workspacePath, {
       ...tree,
@@ -2123,27 +2808,48 @@ export class ProjectAdminService {
 
   reorderPages(
     editId: string,
-    input: { pages: Array<{ id: string; order: number; parentId: string | null }>; folders?: Array<{ id: string; order: number; parentId: string | null }> },
+    input: {
+      pages: Array<{ id: string; order: number; parentId: string | null }>;
+      folders?: Array<{ id: string; order: number; parentId: string | null }>;
+    },
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ pages: DemoPageMeta[]; folders: DemoFolderMeta[] }> {
     const transaction = this.requireEditable(editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     if (input.pages.length > this.maxBatchSize) {
-      return fail("BATCH_LIMIT_EXCEEDED", `批量排序页面不能超过 ${this.maxBatchSize} 个`);
+      return fail(
+        "BATCH_LIMIT_EXCEEDED",
+        `批量排序页面不能超过 ${this.maxBatchSize} 个`,
+      );
     }
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
     const folders = input.folders
       ? tree.folders.map((folder) => {
           const patch = input.folders?.find((item) => item.id === folder.id);
-          return patch ? { ...folder, order: patch.order, parentId: patch.parentId } : folder;
+          return patch
+            ? { ...folder, order: patch.order, parentId: patch.parentId }
+            : folder;
         })
       : tree.folders;
     const pages = tree.pages.map((page) => {
       const patch = input.pages.find((item) => item.id === page.id);
-      return patch ? { ...page, order: patch.order, parentId: patch.parentId } : page;
+      return patch
+        ? { ...page, order: patch.order, parentId: patch.parentId }
+        : page;
     });
     const validation = this.validateTree({ pages, folders });
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "页面树校验失败", { validation });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "页面树校验失败", { validation });
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "page_reorder",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     this.writeWorkspaceTree(transaction.data.workspacePath, { pages, folders });
     const auditId = this.audit("page_reorder", actor, "L2", true, {
       projectId: transaction.data.projectId,
@@ -2151,7 +2857,10 @@ export class ProjectAdminService {
       diffSummary: { updated: ["workspace-tree"] },
       validation,
     });
-    return ok({ pages: sortPages(pages), folders }, { auditId, diffSummary: { updated: ["workspace-tree"] }, validation });
+    return ok(
+      { pages: sortPages(pages), folders },
+      { auditId, diffSummary: { updated: ["workspace-tree"] }, validation },
+    );
   }
 
   restorePageVersion(
@@ -2159,8 +2868,15 @@ export class ProjectAdminService {
     pageId: string,
     versionId: string,
     actor = this.defaultActor(),
+    options: {
+      workspaceId?: string;
+      workspaceRevision?: number;
+      workspaceRootHash?: string;
+      sessionId?: string;
+    } = {},
   ): ProjectAdminResult<PageRestoreResult> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
@@ -2172,27 +2888,65 @@ export class ProjectAdminService {
     const page = this.findPage(workspacePath, pageId);
     if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
 
-    const resourceVersion = this.readResourceVersion(projectId, "page", pageId, versionId);
-    if (!resourceVersion) return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
+    const resourceVersion = this.readResourceVersion(
+      projectId,
+      "page",
+      pageId,
+      versionId,
+    );
+    if (!resourceVersion)
+      return fail("VERSION_NOT_FOUND", `页面版本 ${versionId} 不存在`);
     const files = this.pageFilesFromResourceVersion(resourceVersion);
-    if (!files) return fail("VERSION_SNAPSHOT_MISSING", `页面版本快照已丢失: ${versionId}`);
+    if (!files)
+      return fail(
+        "VERSION_SNAPSHOT_MISSING",
+        `页面版本快照已丢失: ${versionId}`,
+      );
 
-    const validation = this.validateSchemaPair(this.readProjectConfig(workspacePath), files.schema);
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "恢复版本的页面 Schema 校验失败", { validation });
+    const validation = this.validateSchemaPair(
+      this.readProjectConfig(workspacePath),
+      files.schema,
+    );
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "恢复版本的页面 Schema 校验失败", {
+        validation,
+      });
 
     const demoDir = this.pageDir(workspacePath, pageId);
     const runtimeType = resolvePageRuntimeType(page);
     if (runtimeType === "prototype-html-css") {
-      fs.writeFileSync(path.join(demoDir, "prototype.html"), files.prototypeHtml ?? "", "utf-8");
-      fs.writeFileSync(path.join(demoDir, "prototype.css"), files.prototypeCss ?? "", "utf-8");
-      writeJsonFile(path.join(demoDir, "prototype.meta.json"), files.prototypeMeta ?? DEFAULT_PROTOTYPE_META);
+      fs.writeFileSync(
+        path.join(demoDir, "prototype.html"),
+        files.prototypeHtml ?? "",
+        "utf-8",
+      );
+      fs.writeFileSync(
+        path.join(demoDir, "prototype.css"),
+        files.prototypeCss ?? "",
+        "utf-8",
+      );
+      writeJsonFile(
+        path.join(demoDir, "prototype.meta.json"),
+        files.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
+      );
     } else if (runtimeType === "sketch-scene") {
-      fs.writeFileSync(path.join(demoDir, "sketch.scene.json"), files.sketchScene ?? createDefaultSketchSceneText(), "utf-8");
-      writeJsonFile(path.join(demoDir, "sketch.meta.json"), files.sketchMeta ?? DEFAULT_SKETCH_META);
+      fs.writeFileSync(
+        path.join(demoDir, "sketch.scene.json"),
+        files.sketchScene ?? createDefaultSketchSceneText(),
+        "utf-8",
+      );
+      writeJsonFile(
+        path.join(demoDir, "sketch.meta.json"),
+        files.sketchMeta ?? DEFAULT_SKETCH_META,
+      );
     } else {
       fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
     }
-    fs.writeFileSync(path.join(demoDir, "config.schema.json"), files.schema, "utf-8");
+    fs.writeFileSync(
+      path.join(demoDir, "config.schema.json"),
+      files.schema,
+      "utf-8",
+    );
 
     const restoredAt = Date.now();
     const version = this.createProjectVersion(
@@ -2202,22 +2956,38 @@ export class ProjectAdminService {
       `restore-page-${pageId}-${versionId}`,
       `从页面 ${page.name} 的历史版本 ${versionId} 恢复`,
       "restore_snapshot",
+      {
+        workspaceId: options.workspaceId,
+        workspaceRevision: options.workspaceRevision,
+        workspaceRootHash: options.workspaceRootHash,
+      },
     );
-    const previousPointer = this.readHeadCommit(projectId)?.resourcePointers
-      .find((pointer) => pointer.kind === "page" && pointer.resourceId === pageId);
+    const previousPointer = this.readHeadCommit(
+      projectId,
+    )?.resourcePointers.find(
+      (pointer) => pointer.kind === "page" && pointer.resourceId === pageId,
+    );
     const commit = this.createContentCommit({
       projectId,
       visibility: "semantic",
       intent: "restore",
       title: `恢复页面 ${page.name} 到 ${versionId}`,
-      pointers: [{ kind: "page", resourceId: pageId, versionId: resourceVersion.id }],
-      changedResources: [{
-        kind: "page",
-        resourceId: pageId,
-        fromVersionId: previousPointer?.versionId,
-        toVersionId: resourceVersion.id,
-      }],
+      pointers: [
+        { kind: "page", resourceId: pageId, versionId: resourceVersion.id },
+      ],
+      changedResources: [
+        {
+          kind: "page",
+          resourceId: pageId,
+          fromVersionId: previousPointer?.versionId,
+          toVersionId: resourceVersion.id,
+        },
+      ],
       actor,
+      sessionId: options.sessionId,
+      workspaceId: options.workspaceId,
+      workspaceRevision: options.workspaceRevision,
+      workspaceRootHash: options.workspaceRootHash,
     });
     this.writeMaterializationManifest(projectId, commit.id, [resourceVersion]);
     const tree = this.readWorkspaceTree(workspacePath);
@@ -2234,7 +3004,10 @@ export class ProjectAdminService {
       projectId,
       resourceId: pageId,
       diffSummary: {
-        updated: [`demos/${pageId}/index.tsx`, `demos/${pageId}/config.schema.json`],
+        updated: [
+          `demos/${pageId}/index.tsx`,
+          `demos/${pageId}/config.schema.json`,
+        ],
         notes: [`生成版本 ${version.versionId}`],
       },
       validation,
@@ -2250,7 +3023,10 @@ export class ProjectAdminService {
       {
         auditId,
         diffSummary: {
-          updated: [`demos/${pageId}/index.tsx`, `demos/${pageId}/config.schema.json`],
+          updated: [
+            `demos/${pageId}/index.tsx`,
+            `demos/${pageId}/config.schema.json`,
+          ],
           notes: [`生成版本 ${version.versionId}`, `生成资源提交 ${commit.id}`],
         },
         validation,
@@ -2267,9 +3043,12 @@ export class ProjectAdminService {
     options: { folderId?: string; order?: number; dryRun?: boolean } = {},
   ): ProjectAdminResult<DemoFolderMeta> {
     const transaction = this.requireEditable(editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
-    const folderId = options.folderId ? safeId(options.folderId, "folder") : nowId("folder");
+    const folderId = options.folderId
+      ? safeId(options.folderId, "folder")
+      : nowId("folder");
     if (tree.folders.some((folder) => folder.id === folderId)) {
       return fail("FOLDER_ID_CONFLICT", `文件夹 id 已存在: ${folderId}`);
     }
@@ -2281,8 +3060,22 @@ export class ProjectAdminService {
     };
     const nextTree = { ...tree, folders: [...tree.folders, folder] };
     const validation = this.validateTree(nextTree);
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "文件夹层级校验失败", { validation });
-    if (options.dryRun) return ok(folder, { diffSummary: { created: [`folder:${folder.id}`] }, validation });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "文件夹层级校验失败", { validation });
+    if (options.dryRun)
+      return ok(folder, {
+        diffSummary: { created: [`folder:${folder.id}`] },
+        validation,
+      });
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "folder_create",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     this.writeWorkspaceTree(transaction.data.workspacePath, nextTree);
     const auditId = this.audit("folder_create", actor, "L2", true, {
       projectId: transaction.data.projectId,
@@ -2290,26 +3083,54 @@ export class ProjectAdminService {
       diffSummary: { created: [`folder:${folder.id}`] },
       validation,
     });
-    return ok(folder, { auditId, diffSummary: { created: [`folder:${folder.id}`] }, validation });
+    return ok(folder, {
+      auditId,
+      diffSummary: { created: [`folder:${folder.id}`] },
+      validation,
+    });
   }
 
-  updateFolder(input: FolderUpdateInput, actor = this.defaultActor()): ProjectAdminResult<DemoFolderMeta> {
+  updateFolder(
+    input: FolderUpdateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<DemoFolderMeta> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
-    const folderIndex = tree.folders.findIndex((folder) => folder.id === input.folderId);
+    const folderIndex = tree.folders.findIndex(
+      (folder) => folder.id === input.folderId,
+    );
     if (folderIndex === -1) return fail("FOLDER_NOT_FOUND", "文件夹不存在");
     const nextFolder: DemoFolderMeta = {
       ...tree.folders[folderIndex],
       name: input.name?.trim() || tree.folders[folderIndex].name,
-      parentId: input.parentId !== undefined ? input.parentId : tree.folders[folderIndex].parentId,
+      parentId:
+        input.parentId !== undefined
+          ? input.parentId
+          : tree.folders[folderIndex].parentId,
       order: input.order ?? tree.folders[folderIndex].order,
     };
     const folders = [...tree.folders];
     folders[folderIndex] = nextFolder;
     const validation = this.validateTree({ ...tree, folders });
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "文件夹层级校验失败", { validation });
-    if (!input.dryRun) this.writeWorkspaceTree(transaction.data.workspacePath, { ...tree, folders });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "文件夹层级校验失败", { validation });
+    if (!input.dryRun) {
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "folder_update",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
+      this.writeWorkspaceTree(transaction.data.workspacePath, {
+        ...tree,
+        folders,
+      });
+    }
     const auditId = input.dryRun
       ? undefined
       : this.audit("folder_update", actor, "L2", true, {
@@ -2318,10 +3139,17 @@ export class ProjectAdminService {
           diffSummary: { updated: [`folder:${input.folderId}`] },
           validation,
         });
-    return ok(nextFolder, { auditId, diffSummary: { updated: [`folder:${input.folderId}`] }, validation });
+    return ok(nextFolder, {
+      auditId,
+      diffSummary: { updated: [`folder:${input.folderId}`] },
+      validation,
+    });
   }
 
-  deleteFolderPreview(editId: string, folderId: string): ProjectAdminResult<PreviewPlan> {
+  deleteFolderPreview(
+    editId: string,
+    folderId: string,
+  ): ProjectAdminResult<PreviewPlan> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.workspacePath);
@@ -2329,10 +3157,12 @@ export class ProjectAdminService {
     if (!folder) return fail("FOLDER_NOT_FOUND", "文件夹不存在");
     const childPages = tree.pages.filter((page) => page.parentId === folderId);
     return ok(
-      this.createPlan("folder_delete", editId, [
-        `删除文件夹 ${folder.name}`,
-        `影响 ${childPages.length} 个直接页面`,
-      ], { folderId }),
+      this.createPlan(
+        "folder_delete",
+        editId,
+        [`删除文件夹 ${folder.name}`, `影响 ${childPages.length} 个直接页面`],
+        { folderId },
+      ),
       { diffSummary: { deleted: [`folder:${folderId}`] } },
     );
   }
@@ -2344,51 +3174,100 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ deletedFolderId: string; affectedPages: string[] }> {
     const plan = this.readPlan(planId);
-    if (!plan || plan.operation !== "folder_delete") return fail("PLAN_NOT_FOUND", "文件夹删除计划不存在");
-    if (plan.confirmToken !== confirmToken) return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
-    const folderId = typeof plan.extra?.folderId === "string" ? plan.extra.folderId : "";
+    if (!plan || plan.operation !== "folder_delete")
+      return fail("PLAN_NOT_FOUND", "文件夹删除计划不存在");
+    if (plan.confirmToken !== confirmToken)
+      return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
+    const folderId =
+      typeof plan.extra?.folderId === "string" ? plan.extra.folderId : "";
     const transaction = this.requireEditable(plan.resourceId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
-    const affectedPages = tree.pages.filter((page) => page.parentId === folderId).map((page) => page.id);
+    const affectedPages = tree.pages
+      .filter((page) => page.parentId === folderId)
+      .map((page) => page.id);
     const pages =
       strategy === "delete_contents"
         ? tree.pages.filter((page) => page.parentId !== folderId)
-        : tree.pages.map((page) => (page.parentId === folderId ? { ...page, parentId: null } : page));
+        : tree.pages.map((page) =>
+            page.parentId === folderId ? { ...page, parentId: null } : page,
+          );
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "folder_delete_execute",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     if (strategy === "delete_contents") {
       for (const pageId of affectedPages) {
-        fs.rmSync(this.pageDir(transaction.data.workspacePath, pageId), { recursive: true, force: true });
+        fs.rmSync(this.pageDir(transaction.data.workspacePath, pageId), {
+          recursive: true,
+          force: true,
+        });
       }
     }
     this.writeWorkspaceTree(transaction.data.workspacePath, {
       pages,
       folders: tree.folders
         .filter((folder) => folder.id !== folderId)
-        .map((folder) => (folder.parentId === folderId ? { ...folder, parentId: null } : folder)),
+        .map((folder) =>
+          folder.parentId === folderId ? { ...folder, parentId: null } : folder,
+        ),
     });
     const auditId = this.audit("folder_delete_execute", actor, "L3", true, {
       projectId: transaction.data.projectId,
       resourceId: folderId,
-      diffSummary: { deleted: [`folder:${folderId}`], updated: affectedPages.map((id) => `page:${id}`) },
+      diffSummary: {
+        deleted: [`folder:${folderId}`],
+        updated: affectedPages.map((id) => `page:${id}`),
+      },
     });
     return ok({ deletedFolderId: folderId, affectedPages }, { auditId });
   }
 
-  getProjectConfig(editId: string): ProjectAdminResult<{ schema?: string; exists: boolean }> {
+  getProjectConfig(
+    editId: string,
+  ): ProjectAdminResult<{ schema?: string; exists: boolean }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const schema = this.readProjectConfig(transaction.workspacePath);
     return ok({ schema: schema ?? undefined, exists: schema !== null });
   }
 
-  setProjectConfig(input: ConfigUpdateInput, actor = this.defaultActor()): ProjectAdminResult<{ schema?: string; exists: boolean }> {
+  setProjectConfig(
+    input: ConfigUpdateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ schema?: string; exists: boolean }> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    if (input.schema === undefined) return fail("INVALID_REQUEST", "schema 参数必填");
-    const validation = this.validateProjectConfigAgainstPages(transaction.data.workspacePath, input.schema);
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "项目级配置校验失败", { validation });
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (input.schema === undefined)
+      return fail("INVALID_REQUEST", "schema 参数必填");
+    const validation = this.validateProjectConfigAgainstPages(
+      transaction.data.workspacePath,
+      input.schema,
+    );
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "项目级配置校验失败", { validation });
     if (!input.dryRun) {
-      fs.writeFileSync(path.join(transaction.data.workspacePath, PROJECT_CONFIG_FILENAME), input.schema, "utf-8");
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "config_set_project_schema",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
+      fs.writeFileSync(
+        path.join(transaction.data.workspacePath, PROJECT_CONFIG_FILENAME),
+        input.schema,
+        "utf-8",
+      );
     }
     const auditId = input.dryRun
       ? undefined
@@ -2398,29 +3277,65 @@ export class ProjectAdminService {
           diffSummary: { updated: [PROJECT_CONFIG_FILENAME] },
           validation,
         });
-    return ok({ schema: input.schema, exists: true }, { auditId, validation, diffSummary: { updated: [PROJECT_CONFIG_FILENAME] } });
+    return ok(
+      { schema: input.schema, exists: true },
+      {
+        auditId,
+        validation,
+        diffSummary: { updated: [PROJECT_CONFIG_FILENAME] },
+      },
+    );
   }
 
-  deleteProjectConfig(editId: string, dryRun = false, actor = this.defaultActor()): ProjectAdminResult<{ deleted: boolean; affectedPages: string[] }> {
+  deleteProjectConfig(
+    editId: string,
+    dryRun = false,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ deleted: boolean; affectedPages: string[] }> {
     const transaction = this.requireEditable(editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const tree = this.readWorkspaceTree(transaction.data.workspacePath);
-    const configPath = path.join(transaction.data.workspacePath, PROJECT_CONFIG_FILENAME);
-    if (!dryRun && fs.existsSync(configPath)) fs.rmSync(configPath);
+    const configPath = path.join(
+      transaction.data.workspacePath,
+      PROJECT_CONFIG_FILENAME,
+    );
+    if (!dryRun && fs.existsSync(configPath)) {
+      const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+        transaction.data,
+        "config_delete_project_schema",
+      );
+      if (!writeAllowed.ok)
+        return fail(
+          writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+          writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+        );
+      fs.rmSync(configPath);
+    }
     const affectedPages = tree.pages.map((page) => page.id);
     const auditId = dryRun
       ? undefined
       : this.audit("config_delete_project_schema", actor, "L2", true, {
           projectId: transaction.data.projectId,
           resourceId: editId,
-          diffSummary: { deleted: [PROJECT_CONFIG_FILENAME], updated: affectedPages.map((id) => `page:${id}`) },
+          diffSummary: {
+            deleted: [PROJECT_CONFIG_FILENAME],
+            updated: affectedPages.map((id) => `page:${id}`),
+          },
         });
-    return ok({ deleted: fs.existsSync(configPath) ? false : !dryRun, affectedPages }, { auditId });
+    return ok(
+      { deleted: fs.existsSync(configPath) ? false : !dryRun, affectedPages },
+      { auditId },
+    );
   }
 
-  validatePageSchema(editId: string, pageId: string): ProjectAdminResult<ValidationResult> {
+  validatePageSchema(
+    editId: string,
+    pageId: string,
+  ): ProjectAdminResult<ValidationResult> {
     const page = this.getPage(editId, pageId);
-    if (!page.ok || !page.data) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    if (!page.ok || !page.data)
+      return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
     const transaction = this.readEdit(editId);
     const validation = this.validateSchemaPair(
       transaction ? this.readProjectConfig(transaction.workspacePath) : null,
@@ -2436,54 +3351,91 @@ export class ProjectAdminService {
     return ok(validation, { validation });
   }
 
-  generateSchemaFromCode(editId: string, pageId: string): ProjectAdminResult<{ schema: string; applied: false }> {
+  generateSchemaFromCode(
+    editId: string,
+    pageId: string,
+  ): ProjectAdminResult<{ schema: string; applied: false }> {
     const page = this.getPage(editId, pageId);
-    if (!page.ok || !page.data) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
-    const props = [...page.data.files.code.matchAll(/props\.([a-zA-Z_][a-zA-Z0-9_]*)/g)].map((match) => match[1]);
+    if (!page.ok || !page.data)
+      return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const props = [
+      ...page.data.files.code.matchAll(/props\.([a-zA-Z_][a-zA-Z0-9_]*)/g),
+    ].map((match) => match[1]);
     const uniqueProps = [...new Set(props)];
     const schema = JSON.stringify(
       {
         $schema: "https://json-schema.org/draft/2020-12/schema",
         type: "object",
         properties: Object.fromEntries(
-          uniqueProps.map((prop) => [prop, { type: "string", title: prop, default: "" }]),
+          uniqueProps.map((prop) => [
+            prop,
+            { type: "string", title: prop, default: "" },
+          ]),
         ),
       },
       null,
       2,
     );
-    return ok({ schema, applied: false }, { warnings: ["自动生成结果仅作为候选，未覆盖页面 Schema"] });
+    return ok(
+      { schema, applied: false },
+      { warnings: ["自动生成结果仅作为候选，未覆盖页面 Schema"] },
+    );
   }
 
-  applyVisualPatch(editId: string, pageId: string, patch: Record<string, unknown>): ProjectAdminResult<{ patch: Record<string, unknown>; applied: false }> {
+  applyVisualPatch(
+    editId: string,
+    pageId: string,
+    patch: Record<string, unknown>,
+  ): ProjectAdminResult<{ patch: Record<string, unknown>; applied: false }> {
     const page = this.getPage(editId, pageId);
     if (!page.ok) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
     return ok(
       { patch, applied: false },
-      { warnings: ["当前服务仅返回可视化补丁候选；实际配置值写入仍由 Web 配置面板处理"] },
+      {
+        warnings: [
+          "当前服务仅返回可视化补丁候选；实际配置值写入仍由 Web 配置面板处理",
+        ],
+      },
     );
   }
 
   listAssets(editId: string): ProjectAdminResult<{ assets: AssetSummary[] }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    return ok({ assets: this.collectAssetSummaries(transaction.workspacePath, transaction.projectId) });
+    return ok({
+      assets: this.collectAssetSummaries(
+        transaction.workspacePath,
+        transaction.projectId,
+      ),
+    });
   }
 
-  uploadAsset(input: AssetUploadInput, actor = this.defaultActor()): ProjectAdminResult<AssetSummary> {
+  uploadAsset(
+    input: AssetUploadInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<AssetSummary> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const validation = this.validateAssetInput(input);
-    if (!validation.ok) return fail("VALIDATION_BLOCKED", "资产校验失败", { validation });
+    if (!validation.ok)
+      return fail("VALIDATION_BLOCKED", "资产校验失败", { validation });
     const buffer = Buffer.from(input.dataBase64, "base64");
-    const contentHash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const contentHash = crypto
+      .createHash("sha256")
+      .update(buffer)
+      .digest("hex");
     const existingAsset = input.targetPath
       ? undefined
-      : this.findRegisteredAssetByHash(transaction.data.projectId, transaction.data.workspacePath, contentHash);
+      : this.findRegisteredAssetByHash(
+          transaction.data.projectId,
+          transaction.data.workspacePath,
+          contentHash,
+        );
     const filename = this.generateAssetFilename(input.filename, contentHash);
     const relativePath = input.targetPath
       ? this.safeRelativeAssetPath(input.targetPath)
-      : existingAsset?.url ?? `assets/images/${filename}`;
+      : (existingAsset?.url ?? `assets/images/${filename}`);
     if (input.targetPath && relativePath.split("/")[0] !== "assets") {
       return fail("INVALID_ASSET_PATH", "targetPath 必须位于 assets/ 目录下");
     }
@@ -2502,8 +3454,22 @@ export class ProjectAdminService {
       createdAt: existingAsset?.createdAt ?? Date.now(),
     };
     if (input.dryRun) {
-      return ok(summary, { diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] }, validation });
+      return ok(summary, {
+        diffSummary: existed
+          ? { updated: [relativePath] }
+          : { created: [relativePath] },
+        validation,
+      });
     }
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "asset_upload",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
     ensureDir(path.dirname(targetPath));
     if (!existed) {
       fs.writeFileSync(targetPath, buffer);
@@ -2524,26 +3490,45 @@ export class ProjectAdminService {
     const auditId = this.audit("asset_upload", actor, "L2", true, {
       projectId: transaction.data.projectId,
       resourceId: relativePath,
-      diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] },
+      diffSummary: existed
+        ? { updated: [relativePath] }
+        : { created: [relativePath] },
       validation,
     });
-    return ok(summary, { auditId, diffSummary: existed ? { updated: [relativePath] } : { created: [relativePath] }, validation });
+    return ok(summary, {
+      auditId,
+      diffSummary: existed
+        ? { updated: [relativePath] }
+        : { created: [relativePath] },
+      validation,
+    });
   }
 
-  deleteAssetPreview(editId: string, assetPath: string): ProjectAdminResult<PreviewPlan> {
+  deleteAssetPreview(
+    editId: string,
+    assetPath: string,
+  ): ProjectAdminResult<PreviewPlan> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const relativePath = this.safeRelativeAssetPath(assetPath);
     const fullPath = path.join(transaction.workspacePath, relativePath);
     if (!fs.existsSync(fullPath)) return fail("ASSET_NOT_FOUND", "资产不存在");
-    const references = this.findReferences(transaction.workspacePath, relativePath);
+    const references = this.findReferences(
+      transaction.workspacePath,
+      relativePath,
+    );
     return ok(
-      this.createPlan("asset_delete", editId, [
-        `删除资产 ${relativePath}`,
-        `影响 ${references.length} 个引用位置`,
-      ], { assetPath: relativePath }),
+      this.createPlan(
+        "asset_delete",
+        editId,
+        [`删除资产 ${relativePath}`, `影响 ${references.length} 个引用位置`],
+        { assetPath: relativePath },
+      ),
       {
-        warnings: references.length > 0 ? ["资产仍被引用，删除前建议先替换引用"] : undefined,
+        warnings:
+          references.length > 0
+            ? ["资产仍被引用，删除前建议先替换引用"]
+            : undefined,
         diffSummary: { deleted: [relativePath], updated: references },
       },
     );
@@ -2555,36 +3540,65 @@ export class ProjectAdminService {
     actor = this.defaultActor(),
   ): ProjectAdminResult<{ deleted: string }> {
     const plan = this.readPlan(planId);
-    if (!plan || plan.operation !== "asset_delete") return fail("PLAN_NOT_FOUND", "资产删除计划不存在");
-    if (plan.confirmToken !== confirmToken) return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
+    if (!plan || plan.operation !== "asset_delete")
+      return fail("PLAN_NOT_FOUND", "资产删除计划不存在");
+    if (plan.confirmToken !== confirmToken)
+      return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
     const transaction = this.requireEditable(plan.resourceId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    const assetPath = typeof plan.extra?.assetPath === "string" ? plan.extra.assetPath : "";
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    const assetPath =
+      typeof plan.extra?.assetPath === "string" ? plan.extra.assetPath : "";
     const relativePath = this.safeRelativeAssetPath(assetPath);
-    fs.rmSync(path.join(transaction.data.workspacePath, relativePath), { force: true });
-    this.removeProjectImageRegistryEntry(transaction.data.projectId, relativePath);
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "asset_delete_execute",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
+    fs.rmSync(path.join(transaction.data.workspacePath, relativePath), {
+      force: true,
+    });
+    this.removeProjectImageRegistryEntry(
+      transaction.data.projectId,
+      relativePath,
+    );
     const auditId = this.audit("asset_delete_execute", actor, "L3", true, {
       projectId: transaction.data.projectId,
       resourceId: relativePath,
       diffSummary: { deleted: [relativePath] },
     });
-    return ok({ deleted: relativePath }, { auditId, diffSummary: { deleted: [relativePath] } });
+    return ok(
+      { deleted: relativePath },
+      { auditId, diffSummary: { deleted: [relativePath] } },
+    );
   }
 
-  replaceAsset(input: AssetReplaceInput, actor = this.defaultActor()): ProjectAdminResult<{
+  replaceAsset(
+    input: AssetReplaceInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{
     oldPath: string;
     newAsset: AssetSummary;
     updatedReferences: string[];
   }> {
     const transaction = this.requireEditable(input.editId);
-    if (!transaction.ok || !transaction.data) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const oldPath = this.safeRelativeAssetPath(input.oldPath);
     const upload = this.uploadAsset(input, actor);
     if (!upload.ok || !upload.data) {
-      return fail(upload.error?.code ?? "UPLOAD_FAILED", upload.error?.message ?? "资产上传失败", {
-        warnings: upload.warnings,
-        validation: upload.validation,
-      });
+      return fail(
+        upload.error?.code ?? "UPLOAD_FAILED",
+        upload.error?.message ?? "资产上传失败",
+        {
+          warnings: upload.warnings,
+          validation: upload.validation,
+        },
+      );
     }
     if (input.dryRun) {
       return ok(
@@ -2596,13 +3610,23 @@ export class ProjectAdminService {
         },
       );
     }
-    const updatedReferences = oldPath === upload.data.path
-      ? []
-      : this.replaceReferences(
-          transaction.data.workspacePath,
-          oldPath,
-          upload.data.path,
-        );
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "asset_replace",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
+    const updatedReferences =
+      oldPath === upload.data.path
+        ? []
+        : this.replaceReferences(
+            transaction.data.workspacePath,
+            oldPath,
+            upload.data.path,
+          );
     const auditId = this.audit("asset_replace", actor, "L2", true, {
       projectId: transaction.data.projectId,
       resourceId: oldPath,
@@ -2610,27 +3634,47 @@ export class ProjectAdminService {
     });
     return ok(
       { oldPath, newAsset: upload.data, updatedReferences },
-      { auditId, diffSummary: { created: [upload.data.path], updated: updatedReferences } },
+      {
+        auditId,
+        diffSummary: {
+          created: [upload.data.path],
+          updated: updatedReferences,
+        },
+      },
     );
   }
 
-  previewCompile(editId: string, pageId?: string): ProjectAdminResult<RuntimeValidationResult> {
+  previewCompile(
+    editId: string,
+    pageId?: string,
+  ): ProjectAdminResult<RuntimeValidationResult> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    const validation = this.validateWorkspaceRuntime(transaction.workspacePath, pageId);
+    const validation = this.validateWorkspaceRuntime(
+      transaction.workspacePath,
+      pageId,
+    );
     return ok(validation, {
       validation: this.runtimeToValidationResult(validation),
-      warnings: ["CLI 已执行创作端页面源码契约校验；浏览器截图仍需通过 author-site / screenshot-service 验证"],
+      warnings: [
+        "CLI 已执行创作端页面源码契约校验；浏览器截图仍需通过 author-site / screenshot-service 验证",
+      ],
     });
   }
 
-  validatePageRuntime(editId: string, pageId: string): ProjectAdminResult<RuntimeValidationResult> {
+  validatePageRuntime(
+    editId: string,
+    pageId: string,
+  ): ProjectAdminResult<RuntimeValidationResult> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     return ok(this.validateWorkspaceRuntime(transaction.workspacePath, pageId));
   }
 
-  validateWorkspacePathRuntime(workspacePath: string, pageId?: string): ProjectAdminResult<RuntimeValidationResult> {
+  validateWorkspacePathRuntime(
+    workspacePath: string,
+    pageId?: string,
+  ): ProjectAdminResult<RuntimeValidationResult> {
     return ok(this.validateWorkspaceRuntime(workspacePath, pageId));
   }
 
@@ -2650,15 +3694,27 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    return ok(this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId)));
+    return ok(
+      this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId)),
+    );
   }
 
-  editVerify(editId: string, checks: string[] = []): ProjectAdminResult<VerifySummary> {
+  editVerify(
+    editId: string,
+    checks: string[] = [],
+  ): ProjectAdminResult<VerifySummary> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    return ok(this.verifyWorkspace(transaction.projectId, transaction.workspacePath, checks), {
-      nextActions: ["edit diff --summary --json", "edit validate --json"],
-    });
+    return ok(
+      this.verifyWorkspace(
+        transaction.projectId,
+        transaction.workspacePath,
+        checks,
+      ),
+      {
+        nextActions: ["edit diff --summary --json", "edit validate --json"],
+      },
+    );
   }
 
   projectVerify(
@@ -2670,9 +3726,16 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    return ok(this.verifyWorkspace(projectId, this.projectWorkspacePath(projectId), checks), {
-      nextActions: [`project validate-runtime ${projectId} --summary --json`],
-    });
+    return ok(
+      this.verifyWorkspace(
+        projectId,
+        this.projectWorkspacePath(projectId),
+        checks,
+      ),
+      {
+        nextActions: [`project validate-runtime ${projectId} --summary --json`],
+      },
+    );
   }
 
   visualCheck(
@@ -2685,14 +3748,16 @@ export class ProjectAdminService {
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
 
     const viewport = input.viewport ?? "375x812";
-    const checks = input.checks && input.checks.length > 0
-      ? input.checks
-      : ["nonblank", "assets", "layout", "console"];
+    const checks =
+      input.checks && input.checks.length > 0
+        ? input.checks
+        : ["nonblank", "assets", "layout", "console"];
     const workspacePath = this.projectWorkspacePath(input.projectId);
     const tree = this.readWorkspaceTree(workspacePath);
-    const selectedPages = input.pages && input.pages.length > 0 && input.pages[0] !== "all"
-      ? tree.pages.filter((page) => input.pages?.includes(page.id))
-      : tree.pages;
+    const selectedPages =
+      input.pages && input.pages.length > 0 && input.pages[0] !== "all"
+        ? tree.pages.filter((page) => input.pages?.includes(page.id))
+        : tree.pages;
     const outputDir = path.resolve(input.outputDir);
     ensureDir(outputDir);
 
@@ -2704,32 +3769,46 @@ export class ProjectAdminService {
         : {
             ok: false,
             pageIds: [page.id],
-            issues: [{
-              pageId: page.id,
-              severity: "error" as const,
-              stage: "source_contract" as const,
-              code: "FILE_READ_ERROR",
-              message: "页面文件不存在",
-              instruction: "请修复页面文件后重试 visual-check。",
-            }],
+            issues: [
+              {
+                pageId: page.id,
+                severity: "error" as const,
+                stage: "source_contract" as const,
+                code: "FILE_READ_ERROR",
+                message: "页面文件不存在",
+                instruction: "请修复页面文件后重试 visual-check。",
+              },
+            ],
           };
-      const failedRequests = files && checks.includes("assets")
-        ? this.findMissingAssetReferences(workspacePath, page.id, files).map((item) => item.reference)
-        : [];
+      const failedRequests =
+        files && checks.includes("assets")
+          ? this.findMissingAssetReferences(workspacePath, page.id, files).map(
+              (item) => item.reference,
+            )
+          : [];
       const content = files
-        ? [files.code, files.prototypeHtml, files.prototypeCss, files.sketchScene].filter(Boolean).join("\n")
+        ? [
+            files.code,
+            files.prototypeHtml,
+            files.prototypeCss,
+            files.sketchScene,
+          ]
+            .filter(Boolean)
+            .join("\n")
         : "";
       const nonblank = this.isPageContentNonblank(content);
       const issues = [
         ...this.runtimeToValidationResult(runtimeValidation).issues,
         ...(!nonblank && checks.includes("nonblank")
-          ? [{
-              code: "VISUAL_BLANK_PAGE",
-              message: "页面内容为空或疑似透明占位",
-              resourceId: page.id,
-              pageId: page.id,
-              severity: "blocking" as const,
-            }]
+          ? [
+              {
+                code: "VISUAL_BLANK_PAGE",
+                message: "页面内容为空或疑似透明占位",
+                resourceId: page.id,
+                pageId: page.id,
+                severity: "blocking" as const,
+              },
+            ]
           : []),
         ...failedRequests.map((reference) => ({
           code: "VISUAL_ASSET_MISSING",
@@ -2772,8 +3851,14 @@ export class ProjectAdminService {
         passed: pages.filter((page) => page.issues.length === 0).length,
         failed: pages.filter((page) => page.issues.length > 0).length,
         screenshots: pages.length,
-        failedRequests: pages.reduce((sum, page) => sum + page.failedRequests.length, 0),
-        consoleErrors: pages.reduce((sum, page) => sum + page.consoleErrors.length, 0),
+        failedRequests: pages.reduce(
+          (sum, page) => sum + page.failedRequests.length,
+          0,
+        ),
+        consoleErrors: pages.reduce(
+          (sum, page) => sum + page.consoleErrors.length,
+          0,
+        ),
       },
     };
     writeJsonFile(reportPath, result);
@@ -2782,16 +3867,28 @@ export class ProjectAdminService {
         ok: result.summary.failed === 0,
         issues: pages.flatMap((page) => page.issues),
       },
-      warnings: ["visual-check 生成离线检查报告；浏览器级截图仍需 author-site 或 screenshot-service 复验"],
-      nextActions: [`打开报告 ${reportPath}`, `project verify ${input.projectId} --json`],
+      warnings: [
+        "visual-check 生成离线检查报告；浏览器级截图仍需 author-site 或 screenshot-service 复验",
+      ],
+      nextActions: [
+        `打开报告 ${reportPath}`,
+        `project verify ${input.projectId} --json`,
+      ],
     });
   }
 
-  agentRunReport(input: AgentRunReportInput, actor = this.defaultActor()): ProjectAdminResult<AgentRunReport> {
-    const projectId = input.projectId ?? (input.editId ? this.readEdit(input.editId)?.projectId : undefined);
+  agentRunReport(
+    input: AgentRunReportInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<AgentRunReport> {
+    const projectId =
+      input.projectId ??
+      (input.editId ? this.readEdit(input.editId)?.projectId : undefined);
     const project = projectId ? this.readProject(projectId) : null;
     const diff = input.editId ? this.editDiff(input.editId) : undefined;
-    const validation = input.editId ? this.editValidate(input.editId) : undefined;
+    const validation = input.editId
+      ? this.editValidate(input.editId)
+      : undefined;
     const validationIssues = validation?.validation?.issues ?? [];
     const report: AgentRunReport = {
       projectId,
@@ -2804,29 +3901,48 @@ export class ProjectAdminService {
         ? {
             ok: validation.validation?.ok ?? validation.ok,
             issues: validationIssues.length,
-            blocking: validationIssues.filter((issue) => issue.severity === "blocking").length,
-            warnings: validationIssues.filter((issue) => issue.severity === "warning").length,
+            blocking: validationIssues.filter(
+              (issue) => issue.severity === "blocking",
+            ).length,
+            warnings: validationIssues.filter(
+              (issue) => issue.severity === "warning",
+            ).length,
           }
         : undefined,
-      visualCheckSummary: input.visualReportPath ? { reportPath: input.visualReportPath } : undefined,
+      visualCheckSummary: input.visualReportPath
+        ? { reportPath: input.visualReportPath }
+        : undefined,
       artifacts: [
-        ...(input.visualReportPath ? [{ kind: "visual-check-report", path: input.visualReportPath }] : []),
+        ...(input.visualReportPath
+          ? [{ kind: "visual-check-report", path: input.visualReportPath }]
+          : []),
         ...(input.auditId ? [{ kind: "audit", id: input.auditId }] : []),
       ],
       rollback: {
-        restoreCommand: projectId && input.versionId
-          ? `ow resource restore-version ${projectId} page <pageId> ${input.versionId} --json`
+        restoreCommand:
+          projectId && input.versionId
+            ? `ow resource restore-version ${projectId} page <pageId> ${input.versionId} --json`
+            : undefined,
+        projectGetCommand: projectId
+          ? `ow project get ${projectId} --json`
           : undefined,
-        projectGetCommand: projectId ? `ow project get ${projectId} --json` : undefined,
       },
     };
     return ok(report, {
-      nextActions: projectId ? [`project get ${projectId} --json`, "audit list --json"] : ["commands --json"],
-      warnings: actor.role === "readonly" ? ["当前 actor 为 readonly，报告只包含可读取证据"] : undefined,
+      nextActions: projectId
+        ? [`project get ${projectId} --json`, "audit list --json"]
+        : ["commands --json"],
+      warnings:
+        actor.role === "readonly"
+          ? ["当前 actor 为 readonly，报告只包含可读取证据"]
+          : undefined,
     });
   }
 
-  previewRender(editId: string, pageId: string): ProjectAdminResult<{ url?: string; html?: string }> {
+  previewRender(
+    editId: string,
+    pageId: string,
+  ): ProjectAdminResult<{ url?: string; html?: string }> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     const page = this.findPage(transaction.workspacePath, pageId);
@@ -2839,13 +3955,22 @@ export class ProjectAdminService {
     );
   }
 
-  async previewScreenshot(): Promise<ProjectAdminResult<{ available: boolean; reason?: string; serviceUrl: string }>> {
+  async previewScreenshot(): Promise<
+    ProjectAdminResult<{
+      available: boolean;
+      reason?: string;
+      serviceUrl: string;
+    }>
+  > {
     const health = await this.previewHealthcheck();
     const screenshotService = health.data?.screenshotService;
     return ok(
       {
         available: screenshotService === "ok",
-        reason: screenshotService === "ok" ? undefined : "截图服务未就绪，不能直接捕获截图",
+        reason:
+          screenshotService === "ok"
+            ? undefined
+            : "截图服务未就绪，不能直接捕获截图",
         serviceUrl: this.getScreenshotServiceUrl(),
       },
       {
@@ -2861,7 +3986,14 @@ export class ProjectAdminService {
     return ok({ logs: [] }, { warnings: ["当前没有持久化的预览控制台日志"] });
   }
 
-  async previewHealthcheck(): Promise<ProjectAdminResult<{ core: true; screenshotService: "ok" | "unavailable"; authorSite: "not_checked"; serviceUrl: string }>> {
+  async previewHealthcheck(): Promise<
+    ProjectAdminResult<{
+      core: true;
+      screenshotService: "ok" | "unavailable";
+      authorSite: "not_checked";
+      serviceUrl: string;
+    }>
+  > {
     const serviceUrl = this.getScreenshotServiceUrl();
     let screenshotService: "ok" | "unavailable" = "unavailable";
     try {
@@ -2875,22 +4007,42 @@ export class ProjectAdminService {
     } catch {
       screenshotService = "unavailable";
     }
-    return ok({ core: true, screenshotService, authorSite: "not_checked", serviceUrl });
+    return ok({
+      core: true,
+      screenshotService,
+      authorSite: "not_checked",
+      serviceUrl,
+    });
   }
 
-  publishCheck(projectId: string, actor = this.defaultActor()): ProjectAdminResult<ValidationResult> {
+  publishCheck(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ValidationResult> {
     const detail = this.getProject(projectId, actor);
-    if (!detail.ok || !detail.data) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const validation = this.validateWorkspace(this.projectWorkspacePath(projectId));
-    const runtimeValidation = this.validateWorkspaceRuntime(this.projectWorkspacePath(projectId));
+    if (!detail.ok || !detail.data)
+      return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const validation = this.validateWorkspace(
+      this.projectWorkspacePath(projectId),
+    );
+    const runtimeValidation = this.validateWorkspaceRuntime(
+      this.projectWorkspacePath(projectId),
+    );
     const issues = [
       ...validation.issues,
       ...this.runtimeToValidationResult(runtimeValidation).issues,
     ];
     if (detail.data.pages.length === 0) {
-      issues.push({ code: "NO_CONTENT_TO_PUBLISH", message: "项目没有可发布页面", severity: "blocking" });
+      issues.push({
+        code: "NO_CONTENT_TO_PUBLISH",
+        message: "项目没有可发布页面",
+        severity: "blocking",
+      });
     }
-    const result = { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    const result = {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
     return ok(result, { validation: result, runtimeValidation });
   }
 
@@ -2910,30 +4062,47 @@ export class ProjectAdminService {
   ): PublishStatus {
     const project = this.readProject(projectId);
     const pages = project?.demoPages ?? [];
-    const artifactPath = input.artifactPath ?? path.join(this.publishedDir, projectId);
+    const artifactPath =
+      input.artifactPath ?? path.join(this.publishedDir, projectId);
     const artifactExists = fs.existsSync(artifactPath);
     const publishedProjectPath = path.join(artifactPath, "project.json");
     const statusPath = path.join(artifactPath, "project-admin-status.json");
     const publishedProject = fs.existsSync(publishedProjectPath)
-      ? readJsonFile<{ demoPages?: Array<{ id: string; compiledJsPath?: string; schemaPath?: string; iframeHtmlPath?: string }> }>(publishedProjectPath)
+      ? readJsonFile<{
+          demoPages?: Array<{
+            id: string;
+            compiledJsPath?: string;
+            schemaPath?: string;
+            iframeHtmlPath?: string;
+          }>;
+        }>(publishedProjectPath)
       : null;
     const publishedPages = publishedProject?.demoPages ?? [];
-    const hasStatusArtifact = fs.existsSync(statusPath) || (input.published && Boolean(input.artifactPath));
-    const entryPaths = publishedPages.length > 0
-      ? [
-          "project.json",
-          ...publishedPages.flatMap((page) => [
-            page.compiledJsPath,
-            page.iframeHtmlPath,
-            page.schemaPath,
-          ].filter((entryPath): entryPath is string => Boolean(entryPath))),
-        ]
-      : hasStatusArtifact
-        ? ["project-admin-status.json"]
-        : [];
+    const hasStatusArtifact =
+      fs.existsSync(statusPath) ||
+      (input.published && Boolean(input.artifactPath));
+    const entryPaths =
+      publishedPages.length > 0
+        ? [
+            "project.json",
+            ...publishedPages.flatMap((page) =>
+              [
+                page.compiledJsPath,
+                page.iframeHtmlPath,
+                page.schemaPath,
+              ].filter((entryPath): entryPath is string => Boolean(entryPath)),
+            ),
+          ]
+        : hasStatusArtifact
+          ? ["project-admin-status.json"]
+          : [];
     const viewerBaseUrl = this.viewerBaseUrl();
-    const dataBase = viewerBaseUrl ? `${viewerBaseUrl}/data/${projectId}` : `/data/${projectId}`;
-    const viewerUrl = viewerBaseUrl ? `${viewerBaseUrl}/projects/${projectId}` : `/projects/${projectId}`;
+    const dataBase = viewerBaseUrl
+      ? `${viewerBaseUrl}/data/${projectId}`
+      : `/data/${projectId}`;
+    const viewerUrl = viewerBaseUrl
+      ? `${viewerBaseUrl}/projects/${projectId}`
+      : `/projects/${projectId}`;
     const hasFormalArtifact = Boolean(publishedProject);
     return {
       projectId,
@@ -2945,25 +4114,37 @@ export class ProjectAdminService {
       artifactSummary: {
         demoCount: publishedPages.length || pages.length,
         projectJsonPath: hasFormalArtifact ? "project.json" : undefined,
-        indexJsonPath: fs.existsSync(path.join(this.publishedDir, "projects-index.json")) ? "../projects-index.json" : undefined,
+        indexJsonPath: fs.existsSync(
+          path.join(this.publishedDir, "projects-index.json"),
+        )
+          ? "../projects-index.json"
+          : undefined,
         entryPaths,
       },
       accessUrls: {
         viewerUrl,
         dataUrl: hasFormalArtifact ? `${dataBase}/project.json` : undefined,
-        embedUrls: (publishedPages.length > 0 ? publishedPages : pages).map((page) => ({
-          pageId: page.id,
-          url: `${dataBase}/demos/${page.id}/iframe.html`,
-        })),
+        embedUrls: (publishedPages.length > 0 ? publishedPages : pages).map(
+          (page) => ({
+            pageId: page.id,
+            url: `${dataBase}/demos/${page.id}/iframe.html`,
+          }),
+        ),
       },
     };
   }
 
-  publishProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
-    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有发布权限");
+  publishProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PublishStatus> {
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有发布权限");
     const check = this.publishCheck(projectId, actor);
     if (!check.ok || !check.data?.ok) {
-      return fail("VALIDATION_BLOCKED", "发布前检查未通过", { validation: check.data });
+      return fail("VALIDATION_BLOCKED", "发布前检查未通过", {
+        validation: check.data,
+      });
     }
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
@@ -2997,43 +4178,63 @@ export class ProjectAdminService {
       publishedAt: Date.now(),
       artifactPath: path.join(this.publishedDir, projectId),
     });
-    const updated = { ...versionedProject, publishedVersion: status.publishedVersion, publishedAt: status.publishedAt };
+    const updated = {
+      ...versionedProject,
+      publishedVersion: status.publishedVersion,
+      publishedAt: status.publishedAt,
+    };
     this.writeProject(projectId, updated);
     ensureDir(status.artifactPath ?? "");
-    writeJsonFile(path.join(status.artifactPath ?? "", "project-admin-status.json"), status);
+    writeJsonFile(
+      path.join(status.artifactPath ?? "", "project-admin-status.json"),
+      status,
+    );
     const auditId = this.audit("publish_project", actor, "L4", true, {
       projectId,
       diffSummary: { updated: ["publishedVersion", "publishedAt"] },
     });
     return ok(status, {
       auditId,
-      warnings: ["当前 CLI 发布只更新发布状态；完整产物编译需配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后使用 author-site publish API"],
-      nextActions: ["配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后运行 ow publish project <projectId> --json"],
+      warnings: [
+        "当前 CLI 发布只更新发布状态；完整产物编译需配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后使用 author-site publish API",
+      ],
+      nextActions: [
+        "配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后运行 ow publish project <projectId> --json",
+      ],
     });
   }
 
-  publishStatus(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
+  publishStatus(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PublishStatus> {
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    return ok(this.buildPublishStatus(projectId, {
-      published: Boolean(project.publishedVersion),
-      publishedVersion: project.publishedVersion,
-      commitId: this.readContentState(projectId)?.headCommitId,
-      publishedAt: project.publishedAt,
-      artifactPath: fs.existsSync(path.join(this.publishedDir, projectId))
-        ? path.join(this.publishedDir, projectId)
-        : undefined,
-    }));
+    return ok(
+      this.buildPublishStatus(projectId, {
+        published: Boolean(project.publishedVersion),
+        publishedVersion: project.publishedVersion,
+        commitId: this.readContentState(projectId)?.headCommitId,
+        publishedAt: project.publishedAt,
+        artifactPath: fs.existsSync(path.join(this.publishedDir, projectId))
+          ? path.join(this.publishedDir, projectId)
+          : undefined,
+      }),
+    );
   }
 
-  publishRollback(projectId: string, actor = this.defaultActor()): ProjectAdminResult<PublishStatus> {
+  publishRollback(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PublishStatus> {
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    if (project.versions.length < 2) return fail("VERSION_NOT_FOUND", "没有可回滚的上一版本");
+    if (project.versions.length < 2)
+      return fail("VERSION_NOT_FOUND", "没有可回滚的上一版本");
     const previous = project.versions.at(-2);
     const updated = {
       ...project,
@@ -3062,18 +4263,24 @@ export class ProjectAdminService {
     return ok(event);
   }
 
-  aiSessionList(projectId: string): ProjectAdminResult<{ projectId: string; sessions: AiSessionSummary[] }> {
+  aiSessionList(
+    projectId: string,
+  ): ProjectAdminResult<{ projectId: string; sessions: AiSessionSummary[] }> {
     const sessions = this.scanAiSessions(projectId);
     return ok({ projectId, sessions });
   }
 
   aiSessionGet(sessionId: string): ProjectAdminResult<AiSessionSummary> {
-    const session = this.scanAiSessions().find((item) => item.sessionId === sessionId);
+    const session = this.scanAiSessions().find(
+      (item) => item.sessionId === sessionId,
+    );
     if (!session) return fail("SESSION_NOT_FOUND", "AI 会话不存在");
     return ok(session);
   }
 
-  aiRunLogs(sessionId: string): ProjectAdminResult<{ sessionId: string; logs: string[] }> {
+  aiRunLogs(
+    sessionId: string,
+  ): ProjectAdminResult<{ sessionId: string; logs: string[] }> {
     const logs: string[] = [];
     const candidateDirs = [
       path.join(this.agentRunLogsDir, sessionId),
@@ -3091,16 +4298,27 @@ export class ProjectAdminService {
     return ok({ sessionId, logs });
   }
 
-  aiWorkspaceContext(sessionId: string): ProjectAdminResult<{ sessionId: string; workspacePath?: string; files: string[] }> {
+  aiWorkspaceContext(
+    sessionId: string,
+  ): ProjectAdminResult<{
+    sessionId: string;
+    workspacePath?: string;
+    files: string[];
+  }> {
     const session = this.aiSessionGet(sessionId);
-    if (!session.ok || !session.data) return fail("SESSION_NOT_FOUND", "AI 会话不存在");
+    if (!session.ok || !session.data)
+      return fail("SESSION_NOT_FOUND", "AI 会话不存在");
     const workspacePath = session.data.workspaceId
       ? this.findWorkspacePathById(session.data.workspaceId)
       : undefined;
     return ok({
       sessionId,
       workspacePath,
-      files: workspacePath ? this.walkFiles(workspacePath).map((file) => path.relative(workspacePath, file)) : [],
+      files: workspacePath
+        ? this.walkFiles(workspacePath).map((file) =>
+            path.relative(workspacePath, file),
+          )
+        : [],
     });
   }
 
@@ -3114,14 +4332,17 @@ export class ProjectAdminService {
     if (!content) return fail("INVALID_REQUEST", "消息内容不能为空");
 
     const session = this.aiSessionGet(sessionId);
-    if (!session.ok || !session.data) return fail("SESSION_NOT_FOUND", "AI 会话不存在");
+    if (!session.ok || !session.data)
+      return fail("SESSION_NOT_FOUND", "AI 会话不存在");
     const projectId = input.projectId ?? session.data.projectId;
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
 
     const workspacePath =
       input.workingDir ??
-      (session.data.workspaceId ? this.findWorkspacePathById(session.data.workspaceId) : undefined);
+      (session.data.workspaceId
+        ? this.findWorkspacePathById(session.data.workspaceId)
+        : undefined);
     const body = {
       content,
       demoId: projectId,
@@ -3143,9 +4364,11 @@ export class ProjectAdminService {
           body: JSON.stringify(body),
         },
       );
-      const payload = (await response.json().catch(() => null)) as
-        | { success?: boolean; data?: AiSendMessageResult; error?: { code?: string; message?: string } }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        data?: AiSendMessageResult;
+        error?: { code?: string; message?: string };
+      } | null;
       if (!response.ok || payload?.success === false || !payload?.data) {
         return fail(
           payload?.error?.code ?? "AGENT_SERVICE_ERROR",
@@ -3165,13 +4388,21 @@ export class ProjectAdminService {
       return fail(
         "AGENT_SERVICE_UNAVAILABLE",
         error instanceof Error ? error.message : "agent-service 不可用",
-        { warnings: [`请确认 agent-service 已启动: ${this.getAgentServiceUrl()}`] },
+        {
+          warnings: [
+            `请确认 agent-service 已启动: ${this.getAgentServiceUrl()}`,
+          ],
+        },
       );
     }
   }
 
-  lockProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<{ locked: true; projectId: string }> {
-    if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以锁定项目");
+  lockProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ locked: true; projectId: string }> {
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以锁定项目");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
@@ -3184,24 +4415,41 @@ export class ProjectAdminService {
     return ok({ locked: true, projectId });
   }
 
-  unlockProject(projectId: string, actor = this.defaultActor()): ProjectAdminResult<{ unlocked: true; projectId: string }> {
-    if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以解锁项目");
+  unlockProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ unlocked: true; projectId: string }> {
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以解锁项目");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     fs.rmSync(this.projectLockPath(projectId), { force: true });
     return ok({ unlocked: true, projectId });
   }
 
-  private patchProjectCover(projectId: string, thumbnail: string | undefined, actor: ProjectAdminActor): ProjectAdminResult<Project> {
+  private patchProjectCover(
+    projectId: string,
+    thumbnail: string | undefined,
+    actor: ProjectAdminActor,
+  ): ProjectAdminResult<Project> {
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
     const updated = { ...project, thumbnail, updatedAt: Date.now() };
     this.writeProject(projectId, updated);
-    const auditId = this.audit(thumbnail ? "project_set_cover" : "project_delete_cover", actor, "L1", true, {
-      projectId,
+    const auditId = this.audit(
+      thumbnail ? "project_set_cover" : "project_delete_cover",
+      actor,
+      "L1",
+      true,
+      {
+        projectId,
+        diffSummary: { updated: ["project.thumbnail"] },
+      },
+    );
+    return ok(updated, {
+      auditId,
       diffSummary: { updated: ["project.thumbnail"] },
     });
-    return ok(updated, { auditId, diffSummary: { updated: ["project.thumbnail"] } });
   }
 
   private getProjectPath(projectId: string): string {
@@ -3225,11 +4473,24 @@ export class ProjectAdminService {
   }
 
   private commitPath(projectId: string, commitId: string): string {
-    return path.join(this.contentDir(projectId), "commits", `${safeId(commitId, "commit")}.json`);
+    return path.join(
+      this.contentDir(projectId),
+      "commits",
+      `${safeId(commitId, "commit")}.json`,
+    );
   }
 
-  private resourceVersionDir(projectId: string, kind: ProjectResourceKind, resourceId: string): string {
-    return path.join(this.contentDir(projectId), "resources", safeId(kind, "resource_kind"), safeId(resourceId, "resource"));
+  private resourceVersionDir(
+    projectId: string,
+    kind: ProjectResourceKind,
+    resourceId: string,
+  ): string {
+    return path.join(
+      this.contentDir(projectId),
+      "resources",
+      safeId(kind, "resource_kind"),
+      safeId(resourceId, "resource"),
+    );
   }
 
   private resourceVersionPath(
@@ -3238,50 +4499,77 @@ export class ProjectAdminService {
     resourceId: string,
     versionId: string,
   ): string {
-    return path.join(this.resourceVersionDir(projectId, kind, resourceId), `${safeId(versionId, "version")}.json`);
+    return path.join(
+      this.resourceVersionDir(projectId, kind, resourceId),
+      `${safeId(versionId, "version")}.json`,
+    );
   }
 
   private blobPath(projectId: string, hash: string): string {
-    return path.join(this.contentDir(projectId), "blobs", hash.slice(0, 2), hash);
+    return path.join(
+      this.contentDir(projectId),
+      "blobs",
+      hash.slice(0, 2),
+      hash,
+    );
   }
 
   private readContentState(projectId: string): ProjectContentState | null {
     return readJsonFile<ProjectContentState>(this.contentStatePath(projectId));
   }
 
-  private writeContentState(projectId: string, state: ProjectContentState): void {
+  private writeContentState(
+    projectId: string,
+    state: ProjectContentState,
+  ): void {
     writeJsonFile(this.contentStatePath(projectId), state);
   }
 
-  private writeMaterializationManifest(projectId: string, commitId: string, versions: ResourceVersion[]): void {
-    writeJsonFile(path.join(this.contentDir(projectId), "materialization", "manifest.json"), {
-      projectId,
-      commitId,
-      materializerVersion: MATERIALIZER_VERSION,
-      resources: versions.map((version) => ({
-        kind: version.kind,
-        resourceId: version.resourceId,
-        versionId: version.id,
-        contentHash: version.contentHash,
-        blobRefs: version.blobRefs,
-      })),
-      updatedAt: Date.now(),
-    });
+  private writeMaterializationManifest(
+    projectId: string,
+    commitId: string,
+    versions: ResourceVersion[],
+  ): void {
+    writeJsonFile(
+      path.join(this.contentDir(projectId), "materialization", "manifest.json"),
+      {
+        projectId,
+        commitId,
+        materializerVersion: MATERIALIZER_VERSION,
+        resources: versions.map((version) => ({
+          kind: version.kind,
+          resourceId: version.resourceId,
+          versionId: version.id,
+          contentHash: version.contentHash,
+          blobRefs: version.blobRefs,
+        })),
+        updatedAt: Date.now(),
+      },
+    );
     const references: ResourceReference[] = versions
-      .filter((version) => version.kind === "page" || version.kind === "knowledge_document")
+      .filter(
+        (version) =>
+          version.kind === "page" || version.kind === "knowledge_document",
+      )
       .map((version) => ({
         from: { kind: "canvas", resourceId: "main" },
         to: { kind: version.kind, resourceId: version.resourceId },
         reason: "canvas_node",
       }));
-    writeJsonFile(path.join(this.contentDir(projectId), "refs", "references.json"), {
-      projectId,
-      references,
-      updatedAt: Date.now(),
-    });
+    writeJsonFile(
+      path.join(this.contentDir(projectId), "refs", "references.json"),
+      {
+        projectId,
+        references,
+        updatedAt: Date.now(),
+      },
+    );
   }
 
-  private readCommit(projectId: string, commitId: string): ProjectCommit | null {
+  private readCommit(
+    projectId: string,
+    commitId: string,
+  ): ProjectCommit | null {
     return readJsonFile<ProjectCommit>(this.commitPath(projectId, commitId));
   }
 
@@ -3292,7 +4580,8 @@ export class ProjectAdminService {
   private listCommitsFromDisk(projectId: string): ProjectCommit[] {
     const dir = path.join(this.contentDir(projectId), "commits");
     if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
+    return fs
+      .readdirSync(dir)
       .filter((entry) => entry.endsWith(".json"))
       .map((entry) => readJsonFile<ProjectCommit>(path.join(dir, entry)))
       .filter((commit): commit is ProjectCommit => Boolean(commit))
@@ -3305,12 +4594,19 @@ export class ProjectAdminService {
     resourceId: string,
     versionId: string,
   ): ResourceVersion | null {
-    return readJsonFile<ResourceVersion>(this.resourceVersionPath(projectId, kind, resourceId, versionId));
+    return readJsonFile<ResourceVersion>(
+      this.resourceVersionPath(projectId, kind, resourceId, versionId),
+    );
   }
 
   private writeResourceVersion(version: ResourceVersion): void {
     writeJsonFile(
-      this.resourceVersionPath(version.projectId, version.kind, version.resourceId, version.id),
+      this.resourceVersionPath(
+        version.projectId,
+        version.kind,
+        version.resourceId,
+        version.id,
+      ),
       version,
     );
   }
@@ -3322,7 +4618,8 @@ export class ProjectAdminService {
   ): ResourceVersion[] {
     const dir = this.resourceVersionDir(projectId, kind, resourceId);
     if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
+    return fs
+      .readdirSync(dir)
       .filter((entry) => entry.endsWith(".json"))
       .map((entry) => readJsonFile<ResourceVersion>(path.join(dir, entry)))
       .filter((version): version is ResourceVersion => Boolean(version))
@@ -3346,16 +4643,32 @@ export class ProjectAdminService {
   private readBlob(projectId: string, hash?: string): string | undefined {
     if (!hash) return undefined;
     const blobPath = this.blobPath(projectId, hash);
-    return fs.existsSync(blobPath) ? fs.readFileSync(blobPath, "utf-8") : undefined;
+    return fs.existsSync(blobPath)
+      ? fs.readFileSync(blobPath, "utf-8")
+      : undefined;
   }
 
-  private makeResourceContentHash(kind: ProjectResourceKind, resourceId: string, blobRefs: string[], metadata: Record<string, unknown>): string {
-    return this.hashText(JSON.stringify({ kind, resourceId, blobRefs: [...blobRefs].sort(), metadata }));
+  private makeResourceContentHash(
+    kind: ProjectResourceKind,
+    resourceId: string,
+    blobRefs: string[],
+    metadata: Record<string, unknown>,
+  ): string {
+    return this.hashText(
+      JSON.stringify({
+        kind,
+        resourceId,
+        blobRefs: [...blobRefs].sort(),
+        metadata,
+      }),
+    );
   }
 
   private readHeadCommit(projectId: string): ProjectCommit | null {
     const state = this.readContentState(projectId);
-    return state?.headCommitId ? this.readCommit(projectId, state.headCommitId) : null;
+    return state?.headCommitId
+      ? this.readCommit(projectId, state.headCommitId)
+      : null;
   }
 
   private mergePointers(
@@ -3369,7 +4682,9 @@ export class ProjectAdminService {
     for (const pointer of updates) {
       byKey.set(`${pointer.kind}:${pointer.resourceId}`, pointer);
     }
-    return [...byKey.values()].sort((a, b) => `${a.kind}:${a.resourceId}`.localeCompare(`${b.kind}:${b.resourceId}`));
+    return [...byKey.values()].sort((a, b) =>
+      `${a.kind}:${a.resourceId}`.localeCompare(`${b.kind}:${b.resourceId}`),
+    );
   }
 
   private createContentCommit(input: {
@@ -3382,6 +4697,8 @@ export class ProjectAdminService {
     actor: ProjectAdminActor;
     sessionId?: string;
     workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
   }): ProjectCommit {
     const previous = this.readHeadCommit(input.projectId);
     const now = Date.now();
@@ -3392,14 +4709,24 @@ export class ProjectAdminService {
       visibility: input.visibility,
       intent: input.intent,
       title: input.title,
-      resourcePointers: this.mergePointers(previous?.resourcePointers ?? [], input.pointers),
+      resourcePointers: this.mergePointers(
+        previous?.resourcePointers ?? [],
+        input.pointers,
+      ),
       changedResources: input.changedResources,
       createdAt: now,
       createdBy: input.actor.name,
       audit: {
-        actorType: input.actor.source === "project-admin-cli" ? "cli" : input.actor.id === "system" ? "system" : "user",
+        actorType:
+          input.actor.source === "project-admin-cli"
+            ? "cli"
+            : input.actor.id === "system"
+              ? "system"
+              : "user",
         sessionId: input.sessionId,
         workspaceId: input.workspaceId,
+        workspaceRevision: input.workspaceRevision,
+        workspaceRootHash: input.workspaceRootHash,
       },
     };
     this.writeCommit(commit);
@@ -3424,12 +4751,27 @@ export class ProjectAdminService {
     };
     const runtimeType = resolvePageRuntimeType(page);
     if (runtimeType === "prototype-html-css") {
-      fileRefs.prototypeHtml = this.writeBlob(projectId, files.prototypeHtml ?? "");
-      fileRefs.prototypeCss = this.writeBlob(projectId, files.prototypeCss ?? "");
-      fileRefs.prototypeMeta = this.writeBlob(projectId, JSON.stringify(files.prototypeMeta ?? DEFAULT_PROTOTYPE_META, null, 2));
+      fileRefs.prototypeHtml = this.writeBlob(
+        projectId,
+        files.prototypeHtml ?? "",
+      );
+      fileRefs.prototypeCss = this.writeBlob(
+        projectId,
+        files.prototypeCss ?? "",
+      );
+      fileRefs.prototypeMeta = this.writeBlob(
+        projectId,
+        JSON.stringify(files.prototypeMeta ?? DEFAULT_PROTOTYPE_META, null, 2),
+      );
     } else if (runtimeType === "sketch-scene") {
-      fileRefs.sketchScene = this.writeBlob(projectId, files.sketchScene ?? createDefaultSketchSceneText());
-      fileRefs.sketchMeta = this.writeBlob(projectId, JSON.stringify(files.sketchMeta ?? DEFAULT_SKETCH_META, null, 2));
+      fileRefs.sketchScene = this.writeBlob(
+        projectId,
+        files.sketchScene ?? createDefaultSketchSceneText(),
+      );
+      fileRefs.sketchMeta = this.writeBlob(
+        projectId,
+        JSON.stringify(files.sketchMeta ?? DEFAULT_SKETCH_META, null, 2),
+      );
     } else {
       fileRefs.code = this.writeBlob(projectId, files.code);
     }
@@ -3450,6 +4792,9 @@ export class ProjectAdminService {
     note?: string;
     sketchPatchSummary?: SketchPatchVersionSummary;
     restoredFromVersionId?: string;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
     migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
   }): ResourceVersion {
     const metadata = this.pageResourceMetadata(
@@ -3458,16 +4803,30 @@ export class ProjectAdminService {
       input.files,
       input.sketchPatchSummary,
     );
-    const blobRefs = Object.values(metadata.files).filter((hash): hash is string => Boolean(hash));
-    const previousVersionId = this.listResourceVersionsFromDisk(input.projectId, "page", input.page.id)[0]?.id;
+    const blobRefs = Object.values(metadata.files).filter(
+      (hash): hash is string => Boolean(hash),
+    );
+    const previousVersionId = this.listResourceVersionsFromDisk(
+      input.projectId,
+      "page",
+      input.page.id,
+    )[0]?.id;
     const version: ResourceVersion = {
       id: input.versionId,
       projectId: input.projectId,
       kind: "page",
       resourceId: input.page.id,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
       previousVersionId,
       restoredFromVersionId: input.restoredFromVersionId,
-      contentHash: this.makeResourceContentHash("page", input.page.id, blobRefs, metadata),
+      contentHash: this.makeResourceContentHash(
+        "page",
+        input.page.id,
+        blobRefs,
+        metadata,
+      ),
       blobRefs,
       metadata,
       runtime: {
@@ -3485,7 +4844,9 @@ export class ProjectAdminService {
     return version;
   }
 
-  private pageFilesFromResourceVersion(version: ResourceVersion): DemoFiles | null {
+  private pageFilesFromResourceVersion(
+    version: ResourceVersion,
+  ): DemoFiles | null {
     const metadata = version.metadata as Partial<PageResourceMetadata>;
     const files = metadata.files;
     if (!files?.schema) return null;
@@ -3497,7 +4858,10 @@ export class ProjectAdminService {
     };
     const prototypeHtml = this.readBlob(version.projectId, files.prototypeHtml);
     const prototypeCss = this.readBlob(version.projectId, files.prototypeCss);
-    const prototypeMetaText = this.readBlob(version.projectId, files.prototypeMeta);
+    const prototypeMetaText = this.readBlob(
+      version.projectId,
+      files.prototypeMeta,
+    );
     const sketchScene = this.readBlob(version.projectId, files.sketchScene);
     const sketchMetaText = this.readBlob(version.projectId, files.sketchMeta);
     if (prototypeHtml !== undefined) result.prototypeHtml = prototypeHtml;
@@ -3513,19 +4877,36 @@ export class ProjectAdminService {
   }
 
   private readKnowledgeManifest(workspacePath: string): KnowledgeManifest {
-    const manifest = readJsonFile<Partial<KnowledgeManifest>>(path.join(workspacePath, "knowledge", "manifest.json"));
+    const manifest = readJsonFile<Partial<KnowledgeManifest>>(
+      path.join(workspacePath, "knowledge", "manifest.json"),
+    );
     return {
       version: manifest?.version ?? 1,
-      items: Array.isArray(manifest?.items) ? manifest.items as KnowledgeItemMeta[] : [],
+      items: Array.isArray(manifest?.items)
+        ? (manifest.items as KnowledgeItemMeta[])
+        : [],
     };
   }
 
-  private writeKnowledgeManifest(workspacePath: string, manifest: KnowledgeManifest): void {
-    writeJsonFile(path.join(workspacePath, "knowledge", "manifest.json"), manifest);
+  private writeKnowledgeManifest(
+    workspacePath: string,
+    manifest: KnowledgeManifest,
+  ): void {
+    writeJsonFile(
+      path.join(workspacePath, "knowledge", "manifest.json"),
+      manifest,
+    );
   }
 
-  private knowledgeItemContent(workspacePath: string, item: KnowledgeItemMeta): string | null {
-    const filePath = path.join(workspacePath, "knowledge", path.basename(item.fileName));
+  private knowledgeItemContent(
+    workspacePath: string,
+    item: KnowledgeItemMeta,
+  ): string | null {
+    const filePath = path.join(
+      workspacePath,
+      "knowledge",
+      path.basename(item.fileName),
+    );
     return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : null;
   }
 
@@ -3538,6 +4919,9 @@ export class ProjectAdminService {
     source: ResourceVersion["source"];
     note?: string;
     restoredFromVersionId?: string;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
     migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
   }): ResourceVersion {
     const metadata: KnowledgeResourceMetadata = {
@@ -3546,16 +4930,30 @@ export class ProjectAdminService {
         markdown: this.writeBlob(input.projectId, input.content),
       },
     };
-    const blobRefs = Object.values(metadata.files).filter((hash): hash is string => Boolean(hash));
-    const previousVersionId = this.listResourceVersionsFromDisk(input.projectId, "knowledge_document", input.item.id)[0]?.id;
+    const blobRefs = Object.values(metadata.files).filter(
+      (hash): hash is string => Boolean(hash),
+    );
+    const previousVersionId = this.listResourceVersionsFromDisk(
+      input.projectId,
+      "knowledge_document",
+      input.item.id,
+    )[0]?.id;
     const version: ResourceVersion = {
       id: input.versionId,
       projectId: input.projectId,
       kind: "knowledge_document",
       resourceId: input.item.id,
+      workspaceId: input.workspaceId,
+      workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash,
       previousVersionId,
       restoredFromVersionId: input.restoredFromVersionId,
-      contentHash: this.makeResourceContentHash("knowledge_document", input.item.id, blobRefs, metadata),
+      contentHash: this.makeResourceContentHash(
+        "knowledge_document",
+        input.item.id,
+        blobRefs,
+        metadata,
+      ),
       blobRefs,
       metadata,
       runtime: {
@@ -3572,7 +4970,9 @@ export class ProjectAdminService {
     return version;
   }
 
-  private knowledgeContentFromResourceVersion(version: ResourceVersion): { item: KnowledgeItemMeta; content: string } | null {
+  private knowledgeContentFromResourceVersion(
+    version: ResourceVersion,
+  ): { item: KnowledgeItemMeta; content: string } | null {
     const metadata = version.metadata as Partial<KnowledgeResourceMetadata>;
     if (!metadata.item || !metadata.files?.markdown) return null;
     const content = this.readBlob(version.projectId, metadata.files.markdown);
@@ -3580,14 +4980,17 @@ export class ProjectAdminService {
   }
 
   private readProject(projectId: string): Project | null {
-    const parsed = readJsonFile<Partial<Project>>(path.join(this.getProjectPath(projectId), "project.json"));
+    const parsed = readJsonFile<Partial<Project>>(
+      path.join(this.getProjectPath(projectId), "project.json"),
+    );
     if (!parsed) return null;
     return {
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
       category: normalizeProjectCategory(parsed.category),
       description: parsed.description,
-      workspacePath: parsed.workspacePath ?? this.projectWorkspacePath(projectId),
+      workspacePath:
+        parsed.workspacePath ?? this.projectWorkspacePath(projectId),
       demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
       demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
@@ -3605,12 +5008,22 @@ export class ProjectAdminService {
         typeof parsed.canonicalSyncedWorkspaceId === "string"
           ? parsed.canonicalSyncedWorkspaceId
           : undefined,
+      canonicalSyncedRevision:
+        typeof parsed.canonicalSyncedRevision === "number"
+          ? parsed.canonicalSyncedRevision
+          : undefined,
+      canonicalSyncedRootHash:
+        typeof parsed.canonicalSyncedRootHash === "string"
+          ? parsed.canonicalSyncedRootHash
+          : undefined,
       canonicalSyncedAt:
         typeof parsed.canonicalSyncedAt === "number"
           ? parsed.canonicalSyncedAt
           : undefined,
       lockedDependencies: parsed.lockedDependencies,
-      authoringPreferences: normalizeProjectAuthoringPreferences(parsed.authoringPreferences),
+      authoringPreferences: normalizeProjectAuthoringPreferences(
+        parsed.authoringPreferences,
+      ),
       thumbnail: parsed.thumbnail,
       publishedVersion: parsed.publishedVersion,
       publishedAt: parsed.publishedAt,
@@ -3618,17 +5031,40 @@ export class ProjectAdminService {
   }
 
   private writeProject(projectId: string, project: Project): void {
-    writeJsonFile(path.join(this.getProjectPath(projectId), "project.json"), project);
+    writeJsonFile(
+      path.join(this.getProjectPath(projectId), "project.json"),
+      project,
+    );
   }
 
   private readTemplate(templateId: string): ProjectTemplateMeta | null {
-    const parsed = readJsonFile<Partial<ProjectTemplateMeta>>(path.join(this.getTemplatePath(templateId), "template.json"));
-    if (!parsed?.id || !parsed.sourceProjectId || !parsed.category || !parsed.name || !parsed.description) {
+    const parsed = readJsonFile<Partial<ProjectTemplateMeta>>(
+      path.join(this.getTemplatePath(templateId), "template.json"),
+    );
+    if (
+      !parsed?.id ||
+      !parsed.sourceProjectId ||
+      !parsed.category ||
+      !parsed.name ||
+      !parsed.description
+    ) {
       return null;
     }
     return {
       id: parsed.id,
       sourceProjectId: parsed.sourceProjectId,
+      sourceWorkspaceId:
+        typeof parsed.sourceWorkspaceId === "string"
+          ? parsed.sourceWorkspaceId
+          : undefined,
+      sourceWorkspaceRevision:
+        typeof parsed.sourceWorkspaceRevision === "number"
+          ? parsed.sourceWorkspaceRevision
+          : undefined,
+      sourceWorkspaceRootHash:
+        typeof parsed.sourceWorkspaceRootHash === "string"
+          ? parsed.sourceWorkspaceRootHash
+          : undefined,
       category: parsed.category,
       name: parsed.name,
       description: parsed.description,
@@ -3642,13 +5078,24 @@ export class ProjectAdminService {
     };
   }
 
-  private writeTemplate(templateId: string, template: ProjectTemplateMeta): void {
-    writeJsonFile(path.join(this.getTemplatePath(templateId), "template.json"), template);
+  private writeTemplate(
+    templateId: string,
+    template: ProjectTemplateMeta,
+  ): void {
+    writeJsonFile(
+      path.join(this.getTemplatePath(templateId), "template.json"),
+      template,
+    );
   }
 
-  private createTemplateSnapshot(projectId: string, input: TemplateMetaInput): string {
+  private createTemplateSnapshot(
+    projectId: string,
+    input: TemplateMetaInput,
+  ): string {
     const project = this.readProject(projectId);
     if (!project) throw new Error("PROJECT_NOT_FOUND");
+    const proof = this.requireCanonicalWorkspaceProof(project, "保存为模板");
+    if (!proof.ok) throw new Error(proof.error?.code ?? "WORKSPACE_STALE");
     const templateId = nowId("tmpl");
     const templatePath = this.getTemplatePath(templateId);
     const templateWorkspacePath = path.join(templatePath, "workspace");
@@ -3659,6 +5106,9 @@ export class ProjectAdminService {
     const template: ProjectTemplateMeta = {
       id: templateId,
       sourceProjectId: projectId,
+      sourceWorkspaceId: proof.data?.workspaceId,
+      sourceWorkspaceRevision: proof.data?.workspaceRevision,
+      sourceWorkspaceRootHash: proof.data?.workspaceRootHash,
       category: input.category.trim(),
       name: input.name.trim(),
       description: input.description.trim(),
@@ -3681,11 +5131,15 @@ export class ProjectAdminService {
   }
 
   private readWorkspaceTree(workspacePath: string): WorkspaceTree {
-    const parsed = readJsonFile<Partial<WorkspaceTree>>(path.join(workspacePath, WORKSPACE_TREE_FILENAME));
+    const parsed = readJsonFile<Partial<WorkspaceTree>>(
+      path.join(workspacePath, WORKSPACE_TREE_FILENAME),
+    );
     if (parsed) {
       return {
         folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-        pages: Array.isArray(parsed.pages) ? normalizePagesRouteKeys(parsed.pages) : [],
+        pages: Array.isArray(parsed.pages)
+          ? normalizePagesRouteKeys(parsed.pages)
+          : [],
       };
     }
     const pages: DemoPageMeta[] = [];
@@ -3697,7 +5151,12 @@ export class ProjectAdminService {
           pages.push({
             id: entry.name,
             name: entry.name.split("_")[0].replace(/-/g, " "),
-            routeKey: makeUniqueRouteKey(entry.name, new Set(pages.map((page) => page.routeKey).filter(Boolean) as string[])),
+            routeKey: makeUniqueRouteKey(
+              entry.name,
+              new Set(
+                pages.map((page) => page.routeKey).filter(Boolean) as string[],
+              ),
+            ),
             order: pages.length,
             parentId: null,
           });
@@ -3718,15 +5177,67 @@ export class ProjectAdminService {
   }
 
   private readEdit(editId: string): EditTransaction | null {
-    return readJsonFile<EditTransaction>(path.join(this.editsDir, `${safeId(editId, "edit")}.json`));
+    return readJsonFile<EditTransaction>(
+      path.join(this.editsDir, `${safeId(editId, "edit")}.json`),
+    );
   }
 
   private writeEdit(transaction: EditTransaction): void {
-    writeJsonFile(path.join(this.editsDir, `${transaction.editId}.json`), transaction);
+    writeJsonFile(
+      path.join(this.editsDir, `${transaction.editId}.json`),
+      transaction,
+    );
+  }
+
+  private readWorkspaceMetadata(
+    workspacePath: string,
+  ): WorkspaceMetadataFile | null {
+    return readJsonFile<WorkspaceMetadataFile>(
+      path.join(workspacePath, ".workspace.json"),
+    );
+  }
+
+  private assertTransactionWorkspaceWriteAllowed(
+    transaction: EditTransaction,
+    operation: string,
+  ): ProjectAdminResult<void> {
+    if (transaction.workspaceScope && transaction.workspaceScope !== "branch") {
+      if (this.config.workspaceAuthorityPort) {
+        return ok(undefined);
+      }
+      return fail(
+        "WORKSPACE_AUTHORITY_REQUIRED",
+        `live Workspace 写入必须通过 Workspace Mutation Authority: ${operation}`,
+      );
+    }
+    return this.assertWorkspaceWriteAllowed(
+      transaction.workspacePath,
+      operation,
+    );
+  }
+
+  private assertWorkspaceWriteAllowed(
+    workspacePath: string,
+    operation: string,
+  ): ProjectAdminResult<void> {
+    const metadata = this.readWorkspaceMetadata(workspacePath);
+    if (metadata?.scope === "live") {
+      if (this.config.workspaceAuthorityPort) {
+        return ok(undefined);
+      }
+      return fail(
+        "WORKSPACE_AUTHORITY_REQUIRED",
+        `live Workspace 写入必须通过 Workspace Mutation Authority: ${operation}`,
+      );
+    }
+    return ok(undefined);
   }
 
   private refreshEditStatus(transaction: EditTransaction): EditTransaction {
-    if (transaction.status === "editing" && Date.now() > transaction.expiresAt) {
+    if (
+      transaction.status === "editing" &&
+      Date.now() > transaction.expiresAt
+    ) {
       const expired = { ...transaction, status: "expired" as const };
       this.writeEdit(expired);
       return expired;
@@ -3737,8 +5248,10 @@ export class ProjectAdminService {
   private requireEditable(editId: string): ProjectAdminResult<EditTransaction> {
     const transaction = this.readEdit(editId);
     if (!transaction) return fail("EDIT_NOT_FOUND", "编辑事务不存在");
-    if (transaction.status !== "editing") return fail("EDIT_NOT_EDITING", "编辑事务不在编辑状态");
-    if (Date.now() > transaction.expiresAt) return fail("EDIT_EXPIRED", "编辑事务已过期");
+    if (transaction.status !== "editing")
+      return fail("EDIT_NOT_EDITING", "编辑事务不在编辑状态");
+    if (Date.now() > transaction.expiresAt)
+      return fail("EDIT_EXPIRED", "编辑事务已过期");
     return ok(transaction);
   }
 
@@ -3751,7 +5264,10 @@ export class ProjectAdminService {
     return tree.pages.find((page) => page.id === pageId) ?? null;
   }
 
-  private readPageFiles(workspacePath: string, pageId: string): DemoFiles | null {
+  private readPageFiles(
+    workspacePath: string,
+    pageId: string,
+  ): DemoFiles | null {
     const demoDir = this.pageDir(workspacePath, pageId);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
@@ -3772,23 +5288,29 @@ export class ProjectAdminService {
       files.prototypeCss = fs.readFileSync(prototypeCssPath, "utf-8");
     }
     if (fs.existsSync(prototypeMetaPath)) {
-      files.prototypeMeta = readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined;
+      files.prototypeMeta =
+        readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined;
     }
     if (fs.existsSync(sketchScenePath)) {
       files.sketchScene = fs.readFileSync(sketchScenePath, "utf-8");
     }
     if (fs.existsSync(sketchMetaPath)) {
-      files.sketchMeta = readJsonFile<Record<string, unknown>>(sketchMetaPath) ?? undefined;
+      files.sketchMeta =
+        readJsonFile<Record<string, unknown>>(sketchMetaPath) ?? undefined;
     }
     return files;
   }
 
   private readProjectConfig(workspacePath: string): string | null {
     const configPath = path.join(workspacePath, PROJECT_CONFIG_FILENAME);
-    return fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : null;
+    return fs.existsSync(configPath)
+      ? fs.readFileSync(configPath, "utf-8")
+      : null;
   }
 
-  private readProjectConfigValues(workspacePath: string): Record<string, unknown> | null {
+  private readProjectConfigValues(
+    workspacePath: string,
+  ): Record<string, unknown> | null {
     const valuesPath = path.join(workspacePath, PROJECT_CONFIG_VALUES_FILENAME);
     if (!fs.existsSync(valuesPath)) return null;
     try {
@@ -3817,10 +5339,12 @@ export class ProjectAdminService {
     const entry =
       parsed?.entry && pageKeys.has(parsed.entry)
         ? parsed.entry
-        : Object.keys(pages)[0] ?? "";
+        : (Object.keys(pages)[0] ?? "");
     const actions = Array.isArray(parsed?.actions) ? parsed.actions : [];
     const state =
-      parsed?.state && typeof parsed.state === "object" && !Array.isArray(parsed.state)
+      parsed?.state &&
+      typeof parsed.state === "object" &&
+      !Array.isArray(parsed.state)
         ? parsed.state
         : {};
     return {
@@ -3839,6 +5363,11 @@ export class ProjectAdminService {
     editId: string,
     note?: string,
     type: VersionHistoryEntryType = "named_version",
+    proof: {
+      workspaceId?: string;
+      workspaceRevision?: number;
+      workspaceRootHash?: string;
+    } = {},
   ): VersionInfo {
     const versionId = this.generateVersionId(project);
     const snapshotPath = path.join(this.snapshotsDir, project.id, versionId);
@@ -3853,6 +5382,9 @@ export class ProjectAdminService {
       sessionId: editId,
       snapshotPath,
       fileCount: countFiles(workspacePath),
+      workspaceId: proof.workspaceId,
+      workspaceRevision: proof.workspaceRevision,
+      workspaceRootHash: proof.workspaceRootHash,
       note,
     };
   }
@@ -3889,10 +5421,16 @@ export class ProjectAdminService {
     const baseFiles = new Map<string, string>();
     const nextFiles = new Map<string, string>();
     for (const file of this.walkFiles(basePath)) {
-      baseFiles.set(path.relative(basePath, file), fs.readFileSync(file, "utf-8"));
+      baseFiles.set(
+        path.relative(basePath, file),
+        fs.readFileSync(file, "utf-8"),
+      );
     }
     for (const file of this.walkFiles(nextPath)) {
-      nextFiles.set(path.relative(nextPath, file), fs.readFileSync(file, "utf-8"));
+      nextFiles.set(
+        path.relative(nextPath, file),
+        fs.readFileSync(file, "utf-8"),
+      );
     }
     const changed = new Set<string>();
     for (const [file, content] of nextFiles) {
@@ -3916,16 +5454,25 @@ export class ProjectAdminService {
     return result;
   }
 
-  private validateEditTransaction(transaction: EditTransaction): ValidationResult {
-    const structuralValidation = this.validateWorkspace(transaction.workspacePath);
+  private validateEditTransaction(
+    transaction: EditTransaction,
+  ): ValidationResult {
+    const structuralValidation = this.validateWorkspace(
+      transaction.workspacePath,
+    );
     const changedPageIds = this.getChangedCodePageIds(transaction);
-    const runtimeValidation = this.validateWorkspaceRuntime(transaction.workspacePath);
+    const runtimeValidation = this.validateWorkspaceRuntime(
+      transaction.workspacePath,
+    );
     const runtimeIssues = this.runtimeToValidationResult(
       runtimeValidation,
       changedPageIds,
     ).issues;
     const issues = [...structuralValidation.issues, ...runtimeIssues];
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
   private getChangedCodePageIds(transaction: EditTransaction): Set<string> {
@@ -3935,7 +5482,9 @@ export class ProjectAdminService {
     );
     const pageIds = new Set<string>();
     for (const file of changedFiles) {
-      const match = file.match(/^demos\/([^/]+)\/(?:index\.tsx|prototype\.(?:html|css)|prototype\.meta\.json)$/u);
+      const match = file.match(
+        /^demos\/([^/]+)\/(?:index\.tsx|prototype\.(?:html|css)|prototype\.meta\.json)$/u,
+      );
       if (match?.[1]) pageIds.add(match[1]);
     }
     return pageIds;
@@ -4011,7 +5560,9 @@ export class ProjectAdminService {
       );
     }
     if (runtimeType === "sketch-scene") {
-      const parsed = files.sketchScene ? parseSketchSceneText(files.sketchScene) : null;
+      const parsed = files.sketchScene
+        ? parseSketchSceneText(files.sketchScene)
+        : null;
       const validation = validateSketchSceneDocument(parsed);
       return {
         ok: validation.valid,
@@ -4021,7 +5572,8 @@ export class ProjectAdminService {
           stage: "schema_contract",
           code: issue.code,
           message: issue.message,
-          instruction: "请修复 sketch.scene.json，确保版本、页面尺寸、节点 ID 和几何信息有效。",
+          instruction:
+            "请修复 sketch.scene.json，确保版本、页面尺寸、节点 ID 和几何信息有效。",
         })),
         pageIds: [pageId],
       };
@@ -4055,11 +5607,14 @@ export class ProjectAdminService {
     };
 
     if (!html.trim()) {
-      addIssue({
-        code: "PROTOTYPE_HTML_EMPTY",
-        message: "原型页 HTML 不能为空",
-        instruction: "请提供可渲染的 prototype.html 内容。",
-      }, "repair_prototype");
+      addIssue(
+        {
+          code: "PROTOTYPE_HTML_EMPTY",
+          message: "原型页 HTML 不能为空",
+          instruction: "请提供可渲染的 prototype.html 内容。",
+        },
+        "repair_prototype",
+      );
     }
     if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
       addIssue({
@@ -4069,83 +5624,116 @@ export class ProjectAdminService {
       }, "repair_prototype");
     }
     if (css.length > MAX_PROTOTYPE_CSS_LENGTH) {
-      addIssue({
-        code: "PROTOTYPE_CSS_TOO_LARGE",
-        message: "原型页 CSS 超过 MVP 限制",
-        instruction: "请压缩 CSS，移除不必要的样式规则。",
-      }, "repair_prototype");
+      addIssue(
+        {
+          code: "PROTOTYPE_CSS_TOO_LARGE",
+          message: "原型页 CSS 超过 MVP 限制",
+          instruction: "请压缩 CSS，移除不必要的样式规则。",
+        },
+        "repair_prototype",
+      );
     }
     if (/<\s*script\b/i.test(html)) {
-      addIssue({
-        code: "PROTOTYPE_SCRIPT_FORBIDDEN",
-        message: "原型页不允许包含 script 标签",
-        instruction: "页面需要执行脚本时应升级为高保真页；否则请移除 script 标签。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_SCRIPT_FORBIDDEN",
+          message: "原型页不允许包含 script 标签",
+          instruction:
+            "页面需要执行脚本时应升级为高保真页；否则请移除 script 标签。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/\son[a-z]+\s*=/i.test(html)) {
-      addIssue({
-        code: "PROTOTYPE_INLINE_EVENT_FORBIDDEN",
-        message: "原型页不允许包含内联事件属性",
-        instruction: "页面需要真实事件处理时应升级为高保真页；否则请移除 onclick、onload 等内联事件属性。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_INLINE_EVENT_FORBIDDEN",
+          message: "原型页不允许包含内联事件属性",
+          instruction:
+            "页面需要真实事件处理时应升级为高保真页；否则请移除 onclick、onload 等内联事件属性。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/javascript\s*:/i.test(html) || /javascript\s*:/i.test(css)) {
-      addIssue({
-        code: "PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN",
-        message: "原型页不允许包含 javascript: URL",
-        instruction: "页面需要执行 JavaScript URL 时应升级为高保真页；否则请将链接改为普通 URL 或占位链接。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_JAVASCRIPT_URL_FORBIDDEN",
+          message: "原型页不允许包含 javascript: URL",
+          instruction:
+            "页面需要执行 JavaScript URL 时应升级为高保真页；否则请将链接改为普通 URL 或占位链接。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/<\s*(iframe|embed|object)\b/i.test(html)) {
-      addIssue({
-        code: "PROTOTYPE_EMBED_FORBIDDEN",
-        message: "原型页不允许直接内嵌 iframe、embed 或 object",
-        instruction: "需要嵌入第三方运行时内容时应升级为高保真页。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_EMBED_FORBIDDEN",
+          message: "原型页不允许直接内嵌 iframe、embed 或 object",
+          instruction: "需要嵌入第三方运行时内容时应升级为高保真页。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/<\s*form\b[^>]*\saction\s*=/i.test(html)) {
-      addIssue({
-        code: "PROTOTYPE_FORM_ACTION_FORBIDDEN",
-        message: "原型页不允许包含会提交的表单 action",
-        instruction: "需要真实表单提交时应升级为高保真页；静态表单请移除 action。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_FORM_ACTION_FORBIDDEN",
+          message: "原型页不允许包含会提交的表单 action",
+          instruction:
+            "需要真实表单提交时应升级为高保真页；静态表单请移除 action。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/\bposition\s*:\s*fixed\b/i.test(css)) {
-      addIssue({
-        code: "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
-        message: "原型页不允许使用 position: fixed",
-        instruction: "需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。",
-      }, "upgrade_to_high_fidelity");
+      addIssue(
+        {
+          code: "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
+          message: "原型页不允许使用 position: fixed",
+          instruction:
+            "需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。",
+        },
+        "upgrade_to_high_fidelity",
+      );
     }
     if (/@import\b/i.test(css)) {
-      addIssue({
-        code: "PROTOTYPE_CSS_IMPORT_FORBIDDEN",
-        message: "原型页不允许使用 CSS @import",
-        instruction: "请移除远程样式导入，把必要样式内联到 prototype.css。",
-      }, "repair_prototype");
+      addIssue(
+        {
+          code: "PROTOTYPE_CSS_IMPORT_FORBIDDEN",
+          message: "原型页不允许使用 CSS @import",
+          instruction: "请移除远程样式导入，把必要样式内联到 prototype.css。",
+        },
+        "repair_prototype",
+      );
     }
     if (PROTOTYPE_GLOBAL_SELECTOR_RE.test(css)) {
-      addIssue({
-        code: "PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN",
-        message: "原型页 CSS 不允许直接选择 html、body 或 :root",
-        instruction: "请把全局选择器改为原型页根节点内的局部 class 选择器。",
-      }, "repair_prototype");
+      addIssue(
+        {
+          code: "PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN",
+          message: "原型页 CSS 不允许直接选择 html、body 或 :root",
+          instruction: "请把全局选择器改为原型页根节点内的局部 class 选择器。",
+        },
+        "repair_prototype",
+      );
     }
 
-    const decision: PrototypeGateDecision = upgradeReasonCodes.length > 0
-      ? "upgrade_to_high_fidelity"
-      : issues.length > 0
-        ? "repair_prototype"
-        : "accept_prototype";
-    const reasonCodes = Array.from(new Set([
-      ...upgradeReasonCodes,
-      ...repairReasonCodes,
-    ]));
-    const summary = decision === "accept_prototype"
-      ? "HTML/CSS 原型页可安全内嵌渲染。"
-      : decision === "repair_prototype"
-        ? "HTML/CSS 原型页存在可自动修复的问题，修复后可继续按原型页保存。"
-        : "页面触碰运行时隔离红线，应升级为高保真页。";
+    const decision: PrototypeGateDecision =
+      upgradeReasonCodes.length > 0
+        ? "upgrade_to_high_fidelity"
+        : issues.length > 0
+          ? "repair_prototype"
+          : "accept_prototype";
+    const reasonCodes = Array.from(
+      new Set([...upgradeReasonCodes, ...repairReasonCodes]),
+    );
+    const summary =
+      decision === "accept_prototype"
+        ? "HTML/CSS 原型页可安全内嵌渲染。"
+        : decision === "repair_prototype"
+          ? "HTML/CSS 原型页存在可自动修复的问题，修复后可继续按原型页保存。"
+          : "页面触碰运行时隔离红线，应升级为高保真页。";
 
     return {
       ok: issues.length === 0,
@@ -4155,7 +5743,10 @@ export class ProjectAdminService {
     };
   }
 
-  private validatePageRuntimeSource(pageId: string, code: string): RuntimeValidationResult {
+  private validatePageRuntimeSource(
+    pageId: string,
+    code: string,
+  ): RuntimeValidationResult {
     try {
       compilePreviewPageSource(code, {
         resolveDependencyUrl: (specifier) => `/runtime/${specifier}.js`,
@@ -4165,7 +5756,9 @@ export class ProjectAdminService {
       if (error instanceof PreviewRuntimeContractError) {
         return {
           ok: false,
-          issues: error.issues.map((issue) => this.toRuntimeValidationIssue(pageId, issue)),
+          issues: error.issues.map((issue) =>
+            this.toRuntimeValidationIssue(pageId, issue),
+          ),
           pageIds: [pageId],
         };
       }
@@ -4177,8 +5770,10 @@ export class ProjectAdminService {
             severity: "error",
             stage: "compile_transform",
             code: "COMPILE_TRANSFORM_FAILED",
-            message: error instanceof Error ? error.message : "页面源码编译失败",
-            instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
+            message:
+              error instanceof Error ? error.message : "页面源码编译失败",
+            instruction:
+              "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
           },
         ],
         pageIds: [pageId],
@@ -4207,8 +5802,10 @@ export class ProjectAdminService {
     blockingPageIds?: Set<string>,
   ): ValidationResult {
     return {
-      ok: runtime.issues.every((issue) =>
-        issue.severity !== "error" || (blockingPageIds !== undefined && !blockingPageIds.has(issue.pageId))
+      ok: runtime.issues.every(
+        (issue) =>
+          issue.severity !== "error" ||
+          (blockingPageIds !== undefined && !blockingPageIds.has(issue.pageId)),
       ),
       issues: runtime.issues.map((issue) => ({
         code: issue.code,
@@ -4218,7 +5815,8 @@ export class ProjectAdminService {
         stage: issue.stage,
         instruction: issue.instruction,
         severity:
-          issue.severity === "error" && (blockingPageIds === undefined || blockingPageIds.has(issue.pageId))
+          issue.severity === "error" &&
+          (blockingPageIds === undefined || blockingPageIds.has(issue.pageId))
             ? "blocking"
             : "warning",
       })),
@@ -4231,33 +5829,71 @@ export class ProjectAdminService {
     const issues = [...treeValidation.issues];
     const projectSchema = this.readProjectConfig(workspacePath);
     for (const page of tree.pages) {
-      const pageValidation = this.validatePageFiles(workspacePath, page.id, projectSchema);
+      const pageValidation = this.validatePageFiles(
+        workspacePath,
+        page.id,
+        projectSchema,
+      );
       issues.push(...pageValidation.issues);
     }
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
-  private validatePageFiles(workspacePath: string, pageId: string, projectSchema?: string | null): ValidationResult {
+  private validatePageFiles(
+    workspacePath: string,
+    pageId: string,
+    projectSchema?: string | null,
+  ): ValidationResult {
     const files = this.readPageFiles(workspacePath, pageId);
     const page = this.findPage(workspacePath, pageId);
     const issues: ValidationResult["issues"] = [];
     if (!files) {
-      issues.push({ code: "FILE_READ_ERROR", message: `页面文件不存在: ${pageId}`, resourceId: pageId, severity: "blocking" });
+      issues.push({
+        code: "FILE_READ_ERROR",
+        message: `页面文件不存在: ${pageId}`,
+        resourceId: pageId,
+        severity: "blocking",
+      });
       return { ok: false, issues };
     }
-    if (resolvePageRuntimeType(page) === "high-fidelity-react" && !files.code.includes("export default")) {
-      issues.push({ code: "NO_DEFAULT_EXPORT", message: `页面缺少 default export: ${pageId}`, resourceId: pageId, severity: "blocking" });
+    if (
+      resolvePageRuntimeType(page) === "high-fidelity-react" &&
+      !files.code.includes("export default")
+    ) {
+      issues.push({
+        code: "NO_DEFAULT_EXPORT",
+        message: `页面缺少 default export: ${pageId}`,
+        resourceId: pageId,
+        severity: "blocking",
+      });
     }
-    issues.push(...this.validateSchemaPair(projectSchema ?? null, files.schema).issues);
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    issues.push(
+      ...this.validateSchemaPair(projectSchema ?? null, files.schema).issues,
+    );
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
-  private validateSchemaPair(projectSchema: string | null | undefined, pageSchema: string | null | undefined): ValidationResult {
+  private validateSchemaPair(
+    projectSchema: string | null | undefined,
+    pageSchema: string | null | undefined,
+  ): ValidationResult {
     const issues: ValidationResult["issues"] = [];
     const projectKeys = new Set<string>();
     if (projectSchema) {
-      const parsed = this.parseSchema(projectSchema, "project.config.schema.json", issues);
-      Object.keys(parsed?.properties ?? {}).forEach((key) => projectKeys.add(key));
+      const parsed = this.parseSchema(
+        projectSchema,
+        "project.config.schema.json",
+        issues,
+      );
+      Object.keys(parsed?.properties ?? {}).forEach((key) =>
+        projectKeys.add(key),
+      );
     }
     if (pageSchema) {
       const parsed = this.parseSchema(pageSchema, "config.schema.json", issues);
@@ -4272,17 +5908,29 @@ export class ProjectAdminService {
         }
       }
     }
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
-  private validateProjectConfigAgainstPages(workspacePath: string, projectSchema: string): ValidationResult {
+  private validateProjectConfigAgainstPages(
+    workspacePath: string,
+    projectSchema: string,
+  ): ValidationResult {
     const tree = this.readWorkspaceTree(workspacePath);
     const issues = [...this.validateSchemaPair(projectSchema, null).issues];
     for (const page of tree.pages) {
       const files = this.readPageFiles(workspacePath, page.id);
-      if (files) issues.push(...this.validateSchemaPair(projectSchema, files.schema).issues);
+      if (files)
+        issues.push(
+          ...this.validateSchemaPair(projectSchema, files.schema).issues,
+        );
     }
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
   private parseSchema(
@@ -4291,18 +5939,37 @@ export class ProjectAdminService {
     issues: ValidationResult["issues"],
   ): { properties?: Record<string, unknown> } | null {
     try {
-      const parsed = JSON.parse(schema) as { properties?: unknown; type?: unknown };
-      if (parsed.properties !== undefined && (typeof parsed.properties !== "object" || Array.isArray(parsed.properties))) {
-        issues.push({ code: "INVALID_SCHEMA", message: `${resourceId} properties 必须是对象`, resourceId, severity: "blocking" });
+      const parsed = JSON.parse(schema) as {
+        properties?: unknown;
+        type?: unknown;
+      };
+      if (
+        parsed.properties !== undefined &&
+        (typeof parsed.properties !== "object" ||
+          Array.isArray(parsed.properties))
+      ) {
+        issues.push({
+          code: "INVALID_SCHEMA",
+          message: `${resourceId} properties 必须是对象`,
+          resourceId,
+          severity: "blocking",
+        });
       }
       return {
         properties:
-          parsed.properties && typeof parsed.properties === "object" && !Array.isArray(parsed.properties)
+          parsed.properties &&
+          typeof parsed.properties === "object" &&
+          !Array.isArray(parsed.properties)
             ? (parsed.properties as Record<string, unknown>)
             : {},
       };
     } catch {
-      issues.push({ code: "INVALID_JSON", message: `${resourceId} 不是合法 JSON`, resourceId, severity: "blocking" });
+      issues.push({
+        code: "INVALID_JSON",
+        message: `${resourceId} 不是合法 JSON`,
+        resourceId,
+        severity: "blocking",
+      });
       return null;
     }
   }
@@ -4312,21 +5979,47 @@ export class ProjectAdminService {
     const folderIds = new Set(tree.folders.map((folder) => folder.id));
     for (const folder of tree.folders) {
       if (folder.parentId && !folderIds.has(folder.parentId)) {
-        issues.push({ code: "FOLDER_NOT_FOUND", message: `父文件夹不存在: ${folder.parentId}`, resourceId: folder.id, severity: "blocking" });
+        issues.push({
+          code: "FOLDER_NOT_FOUND",
+          message: `父文件夹不存在: ${folder.parentId}`,
+          resourceId: folder.id,
+          severity: "blocking",
+        });
       }
-      if (folder.parentId && this.isFolderDescendant(tree.folders, folder.parentId, folder.id)) {
-        issues.push({ code: "CIRCULAR_REFERENCE", message: "文件夹不能移动到自身或子级", resourceId: folder.id, severity: "blocking" });
+      if (
+        folder.parentId &&
+        this.isFolderDescendant(tree.folders, folder.parentId, folder.id)
+      ) {
+        issues.push({
+          code: "CIRCULAR_REFERENCE",
+          message: "文件夹不能移动到自身或子级",
+          resourceId: folder.id,
+          severity: "blocking",
+        });
       }
       if (this.folderDepth(tree.folders, folder.id) > 3) {
-        issues.push({ code: "FOLDER_DEPTH_EXCEEDED", message: "文件夹嵌套不能超过 3 层", resourceId: folder.id, severity: "blocking" });
+        issues.push({
+          code: "FOLDER_DEPTH_EXCEEDED",
+          message: "文件夹嵌套不能超过 3 层",
+          resourceId: folder.id,
+          severity: "blocking",
+        });
       }
     }
     for (const page of tree.pages) {
       if (page.parentId && !folderIds.has(page.parentId)) {
-        issues.push({ code: "FOLDER_NOT_FOUND", message: `页面父文件夹不存在: ${page.parentId}`, resourceId: page.id, severity: "blocking" });
+        issues.push({
+          code: "FOLDER_NOT_FOUND",
+          message: `页面父文件夹不存在: ${page.parentId}`,
+          resourceId: page.id,
+          severity: "blocking",
+        });
       }
     }
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
   private folderDepth(folders: DemoFolderMeta[], folderId: string): number {
@@ -4339,7 +6032,11 @@ export class ProjectAdminService {
     return depth;
   }
 
-  private isFolderDescendant(folders: DemoFolderMeta[], candidateId: string, ancestorId: string): boolean {
+  private isFolderDescendant(
+    folders: DemoFolderMeta[],
+    candidateId: string,
+    ancestorId: string,
+  ): boolean {
     let current = folders.find((folder) => folder.id === candidateId);
     while (current) {
       if (current.parentId === ancestorId) return true;
@@ -4367,23 +6064,39 @@ export class ProjectAdminService {
     return plan;
   }
 
-  private readPlan(planId: string): (PreviewPlan & { extra?: Record<string, unknown> }) | null {
-    return readJsonFile<PreviewPlan & { extra?: Record<string, unknown> }>(path.join(this.plansDir, `${safeId(planId, "plan")}.json`));
+  private readPlan(
+    planId: string,
+  ): (PreviewPlan & { extra?: Record<string, unknown> }) | null {
+    return readJsonFile<PreviewPlan & { extra?: Record<string, unknown> }>(
+      path.join(this.plansDir, `${safeId(planId, "plan")}.json`),
+    );
   }
 
   private projectLockPath(projectId: string): string {
-    return path.join(this.internalDir, "locks", `${safeId(projectId, "project")}.json`);
+    return path.join(
+      this.internalDir,
+      "locks",
+      `${safeId(projectId, "project")}.json`,
+    );
   }
 
   private isProjectLocked(projectId: string): boolean {
     return fs.existsSync(this.projectLockPath(projectId));
   }
 
-  private canAccessProject(projectId: string, actor: ProjectAdminActor): boolean {
-    return !actor.allowedProjectIds || actor.allowedProjectIds.includes(projectId);
+  private canAccessProject(
+    projectId: string,
+    actor: ProjectAdminActor,
+  ): boolean {
+    return (
+      !actor.allowedProjectIds || actor.allowedProjectIds.includes(projectId)
+    );
   }
 
-  private requireProjectAccess(projectId: string, actor: ProjectAdminActor): ProjectAdminResult<true> {
+  private requireProjectAccess(
+    projectId: string,
+    actor: ProjectAdminActor,
+  ): ProjectAdminResult<true> {
     return this.canAccessProject(projectId, actor)
       ? ok(true)
       : fail("FORBIDDEN", "当前操作者无权访问该项目");
@@ -4413,10 +6126,15 @@ export class ProjectAdminService {
         sessionId,
         projectId: parsedProjectId,
         userId: typeof parsed.userId === "string" ? parsed.userId : undefined,
-        workspaceId: typeof parsed.workspaceId === "string" ? parsed.workspaceId : undefined,
+        workspaceId:
+          typeof parsed.workspaceId === "string"
+            ? parsed.workspaceId
+            : undefined,
         status: typeof parsed.status === "string" ? parsed.status : undefined,
-        createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : undefined,
-        expiresAt: typeof parsed.expiresAt === "number" ? parsed.expiresAt : undefined,
+        createdAt:
+          typeof parsed.createdAt === "number" ? parsed.createdAt : undefined,
+        expiresAt:
+          typeof parsed.expiresAt === "number" ? parsed.expiresAt : undefined,
         path: file,
       });
     }
@@ -4425,7 +6143,9 @@ export class ProjectAdminService {
 
   private findWorkspacePathById(workspaceId: string): string | undefined {
     if (!fs.existsSync(this.workspacesDir)) return undefined;
-    for (const entryPath of this.walkFiles(this.workspacesDir).map((file) => path.dirname(file))) {
+    for (const entryPath of this.walkFiles(this.workspacesDir).map((file) =>
+      path.dirname(file),
+    )) {
       if (path.basename(entryPath) === workspaceId) return entryPath;
     }
     for (const file of this.walkFiles(this.workspacesDir)) {
@@ -4477,12 +6197,16 @@ export class ProjectAdminService {
     return auditId;
   }
 
-  private findReferences(workspacePath: string, relativeAssetPath: string): string[] {
+  private findReferences(
+    workspacePath: string,
+    relativeAssetPath: string,
+  ): string[] {
     const refs: string[] = [];
     for (const file of this.walkFiles(workspacePath)) {
       if (/\.(tsx?|json|md|css)$/i.test(file)) {
         const content = fs.readFileSync(file, "utf-8");
-        if (content.includes(relativeAssetPath)) refs.push(path.relative(workspacePath, file));
+        if (content.includes(relativeAssetPath))
+          refs.push(path.relative(workspacePath, file));
       }
     }
     return refs;
@@ -4521,17 +6245,34 @@ export class ProjectAdminService {
         severity: "blocking",
       });
     }
-    return { ok: issues.every((issue) => issue.severity !== "blocking"), issues };
+    return {
+      ok: issues.every((issue) => issue.severity !== "blocking"),
+      issues,
+    };
   }
 
   private readProjectImageRegistry(projectId: string): ProjectImageManifest {
-    return readJsonFile<ProjectImageManifest>(
-      path.join(this.getProjectPath(projectId), PROJECT_IMAGE_MANIFEST_FILENAME),
-    ) ?? { images: [] };
+    return (
+      readJsonFile<ProjectImageManifest>(
+        path.join(
+          this.getProjectPath(projectId),
+          PROJECT_IMAGE_MANIFEST_FILENAME,
+        ),
+      ) ?? { images: [] }
+    );
   }
 
-  private writeProjectImageRegistry(projectId: string, manifest: ProjectImageManifest): void {
-    writeJsonFile(path.join(this.getProjectPath(projectId), PROJECT_IMAGE_MANIFEST_FILENAME), manifest);
+  private writeProjectImageRegistry(
+    projectId: string,
+    manifest: ProjectImageManifest,
+  ): void {
+    writeJsonFile(
+      path.join(
+        this.getProjectPath(projectId),
+        PROJECT_IMAGE_MANIFEST_FILENAME,
+      ),
+      manifest,
+    );
   }
 
   private findRegisteredAssetByHash(
@@ -4539,17 +6280,24 @@ export class ProjectAdminService {
     workspacePath: string,
     contentHash: string,
   ): ProjectImageManifestEntry | undefined {
-    return this.readProjectImageRegistry(projectId).images.find((image) =>
-      image.contentHash === contentHash &&
-      image.url.startsWith("assets/") &&
-      fs.existsSync(path.join(workspacePath, image.url))
+    return this.readProjectImageRegistry(projectId).images.find(
+      (image) =>
+        image.contentHash === contentHash &&
+        image.url.startsWith("assets/") &&
+        fs.existsSync(path.join(workspacePath, image.url)),
     );
   }
 
-  private upsertProjectImageRegistry(projectId: string, entry: ProjectImageManifestEntry): void {
+  private upsertProjectImageRegistry(
+    projectId: string,
+    entry: ProjectImageManifestEntry,
+  ): void {
     const manifest = this.readProjectImageRegistry(projectId);
-    const existingIndex = manifest.images.findIndex((image) =>
-      image.id === entry.id || image.contentHash === entry.contentHash || image.url === entry.url
+    const existingIndex = manifest.images.findIndex(
+      (image) =>
+        image.id === entry.id ||
+        image.contentHash === entry.contentHash ||
+        image.url === entry.url,
     );
     if (existingIndex >= 0) {
       const previous = manifest.images[existingIndex];
@@ -4564,29 +6312,42 @@ export class ProjectAdminService {
     this.writeProjectImageRegistry(projectId, manifest);
   }
 
-  private removeProjectImageRegistryEntry(projectId: string, assetPath: string): void {
+  private removeProjectImageRegistryEntry(
+    projectId: string,
+    assetPath: string,
+  ): void {
     const manifest = this.readProjectImageRegistry(projectId);
-    const nextImages = manifest.images.filter((image) => image.url !== assetPath);
+    const nextImages = manifest.images.filter(
+      (image) => image.url !== assetPath,
+    );
     if (nextImages.length !== manifest.images.length) {
       this.writeProjectImageRegistry(projectId, { images: nextImages });
     }
   }
 
-  private generateAssetFilename(filename: string, contentHash?: string): string {
+  private generateAssetFilename(
+    filename: string,
+    contentHash?: string,
+  ): string {
     const ext = path.extname(filename).toLowerCase() || ".bin";
-    const stem = path
-      .basename(filename, ext)
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 32) || "image";
+    const stem =
+      path
+        .basename(filename, ext)
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 32) || "image";
     if (contentHash) return `${contentHash.slice(0, 12)}-${stem}${ext}`;
     return `${stem}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
   }
 
   private safeRelativeAssetPath(assetPath: string): string {
-    const normalized = path.normalize(assetPath).replace(/^(\.\.(\/|\\|$))+/, "").split(path.sep).join("/");
+    const normalized = path
+      .normalize(assetPath)
+      .replace(/^(\.\.(\/|\\|$))+/, "")
+      .split(path.sep)
+      .join("/");
     if (path.isAbsolute(normalized) || normalized.startsWith("..")) {
       throw new Error("INVALID_ASSET_PATH");
     }
@@ -4596,25 +6357,36 @@ export class ProjectAdminService {
     return normalized;
   }
 
-  private replaceReferences(workspacePath: string, oldPath: string, newPath: string): string[] {
+  private replaceReferences(
+    workspacePath: string,
+    oldPath: string,
+    newPath: string,
+  ): string[] {
     const updated: string[] = [];
     for (const file of this.walkFiles(workspacePath)) {
       if (!/\.(tsx?|json|md|css)$/i.test(file)) continue;
       const content = fs.readFileSync(file, "utf-8");
       if (!content.includes(oldPath)) continue;
       fs.writeFileSync(file, content.split(oldPath).join(newPath), "utf-8");
-      updated.push(path.relative(workspacePath, file).split(path.sep).join("/"));
+      updated.push(
+        path.relative(workspacePath, file).split(path.sep).join("/"),
+      );
     }
     return updated;
   }
 
-  private verifyWorkspace(projectId: string, workspacePath: string, checks: string[]): VerifySummary {
+  private verifyWorkspace(
+    projectId: string,
+    workspacePath: string,
+    checks: string[],
+  ): VerifySummary {
     const tree = this.readWorkspaceTree(workspacePath);
     const runtimeTypes: Record<string, number> = {};
     const assets = this.collectAssetSummaries(workspacePath, projectId);
-    const runtimeValidation = checks.length === 0 || checks.includes("runtime")
-      ? this.validateWorkspaceRuntime(workspacePath)
-      : { ok: true, issues: [], pageIds: tree.pages.map((page) => page.id) };
+    const runtimeValidation =
+      checks.length === 0 || checks.includes("runtime")
+        ? this.validateWorkspaceRuntime(workspacePath)
+        : { ok: true, issues: [], pageIds: tree.pages.map((page) => page.id) };
     const prototypePlaceholders: VerifySummary["prototypePlaceholders"] = [];
     const missingAssetReferences: VerifySummary["missingAssetReferences"] = [];
     const metadataIssues: ValidationResult["issues"] = [];
@@ -4625,20 +6397,27 @@ export class ProjectAdminService {
       const files = this.readPageFiles(workspacePath, page.id);
       if (!files) continue;
       if (checks.length === 0 || checks.includes("assets")) {
-        missingAssetReferences.push(...this.findMissingAssetReferences(workspacePath, page.id, files));
+        missingAssetReferences.push(
+          ...this.findMissingAssetReferences(workspacePath, page.id, files),
+        );
       }
       if (runtimeType === "prototype-html-css") {
         if (checks.length === 0 || checks.includes("prototype-placeholders")) {
           const markers = this.findPrototypePlaceholderMarkers(files);
-          if (markers.length > 0) prototypePlaceholders.push({ pageId: page.id, markers });
+          if (markers.length > 0)
+            prototypePlaceholders.push({ pageId: page.id, markers });
         }
         if (checks.length === 0 || checks.includes("metadata")) {
-          metadataIssues.push(...this.validatePrototypeMetadata(page.id, files.prototypeMeta));
+          metadataIssues.push(
+            ...this.validatePrototypeMetadata(page.id, files.prototypeMeta),
+          );
         }
       }
     }
 
-    const referencedAssets = assets.filter((asset) => asset.references.length > 0).length;
+    const referencedAssets = assets.filter(
+      (asset) => asset.references.length > 0,
+    ).length;
     return {
       pages: tree.pages.length,
       runtimeTypes,
@@ -4656,13 +6435,21 @@ export class ProjectAdminService {
     };
   }
 
-  private collectAssetSummaries(workspacePath: string, projectId?: string): AssetSummary[] {
-    const registry = projectId ? this.readProjectImageRegistry(projectId).images : [];
+  private collectAssetSummaries(
+    workspacePath: string,
+    projectId?: string,
+  ): AssetSummary[] {
+    const registry = projectId
+      ? this.readProjectImageRegistry(projectId).images
+      : [];
     const registryByPath = new Map(registry.map((image) => [image.url, image]));
     const assets: AssetSummary[] = [];
     for (const file of this.walkFiles(workspacePath)) {
       if (/\.(png|jpe?g|gif|webp|svg|svga)$/i.test(file)) {
-        const relative = path.relative(workspacePath, file).split(path.sep).join("/");
+        const relative = path
+          .relative(workspacePath, file)
+          .split(path.sep)
+          .join("/");
         const entry = registryByPath.get(relative);
         assets.push({
           path: relative,
@@ -4692,29 +6479,45 @@ export class ProjectAdminService {
       files.prototypeCss,
       files.schema,
       files.sketchScene,
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     const references = new Set<string>();
-    const assetReferencePattern = /(?:["'(]|url\()\s*(assets\/[^"')\s]+\.(?:png|jpe?g|gif|webp|svg|svga))/gi;
+    const assetReferencePattern =
+      /(?:["'(]|url\()\s*(assets\/[^"')\s]+\.(?:png|jpe?g|gif|webp|svg|svga))/gi;
     for (const match of content.matchAll(assetReferencePattern)) {
       if (match[1]) references.add(match[1]);
     }
     return [...references]
-      .filter((reference) => !fs.existsSync(path.join(workspacePath, reference)))
+      .filter(
+        (reference) => !fs.existsSync(path.join(workspacePath, reference)),
+      )
       .map((reference) => ({ pageId, reference }));
   }
 
   private findPrototypePlaceholderMarkers(files: DemoFiles): string[] {
     const content = `${files.prototypeHtml ?? ""}\n${files.prototypeCss ?? ""}`;
     const markers: string[] = [];
-    if (/data:image\/gif;base64,R0lGODlhAQAB/i.test(content)) markers.push("transparent-gif");
-    if (/\b(screenshot|placeholder|mockup|wireframe|占位|截图)\b/i.test(content)) markers.push("placeholder-marker");
-    if (/<img\b[^>]*src=["']\s*["']/i.test(content)) markers.push("empty-image-src");
+    if (/data:image\/gif;base64,R0lGODlhAQAB/i.test(content))
+      markers.push("transparent-gif");
+    if (
+      /\b(screenshot|placeholder|mockup|wireframe|占位|截图)\b/i.test(content)
+    )
+      markers.push("placeholder-marker");
+    if (/<img\b[^>]*src=["']\s*["']/i.test(content))
+      markers.push("empty-image-src");
     return [...new Set(markers)];
   }
 
-  private validatePrototypeMetadata(pageId: string, metadata: DemoFiles["prototypeMeta"]): ValidationResult["issues"] {
+  private validatePrototypeMetadata(
+    pageId: string,
+    metadata: DemoFiles["prototypeMeta"],
+  ): ValidationResult["issues"] {
     const issues: ValidationResult["issues"] = [];
-    const record = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+    const record =
+      metadata && typeof metadata === "object"
+        ? (metadata as Record<string, unknown>)
+        : {};
     if (!record.previewSize || typeof record.previewSize !== "object") {
       issues.push({
         code: "PROTOTYPE_META_PREVIEW_SIZE_MISSING",
@@ -4768,11 +6571,12 @@ export class ProjectAdminService {
     const [widthText, heightText] = input.viewport.split("x");
     const width = Number(widthText) || 375;
     const height = Number(heightText) || 812;
-    const escape = (value: string) => value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
+    const escape = (value: string) =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
     const fill = input.nonblank ? "#f8fafc" : "#fff1f2";
     const status = input.nonblank ? "nonblank" : "blank-or-placeholder";
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">

@@ -14,7 +14,13 @@ import type {
   Project,
   ProjectAuthoringPreferences,
   ProjectTemplateMeta,
+  ProjectBaseVersion,
   VersionInfo,
+  WorkspaceRevision,
+  WorkspaceMutationActor,
+  WorkspaceMutationRequest,
+  WorkspaceMutationReceipt,
+  WorkspaceMutationOperation,
 } from "@workbench/shared/contracts";
 
 export type { ProjectResourceKind } from "@workbench/shared/contracts";
@@ -116,11 +122,34 @@ export interface ProjectAdminResult<T> {
   auditId?: string;
 }
 
+export interface WorkspaceMutationPort {
+  commitMutation(
+    request: WorkspaceMutationRequest,
+  ): Promise<WorkspaceMutationReceipt>;
+  getState(workspaceId: string): Promise<WorkspaceAuthorityPortState>;
+}
+
+export interface WorkspaceAuthorityPortState {
+  workspaceId: string;
+  projectId: string;
+  revision: number;
+  rootHash: string;
+  resourceHashes: Record<string, string>;
+  updatedAt: number;
+}
+
+export type {
+  WorkspaceMutationRequest,
+  WorkspaceMutationReceipt,
+  WorkspaceMutationOperation,
+};
+
 export interface ProjectAdminConfig {
   dataDir?: string;
   auditDir?: string;
   requireConfirm?: boolean;
   maxBatchSize?: number;
+  workspaceAuthorityPort?: WorkspaceMutationPort;
 }
 
 export type { ProjectAuthoringPreferences };
@@ -166,6 +195,9 @@ export interface PageVersionCreateInput {
   pageId: string;
   editId?: string;
   sourceWorkspacePath?: string;
+  workspaceId?: string;
+  workspaceRevision?: WorkspaceRevision;
+  workspaceRootHash?: string;
   note?: string;
   sketchPatchSummary?: SketchPatchVersionSummary;
 }
@@ -200,6 +232,9 @@ export interface ResourceVersionCreateInput {
   resourceId: string;
   editId?: string;
   sourceWorkspacePath?: string;
+  workspaceId?: string;
+  workspaceRevision?: WorkspaceRevision;
+  workspaceRootHash?: string;
   note?: string;
   sketchPatchSummary?: SketchPatchVersionSummary;
   visibility?: ProjectCommit["visibility"];
@@ -212,6 +247,8 @@ export interface ResourceRestoreInput {
   resourceId: string;
   versionId: string;
   workspaceId?: string;
+  workspaceRevision?: WorkspaceRevision;
+  workspaceRootHash?: string;
   sessionId?: string;
 }
 
@@ -266,7 +303,10 @@ export interface ProjectPackageExport {
   appGraph?: AppGraph;
   assets: ExportedAsset[];
   knowledgeFiles: ExportedKnowledgeFile[];
-  baseVersion: string;
+  baseVersion: ProjectBaseVersion;
+  workspaceId?: string;
+  workspaceRevision?: WorkspaceRevision;
+  workspaceRootHash?: string;
 }
 
 export interface PageRestoreResult {
@@ -291,8 +331,8 @@ export interface EditTransaction {
   projectId: string;
   workspaceId: string;
   workspacePath: string;
-  workspaceScope?: "branch";
-  baseVersion: string;
+  workspaceScope?: "live" | "branch" | "snapshot-source" | "legacy";
+  baseVersion: ProjectBaseVersion;
   actor: ProjectAdminActor;
   createdAt: number;
   expiresAt: number;

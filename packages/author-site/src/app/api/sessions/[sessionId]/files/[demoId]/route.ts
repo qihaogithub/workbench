@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import {
   getSessionMeta,
   sessionExists,
@@ -18,6 +20,11 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { appendEditorDiagnosticEvents } from "@/lib/editor-diagnostics/store";
 import type { EditorDiagnosticEvent } from "@/lib/editor-diagnostics/types";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
 import { getProjectAdminService } from "@/lib/project-admin-service";
 import {
@@ -39,11 +46,45 @@ type SketchPatchDiagnosticContext = {
   traceId?: string;
 };
 
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function createPutTextOperation(input: {
+  workspacePath: string;
+  resourcePath: string;
+  content: string;
+}): WorkspaceMutationOperation {
+  const absolutePath = path.join(input.workspacePath, input.resourcePath);
+  const previousContent = fs.existsSync(absolutePath)
+    ? fs.readFileSync(absolutePath, "utf-8")
+    : null;
+  return {
+    type: "put_text",
+    path: input.resourcePath,
+    content: input.content,
+    ...(previousContent === null
+      ? { expectedAbsent: true }
+      : { expectedHash: hashText(previousContent) }),
+  };
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseJsonSketchScene(value: string | undefined): SketchSceneDocument | null {
+function parseJsonSketchScene(
+  value: string | undefined,
+): SketchSceneDocument | null {
   if (value === undefined) return null;
   try {
     return parseSketchSceneDocument(JSON.parse(value));
@@ -67,23 +108,30 @@ function sortJsonValue(value: unknown): unknown {
     }, {});
 }
 
-function normalizeSketchSceneForPatchCompare(scene: SketchSceneDocument): SketchSceneDocument {
+function normalizeSketchSceneForPatchCompare(
+  scene: SketchSceneDocument,
+): SketchSceneDocument {
   const metadata = scene.metadata ? { ...scene.metadata } : undefined;
   if (metadata) delete metadata.updatedAt;
   return {
     ...scene,
-    metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
+    metadata:
+      metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
   };
 }
 
 function parseSketchPatchPayload(value: unknown): SketchPatchPayload | null {
   if (!isRecord(value)) return null;
   const operations = value.operations;
-  if (!Array.isArray(operations) || !operations.every(isSketchPatchOperationCandidate)) {
+  if (
+    !Array.isArray(operations) ||
+    !operations.every(isSketchPatchOperationCandidate)
+  ) {
     return null;
   }
   return {
-    baseSceneKey: typeof value.baseSceneKey === "string" ? value.baseSceneKey : undefined,
+    baseSceneKey:
+      typeof value.baseSceneKey === "string" ? value.baseSceneKey : undefined,
     operations: operations as SketchScenePatchOperation[],
   };
 }
@@ -91,7 +139,8 @@ function parseSketchPatchPayload(value: unknown): SketchPatchPayload | null {
 function parseSketchPatchDiagnosticContext(
   value: unknown,
 ): SketchPatchDiagnosticContext | null {
-  if (!isRecord(value) || typeof value.editorSessionId !== "string") return null;
+  if (!isRecord(value) || typeof value.editorSessionId !== "string")
+    return null;
   return {
     editorSessionId: value.editorSessionId,
     traceId: typeof value.traceId === "string" ? value.traceId : undefined,
@@ -145,13 +194,19 @@ async function recordSketchPatchDiagnostic(input: {
 function isSketchPatchOperationCandidate(value: unknown): boolean {
   if (!isRecord(value) || typeof value.op !== "string") return false;
   if (value.op === "add") return isRecord(value.node);
-  if (value.op === "update") return typeof value.nodeId === "string" && isRecord(value.patch);
+  if (value.op === "update")
+    return typeof value.nodeId === "string" && isRecord(value.patch);
   if (value.op === "delete") return typeof value.nodeId === "string";
   if (value.op === "duplicate") {
-    return typeof value.nodeId === "string" && typeof value.newNodeId === "string";
+    return (
+      typeof value.nodeId === "string" && typeof value.newNodeId === "string"
+    );
   }
   if (value.op === "reorder") {
-    return Array.isArray(value.nodeIds) && value.nodeIds.every((nodeId) => typeof nodeId === "string");
+    return (
+      Array.isArray(value.nodeIds) &&
+      value.nodeIds.every((nodeId) => typeof nodeId === "string")
+    );
   }
   if (value.op === "group") {
     return (
@@ -176,7 +231,9 @@ function isSketchPatchOperationCandidate(value: unknown): boolean {
     );
   }
   if (value.op === "unbind") {
-    return typeof value.nodeId === "string" && typeof value.property === "string";
+    return (
+      typeof value.nodeId === "string" && typeof value.property === "string"
+    );
   }
   return false;
 }
@@ -343,7 +400,10 @@ export async function PUT(
       sketchPatch === undefined
     ) {
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "code、schema、prototype 或 sketch 字段至少需提供一个"),
+        createApiError(
+          "INVALID_REQUEST",
+          "code、schema、prototype 或 sketch 字段至少需提供一个",
+        ),
         { status: 400 },
       );
     }
@@ -394,17 +454,23 @@ export async function PUT(
           success: false,
           operationCount: countPatchOperations(sketchPatch),
           hasBaseSceneKey: Boolean(
-            isRecord(sketchPatch) && typeof sketchPatch.baseSceneKey === "string",
+            isRecord(sketchPatch) &&
+            typeof sketchPatch.baseSceneKey === "string",
           ),
         },
       });
       return NextResponse.json(
-        createApiError("INVALID_REQUEST", "sketchPatch 必须包含合法的 operations"),
+        createApiError(
+          "INVALID_REQUEST",
+          "sketchPatch 必须包含合法的 operations",
+        ),
         { status: 400 },
       );
     }
     if (
-      (sketchScene !== undefined || sketchMeta !== undefined || sketchPatch !== undefined) &&
+      (sketchScene !== undefined ||
+        sketchMeta !== undefined ||
+        sketchPatch !== undefined) &&
       !isSketchSceneAuthoringEnabled()
     ) {
       if (sketchPatch !== undefined) {
@@ -491,7 +557,10 @@ export async function PUT(
       isPrototypePage || isSketchPage || parsedSketchPatch
         ? getWorkspaceDemoPageFiles(meta.workspaceId, demoId)
         : null;
-    if ((isPrototypePage || isSketchPage || parsedSketchPatch) && !currentFiles) {
+    if (
+      (isPrototypePage || isSketchPage || parsedSketchPatch) &&
+      !currentFiles
+    ) {
       return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
         status: 404,
       });
@@ -520,10 +589,15 @@ export async function PUT(
           { status: 400 },
         );
       }
-      const currentSketchScene = parseJsonSketchScene(currentFiles?.sketchScene);
+      const currentSketchScene = parseJsonSketchScene(
+        currentFiles?.sketchScene,
+      );
       const clientTargetSketchScene =
         sketchScene === undefined ? null : parseJsonSketchScene(sketchScene);
-      if (!currentSketchScene || (sketchScene !== undefined && !clientTargetSketchScene)) {
+      if (
+        !currentSketchScene ||
+        (sketchScene !== undefined && !clientTargetSketchScene)
+      ) {
         await recordSketchPatchDiagnostic({
           context: sketchPatchDiagnosticContext,
           projectId: meta.demoId,
@@ -540,11 +614,15 @@ export async function PUT(
             hasBaseSceneKey: Boolean(parsedSketchPatch.baseSceneKey),
             currentNodeCount: currentSketchScene?.nodes.length,
             targetNodeCount: clientTargetSketchScene?.nodes.length,
-            targetSource: sketchScene === undefined ? "server_patch" : "client_scene",
+            targetSource:
+              sketchScene === undefined ? "server_patch" : "client_scene",
           },
         });
         return NextResponse.json(
-          createApiError("INVALID_REQUEST", "草图 scene 无法解析，暂不应用 patch"),
+          createApiError(
+            "INVALID_REQUEST",
+            "草图 scene 无法解析，暂不应用 patch",
+          ),
           { status: 400 },
         );
       }
@@ -568,11 +646,15 @@ export async function PUT(
             hasBaseSceneKey: true,
             currentNodeCount: currentSketchScene.nodes.length,
             targetNodeCount: clientTargetSketchScene?.nodes.length,
-            targetSource: sketchScene === undefined ? "server_patch" : "client_scene",
+            targetSource:
+              sketchScene === undefined ? "server_patch" : "client_scene",
           },
         });
         return NextResponse.json(
-          createApiError("INVALID_REQUEST", "草图 patch 基线已过期，请重新加载后再保存"),
+          createApiError(
+            "INVALID_REQUEST",
+            "草图 patch 基线已过期，请重新加载后再保存",
+          ),
           { status: 409 },
         );
       }
@@ -581,11 +663,15 @@ export async function PUT(
         parsedSketchPatch.operations,
       );
       const targetSketchScene = clientTargetSketchScene ?? patchedScene;
-      const targetSource = clientTargetSketchScene ? "client_scene" : "server_patch";
+      const targetSource = clientTargetSketchScene
+        ? "client_scene"
+        : "server_patch";
       if (
         clientTargetSketchScene &&
         stableStringify(normalizeSketchSceneForPatchCompare(patchedScene)) !==
-        stableStringify(normalizeSketchSceneForPatchCompare(targetSketchScene))
+          stableStringify(
+            normalizeSketchSceneForPatchCompare(targetSketchScene),
+          )
       ) {
         await recordSketchPatchDiagnostic({
           context: sketchPatchDiagnosticContext,
@@ -607,7 +693,10 @@ export async function PUT(
           },
         });
         return NextResponse.json(
-          createApiError("INVALID_REQUEST", "草图 patch 回放结果与提交 scene 不一致"),
+          createApiError(
+            "INVALID_REQUEST",
+            "草图 patch 回放结果与提交 scene 不一致",
+          ),
           { status: 409 },
         );
       }
@@ -648,16 +737,22 @@ export async function PUT(
           schema: schema ?? currentFiles.schema,
           prototypeHtml: prototypeHtml ?? currentFiles.prototypeHtml,
           prototypeCss: prototypeCss ?? currentFiles.prototypeCss,
-          prototypeMeta: (prototypeMeta as PrototypePageMeta | undefined) ?? currentFiles.prototypeMeta,
+          prototypeMeta:
+            (prototypeMeta as PrototypePageMeta | undefined) ??
+            currentFiles.prototypeMeta,
           sketchScene: sketchSceneForWrite ?? currentFiles.sketchScene,
-          sketchMeta: (sketchMeta as Record<string, unknown> | undefined) ?? currentFiles.sketchMeta,
+          sketchMeta:
+            (sketchMeta as Record<string, unknown> | undefined) ??
+            currentFiles.sketchMeta,
         },
       );
       if (!runtimeValidation.ok) {
         return NextResponse.json(
           createApiError(
             "VALIDATION_ERROR",
-            isSketchPage ? "手绘页面校验未通过，暂不保存页面文件" : "原型页校验未通过，暂不保存页面文件",
+            isSketchPage
+              ? "手绘页面校验未通过，暂不保存页面文件"
+              : "原型页校验未通过，暂不保存页面文件",
             { runtimeValidation },
           ),
           { status: 422 },
@@ -665,24 +760,89 @@ export async function PUT(
       }
     }
 
-    const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
-      code,
-      schema,
-      prototypeHtml,
-      prototypeCss,
-      prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
-      sketchScene: sketchSceneForWrite,
-      sketchMeta: sketchMeta as Record<string, unknown> | undefined,
-    });
-    if (!success) {
-      return NextResponse.json(
-        createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
-        { status: 500 },
-      );
+    if (isLiveWorkspacePath(wsPath)) {
+      const operations: WorkspaceMutationOperation[] = [];
+      const addTextOperation = (resourcePath: string, content: string) => {
+        operations.push(
+          createPutTextOperation({
+            workspacePath: wsPath,
+            resourcePath,
+            content,
+          }),
+        );
+      };
+      const demoResourcePath = (fileName: string) =>
+        `demos/${demoId}/${fileName}`;
+
+      if (typeof code === "string")
+        addTextOperation(demoResourcePath("index.tsx"), code);
+      if (typeof schema === "string")
+        addTextOperation(demoResourcePath("config.schema.json"), schema);
+      if (typeof prototypeHtml === "string")
+        addTextOperation(demoResourcePath("prototype.html"), prototypeHtml);
+      if (typeof prototypeCss === "string")
+        addTextOperation(demoResourcePath("prototype.css"), prototypeCss);
+      if (prototypeMeta) {
+        addTextOperation(
+          demoResourcePath("prototype.meta.json"),
+          JSON.stringify(prototypeMeta, null, 2),
+        );
+      }
+      if (typeof sketchSceneForWrite === "string") {
+        addTextOperation(
+          demoResourcePath("sketch.scene.json"),
+          sketchSceneForWrite,
+        );
+      }
+      if (sketchMeta) {
+        addTextOperation(
+          demoResourcePath("sketch.meta.json"),
+          JSON.stringify(sketchMeta, null, 2),
+        );
+      }
+
+      if (operations.length === 0) {
+        return NextResponse.json(
+          createApiSuccess(runtimeValidation ? { runtimeValidation } : null),
+        );
+      }
+
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId: meta.demoId,
+        workspaceId: meta.workspaceId,
+        sessionId,
+        baseRevision: 0,
+        actor: "author-site",
+        reason: "update_demo_page_files",
+        operations,
+      });
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
+        code,
+        schema,
+        prototypeHtml,
+        prototypeCss,
+        prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
+        sketchScene: sketchSceneForWrite,
+        sketchMeta: sketchMeta as Record<string, unknown> | undefined,
+      });
+      if (!success) {
+        return NextResponse.json(
+          createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
+          { status: 500 },
+        );
+      }
     }
 
-    return NextResponse.json(createApiSuccess(runtimeValidation ? { runtimeValidation } : null));
+    return NextResponse.json(
+      createApiSuccess(runtimeValidation ? { runtimeValidation } : null),
+    );
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError)
+      return createMutationErrorResponse(error);
     console.error("Error updating session demo page files:", error);
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),

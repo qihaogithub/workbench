@@ -12,6 +12,47 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isFileEditable } from "@/lib/workspace-file-utils";
+import { isLiveWorkspace } from "@/lib/workspace-manager";
+import {
+  commitWorkspaceMutation,
+  createTextWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
+
+interface ResolvedWorkspaceFile {
+  relativePath: string;
+  absolutePath: string;
+}
+
+function resolveWorkspaceFilePath(
+  workspacePath: string,
+  filePathParts: string[],
+): ResolvedWorkspaceFile | null {
+  const requestedPath = filePathParts.join("/").replace(/\\/g, "/");
+  if (!requestedPath || path.isAbsolute(requestedPath)) return null;
+
+  const workspaceRoot = path.resolve(workspacePath);
+  const absolutePath = path.resolve(workspaceRoot, requestedPath);
+  const normalizedRelativePath = path
+    .relative(workspaceRoot, absolutePath)
+    .split(path.sep)
+    .join("/");
+
+  if (
+    !normalizedRelativePath ||
+    normalizedRelativePath.startsWith("../") ||
+    normalizedRelativePath === ".." ||
+    path.isAbsolute(normalizedRelativePath) ||
+    normalizedRelativePath !== requestedPath
+  ) {
+    return null;
+  }
+
+  return {
+    relativePath: normalizedRelativePath,
+    absolutePath,
+  };
+}
 
 /**
  * GET /api/sessions/{sessionId}/workspace/files/{...filePath}
@@ -79,29 +120,28 @@ export async function GET(
       );
     }
 
-    const relativePath = filePathParts.join("/");
-
-    // 安全校验：防止路径遍历
-    const resolvedPath = path.resolve(wsPath, relativePath);
-    if (!resolvedPath.startsWith(wsPath)) {
+    const resolved = resolveWorkspaceFilePath(wsPath, filePathParts);
+    if (!resolved) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "禁止访问工作空间外的文件"),
         { status: 403 },
       );
     }
 
-    if (relativePath === "memory.md") {
+    const { relativePath, absolutePath } = resolved;
+
+    if (relativePath === "memory.md" && !isLiveWorkspace(meta.workspaceId)) {
       ensureMemoryFile(wsPath);
     }
 
-    if (!fs.existsSync(resolvedPath)) {
+    if (!fs.existsSync(absolutePath)) {
       return NextResponse.json(
         createApiError("FILE_READ_ERROR", "文件不存在"),
         { status: 404 },
       );
     }
 
-    const stat = fs.statSync(resolvedPath);
+    const stat = fs.statSync(absolutePath);
     if (!stat.isFile()) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "路径不是文件"),
@@ -117,7 +157,7 @@ export async function GET(
       );
     }
 
-    const content = fs.readFileSync(resolvedPath, "utf-8");
+    const content = fs.readFileSync(absolutePath, "utf-8");
 
     return NextResponse.json(
       createApiSuccess({
@@ -202,7 +242,15 @@ export async function PUT(
       );
     }
 
-    const relativePath = filePathParts.join("/");
+    const resolved = resolveWorkspaceFilePath(wsPath, filePathParts);
+    if (!resolved) {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "禁止访问工作空间外的文件"),
+        { status: 403 },
+      );
+    }
+
+    const { relativePath, absolutePath } = resolved;
 
     // 权限校验：只允许编辑白名单内的文件
     if (!isFileEditable(relativePath)) {
@@ -211,16 +259,7 @@ export async function PUT(
       });
     }
 
-    // 安全校验：防止路径遍历
-    const resolvedPath = path.resolve(wsPath, relativePath);
-    if (!resolvedPath.startsWith(wsPath)) {
-      return NextResponse.json(
-        createApiError("FORBIDDEN", "禁止访问工作空间外的文件"),
-        { status: 403 },
-      );
-    }
-
-    if (!fs.existsSync(resolvedPath)) {
+    if (!fs.existsSync(absolutePath)) {
       return NextResponse.json(
         createApiError("FILE_READ_ERROR", "文件不存在"),
         { status: 404 },
@@ -235,16 +274,32 @@ export async function PUT(
       );
     }
 
-    fs.writeFileSync(resolvedPath, body.content, "utf-8");
+    const previousContent = fs.readFileSync(absolutePath, "utf-8");
+    const receipt = await commitWorkspaceMutation(createTextWorkspaceMutation({
+      projectId: meta.demoId,
+      workspaceId: meta.workspaceId,
+      sessionId,
+      path: relativePath,
+      content: body.content,
+      previousContent,
+      reason: "author_workspace_file_edit",
+    }));
 
     return NextResponse.json(
       createApiSuccess({
         path: relativePath,
-        message: "文件已保存",
+        message: "文件已提交",
+        receipt,
       }),
     );
   } catch (error) {
     console.error("Error updating workspace file:", error);
+    if (error instanceof WorkspaceAuthorityClientError) {
+      return NextResponse.json(
+        createApiError(error.code as never, error.message),
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "更新文件内容失败"),
       { status: 500 },

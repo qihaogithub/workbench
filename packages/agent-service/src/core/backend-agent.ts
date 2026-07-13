@@ -1,8 +1,14 @@
 import { BaseAgent } from "./agent";
-import { AgentConfig, AgentResult, SendMessageOptions, UserChoiceResponse } from "./types";
+import {
+  AgentConfig,
+  AgentResult,
+  SendMessageOptions,
+  UserChoiceResponse,
+} from "./types";
 import { IBackendAdapter } from "../backends/base";
 import { logger } from "../utils/logger";
 import { getErrorMessage } from "../utils/error-utils";
+import { INACTIVITY_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS } from "./timeouts";
 
 interface BackendWithModelSupport extends IBackendAdapter {
   setModel?: (modelId: string) => Promise<void>;
@@ -27,7 +33,11 @@ interface BackendWithModelSupport extends IBackendAdapter {
   }>;
   getLastResponseDebug?: () => unknown;
   cancelPrompt?: () => void;
-  resolvePermission?: (toolCallId: string, approved: boolean, responseContent?: string) => void;
+  resolvePermission?: (
+    toolCallId: string,
+    approved: boolean,
+    responseContent?: string,
+  ) => void;
   resolveUserChoice?: (requestId: string, choice: UserChoiceResponse) => void;
   updateConfig?: (config: Partial<AgentConfig>) => void;
 }
@@ -62,9 +72,60 @@ export class BackendAgent extends BaseAgent {
     content: string,
     options?: SendMessageOptions,
   ): Promise<AgentResult> {
+    const startTime = Date.now();
     this.busy = true;
     this.messageCount++;
     this.setStatus("processing");
+
+    logger.info(
+      {
+        sessionId: this.sessionId,
+        messageCount: this.messageCount,
+        backendStatus: this._status,
+      },
+      "sendMessage start",
+    );
+
+    let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+    let absoluteTimer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+
+    const resetInactivityTimer = () => {
+      this.lastActivityAt = new Date();
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        logger.warn(
+          { sessionId: this.sessionId, inactivityMs: INACTIVITY_TIMEOUT_MS },
+          "Inactivity timeout fired, calling cancel()",
+        );
+        timedOut = true;
+        this.cancel();
+      }, INACTIVITY_TIMEOUT_MS);
+      inactivityTimer.unref?.();
+    };
+
+    // 进度事件：只有“实质性输出”才重置无进展计时器。
+    // 注意：不包含 thought——stuck 场景下模型可能持续产出 reasoning 事件，
+    // 此时不应被视为“有活动”，否则前端 silence 提示和后端超时都无法触发。
+    // 前端 use-chat-stream.ts 的 markActivity() 调用需与此处保持一致。
+    const activityEvents = ["stream", "tool_call", "tool_call_update"] as const;
+    for (const evt of activityEvents) {
+      this.on(evt, resetInactivityTimer);
+    }
+
+    // 启动无进展定时器
+    resetInactivityTimer();
+
+    // 启动绝对超时定时器（永不重置）
+    absoluteTimer = setTimeout(() => {
+      logger.warn(
+        { sessionId: this.sessionId, absoluteMs: ABSOLUTE_TIMEOUT_MS },
+        "Absolute timeout fired, calling cancel()",
+      );
+      timedOut = true;
+      this.cancel();
+    }, ABSOLUTE_TIMEOUT_MS);
+    absoluteTimer.unref?.();
 
     try {
       if (!this.initialized) {
@@ -81,10 +142,37 @@ export class BackendAgent extends BaseAgent {
         images: options?.images,
         files: options?.files,
       });
+
+      // 竞态防护：cancel() 触发 abort 但 harness.prompt() 仍正常 resolve
+      if (timedOut) {
+        logger.warn(
+          { sessionId: this.sessionId, durationMs: Date.now() - startTime },
+          "sendMessage resolved after timeout, returning MESSAGE_TIMEOUT",
+        );
+        return {
+          success: false,
+          error: {
+            code: "MESSAGE_TIMEOUT",
+            message: "AI 处理超时，已自动取消。请重试或换用其他模型。",
+            retryable: true,
+          },
+        };
+      }
+
       this.busy = false;
       this.setStatus("ready");
 
       const files = this.backend.getFiles?.() || [];
+
+      logger.info(
+        {
+          sessionId: this.sessionId,
+          durationMs: Date.now() - startTime,
+          hasContent: !!resultContent,
+          fileCount: files.length,
+        },
+        "sendMessage end success",
+      );
 
       return {
         success: true,
@@ -95,9 +183,33 @@ export class BackendAgent extends BaseAgent {
           : { emptyResponseDebug: this.backend.getLastResponseDebug?.() },
       };
     } catch (error) {
+      if (timedOut) {
+        // cancel() 已将 busy 设为 false、status 设为 ready
+        // 不在此处调用 setStatus('error') 以免覆盖
+        logger.info(
+          { sessionId: this.sessionId, durationMs: Date.now() - startTime },
+          "sendMessage end timeout (caught error after cancel)",
+        );
+        return {
+          success: false,
+          error: {
+            code: "MESSAGE_TIMEOUT",
+            message: "AI 处理超时，已自动取消。请重试或换用其他模型。",
+            retryable: true,
+          },
+        };
+      }
       this.busy = false;
       this.setStatus("error");
       const responseDebug = this.backend.getLastResponseDebug?.();
+      logger.error(
+        {
+          sessionId: this.sessionId,
+          durationMs: Date.now() - startTime,
+          error: getErrorMessage(error),
+        },
+        "sendMessage end error",
+      );
       return {
         success: false,
         error: {
@@ -105,12 +217,26 @@ export class BackendAgent extends BaseAgent {
           message: getErrorMessage(error),
           retryable: true,
         },
-        metadata: responseDebug ? { emptyResponseDebug: responseDebug } : undefined,
+        metadata: responseDebug
+          ? { emptyResponseDebug: responseDebug }
+          : undefined,
       };
+    } finally {
+      // 清理所有定时器和事件监听器
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (absoluteTimer) clearTimeout(absoluteTimer);
+      for (const evt of activityEvents) {
+        this.off(evt, resetInactivityTimer);
+      }
     }
   }
 
   cancel(): void {
+    logger.info(
+      { sessionId: this.sessionId, busy: this.busy, status: this._status },
+      "cancel() called",
+    );
+    if (!this.busy) return; // 幂等守卫：防止多路竞态重复 cancel
     this.backend.cancelPrompt?.();
     this.busy = false;
     this.setStatus("ready");
@@ -172,10 +298,17 @@ export class BackendAgent extends BaseAgent {
   updateConfig(config: Partial<AgentConfig>): void {
     let changed = false;
 
-    if (config.workingDir !== undefined && this.config.workingDir !== config.workingDir) {
+    if (
+      config.workingDir !== undefined &&
+      this.config.workingDir !== config.workingDir
+    ) {
       logger.info(
-        { sessionId: this.sessionId, oldDir: this.config.workingDir, newDir: config.workingDir },
-        'Updating workingDir',
+        {
+          sessionId: this.sessionId,
+          oldDir: this.config.workingDir,
+          newDir: config.workingDir,
+        },
+        "Updating workingDir",
       );
       this.config.workingDir = config.workingDir;
       changed = true;
@@ -183,8 +316,12 @@ export class BackendAgent extends BaseAgent {
 
     if (config.model !== undefined && this.config.model !== config.model) {
       logger.info(
-        { sessionId: this.sessionId, oldModel: this.config.model, newModel: config.model },
-        'Updating model',
+        {
+          sessionId: this.sessionId,
+          oldModel: this.config.model,
+          newModel: config.model,
+        },
+        "Updating model",
       );
       this.config.model = config.model;
       changed = true;
@@ -219,11 +356,15 @@ export class BackendAgent extends BaseAgent {
   /**
    * 解除权限等待：前端用户确认或取消后调用
    */
-  resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
+  resolvePermission(
+    toolCallId: string,
+    approved: boolean,
+    responseContent?: string,
+  ): void {
     if (this.backend.resolvePermission) {
       this.backend.resolvePermission(toolCallId, approved, responseContent);
     } else {
-      logger.warn({ toolCallId }, 'Backend does not support resolvePermission');
+      logger.warn({ toolCallId }, "Backend does not support resolvePermission");
     }
   }
 
@@ -231,7 +372,7 @@ export class BackendAgent extends BaseAgent {
     if (this.backend.resolveUserChoice) {
       this.backend.resolveUserChoice(requestId, choice);
     } else {
-      logger.warn({ requestId }, 'Backend does not support resolveUserChoice');
+      logger.warn({ requestId }, "Backend does not support resolveUserChoice");
     }
   }
 }

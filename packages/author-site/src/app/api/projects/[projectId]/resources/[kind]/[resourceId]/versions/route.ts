@@ -15,6 +15,11 @@ import {
   isSessionExpired,
   sessionExists,
 } from "@/lib/fs-utils";
+import {
+  flushAndSyncProjectWorkspace,
+  getWorkspaceFlushErrorResponse,
+} from "@/lib/workspace-flush";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 
 async function getAuthenticatedUser() {
   const token = getAuthCookie();
@@ -130,6 +135,9 @@ export async function POST(
     );
   }
   let sourceWorkspacePath: string | undefined;
+  let workspaceProof:
+    | { workspaceId: string; workspaceRevision?: number; workspaceRootHash?: string }
+    | undefined;
   if (kind === "page" && body.sessionId) {
     if (!sessionExists(body.sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
@@ -147,6 +155,26 @@ export async function POST(
     sourceWorkspacePath = meta.workspaceId
       ? findWorkspacePath(meta.workspaceId) ?? undefined
       : undefined;
+    if (meta.workspaceId && sourceWorkspacePath && isLiveWorkspacePath(sourceWorkspacePath)) {
+      try {
+        const synced = await flushAndSyncProjectWorkspace({
+          projectId: params.projectId,
+          workspaceId: meta.workspaceId,
+          sessionId: body.sessionId,
+        });
+        workspaceProof = {
+          workspaceId: meta.workspaceId,
+          workspaceRevision: synced.canonicalRevision,
+          workspaceRootHash: synced.canonicalRootHash,
+        };
+      } catch (error) {
+        const flushError = getWorkspaceFlushErrorResponse(error);
+        return NextResponse.json(
+          createApiError(flushError.code, flushError.message),
+          { status: flushError.status },
+        );
+      }
+    }
   }
   const result = projectService().resourceVersionCreate(
     {
@@ -155,6 +183,9 @@ export async function POST(
       resourceId: params.resourceId,
       editId: body.editId,
       sourceWorkspacePath,
+      workspaceId: workspaceProof?.workspaceId,
+      workspaceRevision: workspaceProof?.workspaceRevision,
+      workspaceRootHash: workspaceProof?.workspaceRootHash,
       note: body.note,
       sketchPatchSummary,
     },

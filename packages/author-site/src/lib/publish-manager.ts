@@ -261,6 +261,9 @@ export async function publishProject(
   projectId: string,
   options?: {
     onProgress?: (percent: number, message: string) => void;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
   },
 ): Promise<PublishResult> {
   const startTime = Date.now();
@@ -567,6 +570,9 @@ export async function publishProject(
     sessionId: `publish-${Date.now()}`,
     note: "发布快照",
     sourceWorkspacePath: workspacePath,
+    workspaceId: options?.workspaceId,
+    workspaceRevision: options?.workspaceRevision,
+    workspaceRootHash: options?.workspaceRootHash,
   });
   if (!snapshotResult.success || !snapshotResult.version) {
     throw new Error("SNAPSHOT_CREATE_ERROR");

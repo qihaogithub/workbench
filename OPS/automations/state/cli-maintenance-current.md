@@ -23,13 +23,15 @@
 
 同轮还确认原型页导入上限已放宽：`packages/project-core/src/service.ts` 的 `MAX_PROTOTYPE_HTML_LENGTH` 已从旧的 120KB 提升到 2MB，当前大型 Figma HTML 原型页可以继续走 `page create`、`page update-prototype`、`page update-prototypes` 与 `project import-prototype` 的共享链路，而不需要因为旧限制误判成新的 CLI 缺口。
 
+2026-07-10 本轮还确认 active Workspace 的耐久写入契约进一步扩到了 author-site 路由层：`packages/shared/src/contracts.ts` 新增了 `WorkspaceMutationOperation` / `WorkspaceMutationReceipt` 等共享协议，`packages/project-core/src/workspace-resource-registry.ts` 与 `packages/project-core/src/index.ts` 暴露了受管资源白名单与哈希校验工具，author-site 的 `packages/author-site/src/app/api/knowledge/*` 和 `packages/author-site/src/app/api/projects/[projectId]/demos*` 在 live Workspace 路径下会改走 `commitWorkspaceMutation`。但这仍是 author-site + workspace-authority 的写入编排，不是 `project-core` 新增了可复用的 `knowledge *` / `workspace *` 领域服务，所以不会形成新的 CLI 命令闭环。
+
 当前工作树新增的 HTML/CSS 原型页能力已进入共享层：`page create` 支持 `runtimeType: "prototype-html-css"` 与 `prototypeHtml`、`prototypeCss`、`prototypeMeta`，`page update-prototype` 与 `page switch-runtime` 已注册并纳入 `cli-all-commands` 覆盖。对应的文件读写、版本快照、运行时切换、恢复与校验由 `project-core` 承载，不属于 CLI 侧复制 Web 逻辑；但这条能力当前只确认创作端编辑事务与本地测试链路，不等同于发布、viewer 或本地项目包协议已经完整支持原型页。
 
 当前工作树新增的草图页能力也已进入共享层：`page create` 支持 `runtimeType: "sketch-scene"` 与 `sketchScene`、`sketchMeta`，`page update-sketch` 通过 `switchPageRuntime` 复用 `project-core` 的草图 scene 文件读写、版本快照和 `@workbench/sketch-core` 校验；author-site 的 `/api/projects/[projectId]/demos` 与 `/runtime` 入口也已接受相同 runtimeType 和 scene 负载。本轮只确认共享层、CLI 和 author-site 本地测试链路，不等同于 viewer、publish 或 project-scaffold 已对草图页完成全链路收口。
 
 当前页面历史模型已经从旧 `page version-*` 命令切换到通用 `resource version-*` 入口。author-site 的页面版本与知识文档版本入口均已迁到 `/api/projects/[projectId]/resources/[kind]/[resourceId]/versions/*`，知识文档增删改也会通过 `ProjectAdminService.resourceVersionCreate` / `resourceDelete` 写入资源历史；CLI 与共享层对齐本身没有缺命令，缺的是长期文档还保留旧命令名称和旧路由认知。
 
-本轮复核还确认，会话管理、工作区管理、知识文档“资源历史”与“知识文档 CRUD”以及截图任务仍是多层能力：`packages/author-site/src/app/api/sessions/route.ts` 继续依赖 agent-service、模型配置和外部鉴权同步；`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 仍直接维护 `knowledge/manifest.json` 和文档文件；`packages/author-site/src/app/api/workspaces/route.ts` 仍依赖 author-site 本地 workspace manager；`packages/author-site/src/app/api/screenshots/generate-batch/route.ts` 仍只做代理到 screenshot-service。因此 GAP-002、GAP-003、GAP-004、GAP-005 继续保持 L1，只报告不补 CLI。
+本轮复核还确认，会话管理、工作区管理、知识文档“资源历史”与“知识文档 CRUD”以及截图任务仍是多层能力：`packages/author-site/src/app/api/sessions/route.ts` 继续依赖 agent-service、模型配置和外部鉴权同步；`resource version-*` 与 `resourceDelete` 已进入共享层，但 `packages/author-site/src/app/api/knowledge/*` 只是把 live Workspace 写盘改成 `commitWorkspaceMutation`，文档/manifest 语义与 session/workspace 解析仍由 author-site 路由维护；`packages/author-site/src/app/api/workspaces/route.ts` 仍依赖 author-site 本地 workspace manager；`packages/author-site/src/app/api/screenshots/generate-batch/route.ts` 仍只做代理到 screenshot-service。因此 GAP-002、GAP-003、GAP-004、GAP-005 继续保持 L1，只报告不补 CLI。
 
 本轮处理额外关闭了一个 L4 元数据对齐缺口：此前 CLI `project create` / `project update` 仅暴露名称和描述，未覆盖 Web 已有的项目分类与项目级创作偏好。当前已补齐 CLI 参数层与回归测试，但由于属于创建 / 更新类能力，自动化等级仍按 L4 记录，后续需要人工审核变更语义而非继续自动扩面。
 
@@ -49,6 +51,7 @@
 - 检查 `project-cli` 是否新增或缺失对应命令。
 - 检查现有命令的参数面是否仍与共享层和 Web 路由一致，尤其是 `project create` / `project update` 的 `category` 与 `authoringPreferences`。
 - 检查 `projectConfigValues` 是否进入 `project-core` 的共享写能力，以及 `project-scaffold` 是否把 `project.config.values.json` 纳入本地项目包协议；在这两条都明确前，不要把 `/api/projects/[projectId]/config-values` 误记成 CLI 已对齐。
+- 检查 active Workspace 的 mutation contract 是否继续只停留在 author-site / agent-service 编排层；只有当 `project-core` 真正抽出可复用的 `workspace *` / `knowledge *` 共享服务后，才重新评估 GAP-003、GAP-004。
 - 检查 viewer `/api/viewer/[projectId]/data`、viewer 页面默认值合并和 publish 路由的 canonical 回填是否继续依赖 author-site 本地逻辑；若后续改为共享层承载，再重新评估 GAP-011。
 - 检查 `page create` 默认运行时是否继续在 `project-core`、author-site 页面创建入口和 CLI 测试中保持一致；若要创建高保真 React 页，仍应显式使用 `--runtime-type high-fidelity-react` 或直接提供代码。
 - 检查 HTML/CSS 原型页和草图页能力是否继续保持 `project-core` 共享承载，并确认能力清单、运行手册与全命令测试同步；大型 Figma HTML 原型页仍应继续走共享链路，不要回退到旧 120KB 限制假设。
@@ -87,4 +90,5 @@
 - 2026-07-09：`corepack pnpm check:project-core` 通过（34 tests passed）；`corepack pnpm check:project-cli` 通过；`corepack pnpm check:project-scaffold` 通过。当前工作树里 `projectConfigValues` 扩展到 publish/viewer 链路后，CLI 与共享层相关检查未出现新增回归。
 - 2026-07-09：`corepack pnpm check:author` 通过（102 test suites / 677 tests）。正式仓库路径下当前 author-site 本地测试链路已恢复全绿，因此这轮不再把先前记录的超时 / `act(...)` 噪声视为 CLI 自动维护阻塞。
 - 2026-07-10：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出继续与当前注册命令一致。
-- 2026-07-10：`corepack pnpm check:project-core` 通过；`corepack pnpm check:project-cli` 通过。`page create` 默认原型页策略与大型原型页 HTML 上限调整在当前正式仓库路径下未引入新的 CLI / 共享层回归。
+- 2026-07-10：`corepack pnpm check:project-core` 通过（38 tests passed）；`corepack pnpm check:project-cli` 通过。`page create` 默认原型页策略、大型原型页 HTML 上限调整，以及新引入的 workspace resource registry 在当前正式仓库路径下未引入新的 CLI / 共享层回归。
+- 2026-07-10：`corepack pnpm check:author` 失败，当前失败集中在 `src/app/demo/[id]/edit/__tests__/useVisualEditState.test.tsx` 的 AI prompt 断言，以及 `src/app/api/sessions/[sessionId]/assets/localize/route.test.ts` 的 `fetch is not defined` / 500 响应。这两组失败都落在 author-site 当前脏分支里的新 workspace-authority / AI prompt 改动上，未单独证明 CLI / `project-core` 对齐回归，因此本轮继续保持 report-only。

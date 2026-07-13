@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import fs from "fs";
 import path from "path";
+import type {
+  DemoFolderMeta,
+  DemoPageMeta,
+  WorkspaceTree,
+} from "@workbench/shared";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import {
   createApiSuccess,
   createApiError,
@@ -14,6 +22,64 @@ import {
   getFolderDepth,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
+
+function hashText(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function readWorkspaceTreeSnapshot(
+  workspacePath: string,
+): { content: string; tree: WorkspaceTree } | null {
+  const treePath = path.join(workspacePath, "workspace-tree.json");
+  if (!fs.existsSync(treePath)) return null;
+  try {
+    const content = fs.readFileSync(treePath, "utf-8");
+    const parsed = JSON.parse(content) as Partial<WorkspaceTree>;
+    return {
+      content,
+      tree: {
+        folders: Array.isArray(parsed.folders)
+          ? (parsed.folders as DemoFolderMeta[])
+          : [],
+        pages: Array.isArray(parsed.pages)
+          ? (parsed.pages as DemoPageMeta[])
+          : [],
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createWorkspaceTreePutOperation(input: {
+  previousContent: string;
+  tree: WorkspaceTree;
+}): WorkspaceMutationOperation {
+  return {
+    type: "put_text",
+    path: "workspace-tree.json",
+    content: JSON.stringify(input.tree, null, 2),
+    expectedHash: hashText(input.previousContent),
+  };
+}
+
+function createFolderId(): string {
+  return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
 
 export async function GET(
   _request: NextRequest,
@@ -137,8 +203,21 @@ export async function POST(
     }
 
     if (parentId) {
-      const folders = readFoldersMeta(wsPath);
-      const parent = folders.find(f => f.id === parentId);
+      const liveWorkspace = isLiveWorkspacePath(wsPath);
+      const treeSnapshot = liveWorkspace
+        ? readWorkspaceTreeSnapshot(wsPath)
+        : null;
+      if (liveWorkspace && !treeSnapshot) {
+        return NextResponse.json(
+          createApiError(
+            "FILE_WRITE_ERROR",
+            "live Workspace 缺少有效 workspace-tree.json",
+          ),
+          { status: 409 },
+        );
+      }
+      const folders = treeSnapshot?.tree.folders ?? readFoldersMeta(wsPath);
+      const parent = folders.find((f) => f.id === parentId);
       if (!parent) {
         return NextResponse.json(createApiError("FOLDER_NOT_FOUND"), {
           status: 404,
@@ -151,6 +230,55 @@ export async function POST(
       }
     }
 
+    const liveWorkspace = isLiveWorkspacePath(wsPath);
+    const treeSnapshot = liveWorkspace
+      ? readWorkspaceTreeSnapshot(wsPath)
+      : null;
+    if (liveWorkspace && !treeSnapshot) {
+      return NextResponse.json(
+        createApiError(
+          "FILE_WRITE_ERROR",
+          "live Workspace 缺少有效 workspace-tree.json",
+        ),
+        { status: 409 },
+      );
+    }
+
+    if (liveWorkspace && treeSnapshot) {
+      const sameParent = treeSnapshot.tree.folders.filter(
+        (folder) => (folder.parentId ?? null) === (parentId ?? null),
+      );
+      const folder: DemoFolderMeta = {
+        id: createFolderId(),
+        name: name.trim() || "新建文件夹",
+        parentId: parentId ?? null,
+        order:
+          sameParent.length > 0
+            ? Math.max(...sameParent.map((item) => item.order)) + 1
+            : 0,
+      };
+      await commitWorkspaceMutation({
+        mutationId: crypto.randomUUID(),
+        projectId,
+        workspaceId: meta.workspaceId,
+        sessionId,
+        baseRevision: 0,
+        actor: "author-site",
+        reason: "create_demo_folder",
+        operations: [
+          createWorkspaceTreePutOperation({
+            previousContent: treeSnapshot.content,
+            tree: {
+              folders: [...treeSnapshot.tree.folders, folder],
+              pages: treeSnapshot.tree.pages,
+            },
+          }),
+        ],
+      });
+      return NextResponse.json(createApiSuccess(folder), { status: 201 });
+    }
+
+    // Branch/non-live workspace: direct file write is expected behavior. Live workspace writes go through Authority above.
     const folder = createDemoFolder(wsPath, name.trim(), parentId ?? undefined);
     if (!folder) {
       return NextResponse.json(
@@ -161,6 +289,8 @@ export async function POST(
 
     return NextResponse.json(createApiSuccess(folder), { status: 201 });
   } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError)
+      return createMutationErrorResponse(error);
     console.error("Error creating folder:", error);
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "创建文件夹失败"),

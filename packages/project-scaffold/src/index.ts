@@ -7,6 +7,7 @@ import type {
   ProjectAdminResult,
   TemplateMetaInput,
   ValidationIssue,
+  WorkspaceMutationPort,
 } from "../../project-core/src/types.js";
 import { ProjectAdminService } from "../../project-core/src/service.js";
 import { LOCAL_PREVIEW_DEV_SERVER_SCRIPT } from "./local-preview-dev-server.js";
@@ -18,7 +19,10 @@ const REMOTE_FILE = path.join(".workbench", "remote.json");
 const WORKSPACE_KNOWLEDGE_DIR = "knowledge";
 const DEFAULT_LOCAL_KNOWLEDGE_DIR = "src/knowledge";
 
-type LocalPageRuntimeType = "high-fidelity-react" | "prototype-html-css" | "sketch-scene";
+type LocalPageRuntimeType =
+  | "high-fidelity-react"
+  | "prototype-html-css"
+  | "sketch-scene";
 
 interface LocalProjectPage {
   id: string;
@@ -48,6 +52,9 @@ interface LocalProjectManifest {
   scaffoldVersion: string;
   projectId: string;
   baseVersion: string;
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
   name: string;
   pages: LocalProjectPage[];
   folders: LocalProjectFolder[];
@@ -67,6 +74,9 @@ interface SyncState {
   scaffoldVersion: string;
   projectId: string;
   baseVersion: string;
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
   pulledAt: string;
   files: Record<string, SyncFileState>;
 }
@@ -79,6 +89,9 @@ export interface ProjectScaffoldEntry {
 export interface ProjectScaffoldExport {
   projectId: string;
   baseVersion: string;
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
   pages: number;
   assets: number;
   knowledgeFiles: number;
@@ -95,7 +108,10 @@ export interface ProjectScaffoldUpgradeResult {
   dryRun: boolean;
 }
 
-function ok<T>(data: T, extras: Omit<ProjectAdminResult<T>, "ok" | "data"> = {}): ProjectAdminResult<T> {
+function ok<T>(
+  data: T,
+  extras: Omit<ProjectAdminResult<T>, "ok" | "data"> = {},
+): ProjectAdminResult<T> {
   return { ok: true, data, ...extras };
 }
 
@@ -133,7 +149,32 @@ function readJson<T>(filePath: string): T | null {
   }
 }
 
-function pageRuntimeType(page: Pick<LocalProjectPage, "runtimeType">): LocalPageRuntimeType {
+function readText(projectDir: string, relativePath: string): string {
+  return fs.readFileSync(path.join(projectDir, relativePath), "utf-8");
+}
+
+function readOptionalText(
+  projectDir: string,
+  relativePath: string | undefined,
+): string | undefined {
+  if (!relativePath) return undefined;
+  const filePath = path.join(projectDir, relativePath);
+  return fs.existsSync(filePath)
+    ? fs.readFileSync(filePath, "utf-8")
+    : undefined;
+}
+
+function readOptionalJson<T>(
+  projectDir: string,
+  relativePath: string | undefined,
+): T | undefined {
+  if (!relativePath) return undefined;
+  return readJson<T>(path.join(projectDir, relativePath)) ?? undefined;
+}
+
+function pageRuntimeType(
+  page: Pick<LocalProjectPage, "runtimeType">,
+): LocalPageRuntimeType {
   if (page.runtimeType === "prototype-html-css") return "prototype-html-css";
   if (page.runtimeType === "sketch-scene") return "sketch-scene";
   return "high-fidelity-react";
@@ -173,64 +214,95 @@ function relativeTo(projectDir: string, filePath: string): string {
   return path.relative(projectDir, filePath).split(path.sep).join("/");
 }
 
-function managedFiles(projectDir: string, manifest: LocalProjectManifest): string[] {
+function managedFiles(
+  projectDir: string,
+  manifest: LocalProjectManifest,
+): string[] {
   const files = [
     PROJECT_FILE,
-    ...manifest.pages.flatMap((page) => [
-      page.entry,
-      page.schema,
-      page.prototypeHtml,
-      page.prototypeCss,
-      page.prototypeMeta,
-      page.sketchScene,
-      page.sketchMeta,
-    ].filter((file): file is string => Boolean(file))),
+    ...manifest.pages.flatMap((page) =>
+      [
+        page.entry,
+        page.schema,
+        page.prototypeHtml,
+        page.prototypeCss,
+        page.prototypeMeta,
+        page.sketchScene,
+        page.sketchMeta,
+      ].filter((file): file is string => Boolean(file)),
+    ),
     ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
-    ...walkFiles(path.join(projectDir, manifest.assetsDir)).map((file) => relativeTo(projectDir, file)),
+    ...walkFiles(path.join(projectDir, manifest.assetsDir)).map((file) =>
+      relativeTo(projectDir, file),
+    ),
     ...(manifest.knowledgeDir
-      ? walkFiles(path.join(projectDir, manifest.knowledgeDir)).map((file) => relativeTo(projectDir, file))
+      ? walkFiles(path.join(projectDir, manifest.knowledgeDir)).map((file) =>
+          relativeTo(projectDir, file),
+        )
       : []),
   ];
-  return [...new Set(files)].filter((file) => fs.existsSync(path.join(projectDir, file)));
+  return [...new Set(files)].filter((file) =>
+    fs.existsSync(path.join(projectDir, file)),
+  );
 }
 
-function computeSyncState(projectDir: string, manifest: LocalProjectManifest): SyncState {
+function computeSyncState(
+  projectDir: string,
+  manifest: LocalProjectManifest,
+): SyncState {
   const files = Object.fromEntries(
-    managedFiles(projectDir, manifest).map((file) => [file, hashFile(path.join(projectDir, file))]),
+    managedFiles(projectDir, manifest).map((file) => [
+      file,
+      hashFile(path.join(projectDir, file)),
+    ]),
   );
   return {
     schemaVersion: 1,
     scaffoldVersion: SCAFFOLD_VERSION,
     projectId: manifest.projectId,
     baseVersion: manifest.baseVersion,
+    workspaceId: manifest.workspaceId,
+    workspaceRevision: manifest.workspaceRevision,
+    workspaceRootHash: manifest.workspaceRootHash,
     pulledAt: new Date().toISOString(),
     files,
   };
 }
 
-function computeSyncStateFromEntries(entries: ProjectScaffoldEntry[], manifest: LocalProjectManifest): SyncState {
+function computeSyncStateFromEntries(
+  entries: ProjectScaffoldEntry[],
+  manifest: LocalProjectManifest,
+): SyncState {
   const entryMap = new Map(entries.map((entry) => [entry.path, entry.data]));
   const managedPaths = [
     PROJECT_FILE,
-    ...manifest.pages.flatMap((page) => [
-      page.entry,
-      page.schema,
-      page.prototypeHtml,
-      page.prototypeCss,
-      page.prototypeMeta,
-      page.sketchScene,
-      page.sketchMeta,
-    ].filter((entryPath): entryPath is string => Boolean(entryPath))),
+    ...manifest.pages.flatMap((page) =>
+      [
+        page.entry,
+        page.schema,
+        page.prototypeHtml,
+        page.prototypeCss,
+        page.prototypeMeta,
+        page.sketchScene,
+        page.sketchMeta,
+      ].filter((entryPath): entryPath is string => Boolean(entryPath)),
+    ),
     ...(manifest.appGraph ? [manifest.appGraph] : []),
     ...(manifest.projectConfig ? [manifest.projectConfig] : []),
     ...entries
       .map((entry) => entry.path)
-      .filter((entryPath) => entryPath.startsWith(`${manifest.assetsDir.replace(/\/$/, "")}/`)),
+      .filter((entryPath) =>
+        entryPath.startsWith(`${manifest.assetsDir.replace(/\/$/, "")}/`),
+      ),
     ...(manifest.knowledgeDir
       ? entries
           .map((entry) => entry.path)
-          .filter((entryPath) => entryPath.startsWith(`${manifest.knowledgeDir?.replace(/\/$/, "")}/`))
+          .filter((entryPath) =>
+            entryPath.startsWith(
+              `${manifest.knowledgeDir?.replace(/\/$/, "")}/`,
+            ),
+          )
       : []),
   ];
   const files = Object.fromEntries(
@@ -246,6 +318,9 @@ function computeSyncStateFromEntries(entries: ProjectScaffoldEntry[], manifest: 
     scaffoldVersion: SCAFFOLD_VERSION,
     projectId: manifest.projectId,
     baseVersion: manifest.baseVersion,
+    workspaceId: manifest.workspaceId,
+    workspaceRevision: manifest.workspaceRevision,
+    workspaceRootHash: manifest.workspaceRootHash,
     pulledAt: new Date().toISOString(),
     files,
   };
@@ -259,7 +334,9 @@ function readSyncState(projectDir: string): SyncState | null {
   return readJson<SyncState>(path.join(projectDir, SYNC_STATE_FILE));
 }
 
-function validateManifestShape(manifest: LocalProjectManifest | null): ValidationIssue[] {
+function validateManifestShape(
+  manifest: LocalProjectManifest | null,
+): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!manifest) {
     issues.push({
@@ -277,44 +354,111 @@ function validateManifestShape(manifest: LocalProjectManifest | null): Validatio
     });
   }
   if (!manifest.projectId) {
-    issues.push({ code: "PROJECT_ID_MISSING", message: "projectId 不能为空", severity: "blocking" });
+    issues.push({
+      code: "PROJECT_ID_MISSING",
+      message: "projectId 不能为空",
+      severity: "blocking",
+    });
+  }
+  if (
+    manifest.workspaceId !== undefined &&
+    typeof manifest.workspaceId !== "string"
+  ) {
+    issues.push({
+      code: "WORKSPACE_ID_INVALID",
+      message: "workspaceId 必须是字符串",
+      severity: "blocking",
+    });
+  }
+  if (
+    manifest.workspaceRevision !== undefined &&
+    typeof manifest.workspaceRevision !== "number"
+  ) {
+    issues.push({
+      code: "WORKSPACE_REVISION_INVALID",
+      message: "workspaceRevision 必须是数字",
+      severity: "blocking",
+    });
+  }
+  if (
+    manifest.workspaceRootHash !== undefined &&
+    typeof manifest.workspaceRootHash !== "string"
+  ) {
+    issues.push({
+      code: "WORKSPACE_ROOT_HASH_INVALID",
+      message: "workspaceRootHash 必须是字符串",
+      severity: "blocking",
+    });
   }
   if (!Array.isArray(manifest.pages)) {
-    issues.push({ code: "PAGES_INVALID", message: "pages 必须是数组", severity: "blocking" });
+    issues.push({
+      code: "PAGES_INVALID",
+      message: "pages 必须是数组",
+      severity: "blocking",
+    });
   }
   if (!Array.isArray(manifest.folders)) {
-    issues.push({ code: "FOLDERS_INVALID", message: "folders 必须是数组", severity: "blocking" });
+    issues.push({
+      code: "FOLDERS_INVALID",
+      message: "folders 必须是数组",
+      severity: "blocking",
+    });
   }
   if (manifest.appGraph !== null && typeof manifest.appGraph !== "string") {
-    issues.push({ code: "APP_GRAPH_INVALID", message: "appGraph 必须是字符串或 null", severity: "blocking" });
+    issues.push({
+      code: "APP_GRAPH_INVALID",
+      message: "appGraph 必须是字符串或 null",
+      severity: "blocking",
+    });
   }
   if (!manifest.assetsDir || typeof manifest.assetsDir !== "string") {
-    issues.push({ code: "ASSETS_DIR_INVALID", message: "assetsDir 必须是字符串", severity: "blocking" });
+    issues.push({
+      code: "ASSETS_DIR_INVALID",
+      message: "assetsDir 必须是字符串",
+      severity: "blocking",
+    });
   }
   if (
     manifest.knowledgeDir !== undefined &&
     manifest.knowledgeDir !== null &&
     (!manifest.knowledgeDir || typeof manifest.knowledgeDir !== "string")
   ) {
-    issues.push({ code: "KNOWLEDGE_DIR_INVALID", message: "knowledgeDir 必须是字符串或 null", severity: "blocking" });
+    issues.push({
+      code: "KNOWLEDGE_DIR_INVALID",
+      message: "knowledgeDir 必须是字符串或 null",
+      severity: "blocking",
+    });
   }
   return issues;
 }
 
-function localAssetFileToWorkspacePath(manifest: LocalProjectManifest, file: string): string {
+function localAssetFileToWorkspacePath(
+  manifest: LocalProjectManifest,
+  file: string,
+): string {
   const prefix = `${manifest.assetsDir.replace(/\/$/, "")}/`;
   return `assets/${file.slice(prefix.length)}`;
 }
 
-function localKnowledgeFileToWorkspacePath(manifest: LocalProjectManifest, file: string): string {
+function localKnowledgeFileToWorkspacePath(
+  manifest: LocalProjectManifest,
+  file: string,
+): string {
   const knowledgeDir = manifest.knowledgeDir ?? DEFAULT_LOCAL_KNOWLEDGE_DIR;
   const prefix = `${knowledgeDir.replace(/\/$/, "")}/`;
   return `${WORKSPACE_KNOWLEDGE_DIR}/${file.slice(prefix.length)}`;
 }
 
-function writeWorkspaceKnowledgeFile(workspacePath: string, relativePath: string, data: Buffer): void {
+function writeWorkspaceKnowledgeFile(
+  workspacePath: string,
+  relativePath: string,
+  data: Buffer,
+): void {
   const normalized = relativePath.split(/[\\/]+/).filter(Boolean);
-  if (normalized[0] !== WORKSPACE_KNOWLEDGE_DIR || normalized.some((segment) => segment === "..")) {
+  if (
+    normalized[0] !== WORKSPACE_KNOWLEDGE_DIR ||
+    normalized.some((segment) => segment === "..")
+  ) {
     throw new Error(`Invalid knowledge path: ${relativePath}`);
   }
   const targetPath = path.join(workspacePath, ...normalized);
@@ -322,9 +466,15 @@ function writeWorkspaceKnowledgeFile(workspacePath: string, relativePath: string
   fs.writeFileSync(targetPath, data);
 }
 
-function deleteWorkspaceKnowledgeFile(workspacePath: string, relativePath: string): void {
+function deleteWorkspaceKnowledgeFile(
+  workspacePath: string,
+  relativePath: string,
+): void {
   const normalized = relativePath.split(/[\\/]+/).filter(Boolean);
-  if (normalized[0] !== WORKSPACE_KNOWLEDGE_DIR || normalized.some((segment) => segment === "..")) {
+  if (
+    normalized[0] !== WORKSPACE_KNOWLEDGE_DIR ||
+    normalized.some((segment) => segment === "..")
+  ) {
     throw new Error(`Invalid knowledge path: ${relativePath}`);
   }
   fs.rmSync(path.join(workspacePath, ...normalized), { force: true });
@@ -351,54 +501,75 @@ function discardAndFail<T>(
   return fail(code, message, extras);
 }
 
-function validateSchemaFile(projectDir: string, relativePath: string, resourceId: string): ValidationIssue[] {
+function validateSchemaFile(
+  projectDir: string,
+  relativePath: string,
+  resourceId: string,
+): ValidationIssue[] {
   const filePath = path.join(projectDir, relativePath);
   if (!fs.existsSync(filePath)) {
-    return [{
-      code: "SCHEMA_FILE_MISSING",
-      message: `Schema 文件不存在: ${relativePath}`,
-      resourceId,
-      severity: "blocking",
-    }];
+    return [
+      {
+        code: "SCHEMA_FILE_MISSING",
+        message: `Schema 文件不存在: ${relativePath}`,
+        resourceId,
+        severity: "blocking",
+      },
+    ];
   }
   try {
     JSON.parse(fs.readFileSync(filePath, "utf-8"));
     return [];
   } catch {
-    return [{
-      code: "SCHEMA_JSON_INVALID",
-      message: `Schema 不是合法 JSON: ${relativePath}`,
-      resourceId,
-      severity: "blocking",
-    }];
+    return [
+      {
+        code: "SCHEMA_JSON_INVALID",
+        message: `Schema 不是合法 JSON: ${relativePath}`,
+        resourceId,
+        severity: "blocking",
+      },
+    ];
   }
 }
 
-function validateRequiredFile(projectDir: string, relativePath: string | undefined, resourceId: string, code: string, label: string): ValidationIssue[] {
+function validateRequiredFile(
+  projectDir: string,
+  relativePath: string | undefined,
+  resourceId: string,
+  code: string,
+  label: string,
+): ValidationIssue[] {
   if (!relativePath || !fs.existsSync(path.join(projectDir, relativePath))) {
-    return [{
-      code,
-      message: `${label} 文件不存在: ${relativePath ?? "(未配置)"}`,
-      resourceId,
-      severity: "blocking",
-    }];
+    return [
+      {
+        code,
+        message: `${label} 文件不存在: ${relativePath ?? "(未配置)"}`,
+        resourceId,
+        severity: "blocking",
+      },
+    ];
   }
   return [];
 }
 
-function validateKnowledgeManifest(projectDir: string, knowledgeDir: string): ValidationIssue[] {
+function validateKnowledgeManifest(
+  projectDir: string,
+  knowledgeDir: string,
+): ValidationIssue[] {
   const manifestPath = path.join(projectDir, knowledgeDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) return [];
   try {
     JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     return [];
   } catch {
-    return [{
-      code: "KNOWLEDGE_MANIFEST_INVALID",
-      message: `${knowledgeDir}/manifest.json 不是合法 JSON`,
-      resourceId: "knowledge/manifest.json",
-      severity: "blocking",
-    }];
+    return [
+      {
+        code: "KNOWLEDGE_MANIFEST_INVALID",
+        message: `${knowledgeDir}/manifest.json 不是合法 JSON`,
+        resourceId: "knowledge/manifest.json",
+        severity: "blocking",
+      },
+    ];
   }
 }
 
@@ -406,7 +577,9 @@ function normalizeEntryPath(entryPath: string): string {
   return entryPath.split(path.sep).join("/").replace(/^\/+/, "");
 }
 
-function buildProjectScaffoldPackageJson(manifest: LocalProjectManifest): Record<string, unknown> {
+function buildProjectScaffoldPackageJson(
+  manifest: LocalProjectManifest,
+): Record<string, unknown> {
   return {
     private: true,
     name: manifest.projectId,
@@ -426,10 +599,18 @@ function buildProjectScaffoldPackageJson(manifest: LocalProjectManifest): Record
   };
 }
 
-function buildScaffoldManagedEntries(manifest: LocalProjectManifest): ProjectScaffoldEntry[] {
+function buildScaffoldManagedEntries(
+  manifest: LocalProjectManifest,
+): ProjectScaffoldEntry[] {
   return [
-    { path: "package.json", data: jsonBuffer(buildProjectScaffoldPackageJson(manifest)) },
-    { path: "scripts/dev-server.mjs", data: Buffer.from(buildDevServerScript(), "utf-8") },
+    {
+      path: "package.json",
+      data: jsonBuffer(buildProjectScaffoldPackageJson(manifest)),
+    },
+    {
+      path: "scripts/dev-server.mjs",
+      data: Buffer.from(buildDevServerScript(), "utf-8"),
+    },
   ];
 }
 
@@ -669,7 +850,9 @@ function crc32(buffer: Buffer): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export function buildProjectScaffoldZip(entries: ProjectScaffoldEntry[]): Buffer {
+export function buildProjectScaffoldZip(
+  entries: ProjectScaffoldEntry[],
+): Buffer {
   const localParts: Buffer[] = [];
   const centralParts: Buffer[] = [];
   let offset = 0;
@@ -737,7 +920,10 @@ export function exportProjectScaffoldEntries(
 ): ProjectAdminResult<ProjectScaffoldExport> {
   const projectPackage = service.exportProjectPackage(input.projectId, actor);
   if (!projectPackage.ok || !projectPackage.data) {
-    return fail(projectPackage.error?.code ?? "PROJECT_EXPORT_FAILED", projectPackage.error?.message ?? "项目导出失败");
+    return fail(
+      projectPackage.error?.code ?? "PROJECT_EXPORT_FAILED",
+      projectPackage.error?.message ?? "项目导出失败",
+    );
   }
 
   const manifest: LocalProjectManifest = {
@@ -745,6 +931,9 @@ export function exportProjectScaffoldEntries(
     scaffoldVersion: SCAFFOLD_VERSION,
     projectId: projectPackage.data.project.id,
     baseVersion: projectPackage.data.baseVersion,
+    workspaceId: projectPackage.data.workspaceId,
+    workspaceRevision: projectPackage.data.workspaceRevision,
+    workspaceRootHash: projectPackage.data.workspaceRootHash,
     name: projectPackage.data.project.name,
     pages: projectPackage.data.pages.map((page) => {
       const runtimeType = page.meta.runtimeType ?? "high-fidelity-react";
@@ -779,7 +968,9 @@ export function exportProjectScaffoldEntries(
       order: folder.order,
     })),
     appGraph: projectPackage.data.appGraph ? "src/app.graph.json" : null,
-    projectConfig: projectPackage.data.projectConfigSchema ? "src/project.config.schema.json" : null,
+    projectConfig: projectPackage.data.projectConfigSchema
+      ? "src/project.config.schema.json"
+      : null,
     assetsDir: "src/assets",
     knowledgeDir: DEFAULT_LOCAL_KNOWLEDGE_DIR,
   };
@@ -790,12 +981,21 @@ export function exportProjectScaffoldEntries(
       path: REMOTE_FILE,
       data: jsonBuffer({
         projectId: manifest.projectId,
+        workspaceId: manifest.workspaceId,
+        workspaceRevision: manifest.workspaceRevision,
+        workspaceRootHash: manifest.workspaceRootHash,
         ...(input.includeDataDir ? { dataDir: service.dataDir } : {}),
         pulledAt: new Date().toISOString(),
       }),
     },
-    { path: "package.json", data: jsonBuffer(buildProjectScaffoldPackageJson(manifest)) },
-    { path: "scripts/dev-server.mjs", data: Buffer.from(buildDevServerScript(), "utf-8") },
+    {
+      path: "package.json",
+      data: jsonBuffer(buildProjectScaffoldPackageJson(manifest)),
+    },
+    {
+      path: "scripts/dev-server.mjs",
+      data: Buffer.from(buildDevServerScript(), "utf-8"),
+    },
   ];
 
   for (const page of projectPackage.data.pages) {
@@ -807,21 +1007,36 @@ export function exportProjectScaffoldEntries(
     );
     if (localPage.runtimeType === "prototype-html-css") {
       if (localPage.prototypeHtml) {
-        entries.push({ path: localPage.prototypeHtml, data: Buffer.from(page.files.prototypeHtml ?? "", "utf-8") });
+        entries.push({
+          path: localPage.prototypeHtml,
+          data: Buffer.from(page.files.prototypeHtml ?? "", "utf-8"),
+        });
       }
       if (localPage.prototypeCss) {
-        entries.push({ path: localPage.prototypeCss, data: Buffer.from(page.files.prototypeCss ?? "", "utf-8") });
+        entries.push({
+          path: localPage.prototypeCss,
+          data: Buffer.from(page.files.prototypeCss ?? "", "utf-8"),
+        });
       }
       if (localPage.prototypeMeta) {
-        entries.push({ path: localPage.prototypeMeta, data: jsonBuffer(page.files.prototypeMeta ?? {}) });
+        entries.push({
+          path: localPage.prototypeMeta,
+          data: jsonBuffer(page.files.prototypeMeta ?? {}),
+        });
       }
     }
     if (localPage.runtimeType === "sketch-scene") {
       if (localPage.sketchScene) {
-        entries.push({ path: localPage.sketchScene, data: Buffer.from(page.files.sketchScene ?? "", "utf-8") });
+        entries.push({
+          path: localPage.sketchScene,
+          data: Buffer.from(page.files.sketchScene ?? "", "utf-8"),
+        });
       }
       if (localPage.sketchMeta) {
-        entries.push({ path: localPage.sketchMeta, data: jsonBuffer(page.files.sketchMeta ?? {}) });
+        entries.push({
+          path: localPage.sketchMeta,
+          data: jsonBuffer(page.files.sketchMeta ?? {}),
+        });
       }
     }
   }
@@ -844,7 +1059,10 @@ export function exportProjectScaffoldEntries(
     });
   }
   for (const knowledgeFile of projectPackage.data.knowledgeFiles) {
-    const relativeKnowledgePath = knowledgeFile.path.replace(/^knowledge\//, "");
+    const relativeKnowledgePath = knowledgeFile.path.replace(
+      /^knowledge\//,
+      "",
+    );
     entries.push({
       path: `${DEFAULT_LOCAL_KNOWLEDGE_DIR}/${relativeKnowledgePath}`,
       data: Buffer.from(knowledgeFile.dataBase64, "base64"),
@@ -858,6 +1076,9 @@ export function exportProjectScaffoldEntries(
   return ok({
     projectId: manifest.projectId,
     baseVersion: manifest.baseVersion,
+    workspaceId: manifest.workspaceId,
+    workspaceRevision: manifest.workspaceRevision,
+    workspaceRootHash: manifest.workspaceRootHash,
     pages: manifest.pages.length,
     assets: projectPackage.data.assets.length,
     knowledgeFiles: projectPackage.data.knowledgeFiles.length,
@@ -869,20 +1090,37 @@ export function pullProjectScaffold(
   service: ProjectAdminService,
   actor: ProjectAdminActor,
   input: { projectId: string; targetDir: string; force?: boolean },
-): ProjectAdminResult<{ projectDir: string; projectId: string; baseVersion: string; pages: number; assets: number }> {
+): ProjectAdminResult<{
+  projectDir: string;
+  projectId: string;
+  baseVersion: string;
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
+  pages: number;
+  assets: number;
+}> {
   const exported = exportProjectScaffoldEntries(service, actor, {
     projectId: input.projectId,
     includeDataDir: true,
   });
   if (!exported.ok || !exported.data) {
-    return fail(exported.error?.code ?? "PROJECT_EXPORT_FAILED", exported.error?.message ?? "项目导出失败", {
-      validation: exported.validation,
-      nextActions: exported.nextActions,
-    });
+    return fail(
+      exported.error?.code ?? "PROJECT_EXPORT_FAILED",
+      exported.error?.message ?? "项目导出失败",
+      {
+        validation: exported.validation,
+        nextActions: exported.nextActions,
+      },
+    );
   }
 
   const projectDir = path.resolve(input.targetDir);
-  if (fs.existsSync(projectDir) && fs.readdirSync(projectDir).length > 0 && !input.force) {
+  if (
+    fs.existsSync(projectDir) &&
+    fs.readdirSync(projectDir).length > 0 &&
+    !input.force
+  ) {
     return fail("TARGET_DIR_NOT_EMPTY", `目标目录非空: ${projectDir}`, {
       nextActions: ["选择空目录", "追加 --force 覆盖本地项目包文件"],
     });
@@ -900,6 +1138,9 @@ export function pullProjectScaffold(
       projectDir,
       projectId: exported.data.projectId,
       baseVersion: exported.data.baseVersion,
+      workspaceId: exported.data.workspaceId,
+      workspaceRevision: exported.data.workspaceRevision,
+      workspaceRootHash: exported.data.workspaceRootHash,
       pages: exported.data.pages,
       assets: exported.data.assets,
     },
@@ -919,7 +1160,9 @@ export function pullProjectScaffold(
   );
 }
 
-export function validateProjectScaffold(projectDir: string): ProjectAdminResult<{ projectDir: string }> {
+export function validateProjectScaffold(
+  projectDir: string,
+): ProjectAdminResult<{ projectDir: string }> {
   const resolvedDir = path.resolve(projectDir);
   const manifest = readManifest(resolvedDir);
   const issues = validateManifestShape(manifest);
@@ -927,36 +1170,88 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
     const seenPageIds = new Set<string>();
     const folderIds = new Set(manifest.folders.map((folder) => folder.id));
     for (const page of manifest.pages) {
-      if (!page.id) issues.push({ code: "PAGE_ID_MISSING", message: "页面 id 不能为空", severity: "blocking" });
+      if (!page.id)
+        issues.push({
+          code: "PAGE_ID_MISSING",
+          message: "页面 id 不能为空",
+          severity: "blocking",
+        });
       if (seenPageIds.has(page.id)) {
-        issues.push({ code: "PAGE_ID_DUPLICATED", message: `页面 id 重复: ${page.id}`, resourceId: page.id, severity: "blocking" });
+        issues.push({
+          code: "PAGE_ID_DUPLICATED",
+          message: `页面 id 重复: ${page.id}`,
+          resourceId: page.id,
+          severity: "blocking",
+        });
       }
       seenPageIds.add(page.id);
       if (page.parentId && !folderIds.has(page.parentId)) {
-        issues.push({ code: "PARENT_FOLDER_MISSING", message: `父文件夹不存在: ${page.parentId}`, resourceId: page.id, severity: "blocking" });
+        issues.push({
+          code: "PARENT_FOLDER_MISSING",
+          message: `父文件夹不存在: ${page.parentId}`,
+          resourceId: page.id,
+          severity: "blocking",
+        });
       }
       if (!fs.existsSync(path.join(resolvedDir, page.entry))) {
-        issues.push({ code: "PAGE_ENTRY_MISSING", message: `页面入口不存在: ${page.entry}`, resourceId: page.id, severity: "blocking" });
+        issues.push({
+          code: "PAGE_ENTRY_MISSING",
+          message: `页面入口不存在: ${page.entry}`,
+          resourceId: page.id,
+          severity: "blocking",
+        });
       }
       issues.push(...validateSchemaFile(resolvedDir, page.schema, page.id));
       if (pageRuntimeType(page) === "prototype-html-css") {
-        issues.push(...validateRequiredFile(resolvedDir, page.prototypeHtml, page.id, "PROTOTYPE_HTML_FILE_MISSING", "原型 HTML"));
+        issues.push(
+          ...validateRequiredFile(
+            resolvedDir,
+            page.prototypeHtml,
+            page.id,
+            "PROTOTYPE_HTML_FILE_MISSING",
+            "原型 HTML",
+          ),
+        );
         if (page.prototypeCss) {
-          issues.push(...validateRequiredFile(resolvedDir, page.prototypeCss, page.id, "PROTOTYPE_CSS_FILE_MISSING", "原型 CSS"));
+          issues.push(
+            ...validateRequiredFile(
+              resolvedDir,
+              page.prototypeCss,
+              page.id,
+              "PROTOTYPE_CSS_FILE_MISSING",
+              "原型 CSS",
+            ),
+          );
         }
       }
       if (pageRuntimeType(page) === "sketch-scene") {
-        issues.push(...validateRequiredFile(resolvedDir, page.sketchScene, page.id, "SKETCH_SCENE_FILE_MISSING", "草图 Scene"));
+        issues.push(
+          ...validateRequiredFile(
+            resolvedDir,
+            page.sketchScene,
+            page.id,
+            "SKETCH_SCENE_FILE_MISSING",
+            "草图 Scene",
+          ),
+        );
       }
     }
     if (manifest.projectConfig) {
-      issues.push(...validateSchemaFile(resolvedDir, manifest.projectConfig, "project"));
+      issues.push(
+        ...validateSchemaFile(resolvedDir, manifest.projectConfig, "project"),
+      );
     }
     if (manifest.knowledgeDir) {
-      issues.push(...validateKnowledgeManifest(resolvedDir, manifest.knowledgeDir));
+      issues.push(
+        ...validateKnowledgeManifest(resolvedDir, manifest.knowledgeDir),
+      );
     }
     if (!readSyncState(resolvedDir)) {
-      issues.push({ code: "SYNC_STATE_MISSING", message: ".workbench/sync-state.json 不存在或不是合法 JSON", severity: "warning" });
+      issues.push({
+        code: "SYNC_STATE_MISSING",
+        message: ".workbench/sync-state.json 不存在或不是合法 JSON",
+        severity: "warning",
+      });
     }
   }
 
@@ -964,12 +1259,19 @@ export function validateProjectScaffold(projectDir: string): ProjectAdminResult<
     ok: issues.every((issue) => issue.severity !== "blocking"),
     issues,
   };
-  return ok({ projectDir: resolvedDir }, {
-    validation,
-    nextActions: validation.ok
-      ? ["pnpm preview:check", "ow diff --summary --json", "提交前运行服务侧 edit validate/project verify"]
-      : ["修复 validation.issues 后重试"],
-  });
+  return ok(
+    { projectDir: resolvedDir },
+    {
+      validation,
+      nextActions: validation.ok
+        ? [
+            "pnpm preview:check",
+            "ow diff --summary --json",
+            "提交前运行服务侧 edit validate/project verify",
+          ]
+        : ["修复 validation.issues 后重试"],
+    },
+  );
 }
 
 export function upgradeProjectScaffold(
@@ -979,7 +1281,10 @@ export function upgradeProjectScaffold(
   const resolvedDir = path.resolve(projectDir);
   const manifest = readManifest(resolvedDir);
   const manifestIssues = validateManifestShape(manifest);
-  if (!manifest || manifestIssues.some((issue) => issue.severity === "blocking")) {
+  if (
+    !manifest ||
+    manifestIssues.some((issue) => issue.severity === "blocking")
+  ) {
     return fail("PROJECT_PACKAGE_INVALID", "本地项目包无效，不能升级脚手架", {
       validation: { ok: false, issues: manifestIssues },
       nextActions: ["ow validate --json"],
@@ -996,18 +1301,31 @@ export function upgradeProjectScaffold(
     ...buildScaffoldManagedEntries(nextManifest),
   ];
   const fileExistsBefore = new Map(
-    desiredEntries.map((entry) => [entry.path, fs.existsSync(path.join(resolvedDir, entry.path))]),
+    desiredEntries.map((entry) => [
+      entry.path,
+      fs.existsSync(path.join(resolvedDir, entry.path)),
+    ]),
   );
-  fileExistsBefore.set(SYNC_STATE_FILE, fs.existsSync(path.join(resolvedDir, SYNC_STATE_FILE)));
+  fileExistsBefore.set(
+    SYNC_STATE_FILE,
+    fs.existsSync(path.join(resolvedDir, SYNC_STATE_FILE)),
+  );
   const changedFiles = desiredEntries
     .filter((entry) => {
       const targetPath = path.join(resolvedDir, entry.path);
-      return !fs.existsSync(targetPath) || !fs.readFileSync(targetPath).equals(entry.data);
+      return (
+        !fs.existsSync(targetPath) ||
+        !fs.readFileSync(targetPath).equals(entry.data)
+      );
     })
     .map((entry) => entry.path);
 
   const syncState = readSyncState(resolvedDir);
-  if (syncState && syncState.scaffoldVersion !== SCAFFOLD_VERSION && !changedFiles.includes(SYNC_STATE_FILE)) {
+  if (
+    syncState &&
+    syncState.scaffoldVersion !== SCAFFOLD_VERSION &&
+    !changedFiles.includes(SYNC_STATE_FILE)
+  ) {
     changedFiles.push(SYNC_STATE_FILE);
   }
 
@@ -1045,7 +1363,9 @@ export function upgradeProjectScaffold(
       updated: changedFiles.filter((file) => fileExistsBefore.get(file)),
       notes: changedFiles.length === 0 ? ["脚手架已是最新版本"] : [],
     },
-    nextActions: input.dryRun ? ["ow upgrade --json"] : ["ow validate --json", "ow diff --json"],
+    nextActions: input.dryRun
+      ? ["ow upgrade --json"]
+      : ["ow validate --json", "ow diff --json"],
   });
 }
 
@@ -1058,7 +1378,10 @@ export function diffProjectScaffold(projectDir: string): ProjectAdminResult<{
   const resolvedDir = path.resolve(projectDir);
   const manifest = readManifest(resolvedDir);
   const manifestIssues = validateManifestShape(manifest);
-  if (!manifest || manifestIssues.some((issue) => issue.severity === "blocking")) {
+  if (
+    !manifest ||
+    manifestIssues.some((issue) => issue.severity === "blocking")
+  ) {
     return fail("PROJECT_PACKAGE_INVALID", "本地项目包无效", {
       validation: { ok: false, issues: manifestIssues },
       nextActions: ["ow validate --json"],
@@ -1066,19 +1389,30 @@ export function diffProjectScaffold(projectDir: string): ProjectAdminResult<{
   }
   const syncState = readSyncState(resolvedDir);
   if (!syncState) {
-    return fail("SYNC_STATE_MISSING", ".workbench/sync-state.json 不存在或不是合法 JSON", {
-      nextActions: ["ow project pull <projectId> <dir> --json"],
-    });
+    return fail(
+      "SYNC_STATE_MISSING",
+      ".workbench/sync-state.json 不存在或不是合法 JSON",
+      {
+        nextActions: ["ow project pull <projectId> <dir> --json"],
+      },
+    );
   }
   const currentFiles = Object.fromEntries(
-    managedFiles(resolvedDir, manifest).map((file) => [file, hashFile(path.join(resolvedDir, file))]),
+    managedFiles(resolvedDir, manifest).map((file) => [
+      file,
+      hashFile(path.join(resolvedDir, file)),
+    ]),
   );
-  const created = Object.keys(currentFiles).filter((file) => !syncState.files[file]);
+  const created = Object.keys(currentFiles).filter(
+    (file) => !syncState.files[file],
+  );
   const updated = Object.keys(currentFiles).filter((file) => {
     const previous = syncState.files[file];
     return previous && previous.sha256 !== currentFiles[file]?.sha256;
   });
-  const deleted = Object.keys(syncState.files).filter((file) => !currentFiles[file]);
+  const deleted = Object.keys(syncState.files).filter(
+    (file) => !currentFiles[file],
+  );
   return ok(
     { projectDir: resolvedDir, created, updated, deleted },
     {
@@ -1086,7 +1420,10 @@ export function diffProjectScaffold(projectDir: string): ProjectAdminResult<{
         created,
         updated,
         deleted,
-        notes: created.length + updated.length + deleted.length === 0 ? ["本地项目包没有变更"] : [],
+        notes:
+          created.length + updated.length + deleted.length === 0
+            ? ["本地项目包没有变更"]
+            : [],
       },
       nextActions: ["ow validate --json", "ow submit --json"],
     },
@@ -1097,7 +1434,11 @@ export function submitProjectScaffold(
   service: ProjectAdminService,
   actor: ProjectAdminActor,
   input: { projectDir: string; note?: string },
-): ProjectAdminResult<{ projectDir: string; projectId: string; versionId: string }> {
+): ProjectAdminResult<{
+  projectDir: string;
+  projectId: string;
+  versionId: string;
+}> {
   const resolvedDir = path.resolve(input.projectDir);
   const validation = validateProjectScaffold(resolvedDir);
   if (!validation.validation?.ok) {
@@ -1108,77 +1449,128 @@ export function submitProjectScaffold(
   }
   const manifest = readManifest(resolvedDir);
   if (!manifest) {
-    return fail("PROJECT_PACKAGE_INVALID", "workbench.project.json 不存在或不是合法 JSON");
+    return fail(
+      "PROJECT_PACKAGE_INVALID",
+      "workbench.project.json 不存在或不是合法 JSON",
+    );
   }
 
   const remote = service.getProject(manifest.projectId, actor);
   if (!remote.ok || !remote.data) {
-    return fail(remote.error?.code ?? "PROJECT_NOT_FOUND", remote.error?.message ?? "项目不存在");
+    return fail(
+      remote.error?.code ?? "PROJECT_NOT_FOUND",
+      remote.error?.message ?? "项目不存在",
+    );
   }
   const currentVersion = remote.data.versions[0]?.versionId ?? "v0";
   if (currentVersion !== manifest.baseVersion) {
     return fail("EDIT_CONFLICT", "线上项目版本已变化，请先重新拉取", {
       validation: {
         ok: false,
-        issues: [{
-          code: "EDIT_CONFLICT",
-          message: `当前版本 ${currentVersion} 与本地基线 ${manifest.baseVersion} 不一致`,
-          severity: "blocking",
-        }],
+        issues: [
+          {
+            code: "EDIT_CONFLICT",
+            message: `当前版本 ${currentVersion} 与本地基线 ${manifest.baseVersion} 不一致`,
+            severity: "blocking",
+          },
+        ],
       },
-      nextActions: [`ow project pull ${manifest.projectId} ${resolvedDir} --force --json`],
+      nextActions: [
+        `ow project pull ${manifest.projectId} ${resolvedDir} --force --json`,
+      ],
     });
   }
 
   const diff = diffProjectScaffold(resolvedDir);
   if (!diff.ok) {
-    return fail(diff.error?.code ?? "PROJECT_DIFF_FAILED", diff.error?.message ?? "本地项目包 diff 失败", {
-      validation: diff.validation,
-      nextActions: diff.nextActions,
-    });
+    return fail(
+      diff.error?.code ?? "PROJECT_DIFF_FAILED",
+      diff.error?.message ?? "本地项目包 diff 失败",
+      {
+        validation: diff.validation,
+        nextActions: diff.nextActions,
+      },
+    );
   }
   const assetPrefix = `${manifest.assetsDir.replace(/\/$/, "")}/`;
-  const createdAssets = (diff.diffSummary?.created ?? []).filter((file) => file.startsWith(assetPrefix));
-  const updatedAssets = (diff.diffSummary?.updated ?? []).filter((file) => file.startsWith(assetPrefix));
-  const deletedAssets = (diff.diffSummary?.deleted ?? []).filter((file) => file.startsWith(assetPrefix));
-  const knowledgePrefix = manifest.knowledgeDir ? `${manifest.knowledgeDir.replace(/\/$/, "")}/` : null;
+  const createdAssets = (diff.diffSummary?.created ?? []).filter((file) =>
+    file.startsWith(assetPrefix),
+  );
+  const updatedAssets = (diff.diffSummary?.updated ?? []).filter((file) =>
+    file.startsWith(assetPrefix),
+  );
+  const deletedAssets = (diff.diffSummary?.deleted ?? []).filter((file) =>
+    file.startsWith(assetPrefix),
+  );
+  const knowledgePrefix = manifest.knowledgeDir
+    ? `${manifest.knowledgeDir.replace(/\/$/, "")}/`
+    : null;
   const createdKnowledgeFiles = knowledgePrefix
-    ? (diff.diffSummary?.created ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    ? (diff.diffSummary?.created ?? []).filter((file) =>
+        file.startsWith(knowledgePrefix),
+      )
     : [];
   const updatedKnowledgeFiles = knowledgePrefix
-    ? (diff.diffSummary?.updated ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    ? (diff.diffSummary?.updated ?? []).filter((file) =>
+        file.startsWith(knowledgePrefix),
+      )
     : [];
   const deletedKnowledgeFiles = knowledgePrefix
-    ? (diff.diffSummary?.deleted ?? []).filter((file) => file.startsWith(knowledgePrefix))
+    ? (diff.diffSummary?.deleted ?? []).filter((file) =>
+        file.startsWith(knowledgePrefix),
+      )
     : [];
 
   const edit = service.beginEdit(manifest.projectId, actor);
   if (!edit.ok || !edit.data) {
-    return fail(edit.error?.code ?? "EDIT_BEGIN_FAILED", edit.error?.message ?? "编辑事务打开失败");
+    return fail(
+      edit.error?.code ?? "EDIT_BEGIN_FAILED",
+      edit.error?.message ?? "编辑事务打开失败",
+    );
   }
   const editId = edit.data.editId;
   const editWorkspacePath = edit.data.workspacePath;
 
   const remotePageIds = new Set(remote.data.pages.map((page) => page.id));
   const localPageIds = new Set(manifest.pages.map((page) => page.id));
-  const remoteFolderIds = new Set(remote.data.folders.map((folder) => folder.id));
+  const remoteFolderIds = new Set(
+    remote.data.folders.map((folder) => folder.id),
+  );
   const localFolderIds = new Set(manifest.folders.map((folder) => folder.id));
 
-  const pendingFolders = manifest.folders.filter((folder) => !remoteFolderIds.has(folder.id));
+  const pendingFolders = manifest.folders.filter(
+    (folder) => !remoteFolderIds.has(folder.id),
+  );
   const availableFolderIds = new Set(remoteFolderIds);
   while (pendingFolders.length > 0) {
-    const index = pendingFolders.findIndex((folder) => !folder.parentId || availableFolderIds.has(folder.parentId));
+    const index = pendingFolders.findIndex(
+      (folder) => !folder.parentId || availableFolderIds.has(folder.parentId),
+    );
     if (index === -1) {
-      return discardAndFail(service, editId, "FOLDER_TREE_INVALID", "本地文件夹层级无法按父子顺序创建", {
-        nextActions: ["修复 workbench.project.json 中的 folders 顺序或父级引用后重试"],
-      });
+      return discardAndFail(
+        service,
+        editId,
+        "FOLDER_TREE_INVALID",
+        "本地文件夹层级无法按父子顺序创建",
+        {
+          nextActions: [
+            "修复 workbench.project.json 中的 folders 顺序或父级引用后重试",
+          ],
+        },
+      );
     }
     const [folder] = pendingFolders.splice(index, 1);
     if (!folder) continue;
-    const createdFolder = service.createFolder(editId, folder.name, folder.parentId, actor, {
-      folderId: folder.id,
-      order: folder.order,
-    });
+    const createdFolder = service.createFolder(
+      editId,
+      folder.name,
+      folder.parentId,
+      actor,
+      {
+        folderId: folder.id,
+        order: folder.order,
+      },
+    );
     if (!createdFolder.ok) {
       return discardAndFail(
         service,
@@ -1191,17 +1583,22 @@ export function submitProjectScaffold(
     availableFolderIds.add(folder.id);
   }
 
-  for (const page of manifest.pages.filter((item) => !remotePageIds.has(item.id))) {
-    const createdPage = service.createPage({
-      editId,
-      pageId: page.id,
-      name: page.name,
-      routeKey: page.routeKey,
-      parentId: page.parentId,
-      order: page.order,
-      code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
-      schema: fs.readFileSync(path.join(resolvedDir, page.schema), "utf-8"),
-    }, actor);
+  for (const page of manifest.pages.filter(
+    (item) => !remotePageIds.has(item.id),
+  )) {
+    const createdPage = service.createPage(
+      {
+        editId,
+        pageId: page.id,
+        name: page.name,
+        routeKey: page.routeKey,
+        parentId: page.parentId,
+        order: page.order,
+        code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
+        schema: fs.readFileSync(path.join(resolvedDir, page.schema), "utf-8"),
+      },
+      actor,
+    );
     if (!createdPage.ok) {
       return discardAndFail(
         service,
@@ -1213,14 +1610,19 @@ export function submitProjectScaffold(
     }
   }
 
-  for (const folder of manifest.folders.filter((item) => remoteFolderIds.has(item.id))) {
-    const updatedFolder = service.updateFolder({
-      editId,
-      folderId: folder.id,
-      name: folder.name,
-      parentId: folder.parentId,
-      order: folder.order,
-    }, actor);
+  for (const folder of manifest.folders.filter((item) =>
+    remoteFolderIds.has(item.id),
+  )) {
+    const updatedFolder = service.updateFolder(
+      {
+        editId,
+        folderId: folder.id,
+        name: folder.name,
+        parentId: folder.parentId,
+        order: folder.order,
+      },
+      actor,
+    );
     if (!updatedFolder.ok) {
       return discardAndFail(
         service,
@@ -1233,56 +1635,105 @@ export function submitProjectScaffold(
   }
 
   for (const page of manifest.pages) {
-    const updated = service.updatePage({
-      editId,
-      pageId: page.id,
-      code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
-      schema: fs.readFileSync(path.join(resolvedDir, page.schema), "utf-8"),
-      name: page.name,
-      routeKey: page.routeKey,
-      parentId: page.parentId,
-      order: page.order,
-    }, actor);
+    const updated = service.updatePage(
+      {
+        editId,
+        pageId: page.id,
+        code: fs.readFileSync(path.join(resolvedDir, page.entry), "utf-8"),
+        schema: fs.readFileSync(path.join(resolvedDir, page.schema), "utf-8"),
+        name: page.name,
+        routeKey: page.routeKey,
+        parentId: page.parentId,
+        order: page.order,
+      },
+      actor,
+    );
     if (!updated.ok) {
-      return discardAndFail(service, editId, updated.error?.code ?? "PAGE_UPDATE_FAILED", updated.error?.message ?? `页面提交失败: ${page.id}`, {
-        validation: updated.validation,
-      });
+      return discardAndFail(
+        service,
+        editId,
+        updated.error?.code ?? "PAGE_UPDATE_FAILED",
+        updated.error?.message ?? `页面提交失败: ${page.id}`,
+        {
+          validation: updated.validation,
+        },
+      );
     }
   }
 
-  const deletedPageIds = remote.data.pages.filter((page) => !localPageIds.has(page.id)).map((page) => page.id);
+  const deletedPageIds = remote.data.pages
+    .filter((page) => !localPageIds.has(page.id))
+    .map((page) => page.id);
   if (deletedPageIds.length > 0) {
     const preview = service.deletePagePreview(editId, deletedPageIds);
     if (!preview.ok || !preview.data) {
-      return discardAndFail(service, editId, preview.error?.code ?? "PAGE_DELETE_PREVIEW_FAILED", preview.error?.message ?? "页面删除预览失败");
+      return discardAndFail(
+        service,
+        editId,
+        preview.error?.code ?? "PAGE_DELETE_PREVIEW_FAILED",
+        preview.error?.message ?? "页面删除预览失败",
+      );
     }
-    const executed = service.deletePageExecute(preview.data.planId, preview.data.confirmToken, actor);
+    const executed = service.deletePageExecute(
+      preview.data.planId,
+      preview.data.confirmToken,
+      actor,
+    );
     if (!executed.ok) {
-      return discardAndFail(service, editId, executed.error?.code ?? "PAGE_DELETE_FAILED", executed.error?.message ?? "页面删除失败");
+      return discardAndFail(
+        service,
+        editId,
+        executed.error?.code ?? "PAGE_DELETE_FAILED",
+        executed.error?.message ?? "页面删除失败",
+      );
     }
   }
 
-  for (const folder of remote.data.folders.filter((item) => !localFolderIds.has(item.id))) {
+  for (const folder of remote.data.folders.filter(
+    (item) => !localFolderIds.has(item.id),
+  )) {
     const preview = service.deleteFolderPreview(editId, folder.id);
     if (!preview.ok || !preview.data) {
-      return discardAndFail(service, editId, preview.error?.code ?? "FOLDER_DELETE_PREVIEW_FAILED", preview.error?.message ?? `文件夹删除预览失败: ${folder.id}`);
+      return discardAndFail(
+        service,
+        editId,
+        preview.error?.code ?? "FOLDER_DELETE_PREVIEW_FAILED",
+        preview.error?.message ?? `文件夹删除预览失败: ${folder.id}`,
+      );
     }
-    const executed = service.deleteFolderExecute(preview.data.planId, preview.data.confirmToken, "move_to_root", actor);
+    const executed = service.deleteFolderExecute(
+      preview.data.planId,
+      preview.data.confirmToken,
+      "move_to_root",
+      actor,
+    );
     if (!executed.ok) {
-      return discardAndFail(service, editId, executed.error?.code ?? "FOLDER_DELETE_FAILED", executed.error?.message ?? `文件夹删除失败: ${folder.id}`);
+      return discardAndFail(
+        service,
+        editId,
+        executed.error?.code ?? "FOLDER_DELETE_FAILED",
+        executed.error?.message ?? `文件夹删除失败: ${folder.id}`,
+      );
     }
   }
 
   const projectConfig = manifest.projectConfig
     ? fs.readFileSync(path.join(resolvedDir, manifest.projectConfig), "utf-8")
     : undefined;
-  const configResult = projectConfig !== undefined
-    ? service.setProjectConfig({ editId, schema: projectConfig }, actor)
-    : service.deleteProjectConfig(editId, false, actor);
+  const configResult =
+    projectConfig !== undefined
+      ? service.setProjectConfig({ editId, schema: projectConfig }, actor)
+      : service.deleteProjectConfig(editId, false, actor);
   if (!configResult.ok) {
-    return discardAndFail(service, editId, configResult.error?.code ?? "CONFIG_UPDATE_FAILED", configResult.error?.message ?? "项目配置提交失败", {
-      validation: configResult.validation,
-    });
+    return discardAndFail(
+      service,
+      editId,
+      configResult.error?.code ?? "CONFIG_UPDATE_FAILED",
+      configResult.error?.message ?? "项目配置提交失败",
+      {
+        validation: configResult.validation,
+      },
+    );
   }
 
   try {
@@ -1294,7 +1745,10 @@ export function submitProjectScaffold(
       );
     }
     for (const file of deletedKnowledgeFiles) {
-      deleteWorkspaceKnowledgeFile(editWorkspacePath, localKnowledgeFileToWorkspacePath(manifest, file));
+      deleteWorkspaceKnowledgeFile(
+        editWorkspacePath,
+        localKnowledgeFileToWorkspacePath(manifest, file),
+      );
     }
   } catch (error) {
     return discardAndFail(
@@ -1306,13 +1760,18 @@ export function submitProjectScaffold(
   }
 
   for (const file of [...createdAssets, ...updatedAssets]) {
-    const assetResult = service.uploadAsset({
-      editId,
-      filename: path.basename(file),
-      targetPath: localAssetFileToWorkspacePath(manifest, file),
-      mimeType: mimeTypeForFile(file),
-      dataBase64: fs.readFileSync(path.join(resolvedDir, file)).toString("base64"),
-    }, actor);
+    const assetResult = service.uploadAsset(
+      {
+        editId,
+        filename: path.basename(file),
+        targetPath: localAssetFileToWorkspacePath(manifest, file),
+        mimeType: mimeTypeForFile(file),
+        dataBase64: fs
+          .readFileSync(path.join(resolvedDir, file))
+          .toString("base64"),
+      },
+      actor,
+    );
     if (!assetResult.ok) {
       return discardAndFail(
         service,
@@ -1328,20 +1787,38 @@ export function submitProjectScaffold(
     const assetPath = localAssetFileToWorkspacePath(manifest, file);
     const preview = service.deleteAssetPreview(editId, assetPath);
     if (!preview.ok || !preview.data) {
-      return discardAndFail(service, editId, preview.error?.code ?? "ASSET_DELETE_PREVIEW_FAILED", preview.error?.message ?? `资产删除预览失败: ${file}`);
+      return discardAndFail(
+        service,
+        editId,
+        preview.error?.code ?? "ASSET_DELETE_PREVIEW_FAILED",
+        preview.error?.message ?? `资产删除预览失败: ${file}`,
+      );
     }
-    const executed = service.deleteAssetExecute(preview.data.planId, preview.data.confirmToken, actor);
+    const executed = service.deleteAssetExecute(
+      preview.data.planId,
+      preview.data.confirmToken,
+      actor,
+    );
     if (!executed.ok) {
-      return discardAndFail(service, editId, executed.error?.code ?? "ASSET_DELETE_FAILED", executed.error?.message ?? `资产删除失败: ${file}`);
+      return discardAndFail(
+        service,
+        editId,
+        executed.error?.code ?? "ASSET_DELETE_FAILED",
+        executed.error?.message ?? `资产删除失败: ${file}`,
+      );
     }
   }
 
   const committed = service.commitEdit(editId, input.note, actor);
   if (!committed.ok || !committed.data) {
-    return fail(committed.error?.code ?? "EDIT_COMMIT_FAILED", committed.error?.message ?? "编辑事务提交失败", {
-      validation: committed.validation,
-      nextActions: committed.nextActions,
-    });
+    return fail(
+      committed.error?.code ?? "EDIT_COMMIT_FAILED",
+      committed.error?.message ?? "编辑事务提交失败",
+      {
+        validation: committed.validation,
+        nextActions: committed.nextActions,
+      },
+    );
   }
 
   const nextManifest: LocalProjectManifest = {
@@ -1349,7 +1826,10 @@ export function submitProjectScaffold(
     baseVersion: committed.data.version.versionId,
   };
   writeJson(path.join(resolvedDir, PROJECT_FILE), nextManifest);
-  writeJson(path.join(resolvedDir, SYNC_STATE_FILE), computeSyncState(resolvedDir, nextManifest));
+  writeJson(
+    path.join(resolvedDir, SYNC_STATE_FILE),
+    computeSyncState(resolvedDir, nextManifest),
+  );
 
   return ok(
     {
@@ -1361,7 +1841,10 @@ export function submitProjectScaffold(
       auditId: committed.auditId,
       diffSummary: committed.diffSummary,
       validation: committed.validation,
-      nextActions: ["ow diff --json", `ow project get ${manifest.projectId} --json`],
+      nextActions: [
+        "ow diff --json",
+        `ow project get ${manifest.projectId} --json`,
+      ],
     },
   );
 }
@@ -1369,18 +1852,34 @@ export function submitProjectScaffold(
 export function initTemplateScaffold(
   service: ProjectAdminService,
   actor: ProjectAdminActor,
-  input: { templateId: string; targetDir: string; name?: string; force?: boolean },
-): ProjectAdminResult<{ projectDir: string; projectId: string; templateId: string; baseVersion: string; pages: number; assets: number }> {
+  input: {
+    templateId: string;
+    targetDir: string;
+    name?: string;
+    force?: boolean;
+  },
+): ProjectAdminResult<{
+  projectDir: string;
+  projectId: string;
+  templateId: string;
+  baseVersion: string;
+  pages: number;
+  assets: number;
+}> {
   const created = service.instantiateTemplate(
     input.templateId,
     input.name ?? `template-${input.templateId}`,
     actor,
   );
   if (!created.ok || !created.data) {
-    return fail(created.error?.code ?? "TEMPLATE_INIT_FAILED", created.error?.message ?? "模板实例化失败", {
-      validation: created.validation,
-      nextActions: created.nextActions,
-    });
+    return fail(
+      created.error?.code ?? "TEMPLATE_INIT_FAILED",
+      created.error?.message ?? "模板实例化失败",
+      {
+        validation: created.validation,
+        nextActions: created.nextActions,
+      },
+    );
   }
   const pulled = pullProjectScaffold(service, actor, {
     projectId: created.data.id,
@@ -1388,10 +1887,14 @@ export function initTemplateScaffold(
     force: input.force,
   });
   if (!pulled.ok || !pulled.data) {
-    return fail(pulled.error?.code ?? "PROJECT_PULL_FAILED", pulled.error?.message ?? "模板项目拉取失败", {
-      validation: pulled.validation,
-      nextActions: pulled.nextActions,
-    });
+    return fail(
+      pulled.error?.code ?? "PROJECT_PULL_FAILED",
+      pulled.error?.message ?? "模板项目拉取失败",
+      {
+        validation: pulled.validation,
+        nextActions: pulled.nextActions,
+      },
+    );
   }
   return ok(
     {
@@ -1400,8 +1903,14 @@ export function initTemplateScaffold(
     },
     {
       auditId: created.auditId,
-      warnings: ["template init 会创建一个基于模板的项目作为本地开发和后续提交目标"],
-      nextActions: ["ow validate --json", "ow diff --json", "ow template submit --json"],
+      warnings: [
+        "template init 会创建一个基于模板的项目作为本地开发和后续提交目标",
+      ],
+      nextActions: [
+        "ow validate --json",
+        "ow diff --json",
+        "ow template submit --json",
+      ],
     },
   );
 }
@@ -1410,30 +1919,54 @@ export function submitTemplateScaffold(
   service: ProjectAdminService,
   actor: ProjectAdminActor,
   input: { projectDir: string; meta: TemplateMetaInput; note?: string },
-): ProjectAdminResult<{ projectDir: string; projectId: string; templateId: string }> {
-  if (!input.meta.category.trim() || !input.meta.name.trim() || !input.meta.description.trim()) {
-    return fail("TEMPLATE_META_INVALID", "模板提交需要提供 category、name 和 description", {
-      nextActions: [
-        "ow template submit --category <分类> --name <模板名> --description <描述> --json",
-      ],
-    });
+): ProjectAdminResult<{
+  projectDir: string;
+  projectId: string;
+  templateId: string;
+}> {
+  if (
+    !input.meta.category.trim() ||
+    !input.meta.name.trim() ||
+    !input.meta.description.trim()
+  ) {
+    return fail(
+      "TEMPLATE_META_INVALID",
+      "模板提交需要提供 category、name 和 description",
+      {
+        nextActions: [
+          "ow template submit --category <分类> --name <模板名> --description <描述> --json",
+        ],
+      },
+    );
   }
   const submitted = submitProjectScaffold(service, actor, {
     projectDir: input.projectDir,
     note: input.note ?? "提交本地模板项目包",
   });
   if (!submitted.ok || !submitted.data) {
-    return fail(submitted.error?.code ?? "PROJECT_SUBMIT_FAILED", submitted.error?.message ?? "本地模板项目提交失败", {
-      validation: submitted.validation,
-      nextActions: submitted.nextActions,
-    });
+    return fail(
+      submitted.error?.code ?? "PROJECT_SUBMIT_FAILED",
+      submitted.error?.message ?? "本地模板项目提交失败",
+      {
+        validation: submitted.validation,
+        nextActions: submitted.nextActions,
+      },
+    );
   }
-  const template = service.createTemplateFromProject(submitted.data.projectId, input.meta, actor);
+  const template = service.createTemplateFromProject(
+    submitted.data.projectId,
+    input.meta,
+    actor,
+  );
   if (!template.ok || !template.data) {
-    return fail(template.error?.code ?? "TEMPLATE_CREATE_FAILED", template.error?.message ?? "模板快照创建失败", {
-      validation: template.validation,
-      nextActions: template.nextActions,
-    });
+    return fail(
+      template.error?.code ?? "TEMPLATE_CREATE_FAILED",
+      template.error?.message ?? "模板快照创建失败",
+      {
+        validation: template.validation,
+        nextActions: template.nextActions,
+      },
+    );
   }
   return ok(
     {
@@ -1445,7 +1978,75 @@ export function submitTemplateScaffold(
       auditId: template.auditId,
       diffSummary: template.diffSummary,
       validation: submitted.validation,
-      nextActions: [`ow template get ${template.data.id} --json`, `ow template health-check ${template.data.id} --json`],
+      nextActions: [
+        `ow template get ${template.data.id} --json`,
+        `ow template health-check ${template.data.id} --json`,
+      ],
     },
   );
+}
+
+export interface WorkspaceMergeBarrierResult {
+  ok: boolean;
+  error?: { code: string; message: string };
+}
+
+/**
+ * Merge barrier for branch workspace submissions.
+ *
+ * 在提交本地项目包前，检查工作区 revision 是否已经变化。
+ * 当 service 配置了 workspaceAuthorityPort 且目标 workspace 是 live 时，
+ * 通过 Authority 查询当前 revision，与本地 manifest 记录的 workspaceRevision 对比。
+ * 如果 revision 已变化，拒绝合并以防止并发写入冲突。
+ */
+export async function checkWorkspaceMergeBarrier(
+  service: ProjectAdminService,
+  projectDir: string,
+): Promise<WorkspaceMergeBarrierResult> {
+  const resolvedDir = path.resolve(projectDir);
+  const manifest = readManifest(resolvedDir);
+  if (!manifest?.workspaceId || manifest.workspaceRevision === undefined) {
+    return { ok: true };
+  }
+
+  const port = service.getWorkspaceAuthorityPort();
+  if (!port) return { ok: true };
+
+  try {
+    const state = await port.getState(manifest.workspaceId);
+    if (state.revision > manifest.workspaceRevision) {
+      return {
+        ok: false,
+        error: {
+          code: "WORKSPACE_REVISION_CONFLICT",
+          message: `工作区 revision 已变化（本地基线 ${manifest.workspaceRevision}，当前 ${state.revision}），请先重新拉取`,
+        },
+      };
+    }
+    if (
+      manifest.workspaceRootHash &&
+      state.revision === manifest.workspaceRevision &&
+      state.rootHash !== manifest.workspaceRootHash
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "WORKSPACE_REVISION_CONFLICT",
+          message: `工作区 revision ${state.revision} 的 rootHash 不一致，请先重新拉取`,
+        },
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "WORKSPACE_AUTHORITY_REQUIRED",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Workspace Authority 不可用，无法确认工作区状态",
+      },
+    };
+  }
 }

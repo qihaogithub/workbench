@@ -6,12 +6,14 @@ import type { CanvasState } from "@workbench/demo-ui";
 
 class TestResponse {
   status: number;
+  ok: boolean;
   body: BodyInit | null;
   headers: { get: (name: string) => string | null };
   private readonly buffer: Buffer;
 
   constructor(body?: BodyInit | null, init?: ResponseInit) {
     this.status = init?.status ?? 200;
+    this.ok = this.status >= 200 && this.status < 300;
     this.body = body ?? null;
     const headers = new Map<string, string>();
     if (init?.headers) {
@@ -61,11 +63,27 @@ function createRequest(): Request {
 describe("canvas layout route", () => {
   const originalEnv = { ...process.env };
   const originalResponse = global.Response;
+  const originalFetch = global.fetch;
   let tempDir: string;
 
   beforeEach(() => {
     jest.resetModules();
     global.Response = TestResponse as unknown as typeof Response;
+    global.fetch = jest.fn(async () => TestResponse.json({
+      success: true,
+      data: {
+        committed: true,
+        mutationId: "mutation-test",
+        projectId: "project-test",
+        workspaceId: "workspace-test",
+        baseRevision: 0,
+        revision: 2,
+        rootHash: "root-hash",
+        actor: "author-site",
+        resources: [],
+        committedAt: Date.now(),
+      },
+    })) as unknown as typeof fetch;
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "canvas-layout-route-"));
     process.env.DATA_DIR = tempDir;
     process.env.PROJECTS_DIR = path.join(tempDir, "projects");
@@ -86,10 +104,11 @@ describe("canvas layout route", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
     process.env = { ...originalEnv };
     global.Response = originalResponse;
+    global.fetch = originalFetch;
     jest.resetModules();
   });
 
-  it("保存画布布局时同步写入 workspace，并优先从 workspace 读取", async () => {
+  it("保存画布布局时通过 Authority 提交 live Workspace，并保留 session 恢复缓存", async () => {
     const fsUtils = await import("@/lib/fs-utils");
     const sessionManager = await import("@/lib/session-manager");
     const { GET, POST } = await import("./route");
@@ -215,17 +234,12 @@ describe("canvas layout route", () => {
       workspacePath!,
       ".canvas-layout.json",
     );
-    const projectLayoutPath = path.join(
-      fsUtils.getProjectPath(project.id),
-      "workspace",
-      ".canvas-layout.json",
-    );
     expect(fs.existsSync(sessionLayoutPath)).toBe(true);
-    expect(fs.existsSync(workspaceLayoutPath)).toBe(true);
-    expect(fs.existsSync(projectLayoutPath)).toBe(true);
-
-    fs.rmSync(sessionLayoutPath);
-    fs.rmSync(workspaceLayoutPath);
+    expect(fs.existsSync(workspaceLayoutPath)).toBe(false);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(session.workspaceId)}/mutate`),
+      expect.objectContaining({ method: "POST" }),
+    );
 
     const getResponse = await GET(
       createRequest(),
@@ -240,6 +254,55 @@ describe("canvas layout route", () => {
     expect(body.data.state).toEqual(expectedState);
     expect(body.data.state?.nodes).toEqual(state.nodes);
     expect(body.data.state?.layers?.annotations?.nodes).toEqual(state.nodes);
+  });
+
+  it("保存非 live 画布布局时写入 workspace 文件且不调用 Authority", async () => {
+    const fsUtils = await import("@/lib/fs-utils");
+    const sessionManager = await import("@/lib/session-manager");
+    const { POST } = await import("./route");
+
+    const project = fsUtils.createProject("非 live 画布布局项目");
+    const session = await sessionManager.createEditSession(
+      "user-1",
+      project.id,
+    );
+    const workspaceMeta = fsUtils.getWorkspaceMeta(session.workspaceId);
+    if (!workspaceMeta) throw new Error("workspace meta missing");
+    fsUtils.writeWorkspaceMeta(session.workspaceId, {
+      ...workspaceMeta,
+      scope: "branch",
+      updatedAt: workspaceMeta.updatedAt,
+    });
+
+    const state: CanvasState = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      pages: {
+        page_1: { x: 10, y: 20, width: 375, height: 812 },
+      },
+      nodes: {},
+      hiddenKnowledgeDocumentIds: [],
+    };
+
+    const response = await POST(
+      createJsonRequest({ projectId: project.id, version: 1, state }),
+      { params: { sessionId: session.sessionId } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const workspacePath = fsUtils.findWorkspacePath(session.workspaceId);
+    const sessionPath = fsUtils.getSessionPath(session.sessionId);
+    expect(workspacePath).toBeTruthy();
+    expect(sessionPath).toBeTruthy();
+
+    const workspaceLayoutPath = path.join(workspacePath!, ".canvas-layout.json");
+    const sessionLayoutPath = path.join(sessionPath!, ".canvas-layout.json");
+    expect(fs.existsSync(workspaceLayoutPath)).toBe(true);
+    expect(fs.existsSync(sessionLayoutPath)).toBe(true);
+
+    const stored = JSON.parse(fs.readFileSync(workspaceLayoutPath, "utf-8"));
+    expect(stored.state).toEqual(normalizeCanvasStateLayers(state));
   });
 
   it("读取拼接损坏的画布布局时恢复最新有效布局", async () => {

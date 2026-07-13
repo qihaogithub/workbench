@@ -89,7 +89,7 @@ export class EventMapper {
           // pi-agent-core 的底层 tool_execution_end 只保证 toolCallId + result，
           // 不保证携带 toolName / input。文件变更必须由随后带完整参数的
           // AgentHarness tool_result 钩子处理，否则 editFile 虽写入成功，
-          // 前端却收不到 file_operation，旧的内存快照会再次覆盖磁盘文件。
+          // 文件摘要会缺失，旧的内存快照仍可能在旧链路中覆盖磁盘文件。
           if (typeof event.toolName === 'string') {
             this.emitToolCallUpdate(event.toolCallId, event.toolName, event.isError, event, details);
           }

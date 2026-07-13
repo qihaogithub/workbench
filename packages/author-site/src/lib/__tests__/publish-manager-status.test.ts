@@ -193,7 +193,11 @@ describe("getPublishStatus", () => {
   it("发布前应创建发布快照并指向该版本", async () => {
     setupPublishableProject("proj-publish-snapshot");
 
-    const result = await publishProject("proj-publish-snapshot");
+    const result = await publishProject("proj-publish-snapshot", {
+      workspaceId: "live-publish",
+      workspaceRevision: 11,
+      workspaceRootHash: "root-hash-11",
+    });
     expect(result.publishedVersion).toBe("v1");
 
     const project = JSON.parse(
@@ -208,6 +212,9 @@ describe("getPublishStatus", () => {
       versionId: "v1",
       type: "publish_snapshot",
       note: "发布快照",
+      workspaceId: "live-publish",
+      workspaceRevision: 11,
+      workspaceRootHash: "root-hash-11",
     });
   });
 
@@ -402,6 +409,8 @@ describe("getPublishStatus", () => {
           activeWorkspaceId: liveWorkspaceId,
           activeWorkspaceUpdatedAt: now,
           canonicalSyncedWorkspaceId: liveWorkspaceId,
+          canonicalSyncedRevision: 4,
+          canonicalSyncedRootHash: "root-hash-4",
           canonicalSyncedAt: now + 1,
         },
         null,
@@ -417,6 +426,12 @@ describe("getPublishStatus", () => {
       fs.readFileSync(path.join(liveWorkspacePath, ".workspace.json"), "utf-8"),
     );
     expect(workspaceMeta.baseVersion).toBe("v1");
+    const updatedProject = JSON.parse(fs.readFileSync(projectFile, "utf-8"));
+    expect(updatedProject.versions[0]).toMatchObject({
+      workspaceId: liveWorkspaceId,
+      workspaceRevision: 4,
+      workspaceRootHash: "root-hash-4",
+    });
   });
 
   it("重新发布会替换旧发布目录并排除临时目录索引", async () => {

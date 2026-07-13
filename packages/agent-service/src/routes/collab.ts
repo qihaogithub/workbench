@@ -3,6 +3,7 @@ import WebSocket from "ws";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
 import { collabRoomManager } from "../collab/collab-room-manager";
+import { WorkspaceMutationAuthorityError } from "../workspace/workspace-mutation-authority";
 
 interface CollabParams {
   projectId: string;
@@ -45,6 +46,23 @@ function normalizeDescriptor(
     sessionId: query.sessionId,
     resourcePath: query.resourcePath,
     kind: query.kind,
+  };
+}
+
+function collabFailure(reply: { status: (statusCode: number) => unknown }, error: unknown) {
+  const code = error instanceof WorkspaceMutationAuthorityError
+    ? error.code
+    : error instanceof Error
+      ? error.message
+      : "COLLAB_FLUSH_FAILED";
+  const status = code === "WORKSPACE_RESOURCE_CONFLICT" ? 409 : 403;
+  reply.status(status);
+  return {
+    success: false,
+    error: {
+      code,
+      message: code,
+    },
   };
 }
 
@@ -91,14 +109,7 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
         const result = await collabRoomManager.flush(descriptor);
         return { success: true, data: result };
       } catch (error) {
-        reply.status(403);
-        return {
-          success: false,
-          error: {
-            code: "COLLAB_FLUSH_FAILED",
-            message: error instanceof Error ? error.message : "协同草稿落盘失败",
-          },
-        };
+        return collabFailure(reply, error);
       }
     },
   );
@@ -123,14 +134,7 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
         );
         return { success: true, data: result };
       } catch (error) {
-        reply.status(403);
-        return {
-          success: false,
-          error: {
-            code: "COLLAB_FLUSH_FAILED",
-            message: error instanceof Error ? error.message : "协同草稿落盘失败",
-          },
-        };
+        return collabFailure(reply, error);
       }
     },
   );

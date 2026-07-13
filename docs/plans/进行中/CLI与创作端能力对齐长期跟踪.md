@@ -6,6 +6,7 @@
 
 ## 当前结论
 
+- 2026-07-10 同步主文档结论：active Workspace 的耐久写入契约已经扩到 author-site 的知识文档和页面创建/元数据路由，`packages/shared/src/contracts.ts` 与 `packages/project-core/src/workspace-resource-registry.ts` 提供了共享 mutation 协议和受管资源白名单；但这仍是 author-site + workspace-authority 的写入编排，不等于 `project-core` 已新增 `knowledge *` / `workspace *` 共享服务，因此 GAP-003、GAP-004 继续保持 L1。当前 `check:author` 失败也集中在 author-site 自己的 `useVisualEditState` 与 `assets/localize` 测试，未单独证明 CLI 回归，所以本轮保持 report-only。
 - 2026-07-10 同步主文档结论：`page create` 默认运行时已切到 `prototype-html-css`，author-site 页面创建入口也同步默认写入原型页文件；CLI 若要稳定创建高保真 React 页，应显式传 `--runtime-type high-fidelity-react` 或提供页面代码。大型 Figma HTML 原型页上限也已放宽到 2MB，这两项都属于共享层当前事实，不新增 CLI 命令缺口。
 - 2026-07-09 同步主文档结论：`projectConfigValues` 已进一步进入 viewer 默认值与发布前 canonical workspace 回填链路，但写回语义仍停留在 author-site 路由层，`project-core` / `project-scaffold` 仍未形成共享闭环，因此 GAP-011 继续按 L1 report-only 处理，不新增 CLI 命令。
 - 2026-07-02 确认外部 CLI 自动维护提示词仍引用本文件名。
@@ -27,10 +28,11 @@
 - `corepack pnpm check:automation`：通过。
 - `corepack pnpm check:project-core`：2026-07-10 通过。
 - `corepack pnpm check:project-cli`：2026-07-10 通过。
+- `corepack pnpm check:author`：2026-07-10 失败；当前失败集中在 `useVisualEditState` 与 `assets/localize` 两组 author-site 测试，未单独证明 CLI 回归，因此本轮继续 report-only。
 - `corepack pnpm check:project-core`：2026-07-09 通过（34 tests passed）。
 - `corepack pnpm check:project-cli`：2026-07-09 通过（含命令集与全命令回归复核）。
 - `corepack pnpm check:project-scaffold`：2026-07-09 通过。
-- `corepack pnpm check:author`：2026-07-09 通过（102 test suites / 677 tests）；正式仓库路径下当前 author-site 本地测试链路已恢复全绿。
+- `corepack pnpm check:author`：2026-07-09 通过（102 test suites / 677 tests）；这是上一轮全绿基线，不再代表当前脏分支状态。
 
 ## 风险
 

@@ -3,6 +3,7 @@ import * as path from 'path';
 import {
   isPathAllowed,
   isCommandAllowed,
+  isLiveWorkspaceReadOnlyCommandAllowed,
   DEFAULT_WORKSPACE_PERMISSIONS,
 } from '../../src/backends/pi-tools/permissions';
 
@@ -136,6 +137,29 @@ describe('isCommandAllowed', () => {
 
   it('拒绝前后带空格的命令', () => {
     expect(isCommandAllowed('   rm -rf /', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+});
+
+describe('isLiveWorkspaceReadOnlyCommandAllowed', () => {
+  it('允许 live Workspace 中的简单只读命令', () => {
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('ls -la', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('cat README.md', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('grep foo workspace-tree.json', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+  });
+
+  it('拒绝 live Workspace 中可能产生写副作用的 shell 语法', () => {
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('echo hello > demos/home/index.tsx', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('echo hello >> notes.txt', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('cat <<EOF > notes.txt', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('ls && echo hello', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('cat README.md | tee notes.txt', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('echo $(cat README.md)', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+
+  it('拒绝 live Workspace 中执行 node/npm/npx', () => {
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('node scripts/check.js', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('npm install', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isLiveWorkspaceReadOnlyCommandAllowed('npx tsc --noEmit', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 });
 

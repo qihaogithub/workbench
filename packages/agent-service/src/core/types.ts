@@ -56,12 +56,12 @@ export interface AgentConfig {
 export interface PiAgentConfig {
   apiKey?: string;
   model?: string;
-  provider?: string;  // "anthropic" | "openai" | "google"
-  baseUrl?: string;   // 自定义 API 基础地址（OpenAI 兼容格式）
+  provider?: string; // "anthropic" | "openai" | "google"
+  baseUrl?: string; // 自定义 API 基础地址（OpenAI 兼容格式）
   timeout?: number;
   subagentsEnabled?: boolean;
   subagentTimeout?: number;
-  thinkingLevel?: string;  // "off" | "low" | "medium" | "high" — AgentHarness 思考级别
+  thinkingLevel?: string; // "off" | "low" | "medium" | "high" — AgentHarness 思考级别
 }
 
 // ============================================================
@@ -112,11 +112,7 @@ export interface FileChange {
   content?: string;
 }
 
-export type PlanItemStatus =
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "failed";
+export type PlanItemStatus = "pending" | "in_progress" | "completed" | "failed";
 
 export interface PlanItem {
   id: string;
@@ -139,6 +135,29 @@ export interface ResultMetadata {
     completion: number;
   };
   duration?: number;
+  runSummary?: RunSummary;
+}
+
+export interface MutationReceiptEntry {
+  mutationId: string;
+  revision: number;
+  status: "committed" | "conflicted" | "rolled_back";
+  resources: Array<{
+    path: string;
+    action: "created" | "modified" | "deleted" | "moved";
+  }>;
+  actor: string;
+}
+
+export interface ProjectionAckEntry {
+  revision: number;
+  surface: string;
+  status: "pending" | "applied" | "failed";
+}
+
+export interface RunSummary {
+  mutations: MutationReceiptEntry[];
+  projections: ProjectionAckEntry[];
 }
 
 // ============================================================
@@ -213,14 +232,10 @@ export interface StatusEvent {
   status: AgentStatus;
 }
 
-export interface FileOperationEvent {
-  type: "file_operation";
+export interface RunSummaryEvent {
+  type: "run_summary";
   sessionId: string;
-  fileOperation: {
-    method: string;
-    path: string;
-    content?: string;
-  };
+  runSummary: RunSummary;
 }
 
 export interface PlanEvent {
@@ -299,7 +314,7 @@ export type AgentEvent =
   | ErrorEvent
   | FinishEvent
   | StatusEvent
-  | FileOperationEvent
+  | RunSummaryEvent
   | PermissionRequestEvent
   | UserChoiceRequestEvent
   | ConfigUpdatedEvent;

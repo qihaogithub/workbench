@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
 import path from "path";
 import {
   createApiError,
@@ -14,6 +15,12 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { updateWorkspaceTimestamp } from "@/lib/workspace-manager";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import {
+  commitWorkspaceMutation,
+  createTextWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 
 interface SessionContext {
   workspaceId: string;
@@ -24,12 +31,20 @@ function isPlainConfigObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  return NextResponse.json(
+    createApiError("FILE_WRITE_ERROR", error.message, {
+      authorityCode: error.code,
+    }),
+    { status: error.status },
+  );
+}
+
 async function resolveSessionWorkspace(
   projectId: string,
   sessionId: string | undefined,
 ): Promise<
-  | { ok: true; ctx: SessionContext }
-  | { ok: false; response: NextResponse }
+  { ok: true; ctx: SessionContext } | { ok: false; response: NextResponse }
 > {
   const token = getAuthCookie();
   if (!token) {
@@ -190,9 +205,45 @@ export async function PUT(
 
     const ctx = await resolveSessionWorkspace(projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    const resolvedSessionId = sessionId;
+    if (!resolvedSessionId) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sessionId 参数必填"),
+        { status: 400 },
+      );
+    }
 
-    saveProjectConfigValues(ctx.ctx.workspacePath, values);
-    updateWorkspaceTimestamp(ctx.ctx.workspaceId);
+    if (isLiveWorkspacePath(ctx.ctx.workspacePath)) {
+      const configValuesPath = path.join(
+        ctx.ctx.workspacePath,
+        "project.config.values.json",
+      );
+      const previousContent = fs.existsSync(configValuesPath)
+        ? fs.readFileSync(configValuesPath, "utf-8")
+        : null;
+      try {
+        await commitWorkspaceMutation(
+          createTextWorkspaceMutation({
+            projectId,
+            workspaceId: ctx.ctx.workspaceId,
+            sessionId: resolvedSessionId,
+            path: "project.config.values.json",
+            content: JSON.stringify(values, null, 2),
+            previousContent,
+            reason: "update_project_config_values",
+          }),
+        );
+      } catch (error) {
+        if (error instanceof WorkspaceAuthorityClientError)
+          return createMutationErrorResponse(error);
+        throw error;
+      }
+    } else {
+      // Branch/non-live workspace: direct file write is expected behavior.
+      // Live workspace writes go through Authority above.
+      saveProjectConfigValues(ctx.ctx.workspacePath, values);
+      updateWorkspaceTimestamp(ctx.ctx.workspaceId);
+    }
     return NextResponse.json(createApiSuccess({ values, exists: true }));
   } catch (error) {
     console.error("Error updating project config values:", error);

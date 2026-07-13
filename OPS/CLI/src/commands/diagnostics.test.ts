@@ -8,8 +8,11 @@ import Database from "better-sqlite3";
 
 import {
   applyFilters,
+  buildDiagnosticsResult,
+  buildWorkspaceFlows,
   formatDiagnosticFailureDetails,
   readSqliteEvents,
+  summarizeDiagnosticPerformance,
 } from "./diagnostics.js";
 
 function makeDataDir(): string {
@@ -170,6 +173,151 @@ test("applyFilters uses the same group filtering for JSONL fallback events", () 
     filtered.map((event) => event.eventType),
     ["autosave.flush_failed"],
   );
+});
+
+test("SQLite and JSONL filters support the same multi-group workspace flow scope", () => {
+  const dataDir = makeDataDir();
+  try {
+    const db = createDiagnosticsDb(dataDir);
+    try {
+      insertEvent(db, { id: "autosave", group: "autosave", type: "autosave.flush_started", ts: "2026-07-09T00:00:00.000Z" });
+      insertEvent(db, { id: "workspace", group: "workspace", type: "workspace.mutation_committed", ts: "2026-07-09T00:00:01.000Z" });
+      insertEvent(db, { id: "preview", group: "preview", type: "preview.content_loaded", ts: "2026-07-09T00:00:02.000Z" });
+      insertEvent(db, { id: "ui", group: "ui", type: "ui.changed", ts: "2026-07-09T00:00:03.000Z" });
+    } finally {
+      db.close();
+    }
+    const groups = "autosave,collab,preview,workspace";
+    const sqlite = readSqliteEvents(dataDir, { project: "project-1", groups }, 20);
+    assert.deepEqual(sqlite.events.map((event) => event.id), ["autosave", "workspace", "preview"]);
+    const filtered = applyFilters([
+      ...sqlite.events,
+      {
+        id: "ui-jsonl", schemaVersion: 1, ts: "2026-07-09T00:00:04.000Z",
+        source: "frontend" as const, level: "info" as const, eventGroup: "ui" as const,
+        eventType: "ui.changed", projectId: "project-1", payload: {},
+      },
+    ], { project: "project-1", groups }, 20);
+    assert.deepEqual(filtered.map((event) => event.id), ["autosave", "workspace", "preview"]);
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("workspace flows correlate mutation projection and canonical events by revision", () => {
+  const base = {
+    schemaVersion: 1,
+    source: "agent-service" as const,
+    level: "info" as const,
+    eventGroup: "workspace" as const,
+    projectId: "project-1",
+    workspaceId: "workspace-1",
+  };
+  const flows = buildWorkspaceFlows([
+    { ...base, id: "received", ts: "2026-07-09T00:00:00.000Z", eventType: "workspace.mutation_received", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: null } },
+    { ...base, id: "committed", ts: "2026-07-09T00:00:01.000Z", eventType: "workspace.mutation_committed", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: 2 } },
+    { ...base, id: "projection", ts: "2026-07-09T00:00:02.000Z", eventType: "workspace.projection_applied", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: 2 } },
+    { ...base, source: "author-api" as const, id: "canonical", ts: "2026-07-09T00:00:03.000Z", eventType: "workspace.canonical_materialization_succeeded", traceId: "canonical:project-1:workspace-1:2", payload: { revision: 2 } },
+  ]);
+  assert.equal(flows.length, 1);
+  assert.deepEqual(flows[0], {
+    workspaceId: "workspace-1",
+    revision: 2,
+    mutationIds: ["mutation-1"],
+    traceIds: ["mutation-1", "canonical:project-1:workspace-1:2"],
+    eventIds: ["received", "committed", "projection", "canonical"],
+    eventTypes: [
+      "workspace.mutation_received",
+      "workspace.mutation_committed",
+      "workspace.projection_applied",
+      "workspace.canonical_materialization_succeeded",
+    ],
+    startedAt: "2026-07-09T00:00:00.000Z",
+    completedAt: "2026-07-09T00:00:03.000Z",
+    status: "canonical_succeeded",
+  });
+});
+
+test("performance summary emits stable p50 p95 p99 fields for every WMA metric", () => {
+  const metricPayloads = [10, 20, 30].map((value, index) => ({
+    id: `metric-${index}`,
+    schemaVersion: 1,
+    ts: `2026-07-09T00:00:0${index}.000Z`,
+    source: "agent-service" as const,
+    level: "info" as const,
+    eventGroup: "workspace" as const,
+    eventType: "workspace.mutation_committed",
+    workspaceId: "workspace-1",
+    payload: {
+      queueWaitMs: value,
+      commitLatencyMs: value * 2,
+      remoteUpdateLatencyMs: value * 3,
+      draftPreviewLatencyMs: value * 4,
+      projectionLatencyMs: value * 5,
+      reconnectConvergenceMs: value * 6,
+    },
+  }));
+  const summary = summarizeDiagnosticPerformance([
+    ...metricPayloads,
+    {
+      ...metricPayloads[0], id: "debounce", eventGroup: "autosave", eventType: "autosave.flush_debounced",
+      payload: { delayMs: 800 },
+    },
+  ]);
+  assert.deepEqual(summary.metrics.queueWait, {
+    count: 3, min: 10, p50: 20, p95: 30, p99: 30, max: 30, average: 20,
+  });
+  assert.equal(summary.metrics.autosaveDebounceWait.p50, 800);
+  assert.equal(summary.metrics.commitLatency.p95, 60);
+  assert.equal(summary.metrics.remoteUpdateLatency.p95, 90);
+  assert.equal(summary.metrics.draftPreviewLatency.p95, 120);
+  assert.equal(summary.metrics.projectionLatency.p95, 150);
+  assert.equal(summary.metrics.reconnectConvergence.p95, 180);
+  assert.equal(summary.metrics.canonicalLag.count, 0);
+});
+
+test("export merges SQLite canonical events with agent-service JSONL mutation spool", () => {
+  const dataDir = makeDataDir();
+  try {
+    const db = createDiagnosticsDb(dataDir);
+    try {
+      insertEvent(db, {
+        id: "canonical",
+        group: "workspace",
+        type: "workspace.canonical_materialization_succeeded",
+        ts: "2026-07-09T00:00:03.000Z",
+        payload: { revision: 2, rootHash: "root-2", durationMs: 40 },
+      });
+    } finally {
+      db.close();
+    }
+    const jsonlDir = path.join(dataDir, "editor-diagnostics");
+    fs.mkdirSync(jsonlDir, { recursive: true });
+    fs.writeFileSync(path.join(jsonlDir, "agent-service.jsonl"), `${JSON.stringify({
+      id: "committed",
+      schemaVersion: 1,
+      ts: "2026-07-09T00:00:01.000Z",
+      source: "agent-service",
+      level: "info",
+      eventGroup: "workspace",
+      eventType: "workspace.mutation_committed",
+      projectId: "project-1",
+      sessionId: "session-1",
+      workspaceId: "workspace-1",
+      traceId: "mutation-1",
+      operationId: "mutation-1",
+      payload: { mutationId: "mutation-1", revision: 2, queueWaitMs: 5, commitLatencyMs: 25 },
+    })}\n`);
+
+    const result = buildDiagnosticsResult("export", { dataDir }, { project: "project-1" });
+    assert.deepEqual(result.events.map((event) => event.id), ["committed", "canonical"]);
+    assert.equal(result.workspaceFlows[0]?.status, "canonical_succeeded");
+    assert.equal(result.performance.metrics.canonicalLag.p50, 2000);
+    assert.equal(result.diagnostics.jsonlFallbackUsed, true);
+    assert.equal(result.diagnostics.eventGapDetected, false);
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
 });
 
 test("formatDiagnosticFailureDetails includes sync failure summary fields", () => {

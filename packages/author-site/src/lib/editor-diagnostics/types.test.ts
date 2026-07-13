@@ -177,7 +177,7 @@ describe("editor diagnostic sanitizers", () => {
     });
   });
 
-  it("保留 workspace 同步失败的权威链路摘要", () => {
+  it("保留 canonical materialization 失败的权威链路摘要", () => {
     const event = normalizeEditorDiagnosticEvent({
       id: "evt-workspace-sync",
       schemaVersion: 1,
@@ -185,7 +185,7 @@ describe("editor diagnostic sanitizers", () => {
       source: "author-api",
       level: "error",
       eventGroup: "workspace",
-      eventType: "workspace.sync_failed",
+      eventType: "workspace.canonical_materialization_failed",
       projectId: "project-1",
       workspaceId: "workspace-1",
       payload: {
@@ -195,8 +195,11 @@ describe("editor diagnostic sanitizers", () => {
         canonicalSyncedWorkspaceId: "workspace-2",
         baseVersion: "v1",
         latestVersionId: "v2",
-        phase: "persist-workspace",
+        phase: "canonical-materialization",
         errorCode: "WORKSPACE_STALE",
+        revision: 8,
+        rootHash: "root-hash-8",
+        durationMs: 42,
         code: "export default function Demo() {}",
         prompt: "不要入库",
         ignored: "not allowed",
@@ -210,8 +213,11 @@ describe("editor diagnostic sanitizers", () => {
       canonicalSyncedWorkspaceId: "workspace-2",
       baseVersion: "v1",
       latestVersionId: "v2",
-      phase: "persist-workspace",
+      phase: "canonical-materialization",
       errorCode: "WORKSPACE_STALE",
+      revision: 8,
+      rootHash: "root-hash-8",
+      durationMs: 42,
       code: { length: 33, redacted: true },
       prompt: { length: 4, redacted: true },
     });

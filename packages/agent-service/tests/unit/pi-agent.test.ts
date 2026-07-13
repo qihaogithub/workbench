@@ -561,11 +561,9 @@ describe('PiAgentBackend', () => {
       });
     });
 
-    it('应从带完整参数的 tool_result 钩子捕获 writeFile 并发出文件事件', async () => {
+    it('应从带完整参数的 tool_result 钩子捕获 writeFile 文件摘要', async () => {
       const backend = new PiAgentBackend(mockConfig);
-      const events: any[] = [];
 
-      backend.onStream((event) => events.push(event));
       await backend.start();
 
       const harness = piAgentMocks.harnesses[0];
@@ -597,23 +595,11 @@ describe('PiAgentBackend', () => {
           content: 'export default function Demo() { return <div />; }',
         },
       ]);
-      expect(events).toContainEqual(
-        expect.objectContaining({
-          type: 'file_operation',
-          fileOperation: {
-            method: 'fs/write_text_file',
-            path: 'demos/new-page_a1b2/index.tsx',
-            content: 'export default function Demo() { return <div />; }',
-          },
-        }),
-      );
     });
 
-    it('应从带完整参数的 tool_result 钩子捕获 editFile 并立即发出文件事件', async () => {
+    it('应从带完整参数的 tool_result 钩子捕获 editFile 文件摘要', async () => {
       const backend = new PiAgentBackend(mockConfig);
-      const events: any[] = [];
 
-      backend.onStream((event) => events.push(event));
       await backend.start();
 
       const harness = piAgentMocks.harnesses[0];
@@ -645,25 +631,12 @@ describe('PiAgentBackend', () => {
           action: 'modified',
         },
       ]);
-      expect(events).toContainEqual(
-        expect.objectContaining({
-          type: 'file_operation',
-          fileOperation: {
-            method: 'fs/edit_text_file',
-            path: 'demos/new-page_a1b2/index.tsx',
-            content: 'edited file content',
-          },
-        }),
-      );
     });
   });
 
   describe('子 agent', () => {
     it('应执行短生命周期子 agent 并汇总写文件变更', async () => {
       const backend = new PiAgentBackend(mockConfig);
-      const events: any[] = [];
-
-      backend.onStream((event) => events.push(event));
 
       const result = await (backend as any).runSubagent({ task: '写入结果文件' });
 
@@ -677,16 +650,6 @@ describe('PiAgentBackend', () => {
         },
       ]);
       expect(backend.getFiles()).toEqual(result.files);
-      expect(events).toContainEqual(
-        expect.objectContaining({
-          type: 'file_operation',
-          fileOperation: {
-            method: 'fs/write_text_file',
-            path: 'demos/subagent-result.txt',
-            content: 'done',
-          },
-        }),
-      );
       expect(piAgentMocks.harnesses[0].options.tools.map((tool: any) => tool.name)).not.toContain('delegateTask');
       expect(piAgentMocks.harnesses[0].options.resources.skills[0].name).toBe('design-taste-frontend');
       expect(piAgentMocks.envs[0].cleanup).toHaveBeenCalled();

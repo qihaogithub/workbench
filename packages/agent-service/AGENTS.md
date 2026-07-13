@@ -89,7 +89,7 @@ tests/
 | `editFile` | 精确编辑文件（old_string/new_string 替换） |
 | `writeFile` | 写入工作空间内文件（变更会被捕获） |
 | `listFiles` | 列出目录文件 |
-| `bash` | Shell 命令（白名单：npm/node/npx/ls/cat/head/tail/grep/find/wc/echo） |
+| `bash` | Shell 命令（默认白名单：node/ls/cat/head/tail/grep/find/wc/echo；live Workspace 下进一步收紧为只读命令） |
 | `schemaValidate` | 校验 config.schema.json 格式 |
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |
@@ -101,14 +101,15 @@ tests/
 | `listPages` | 查询工作空间页面清单 |
 | `deletePage` | 删除单个页面（需要权限确认） |
 | `deletePages` | 批量删除页面（需要权限确认） |
-| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent |
+| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下禁用，避免绕过 Workspace Mutation Authority |
 
 ### Shell 白名单
 
 当前默认白名单在 `pi-tools/permissions.ts`：`node`、`ls`、`cat`、`head`、`tail`、`grep`、`find`、`wc`、`echo`；`npm`、`npx`、`node -e`、`rm`、`mv` 等默认拒绝。
 
-`pi-tools/bash-tool.ts:10` 定义 11 个允许的命令：`['npm', 'node', 'npx', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'echo']`。
-注：`npm install` / `npx` 可写文件系统；`echo` 可重定向。但未含 `rm` / `mv` 等高危命令。
+如果当前 `workingDir` 是 `scope=live` Workspace，`bash-tool` 会追加单写者防线：拒绝 `node`、`npm`、`npx`、重定向、heredoc、管道、命令连接符、命令替换、`tee` 和 `xargs` 等可能产生写副作用或绕过 Authority 的命令；需要写入时必须走受管工具或 Workspace Mutation Authority。
+
+如果当前 `workingDir` 是 `scope=live` Workspace，`delegateTask` 会直接返回 `WORKSPACE_AUTHORITY_REQUIRED`，不启动子 Agent runner。子 Agent 重新开放前必须先接入受管写工具、actor identity 和 receipt 汇总，不能让短生命周期 Agent 获得裸 Workspace 写权限。
 
 ## 配置（环境变量）
 

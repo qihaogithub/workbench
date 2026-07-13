@@ -4,7 +4,6 @@ import type {
   CreateProjectRequest,
   OpenProjectEditRequest,
   SaveProjectChangesRequest,
-  RestoreVersionRequest,
 } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
@@ -300,56 +299,6 @@ export async function registerProjectRoutes(fastify: FastifyInstance): Promise<v
         error: {
           code: 'FILE_READ_ERROR',
           message: '获取版本历史失败',
-        },
-      });
-    }
-  });
-
-  // 恢复指定版本
-  fastify.post('/api/projects/:id/restore', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const body = request.body as RestoreVersionRequest;
-
-      if (!body.versionId) {
-        return reply.code(400).send({
-          success: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: '版本号不能为空',
-          },
-        });
-      }
-
-      if (!body.username) {
-        return reply.code(400).send({
-          success: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: '用户名不能为空',
-          },
-        });
-      }
-
-      const result = await projectWorkspaceManager.restoreVersion(id, body.versionId, body.username);
-      return { success: true, data: result };
-    } catch (error) {
-      if (error instanceof Error && error.message === 'VERSION_NOT_FOUND') {
-        return reply.code(404).send({
-          success: false,
-          error: {
-            code: 'VERSION_NOT_FOUND',
-            message: '版本不存在',
-          },
-        });
-      }
-
-      logger.error({ error }, '恢复版本失败');
-      return reply.code(500).send({
-        success: false,
-        error: {
-          code: 'FILE_WRITE_ERROR',
-          message: '恢复版本失败',
         },
       });
     }

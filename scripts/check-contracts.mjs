@@ -76,7 +76,6 @@ function validateAgentStreamEvent(value, label) {
     "pong",
     "status",
     "permission_request",
-    "file_operation",
     "models",
   ]);
   expectString(value.type, `${label}.type`);
@@ -207,7 +206,6 @@ for (const eventType of [
   "pong",
   "status",
   "permission_request",
-  "file_operation",
   "models",
 ]) {
   expectSourceIncludes(agentClientSource, `"${eventType}"`, `agent StreamEvent ${eventType}`);
@@ -217,7 +215,7 @@ expectSourceIncludes(agentClientSource, "currentModelId", "agent models currentM
 
 const screenshotRouteSource = readSource("packages/screenshot-service/src/routes/screenshots.ts");
 for (const token of [
-  "interface GenerateRequest",
+  "type GenerateRequest = RequestSnapshotInput",
   "interface GenerateBatchRequest",
   "interface BatchState",
   "interface GenerateScreenshotResult",

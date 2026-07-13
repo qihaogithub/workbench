@@ -1,13 +1,18 @@
 import type {
   DemoPageRuntimeType,
   ProjectAuthoringPreferences,
+  UserAuthoringPreferences,
+  WorkspaceRevision,
 } from "./workspace";
 
 export type { DemoPageRuntimeType } from "./workspace";
 export type {
+  CanonicalSyncedRevision,
+  ProjectBaseVersion,
   ProjectAuthoringPreferences,
   SketchEditorEnginePreference,
   UserAuthoringPreferences,
+  WorkspaceRevision,
 } from "./workspace";
 export {
   SKETCH_SCENE_PROTOCOL_VERSION,
@@ -70,6 +75,9 @@ export interface DemoMeta {
 export interface ProjectTemplateMeta {
   id: string;
   sourceProjectId: string;
+  sourceWorkspaceId?: string;
+  sourceWorkspaceRevision?: WorkspaceRevision;
+  sourceWorkspaceRootHash?: string;
   category: string;
   name: string;
   description: string;
@@ -225,6 +233,7 @@ export const ErrorCode = {
   SESSION_EXPIRED: "SESSION_EXPIRED",
   VALIDATION_ERROR: "VALIDATION_ERROR",
   AGENT_SERVICE_ERROR: "AGENT_SERVICE_ERROR",
+  WORKSPACE_AUTHORITY_NOT_READY: "WORKSPACE_AUTHORITY_NOT_READY",
   PROJECT_NOT_FOUND: "PROJECT_NOT_FOUND",
   VERSION_NOT_FOUND: "VERSION_NOT_FOUND",
   SESSION_NOT_EDITING: "SESSION_NOT_EDITING",
@@ -258,6 +267,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   SESSION_EXPIRED: "Session 已过期",
   VALIDATION_ERROR: "数据校验失败",
   AGENT_SERVICE_ERROR: "Agent 服务请求失败",
+  WORKSPACE_AUTHORITY_NOT_READY: "Workspace Authority 不可用",
   PROJECT_NOT_FOUND: "项目不存在",
   VERSION_NOT_FOUND: "版本不存在",
   SESSION_NOT_EDITING: "会话不在编辑状态",

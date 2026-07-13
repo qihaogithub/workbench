@@ -36,6 +36,11 @@ export interface WorkspaceSyncResult {
   error?: string;
 }
 
+export interface WorkspaceCanonicalSyncMetadata {
+  revision: number;
+  rootHash: string;
+}
+
 type WorkspaceSyncDiagnosticReason =
   | "missing_active_workspace"
   | "active_workspace_mismatch"
@@ -45,15 +50,21 @@ type WorkspaceSyncDiagnosticReason =
 
 interface WorkspaceSyncDiagnosticContext {
   projectId: string;
+  startedAt: number;
   requestedWorkspaceId?: string | null;
   activeWorkspaceId?: string | null;
   canonicalSyncedWorkspaceId?: string | null;
   baseVersion?: string | null;
   latestVersionId?: string | null;
+  revision?: number;
+  rootHash?: string;
 }
 
 function recordWorkspaceSyncDiagnostic(
-  eventType: "workspace.sync_started" | "workspace.sync_succeeded" | "workspace.sync_failed",
+  eventType:
+    | "workspace.canonical_materialization_started"
+    | "workspace.canonical_materialization_succeeded"
+    | "workspace.canonical_materialization_failed",
   context: WorkspaceSyncDiagnosticContext,
   details: {
     level?: "info" | "warn" | "error";
@@ -62,22 +73,26 @@ function recordWorkspaceSyncDiagnostic(
     workspacePath?: string;
   } = {},
 ): void {
+  const workspaceId = context.requestedWorkspaceId || context.activeWorkspaceId || undefined;
+  const operationId = `canonical:${context.projectId}:${workspaceId ?? "missing"}:${context.revision ?? "legacy"}`;
   appendServerEditorDiagnosticEvent({
     level: details.level ?? "info",
     eventGroup: "workspace",
     eventType,
     projectId: context.projectId,
-    workspaceId:
-      context.requestedWorkspaceId ||
-      context.activeWorkspaceId ||
-      undefined,
+    workspaceId,
+    operationId,
+    traceId: operationId,
     payload: {
-      phase: "persist-workspace",
+      phase: "canonical-materialization",
       requestedWorkspaceId: context.requestedWorkspaceId ?? null,
       activeWorkspaceId: context.activeWorkspaceId ?? null,
       canonicalSyncedWorkspaceId: context.canonicalSyncedWorkspaceId ?? null,
       baseVersion: context.baseVersion ?? null,
       latestVersionId: context.latestVersionId ?? null,
+      revision: context.revision ?? null,
+      rootHash: context.rootHash ?? null,
+      durationMs: Math.max(0, Date.now() - context.startedAt),
       reason: details.reason,
       errorCode: details.errorCode,
       workspacePath: details.workspacePath,
@@ -245,6 +260,9 @@ export function getOrCreateProjectActiveWorkspace(
           activeWorkspaceId: undefined,
           activeWorkspaceUpdatedAt: undefined,
           canonicalSyncedWorkspaceId: undefined,
+          canonicalSyncedRevision: undefined,
+          canonicalSyncedRootHash: undefined,
+          canonicalSyncedAt: undefined,
           updatedAt: Date.now(),
         });
       } else if (!meta) {
@@ -296,6 +314,10 @@ export function getOrCreateProjectActiveWorkspace(
     ...project,
     activeWorkspaceId: workspaceId,
     activeWorkspaceUpdatedAt: now,
+    canonicalSyncedWorkspaceId: undefined,
+    canonicalSyncedRevision: undefined,
+    canonicalSyncedRootHash: undefined,
+    canonicalSyncedAt: undefined,
     updatedAt: now,
   });
 
@@ -314,6 +336,7 @@ export function getOrCreateProjectActiveWorkspace(
 export function syncActiveWorkspaceToCanonical(
   projectId: string,
   workspaceId?: string | null,
+  metadata?: WorkspaceCanonicalSyncMetadata,
 ): WorkspaceSyncResult {
   const project = readProjectMeta(projectId);
   if (!project) {
@@ -326,16 +349,19 @@ export function syncActiveWorkspaceToCanonical(
 
   const diagnosticContext: WorkspaceSyncDiagnosticContext = {
     projectId,
+    startedAt: Date.now(),
     requestedWorkspaceId: workspaceId ?? null,
     activeWorkspaceId: project.activeWorkspaceId ?? null,
     canonicalSyncedWorkspaceId: project.canonicalSyncedWorkspaceId ?? null,
     latestVersionId: latestVersionId(projectId),
+    revision: metadata?.revision,
+    rootHash: metadata?.rootHash,
   };
-  recordWorkspaceSyncDiagnostic("workspace.sync_started", diagnosticContext);
+  recordWorkspaceSyncDiagnostic("workspace.canonical_materialization_started", diagnosticContext);
 
   const effectiveWorkspaceId = workspaceId || project.activeWorkspaceId;
   if (!effectiveWorkspaceId) {
-    recordWorkspaceSyncDiagnostic("workspace.sync_failed", diagnosticContext, {
+    recordWorkspaceSyncDiagnostic("workspace.canonical_materialization_failed", diagnosticContext, {
       level: "error",
       reason: "missing_active_workspace",
       errorCode: "WORKSPACE_STALE",
@@ -349,7 +375,7 @@ export function syncActiveWorkspaceToCanonical(
 
   if (project.activeWorkspaceId !== effectiveWorkspaceId) {
     recordWorkspaceSyncDiagnostic(
-      "workspace.sync_failed",
+      "workspace.canonical_materialization_failed",
       {
         ...diagnosticContext,
         requestedWorkspaceId: effectiveWorkspaceId,
@@ -370,7 +396,7 @@ export function syncActiveWorkspaceToCanonical(
   const sourcePath = findWorkspacePath(effectiveWorkspaceId);
   if (!sourcePath || !fs.existsSync(sourcePath)) {
     recordWorkspaceSyncDiagnostic(
-      "workspace.sync_failed",
+      "workspace.canonical_materialization_failed",
       {
         ...diagnosticContext,
         requestedWorkspaceId: effectiveWorkspaceId,
@@ -395,7 +421,7 @@ export function syncActiveWorkspaceToCanonical(
     baseVersion: sourceMeta?.baseVersion ?? null,
   };
   if (!isWorkspaceBasedOnLatest(projectId, sourceMeta)) {
-    recordWorkspaceSyncDiagnostic("workspace.sync_failed", syncContext, {
+    recordWorkspaceSyncDiagnostic("workspace.canonical_materialization_failed", syncContext, {
       level: "error",
       reason: "base_version_stale",
       errorCode: "WORKSPACE_STALE",
@@ -434,11 +460,13 @@ export function syncActiveWorkspaceToCanonical(
       activeWorkspaceId: effectiveWorkspaceId,
       activeWorkspaceUpdatedAt: readWorkspaceUpdatedAt(effectiveWorkspaceId) || now,
       canonicalSyncedWorkspaceId: effectiveWorkspaceId,
+      canonicalSyncedRevision: metadata?.revision,
+      canonicalSyncedRootHash: metadata?.rootHash,
       canonicalSyncedAt: now,
       updatedAt: now,
     });
     recordWorkspaceSyncDiagnostic(
-      "workspace.sync_succeeded",
+      "workspace.canonical_materialization_succeeded",
       {
         ...syncContext,
         activeWorkspaceId: effectiveWorkspaceId,
@@ -451,7 +479,7 @@ export function syncActiveWorkspaceToCanonical(
     return { success: true, workspacePath: projectWorkspacePath };
   } catch (error) {
     fs.rmSync(tempPath, { recursive: true, force: true });
-    recordWorkspaceSyncDiagnostic("workspace.sync_failed", syncContext, {
+    recordWorkspaceSyncDiagnostic("workspace.canonical_materialization_failed", syncContext, {
       level: "error",
       reason: "canonical_write_failed",
       errorCode: "FILE_WRITE_ERROR",
@@ -461,6 +489,36 @@ export function syncActiveWorkspaceToCanonical(
       error: error instanceof Error ? error.message : "Sync failed",
     };
   }
+}
+
+export function clearCanonicalSyncProofIfMatches(
+  projectId: string,
+  workspaceId: string | null | undefined,
+  metadata: WorkspaceCanonicalSyncMetadata,
+): boolean {
+  if (!workspaceId) {
+    return false;
+  }
+  const project = readProjectMeta(projectId);
+  if (!project) {
+    return false;
+  }
+  if (
+    project.canonicalSyncedWorkspaceId !== workspaceId ||
+    project.canonicalSyncedRevision !== metadata.revision ||
+    project.canonicalSyncedRootHash !== metadata.rootHash
+  ) {
+    return false;
+  }
+  writeProjectMeta(projectId, {
+    ...project,
+    canonicalSyncedWorkspaceId: undefined,
+    canonicalSyncedRevision: undefined,
+    canonicalSyncedRootHash: undefined,
+    canonicalSyncedAt: undefined,
+    updatedAt: Date.now(),
+  });
+  return true;
 }
 
 export function getWorkspace(workspaceId: string) {

@@ -12,6 +12,12 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { isLiveWorkspace } from "@/lib/workspace-manager";
+import {
+  commitWorkspaceMutation,
+  createTextWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
 import { normalizeCanvasStateLayers } from "@workbench/demo-ui";
 import type {
   CanvasDocumentEntry,
@@ -398,6 +404,7 @@ async function validateSessionAccess(sessionId: string) {
   return {
     sessionPath: getSessionPath(sessionId),
     workspacePath,
+    workspaceId: meta.workspaceId,
     projectId: meta.demoId,
   };
 }
@@ -587,19 +594,54 @@ export async function POST(
       state,
     };
 
-    for (const layoutPath of getCanvasLayoutPaths(access)) {
-      fs.mkdirSync(path.dirname(layoutPath), { recursive: true });
-      writeJsonFileAtomic(layoutPath, stored);
+    const content = JSON.stringify(stored, null, 2);
+    let receipt;
+    if (
+      access.workspacePath &&
+      access.workspaceId &&
+      access.projectId &&
+      isLiveWorkspace(access.workspaceId)
+    ) {
+      const layoutPath = getCanvasLayoutPath(access.workspacePath);
+      const previousContent = fs.existsSync(layoutPath)
+        ? fs.readFileSync(layoutPath, "utf-8")
+        : null;
+      receipt = await commitWorkspaceMutation(createTextWorkspaceMutation({
+        projectId: access.projectId,
+        workspaceId: access.workspaceId,
+        sessionId: params.sessionId,
+        path: ".canvas-layout.json",
+        content,
+        previousContent,
+        reason: "author_canvas_layout_save",
+      }));
+    } else if (access.workspacePath) {
+      const workspaceLayoutPath = getCanvasLayoutPath(access.workspacePath);
+      fs.mkdirSync(path.dirname(workspaceLayoutPath), { recursive: true });
+      writeJsonFileAtomic(workspaceLayoutPath, stored);
     }
+
+    // The session copy is a disposable UI recovery cache. Canonical is an
+    // asynchronous projection and must not be directly overwritten here.
+    const sessionLayoutPath = getCanvasLayoutPath(access.sessionPath);
+    fs.mkdirSync(path.dirname(sessionLayoutPath), { recursive: true });
+    writeJsonFileAtomic(sessionLayoutPath, stored);
 
     return NextResponse.json(
       createApiSuccess({
         state,
         updatedAt: stored.updatedAt,
+        receipt,
       }),
     );
   } catch (error) {
     console.error("Error saving canvas layout:", error);
+    if (error instanceof WorkspaceAuthorityClientError) {
+      return NextResponse.json(
+        createApiError(error.code as never, error.message),
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       createApiError("FILE_WRITE_ERROR", "保存画布布局失败"),
       { status: 500 },

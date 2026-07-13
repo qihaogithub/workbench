@@ -277,8 +277,117 @@ corepack pnpm diagnostics:export -- --project "project-1" --since 24h
 
 默认输出 JSON；人工查看可加 `--format text` 输出简短时间线。失败事件会额外显示 `workspace`、`page`、`phase`、`code` 和 `status`，便于直接判断同步失败边界。
 
-SQLite 是诊断主账本。JSONL 只在 SQLite 不可用、无匹配主事件或导出 fallback/spool 片段时读取；输出中的 `jsonlFallbackUsed` 会明确标记该情况。
-`diagnostics:autosave`、`diagnostics:collab` 和 `diagnostics:preview` 在 SQLite 与 JSONL 兜底路径都会按事件组过滤，避免高频协同状态快照淹没专项时间线。
+SQLite 是诊断主账本，agent-service JSONL 是 mutation/projection 等跨服务事件的 spool。`diagnostics:autosave`、`diagnostics:collab`、`diagnostics:preview`、`diagnostics:project` 和 `diagnostics:export` 会对 SQLite 与 JSONL 去重合并，避免 canonical 事件在主库、mutation/projection 事件在 spool 时被分成两条时间线。使用 JSONL 时 `jsonlFallbackUsed` 会明确标记。
+
+autosave/collab/preview 三类专项查询均包含 `autosave`、`collab`、`preview`、`workspace` 四组事件。JSON 结果除 `events` 外还输出：
+
+- `workspaceFlows`：按 Workspace + Authority revision 串联 mutation received/committed、projection applied/failed/gap 和 canonical materialization。
+- `performance.metrics`：固定输出 autosave debounce wait、queue wait、commit latency、remote update latency、draft preview latency、projection latency、reconnect convergence 和 canonical lag 的 `count/min/p50/p95/p99/max/average`。无样本时 count 为 `0`，分位值为 `null`。
+
+---
+
+### `workspace-authority-status <projectId> <workspaceId>` - Workspace Authority 状态
+
+只读查询某个 live Workspace 的 Authority 状态，用于发布、导出、模板、canonical 物化或部署前检查之前确认单写者状态。该命令需要有效编辑 Session 做访问校验，不会触发 bootstrap、不会获取写 lease，也不会修改业务文件。
+
+```bash
+corepack pnpm workspace-authority:status -- "project-1" "live-1" --session "session-1" --json
+
+# 或直接调用 OPS CLI
+corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts \
+  workspace-authority-status "project-1" "live-1" \
+  --session "session-1" \
+  --json
+```
+
+JSON 输出包含：
+
+| 字段 | 说明 |
+|:-----|:-----|
+| `status.ready` | 是否满足当前只读 preflight：存在 state、Workspace 可读、无 external drift、无 active lease、无 prepared 事务 |
+| `status.revision` / `status.rootHash` | Authority 当前 committed revision 和根哈希 |
+| `status.actualRootHash` | 当前磁盘受管资源重新计算出的根哈希 |
+| `status.externalDrift` | 磁盘受管资源是否已偏离 Authority state |
+| `status.queueDepth` | 当前进程内该 Workspace mutation 队列深度 |
+| `status.activeLease` | 是否存在跨进程写 lease；遗留 lease 也会 fail-closed |
+| `status.preparedCount` | 是否存在待恢复 prepared 事务 |
+| `status.recoveryPendingCount` | 启动恢复尚未收敛的事务数 |
+| `status.conflictCount` | 从 Authority journal 持久派生的 mutation 冲突数 |
+| `status.eventSubscriberCount` | 当前进程同一 `DATA_DIR` 下的 committed-event 订阅者数 |
+| `status.stagingCount` / `backupCount` / `receiptCount` / `journalEntries` / `projectionAckEntries` | staging、committed backup、receipt、journal 和 projection ack 的诊断计数 |
+| `status.missingBackupCount` | 当前 committed state 引用但缺失或损坏的内容备份数；非零时 Authority 不 ready |
+| `warnings` | 面向自动任务和开发者的可读风险摘要 |
+
+### `workspace-authority-preflight <projectId> <workspaceId>` - Workspace Authority 自动化前置检查
+
+只读执行关键动作前置检查，并把 health 状态转换成机器可消费的 `passed` / `issues`。默认把 Workspace 缺失、Authority state 缺失、external drift、active/stale write lease、prepared 事务和 committed backup 不完整判为失败；可用 `--fail-on-queue` 或 `--fail-on-staging` 把队列积压和 staging 文件残留也纳入阻断项。
+
+```bash
+corepack pnpm workspace-authority:preflight -- "project-1" "live-1" --session "session-1" --json
+
+corepack pnpm workspace-authority:preflight -- "project-1" "live-1" \
+  --session "session-1" \
+  --fail-on-queue \
+  --fail-on-staging \
+  --json
+```
+
+JSON 输出包含：
+
+| 字段 | 说明 |
+|:-----|:-----|
+| `passed` | 是否允许继续执行发布、导出、模板、canonical 物化或部署前检查 |
+| `issues` | 机器可消费的阻断原因列表；为空表示通过 |
+| `status` | 与 `workspace-authority-status` 相同的 health 明细 |
+| `warnings` | 可读风险摘要；可能包含非阻断项 |
+
+部署前需要一次检查全部 live Workspace 时，使用无服务依赖的离线扫描：
+
+```bash
+corepack pnpm check:workspace-deploy-preflight
+```
+
+该检查只读本地 `data/` 和 `docker-compose.yml`，阻断未注册 live Workspace、external drift、lease、prepared 事务、committed backup 缺口以及共享 `DATA_DIR` 不一致。正式部署脚本会在同步/构建前自动运行静态门禁，并在远端正式 `APP_DATA_DIR` 上执行同一扫描。
+
+历史 live Workspace 的 Authority 注册使用幂等迁移命令，默认 dry-run：
+
+```bash
+# 单 Workspace / 单项目 / 全量，三者必须且只能选一个
+corepack pnpm workspace-authority:migrate -- --workspace <workspaceId> --json
+corepack pnpm workspace-authority:migrate -- --project <projectId> --json
+corepack pnpm workspace-authority:migrate -- --all --json
+
+# 显式写入 Authority state 与 committed backup，不修改 Workspace 业务内容
+corepack pnpm workspace-authority:migrate -- --all --apply --json
+```
+
+已注册且完整的 Workspace 返回 `already_bootstrapped`；旧 state 缺少 committed backup 时返回 `would_repair_backups` / `backups_repaired`。若存在 external drift、lease 或 prepared 事务，迁移保持 `blocked`，不会静默 adopt。
+
+### `workspace-authority-bootstrap` / `workspace-authority-reconcile-adopt` / `workspace-authority-reconcile-restore`
+
+这两个命令用于受控修复 Authority 元数据，默认都是 dry-run：
+
+```bash
+# 只检查是否需要 bootstrap，不写入 state
+corepack pnpm workspace-authority:bootstrap -- "project-1" "live-1" --session "session-1" --json
+
+# 显式创建 Authority state。该操作只写 Authority 内部 state，不修改业务文件。
+corepack pnpm workspace-authority:bootstrap -- "project-1" "live-1" --session "session-1" --apply --json
+
+# 只检查 external drift，不接纳磁盘漂移
+corepack pnpm workspace-authority:reconcile-adopt -- "project-1" "live-1" --session "session-1" --json
+
+# 显式把当前磁盘受管内容 adopt 为新 revision
+corepack pnpm workspace-authority:reconcile-adopt -- "project-1" "live-1" --session "session-1" --apply --json
+
+# 只检查能否从 committed backup 恢复，不修改 Workspace
+corepack pnpm workspace-authority:reconcile-restore -- "project-1" "live-1" --session "session-1" --json
+
+# 丢弃外部漂移，恢复最后 committed 内容
+corepack pnpm workspace-authority:reconcile-restore -- "project-1" "live-1" --session "session-1" --apply --json
+```
+
+`bootstrap` 默认返回 `would_bootstrap` 或 `already_bootstrapped`；`reconcile-adopt` 默认返回 `would_adopt` 或 `noop`；`reconcile-restore` 默认返回 `would_restore`、`restore_blocked` 或 `noop`。只有加 `--apply` 才会调用 agent-service 的修复入口。restore 依赖 Authority 内部按内容 hash 保存的 committed backup，备份缺失或损坏时返回阻断结果并保留当前外部内容，不会退化为静默 adopt。
 
 **输出示例:**
 ```

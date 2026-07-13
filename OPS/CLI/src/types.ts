@@ -50,6 +50,45 @@ export interface HealthStatus {
   timestamp: string;
   uptime: number;
   agents: number;
+  workspaceAuthorityRecovery?: {
+    state: "pending" | "recovering" | "ready" | "failed";
+    scannedWorkspaceCount: number;
+    registeredWorkspaceCount: number;
+    skippedUnregisteredCount: number;
+    pendingTransactionCount: number;
+    recoveredTransactionCount: number;
+    rolledBackCount: number;
+    committedCleanupCount: number;
+    startedAt?: number;
+    completedAt?: number;
+    error?: string;
+  };
+}
+
+export interface WorkspaceAuthorityHealthStatus {
+  workspaceId: string;
+  projectId?: string;
+  ready: boolean;
+  stateExists: boolean;
+  workspaceExists: boolean;
+  revision?: number;
+  rootHash?: string;
+  actualRootHash?: string;
+  externalDrift: boolean;
+  queueDepth: number;
+  activeLease: boolean;
+  preparedCount: number;
+  recoveryState: "ready" | "pending";
+  recoveryPendingCount: number;
+  conflictCount: number;
+  eventSubscriberCount: number;
+  stagingCount: number;
+  backupCount: number;
+  missingBackupCount: number;
+  receiptCount: number;
+  journalEntries: number;
+  projectionAckEntries: number;
+  checkedAt: number;
 }
 
 export interface HttpMessageOptions {
@@ -147,7 +186,6 @@ export interface StreamEvent {
     | "status"
     | "permission_request"
     | "user_choice_request"
-    | "file_operation"
     | "models";
   id?: string;
   content?: string;
@@ -185,11 +223,6 @@ export interface StreamEvent {
       description?: string;
     }>;
     allowCustom: boolean;
-  };
-  fileOperation?: {
-    method: string;
-    path: string;
-    content?: string;
   };
   models?: Array<{
     id: string;

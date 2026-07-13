@@ -36,7 +36,10 @@ jest.mock("@/lib/workspace-flush", () => ({
   flushAndSyncProjectWorkspace: jest.fn(async () => ({
     status: "no_active_room",
     flushedRooms: 0,
+    revision: 6,
     workspacePath: "/tmp/project-1/workspace",
+    canonicalRevision: 6,
+    canonicalRootHash: "root-hash-6",
   })),
   getWorkspaceFlushErrorResponse: jest.fn((error: unknown) => ({
     code: "FILE_WRITE_ERROR",
@@ -98,6 +101,8 @@ describe("session persist workspace route", () => {
         sessionId: "session-1",
         projectId: "project-1",
         workspacePath: "/tmp/project-1/workspace",
+        canonicalRevision: 6,
+        canonicalRootHash: "root-hash-6",
         persistedAt: expect.any(Number),
       },
     });

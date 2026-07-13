@@ -16,13 +16,15 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-10。
 
 同轮还确认 `packages/project-core/src/service.ts` 已把原型页 HTML 上限从旧 120KB 提升到 2MB；当前大型 Figma HTML 原型页仍可继续通过 `page create`、`page update-prototype`、`page update-prototypes` 与 `project import-prototype` 的共享链路导入，不应再沿用旧限制判断为 CLI 缺口。
 
+2026-07-10 同轮还确认 active Workspace 的耐久写入契约进一步扩到了 author-site 路由层：`packages/shared/src/contracts.ts` 新增了 `WorkspaceMutationOperation` / `WorkspaceMutationReceipt` 等共享协议，`packages/project-core/src/workspace-resource-registry.ts` 则把 demo / knowledge / asset / workspace-tree / canvas-layout 等受管资源的白名单和哈希校验集中化。author-site 当前对 `packages/author-site/src/app/api/knowledge/*` 与 `packages/author-site/src/app/api/projects/[projectId]/demos*` 的 live Workspace 写入，已经改走 `commitWorkspaceMutation`；但这仍是 author-site + workspace-authority 的写入编排，并不等于 `project-core` 已经提供了可复用的 `knowledge *`、`workspace *` 或 session 生命周期共享服务，所以它不会关闭现有 CLI 缺口。
+
 ## 当前缺口
 
 | 编号 | 状态 | 自动化等级 | 缺口 | 当前判断 |
 | --- | --- | --- | --- | --- |
 | GAP-002 | 待处理 | L1 | 会话管理缺失 | Web 会话创建/删除依赖 agent-service、模型配置和外部鉴权同步；`project-core` 尚无共享会话生命周期能力 |
-| GAP-003 | 待处理 | L1 | 工作区管理缺失 | Web 工作区仍停留在 author-site 本地 manager；`project-core` 尚无统一工作区服务 |
-| GAP-004 | 待处理 | L1 | 知识文档 CRUD 缺失 | Web 侧知识文档直接操作 `workingDir/knowledge` 与 manifest，缺少适用于 CLI 的共享领域封装 |
+| GAP-003 | 待处理 | L1 | 工作区管理缺失 | Web live Workspace 写入正在接入 author-site + workspace-authority 契约，但 `project-core` 仍无统一工作区共享服务 |
+| GAP-004 | 待处理 | L1 | 知识文档 CRUD 缺失 | knowledge 写入在 live Workspace 已改走 mutation contract，但语义仍由 author-site 路由拼装，`project-core` 尚无可复用 CRUD 服务 |
 | GAP-005 | 待处理 | L1 | 截图任务命令缺失 | 截图任务依赖 author-site 代理与 screenshot-service；当前 `project-core` 只有健康状态查询，未具备任务级共享能力 |
 | GAP-011 | 待处理 | L1 | 项目配置运行值共享与本地包同步缺失 | `project-core` 已把 `projectConfigValues` 放进 `project get` / `exportProjectPackage`，但 author-site `/config-values` 写入仍停留在路由层，`project-scaffold` 也未把 `project.config.values.json` 纳入本地项目包协议 |
 
@@ -42,12 +44,13 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-10。
 - `corepack pnpm ops:automation report --json`：通过，当前仍为 13 个 active 入口（`tools.json` 3 / `tests.json` 6 / `scripts.json` 4）。
 - `corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json`：通过；返回的命令清单与 `packages/project-cli/src/index.ts` 注册项一致。
 - `packages/project-cli/src/cli-all-commands.test.ts`：仍以 `registeredCommands.filter((command) => !executed.has(command))` 断言没有未覆盖命令。
-- `corepack pnpm check:project-core`：通过（34 tests passed），确认原型页与草图页能力的共享层实现可通过类型检查与单元测试。
+- `corepack pnpm check:project-core`：通过（38 tests passed），确认原型页与草图页能力，以及新加入的 workspace resource registry 共享层实现可通过类型检查与单元测试。
 - `corepack pnpm check:project-cli`：通过，确认 `page update-prototype`、`page update-sketch` 与扩展后的 `page create` 仍满足全命令回归。
-- `corepack pnpm check:author`：通过（94 test suites / 641 tests），确认当前工作树里的项目配置运行值路由和其他 author-site 改动未引入本地测试回归。
+- `corepack pnpm check:author`：2026-07-10 失败；当前失败集中在 `src/app/demo/[id]/edit/__tests__/useVisualEditState.test.tsx` 的 AI prompt 断言，以及 `src/app/api/sessions/[sessionId]/assets/localize/route.test.ts` 的 `fetch is not defined` / 500 响应。这些失败落在 author-site 当前脏分支里的新 workspace-authority / AI prompt 改动上，尚未单独证明 CLI 或 `project-core` 对齐回归。
 - `corepack pnpm check:project-scaffold`：通过。
 - 2026-07-10 当前工作树验证：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出继续与当前注册命令一致。
-- 2026-07-10 当前工作树验证：`corepack pnpm check:project-core` 通过；`corepack pnpm check:project-cli` 通过。`page create` 默认原型页策略与大型原型页 HTML 上限调整在当前正式仓库路径下未引入新的 CLI / 共享层回归。
+- 2026-07-10 当前工作树验证：`corepack pnpm check:project-core` 通过（38 tests passed）；`corepack pnpm check:project-cli` 通过。`page create` 默认原型页策略、大型原型页 HTML 上限调整，以及 workspace resource registry 引入在当前正式仓库路径下未引入新的 CLI / 共享层回归。
+- 2026-07-10 当前工作树验证：`corepack pnpm check:author` 失败，当前失败集中在 `useVisualEditState` 与 `assets/localize` 两组 author-site 测试；因为没有独立的 `project-cli` / `project-core` 失配证据，本轮结论继续保持 report-only。
 - 2026-07-09 当前工作树验证：`corepack pnpm check:automation` 通过；`corepack pnpm ops:automation report --json` 仍显示 13 个 active 入口；`corepack pnpm exec tsx packages/project-cli/src/index.ts commands --json` 输出仍与当前注册命令一致。
 - 2026-07-09 当前工作树验证：`corepack pnpm check:project-core` 通过（34 tests passed）；`corepack pnpm check:project-cli` 通过；`corepack pnpm check:project-scaffold` 通过。`projectConfigValues` 扩展到 publish / viewer 消费链路后，CLI 与共享层相关检查未出现新增回归。
 - 2026-07-09 当前工作树验证：`corepack pnpm check:author` 通过（102 test suites / 677 tests）。正式仓库路径下 author-site 本地测试链路已恢复全绿，因此本轮不再把先前记录的超时 / `act(...)` 噪声视为 CLI 自动维护阻塞。
@@ -79,12 +82,15 @@ CLI 与创作端能力对齐仍需长期跟踪。最近更新：2026-07-10。
 - `packages/project-core/src/service.ts` 的 `createProject` / `updateProject` 与 author-site 的项目元数据路由当前都支持 `category`；其中更新链路还支持项目级 `authoringPreferences.sketchEditorEngine`。CLI 现在只做参数适配与校验，不引入新的业务语义，也不绕过 `project-core` 的审计和权限边界。
 - `packages/project-core/src/service.ts` 的 `listProjects()` 现在会忽略缺少 `project.json` 的残留目录；`packages/project-cli/src/index.ts` 的 `project list`、author-site 的 `/api/demos` GET 和首页项目列表都直接复用这条共享层路径，因此当前项目列表语义已经在 CLI 与 Web 之间保持一致。
 - `packages/project-core/src/service.ts` 的 `getProject()` 与 `exportProjectPackage()` 现在会带出 `projectConfigValues`，因此 `project get` 已可只读读取项目级配置运行值；但这不等同于 CLI 已经具备独立的配置运行值管理能力。
+- `packages/shared/src/contracts.ts` 与 `packages/project-core/src/workspace-resource-registry.ts` 现在已经定义了 active Workspace 的共享 mutation 协议、受管资源白名单和哈希校验工具；但这还是底层写入契约，不是 `project-core` 面向 CLI 暴露的项目级 CRUD 服务。
 - `packages/project-scaffold/src/index.ts` 与 `project-package.schema.json` 当前仍只托管 `projectConfigSchema`，没有为 `project.config.values.json` 分配 manifest 字段、托管文件路径或提交写回逻辑；因此 `project pull`、`validate` 与 `submit` 还不能 round-trip 这份运行值文件。
 - `packages/author-site/src/app/api/projects/[projectId]/config-values/route.ts` 的 PUT 仍直接依赖 session/workspace 解析、`saveProjectConfigValues()` 与 `updateWorkspaceTimestamp()`，说明项目配置运行值写回语义仍停留在 author-site 路由层，尚未沉淀成可被 CLI 复用的共享领域服务。
 - `packages/author-site/src/app/api/viewer/[projectId]/data/route.ts` 与 viewer 页面当前会把 `projectConfigValues` 合并进页面默认配置，`packages/author-site/src/app/api/projects/[projectId]/publish/route.ts` 还会在发布前把 live workspace 中非空的运行值回填到 canonical workspace；这说明 `project.config.values.json` 已经进入 viewer / publish 用户链路，但共享写入仍未进入 `project-core`。
-- `packages/author-site/src/app/api/knowledge/*` 虽然已经把知识文档版本快照和删除审计接到 `resourceVersionCreate` / `resourceDelete`，但创建、改名、内容写入、manifest 维护仍直接操作 `workspace/knowledge/*` 与 `knowledge/manifest.json`；因此 GAP-004 只能继续按“共享层未完成”处理，不能因为有 `resource version-*` 就判定知识文档 CLI 已可补齐。
+- `packages/author-site/src/app/api/knowledge/*` 虽然已经把知识文档版本快照和删除审计接到 `resourceVersionCreate` / `resourceDelete`，并在 live Workspace 路径下改为提交 `commitWorkspaceMutation`，但文档/manifest 语义、session/workspace 解析和 mutation 组装仍停留在 author-site 路由层；因此 GAP-004 只能继续按“共享层未完成”处理，不能因为有 `resource version-*` 或 workspace-authority 契约就判定知识文档 CLI 已可补齐。
+- `packages/author-site/src/app/api/projects/[projectId]/demos/route.ts` 与 `[demoId]/route.ts` 当前也会在 live Workspace 路径下通过 `commitWorkspaceMutation` 维护 `workspace-tree.json` 和页面初始文件；但 CLI 页面能力早已通过 `project-core` 共享服务对齐，这轮变化属于 author-site 写入通路治理，而不是新的 CLI 缺口或新的共享层闭环。
 - 原型页和草图页能力当前仅确认创作端编辑事务与本地测试链路；根据 [`docs/项目文档/创作端/10-CLI/技术/01_CLI能力层实现设计.md`](../../项目文档/创作端/10-CLI/技术/01_CLI能力层实现设计.md)，发布、viewer 与本地项目包协议仍不应被自动推断为已完整支持。
 - `packages/author-site/src/app/api/projects/[projectId]/resources/*`、`commits/*`、`materialize/route.ts` 与 `packages/author-site/src/app/api/knowledge/*` 说明资源历史与内容图迁移已经完成共享层复用；`packages/author-site/src/app/api/sessions/route.ts`、`workspaces/route.ts`、`screenshots/generate-batch/route.ts` 仍继续证明剩余 4 个缺口属于共享层缺口，不适合在 CLI 侧直接复制 Web 逻辑。
+- 2026-07-10 当前正式仓库路径上的 `check:author` 失败集中在 `useVisualEditState` 与 `assets/localize` 两组 author-site 测试，说明当前脏分支里确实存在 author-site 独立回归；但它们没有改变 `commands --json`、`project-core` 或现有 CLI 参数面对齐结论，因此本轮不把它升级成新的 CLI 缺口。
 - 当前工作树中的 `packages/project-core/src/service.ts` 已出现 `project_delete_execute` 同步删除已发布产物并重建 `published/projects-index.json` 的语义扩展；它落在删除 / 发布链路，自动化等级继续按 L5 只报告，不触发新的 CLI 自动实现。
 - `project materialize`、`project content-gc` 与 `resource restore-version` 虽然都已有 CLI 命令，但它们分别涉及写项目基准工作区、删除 blob 和覆盖资源内容，后续自动任务仍需按 L5 高风险处理；只有 `project commit-list`、`resource version-list`、`resource version-get` 可继续视为低风险只读命令。
 - `project create` / `project update` 的项目元数据参数面对齐虽然已经补齐，但它们仍属于创建 / 更新类能力，自动任务后续只能按 L4 继续维护，不因为参数补齐就下调为 L3。
