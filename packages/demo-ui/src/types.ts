@@ -155,11 +155,7 @@ export interface ConfigFormProps {
 export type PreviewMode = "single" | "canvas";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
-export type CanvasToolMode =
-  | "hand"
-  | "select"
-  | "text"
-  | "image";
+export type CanvasToolMode = "hand" | "select" | "text" | "image";
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
 
@@ -191,7 +187,12 @@ export interface CanvasState {
   hiddenKnowledgeDocumentIds?: string[];
 }
 
-export type CanvasSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
+export type CanvasSaveStatus =
+  | "idle"
+  | "loading"
+  | "saving"
+  | "saved"
+  | "error";
 
 export type CanvasPageRuntimeType =
   | "prototype-html-css"
@@ -247,10 +248,7 @@ export type CanvasPageRenderMode =
   | "prototype"
   | "loading";
 
-export type CanvasFreeNodeKind =
-  | "document"
-  | "image"
-  | "text";
+export type CanvasFreeNodeKind = "document" | "image" | "text";
 
 export interface CanvasFreeNodeBase {
   id: string;
@@ -412,7 +410,9 @@ export interface PreviewCanvasProps {
     id: string,
     input: CanvasKnowledgeDocumentUpdateInput,
   ) => Promise<CanvasKnowledgeDocument>;
-  onReadKnowledgeDocument?: (document: CanvasKnowledgeDocument) => Promise<string>;
+  onReadKnowledgeDocument?: (
+    document: CanvasKnowledgeDocument,
+  ) => Promise<string>;
   /** 粘贴页面时触发，由父组件调用 API 创建页面并返回 ID 映射 */
   onRequestPastePages?: (input: {
     pages: CanvasPageData[];

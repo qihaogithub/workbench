@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -133,7 +139,11 @@ interface CanvasPageGroupItemProps {
   onActivePageChange: (groupId: string, pageId: string) => void;
   onDirectoryCollapsedChange: (groupId: string, collapsed: boolean) => void;
   onDragStart?: (groupId: string) => void;
-  onDragMove?: (groupId: string, layout: CanvasPageLayout, edge?: string) => void;
+  onDragMove?: (
+    groupId: string,
+    layout: CanvasPageLayout,
+    edge?: string,
+  ) => void;
   onDragEnd?: () => void;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onError?: (error: Error) => void;
@@ -283,11 +293,7 @@ function CanvasPageGroupItem({
   );
 
   const cursor =
-    resizeEdge || hoveredEdge
-      ? "nwse-resize"
-      : editable
-        ? "move"
-        : undefined;
+    resizeEdge || hoveredEdge ? "nwse-resize" : editable ? "move" : undefined;
 
   return (
     <div
@@ -464,7 +470,8 @@ export function PreviewCanvas({
   onReadKnowledgeDocument,
   onRequestPastePages,
 }: PreviewCanvasProps) {
-  const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
+  const resolvedInteractionMode =
+    interactionMode ?? (editable ? "editor" : "readonly");
   const isEditorMode = resolvedInteractionMode === "editor";
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
   const [internalState, setInternalState] = useState<CanvasState>({
@@ -490,9 +497,15 @@ export function PreviewCanvas({
   const [documentSaving, setDocumentSaving] = useState(false);
   const [draggingFileOver, setDraggingFileOver] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedDocumentNodeIds, setSelectedDocumentNodeIds] = useState<string[]>([]);
-  const [selectedPageGroupIds, setSelectedPageGroupIds] = useState<string[]>([]);
-  const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(null);
+  const [selectedDocumentNodeIds, setSelectedDocumentNodeIds] = useState<
+    string[]
+  >([]);
+  const [selectedPageGroupIds, setSelectedPageGroupIds] = useState<string[]>(
+    [],
+  );
+  const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(
+    null,
+  );
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
   const pendingImageFilesRef = useRef<File[]>([]);
 
@@ -510,9 +523,10 @@ export function PreviewCanvas({
   const prewarmedResourceFingerprintsRef = useRef<Set<string>>(new Set());
   const initialViewerFitSignatureRef = useRef<string | null>(null);
   const fitToScreenOnMountAppliedRef = useRef(false);
-  const multiDragStartLayoutsRef = useRef<Record<string, CanvasPageLayout> | null>(
-    null,
-  );
+  const multiDragStartLayoutsRef = useRef<Record<
+    string,
+    CanvasPageLayout
+  > | null>(null);
 
   const canvasState = useMemo(
     () => normalizeCanvasStateLayers(externalState || internalState),
@@ -539,9 +553,13 @@ export function PreviewCanvas({
     return Object.fromEntries(
       Object.entries(canvasState.pageGroups ?? {})
         .map(([groupId, group]) => {
-          const entries = group.pages.filter((entry) => pageIds.has(entry.pageId));
+          const entries = group.pages.filter((entry) =>
+            pageIds.has(entry.pageId),
+          );
           if (entries.length === 0) return null;
-          const activePageId = entries.some((entry) => entry.pageId === group.activePageId)
+          const activePageId = entries.some(
+            (entry) => entry.pageId === group.activePageId,
+          )
             ? group.activePageId
             : entries[0].pageId;
           return [
@@ -554,7 +572,8 @@ export function PreviewCanvas({
           ] as const;
         })
         .filter(
-          (entry): entry is readonly [string, CanvasPageGroup] => entry !== null,
+          (entry): entry is readonly [string, CanvasPageGroup] =>
+            entry !== null,
         ),
     );
   }, [canvasState.pageGroups, pageIds]);
@@ -566,7 +585,9 @@ export function PreviewCanvas({
   const standalonePageLayouts = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(effectivePages).filter(([pageId]) => !hiddenPageIdSet.has(pageId)),
+        Object.entries(effectivePages).filter(
+          ([pageId]) => !hiddenPageIdSet.has(pageId),
+        ),
       ),
     [effectivePages, hiddenPageIdSet],
   );
@@ -699,9 +720,8 @@ export function PreviewCanvas({
     () =>
       selectedDocumentNodeIds
         .map((nodeId) => effectiveNodes[nodeId])
-        .filter(
-          (node): node is CanvasDocumentNode =>
-            Boolean(node && node.kind === "document"),
+        .filter((node): node is CanvasDocumentNode =>
+          Boolean(node && node.kind === "document"),
         ),
     [effectiveNodes, selectedDocumentNodeIds],
   );
@@ -724,7 +744,10 @@ export function PreviewCanvas({
       Object.entries(effectiveNodes).map(([id, node]) => [id, node.layout]),
     );
     const pageGroupLayouts = Object.fromEntries(
-      Object.entries(effectivePageGroups).map(([id, group]) => [id, group.layout]),
+      Object.entries(effectivePageGroups).map(([id, group]) => [
+        id,
+        group.layout,
+      ]),
     );
     return { ...standalonePageLayouts, ...pageGroupLayouts, ...nodeLayouts };
   }, [effectiveNodes, effectivePageGroups, standalonePageLayouts]);
@@ -763,7 +786,9 @@ export function PreviewCanvas({
 
   useEffect(() => {
     setSelectedPageIds((current) =>
-      current.filter((pageId) => pageIds.has(pageId) && !hiddenPageIdSet.has(pageId)),
+      current.filter(
+        (pageId) => pageIds.has(pageId) && !hiddenPageIdSet.has(pageId),
+      ),
     );
   }, [hiddenPageIdSet, pageIds]);
 
@@ -820,15 +845,12 @@ export function PreviewCanvas({
       );
 
       const nextSelectedTextNode = Object.values(effectiveNodes).find(
-        (node) =>
-          node.kind === "text" &&
-          rectsIntersect(rect, node.layout),
+        (node) => node.kind === "text" && rectsIntersect(rect, node.layout),
       );
 
-      const nextSelectedDocumentNodeIds =
-        !hasSelectedPageLikeItems
-          ? nextSelectedDocumentNodes.map((node) => node.id)
-          : [];
+      const nextSelectedDocumentNodeIds = !hasSelectedPageLikeItems
+        ? nextSelectedDocumentNodes.map((node) => node.id)
+        : [];
 
       setSelectedDocumentNodeIds(nextSelectedDocumentNodeIds);
       setSelectedPageGroupIds(nextSelectedPageGroupIds);
@@ -858,7 +880,9 @@ export function PreviewCanvas({
     (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
       if (isEditorMode && effectiveToolMode === "select") {
         const isAdditive =
-          Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
+          Boolean(event?.shiftKey) ||
+          Boolean(event?.metaKey) ||
+          Boolean(event?.ctrlKey);
         setSelectedNodeId(null);
         setSelectedDocumentNodeIds([]);
         setEditingTextNodeId(null);
@@ -886,7 +910,9 @@ export function PreviewCanvas({
     (nodeId: string, event?: React.PointerEvent | React.MouseEvent) => {
       const node = effectiveNodes[nodeId];
       const isAdditive =
-        Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
+        Boolean(event?.shiftKey) ||
+        Boolean(event?.metaKey) ||
+        Boolean(event?.ctrlKey);
 
       setSelectedPageIds([]);
       setSelectedPageGroupIds([]);
@@ -910,7 +936,8 @@ export function PreviewCanvas({
 
   const updateSelectedPageLayouts = useCallback(
     (action: MultiPageAlignAction) => {
-      if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds) return;
+      if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds)
+        return;
 
       updateState((prev) => {
         const selectedLayouts = selectedPageLikeLayoutEntries;
@@ -944,7 +971,8 @@ export function PreviewCanvas({
             (sum, entry) => sum + entry.layout.width,
             0,
           );
-          const gap = (selectedPageBounds.width - totalWidth) / (sorted.length - 1);
+          const gap =
+            (selectedPageBounds.width - totalWidth) / (sorted.length - 1);
           let cursor = selectedPageBounds.x;
           for (const entry of sorted) {
             applyLayout(entry, { ...entry.layout, x: cursor });
@@ -979,7 +1007,10 @@ export function PreviewCanvas({
           } else if (action === "center-x") {
             applyLayout(entry, {
               ...layout,
-              x: selectedPageBounds.x + selectedPageBounds.width / 2 - layout.width / 2,
+              x:
+                selectedPageBounds.x +
+                selectedPageBounds.width / 2 -
+                layout.width / 2,
             });
           } else if (action === "right") {
             applyLayout(entry, {
@@ -999,7 +1030,10 @@ export function PreviewCanvas({
           } else if (action === "bottom") {
             applyLayout(entry, {
               ...layout,
-              y: selectedPageBounds.y + selectedPageBounds.height - layout.height,
+              y:
+                selectedPageBounds.y +
+                selectedPageBounds.height -
+                layout.height,
             });
           }
         }
@@ -1048,7 +1082,9 @@ export function PreviewCanvas({
       event?: React.PointerEvent | React.MouseEvent,
     ) => {
       const isAdditive =
-        Boolean(event?.shiftKey) || Boolean(event?.metaKey) || Boolean(event?.ctrlKey);
+        Boolean(event?.shiftKey) ||
+        Boolean(event?.metaKey) ||
+        Boolean(event?.ctrlKey);
       setSelectedDocumentNodeIds([]);
       setSelectedNodeId(null);
       setEditingTextNodeId(null);
@@ -1119,21 +1155,21 @@ export function PreviewCanvas({
         const nextCollapsed = !node.collapsed;
         const expandedHeight = nextCollapsed
           ? Math.max(node.layout.height, DOCUMENT_NODE_COLLAPSED_HEIGHT)
-          : node.expandedHeight ?? DOCUMENT_NODE_DEFAULT_HEIGHT;
+          : (node.expandedHeight ?? DOCUMENT_NODE_DEFAULT_HEIGHT);
         return withCanvasAnnotationNodes(prev, {
           ...(prev.nodes ?? {}),
           [nodeId]: {
-              ...node,
-              collapsed: nextCollapsed,
-              expandedHeight,
-              layout: {
-                ...node.layout,
-                height: nextCollapsed
-                  ? DOCUMENT_NODE_COLLAPSED_HEIGHT
-                  : Math.max(expandedHeight, DOCUMENT_NODE_COLLAPSED_HEIGHT),
-              },
-              updatedAt: Date.now(),
+            ...node,
+            collapsed: nextCollapsed,
+            expandedHeight,
+            layout: {
+              ...node.layout,
+              height: nextCollapsed
+                ? DOCUMENT_NODE_COLLAPSED_HEIGHT
+                : Math.max(expandedHeight, DOCUMENT_NODE_COLLAPSED_HEIGHT),
             },
+            updatedAt: Date.now(),
+          },
         });
       });
     },
@@ -1146,7 +1182,9 @@ export function PreviewCanvas({
         const node = prev.nodes?.[nodeId];
         if (!node || node.kind !== "document") return prev;
         if (
-          !getCanvasDocumentEntries(node).some((entry) => entry.id === documentId)
+          !getCanvasDocumentEntries(node).some(
+            (entry) => entry.id === documentId,
+          )
         ) {
           return prev;
         }
@@ -1188,7 +1226,12 @@ export function PreviewCanvas({
         zIndex: maxZ + 1,
       };
     },
-    [allItemLayouts, canvasState.viewport, containerSize.height, containerSize.width],
+    [
+      allItemLayouts,
+      canvasState.viewport,
+      containerSize.height,
+      containerSize.width,
+    ],
   );
 
   const getCanvasPointFromClient = useCallback(
@@ -1199,7 +1242,12 @@ export function PreviewCanvas({
       const container = containerRef.current;
       if (!container) return undefined;
       const rect = container.getBoundingClientRect();
-      return screenPointToCanvasPoint(clientX, clientY, rect, canvasState.viewport);
+      return screenPointToCanvasPoint(
+        clientX,
+        clientY,
+        rect,
+        canvasState.viewport,
+      );
     },
     [canvasState.viewport],
   );
@@ -1231,12 +1279,15 @@ export function PreviewCanvas({
                 ]),
               )
             : prev.hiddenKnowledgeDocumentIds;
-        return withCanvasAnnotationNodes({
-          ...prev,
-          ...(hiddenKnowledgeDocumentIds
-            ? { hiddenKnowledgeDocumentIds }
-            : {}),
-        }, nextNodes);
+        return withCanvasAnnotationNodes(
+          {
+            ...prev,
+            ...(hiddenKnowledgeDocumentIds
+              ? { hiddenKnowledgeDocumentIds }
+              : {}),
+          },
+          nextNodes,
+        );
       });
       setSelectedNodeId((current) => (current === nodeId ? null : current));
       setSelectedDocumentNodeIds((current) =>
@@ -1252,7 +1303,9 @@ export function PreviewCanvas({
 
     updateState((prev) => {
       const nodes = prev.nodes ?? {};
-      const validKnowledgeIds = new Set(knowledgeDocuments.map((item) => item.id));
+      const validKnowledgeIds = new Set(
+        knowledgeDocuments.map((item) => item.id),
+      );
       const hiddenKnowledgeIds = new Set(prev.hiddenKnowledgeDocumentIds ?? []);
       const existingKnowledgeIds = new Set<string>();
       const nextNodes = { ...nodes };
@@ -1335,8 +1388,7 @@ export function PreviewCanvas({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
 
-      const target =
-        event.target instanceof HTMLElement ? event.target : null;
+      const target = event.target instanceof HTMLElement ? event.target : null;
       if (
         target?.closest("input,textarea,select,[contenteditable='true']") ||
         target?.isContentEditable
@@ -1474,14 +1526,12 @@ export function PreviewCanvas({
         (-canvasState.viewport.x + containerSize.width / 2) / zoom;
       const centerY =
         (-canvasState.viewport.y + containerSize.height / 2) / zoom;
-      const offsetX =
-        clipboardData.bounds
-          ? centerX - clipboardData.bounds.x + PASTE_OFFSET
-          : PASTE_OFFSET;
-      const offsetY =
-        clipboardData.bounds
-          ? centerY - clipboardData.bounds.y + PASTE_OFFSET
-          : PASTE_OFFSET;
+      const offsetX = clipboardData.bounds
+        ? centerX - clipboardData.bounds.x + PASTE_OFFSET
+        : PASTE_OFFSET;
+      const offsetY = clipboardData.bounds
+        ? centerY - clipboardData.bounds.y + PASTE_OFFSET
+        : PASTE_OFFSET;
       const now = Date.now();
       const maxZ = Math.max(
         0,
@@ -1526,10 +1576,7 @@ export function PreviewCanvas({
       }
 
       // B. 粘贴页面（通过回调通知父组件）
-      if (
-        clipboardData.pages.length > 0 &&
-        onRequestPastePages
-      ) {
+      if (clipboardData.pages.length > 0 && onRequestPastePages) {
         // 对页面布局应用偏移
         const shiftedPageLayouts: Record<string, CanvasPageLayout> = {};
         for (const [pageId, layout] of Object.entries(
@@ -1578,9 +1625,10 @@ export function PreviewCanvas({
             return {
               ...prev,
               pages: nextPages,
-              pageGroups: Object.keys(nextGroups).length > 0
-                ? nextGroups
-                : prev.pageGroups,
+              pageGroups:
+                Object.keys(nextGroups).length > 0
+                  ? nextGroups
+                  : prev.pageGroups,
             };
           });
 
@@ -1651,7 +1699,8 @@ export function PreviewCanvas({
   // 拖拽/缩放过程中计算对齐
   const handleDragMove = useCallback(
     (itemId: string, layout: CanvasPageLayout, edge?: string) => {
-      const activeDragItemIdValue = activeDragItemIdRef.current ?? activeDragItemId;
+      const activeDragItemIdValue =
+        activeDragItemIdRef.current ?? activeDragItemId;
       if (!activeDragItemIdValue || activeDragItemIdValue !== itemId) return;
       const isPageItem = pageIds.has(itemId);
       const isPageGroupItem = pageGroupIds.has(itemId);
@@ -1840,7 +1889,9 @@ export function PreviewCanvas({
     for (const pageId of warmPageIds) {
       const descriptor = pageResourceDescriptors[pageId];
       if (!descriptor) continue;
-      if (prewarmedResourceFingerprintsRef.current.has(descriptor.fingerprint)) {
+      if (
+        prewarmedResourceFingerprintsRef.current.has(descriptor.fingerprint)
+      ) {
         continue;
       }
       prewarmedResourceFingerprintsRef.current.add(descriptor.fingerprint);
@@ -1976,8 +2027,10 @@ export function PreviewCanvas({
 
   const handleMergeSelectedPages = useCallback(() => {
     if (selectedPageIds.length < 2) return;
-    const sortedPageIds = sortPageIdsByLayout(selectedPageIds, effectivePages)
-      .filter((pageId) => pagesById.has(pageId));
+    const sortedPageIds = sortPageIdsByLayout(
+      selectedPageIds,
+      effectivePages,
+    ).filter((pageId) => pagesById.has(pageId));
     const uniquePageIds = Array.from(new Set(sortedPageIds));
     if (uniquePageIds.length < 2) return;
 
@@ -2057,16 +2110,18 @@ export function PreviewCanvas({
   );
 
   const handleMergeSelectedDocuments = useCallback(() => {
-    const selectedNodes = sortDocumentNodesByLayout(selectedDocumentNodes).filter(
-      (node) => getCanvasDocumentEntries(node).length > 0,
-    );
+    const selectedNodes = sortDocumentNodesByLayout(
+      selectedDocumentNodes,
+    ).filter((node) => getCanvasDocumentEntries(node).length > 0);
     if (selectedNodes.length < 2 || !selectedDocumentBounds) return;
 
     const entries = selectedNodes.flatMap((node) =>
       getCanvasDocumentEntries(node),
     );
     const uniqueEntries = Array.from(
-      new Map(entries.map((entry) => [entry.knowledgeDocument.id, entry])).values(),
+      new Map(
+        entries.map((entry) => [entry.knowledgeDocument.id, entry]),
+      ).values(),
     );
     if (uniqueEntries.length < 2) return;
 
@@ -2143,15 +2198,14 @@ export function PreviewCanvas({
         existing?.kind === "document"
           ? getActiveCanvasDocumentEntry(existing)
           : undefined;
-      const existingDocument =
-        documentDraft.knowledgeDocumentId
-          ? knowledgeDocumentsById.get(documentDraft.knowledgeDocumentId) ??
-            (existing?.kind === "document"
-              ? activeEntry?.knowledgeDocument ?? existing.knowledgeDocument
-              : undefined)
-          : existing?.kind === "document"
-            ? activeEntry?.knowledgeDocument ?? existing.knowledgeDocument
-            : undefined;
+      const existingDocument = documentDraft.knowledgeDocumentId
+        ? (knowledgeDocumentsById.get(documentDraft.knowledgeDocumentId) ??
+          (existing?.kind === "document"
+            ? (activeEntry?.knowledgeDocument ?? existing.knowledgeDocument)
+            : undefined))
+        : existing?.kind === "document"
+          ? (activeEntry?.knowledgeDocument ?? existing.knowledgeDocument)
+          : undefined;
       const knowledgeDocument =
         existingDocument && onUpdateKnowledgeDocument
           ? await onUpdateKnowledgeDocument(existingDocument.id, {
@@ -2172,7 +2226,8 @@ export function PreviewCanvas({
         existing.documents.length > 0
       ) {
         const documents = getCanvasDocumentEntries(existing).map((entry) =>
-          knowledgeDocument && entry.knowledgeDocument.id === knowledgeDocument.id
+          knowledgeDocument &&
+          entry.knowledgeDocument.id === knowledgeDocument.id
             ? {
                 id: knowledgeDocument.id,
                 title: knowledgeDocument.title,
@@ -2189,7 +2244,9 @@ export function PreviewCanvas({
               : existing.title,
           documents,
           activeDocumentId:
-            knowledgeDocument?.id ?? activeEntry?.id ?? existing.activeDocumentId,
+            knowledgeDocument?.id ??
+            activeEntry?.id ??
+            existing.activeDocumentId,
           ...(!knowledgeDocument ? { markdown: documentDraft.markdown } : {}),
           updatedAt: now,
         });
@@ -2204,10 +2261,13 @@ export function PreviewCanvas({
           ...(existing?.kind === "document" && existing.collapsed !== undefined
             ? { collapsed: existing.collapsed }
             : {}),
-          ...(existing?.kind === "document" && existing.expandedHeight !== undefined
+          ...(existing?.kind === "document" &&
+          existing.expandedHeight !== undefined
             ? { expandedHeight: existing.expandedHeight }
             : {}),
-          layout: existing?.layout ?? getNodeLayout(420, DOCUMENT_NODE_DEFAULT_HEIGHT),
+          layout:
+            existing?.layout ??
+            getNodeLayout(420, DOCUMENT_NODE_DEFAULT_HEIGHT),
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
         });
@@ -2216,9 +2276,9 @@ export function PreviewCanvas({
       if (knowledgeDocument) {
         updateState((prev) => ({
           ...prev,
-          hiddenKnowledgeDocumentIds: (prev.hiddenKnowledgeDocumentIds ?? []).filter(
-            (documentId) => documentId !== knowledgeDocument.id,
-          ),
+          hiddenKnowledgeDocumentIds: (
+            prev.hiddenKnowledgeDocumentIds ?? []
+          ).filter((documentId) => documentId !== knowledgeDocument.id),
         }));
         setKnowledgeDocumentMarkdown((prev) => ({
           ...prev,
@@ -2242,11 +2302,7 @@ export function PreviewCanvas({
   ]);
 
   const addImageFile = useCallback(
-    async (
-      file: File,
-      index: number = 0,
-      canvasPoint?: CanvasPoint,
-    ) => {
+    async (file: File, index: number = 0, canvasPoint?: CanvasPoint) => {
       if (!file.type.startsWith("image/")) return;
       const src = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -2318,11 +2374,7 @@ export function PreviewCanvas({
   );
 
   const addMarkdownFile = useCallback(
-    async (
-      file: File,
-      index: number = 0,
-      canvasPoint?: CanvasPoint,
-    ) => {
+    async (file: File, index: number = 0, canvasPoint?: CanvasPoint) => {
       if (!isMarkdownFile(file)) return;
       const markdown = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -2346,7 +2398,11 @@ export function PreviewCanvas({
           })
         : undefined;
       const now = Date.now();
-      const layout = getNodeLayout(420, DOCUMENT_NODE_DEFAULT_HEIGHT, canvasPoint);
+      const layout = getNodeLayout(
+        420,
+        DOCUMENT_NODE_DEFAULT_HEIGHT,
+        canvasPoint,
+      );
       const id = createNodeId("doc");
       addOrUpdateNode({
         id,
@@ -2365,9 +2421,9 @@ export function PreviewCanvas({
       if (knowledgeDocument) {
         updateState((prev) => ({
           ...prev,
-          hiddenKnowledgeDocumentIds: (prev.hiddenKnowledgeDocumentIds ?? []).filter(
-            (documentId) => documentId !== knowledgeDocument.id,
-          ),
+          hiddenKnowledgeDocumentIds: (
+            prev.hiddenKnowledgeDocumentIds ?? []
+          ).filter((documentId) => documentId !== knowledgeDocument.id),
         }));
         setKnowledgeDocumentMarkdown((prev) => ({
           ...prev,
@@ -2397,37 +2453,40 @@ export function PreviewCanvas({
     [addImageFile, addMarkdownFile],
   );
 
-  const handleAddImageFiles = useCallback(
-    (files: FileList) => {
-      pendingImageFilesRef.current = Array.from(files).filter((file) =>
-        file.type.startsWith("image/"),
-      );
-      if (pendingImageFilesRef.current.length > 0) {
-        setSelectedPageIds([]);
-        setSelectedDocumentNodeIds([]);
-        setSelectedPageGroupIds([]);
-        setSelectedNodeId(null);
-        setEditingTextNodeId(null);
-        setToolMode("image");
-      }
+  const handleAddImageFiles = useCallback((files: FileList) => {
+    pendingImageFilesRef.current = Array.from(files).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    if (pendingImageFilesRef.current.length > 0) {
+      setSelectedPageIds([]);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+      setSelectedNodeId(null);
+      setEditingTextNodeId(null);
+      setToolMode("image");
+    }
+  }, []);
+
+  const handleEditNode = useCallback(
+    (node: CanvasFreeNode) => {
+      if (node.kind !== "document") return;
+      const activeEntry = getActiveCanvasDocumentEntry(node);
+      const activeDocument =
+        activeEntry?.knowledgeDocument ?? node.knowledgeDocument;
+
+      setDocumentDraft({
+        nodeId: node.id,
+        knowledgeDocumentId: activeDocument?.id,
+        title: activeEntry?.title ?? activeDocument?.title ?? node.title,
+        markdown: activeDocument
+          ? (knowledgeDocumentMarkdown[activeDocument.id] ??
+            node.markdown ??
+            "")
+          : (node.markdown ?? ""),
+      });
     },
-    [],
+    [knowledgeDocumentMarkdown],
   );
-
-  const handleEditNode = useCallback((node: CanvasFreeNode) => {
-    if (node.kind !== "document") return;
-    const activeEntry = getActiveCanvasDocumentEntry(node);
-    const activeDocument = activeEntry?.knowledgeDocument ?? node.knowledgeDocument;
-
-    setDocumentDraft({
-      nodeId: node.id,
-      knowledgeDocumentId: activeDocument?.id,
-      title: activeEntry?.title ?? activeDocument?.title ?? node.title,
-      markdown: activeDocument
-        ? knowledgeDocumentMarkdown[activeDocument.id] ?? node.markdown ?? ""
-        : node.markdown ?? "",
-    });
-  }, [knowledgeDocumentMarkdown]);
 
   const classifyImportFile = useCallback(
     (file: File): CanvasImportFile | null => {
@@ -2463,10 +2522,7 @@ export function PreviewCanvas({
   );
 
   const extractImportFilesFromTransfer = useCallback(
-    (
-      files: FileList | File[],
-      items: DataTransferItemList | undefined,
-    ) => {
+    (files: FileList | File[], items: DataTransferItemList | undefined) => {
       const importFiles = extractImportFiles(files);
       if (importFiles.length > 0) {
         return importFiles;
@@ -2488,7 +2544,8 @@ export function PreviewCanvas({
     [],
   );
 
-    const handleAddTextNode = useCallback((canvasPoint?: CanvasPoint) => {
+  const handleAddTextNode = useCallback(
+    (canvasPoint?: CanvasPoint) => {
       if (!canvasPoint) {
         pendingImageFilesRef.current = [];
         setSelectedPageIds([]);
@@ -2498,33 +2555,35 @@ export function PreviewCanvas({
         setEditingTextNodeId(null);
         setToolMode("text");
         return;
-    }
-    const now = Date.now();
-    const id = createNodeId("text");
-    addOrUpdateNode({
-      id,
-      kind: "text",
-      title: "文字",
-      text: "",
-      fontSize: 18,
-      color: "#ffffff",
-      autoWidth: true,
-      layout: {
-        x: canvasPoint.x,
-        y: canvasPoint.y,
-        width: 18,
-        height: Math.ceil(18 * 1.35),
-      },
-      createdAt: now,
-      updatedAt: now,
-    });
-    setSelectedPageIds([]);
-    setSelectedDocumentNodeIds([]);
-    setSelectedPageGroupIds([]);
-    setSelectedNodeId(id);
-    setEditingTextNodeId(id);
-    setToolMode("select");
-  }, [addOrUpdateNode, createNodeId, getNodeLayout]);
+      }
+      const now = Date.now();
+      const id = createNodeId("text");
+      addOrUpdateNode({
+        id,
+        kind: "text",
+        title: "文字",
+        text: "",
+        fontSize: 18,
+        color: "#ffffff",
+        autoWidth: true,
+        layout: {
+          x: canvasPoint.x,
+          y: canvasPoint.y,
+          width: 18,
+          height: Math.ceil(18 * 1.35),
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+      setSelectedPageIds([]);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+      setSelectedNodeId(id);
+      setEditingTextNodeId(id);
+      setToolMode("select");
+    },
+    [addOrUpdateNode, createNodeId, getNodeLayout],
+  );
 
   const handleCanvasPointCreate = useCallback(
     (point: CanvasPoint) => {
@@ -2590,7 +2649,10 @@ export function PreviewCanvas({
       left:
         canvasState.viewport.x +
         (selectedPageBounds.x + selectedPageBounds.width / 2) * zoom,
-      top: Math.max(12, canvasState.viewport.y + selectedPageBounds.y * zoom - 48),
+      top: Math.max(
+        12,
+        canvasState.viewport.y + selectedPageBounds.y * zoom - 48,
+      ),
       transform: "translateX(-50%)",
     };
   }, [canvasState.viewport, selectedPageBounds, selectedPageLikeCount]);
@@ -2690,7 +2752,8 @@ export function PreviewCanvas({
       }}
       onDragLeave={(event) => {
         if (!isEditorMode) return;
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (event.currentTarget.contains(event.relatedTarget as Node | null))
+          return;
         setDraggingFileOver(false);
       }}
       onDrop={(event) => {
@@ -2711,10 +2774,7 @@ export function PreviewCanvas({
       onPaste={(event) => {
         if (!isEditorMode) return;
         const target = event.target as HTMLElement;
-        if (
-          target.closest("input,textarea") ||
-          target.isContentEditable
-        ) {
+        if (target.closest("input,textarea") || target.isContentEditable) {
           return;
         }
         if (documentDraft) return;
@@ -2877,9 +2937,7 @@ export function PreviewCanvas({
         onCanvasClick={handleCanvasClick}
         onPageClick={handlePageSelect}
         onNodeClick={
-          isEditorMode
-            ? (nodeId) => handleNodeSelect(nodeId)
-            : undefined
+          isEditorMode ? (nodeId) => handleNodeSelect(nodeId) : undefined
         }
         onFitToScreen={handleFitToScreen}
         onToolModeChange={isEditorMode ? setToolMode : undefined}
@@ -2888,63 +2946,71 @@ export function PreviewCanvas({
         onSelectionRectChange={handleSelectionRectChange}
         creationMode={
           isEditorMode &&
-          (effectiveToolMode === "text" ||
-            effectiveToolMode === "image")
+          (effectiveToolMode === "text" || effectiveToolMode === "image")
             ? effectiveToolMode
             : null
         }
         onCanvasPointClick={handleCanvasPointCreate}
       >
-        {pages.filter((page) => !hiddenPageIdSet.has(page.id)).map((page) => {
-          const renderMode = pageRenderModes[page.id] ?? "loading";
-          return (
-            <CanvasPageItem
-              key={page.id}
-              page={page}
-              layout={
-                standalonePageLayouts[page.id] ||
-                (() => {
-                  const size = resolveCanvasPageSize(page.previewSize);
-                  return { x: 0, y: 0, width: size.width, height: size.height };
-                })()
-              }
-              editable={isEditorMode}
-              isEditing={editingPageId === page.id}
-              zoom={canvasState.viewport.zoom}
-              visible={
-                renderMode === "iframe" ||
-                visiblePageIds.has(page.id) ||
-                renderMode === "sleeping-iframe"
-              }
-              sessionId={sessionId}
-              screenshotUrl={
-                shouldUseScreenshotLayer ? screenshotUrls?.[page.id] : undefined
-              }
-              screenshotRenderBox={
-                shouldUseScreenshotLayer
-                  ? screenshotRenderBoxes?.[page.id]
-                  : undefined
-              }
-              renderMode={renderMode}
-              onLayoutChange={handleLayoutChange}
-              onConfigEdit={handlePageSelect}
-              onRequestDelete={
-                onRequestDeletePages
-                  ? (pageId) => void onRequestDeletePages([pageId])
-                  : undefined
-              }
-              onRuntimeConversionRequest={onRuntimeConversionRequest}
-              onConsoleEntry={onConsoleEntry}
-              onError={onError}
-              onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
-              toolMode={effectiveToolMode}
-              selected={selectedPageIds.includes(page.id)}
-              onPositionableSizes={onPositionableSizes}
-            />
-          );
-        })}
+        {pages
+          .filter((page) => !hiddenPageIdSet.has(page.id))
+          .map((page) => {
+            const renderMode = pageRenderModes[page.id] ?? "loading";
+            return (
+              <CanvasPageItem
+                key={page.id}
+                page={page}
+                layout={
+                  standalonePageLayouts[page.id] ||
+                  (() => {
+                    const size = resolveCanvasPageSize(page.previewSize);
+                    return {
+                      x: 0,
+                      y: 0,
+                      width: size.width,
+                      height: size.height,
+                    };
+                  })()
+                }
+                editable={isEditorMode}
+                isEditing={editingPageId === page.id}
+                zoom={canvasState.viewport.zoom}
+                visible={
+                  renderMode === "iframe" ||
+                  visiblePageIds.has(page.id) ||
+                  renderMode === "sleeping-iframe"
+                }
+                sessionId={sessionId}
+                screenshotUrl={
+                  shouldUseScreenshotLayer
+                    ? screenshotUrls?.[page.id]
+                    : undefined
+                }
+                screenshotRenderBox={
+                  shouldUseScreenshotLayer
+                    ? screenshotRenderBoxes?.[page.id]
+                    : undefined
+                }
+                renderMode={renderMode}
+                onLayoutChange={handleLayoutChange}
+                onConfigEdit={handlePageSelect}
+                onRequestDelete={
+                  onRequestDeletePages
+                    ? (pageId) => void onRequestDeletePages([pageId])
+                    : undefined
+                }
+                onRuntimeConversionRequest={onRuntimeConversionRequest}
+                onConsoleEntry={onConsoleEntry}
+                onError={onError}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+                toolMode={effectiveToolMode}
+                selected={selectedPageIds.includes(page.id)}
+                onPositionableSizes={onPositionableSizes}
+              />
+            );
+          })}
         {Object.values(effectivePageGroups).map((group) => (
           <CanvasPageGroupItem
             key={group.id}
@@ -2955,7 +3021,9 @@ export function PreviewCanvas({
             zoom={canvasState.viewport.zoom}
             sessionId={sessionId}
             pageRenderModes={pageRenderModes}
-            screenshotUrls={shouldUseScreenshotLayer ? screenshotUrls : undefined}
+            screenshotUrls={
+              shouldUseScreenshotLayer ? screenshotUrls : undefined
+            }
             screenshotRenderBoxes={
               shouldUseScreenshotLayer ? screenshotRenderBoxes : undefined
             }
@@ -2993,8 +3061,9 @@ export function PreviewCanvas({
                 documents,
                 activeDocumentId: activeEntry?.id ?? node.activeDocumentId,
                 markdown: activeEntry
-                  ? knowledgeDocumentMarkdown[activeEntry.knowledgeDocument.id] ??
-                    node.markdown
+                  ? (knowledgeDocumentMarkdown[
+                      activeEntry.knowledgeDocument.id
+                    ] ?? node.markdown)
                   : node.markdown,
               };
             }
@@ -3012,35 +3081,35 @@ export function PreviewCanvas({
           })();
 
           return (
-          <CanvasFreeNodeItem
-            key={node.id}
-            node={renderedNode}
-            editable={isEditorMode}
-            zoom={canvasState.viewport.zoom}
-            toolMode={effectiveToolMode}
-            selected={
-              selectedNodeId === node.id ||
-              selectedDocumentNodeIds.includes(node.id)
-            }
-            editing={editingTextNodeId === node.id}
-            onLayoutChange={handleNodeLayoutChange}
-            onEdit={handleEditNode}
-            onTextChange={handleTextNodeChange}
-            onNodeStyleChange={handleNodeStyleChange}
-            onTextEditStart={(nodeId) => {
-              setSelectedPageIds([]);
-              setSelectedDocumentNodeIds([]);
-              setSelectedPageGroupIds([]);
-              setSelectedNodeId(nodeId);
-              setEditingTextNodeId(nodeId);
-            }}
-            onToggleCollapse={handleNodeToggleCollapse}
-            onActiveDocumentChange={handleActiveDocumentChange}
-            onSelect={handleNodeSelect}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-          />
+            <CanvasFreeNodeItem
+              key={node.id}
+              node={renderedNode}
+              editable={isEditorMode}
+              zoom={canvasState.viewport.zoom}
+              toolMode={effectiveToolMode}
+              selected={
+                selectedNodeId === node.id ||
+                selectedDocumentNodeIds.includes(node.id)
+              }
+              editing={editingTextNodeId === node.id}
+              onLayoutChange={handleNodeLayoutChange}
+              onEdit={handleEditNode}
+              onTextChange={handleTextNodeChange}
+              onNodeStyleChange={handleNodeStyleChange}
+              onTextEditStart={(nodeId) => {
+                setSelectedPageIds([]);
+                setSelectedDocumentNodeIds([]);
+                setSelectedPageGroupIds([]);
+                setSelectedNodeId(nodeId);
+                setEditingTextNodeId(nodeId);
+              }}
+              onToggleCollapse={handleNodeToggleCollapse}
+              onActiveDocumentChange={handleActiveDocumentChange}
+              onSelect={handleNodeSelect}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+            />
           );
         })}
       </CanvasViewport>
@@ -3083,7 +3152,6 @@ export function PreviewCanvas({
           </div>
         </div>
       )}
-
     </div>
   );
 }

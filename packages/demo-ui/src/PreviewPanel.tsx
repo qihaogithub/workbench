@@ -7,7 +7,12 @@ import type {
   PreviewPanelProps,
   PositionableSizeItem,
 } from "./types";
-import type { AppActionPayload, ConsoleLogPayload, VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
+import type {
+  AppActionPayload,
+  ConsoleLogPayload,
+  VisualNodeInfo,
+  VisualNodeTreeItem,
+} from "./iframe-types";
 import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
@@ -22,7 +27,9 @@ interface VisualContextMenuState {
   tree: VisualNodeTreeItem[];
 }
 
-function buildVisualTreeFromStack(nodes: VisualNodeInfo[]): VisualNodeTreeItem[] {
+function buildVisualTreeFromStack(
+  nodes: VisualNodeInfo[],
+): VisualNodeTreeItem[] {
   if (nodes.length === 0) return [];
   let child: VisualNodeTreeItem | null = null;
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
@@ -94,7 +101,9 @@ function createPreviewDiagnosticError(
   return error;
 }
 
-async function readCompileResponse(response: Response): Promise<CompileApiResponse> {
+async function readCompileResponse(
+  response: Response,
+): Promise<CompileApiResponse> {
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("application/json")) {
@@ -137,7 +146,10 @@ function sanitizeStaticPrototypeElement(root: HTMLElement) {
         node.removeAttribute(attr.name);
         continue;
       }
-      if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+      if (
+        (name === "href" || name === "src") &&
+        value.startsWith("javascript:")
+      ) {
         node.removeAttribute(attr.name);
       }
     }
@@ -207,10 +219,7 @@ function normalizeMeasuredSize(value: number): number {
 }
 
 function shouldUsePassiveMeasureFallback(): boolean {
-  return (
-    typeof navigator !== "undefined" &&
-    /jsdom/i.test(navigator.userAgent)
-  );
+  return typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent);
 }
 
 function setBooleanStateIfChanged(
@@ -280,8 +289,10 @@ export function PreviewPanel({
   const iframeReadyRef = useRef(false);
   const activePreviewRequestIdRef = useRef(0);
   const nextPreviewRequestIdRef = useRef(0);
-  const [pendingCompileResult, setPendingCompileResult] =
-    useState<{ result: CompileResult; requestId: number } | null>(null);
+  const [pendingCompileResult, setPendingCompileResult] = useState<{
+    result: CompileResult;
+    requestId: number;
+  } | null>(null);
   const [lastSuccessfulResult, setLastSuccessfulResult] =
     useState<CompileResult | null>(null);
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
@@ -316,15 +327,18 @@ export function PreviewPanel({
   };
 
   const validCode = code ? isValidCode(code) : true;
-  const effectiveContainerWidth = containerSizeOverride?.width ?? containerWidth;
-  const effectiveContainerHeight = containerSizeOverride?.height ?? containerHeight;
-  const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
-    previewSize,
-    effectiveContainerWidth,
-    effectiveContainerHeight,
-    fillContainer,
-    effectiveHeight,
-  );
+  const effectiveContainerWidth =
+    containerSizeOverride?.width ?? containerWidth;
+  const effectiveContainerHeight =
+    containerSizeOverride?.height ?? containerHeight;
+  const { designWidth, designHeight, wrapperStyle, contentStyle } =
+    computePreviewScale(
+      previewSize,
+      effectiveContainerWidth,
+      effectiveContainerHeight,
+      fillContainer,
+      effectiveHeight,
+    );
 
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
@@ -351,7 +365,9 @@ export function PreviewPanel({
         timingStartRef.current = now;
       }
       const sinceStart =
-        timingStartRef.current > 0 ? Math.round(now - timingStartRef.current) : 0;
+        timingStartRef.current > 0
+          ? Math.round(now - timingStartRef.current)
+          : 0;
       const payload = {
         source: "preview-runtime",
         stage,
@@ -510,32 +526,35 @@ export function PreviewPanel({
     [sessionId, demoId, reportTiming, sendUpdateCodeUrl],
   );
 
-  const sendUpdateConfig = useCallback((config: Record<string, unknown>) => {
-    const iframe = iframeRef.current;
-    if (!iframe || !iframe.contentWindow) {
-      return;
-    }
-    if (activityStateRef.current === "sleeping") {
-      return;
-    }
+  const sendUpdateConfig = useCallback(
+    (config: Record<string, unknown>) => {
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+      if (activityStateRef.current === "sleeping") {
+        return;
+      }
 
-    const resolvedConfig = resolvePreviewConfigAssetUrls(config, {
-      sessionId,
-      demoId,
-    });
-    const requestId = activePreviewRequestIdRef.current;
+      const resolvedConfig = resolvePreviewConfigAssetUrls(config, {
+        sessionId,
+        demoId,
+      });
+      const requestId = activePreviewRequestIdRef.current;
 
-    iframe.contentWindow.postMessage(
-      {
-        type: "UPDATE_CONFIG",
-        configData: resolvedConfig,
-        appState: appStateRef.current || {},
-        routeParams: routeParamsRef.current || {},
-        requestId,
-      },
-      "*",
-    );
-  }, [sessionId, demoId]);
+      iframe.contentWindow.postMessage(
+        {
+          type: "UPDATE_CONFIG",
+          configData: resolvedConfig,
+          appState: appStateRef.current || {},
+          routeParams: routeParamsRef.current || {},
+          requestId,
+        },
+        "*",
+      );
+    },
+    [sessionId, demoId],
+  );
 
   const sendCollectPositionableSizes = useCallback(() => {
     const iframe = iframeRef.current;
@@ -718,7 +737,8 @@ export function PreviewPanel({
           if (cached) {
             const compileResult: CompileResult = cached;
             const compileMs =
-              compileStartRef.current != null && typeof performance !== "undefined"
+              compileStartRef.current != null &&
+              typeof performance !== "undefined"
                 ? Math.round(performance.now() - compileStartRef.current)
                 : undefined;
             reportTiming("compile_done", { cacheHit: true, compileMs });
@@ -755,13 +775,17 @@ export function PreviewPanel({
           const message = result.error?.message || "编译失败";
           const issue = result.error?.details?.issues?.[0];
           const diagnosticPageId =
-            result.error?.details?.pageId || result.error?.details?.demoId || demoId;
+            result.error?.details?.pageId ||
+            result.error?.details?.demoId ||
+            demoId;
           const diagnostic: PreviewDiagnostic = {
             source: "post_generation_validation",
             stage: issue?.stage ?? "compile_transform",
             code: issue?.code,
             pageId: diagnosticPageId,
-            file: diagnosticPageId ? `demos/${diagnosticPageId}/index.tsx` : undefined,
+            file: diagnosticPageId
+              ? `demos/${diagnosticPageId}/index.tsx`
+              : undefined,
             message: issue?.message ?? message,
             instruction: issue?.instruction,
             moduleName: issue?.moduleName,
@@ -770,11 +794,14 @@ export function PreviewPanel({
             moduleHash: result.error?.details?.moduleHash,
           };
           setNullableStringStateIfChanged(setCompileError, message);
-          onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
+          onErrorRef.current?.(
+            createPreviewDiagnosticError(message, diagnostic),
+          );
           setPendingCompileResult(null);
           setBooleanStateIfChanged(setIsCompiling, false);
           const compileMs =
-            compileStartRef.current != null && typeof performance !== "undefined"
+            compileStartRef.current != null &&
+            typeof performance !== "undefined"
               ? Math.round(performance.now() - compileStartRef.current)
               : undefined;
           reportTiming("compile_error", { compileMs, message });
@@ -811,7 +838,8 @@ export function PreviewPanel({
           pageId: demoId,
           file: demoId ? `demos/${demoId}/index.tsx` : undefined,
           message,
-          instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
+          instruction:
+            "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
         };
         setNullableStringStateIfChanged(setCompileError, message);
         onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
@@ -940,7 +968,11 @@ export function PreviewPanel({
           iframeReadyRef.current = true;
           setBooleanStateIfChanged(setIframeReady, true);
           if (isUrlMode && compiledJsUrl) {
-            sendUpdateCodeUrl(compiledJsUrl, externalCssImports || [], configData || {});
+            sendUpdateCodeUrl(
+              compiledJsUrl,
+              externalCssImports || [],
+              configData || {},
+            );
           } else if (pendingCompileResult) {
             sendUpdateCode(
               pendingCompileResult.result,
@@ -1004,7 +1036,9 @@ export function PreviewPanel({
 
         case "CONSOLE_LOG":
           if (event.data?.payload) {
-            onConsoleEntryRef.current?.(event.data.payload as ConsoleLogPayload);
+            onConsoleEntryRef.current?.(
+              event.data.payload as ConsoleLogPayload,
+            );
           }
           break;
 
@@ -1027,7 +1061,9 @@ export function PreviewPanel({
         case "POSITIONABLE_SIZES_RESULT":
           if (!isCurrentPreviewRequest) return;
           if (event.data?.sizes) {
-            onPositionableSizes?.(event.data.sizes as Record<string, PositionableSizeItem>);
+            onPositionableSizes?.(
+              event.data.sizes as Record<string, PositionableSizeItem>,
+            );
           }
           break;
 
@@ -1059,12 +1095,15 @@ export function PreviewPanel({
                 : null;
               if (position && nodeStack.length > 0) {
                 const nodeTree =
-                  event.data?.nodeTree && Array.isArray(event.data.nodeTree.children)
+                  event.data?.nodeTree &&
+                  Array.isArray(event.data.nodeTree.children)
                     ? (event.data.nodeTree as VisualNodeTreeItem)
                     : null;
                 setVisualContextMenu({
                   ...position,
-                  tree: nodeTree ? [nodeTree] : buildVisualTreeFromStack(nodeStack),
+                  tree: nodeTree
+                    ? [nodeTree]
+                    : buildVisualTreeFromStack(nodeStack),
                 });
               } else {
                 closeVisualContextMenu();
@@ -1199,7 +1238,10 @@ export function PreviewPanel({
     while (parent) {
       const style = getComputedStyle(parent);
       const overflowY = style.overflowY;
-      if ((overflowY === 'auto' || overflowY === 'scroll') && parent.scrollTop > 0) {
+      if (
+        (overflowY === "auto" || overflowY === "scroll") &&
+        parent.scrollTop > 0
+      ) {
         parent.scrollTop = 0;
         break;
       }
@@ -1220,13 +1262,14 @@ export function PreviewPanel({
     return () => iframe.removeEventListener("load", handleLoad);
   }, [iframeSrcUrl, reportTiming]);
 
-  const hasPreviewSource = isUrlMode || (typeof code === "string" && code.length > 0);
-  const showPreviewLoading = hasPreviewSource && (isCompiling || !contentLoaded);
+  const hasPreviewSource =
+    isUrlMode || (typeof code === "string" && code.length > 0);
+  const showPreviewLoading =
+    hasPreviewSource && (isCompiling || !contentLoaded);
   const showPreviewPendingText = showPreviewLoading && !isCompiling;
   const showPlaceholder =
     !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;
-  const showLoadingOverlay =
-    showPreviewLoading && !showPlaceholder;
+  const showLoadingOverlay = showPreviewLoading && !showPlaceholder;
   const showEmptyPreview = !hasPreviewSource && !compileError && !runtimeError;
 
   useEffect(() => {
@@ -1240,20 +1283,25 @@ export function PreviewPanel({
       cdnBase: resolvedCdnBaseUrl,
       urlMode: isUrlMode,
     });
-    const runtimeSource = process.env.NEXT_PUBLIC_PREVIEW_RUNTIME_SOURCE === "cdn" ? "cdn" : "local";
+    const runtimeSource =
+      process.env.NEXT_PUBLIC_PREVIEW_RUNTIME_SOURCE === "cdn"
+        ? "cdn"
+        : "local";
     const shellMode = process.env.NEXT_PUBLIC_PREVIEW_SHELL_MODE || "fixed";
     const canUseFixedShell =
       shellMode !== "inline" &&
       typeof window !== "undefined" &&
       !!window.location?.origin;
     const url = canUseFixedShell
-        ? `${window.location.origin}/api/preview-runtime/shell?runtimeSource=${runtimeSource}`
-        : `data:text/html;charset=utf-8,${encodeURIComponent(generateIframeHtml({
+      ? `${window.location.origin}/api/preview-runtime/shell?runtimeSource=${runtimeSource}`
+      : `data:text/html;charset=utf-8,${encodeURIComponent(
+          generateIframeHtml({
             supportUrlMode: true,
             cdnBaseUrl: resolvedCdnBaseUrl,
             runtimeBaseUrl: window.location.origin,
             useCdnRuntime: runtimeSource === "cdn",
-          }))}`;
+          }),
+        )}`;
     setIframeSrcUrl((current) => (current === url ? current : url));
     reportTiming("iframe_html_created", {
       cdnBase: resolvedCdnBaseUrl,
@@ -1296,18 +1344,18 @@ export function PreviewPanel({
       )}
 
       {compileError && !isCompiling && isAutoRepairing && (
-        <div
-          className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
-        >
-          <p className="text-sm font-medium text-muted-foreground">正在修复预览</p>
+        <div className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center">
+          <p className="text-sm font-medium text-muted-foreground">
+            正在修复预览
+          </p>
         </div>
       )}
 
       {runtimeError && !isCompiling && isAutoRepairing && (
-        <div
-          className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center"
-        >
-          <p className="text-sm font-medium text-muted-foreground">正在修复预览</p>
+        <div className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-border bg-background/95 p-4 text-center">
+          <p className="text-sm font-medium text-muted-foreground">
+            正在修复预览
+          </p>
         </div>
       )}
 
@@ -1321,7 +1369,14 @@ export function PreviewPanel({
         }}
       >
         {iframeSrcUrl && (
-          <div style={wrapperStyle} className={fillContainer ? "relative" : "rounded-lg border border-border relative"}>
+          <div
+            style={wrapperStyle}
+            className={
+              fillContainer
+                ? "relative"
+                : "rounded-lg border border-border relative"
+            }
+          >
             {showPlaceholder && (
               <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg pointer-events-none overflow-hidden">
                 <img
@@ -1329,7 +1384,9 @@ export function PreviewPanel({
                   alt="preview placeholder"
                   className="h-full w-full object-contain"
                   draggable={false}
-                  onError={() => setBooleanStateIfChanged(setPlaceholderFailed, true)}
+                  onError={() =>
+                    setBooleanStateIfChanged(setPlaceholderFailed, true)
+                  }
                 />
               </div>
             )}
@@ -1349,7 +1406,9 @@ export function PreviewPanel({
             )}
             {showEmptyPreview && (
               <div className="absolute inset-0 z-20 bg-muted/30 flex items-center justify-center rounded-lg px-4 text-center">
-                <p className="text-xs text-muted-foreground">等待页面代码加载</p>
+                <p className="text-xs text-muted-foreground">
+                  等待页面代码加载
+                </p>
               </div>
             )}
             <iframe
@@ -1359,7 +1418,7 @@ export function PreviewPanel({
               style={{
                 ...contentStyle,
                 opacity: contentLoaded ? 1 : 0,
-                transition: 'opacity 0.2s ease-in-out',
+                transition: "opacity 0.2s ease-in-out",
               }}
               title="预览"
             />
