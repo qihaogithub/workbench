@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ba873606-b4ac-4314-832c-340d5d615790/0fbbe89f-854a-4441-b19a-093122a83d77
+title: 模板/演示项目与预览数据 API（Next.js App Router）
+scope:
+    - packages/author-site/src/app/api/templates/
+    - packages/author-site/src/app/api/demos/
+    - packages/author-site/src/app/api/viewer/
+source_files: []
+depends_on: []
+related_to: []

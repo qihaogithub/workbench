@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/82de9587-0ab3-48da-803e-cef80cdcda04
+title: 仓库级构建、部署与开发诊断脚本集
+scope:
+    - scripts/
+source_files: []
+depends_on: []
+related_to: []

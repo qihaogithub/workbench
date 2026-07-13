@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: author_site
-title: 作者站点（Author Site）
-scope:
-    - packages/author-site/
-source_files: []
-depends_on: []
-related_to: []

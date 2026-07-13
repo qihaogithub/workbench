@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ba873606-b4ac-4314-832c-340d5d615790/ed5d9ce9-48b1-4466-9ea0-8bdc1ccb9bc4
+title: AI 对话与流式渲染组件集
+scope:
+    - packages/author-site/src/components/ai-elements/
+source_files: []
+depends_on: []
+related_to: []

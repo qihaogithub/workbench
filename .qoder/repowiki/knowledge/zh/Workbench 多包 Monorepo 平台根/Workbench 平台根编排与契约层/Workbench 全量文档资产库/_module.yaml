@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/418f71bb-7c7b-46d1-936b-0a12e65ad4c6
+title: Workbench 全量文档资产库
+scope:
+    - docs/
+source_files: []
+depends_on: []
+related_to: []

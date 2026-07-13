@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ba873606-b4ac-4314-832c-340d5d615790/89524f11-c9e4-4f1c-8b42-63f5956d1fd2
+title: 作者站认证路由与 UI
+scope:
+    - packages/author-site/src/app/(auth)/
+    - packages/author-site/src/components/auth/
+source_files: []
+depends_on: []
+related_to: []

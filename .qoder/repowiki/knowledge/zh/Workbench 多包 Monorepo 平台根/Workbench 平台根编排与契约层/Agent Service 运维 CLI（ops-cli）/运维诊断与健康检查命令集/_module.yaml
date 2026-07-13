@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/c72b4f30-ad47-4043-9061-0c912bb2d278/825e6ec6-5ee6-49ad-85ae-fa9bc1f9a427
+title: 运维诊断与健康检查命令集
+scope:
+    - OPS/CLI/src/commands/diagnose.ts
+    - OPS/CLI/src/commands/diagnostics.ts
+    - OPS/CLI/src/commands/logs.ts
+source_files: []
+depends_on: []
+related_to: []

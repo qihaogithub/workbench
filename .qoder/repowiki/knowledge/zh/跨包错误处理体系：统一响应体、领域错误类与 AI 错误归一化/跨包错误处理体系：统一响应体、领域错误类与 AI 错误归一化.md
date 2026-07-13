@@ -1,16 +1,10 @@
 ---
 kind: error_handling
 name: 跨包错误处理体系：统一响应体、领域错误类与 AI 错误归一化
+slug: error_handling
 category: error_handling
 scope:
     - '**'
-source_files:
-    - packages/shared/src/types.ts
-    - packages/shared/src/ai-error-normalizer.ts
-    - packages/agent-client/src/types.ts
-    - packages/screenshot-service/src/utils/errors.ts
-    - packages/agent-service/src/services/image-describer.ts
-    - packages/agent-service/src/workspace/workspace-mutation-authority.ts
 ---
 
 ## 1. 整体方案概述

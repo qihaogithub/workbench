@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: bcff1473-ab8b-41c5-8a01-8528fbe47684/39386635-a85d-4560-ab80-0cb723187931
+title: Sketch SDK 交互式开发沙盒
+scope:
+    - packages/sketch-playground/
+source_files: []
+depends_on: []
+related_to: []

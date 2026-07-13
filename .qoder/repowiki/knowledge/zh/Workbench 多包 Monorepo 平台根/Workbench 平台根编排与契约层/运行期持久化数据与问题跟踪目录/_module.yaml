@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/1d70be84-6573-4c71-b9f6-4a69d424276b
+title: 运行期持久化数据与问题跟踪目录
+scope:
+    - data/
+    - issues/
+    - tmp/
+source_files: []
+depends_on: []
+related_to: []

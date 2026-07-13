@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: f76336ab-f8cf-4b05-a578-36dd826c1969/b3b00a01-f85b-4f24-b55c-14a96df24616
+title: Demo 页面与运行时模板 API
+scope:
+    - packages/author-site/src/app/api/projects/[projectId]/demos/
+    - packages/author-site/src/app/api/projects/[projectId]/demo-pages/
+source_files: []
+depends_on: []
+related_to: []

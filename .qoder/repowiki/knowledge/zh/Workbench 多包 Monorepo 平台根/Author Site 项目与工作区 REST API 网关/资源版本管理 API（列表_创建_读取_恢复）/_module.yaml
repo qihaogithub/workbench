@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: 0ecacaa0-1692-427d-bfdb-c831073b559d/6995829e-a76b-49da-8a41-dd8baf8c2aea
+title: 资源版本管理 API（列表/创建/读取/恢复）
+scope:
+    - packages/author-site/src/app/api/projects/[projectId]/resources/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: c2f00d38-85b9-495b-9dfa-7c2d682fcd31/8649803c-6320-471a-ae78-0044536143a5
+title: E2E 端到端测试套件（创作端与 Sketch Playground）
+scope:
+    - test/
+    - test-results/
+source_files: []
+depends_on: []
+related_to: []

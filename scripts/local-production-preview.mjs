@@ -5,9 +5,18 @@ import { fileURLToPath } from "node:url";
 
 const PROJECT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AUTHOR_PORT = 3200;
+const AGENT_PORT = 3201;
+const SCREENSHOT_PORT = 3202;
 const SHUTDOWN_WAIT_MS = 1500;
+const SERVICE_READY_TIMEOUT_MS = 45_000;
 const args = new Set(process.argv.slice(2).filter((arg) => arg !== "--"));
-const allowedArgs = new Set(["--build-only", "--dry-run", "--help"]);
+const allowedArgs = new Set([
+  "--build-only",
+  "--dry-run",
+  "--help",
+  "--no-agent",
+  "--no-screenshot",
+]);
 const unknownArgs = [...args].filter((arg) => !allowedArgs.has(arg));
 
 function readEnvFile(path) {
@@ -37,16 +46,20 @@ function printUsage() {
   corepack pnpm preview:local
   corepack pnpm preview:local -- --build-only
   corepack pnpm preview:local -- --dry-run
+  corepack pnpm preview:local -- --no-agent --no-screenshot
 
 行为:
   1. 停止本项目的本地 Docker author-site，释放 3200 端口。
   2. 保留 .next 构建缓存，使用当前工作区源码执行 author-site production build。
-  3. 只有构建成功才启动 http://localhost:3200。
+  3. 检测 agent-service (3201) 和 screenshot-service (3202)，未运行时自动以 dev 模式启动。
+  4. 只有构建成功才启动 http://localhost:3200。
 
 选项:
-  --build-only  仅构建当前源码，不启动服务
-  --dry-run     仅打印执行计划
-  --help        显示帮助`);
+  --build-only       仅构建当前源码，不启动任何服务
+  --no-agent         不自动启动 agent-service（不可用时仅警告）
+  --no-screenshot    不自动启动 screenshot-service（不可用时仅警告）
+  --dry-run          仅打印执行计划
+  --help             显示帮助`);
 }
 
 if (unknownArgs.length > 0) {
@@ -69,8 +82,7 @@ const configuredEnv = {
 const localEnv = {
   ...configuredEnv,
   DATA_DIR: configuredEnv.DATA_DIR || resolve(PROJECT_DIR, "data"),
-  AGENT_SERVICE_URL:
-    configuredEnv.AGENT_SERVICE_URL || "http://localhost:3201",
+  AGENT_SERVICE_URL: configuredEnv.AGENT_SERVICE_URL || "http://localhost:3201",
   SCREENSHOT_SERVICE_URL:
     configuredEnv.SCREENSHOT_SERVICE_URL || "http://localhost:3202",
   NEXT_PUBLIC_AGENT_SERVICE_URL:
@@ -103,10 +115,9 @@ function run(command, commandArgs, options = {}) {
 }
 
 function findListeningPids(port) {
-  const result = spawnSync("lsof", [
-    `-tiTCP:${port}`,
-    "-sTCP:LISTEN",
-  ], { encoding: "utf8" });
+  const result = spawnSync("lsof", [`-tiTCP:${port}`, "-sTCP:LISTEN"], {
+    encoding: "utf8",
+  });
 
   if (result.error) {
     if (result.error.code === "ENOENT") {
@@ -131,9 +142,10 @@ function isRunning(pid) {
   }
 }
 
-const sleep = (ms) => new Promise((resolvePromise) => {
-  setTimeout(resolvePromise, ms);
-});
+const sleep = (ms) =>
+  new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
 
 async function stopLocalAuthorProcesses() {
   const composePs = spawnSync(
@@ -143,7 +155,9 @@ async function stopLocalAuthorProcesses() {
   );
 
   if (composePs.status === 0 && composePs.stdout.trim()) {
-    console.log("[本地准生产预览] 停止本项目 Docker author-site，保留其他服务和 data。");
+    console.log(
+      "[本地准生产预览] 停止本项目 Docker author-site，保留其他服务和 data。",
+    );
     run("docker", ["compose", "stop", "author-site"]);
   }
 
@@ -172,20 +186,92 @@ async function stopLocalAuthorProcesses() {
   }
 }
 
-async function checkOptionalService(name, url) {
+async function isServiceHealthy(url) {
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(1500),
     });
-    if (response.ok) {
-      console.log(`[本地准生产预览] ${name} 可用: ${url}`);
-      return;
-    }
+    return response.ok;
   } catch {
-    // 下方统一输出不阻断警告。
+    return false;
+  }
+}
+
+async function waitForService(name, url, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await isServiceHealthy(url)) return true;
+    await sleep(1000);
+  }
+  return false;
+}
+
+/**
+ * 检测服务是否可用；不可用时按策略自动以 dev 模式启动。
+ *
+ * @param {object} options
+ * @param {string} options.name 服务名称（日志显示）
+ * @param {string} options.url 健康检查 URL
+ * @param {string} options.filter pnpm --filter 包名
+ * @param {boolean} options.autoStart 是否自动启动
+ * @param {string[]} options.ports 启动前需要释放的端口
+ * @param {ChildProcess[]} spawnedChildren 已启动的子进程列表（信号传播用）
+ */
+async function ensureService(
+  { name, url, filter, autoStart, ports },
+  spawnedChildren,
+) {
+  if (await isServiceHealthy(url)) {
+    console.log(`[本地准生产预览] ${name} 已运行: ${url}`);
+    return;
   }
 
-  console.warn(`[本地准生产预览] 警告: ${name} 不可用 (${url})，相关功能可能不完整。`);
+  if (!autoStart) {
+    console.warn(
+      `[本地准生产预览] 警告: ${name} 不可用 (${url})，相关功能可能不完整。`,
+    );
+    return;
+  }
+
+  console.log(
+    `[本地准生产预览] ${name} 未运行，自动以 dev 模式启动 (${filter})…`,
+  );
+  for (const port of ports) {
+    const pids = findListeningPids(port);
+    if (pids.length > 0) {
+      console.log(
+        `[本地准生产预览] 释放 ${port} 端口残留进程: ${pids.join(", ")}`,
+      );
+      for (const pid of pids) {
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch (error) {
+          if (error.code !== "ESRCH") throw error;
+        }
+      }
+      await sleep(SHUTDOWN_WAIT_MS);
+    }
+  }
+
+  const child = spawn("corepack", ["pnpm", "--filter", filter, "dev"], {
+    cwd: PROJECT_DIR,
+    env: localEnv,
+    stdio: "inherit",
+  });
+  spawnedChildren.push(child);
+  child.once("exit", () => {
+    const idx = spawnedChildren.indexOf(child);
+    if (idx >= 0) spawnedChildren.splice(idx, 1);
+  });
+
+  const ready = await waitForService(name, url, SERVICE_READY_TIMEOUT_MS);
+  if (!ready) {
+    console.warn(
+      `[本地准生产预览] 警告: ${name} 在 ${SERVICE_READY_TIMEOUT_MS / 1000}s 内未就绪 (${url})，编辑页可能显示“协同异常”，请检查服务日志。`,
+    );
+  } else {
+    console.log(`[本地准生产预览] ${name} 已就绪: ${url}`);
+  }
 }
 
 function prepareStandaloneRuntime() {
@@ -201,7 +287,10 @@ function prepareStandaloneRuntime() {
   }
 
   const copies = [
-    [resolve(authorDir, ".next/static"), resolve(standaloneAuthorDir, ".next/static")],
+    [
+      resolve(authorDir, ".next/static"),
+      resolve(standaloneAuthorDir, ".next/static"),
+    ],
     [resolve(authorDir, "public"), resolve(standaloneAuthorDir, "public")],
   ];
 
@@ -218,6 +307,14 @@ function prepareStandaloneRuntime() {
 if (args.has("--dry-run")) {
   console.log("[本地准生产预览] 计划:");
   console.log("- 停止本项目 Docker author-site 和 3200 端口现有进程");
+  if (!args.has("--no-agent")) {
+    console.log("- 检测 agent-service (3201)，未运行时自动以 dev 模式启动");
+  }
+  if (!args.has("--no-screenshot")) {
+    console.log(
+      "- 检测 screenshot-service (3202)，未运行时自动以 dev 模式启动",
+    );
+  }
   console.log("- 保留 packages/author-site/.next 缓存");
   console.log("- 使用当前工作区执行 author-site production build");
   if (!args.has("--build-only")) {
@@ -228,9 +325,29 @@ if (args.has("--dry-run")) {
 
 try {
   await stopLocalAuthorProcesses();
+
+  const spawnedChildren = [];
   await Promise.all([
-    checkOptionalService("agent-service", "http://localhost:3201/health"),
-    checkOptionalService("screenshot-service", "http://localhost:3202/health"),
+    ensureService(
+      {
+        name: "agent-service",
+        url: `http://localhost:${AGENT_PORT}/health`,
+        filter: "@workbench/agent-service",
+        autoStart: !args.has("--no-agent"),
+        ports: [AGENT_PORT],
+      },
+      spawnedChildren,
+    ),
+    ensureService(
+      {
+        name: "screenshot-service",
+        url: `http://localhost:${SCREENSHOT_PORT}/health`,
+        filter: "@workbench/screenshot-service",
+        autoStart: !args.has("--no-screenshot"),
+        ports: [SCREENSHOT_PORT],
+      },
+      spawnedChildren,
+    ),
   ]);
 
   console.log("[本地准生产预览] 开始用当前工作区源码执行 production build…");
@@ -239,26 +356,36 @@ try {
   console.log("[本地准生产预览] 当前源码构建成功。");
 
   if (args.has("--build-only")) {
+    for (const child of spawnedChildren) {
+      if (child.exitCode === null) child.kill("SIGTERM");
+    }
     process.exit(0);
   }
 
   console.log("[本地准生产预览] 启动 http://localhost:3200");
-  const child = spawn(
-    process.execPath,
-    [standaloneServerPath],
-    {
-      cwd: PROJECT_DIR,
-      env: localEnv,
-      stdio: "inherit",
-    },
-  );
+  const authorChild = spawn(process.execPath, [standaloneServerPath], {
+    cwd: PROJECT_DIR,
+    env: localEnv,
+    stdio: "inherit",
+  });
+  spawnedChildren.push(authorChild);
 
   const forwardSignal = (signal) => {
-    if (child.exitCode === null) child.kill(signal);
+    for (const child of spawnedChildren) {
+      if (child.exitCode === null) {
+        try {
+          child.kill(signal);
+        } catch {
+          // 忽略已退出进程的 kill 失败。
+        }
+      }
+    }
   };
   process.once("SIGINT", () => forwardSignal("SIGINT"));
   process.once("SIGTERM", () => forwardSignal("SIGTERM"));
-  child.once("exit", (code, signal) => {
+  authorChild.once("exit", (code, signal) => {
+    // author-site 退出时，一并关停自动启动的 agent/screenshot。
+    forwardSignal("SIGTERM");
     if (signal) {
       process.kill(process.pid, signal);
       return;
@@ -266,7 +393,9 @@ try {
     process.exit(code ?? 0);
   });
 } catch (error) {
-  console.error(`[本地准生产预览] ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `[本地准生产预览] ${error instanceof Error ? error.message : String(error)}`,
+  );
   console.error("[本地准生产预览] 构建或启动失败，未回退启动旧产物。");
   process.exit(1);
 }

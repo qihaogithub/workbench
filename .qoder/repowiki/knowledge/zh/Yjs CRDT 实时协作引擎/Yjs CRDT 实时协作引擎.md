@@ -1,10 +1,8 @@
 ---
 kind: external_dependency
 name: Yjs CRDT 实时协作引擎
-slug: yjs
+slug: yjs-crdt-实时协作引擎
 category: external_dependency
-category_hints:
-    - framework_behavior
 scope:
     - '**'
 ---

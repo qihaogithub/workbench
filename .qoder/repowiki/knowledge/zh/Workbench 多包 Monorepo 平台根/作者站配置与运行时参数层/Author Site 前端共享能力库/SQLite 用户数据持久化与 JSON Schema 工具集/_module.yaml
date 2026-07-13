@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/f5464b0d-0188-48b3-94f1-2409c9e84383
+title: SQLite 用户数据持久化与 JSON Schema 工具集
+scope:
+    - packages/author-site/src/lib/db/
+    - packages/author-site/src/lib/schema-defaults.ts
+    - packages/author-site/src/lib/schema-generator.ts
+    - packages/author-site/src/lib/schema-validator.ts
+source_files: []
+depends_on: []
+related_to: []

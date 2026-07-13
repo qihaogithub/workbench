@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: 0f53ba6d-ed7b-48fe-8dee-01b1b2dd8959/72c94e07-d2a3-4d6f-b34b-786c544df552/c1c37c12-815d-40a8-a4cf-9a5fd857b848
+title: 项目发布与后端配置同步
+scope:
+    - packages/author-site/src/lib/publish-manager.ts
+    - packages/author-site/src/lib/project-api.ts
+    - packages/author-site/src/lib/project-cli-url.ts
+    - packages/author-site/src/lib/project-images.ts
+    - packages/author-site/src/lib/backend-providers-sync.ts
+source_files: []
+depends_on: []
+related_to: []

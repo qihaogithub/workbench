@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: 22d9d02b-bd3a-45e8-b811-65f332a97e92/df6e2c32-d791-4ed2-a0aa-83d646074d11
+title: Session 工作区与 Demo 页面文件 API
+scope:
+    - packages/author-site/src/app/api/sessions/[sessionId]/workspace/
+    - packages/author-site/src/app/api/sessions/[sessionId]/files/
+source_files: []
+depends_on: []
+related_to: []

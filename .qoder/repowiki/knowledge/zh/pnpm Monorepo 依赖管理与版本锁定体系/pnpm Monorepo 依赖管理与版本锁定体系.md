@@ -1,17 +1,10 @@
 ---
 kind: dependency_management
 name: pnpm Monorepo 依赖管理与版本锁定体系
+slug: dependency_management
 category: dependency_management
 scope:
     - '**'
-source_files:
-    - package.json
-    - pnpm-workspace.yaml
-    - pnpm-lock.yaml
-    - turbo.json
-    - packages/shared/package.json
-    - packages/author-site/package.json
-    - packages/agent-service/package.json
 ---
 
 ## 系统概览

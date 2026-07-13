@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: f182ce66-05a1-413c-9e03-8471e20ce412/fefefee8-16ab-404f-99a0-d9cf844f9746/9e4ee96e-965b-4f7e-a373-131b74ef455c
+title: Agent Service 服务端与客户端 SDK
+scope:
+    - packages/agent-service/
+    - packages/agent-client/
+source_files: []
+depends_on: []
+related_to: []

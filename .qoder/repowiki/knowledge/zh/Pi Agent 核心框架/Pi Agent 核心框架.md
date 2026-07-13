@@ -1,11 +1,8 @@
 ---
 kind: external_dependency
 name: Pi Agent 核心框架
-slug: pi-agent-core
+slug: pi-agent-核心框架
 category: external_dependency
-category_hints:
-    - vendor_identity
-    - framework_behavior
 scope:
     - '**'
 ---

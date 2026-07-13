@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ba873606-b4ac-4314-832c-340d5d615790/d96c1b95-66bc-4a15-b2b3-1a20cd318269
+title: 作者站初始化脚本与静态资源
+scope:
+    - packages/author-site/scripts/
+    - packages/author-site/public/
+    - packages/author-site/data/
+source_files: []
+depends_on: []
+related_to: []

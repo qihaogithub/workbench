@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: 22d9d02b-bd3a-45e8-b811-65f332a97e92/a0372c12-63b2-4cf4-bc80-ba22d825f2d1
+title: 会话清理与项目/元数据管理 API
+scope:
+    - packages/author-site/src/app/api/sessions/cleanup/
+    - packages/author-site/src/app/api/sessions/project/
+    - packages/author-site/src/app/api/sessions/[sessionId]/meta/
+source_files: []
+depends_on: []
+related_to: []
