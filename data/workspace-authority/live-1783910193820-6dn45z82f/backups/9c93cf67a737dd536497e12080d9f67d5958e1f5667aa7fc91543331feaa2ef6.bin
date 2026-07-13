@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "projectId": "proj_1783334663364_30hsrv",
+  "updatedAt": 1783924493326,
+  "state": {
+    "viewport": {
+      "x": 431.0562427279463,
+      "y": -16.47026999889789,
+      "zoom": 0.23113665488718904
+    },
+    "pages": {
+      "product-showcase_a3f2": {
+        "x": 125.39690763360568,
+        "y": -2.3175568533097497,
+        "width": 375,
+        "height": 2084.953125,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "contact-section_k8m2": {
+        "x": 553.1969318188051,
+        "y": -2.3175568533097497,
+        "width": 375,
+        "height": 1658.34375,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}
