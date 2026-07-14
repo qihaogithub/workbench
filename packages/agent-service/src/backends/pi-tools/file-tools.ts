@@ -188,7 +188,7 @@ export function createWriteFileTool(
     name: "writeFile",
     label: "Write File",
     description:
-      "Write the complete new content of a file, replacing the entire existing content. The content parameter must be the full new file, not a combination of old and new content.",
+      "Create a new file or completely overwrite an existing file with the given content. The content parameter must be the full file content, not a combination of old and new content. Prefer editFile for targeted modifications to existing files.",
     parameters: WriteFileParams,
     execute: async (toolCallId: string, args: WriteFileParams) => {
       const filePath = path.resolve(config.workingDir || ".", args.path);
@@ -247,36 +247,6 @@ export function createWriteFileTool(
         const existing = snapshot
           ? (snapshot.resources[args.path] ?? null)
           : await fs.promises.readFile(filePath, "utf-8").catch(() => null);
-
-        // Direction A: detect content concatenation before writing
-        if (
-          existing &&
-          args.content.length > existing.length * 1.5 &&
-          args.content.includes(existing) &&
-          args.content.length > 200
-        ) {
-          logger.warn(
-            {
-              path: args.path,
-              contentLength: args.content.length,
-              existingLength: existing.length,
-            },
-            "writeFile: suspected content concatenation detected",
-          );
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error: suspected content concatenation. The new content (${args.content.length} chars) appears to contain the entire existing content (${existing.length} chars) plus additional text. This usually means the file content was accidentally duplicated. Please use readFile to read the current file content first, then write ONLY the corrected complete new content.`,
-              },
-            ],
-            details: {
-              path: args.path,
-              error: "SUSPECTED_CONTENT_CONCATENATION",
-            },
-            isError: true,
-          };
-        }
 
         let receipt;
         let driftRetryCount = 0;
