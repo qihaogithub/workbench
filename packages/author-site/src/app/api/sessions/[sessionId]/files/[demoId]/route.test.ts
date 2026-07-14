@@ -103,9 +103,9 @@ jest.mock("@/lib/fs-utils", () => ({
     {
       id: "page-sketch",
       name: "手绘页",
-      runtimeType: "sketch-scene",
     },
   ]),
+  resolvePageRuntimeType: jest.fn(() => "sketch-scene" as const),
   sessionExists: jest.fn(() => true),
   updateWorkspaceDemoFiles: jest.fn(() => true),
 }));

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolvePageRuntimeType } from "../utils";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -127,7 +128,7 @@ describe("ProjectAdminService", () => {
     const page = service.createPage({ editId, name: "首页" });
     expect(page.ok).toBe(true);
     expect((page.data as PageDetail).meta.name).toBe("首页");
-    expect((page.data as PageDetail).meta.runtimeType).toBe(
+    expect(resolvePageRuntimeType(path.join(transaction.workspacePath, "demos", (page.data as PageDetail).meta.id))).toBe(
       "prototype-html-css",
     );
     expect((page.data as PageDetail).files.prototypeHtml).toContain("<main");
@@ -607,7 +608,8 @@ describe("ProjectAdminService", () => {
     });
 
     expect(page.ok).toBe(true);
-    expect(page.data?.meta.runtimeType).toBeUndefined();
+    // runtimeType 不再存储在 meta 中，通过文件系统推断
+    expect(page.data?.files.code).toContain("export default function Demo");
     expect(page.data?.files.code).toContain("export default function Demo");
     expect(page.data?.files.prototypeHtml).toBeUndefined();
   });
@@ -688,7 +690,7 @@ describe("ProjectAdminService", () => {
     const pageId = (page.data as PageDetail).meta.id;
 
     expect(page.ok).toBe(true);
-    expect(page.data?.meta.runtimeType).toBe("prototype-html-css");
+    expect(page.data?.files.prototypeHtml).toContain("原型首页");
     expect(page.data?.files.prototypeHtml).toContain("原型首页");
     expect(page.runtimeValidation?.ok).toBe(true);
     expect(page.runtimeValidation?.prototypeGate).toMatchObject({
@@ -826,7 +828,7 @@ describe("ProjectAdminService", () => {
     });
 
     expect(switched.ok).toBe(true);
-    expect(switched.data?.meta.runtimeType).toBeUndefined();
+    // runtimeType 不再存储在 meta 中，已通过文件系统推断
     expect(switched.runtimeValidation?.ok).toBe(true);
     expect(
       fs.readFileSync(
@@ -850,7 +852,7 @@ describe("ProjectAdminService", () => {
     });
 
     expect(reverted.ok).toBe(true);
-    expect(reverted.data?.meta.runtimeType).toBe("prototype-html-css");
+    expect(reverted.data?.files.prototypeHtml).toContain("恢复原型页");
     expect(reverted.runtimeValidation?.prototypeGate?.decision).toBe(
       "accept_prototype",
     );
@@ -890,9 +892,7 @@ describe("ProjectAdminService", () => {
 
     expect(failed.ok).toBe(false);
     expect(failed.error?.code).toBe("VALIDATION_BLOCKED");
-    expect(
-      service.getPage(editId, pageId).data?.meta.runtimeType,
-    ).toBeUndefined();
+    // runtimeType 不再存储在 meta 中，切换失败时文件不变
     expect(
       fs.readFileSync(
         path.join(workspacePath, "demos", pageId, "index.tsx"),

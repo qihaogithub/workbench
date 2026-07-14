@@ -1,5 +1,4 @@
 import type {
-  DemoPageRuntimeType,
   ProjectAuthoringPreferences,
   UserAuthoringPreferences,
   WorkspaceRevision,
@@ -72,7 +71,6 @@ export interface DemoMeta {
     id: string;
     name: string;
     routeKey?: string;
-    runtimeType?: DemoPageRuntimeType;
     order: number;
     parentId: string | null;
   }>;
@@ -96,7 +94,6 @@ export interface ProjectTemplateMeta {
     id: string;
     name: string;
     routeKey?: string;
-    runtimeType?: DemoPageRuntimeType;
     order: number;
     parentId: string | null;
   }>;

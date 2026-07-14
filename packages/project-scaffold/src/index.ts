@@ -936,7 +936,11 @@ export function exportProjectScaffoldEntries(
     workspaceRootHash: projectPackage.data.workspaceRootHash,
     name: projectPackage.data.project.name,
     pages: projectPackage.data.pages.map((page) => {
-      const runtimeType = page.meta.runtimeType ?? "high-fidelity-react";
+      const runtimeType = page.files.sketchScene
+        ? "sketch-scene"
+        : page.files.prototypeHtml
+          ? "prototype-html-css"
+          : "high-fidelity-react";
       return {
         id: page.meta.id,
         name: page.meta.name,

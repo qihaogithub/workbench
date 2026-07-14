@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { createDefaultSketchScene, type SketchSceneDocument } from "@workbench/sketch-core";
+import {
+  createDefaultSketchScene,
+  type SketchSceneDocument,
+} from "@workbench/sketch-core";
 import type {
   DemoPageMeta,
   DemoPageRuntimeType,
@@ -41,9 +44,15 @@ export function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
 
-export function resolvePageRuntimeType(page?: Pick<DemoPageMeta, "runtimeType"> | null): DemoPageRuntimeType {
-  if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
-  if (page?.runtimeType === "sketch-scene") return "sketch-scene";
+/**
+ * 根据页面目录下的文件推断运行时类型。
+ * 优先级：sketch.scene.json > prototype.html > high-fidelity-react（默认）
+ */
+export function resolvePageRuntimeType(pageDir: string): DemoPageRuntimeType {
+  if (fs.existsSync(path.join(pageDir, "sketch.scene.json")))
+    return "sketch-scene";
+  if (fs.existsSync(path.join(pageDir, "prototype.html")))
+    return "prototype-html-css";
   return "high-fidelity-react";
 }
 
@@ -91,16 +100,21 @@ export function isWorkspaceMetadataPath(filePath: string): boolean {
   return [".workspace.json", ".session.json"].includes(path.basename(filePath));
 }
 
-export function copyWorkspaceWithoutRuntimeMetadata(source: string, target: string): void {
+export function copyWorkspaceWithoutRuntimeMetadata(
+  source: string,
+  target: string,
+): void {
   fs.cpSync(source, target, {
     recursive: true,
     filter: (sourcePath) => {
       const relative = path.relative(source, sourcePath);
       if (!relative) return true;
       const segments = relative.split(path.sep);
-      if (segments.some((segment) =>
-        ["node_modules", ".next", ".workbench", ".git"].includes(segment),
-      )) {
+      if (
+        segments.some((segment) =>
+          ["node_modules", ".next", ".workbench", ".git"].includes(segment),
+        )
+      ) {
         return false;
       }
       return !isWorkspaceMetadataPath(relative);
@@ -150,7 +164,8 @@ export function makeUniqueRouteKey(base: string, used: Set<string>): string {
 export function normalizePagesRouteKeys(pages: DemoPageMeta[]): DemoPageMeta[] {
   const used = new Set<string>();
   return pages.map((page) => {
-    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
+    const current =
+      typeof page.routeKey === "string" ? page.routeKey.trim() : "";
     if (current && isValidRouteKey(current) && !used.has(current)) {
       used.add(current);
       return page;

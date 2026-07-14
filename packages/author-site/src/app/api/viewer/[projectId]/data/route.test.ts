@@ -195,7 +195,6 @@ describe("viewer project data route", () => {
 
     expect(response.status).toBe(200);
     expect(body.data?.demoPages[0]).toMatchObject({
-      runtimeType: "prototype-html-css",
       prototypeHtml: expect.stringContaining("静态原型页"),
       prototypeCss: expect.stringContaining("padding"),
     });

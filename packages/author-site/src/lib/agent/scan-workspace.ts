@@ -3,7 +3,7 @@ import * as path from "path";
 import { summarizeCanvasTextNodes } from "@workbench/demo-ui";
 import type { SystemPromptContext } from "./system-prompt";
 import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
-import { listDemoPages } from "../fs-utils";
+import { listDemoPages, resolvePageRuntimeType } from "../fs-utils";
 import { readWorkspaceKnowledgeManifest } from "../knowledge/builtin-documents";
 import { SKETCH_SCENE_AUTHORING_ENABLED } from "../authoring-feature-flags";
 
@@ -114,15 +114,10 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   // 使用 listDemoPages 读取页面列表（自动处理 workspace-tree.json 迁移和磁盘发现）
   const demoPages = listDemoPages(workingDir);
   for (const p of demoPages) {
-    if (p.runtimeType === "sketch-scene" && !SKETCH_SCENE_AUTHORING_ENABLED) {
+    const runtimeType = resolvePageRuntimeType(path.join(workingDir, "demos", p.id));
+    if (runtimeType === "sketch-scene" && !SKETCH_SCENE_AUTHORING_ENABLED) {
       continue;
     }
-    const runtimeType =
-      p.runtimeType === "prototype-html-css"
-        ? "prototype-html-css"
-        : p.runtimeType === "sketch-scene"
-          ? "sketch-scene"
-          : "high-fidelity-react";
     pages.push({
       id: p.id,
       name: p.name,

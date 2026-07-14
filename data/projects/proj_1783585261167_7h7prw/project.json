@@ -6,11 +6,11 @@
   "demoPages": [
     {
       "id": "mobile-page_x7k2",
-      "name": "个人主页",
-      "runtimeType": "prototype-html-css",
-      "order": 1,
+      "name": "mobile page",
+      "order": 0,
       "parentId": null,
-      "routeKey": "page"
+      "routeKey": "mobile-page",
+      "runtimeType": "prototype-html-css"
     }
   ],
   "demoFolders": [],
@@ -166,11 +166,7 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1783993889076,
+  "updatedAt": 1784000678052,
   "activeWorkspaceId": "live-1783654372084-5b2qhswm4",
-  "activeWorkspaceUpdatedAt": 1783659602211,
-  "canonicalSyncedWorkspaceId": "live-1783654372084-5b2qhswm4",
-  "canonicalSyncedAt": 1783993889076,
-  "canonicalSyncedRevision": 68,
-  "canonicalSyncedRootHash": "3a9b94e12bba7ebacaef2e6b5843467a75b7c56ae682e315932b9d7394405d82"
+  "activeWorkspaceUpdatedAt": 1783659602211
 }

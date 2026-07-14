@@ -16,7 +16,11 @@ import {
   WorkspaceAuthorityClientError,
 } from "./workspace-authority-client";
 
-export type WorkspaceFlushStatus = "skipped" | "flushed" | "no_active_room" | "partial_failure";
+export type WorkspaceFlushStatus =
+  | "skipped"
+  | "flushed"
+  | "no_active_room"
+  | "partial_failure";
 
 export interface WorkspaceFlushResult {
   status: WorkspaceFlushStatus;
@@ -72,8 +76,14 @@ interface ApiEnvelope<T> {
   };
 }
 
-function isFlushStatus(value: unknown): value is Exclude<WorkspaceFlushStatus, "skipped"> {
-  return value === "flushed" || value === "no_active_room" || value === "partial_failure";
+function isFlushStatus(
+  value: unknown,
+): value is Exclude<WorkspaceFlushStatus, "skipped"> {
+  return (
+    value === "flushed" ||
+    value === "no_active_room" ||
+    value === "partial_failure"
+  );
 }
 
 function toApiErrorCode(code: string): ErrorCodeType {
@@ -88,7 +98,10 @@ function toApiErrorCode(code: string): ErrorCodeType {
   return "AGENT_SERVICE_ERROR";
 }
 
-function normalizeAgentFlushErrorCode(code?: string, message?: string): string | undefined {
+function normalizeAgentFlushErrorCode(
+  code?: string,
+  message?: string,
+): string | undefined {
   if (code === "WORKSPACE_RESOURCE_CONFLICT") return "WORKSPACE_STALE";
   if (code === "WORKSPACE_EXTERNAL_DRIFT") return "WORKSPACE_STALE";
   if (code !== "COLLAB_FLUSH_FAILED") return code;
@@ -104,7 +117,10 @@ function normalizeAgentFlushErrorCode(code?: string, message?: string): string |
   ) {
     return "INVALID_REQUEST";
   }
-  if (message === "WORKSPACE_NOT_FOUND" || message === "INVALID_RESOURCE_PATH") {
+  if (
+    message === "WORKSPACE_NOT_FOUND" ||
+    message === "INVALID_RESOURCE_PATH"
+  ) {
     return "FILE_WRITE_ERROR";
   }
   if (message === "COLLAB_FORBIDDEN") return "FORBIDDEN";
@@ -150,7 +166,10 @@ export async function ensureCanonicalRevision(
     };
   } catch (error) {
     if (error instanceof WorkspaceAuthorityClientError) {
-      const normalizedCode = normalizeAgentFlushErrorCode(error.code, error.message);
+      const normalizedCode = normalizeAgentFlushErrorCode(
+        error.code,
+        error.message,
+      );
       throw new WorkspaceFlushError(error.message, {
         code: normalizedCode,
         status: error.code === "WORKSPACE_EXTERNAL_DRIFT" ? 409 : error.status,
@@ -233,7 +252,8 @@ export async function flushWorkspaceBeforeCriticalAction(
   }
   return {
     status,
-    flushedRooms: typeof data?.flushedRooms === "number" ? data.flushedRooms : 0,
+    flushedRooms:
+      typeof data?.flushedRooms === "number" ? data.flushedRooms : 0,
     revision: typeof data?.revision === "number" ? data.revision : undefined,
   };
 }
@@ -266,13 +286,10 @@ export async function flushAndSyncProjectWorkspace(
     });
   }
   if (!synced.success) {
-    throw new WorkspaceFlushError(
-      synced.error || "同步项目当前工作区失败",
-      {
-        code: synced.code || "FILE_WRITE_ERROR",
-        status: synced.code === "WORKSPACE_STALE" ? 409 : 500,
-      },
-    );
+    throw new WorkspaceFlushError(synced.error || "同步项目当前工作区失败", {
+      code: synced.code || "FILE_WRITE_ERROR",
+      status: synced.code === "WORKSPACE_STALE" ? 409 : 500,
+    });
   }
   if (syncMetadata) {
     try {

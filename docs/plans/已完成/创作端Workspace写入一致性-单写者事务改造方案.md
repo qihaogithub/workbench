@@ -4,9 +4,9 @@
 > 任务代号：`WMA`（Workspace Mutation Authority）
 > 创建日期：2026-07-10
 > 完成日期：2026-07-11
-> 完整历史：`git log -- docs/plans/进行中/创作端Workspace写入一致性-单写者事务改造方案.md`
+> 原始文件已从 `docs/plans/进行中/` 删除，完整历史见 git log。
 
-本文是 WMA 方案的归档压缩版。完整计划、进度记录和设计细节保留在 `docs/plans/进行中/` 原文件的 git 历史中。
+本文是 WMA 方案的归档压缩版。原始计划文件已删除，完整历史见 git log。
 
 ## 一、最终架构
 
@@ -44,14 +44,14 @@ flowchart LR
 
 ### 模块职责
 
-| 模块 | 最终职责 |
-|:-----|:-----|
-| `@workbench/shared` | 传输协议、receipt、event、错误码、actor 和 operation 类型 |
-| `@workbench/project-core` | 资源注册表、路径与类型校验、hash/manifest、冲突和 mutation policy |
+| 模块                       | 最终职责                                                                                                               |
+| :------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `@workbench/shared`        | 传输协议、receipt、event、错误码、actor 和 operation 类型                                                              |
+| `@workbench/project-core`  | 资源注册表、路径与类型校验、hash/manifest、冲突和 mutation policy                                                      |
 | `@workbench/agent-service` | 每 live Workspace 单写者 coordinator、持久化 lease、串行队列、事务日志、恢复、HTTP/WS、协同草稿 barrier 和 AI 工具适配 |
-| `@workbench/author-site` | Authority client、Yjs/本地草稿热路径、autosave scheduler、保存状态、异步预览 revision ack 和关键动作编排 |
-| `@workbench/project-cli` | branch Workspace 隔离编辑；读取或改变 live Workspace 必须调用 Authority 协议 |
-| screenshot/viewer | 只读 committed snapshot 或已绑定 revision 的物化产物 |
+| `@workbench/author-site`   | Authority client、Yjs/本地草稿热路径、autosave scheduler、保存状态、异步预览 revision ack 和关键动作编排               |
+| `@workbench/project-cli`   | branch Workspace 隔离编辑；读取或改变 live Workspace 必须调用 Authority 协议                                           |
+| screenshot/viewer          | 只读 committed snapshot 或已绑定 revision 的物化产物                                                                   |
 
 ## 二、核心数据协议
 
@@ -132,33 +132,33 @@ receipt 一旦 durable 就立即返回。Projection ack 可以晚到、缺失或
 
 ## 三、系统不变量（INV-1 ~ INV-10）
 
-| 编号 | 不变量 | 说明 |
-|:-----|:-----|:-----|
-| INV-1 | 活动 Workspace 单写者 | `scope=live` 激活后只有 Authority 可改受管资源 |
-| INV-2 | 资源级冲突检测 | 每个变更携带 `expectedHash`，hash 不匹配返回 `WORKSPACE_RESOURCE_CONFLICT` |
-| INV-3 | 提交后才发事件 | 只有 durable receipt 写入后才广播 `workspace_mutation_committed` |
-| INV-4 | 旧投影无权回写 | 协同房间 flush 时若目标资源已被其他 mutation 推进，只能进入冲突状态 |
-| INV-5 | 草稿预览即时，可靠消费有版本 | 编辑态预览消费本地/Yjs 草稿；截图、发布、导出只消费 committed snapshot |
-| INV-6 | 项目版本与 Workspace revision 分离 | `baseVersion` 和 `revision` 不得互相替代 |
-| INV-7 | 关键动作绑定确切 revision | 命名版本、发布、导出、模板、恢复必须记录 `workspaceId` + `revision` |
-| INV-8 | 成功状态由系统生成 | UI 状态由 receipt 和 revision ack 生成，不从模型自然语言推断 |
-| INV-9 | 自动保存不等待 canonical | "已自动保存"只要求 mutation durable commit；canonical 异步追赶 |
-| INV-10 | 实时热路径不进入 Authority | 本地输入、Yjs 广播、草稿预览不等待 mutation journal 或 canonical |
+| 编号   | 不变量                             | 说明                                                                       |
+| :----- | :--------------------------------- | :------------------------------------------------------------------------- |
+| INV-1  | 活动 Workspace 单写者              | `scope=live` 激活后只有 Authority 可改受管资源                             |
+| INV-2  | 资源级冲突检测                     | 每个变更携带 `expectedHash`，hash 不匹配返回 `WORKSPACE_RESOURCE_CONFLICT` |
+| INV-3  | 提交后才发事件                     | 只有 durable receipt 写入后才广播 `workspace_mutation_committed`           |
+| INV-4  | 旧投影无权回写                     | 协同房间 flush 时若目标资源已被其他 mutation 推进，只能进入冲突状态        |
+| INV-5  | 草稿预览即时，可靠消费有版本       | 编辑态预览消费本地/Yjs 草稿；截图、发布、导出只消费 committed snapshot     |
+| INV-6  | 项目版本与 Workspace revision 分离 | `baseVersion` 和 `revision` 不得互相替代                                   |
+| INV-7  | 关键动作绑定确切 revision          | 命名版本、发布、导出、模板、恢复必须记录 `workspaceId` + `revision`        |
+| INV-8  | 成功状态由系统生成                 | UI 状态由 receipt 和 revision ack 生成，不从模型自然语言推断               |
+| INV-9  | 自动保存不等待 canonical           | "已自动保存"只要求 mutation durable commit；canonical 异步追赶             |
+| INV-10 | 实时热路径不进入 Authority         | 本地输入、Yjs 广播、草稿预览不等待 mutation journal 或 canonical           |
 
 ## 四、验证证据摘要
 
 ### 测试覆盖
 
-| 包 | 测试数 | 状态 |
-|:-----|:-----|:-----|
-| agent-service | 41 suites / 350+ tests | 通过 |
-| project-core | 3 suites / 49+ tests | 通过 |
-| author-site | 700+ tests（4 个既有 `useVisualEditState` 基线失败，与 WMA 无关） | 通过 |
-| project-cli | 全量测试 | 通过 |
-| screenshot-service | 18 tests | 通过 |
-| OPS CLI | 18 tests | 通过 |
-| check:workspace-authority | 静态门禁 + allowlist | 通过 |
-| check:contracts | 共享合同检查 | 通过 |
+| 包                        | 测试数                                                            | 状态 |
+| :------------------------ | :---------------------------------------------------------------- | :--- |
+| agent-service             | 41 suites / 350+ tests                                            | 通过 |
+| project-core              | 3 suites / 49+ tests                                              | 通过 |
+| author-site               | 700+ tests（4 个既有 `useVisualEditState` 基线失败，与 WMA 无关） | 通过 |
+| project-cli               | 全量测试                                                          | 通过 |
+| screenshot-service        | 18 tests                                                          | 通过 |
+| OPS CLI                   | 18 tests                                                          | 通过 |
+| check:workspace-authority | 静态门禁 + allowlist                                              | 通过 |
+| check:contracts           | 共享合同检查                                                      | 通过 |
 
 ### 已覆盖的关键场景
 
@@ -180,16 +180,16 @@ receipt 一旦 durable 就立即返回。Projection ack 可以晚到、缺失或
 
 ### 性能 SLO 目标
 
-| 指标 | 目标 |
-|:-----|:-----|
-| 本地输入回显 | 不等待网络或文件提交 |
-| 远端协作更新 | p95 < 300ms |
-| HTML/CSS/Sketch 草稿预览 | p95 < 150ms |
-| Authority commit latency | p95 < 500ms |
-| 停止输入到"已自动保存" | p95 < 1500ms |
-| WebSocket 重连收敛 | p95 < 3000ms |
-| canonical 后台 lag | p95 < 5000ms |
-| 内容回退 | 0 次 |
+| 指标                     | 目标                 |
+| :----------------------- | :------------------- |
+| 本地输入回显             | 不等待网络或文件提交 |
+| 远端协作更新             | p95 < 300ms          |
+| HTML/CSS/Sketch 草稿预览 | p95 < 150ms          |
+| Authority commit latency | p95 < 500ms          |
+| 停止输入到"已自动保存"   | p95 < 1500ms         |
+| WebSocket 重连收敛       | p95 < 3000ms         |
+| canonical 后台 lag       | p95 < 5000ms         |
+| 内容回退                 | 0 次                 |
 
 ## 五、迁移结论
 

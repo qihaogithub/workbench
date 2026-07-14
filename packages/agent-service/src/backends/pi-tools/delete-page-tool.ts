@@ -457,6 +457,8 @@ async function deleteOnePage(
         },
       ],
     });
+    // P2: clean up empty page directory after Authority delete_path operations
+    fs.rmSync(pageDir, { recursive: true, force: true });
   } else {
     fs.rmSync(pageDir, { recursive: true, force: true });
     writeWorkspaceTree(workingDir, nextTree);
@@ -571,6 +573,13 @@ async function deletePageBatch(
         },
       ],
     });
+    // P2: clean up empty page directories after Authority delete_path operations
+    for (const pageId of pageIds) {
+      fs.rmSync(getPageDir(workingDir, pageId), {
+        recursive: true,
+        force: true,
+      });
+    }
   } else {
     for (const pageId of pageIds)
       fs.rmSync(getPageDir(workingDir, pageId), {

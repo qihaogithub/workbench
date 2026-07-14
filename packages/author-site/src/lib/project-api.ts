@@ -216,7 +216,7 @@ export class ProjectApiClient {
     name: string,
     sessionId: string,
     parentId?: string | null,
-    runtimeType?: DemoPageMeta["runtimeType"],
+    runtimeType?: DemoPageRuntimeType,
   ): Promise<DemoPageMeta> {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos`,

@@ -62,7 +62,7 @@ export function isHiddenEntry(name: string, showKnowledge = false): boolean {
   return false;
 }
 
-export function resolvePageRuntimeType(
+export function normalizePageRuntimeType(
   runtimeType?: DemoPageRuntimeType | null,
 ): DemoPageRuntimeType {
   if (runtimeType === "prototype-html-css") return "prototype-html-css";
@@ -91,7 +91,7 @@ export function isVisiblePageRuntimeFile(input: {
   runtimeType?: DemoPageRuntimeType | null;
   schemaContent?: string | null;
 }): boolean {
-  const runtimeType = resolvePageRuntimeType(input.runtimeType);
+  const runtimeType = normalizePageRuntimeType(input.runtimeType);
 
   if (input.fileName === "prototype.meta.json") return false;
   if (input.fileName === "sketch.meta.json") return false;

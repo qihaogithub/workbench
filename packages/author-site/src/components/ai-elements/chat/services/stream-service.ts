@@ -6,7 +6,12 @@ import {
 } from "@workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
-import { buildStaticSystemPrompt, buildDynamicContextPrefix, buildMemoryPrefix, buildKnowledgeIndexPrefix } from "@/lib/agent/system-prompt";
+import {
+  buildStaticSystemPrompt,
+  buildDynamicContextPrefix,
+  buildMemoryPrefix,
+  buildKnowledgeIndexPrefix,
+} from "@/lib/agent/system-prompt";
 import {
   buildActiveViewContextPrefix,
   type ActiveViewContext,
@@ -19,18 +24,24 @@ export interface ToolCapabilities {
 
 export class MissingTransactionalDeleteToolsError extends Error {
   constructor() {
-    super("Agent Service 版本过旧或当前会话未加载事务化删除工具。请重启 agent-service 并刷新创作端页面后再试。");
+    super(
+      "Agent Service 版本过旧或当前会话未加载事务化删除工具。请重启 agent-service 并刷新创作端页面后再试。",
+    );
     this.name = "MissingTransactionalDeleteToolsError";
   }
 }
 
 function isBulkPageDeletionRequest(message: string): boolean {
-  return /删|删除|清理/.test(message) &&
+  return (
+    /删|删除|清理/.test(message) &&
     /页面|页/.test(message) &&
-    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message);
+    /所有|全部|批量|这些|那些|多个|副本|不需要|冗余/.test(message)
+  );
 }
 
-function hasTransactionalDeleteTools(capabilities: ToolCapabilities | null): boolean {
+function hasTransactionalDeleteTools(
+  capabilities: ToolCapabilities | null,
+): boolean {
   const tools = new Set(capabilities?.toolNames || []);
   return tools.has("previewDeletePages") && tools.has("executeDeletePagePlan");
 }
@@ -54,17 +65,23 @@ async function fetchToolCapabilities(): Promise<ToolCapabilities | null> {
  * 异步获取 L3 上下文前缀和 L4 记忆内容（通过服务端 API 避免客户端打包 fs）
  * 失败时返回空字符串（仍会发，但会让 AI 不知道页面列表/记忆）
  */
-async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; memory: string | null; knowledgeIndex: string | null }> {
+async function fetchContextPrefix(
+  workingDir: string,
+): Promise<{
+  l3: string;
+  memory: string | null;
+  knowledgeIndex: string | null;
+}> {
   try {
     const response = await fetch(
       `/api/agent/workspace-context?workingDir=${encodeURIComponent(workingDir)}`,
-      { method: "GET" }
+      { method: "GET" },
     );
     if (!response.ok) {
       console.warn(
         "[StreamService] workspace-context API 响应非 OK:",
         response.status,
-        response.statusText
+        response.statusText,
       );
       return { l3: "", memory: null, knowledgeIndex: null };
     }
@@ -74,7 +91,9 @@ async function fetchContextPrefix(workingDir: string): Promise<{ l3: string; mem
       return { l3: "", memory: null, knowledgeIndex: null };
     }
     const l3 = buildDynamicContextPrefix(json.data);
-    const memory = json.data.memoryContent ? buildMemoryPrefix(json.data.memoryContent) : null;
+    const memory = json.data.memoryContent
+      ? buildMemoryPrefix(json.data.memoryContent)
+      : null;
     const knowledgeIndex = json.data.knowledgeIndex || null;
     return { l3, memory, knowledgeIndex };
   } catch (error) {
@@ -247,7 +266,10 @@ export class StreamService {
     }
 
     const toolCapabilities = await fetchToolCapabilities();
-    if (isBulkPageDeletionRequest(message) && !hasTransactionalDeleteTools(toolCapabilities)) {
+    if (
+      isBulkPageDeletionRequest(message) &&
+      !hasTransactionalDeleteTools(toolCapabilities)
+    ) {
       throw new MissingTransactionalDeleteToolsError();
     }
     const systemPrompt = buildStaticSystemPrompt({
@@ -258,7 +280,9 @@ export class StreamService {
     // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
     // L4 记忆仅在首条消息注入
     const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
-    let finalContent = activeViewPrefix ? `${activeViewPrefix}${message}` : message;
+    let finalContent = activeViewPrefix
+      ? `${activeViewPrefix}${message}`
+      : message;
     if (workingDir) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
       let ctx = await fetchContextPrefix(workingDir);
@@ -270,16 +294,17 @@ export class StreamService {
         // 知识库索引：每条消息都注入（与 L3 同频，因为知识库可能被用户更新）
         const knowledgePrefix = ctx.knowledgeIndex
           ? buildKnowledgeIndexPrefix(ctx.knowledgeIndex)
-          : '';
+          : "";
         // L4 记忆：仅首条消息注入
-        const memoryPrefix = (!this.hasInjectedMemory && ctx.memory) ? ctx.memory : '';
+        const memoryPrefix =
+          !this.hasInjectedMemory && ctx.memory ? ctx.memory : "";
         if (memoryPrefix) {
           this.hasInjectedMemory = true;
         }
         finalContent = `${ctx.l3}${knowledgePrefix}${memoryPrefix}${activeViewPrefix}${message}`;
       } else {
         console.warn(
-          "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态"
+          "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态",
         );
       }
     }
@@ -297,7 +322,11 @@ export class StreamService {
     } as any);
   }
 
-  sendPermissionResponse(permissionId: string, optionId: string, responseContent?: string): void {
+  sendPermissionResponse(
+    permissionId: string,
+    optionId: string,
+    responseContent?: string,
+  ): void {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(
@@ -338,7 +367,9 @@ export class StreamService {
     }
   }
 
-  forwardConsoleEntries(entries: Array<{ level: string; args: string; timestamp: number }>): void {
+  forwardConsoleEntries(
+    entries: Array<{ level: string; args: string; timestamp: number }>,
+  ): void {
     const ws = (this.stream as any)?.ws;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "console_data", entries }));
@@ -348,6 +379,15 @@ export class StreamService {
   close(): void {
     this.stopKeepalive();
     if (this.stream) {
+      // P5 Layer 1: send cancel frame before closing if a message is in flight
+      const ws = (this.stream as any)?.ws;
+      if (this.messageInFlight && ws?.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: "cancel" }));
+        } catch {
+          // WebSocket may close between the check and send; ignore
+        }
+      }
       this.stream.close();
       this.stream = null;
       this.currentSessionId = "";
@@ -394,7 +434,11 @@ export class StreamService {
   }
 
   private scheduleReadyFinishFallback(streamId: string): void {
-    if (this.finishDelivered || !this.messageInFlight || this.readyFallbackTimer) {
+    if (
+      this.finishDelivered ||
+      !this.messageInFlight ||
+      this.readyFallbackTimer
+    ) {
       return;
     }
     this.readyFallbackTimer = setTimeout(() => {

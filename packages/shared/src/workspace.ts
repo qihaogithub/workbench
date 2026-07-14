@@ -1,7 +1,7 @@
 export interface WorkspaceInfo {
   path: string;
   customWorkspace: boolean;
-  type: 'user' | 'temp';
+  type: "user" | "temp";
   createdAt: number;
 }
 
@@ -12,12 +12,12 @@ export interface CreateWorkspaceOptions {
 
 export interface FileChangeInfo {
   path: string;
-  operation: 'create' | 'modify' | 'delete';
-  status: 'staged' | 'unstaged';
+  operation: "create" | "modify" | "delete";
+  status: "staged" | "unstaged";
 }
 
 export interface SnapshotInfo {
-  mode: 'git-repo' | 'snapshot';
+  mode: "git-repo" | "snapshot";
   branch: string | null;
 }
 
@@ -29,8 +29,8 @@ export interface CompareResult {
 export interface WorkspaceMeta {
   workingDir: string;
   customWorkspace: boolean;
-  workspaceType: 'user' | 'temp';
-  snapshotMode: 'git-repo' | 'snapshot' | null;
+  workspaceType: "user" | "temp";
+  snapshotMode: "git-repo" | "snapshot" | null;
   snapshotBranch: string | null;
 }
 
@@ -50,17 +50,17 @@ export type VersionHistoryEntryType =
  * 旧数据可能没有 type，读取时应按普通命名版本兼容。
  */
 export interface VersionInfo {
-  versionId: string;           // 例如 "v1", "v2", "v3"
+  versionId: string; // 例如 "v1", "v2", "v3"
   type?: VersionHistoryEntryType; // 历史记录类型
-  savedAt: number;             // 保存时间戳
-  savedBy: string;             // 保存者用户名
-  sessionId: string;           // 关联的编辑会话 ID
-  snapshotPath: string;        // 备份文件夹路径（绝对路径）
-  fileCount: number;           // 文件数量
-  workspaceId?: string;        // 生成该历史记录时消费的 Workspace ID
-  workspaceRevision?: WorkspaceRevision;  // 生成该历史记录时消费的 Workspace Authority revision
-  workspaceRootHash?: string;  // 生成该历史记录时消费的 Workspace Authority root hash
-  note?: string;               // 用户备注（可选）
+  savedAt: number; // 保存时间戳
+  savedBy: string; // 保存者用户名
+  sessionId: string; // 关联的编辑会话 ID
+  snapshotPath: string; // 备份文件夹路径（绝对路径）
+  fileCount: number; // 文件数量
+  workspaceId?: string; // 生成该历史记录时消费的 Workspace ID
+  workspaceRevision?: WorkspaceRevision; // 生成该历史记录时消费的 Workspace Authority revision
+  workspaceRootHash?: string; // 生成该历史记录时消费的 Workspace Authority root hash
+  note?: string; // 用户备注（可选）
 }
 
 /**
@@ -120,7 +120,14 @@ export interface ProjectCommit {
   projectId: string;
   parentCommitId?: string;
   visibility: "draft_checkpoint" | "semantic" | "protected";
-  intent: "edit" | "checkpoint" | "restore" | "publish" | "import" | "ai" | "system";
+  intent:
+    | "edit"
+    | "checkpoint"
+    | "restore"
+    | "publish"
+    | "import"
+    | "ai"
+    | "system";
   title: string;
   resourcePointers: ResourcePointer[];
   changedResources: Array<{
@@ -168,12 +175,11 @@ export type DemoPageRuntimeType =
   | "sketch-scene";
 
 export interface DemoPageMeta {
-  id: string;                  // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
-  name: string;                // 显示名称，如 "首页"、"详情页"
-  routeKey?: string;           // 页面稳定语义标识，供应用逻辑图、AI 和工程交接使用
-  runtimeType?: DemoPageRuntimeType; // 页面运行时类型；旧数据缺省为 high-fidelity-react
-  order: number;               // 在页面列表中的展示顺序（小者在前）
-  parentId: string | null;     // 所属文件夹 ID，null 表示根级
+  id: string; // 唯一标识，格式 "demo_{timestamp}_{random6}"，同时作为目录名
+  name: string; // 显示名称，如 "首页"、"详情页"
+  routeKey?: string; // 页面稳定语义标识，供应用逻辑图、AI 和工程交接使用
+  order: number; // 在页面列表中的展示顺序（小者在前）
+  parentId: string | null; // 所属文件夹 ID，null 表示根级
 }
 
 export interface AppGraphPageNode {
@@ -228,10 +234,10 @@ export interface AppGraphValidationResult {
  * 持久化在 workspace/workspace-tree.json 的 folders 数组中，保存时合并到 Project.demoFolders。
  */
 export interface DemoFolderMeta {
-  id: string;                  // 唯一标识，格式 "folder_{timestamp}_{random6}"
-  name: string;                // 文件夹显示名称
-  parentId: string | null;     // 父文件夹 ID，null 表示根级
-  order: number;               // 同级内的排序（小者在前）
+  id: string; // 唯一标识，格式 "folder_{timestamp}_{random6}"
+  name: string; // 文件夹显示名称
+  parentId: string | null; // 父文件夹 ID，null 表示根级
+  order: number; // 同级内的排序（小者在前）
 }
 
 /**
@@ -259,27 +265,27 @@ export function isDemoFolder(item: DemoPageItem): item is DemoFolderMeta {
  * 项目定义
  */
 export interface Project {
-  id: string;                  // 项目唯一标识
-  name: string;                // 项目名称
-  category?: string;           // 首页项目分类
-  description?: string;        // 项目描述
-  workspacePath: string;       // 项目基准工作区绝对路径（canonical Workspace）
-  activeWorkspaceId?: string;  // 项目级共享当前工作空间 ID
+  id: string; // 项目唯一标识
+  name: string; // 项目名称
+  category?: string; // 首页项目分类
+  description?: string; // 项目描述
+  workspacePath: string; // 项目基准工作区绝对路径（canonical Workspace）
+  activeWorkspaceId?: string; // 项目级共享当前工作空间 ID
   activeWorkspaceUpdatedAt?: number; // 项目级共享当前工作空间更新时间
   canonicalSyncedWorkspaceId?: string; // 最近同步到项目基准工作区的 Workspace ID
   canonicalSyncedRevision?: CanonicalSyncedRevision; // 仅在 canonical materialize 成功后推进，不代表 Authority 当前 revision
   canonicalSyncedRootHash?: string; // 最近同步到项目基准工作区的 Authority root hash
-  canonicalSyncedAt?: number;  // 最近同步到项目基准工作区的时间
-  demoPages: DemoPageMeta[];   // Demo 页面列表（按 order 升序）
+  canonicalSyncedAt?: number; // 最近同步到项目基准工作区的时间
+  demoPages: DemoPageMeta[]; // Demo 页面列表（按 order 升序）
   demoFolders: DemoFolderMeta[]; // 虚拟文件夹列表
-  versions: VersionInfo[];     // 版本历史（最多 50 个）
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
+  versions: VersionInfo[]; // 版本历史（最多 50 个）
+  createdAt: number; // 创建时间戳
+  updatedAt: number; // 最后更新时间戳
   lockedDependencies?: Record<string, string>; // 依赖版本锁定：包名 -> CDN URL
   authoringPreferences?: ProjectAuthoringPreferences; // 创作端项目级编辑偏好
-  thumbnail?: string;          // 缩略图路径
-  publishedVersion?: string;   // 已发布的版本ID，如 "v3"；undefined 表示从未发布
-  publishedAt?: number;        // 最后发布时间戳
+  thumbnail?: string; // 缩略图路径
+  publishedVersion?: string; // 已发布的版本ID，如 "v3"；undefined 表示从未发布
+  publishedAt?: number; // 最后发布时间戳
 }
 
 /**
@@ -302,8 +308,8 @@ export interface UserAuthoringPreferences {
  */
 export interface DemoPageDetail {
   meta: DemoPageMeta;
-  code: string;                // index.tsx 内容
-  schema: string;              // config.schema.json 内容
+  code: string; // index.tsx 内容
+  schema: string; // config.schema.json 内容
 }
 
 /**
@@ -311,15 +317,15 @@ export interface DemoPageDetail {
  */
 export interface CreateDemoPageRequest {
   name: string;
-  parentId?: string | null;    // 创建时指定所属文件夹
+  parentId?: string | null; // 创建时指定所属文件夹
 }
 
 /**
  * 更新 Demo 代码/配置请求（按职责拆分）
  */
 export interface UpdateDemoPageFilesRequest {
-  code?: string;               // index.tsx 内容
-  schema?: string;             // config.schema.json 内容
+  code?: string; // index.tsx 内容
+  schema?: string; // config.schema.json 内容
 }
 
 /**
@@ -328,7 +334,7 @@ export interface UpdateDemoPageFilesRequest {
 export interface PatchDemoPageMetaRequest {
   name?: string;
   order?: number;
-  parentId?: string | null;    // 移动到其他文件夹
+  parentId?: string | null; // 移动到其他文件夹
 }
 
 /**
@@ -336,7 +342,7 @@ export interface PatchDemoPageMetaRequest {
  */
 export interface CreateDemoFolderRequest {
   name: string;
-  parentId?: string | null;    // 父文件夹 ID，null 为根级
+  parentId?: string | null; // 父文件夹 ID，null 为根级
 }
 
 /**
@@ -371,8 +377,8 @@ export interface ReorderDemoPagesRequest {
  * 不在 Project 上持久化任何标记字段。
  */
 export interface ProjectConfig {
-  schema: string;              // project.config.schema.json 内容
-  exists: boolean;             // 是否存在项目级配置
+  schema: string; // project.config.schema.json 内容
+  exists: boolean; // 是否存在项目级配置
 }
 
 /**
@@ -386,14 +392,14 @@ export interface UpdateProjectConfigRequest {
  * 编辑会话
  */
 export interface EditSession {
-  sessionId: string;           // 会话唯一标识
-  projectId: string;           // 关联的项目 ID
-  username: string;            // 当前编辑者用户名
-  workspacePath?: string;      // 工作区绝对路径
-  tempWorkspace: string;       // @deprecated 兼容旧调用方，等同于 workspacePath
-  basedOnVersion: string;      // 基于的版本号
-  status: 'editing' | 'saved' | 'discarded';
-  createdAt: number;           // 创建时间戳
+  sessionId: string; // 会话唯一标识
+  projectId: string; // 关联的项目 ID
+  username: string; // 当前编辑者用户名
+  workspacePath?: string; // 工作区绝对路径
+  tempWorkspace: string; // @deprecated 兼容旧调用方，等同于 workspacePath
+  basedOnVersion: string; // 基于的版本号
+  status: "editing" | "saved" | "discarded";
+  createdAt: number; // 创建时间戳
 }
 
 /**
@@ -403,35 +409,35 @@ export interface CreateProjectRequest {
   name: string;
   category?: string;
   description?: string;
-  workspacePath?: string;      // 可选：指定初始工作空间路径
+  workspacePath?: string; // 可选：指定初始工作空间路径
 }
 
 /**
  * 打开项目编辑请求参数
  */
 export interface OpenProjectEditRequest {
-  username: string;            // 用户名
+  username: string; // 用户名
 }
 
 /**
  * 打开项目编辑响应
  */
 export interface OpenProjectEditResponse {
-  sessionId: string;           // 编辑会话 ID
-  workspaceId?: string;        // 工作空间 ID，新链路优先使用
+  sessionId: string; // 编辑会话 ID
+  workspaceId?: string; // 工作空间 ID，新链路优先使用
   workspaceScope?: "live" | "branch" | "snapshot-source" | "legacy";
-  workspacePath?: string;      // 工作空间绝对路径
+  workspacePath?: string; // 工作空间绝对路径
   isSharedWorkspace?: boolean; // 是否为项目级共享工作空间
-  tempWorkspace: string;       // @deprecated 兼容旧调用方，等同于 workspacePath
-  basedOnVersion: string;      // 基于的版本号
-  warning?: string;            // 警告信息（如多人编辑）
+  tempWorkspace: string; // @deprecated 兼容旧调用方，等同于 workspacePath
+  basedOnVersion: string; // 基于的版本号
+  warning?: string; // 警告信息（如多人编辑）
 }
 
 /**
  * 保存项目变更请求参数
  */
 export interface SaveProjectChangesRequest {
-  note?: string;               // 备注信息
+  note?: string; // 备注信息
 }
 
 /**
@@ -439,8 +445,8 @@ export interface SaveProjectChangesRequest {
  */
 export interface SaveProjectChangesResponse {
   success: boolean;
-  version: string;             // 新版本号
-  savedAt: number;             // 保存时间
+  version: string; // 新版本号
+  savedAt: number; // 保存时间
 }
 
 /**
@@ -448,9 +454,9 @@ export interface SaveProjectChangesResponse {
  */
 export interface VersionHistoryResponse {
   projectId: string;
-  currentVersion: string;      // 当前最新版本
-  versions: VersionInfo[];     // 版本列表（倒序）
-  totalVersions: number;       // 总版本数
+  currentVersion: string; // 当前最新版本
+  versions: VersionInfo[]; // 版本列表（倒序）
+  totalVersions: number; // 总版本数
 }
 
 export interface PageVersionHistoryResponse {
@@ -520,6 +526,12 @@ export const MAX_VERSIONS_KEEP = 50;
  * source-compatible while preventing an already-typed axis from being passed
  * as another axis accidentally.
  */
-export type ProjectBaseVersion = string & { readonly __versionAxis?: "project-base-version" };
-export type WorkspaceRevision = number & { readonly __versionAxis?: "workspace-revision" };
-export type CanonicalSyncedRevision = number & { readonly __versionAxis?: "canonical-synced-revision" };
+export type ProjectBaseVersion = string & {
+  readonly __versionAxis?: "project-base-version";
+};
+export type WorkspaceRevision = number & {
+  readonly __versionAxis?: "workspace-revision";
+};
+export type CanonicalSyncedRevision = number & {
+  readonly __versionAxis?: "canonical-synced-revision";
+};

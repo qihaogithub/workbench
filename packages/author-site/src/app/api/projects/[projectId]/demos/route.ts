@@ -18,6 +18,7 @@ import {
   findWorkspacePath,
   readFoldersMeta,
   generateDemoPageId,
+  resolvePageRuntimeType,
   generateRouteKey,
   DEFAULT_DEMO_CODE,
   DEFAULT_DEMO_SCHEMA,
@@ -389,7 +390,7 @@ export async function POST(
           : 0;
       const demoId = generateDemoPageId(name.trim());
       const resolvedRuntimeType = sourceMeta
-        ? (sourceMeta.runtimeType ?? "high-fidelity-react")
+        ? resolvePageRuntimeType(getDemoDirPath(wsPath, sourcePageId!))
         : resolveNewPageRuntimeType(runtimeType);
       demoMeta = {
         id: demoId,
@@ -400,10 +401,6 @@ export async function POST(
             .map((page) => page.routeKey)
             .filter(Boolean) as string[],
         ),
-        runtimeType:
-          resolvedRuntimeType === "high-fidelity-react"
-            ? undefined
-            : resolvedRuntimeType,
         order: nextOrder,
         parentId: effectiveParentId,
       };

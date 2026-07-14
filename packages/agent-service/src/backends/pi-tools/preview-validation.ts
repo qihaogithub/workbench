@@ -52,7 +52,7 @@ export function formatRuntimeValidationInstruction(
         ? [
             '',
             'Prototype gate decision: upgrade_to_high_fidelity.',
-            `Regenerate this page as high-fidelity React: write demos/${pageId}/index.tsx, keep config.schema.json valid, and update workspace-tree.json runtimeType to high-fidelity-react only after the React file validates.`,
+            `Regenerate this page as high-fidelity React: write demos/${pageId}/index.tsx, keep config.schema.json valid, and ensure the React file validates before considering the conversion complete. Runtime type is inferred from files on disk.`,
             `Tell the user briefly why the page needs isolated runtime: ${gate.summary}`,
           ].join('\n')
         : ''

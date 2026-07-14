@@ -30,7 +30,7 @@ import {
 } from "@/lib/workspace-flush";
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
-import { resolvePageRuntimeType } from "@/lib/workspace-file-utils";
+import { resolvePageRuntimeType } from "@/lib/fs-utils";
 import { commitWorkspaceMutation, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 
 const DEFAULT_PROTOTYPE_META = {
@@ -100,7 +100,8 @@ function getLiveWorkspacePageRuntime(input: {
     ? tree.pages.find((item) => item.id === input.pageId)
     : null;
   if (!page) throw new Error("DEMO_PAGE_NOT_FOUND");
-  return resolvePageRuntimeType(page.runtimeType);
+  const pageDir = path.join(input.workspacePath, "demos", input.pageId);
+  return resolvePageRuntimeType(pageDir);
 }
 
 function createRestorePageVersionOperations(input: {

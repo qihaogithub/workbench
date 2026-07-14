@@ -14,6 +14,7 @@ import {
   projectExists,
   getDataDir,
   readAppGraph,
+  resolvePageRuntimeType,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import { extractSchemaDefaults } from "@/lib/schema-defaults";
@@ -21,6 +22,7 @@ import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 import type {
   Project,
   DemoPageMeta,
+  DemoPageRuntimeType,
   DemoFolderMeta,
   AppGraph,
 } from "@workbench/shared";
@@ -65,7 +67,7 @@ export interface PublishedDemoPage {
   routeKey?: string;
   order: number;
   parentId: string | null;
-  runtimeType?: DemoPageMeta["runtimeType"];
+  runtimeType?: DemoPageRuntimeType;
   compiledJsPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
@@ -86,10 +88,13 @@ export interface PublishedDemoPage {
 
 interface ScreenshotMeta {
   currentHash?: string;
-  variants?: Record<string, {
-    variant?: "strict" | "fast";
-    generatedAt?: string;
-  }>;
+  variants?: Record<
+    string,
+    {
+      variant?: "strict" | "fast";
+      generatedAt?: string;
+    }
+  >;
 }
 
 export interface PublishedProject {
@@ -149,8 +154,15 @@ function getViewerBaseUrl(): string {
   return process.env.VIEWER_CLOUDFLARE_URL || process.env.VIEWER_LAN_URL || "";
 }
 
-function copyPreviewRuntimeForPublish(projectId: string, publishDir: string): string | undefined {
-  const runtimeSourceDir = path.join(process.cwd(), "public", "preview-runtime");
+function copyPreviewRuntimeForPublish(
+  projectId: string,
+  publishDir: string,
+): string | undefined {
+  const runtimeSourceDir = path.join(
+    process.cwd(),
+    "public",
+    "preview-runtime",
+  );
   if (!fs.existsSync(runtimeSourceDir)) {
     return undefined;
   }
@@ -197,7 +209,10 @@ function normalizeScreenshotHash(hash?: string | null): string | null {
   return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
 }
 
-function readScreenshotMeta(projectId: string, pageId: string): ScreenshotMeta | null {
+function readScreenshotMeta(
+  projectId: string,
+  pageId: string,
+): ScreenshotMeta | null {
   const metaPath = path.join(SCREENSHOTS_DIR, projectId, `${pageId}.meta.json`);
   try {
     return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as ScreenshotMeta;
@@ -206,14 +221,20 @@ function readScreenshotMeta(projectId: string, pageId: string): ScreenshotMeta |
   }
 }
 
-function resolveCurrentScreenshotPath(projectId: string, pageId: string): string | undefined {
+function resolveCurrentScreenshotPath(
+  projectId: string,
+  pageId: string,
+): string | undefined {
   const projectScreenshotsDir = path.join(SCREENSHOTS_DIR, projectId);
   if (!fs.existsSync(projectScreenshotsDir)) return undefined;
 
   const meta = readScreenshotMeta(projectId, pageId);
   const currentHash = normalizeScreenshotHash(meta?.currentHash);
   if (currentHash) {
-    const strictPath = path.join(projectScreenshotsDir, `${pageId}.${currentHash}.png`);
+    const strictPath = path.join(
+      projectScreenshotsDir,
+      `${pageId}.${currentHash}.png`,
+    );
     if (fs.existsSync(strictPath)) return strictPath;
   }
 
@@ -222,11 +243,19 @@ function resolveCurrentScreenshotPath(projectId: string, pageId: string): string
       const [hash, variant = "strict"] = key.split(":");
       return {
         hash: normalizeScreenshotHash(hash),
-        variant: variant === "fast" ? "fast" as const : "strict" as const,
+        variant: variant === "fast" ? ("fast" as const) : ("strict" as const),
         generatedAt: value.generatedAt ?? "",
       };
     })
-    .filter((entry): entry is { hash: string; variant: "strict" | "fast"; generatedAt: string } => Boolean(entry.hash))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        hash: string;
+        variant: "strict" | "fast";
+        generatedAt: string;
+      } => Boolean(entry.hash),
+    )
     .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
 
   if (latestVariant) {
@@ -313,7 +342,9 @@ export async function publishProject(
   if (!imageResult.success) {
     console.warn(
       `[publish] ${imageResult.errors.length} 张图片本地化失败:`,
-      imageResult.errors.map((e) => `${e.localPath}:${e.error || "UNKNOWN"}`).join(", "),
+      imageResult.errors
+        .map((e) => `${e.localPath}:${e.error || "UNKNOWN"}`)
+        .join(", "),
     );
     throw new Error("IMAGE_LOCALIZATION_FAILED");
   }
@@ -354,12 +385,7 @@ export async function publishProject(
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
     const sketchScenePath = path.join(demoDir, "sketch.scene.json");
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
-    const runtimeType =
-      page.runtimeType === "prototype-html-css"
-        ? "prototype-html-css"
-        : page.runtimeType === "sketch-scene"
-          ? "sketch-scene"
-          : "high-fidelity-react";
+    const runtimeType = resolvePageRuntimeType(demoDir);
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
@@ -382,20 +408,41 @@ export async function publishProject(
 
     if (runtimeType === "prototype-html-css") {
       if (!fs.existsSync(prototypeHtmlPath)) continue;
-      const prototypeHtml = urlMap.size > 0
-        ? replacePathsInContent(fs.readFileSync(prototypeHtmlPath, "utf-8"), urlMap, prototypeHtmlPath)
-        : fs.readFileSync(prototypeHtmlPath, "utf-8");
+      const prototypeHtml =
+        urlMap.size > 0
+          ? replacePathsInContent(
+              fs.readFileSync(prototypeHtmlPath, "utf-8"),
+              urlMap,
+              prototypeHtmlPath,
+            )
+          : fs.readFileSync(prototypeHtmlPath, "utf-8");
       const prototypeCss = fs.existsSync(prototypeCssPath)
         ? urlMap.size > 0
-          ? replacePathsInContent(fs.readFileSync(prototypeCssPath, "utf-8"), urlMap, prototypeCssPath)
+          ? replacePathsInContent(
+              fs.readFileSync(prototypeCssPath, "utf-8"),
+              urlMap,
+              prototypeCssPath,
+            )
           : fs.readFileSync(prototypeCssPath, "utf-8")
         : "";
-      fs.writeFileSync(path.join(demoPublishDir, "prototype.html"), prototypeHtml, "utf-8");
-      fs.writeFileSync(path.join(demoPublishDir, "prototype.css"), prototypeCss, "utf-8");
+      fs.writeFileSync(
+        path.join(demoPublishDir, "prototype.html"),
+        prototypeHtml,
+        "utf-8",
+      );
+      fs.writeFileSync(
+        path.join(demoPublishDir, "prototype.css"),
+        prototypeCss,
+        "utf-8",
+      );
       let prototypeMeta: Record<string, unknown> | undefined;
       if (fs.existsSync(prototypeMetaPath)) {
         const metaContent = fs.readFileSync(prototypeMetaPath, "utf-8");
-        fs.writeFileSync(path.join(demoPublishDir, "prototype.meta.json"), metaContent, "utf-8");
+        fs.writeFileSync(
+          path.join(demoPublishDir, "prototype.meta.json"),
+          metaContent,
+          "utf-8",
+        );
         try {
           prototypeMeta = JSON.parse(metaContent) as Record<string, unknown>;
         } catch {
@@ -418,10 +465,13 @@ export async function publishProject(
         prototypeMeta,
         prototypeHtmlPath: `demos/${page.id}/prototype.html`,
         prototypeCssPath: `demos/${page.id}/prototype.css`,
-        prototypeMetaPath: prototypeMeta ? `demos/${page.id}/prototype.meta.json` : undefined,
+        prototypeMetaPath: prototypeMeta
+          ? `demos/${page.id}/prototype.meta.json`
+          : undefined,
       });
 
-      const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+      const pagePercent =
+        10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
       onProgress?.(pagePercent, `发布原型页 ${i + 1}/${totalPages}...`);
       continue;
     }
@@ -429,7 +479,11 @@ export async function publishProject(
     if (runtimeType === "sketch-scene") {
       if (!fs.existsSync(sketchScenePath)) continue;
       const sceneContent = fs.readFileSync(sketchScenePath, "utf-8");
-      fs.writeFileSync(path.join(demoPublishDir, "sketch.scene.json"), sceneContent, "utf-8");
+      fs.writeFileSync(
+        path.join(demoPublishDir, "sketch.scene.json"),
+        sceneContent,
+        "utf-8",
+      );
       let sketchScene: Record<string, unknown> | undefined;
       let sketchMeta: Record<string, unknown> | undefined;
       try {
@@ -439,7 +493,11 @@ export async function publishProject(
       }
       if (fs.existsSync(sketchMetaPath)) {
         const metaContent = fs.readFileSync(sketchMetaPath, "utf-8");
-        fs.writeFileSync(path.join(demoPublishDir, "sketch.meta.json"), metaContent, "utf-8");
+        fs.writeFileSync(
+          path.join(demoPublishDir, "sketch.meta.json"),
+          metaContent,
+          "utf-8",
+        );
         try {
           sketchMeta = JSON.parse(metaContent) as Record<string, unknown>;
         } catch {
@@ -460,10 +518,13 @@ export async function publishProject(
         sketchScene,
         sketchMeta,
         sketchScenePath: `demos/${page.id}/sketch.scene.json`,
-        sketchMetaPath: sketchMeta ? `demos/${page.id}/sketch.meta.json` : undefined,
+        sketchMetaPath: sketchMeta
+          ? `demos/${page.id}/sketch.meta.json`
+          : undefined,
       });
 
-      const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+      const pagePercent =
+        10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
       onProgress?.(pagePercent, `发布手绘页面 ${i + 1}/${totalPages}...`);
       continue;
     }
@@ -477,14 +538,12 @@ export async function publishProject(
       compileRuntimeOptions,
     );
 
-    const replacedCode = urlMap.size > 0
-      ? replacePathsInContent(compileResult.compiledCode, urlMap, codePath)
-      : compileResult.compiledCode;
+    const replacedCode =
+      urlMap.size > 0
+        ? replacePathsInContent(compileResult.compiledCode, urlMap, codePath)
+        : compileResult.compiledCode;
 
-    fs.writeFileSync(
-      path.join(demoPublishDir, "compiled.js"),
-      replacedCode,
-    );
+    fs.writeFileSync(path.join(demoPublishDir, "compiled.js"), replacedCode);
 
     const mergedConfigData = {
       ...projectConfigDefaults,
@@ -516,7 +575,7 @@ export async function publishProject(
       routeKey: page.routeKey,
       order: page.order,
       parentId: page.parentId,
-      runtimeType: page.runtimeType,
+      runtimeType,
       compiledJsPath,
       schemaPath: schemaPublishPath,
       previewSize,
@@ -525,7 +584,8 @@ export async function publishProject(
       embedCode,
     });
 
-    const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+    const pagePercent =
+      10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
     onProgress?.(pagePercent, `编译页面 ${i + 1}/${totalPages}...`);
   }
 
@@ -556,7 +616,8 @@ export async function publishProject(
   if (project.thumbnail) {
     const thumbnailSrc = resolvePublishThumbnailSource(project.thumbnail);
     if (thumbnailSrc && fs.existsSync(thumbnailSrc)) {
-      thumbnailExt = path.extname(thumbnailSrc) || path.extname(project.thumbnail);
+      thumbnailExt =
+        path.extname(thumbnailSrc) || path.extname(project.thumbnail);
       fs.copyFileSync(
         thumbnailSrc,
         path.join(publishedProjectDir, `thumbnail${thumbnailExt}`),
@@ -583,7 +644,9 @@ export async function publishProject(
   }
 
   const currentVersion = snapshotResult.version.versionId;
-  const publishCommit = new ProjectAdminService({ dataDir: getDataDir() }).projectCreatePublishCommit(
+  const publishCommit = new ProjectAdminService({
+    dataDir: getDataDir(),
+  }).projectCreatePublishCommit(
     {
       projectId,
       publishedVersion: currentVersion,
@@ -726,8 +789,10 @@ export function getPublishStatus(projectId: string): {
 
   return {
     projectId: project.id,
-    publishedVersion: isValidPublishedVersion ? project.publishedVersion ?? null : null,
-    publishedAt: isValidPublishedVersion ? project.publishedAt ?? null : null,
+    publishedVersion: isValidPublishedVersion
+      ? (project.publishedVersion ?? null)
+      : null,
+    publishedAt: isValidPublishedVersion ? (project.publishedAt ?? null) : null,
     currentVersion: currentVersion ?? null,
     hasUnpublishedChanges: status === "unpublished_changes",
     status,

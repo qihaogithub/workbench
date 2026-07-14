@@ -1752,7 +1752,7 @@ export class ProjectAdminService {
         if (!files || !metadata.page) continue;
         const demoDir = this.pageDir(workspacePath, version.resourceId);
         ensureDir(demoDir);
-        const runtimeType = resolvePageRuntimeType(metadata.page);
+        const runtimeType = resolvePageRuntimeType(demoDir);
         if (runtimeType === "prototype-html-css") {
           fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
           fs.writeFileSync(
@@ -2054,15 +2054,17 @@ export class ProjectAdminService {
       return fail("PAGE_ID_CONFLICT", `页面 id 已存在: ${pageId}`);
     }
     const runtimeType: DemoPageRuntimeType =
-      input.runtimeType === "high-fidelity-react"
-        ? "high-fidelity-react"
+      input.runtimeType === "sketch-scene"
+        ? "sketch-scene"
         : input.runtimeType === "prototype-html-css"
           ? "prototype-html-css"
-          : input.runtimeType === "sketch-scene"
+          : input.sketchScene
             ? "sketch-scene"
-            : input.code
-              ? "high-fidelity-react"
-              : "prototype-html-css";
+            : input.prototypeHtml
+              ? "prototype-html-css"
+              : input.code
+                ? "high-fidelity-react"
+                : "prototype-html-css";
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -2072,8 +2074,6 @@ export class ProjectAdminService {
           tree.pages.map((page) => page.routeKey).filter(Boolean) as string[],
         ),
       ),
-      runtimeType:
-        runtimeType === "high-fidelity-react" ? undefined : runtimeType,
       order: input.order ?? tree.pages.length,
       parentId,
     };
@@ -2198,12 +2198,17 @@ export class ProjectAdminService {
     const page = this.getPage(editId, pageId);
     if (!page.ok || !page.data)
       return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const transaction = this.readEdit(editId);
+    if (!transaction)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
     return this.createPage(
       {
         editId,
         name: name ?? `${page.data.meta.name} 副本`,
         parentId: page.data.meta.parentId,
-        runtimeType: resolvePageRuntimeType(page.data.meta),
+        runtimeType: resolvePageRuntimeType(
+          this.pageDir(transaction.workspacePath, page.data.meta.id),
+        ),
         code: page.data.files.code,
         schema: page.data.files.schema,
         prototypeHtml: page.data.files.prototypeHtml,
@@ -2309,7 +2314,7 @@ export class ProjectAdminService {
       input.code !== undefined
         ? this.validatePageFilesRuntime(
             input.pageId,
-            resolvePageRuntimeType(nextMeta),
+            resolvePageRuntimeType(this.pageDir(workspacePath, input.pageId)),
             files,
           )
         : undefined;
@@ -2330,7 +2335,7 @@ export class ProjectAdminService {
     const tree = this.readWorkspaceTree(workspacePath);
     const page = tree.pages.find((item) => item.id === input.pageId);
     if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
-    if (resolvePageRuntimeType(page) !== "prototype-html-css") {
+    if (resolvePageRuntimeType(this.pageDir(workspacePath, input.pageId)) !== "prototype-html-css") {
       return fail("INVALID_REQUEST", "当前页面不是 HTML/CSS 原型页");
     }
     const currentFiles = this.readPageFiles(workspacePath, input.pageId);
@@ -2443,7 +2448,7 @@ export class ProjectAdminService {
     }
 
     const current = tree.pages[pageIndex];
-    const currentRuntimeType = resolvePageRuntimeType(current);
+    const currentRuntimeType = resolvePageRuntimeType(this.pageDir(workspacePath, input.pageId));
     const currentFiles = this.readPageFiles(workspacePath, input.pageId);
     if (!currentFiles) return fail("FILE_READ_ERROR", "页面文件不存在");
 
@@ -2495,10 +2500,6 @@ export class ProjectAdminService {
 
     const nextMeta: DemoPageMeta = {
       ...current,
-      runtimeType:
-        targetRuntimeType === "high-fidelity-react"
-          ? undefined
-          : targetRuntimeType,
     };
     const diff: DiffSummary = {
       updated: [
@@ -2643,7 +2644,7 @@ export class ProjectAdminService {
       return fail("VALIDATION_BLOCKED", "页面 Schema 校验失败", { validation });
     const runtimeValidation = this.validatePageFilesRuntime(
       input.pageId,
-      resolvePageRuntimeType(page),
+      resolvePageRuntimeType(this.pageDir(sourceWorkspacePath, input.pageId)),
       files,
     );
     if (!runtimeValidation.ok) {
@@ -2922,7 +2923,7 @@ export class ProjectAdminService {
       });
 
     const demoDir = this.pageDir(workspacePath, pageId);
-    const runtimeType = resolvePageRuntimeType(page);
+    const runtimeType = resolvePageRuntimeType(demoDir);
     if (runtimeType === "prototype-html-css") {
       fs.writeFileSync(
         path.join(demoDir, "prototype.html"),
@@ -3771,7 +3772,7 @@ export class ProjectAdminService {
     ensureDir(outputDir);
 
     const pages: VisualCheckPageResult[] = selectedPages.map((page) => {
-      const runtimeType = resolvePageRuntimeType(page);
+      const runtimeType = resolvePageRuntimeType(this.pageDir(workspacePath, page.id));
       const files = this.readPageFiles(workspacePath, page.id);
       const runtimeValidation = files
         ? this.validatePageFilesRuntime(page.id, runtimeType, files)
@@ -4756,7 +4757,7 @@ export class ProjectAdminService {
     const fileRefs: ResourceBlobMap = {
       schema: this.writeBlob(projectId, files.schema),
     };
-    const runtimeType = resolvePageRuntimeType(page);
+    const runtimeType = resolvePageRuntimeType(this.pageDir(this.projectWorkspacePath(projectId), page.id));
     if (runtimeType === "prototype-html-css") {
       fileRefs.prototypeHtml = this.writeBlob(
         projectId,
@@ -4838,7 +4839,7 @@ export class ProjectAdminService {
       metadata,
       runtime: {
         schemaVersion: CONTENT_GRAPH_SCHEMA_VERSION,
-        runtimeType: resolvePageRuntimeType(input.page),
+        runtimeType: resolvePageRuntimeType(this.pageDir(this.projectWorkspacePath(input.projectId), input.page.id)),
         materializerVersion: MATERIALIZER_VERSION,
         migrationStatus: input.migrationStatus ?? "native",
       },
@@ -5537,7 +5538,7 @@ export class ProjectAdminService {
       }
       const pageValidation = this.validatePageFilesRuntime(
         page.id,
-        resolvePageRuntimeType(page),
+        resolvePageRuntimeType(this.pageDir(workspacePath, page.id)),
         files,
       );
       issues.push(...pageValidation.issues);
@@ -5870,7 +5871,7 @@ export class ProjectAdminService {
       return { ok: false, issues };
     }
     if (
-      resolvePageRuntimeType(page) === "high-fidelity-react" &&
+      resolvePageRuntimeType(this.pageDir(workspacePath, pageId)) === "high-fidelity-react" &&
       !files.code.includes("export default")
     ) {
       issues.push({
@@ -6402,7 +6403,7 @@ export class ProjectAdminService {
     const metadataIssues: ValidationResult["issues"] = [];
 
     for (const page of tree.pages) {
-      const runtimeType = resolvePageRuntimeType(page);
+      const runtimeType = resolvePageRuntimeType(this.pageDir(workspacePath, page.id));
       runtimeTypes[runtimeType] = (runtimeTypes[runtimeType] ?? 0) + 1;
       const files = this.readPageFiles(workspacePath, page.id);
       if (!files) continue;

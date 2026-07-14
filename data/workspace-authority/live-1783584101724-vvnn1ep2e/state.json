@@ -1,0 +1,31 @@
+{
+  "workspaceId": "live-1783584101724-vvnn1ep2e",
+  "projectId": "proj_1779608458649",
+  "revision": 7,
+  "rootHash": "c0577bc4c4aff83a98ab75e82c6f6f66e81a43fc4cb18046933e748682ffb56c",
+  "resourceHashes": {
+    ".canvas-layout.json": "aec6b49625632ba613df99ccf5f9a54ba761be76c2ed5e95f634c0d96e85ece4",
+    "demos/demo_1779608460500_a1b2c3/config.schema.json": "18f810803b8baa21dbb99f7db4b87b659720bfb66124e17afb9eead6036139d8",
+    "demos/demo_1779608460500_a1b2c3/index.tsx": "be95aef08ce606479eff10bafdfef89407c24e46f160dd24c5fe5b84da52ca87",
+    "demos/demo_1779608460500_a1b2c3/prototype.css": "8a91ad67e064ee77c5c2fd77a4738bfde7472a68ea8bfc94daf59e71464f8fd8",
+    "demos/demo_1779608460500_a1b2c3/prototype.html": "f079dc007b82c9b5918b19812382dcbe35299d06c225b5d428b66f4016cbb27c",
+    "demos/demo_1779608460500_a1b2c3/prototype.meta.json": "9dbbdb15d7706c8aace79672d33e20f7071f4c6dc7e7abcc0a0d677396558986",
+    "demos/demo_1779608461000_d4e5f6/config.schema.json": "c5da73ca578c3bfbf5151a0db57ff38fb329e899cb4b5b253c8a7bef0e18fbe3",
+    "demos/demo_1779608461000_d4e5f6/index.tsx": "6b07624c5b27956aec0ccf9a8e41202ece42a61316feb75a406b62e6586c93c4",
+    "demos/demo_1779608461000_d4e5f6/prototype.css": "8f3e39cf467df6e406fb40a2f999b72adc691692fb7e2f67d3cf5a5506576848",
+    "demos/demo_1779608461000_d4e5f6/prototype.html": "d00c4518fe24169c57d53bb988a2f9472f38c198f14399298aa4fc47284b6d57",
+    "demos/demo_1779608461000_d4e5f6/prototype.meta.json": "b555605d80249089b938556da32ac7487b6f1b28e5bfbda60d2b87bd04015bd5",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "project.config.schema.json": "b481f5b5ab9455495a10601e4646650e2a06679196b129588bd9b3d9bc6dbab4",
+    "workspace-tree.json": "8dcdf62a0fda2032ee95f06757f2ce424fdc572ca6f64f5b9497a7f2989dae1d"
+  },
+  "mutationPayloads": {
+    "6cfdae6c-cfc5-48c1-b514-b3d6a2a33347": "6533ee8744079553839d032b1602d568559e3a2851b3531a93eee99a7276d176",
+    "a9749eca-6cb8-4856-9e76-4679bf1fd186": "4728f0df8b5129a22122ae66c78413f19e83f2f56a51c276cbff4b0e0fdd178f",
+    "de1acadb-a684-4d00-bbb0-85b4289b16dd": "45b996fdf1d40f6acf061f7d6ca0f32861ab7dd1e0c8103c79ab64c98f01c424",
+    "07ce1263-5ce3-41dc-8b3d-9cfb35d8e1f6": "9f1f24a1fecb5f31beaebd5046230abb9ce060819537c8c9d503ec8cd28c2d59",
+    "66b5e270-2ab9-4df5-a368-b0527644be4e": "cfd94346a549508824ed27b1da618622df75a4ad4b217a60b6bc22dbfcb32cb5",
+    "304c88d4-cbe3-4e2a-ba5e-219b314b65c9": "dd99587d90d47d2b9540f40384d61f6c4ebfb1822e2c5ce91e35dd657cb8bc7e"
+  },
+  "updatedAt": 1784007789325
+}

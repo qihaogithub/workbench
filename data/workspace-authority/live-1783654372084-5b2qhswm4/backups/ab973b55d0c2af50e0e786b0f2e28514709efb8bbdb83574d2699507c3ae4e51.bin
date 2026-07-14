@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>个人主页</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <div class="header">
+      <div class="avatar">
+        <img src="../../assets/images/placeholder-avatar.svg" alt="头像" data-bind-src="avatar" />
+      </div>
+      <h1 class="name" data-bind-text="name">jojo</h1>
+      <p class="bio" data-bind-text="bio">前端开发者 · 摄影爱好者 · 猫奴</p>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-number">128</span>
+        <span class="stat-label">动态</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">1.2k</span>
+        <span class="stat-label">粉丝</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">68</span>
+        <span class="stat-label">关注</span>
+      </div>
+    </div>
+
+    <!-- 功能菜单 -->
+    <div class="menu-grid">
+      <div class="menu-item">
+        <div class="menu-icon icon-photo">📷</div>
+        <span>相册</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-icon icon-article">📝</div>
+        <span>文章</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-icon icon-video">🎬</div>
+        <span>视频</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-icon icon-like">❤️</div>
+        <span>收藏</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-icon icon-tag">🏷️</div>
+        <span>标签</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-icon icon-more">⚙️</div>
+        <span>更多</span>
+      </div>
+    </div>
+
+    <!-- 最近动态 -->
+    <div class="section-title">最近动态</div>
+    <div class="feed-list">
+      <div class="feed-item">
+        <div class="feed-avatar">
+          <div class="feed-avatar-img">👤</div>
+        </div>
+        <div class="feed-content">
+          <p class="feed-text">周末去爬山了，山顶的风景真的超级棒！🏔️</p>
+          <span class="feed-time">2 小时前</span>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-avatar">
+          <div class="feed-avatar-img">📸</div>
+        </div>
+        <div class="feed-content">
+          <p class="feed-text">分享一组街拍作品，阳光洒在老城区的巷子里...</p>
+          <span class="feed-time">昨天</span>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-avatar">
+          <div class="feed-avatar-img">🐱</div>
+        </div>
+        <div class="feed-content">
+          <p class="feed-text">我家猫又学会了新技能——开冰箱门😂</p>
+          <span class="feed-time">3 天前</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">首页</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">发现</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">➕</span>
+        <span class="nav-label">发布</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">消息</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">我的</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
